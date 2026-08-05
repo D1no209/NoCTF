@@ -30,5 +30,6 @@ public enum ScoringFailureCode
     AwdpPatchFailed,
     AwdpPatchTimeout,
     AwdpServiceDown,
-    AwdpViolation
+    AwdpViolation,
+    ForeignTeamFlagDetected
 }

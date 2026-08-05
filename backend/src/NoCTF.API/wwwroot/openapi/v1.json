@@ -7381,6 +7381,411 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/confirm": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Confirms one incident and bans its source team.",
+        "description": "Administrator, owner, and manager only. The public competition notification contains no Flag or private evidence.",
+        "operationId": "AdminConfirmCheatIncident",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scoringEventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ConfirmCheatIncidentRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsConfirmCheatIncidentRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/correct": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Corrects a confirmed incident and unbans its source team.",
+        "description": "Administrator, owner, and manager only. A safe correction notice is delivered to the whole competition.",
+        "operationId": "AdminCorrectCheatIncident",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scoringEventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CorrectCheatIncidentRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsCorrectCheatIncidentRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/dismiss": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Dismisses one pending cheat incident with an audit reason.",
+        "description": "Administrator, owner, manager, and judge only. Dismissal is silent and does not ban a team.",
+        "operationId": "AdminDismissCheatIncident",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scoringEventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "DismissCheatIncidentRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsDismissCheatIncidentRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Reads one protected cross-team Flag incident.",
+        "description": "Administrator, owner, manager, and judge only. The full Flag response is never cached and every successful read is audited.",
+        "operationId": "AdminGetCheatIncident",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "scoringEventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/cheat-incidents": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists cross-team Flag detection incidents.",
+        "description": "Observer and above may list redacted evidence. Only current scoring facts and immutable adjudication events are used.",
+        "operationId": "AdminListCheatIncidents",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sourceTeamId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "ownerTeamId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFDomainSubmissionsCheatIncidentStatus"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/challenges": {
       "post": {
         "tags": [
@@ -10178,7 +10583,8 @@
           "AwdpPatchFailed",
           "AwdpPatchTimeout",
           "AwdpServiceDown",
-          "AwdpViolation"
+          "AwdpViolation",
+          "ForeignTeamFlagDetected"
         ],
         "enum": [
           0,
@@ -10209,7 +10615,8 @@
           25,
           26,
           27,
-          28
+          28,
+          29
         ]
       },
       "NoCTFAPIEndpointsSubmissionsGetSubmissionStatusRequest": {
@@ -10752,7 +11159,9 @@
           "TeamBanned",
           "CompetitionQuestionOpened",
           "CompetitionQuestionReplied",
-          "CompetitionQuestionStatusChanged"
+          "CompetitionQuestionStatusChanged",
+          "CheatIncidentDetected",
+          "TeamBanCorrected"
         ],
         "enum": [
           0,
@@ -10767,7 +11176,9 @@
           9,
           10,
           11,
-          12
+          12,
+          13,
+          14
         ]
       },
       "NoCTFAPIEndpointsNotificationsListNotificationsRequest": {
@@ -11333,7 +11744,12 @@
           "QuestionReplied",
           "QuestionStatusChanged",
           "QuestionPublished",
-          "ProtectedSubmissionFlagAccessed"
+          "ProtectedSubmissionFlagAccessed",
+          "CheatIncidentDetected",
+          "CheatIncidentConfirmed",
+          "CheatIncidentDismissed",
+          "CheatIncidentSuperseded",
+          "CheatIncidentCorrected"
         ],
         "enum": [
           0,
@@ -11373,7 +11789,12 @@
           34,
           35,
           36,
-          37
+          37,
+          38,
+          39,
+          40,
+          41,
+          42
         ]
       },
       "NoCTFDomainCompetitionsEventsCompetitionEventLevel": {
@@ -11502,6 +11923,11 @@
             "nullable": true
           },
           "submissionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "scoringEventId": {
             "type": "string",
             "format": "guid",
             "nullable": true
@@ -14233,6 +14659,295 @@
             "type": "string"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsConfirmCheatIncidentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 8,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsCorrectCheatIncidentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 8,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsDismissCheatIncidentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 8,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scoringEventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submissionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submittedFlag": {
+            "type": "string"
+          },
+          "sourceTeamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "sourceTeamName": {
+            "type": "string"
+          },
+          "ownerTeamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "ownerTeamName": {
+            "type": "string"
+          },
+          "submittedByUserId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submittedByUserName": {
+            "type": "string"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeTitle": {
+            "type": "string"
+          },
+          "submissionKind": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+          },
+          "result": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+          },
+          "failureCode": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsCheatIncidentStatus"
+          },
+          "resolvedByUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "resolvedByUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "resolutionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceTeamIsBanned": {
+            "type": "boolean"
+          },
+          "sourceTeamBannedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sourceTeamBannedByUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "sourceTeamBanReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "canDismiss": {
+            "type": "boolean"
+          },
+          "canConfirm": {
+            "type": "boolean"
+          },
+          "canCorrect": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFDomainSubmissionsCheatIncidentStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Confirmed",
+          "Dismissed",
+          "Superseded",
+          "Corrected"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsGetCheatIncidentRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse"
+            }
+          },
+          "pendingCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "canDismiss": {
+            "type": "boolean"
+          },
+          "canConfirm": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "scoringEventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submissionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "sourceTeamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "sourceTeamName": {
+            "type": "string"
+          },
+          "ownerTeamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "ownerTeamName": {
+            "type": "string"
+          },
+          "submittedByUserId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submittedByUserName": {
+            "type": "string"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeTitle": {
+            "type": "string"
+          },
+          "submissionKind": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+          },
+          "result": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+          },
+          "failureCode": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFDomainSubmissionsCheatIncidentStatus"
+          },
+          "resolvedByUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "resolvedByUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "resolutionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sourceTeamIsBanned": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsListCheatIncidentsRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationChallengesCompetitionChallengeConflictResponse": {
         "type": "object",

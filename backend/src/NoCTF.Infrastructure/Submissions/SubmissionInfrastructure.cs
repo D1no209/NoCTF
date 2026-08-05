@@ -4,6 +4,7 @@ using NoCTF.Application.Submissions.Management;
 using NoCTF.Application.Submissions.PatchUploads;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Application.Submissions.Status;
+using NoCTF.Application.Submissions.CheatIncidents;
 using NoCTF.GameModes.Registration;
 using NoCTF.GameModes.Submission;
 using NoCTF.Infrastructure.Submissions.Administration;
@@ -12,6 +13,7 @@ using NoCTF.Infrastructure.Submissions.Management;
 using NoCTF.Infrastructure.Submissions.PatchUploads;
 using NoCTF.Infrastructure.Submissions.Processing;
 using NoCTF.Infrastructure.Submissions.Status;
+using NoCTF.Infrastructure.Submissions.CheatIncidents;
 
 namespace NoCTF.Infrastructure.Submissions;
 
@@ -28,6 +30,10 @@ internal static class SubmissionInfrastructure
         services.AddScoped<ISubmissionManagementStore, SubmissionManagementStore>();
         services.AddScoped<ListSubmissions>();
         services.AddScoped<QueueSubmissionWork>();
+        services.AddScoped<ICheatIncidentStore, CheatIncidentStore>();
+        services.AddScoped<ListCheatIncidents>();
+        services.AddScoped<AccessCheatIncident>();
+        services.AddScoped<ResolveCheatIncident>();
         services.AddScoped<ISubmissionProcessor, SubmissionProcessor>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();
         services.AddScoped<RecordInternalResult>();

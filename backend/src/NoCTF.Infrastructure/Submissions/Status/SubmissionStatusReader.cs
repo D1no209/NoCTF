@@ -1,6 +1,7 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Submissions.Status;
+using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Infrastructure.Submissions.Status;
 
@@ -34,20 +35,26 @@ public sealed class SubmissionStatusReader(NoCtfDbContext db) : ISubmissionStatu
                 (submission, scoringEvents) => new { submission, scoringEvents })
             .SelectMany(
                 item => item.scoringEvents.DefaultIfEmpty(),
-                (item, scoringEvent) => new SubmissionStatusView(
-                    item.submission.Id,
-                    item.submission.CompetitionId,
-                    item.submission.TeamId,
-                    item.submission.CompetitionChallengeId,
-                    item.submission.Kind,
-                    item.submission.EvaluationState,
-                    scoringEvent == null ? null : scoringEvent.Result,
-                    item.submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed
+                (item, scoringEvent) => new
+                {
+                    item.submission,
+                    Result = scoringEvent == null ? null : (ScoringResult?)scoringEvent.Result,
+                    FailureCode = item.submission.EvaluationState == SubmissionEvaluationState.PlatformFailed
                         ? item.submission.EvaluationFailureCode
-                        : scoringEvent == null ? null : scoringEvent.FailureCode,
-                    item.submission.ReceivedAt,
-                    item.submission.EvaluationUpdatedAt,
-                    item.submission.ProcessingVersion))
+                        : scoringEvent == null ? null : scoringEvent.FailureCode
+                })
+            .Select(item => new SubmissionStatusView(
+                item.submission.Id,
+                item.submission.CompetitionId,
+                item.submission.TeamId,
+                item.submission.CompetitionChallengeId,
+                item.submission.Kind,
+                item.submission.EvaluationState,
+                SubmissionResultDisclosure.PlayerResult(item.Result, item.FailureCode),
+                SubmissionResultDisclosure.PlayerFailureCode(item.FailureCode),
+                item.submission.ReceivedAt,
+                item.submission.EvaluationUpdatedAt,
+                item.submission.ProcessingVersion))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }

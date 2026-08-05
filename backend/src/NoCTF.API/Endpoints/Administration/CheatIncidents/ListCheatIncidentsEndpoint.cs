@@ -1,0 +1,183 @@
+using System.Globalization;
+using FastEndpoints;
+using FluentValidation;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Pagination;
+using NoCTF.API.Security;
+using NoCTF.Application.Submissions.CheatIncidents;
+using NoCTF.Application.Teams.Moderation;
+using NoCTF.Domain.Submissions;
+
+namespace NoCTF.API.Endpoints.Administration.CheatIncidents;
+
+public sealed class ListCheatIncidentsRequest
+{
+    [QueryParam] public Guid? SourceTeamId { get; set; }
+    [QueryParam] public Guid? OwnerTeamId { get; set; }
+    [QueryParam] public Guid? UserId { get; set; }
+    [QueryParam] public Guid? CompetitionChallengeId { get; set; }
+    [QueryParam] public CheatIncidentStatus? Status { get; set; }
+    [QueryParam] public DateTimeOffset From { get; set; }
+    [QueryParam] public DateTimeOffset To { get; set; }
+    [QueryParam] public string? Cursor { get; set; }
+    [QueryParam] public int Limit { get; set; } = 50;
+}
+
+public sealed class ListCheatIncidentsValidator : Validator<ListCheatIncidentsRequest>
+{
+    public ListCheatIncidentsValidator()
+    {
+        RuleFor(request => request.Limit).InclusiveBetween(1, 200);
+        RuleFor(request => request.From).NotEmpty();
+        RuleFor(request => request.To).NotEmpty();
+        RuleFor(request => request).Must(request =>
+                request.From <= request.To
+                && request.To - request.From <= TimeSpan.FromDays(31))
+            .WithMessage("The incident query range must be between zero and 31 days.");
+    }
+}
+
+public sealed record CheatIncidentListItemResponse(
+    Guid ScoringEventId,
+    Guid SubmissionId,
+    Guid SourceTeamId,
+    string SourceTeamName,
+    Guid OwnerTeamId,
+    string OwnerTeamName,
+    Guid SubmittedByUserId,
+    string SubmittedByUserName,
+    Guid CompetitionChallengeId,
+    string ChallengeTitle,
+    SubmissionKind SubmissionKind,
+    ScoringResult Result,
+    ScoringFailureCode FailureCode,
+    CheatIncidentStatus Status,
+    Guid? ResolvedByUserId,
+    string? ResolvedByUserName,
+    DateTimeOffset? ResolvedAt,
+    string? ResolutionReason,
+    DateTimeOffset SubmittedAt,
+    DateTimeOffset DetectedAt,
+    bool SourceTeamIsBanned);
+
+public sealed record CheatIncidentListResponse(
+    IReadOnlyList<CheatIncidentListItemResponse> Items,
+    int PendingCount,
+    bool CanDismiss,
+    bool CanConfirm,
+    string? NextCursor);
+
+public sealed class ListCheatIncidentsEndpoint(
+    ListCheatIncidents list,
+    SignedKeysetCursor cursors,
+    ICompetitionModerationAuthorizer authorizer,
+    IUserContext user)
+    : Endpoint<ListCheatIncidentsRequest,
+        Results<Ok<CheatIncidentListResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+{
+    private const string CursorEndpoint = "admin.competition.cheat-incidents.list";
+
+    public override void Configure()
+    {
+        Get("/admin/competitions/{competitionId}/cheat-incidents");
+        AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminListCheatIncidents"));
+        Summary(summary =>
+        {
+            summary.Summary = "Lists cross-team Flag detection incidents.";
+            summary.Description =
+                "Observer and above may list redacted evidence. Only current scoring facts and immutable adjudication events are used.";
+        });
+    }
+
+    public override async Task<
+        Results<Ok<CheatIncidentListResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+        ExecuteAsync(
+            ListCheatIncidentsRequest request,
+            CancellationToken cancellationToken)
+    {
+        var competitionId = Route<Guid>("competitionId");
+        if (!await authorizer.CanObserveAsync(user.UserId, competitionId, cancellationToken))
+            return TypedResults.Forbid();
+        var filterKey = FilterKey(competitionId, request);
+        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid cursor.");
+        }
+        var result = await list.ExecuteAsync(new(
+            competitionId,
+            request.SourceTeamId,
+            request.OwnerTeamId,
+            request.UserId,
+            request.CompetitionChallengeId,
+            request.Status,
+            request.From,
+            request.To,
+            position?.CreatedAt,
+            position?.Id,
+            request.Limit), cancellationToken);
+        if (result is null)
+            return TypedResults.NotFound();
+
+        var canDismiss = await authorizer.CanJudgeAsync(
+            user.UserId,
+            competitionId,
+            cancellationToken);
+        var canConfirm = await authorizer.CanModerateAsync(
+            user.UserId,
+            competitionId,
+            cancellationToken);
+        var nextCursor = result.Items.Count == request.Limit
+            ? cursors.Encode(
+                CursorEndpoint,
+                filterKey,
+                new(result.Items[^1].DetectedAt, result.Items[^1].ScoringEventId))
+            : null;
+        return TypedResults.Ok(new CheatIncidentListResponse(
+            result.Items.Select(Map).ToArray(),
+            result.PendingCount,
+            canDismiss,
+            canConfirm,
+            nextCursor));
+    }
+
+    private static string FilterKey(
+        Guid competitionId,
+        ListCheatIncidentsRequest request) =>
+        string.Join(
+            '|',
+            competitionId,
+            request.SourceTeamId,
+            request.OwnerTeamId,
+            request.UserId,
+            request.CompetitionChallengeId,
+            request.Status,
+            request.From.ToString("O", CultureInfo.InvariantCulture),
+            request.To.ToString("O", CultureInfo.InvariantCulture));
+
+    private static CheatIncidentListItemResponse Map(CheatIncidentListItem item) => new(
+        item.ScoringEventId,
+        item.SubmissionId,
+        item.SourceTeamId,
+        item.SourceTeamName,
+        item.OwnerTeamId,
+        item.OwnerTeamName,
+        item.SubmittedByUserId,
+        item.SubmittedByUserName,
+        item.CompetitionChallengeId,
+        item.ChallengeTitle,
+        item.SubmissionKind,
+        item.Result,
+        item.FailureCode,
+        item.Status,
+        item.ResolvedByUserId,
+        item.ResolvedByUserName,
+        item.ResolvedAt,
+        item.ResolutionReason,
+        item.SubmittedAt,
+        item.DetectedAt,
+        item.SourceTeamIsBanned);
+}

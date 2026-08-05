@@ -33,6 +33,12 @@ public sealed record TeamBannedPayload(
     string TeamName,
     DateTimeOffset BannedAt);
 
+public sealed record TeamBanCorrectedPayload(
+    Guid CompetitionId,
+    Guid TeamId,
+    string TeamName,
+    DateTimeOffset CorrectedAt);
+
 public sealed record CompetitionQuestionActivityPayload(
     Guid CompetitionId,
     Guid QuestionId,
@@ -40,3 +46,13 @@ public sealed record CompetitionQuestionActivityPayload(
     CompetitionQuestionNotificationEvent Event,
     string Title,
     DateTimeOffset OccurredAt);
+
+public sealed record CheatIncidentDetectedPayload(
+    Guid CompetitionId,
+    Guid ScoringEventId,
+    Guid SubmissionId,
+    Guid SourceTeamId,
+    Guid OwnerTeamId,
+    Guid SubmittedByUserId,
+    Guid CompetitionChallengeId,
+    DateTimeOffset DetectedAt);

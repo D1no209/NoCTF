@@ -6,6 +6,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { cheatIncidentApi } from '@/api/cheatIncidentApi'
 import {
   competitionAdminApi,
   competitionRuntimeAdminApi,
@@ -13,6 +14,7 @@ import {
 } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import AdminCompetitionChallengesPanel from '@/components/admin/competition-detail/AdminCompetitionChallengesPanel.vue'
+import AdminCompetitionCheatIncidentsPanel from '@/components/admin/competition-detail/AdminCompetitionCheatIncidentsPanel.vue'
 import AdminCompetitionLeaderboardVisibilityPanel from '@/components/admin/competition-detail/AdminCompetitionLeaderboardVisibilityPanel.vue'
 import AdminCompetitionPermissionsPanel from '@/components/admin/competition-detail/AdminCompetitionPermissionsPanel.vue'
 import AdminCompetitionRuntimesPanel from '@/components/admin/competition-detail/AdminCompetitionRuntimesPanel.vue'
@@ -34,6 +36,7 @@ const sections = [
   { key: 'permissions', labelKey: 'admin.competitionDetail.navPermissions' },
   { key: 'challenges', labelKey: 'admin.competitionDetail.navChallenges' },
   { key: 'teams', labelKey: 'admin.competitionDetail.navTeams' },
+  { key: 'cheats', labelKey: 'admin.competitionDetail.navCheats' },
   { key: 'runtimes', labelKey: 'admin.competitionDetail.navRuntimes' },
 ] as const
 type Section = typeof sections[number]['key']
@@ -86,6 +89,25 @@ const {
   enabled: computed(() => Boolean(competitionId.value)),
 })
 
+const cheatSummaryWindow = (() => {
+  const to = new Date()
+  return {
+    from: new Date(to.getTime() - 60 * 60 * 1000).toISOString(),
+    to: to.toISOString(),
+    limit: 1,
+  }
+})()
+
+const { data: cheatSummary } = useQuery({
+  queryKey: computed(() => [
+    ...queryKeys.adminCompetitionCheatIncidents(competitionId.value),
+    'summary',
+  ]),
+  queryFn: () => cheatIncidentApi.list(competitionId.value, cheatSummaryWindow),
+  enabled: computed(() => Boolean(competitionId.value)),
+  refetchInterval: 15_000,
+})
+
 watch(competition, (value) => {
   if (!value)
     return
@@ -131,13 +153,19 @@ function refreshTeams() {
 
 const approveTeamMutation = useMutation({
   mutationFn: (teamId: string) => competitionTeamAdminApi.approve(competitionId.value, teamId),
-  onSuccess: () => { refreshTeams(); toast.success(t('admin.competitionDetail.teamApproved')) },
+  onSuccess: () => {
+    refreshTeams()
+    toast.success(t('admin.competitionDetail.teamApproved'))
+  },
   onError: () => toast.error(t('admin.competitionDetail.teamActionError')),
 })
 
 const rejectTeamMutation = useMutation({
   mutationFn: (teamId: string) => competitionTeamAdminApi.reject(competitionId.value, teamId),
-  onSuccess: () => { refreshTeams(); toast.success(t('admin.competitionDetail.teamRejected')) },
+  onSuccess: () => {
+    refreshTeams()
+    toast.success(t('admin.competitionDetail.teamRejected'))
+  },
   onError: () => toast.error(t('admin.competitionDetail.teamActionError')),
 })
 
@@ -203,10 +231,16 @@ async function refreshAll() {
           <ArrowLeft class="mr-2 size-4" />{{ t('admin.competitions.title') }}
         </Button>
         <div>
-          <h2 class="text-2xl font-bold tracking-tight">{{ competition?.title ?? t('admin.competitionDetail.fallbackTitle') }}</h2>
+          <h2 class="text-2xl font-bold tracking-tight">
+            {{ competition?.title ?? t('admin.competitionDetail.fallbackTitle') }}
+          </h2>
           <div class="mt-2 flex flex-wrap gap-2">
-            <Badge v-if="modeLabel" variant="secondary">{{ modeLabel }}</Badge>
-            <Badge v-if="statusLabel" variant="outline">{{ statusLabel }}</Badge>
+            <Badge v-if="modeLabel" variant="secondary">
+              {{ modeLabel }}
+            </Badge>
+            <Badge v-if="statusLabel" variant="outline">
+              {{ statusLabel }}
+            </Badge>
           </div>
         </div>
       </div>
@@ -221,10 +255,15 @@ async function refreshAll() {
 
     <Tabs v-else :model-value="activeSection" @update:model-value="(value: string | undefined) => value && router.replace(sectionRoute(value as Section))">
       <TabsList class="h-auto flex-wrap justify-start">
-        <TabsTrigger v-for="section in sections" :key="section.key" :value="section.key">{{ t(section.labelKey) }}</TabsTrigger>
+        <TabsTrigger v-for="section in sections" :key="section.key" :value="section.key">
+          {{ t(section.labelKey) }}
+          <Badge v-if="section.key === 'cheats' && cheatSummary?.pendingCount" variant="destructive" class="ml-2">
+            {{ cheatSummary.pendingCount }}
+          </Badge>
+        </TabsTrigger>
       </TabsList>
 
-      <div class="grid gap-6">
+      <div class="grid min-w-0 gap-6">
         <TabsContent value="settings">
           <div v-if="activeSection === 'settings'" class="space-y-6">
             <AdminCompetitionSettingsPanel :competition-form="competitionForm" :saving="saveCompetitionMutation.isPending.value" @save="saveCompetitionMutation.mutate()" />
@@ -247,6 +286,13 @@ async function refreshAll() {
             @reject="rejectTeamMutation.mutate($event)"
             @ban="banTeamMutation.mutate($event)"
             @unban="unbanTeamMutation.mutate($event)"
+          />
+        </TabsContent>
+        <TabsContent value="cheats" class="min-w-0">
+          <AdminCompetitionCheatIncidentsPanel
+            v-if="activeSection === 'cheats'"
+            :competition-id="competitionId"
+            :competition-teams="competitionTeams"
           />
         </TabsContent>
         <TabsContent value="runtimes">

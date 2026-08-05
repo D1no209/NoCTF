@@ -68,6 +68,12 @@ export function notificationCopy(notification: PublicNotification): Notification
       return copy('competitionQuestionStatusChanged', {
         title: readPayloadString(notification.payload, 'title'),
       })
+    case NotificationKind.CheatIncidentDetected:
+      return copy('cheatIncidentDetected')
+    case NotificationKind.TeamBanCorrected:
+      return copy('teamBanCorrected', {
+        team: readPayloadString(notification.payload, 'teamName'),
+      })
     default:
       return copy('unknown')
   }

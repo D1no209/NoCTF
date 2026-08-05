@@ -125,6 +125,69 @@ public static class CompetitionNotificationMessageHandlers
             message.TeamId,
             ct);
 
+    public static async Task Handle(
+        ForeignTeamFlagDetected message,
+        NoCtfDbContext db,
+        CompetitionNotificationDelivery delivery,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == message.CompetitionId && item.DeletedAt == null)
+            .Select(item => new
+            {
+                item.OwnerId,
+                item.ManagerIds,
+                item.JudgeIds
+            })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null)
+            return;
+
+        var administratorIds = await db.Users.AsNoTracking()
+            .Where(user => user.Role == NoCTF.Domain.Identity.UserRole.Administrator)
+            .Select(user => user.Id)
+            .ToArrayAsync(ct);
+        var recipients = administratorIds
+            .Concat(competition.ManagerIds)
+            .Concat(competition.JudgeIds)
+            .Append(competition.OwnerId)
+            .Distinct()
+            .ToArray();
+        await delivery.DeliverToUsersAsync(
+            message.CompetitionId,
+            message.ScoringEventId,
+            NotificationKind.CheatIncidentDetected,
+            $"cheat-incident:{message.SubmissionId:N}",
+            new CheatIncidentDetectedPayload(
+                message.CompetitionId,
+                message.ScoringEventId,
+                message.SubmissionId,
+                message.SourceTeamId,
+                message.OwnerTeamId,
+                message.SubmittedByUserId,
+                message.CompetitionChallengeId,
+                message.DetectedAt),
+            recipients,
+            ct);
+    }
+
+    public static Task Handle(
+        TeamBanCorrected message,
+        CompetitionNotificationDelivery delivery,
+        CancellationToken ct) =>
+        delivery.DeliverAsync(
+            message.CompetitionId,
+            message.ScoringEventId,
+            NotificationKind.TeamBanCorrected,
+            $"team-ban-corrected:{message.ScoringEventId:N}:{message.CorrectedAt.UtcTicks}",
+            new TeamBanCorrectedPayload(
+                message.CompetitionId,
+                message.TeamId,
+                message.TeamName,
+                message.CorrectedAt),
+            requiredTeamId: null,
+            ct);
+
     public static Task Handle(
         DeliverCompetitionQuestionNotification message,
         CompetitionNotificationDelivery delivery,

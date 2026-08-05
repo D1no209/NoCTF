@@ -94,6 +94,11 @@ const eventKinds = [
   [35, 'questionStatusChanged'],
   [36, 'questionPublished'],
   [37, 'protectedSubmissionFlagAccessed'],
+  [38, 'cheatIncidentDetected'],
+  [39, 'cheatIncidentConfirmed'],
+  [40, 'cheatIncidentDismissed'],
+  [41, 'cheatIncidentSuperseded'],
+  [42, 'cheatIncidentCorrected'],
 ] as const satisfies ReadonlyArray<readonly [CompetitionEventKind, string]>
 
 const kindKeys = new Map<CompetitionEventKind, string>(eventKinds)

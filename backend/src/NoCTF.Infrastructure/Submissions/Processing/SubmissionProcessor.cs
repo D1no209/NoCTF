@@ -1,6 +1,7 @@
 using NoCTF.Infrastructure.Persistence;
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Scoring.Leaderboard;
@@ -23,10 +24,21 @@ public sealed class SubmissionProcessor(
     ISubmissionAdmissionModePolicy admissionModePolicy,
     IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
-    ICompetitionEventRecorder? eventRecorder = null) : ISubmissionProcessor
+    ICompetitionEventRecorder? eventRecorder = null,
+    ILogger<SubmissionProcessor>? logger = null) : ISubmissionProcessor
 {
+    private static readonly CompetitionEventKind[] CheatResolutionKinds =
+    [
+        CompetitionEventKind.CheatIncidentConfirmed,
+        CompetitionEventKind.CheatIncidentDismissed,
+        CompetitionEventKind.CheatIncidentSuperseded,
+        CompetitionEventKind.CheatIncidentCorrected
+    ];
+
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
+    private readonly ILogger<SubmissionProcessor> log =
+        logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<SubmissionProcessor>.Instance;
 
     public async Task ProcessAsync(
         Guid submissionId,
@@ -136,7 +148,9 @@ public sealed class SubmissionProcessor(
                 flag.CompetitionChallengeId == submission.CompetitionChallengeId
                 || flag.ChallengeId == configuration.CompetitionChallenge.ChallengeId)
             .Where(flag => flag.TeamId == null || flag.TeamId == submission.TeamId
-                || configuration.Competition.Mode == GameMode.Awd)
+                || configuration.Competition.Mode == GameMode.Ctf
+                || configuration.Competition.Mode == GameMode.Awd
+                || configuration.Competition.Mode == GameMode.Awdp)
             .ToListAsync(cancellationToken);
         var patch = submission.PatchUploadId is { } patchUploadId
             ? await db.PatchUploads.AsNoTracking()
@@ -316,8 +330,34 @@ public sealed class SubmissionProcessor(
 
         if (submission.CurrentScoringEventId is { } currentEventId)
         {
-            var current = await db.ScoringEvents.IgnoreQueryFilters()
+            var current = await db.ScoringEvents
+                .FromSqlInterpolated(
+                    $"SELECT * FROM scoring_events WHERE id = {currentEventId} FOR UPDATE")
+                .IgnoreQueryFilters()
                 .SingleAsync(item => item.Id == currentEventId, cancellationToken);
+            if (current.FailureCode == ScoringFailureCode.ForeignTeamFlagDetected)
+            {
+                var resolved = await db.CompetitionEvents.AsNoTracking().AnyAsync(
+                    @event => @event.ScoringEventId == current.Id
+                        && CheatResolutionKinds.Contains(@event.Kind),
+                    cancellationToken);
+                if (!resolved)
+                {
+                    await events.RecordAsync(new(
+                        submission.CompetitionId,
+                        CompetitionEventKind.CheatIncidentSuperseded,
+                        CompetitionEventLevel.Information,
+                        CompetitionEventVisibility.Staff,
+                        now,
+                        TeamId: current.TeamId,
+                        CompetitionChallengeId: current.CompetitionChallengeId,
+                        SubmissionId: current.SubmissionId,
+                        ScoringEventId: current.Id,
+                        ScoringEventKind: current.Kind,
+                        ScoringResult: current.Result,
+                        Reason: "Superseded by submission re-evaluation."), cancellationToken);
+                }
+            }
             current.DeletedAt = now;
         }
         var scoringEvent = new ScoringEvent
@@ -340,6 +380,47 @@ public sealed class SubmissionProcessor(
             CreatedAt = now
         };
         db.ScoringEvents.Add(scoringEvent);
+        if (scoringEvent.FailureCode == ScoringFailureCode.ForeignTeamFlagDetected
+            && scoringEvent.VictimTeamId is Guid ownerTeamId)
+        {
+            await outbox.PublishAsync(new ForeignTeamFlagDetected(
+                submission.CompetitionId,
+                scoringEvent.Id,
+                submission.Id,
+                submission.TeamId,
+                ownerTeamId,
+                submission.SubmittedByUserId,
+                submission.CompetitionChallengeId,
+                scoringEvent.OccurredAt));
+            await events.RecordAsync(new(
+                submission.CompetitionId,
+                CompetitionEventKind.CheatIncidentDetected,
+                CompetitionEventLevel.Warning,
+                CompetitionEventVisibility.Staff,
+                scoringEvent.OccurredAt,
+                ActorUserId: submission.SubmittedByUserId,
+                TeamId: submission.TeamId,
+                CompetitionChallengeId: submission.CompetitionChallengeId,
+                SubmissionId: submission.Id,
+                ScoringEventId: scoringEvent.Id,
+                SubmissionKind: submission.Kind,
+                ScoringEventKind: scoringEvent.Kind,
+                ScoringResult: scoringEvent.Result), cancellationToken);
+            log.LogWarning(
+                "Foreign team Flag detected for competition {CompetitionId}, submission {SubmissionId}, source team {SourceTeamId}, owner team {OwnerTeamId}.",
+                submission.CompetitionId,
+                submission.Id,
+                submission.TeamId,
+                ownerTeamId);
+        }
+        else if (scoringEvent.FailureCode == ScoringFailureCode.AmbiguousFlagMatch)
+        {
+            log.LogWarning(
+                "Ambiguous Flag ownership detected for competition {CompetitionId}, submission {SubmissionId}, source team {SourceTeamId}.",
+                submission.CompetitionId,
+                submission.Id,
+                submission.TeamId);
+        }
         submission.CurrentScoringEventId = scoringEvent.Id;
         submission.EvaluationState = SubmissionEvaluationState.Completed;
         submission.EvaluationFailureCode = null;
@@ -381,6 +462,7 @@ public sealed class SubmissionProcessor(
             TeamId: scoringEvent.TeamId,
             CompetitionChallengeId: scoringEvent.CompetitionChallengeId,
             SubmissionId: scoringEvent.SubmissionId,
+            ScoringEventId: scoringEvent.Id,
             ScoringEventKind: scoringEvent.Kind,
             ScoringResult: scoringEvent.Result), cancellationToken);
         if (bloodAward is not null)

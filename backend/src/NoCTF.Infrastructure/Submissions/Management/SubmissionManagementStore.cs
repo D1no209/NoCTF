@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Submissions.Management;
+using NoCTF.Application.Submissions.Status;
 using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Infrastructure.Submissions.Management;
@@ -77,12 +78,17 @@ public sealed class SubmissionManagementStore(
             .Where(submission =>
                 submission.CompetitionId == competitionId
                 && submission.TeamId == teamId.Value);
-        return await Project(Page(
+        var items = await Project(Page(
                 submissions,
                 beforeReceivedAt,
                 beforeId,
                 limit))
             .ToListAsync(ct);
+        return items.Select(item => item with
+        {
+            Result = SubmissionResultDisclosure.PlayerResult(item.Result, item.FailureCode),
+            FailureCode = SubmissionResultDisclosure.PlayerFailureCode(item.FailureCode)
+        }).ToArray();
     }
 
     public async Task QueueDrainAsync(

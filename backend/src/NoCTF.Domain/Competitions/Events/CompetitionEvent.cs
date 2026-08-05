@@ -45,7 +45,12 @@ public enum CompetitionEventKind : short
     QuestionReplied,
     QuestionStatusChanged,
     QuestionPublished,
-    ProtectedSubmissionFlagAccessed
+    ProtectedSubmissionFlagAccessed,
+    CheatIncidentDetected,
+    CheatIncidentConfirmed,
+    CheatIncidentDismissed,
+    CheatIncidentSuperseded,
+    CheatIncidentCorrected
 }
 
 public enum CompetitionEventLevel : short
@@ -76,6 +81,7 @@ public sealed class CompetitionEvent
     public Guid? HintId { get; set; }
     public Guid? RuntimeInstanceId { get; set; }
     public Guid? SubmissionId { get; set; }
+    public Guid? ScoringEventId { get; set; }
     public Guid? QuestionId { get; set; }
     public CompetitionStatus? CompetitionStatus { get; set; }
     public CompetitionLeaderboardVisibility? LeaderboardVisibility { get; set; }
