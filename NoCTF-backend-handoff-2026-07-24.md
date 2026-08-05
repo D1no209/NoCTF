@@ -2207,6 +2207,54 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 本轮未改 Frontend，也未运行 Frontend SDK generator；协作者需要从新 OpenAPI 重新生成，
   将旧 `firstBloods` 消费改为 `bloods` 并在排行榜 UI 展示 First/Second/Third。
 
+### 6.49 独立个人资料页与安全头像处理（2026-08-05）
+
+- 功能提交：`809f825 feat(profile): add secure profile workspace`。本提交只在本地分支，
+  未 push、未部署；本阶段没有必要递增运行版本。
+- 首页已移除简介表单、文件输入和头像编辑器，只保留头像、用户名、简介、邮箱公开状态及
+  命名路由编辑入口；完整资料编辑迁入需认证的 `/profile`。页面沿用 Pixel Industrial
+  Card、边框、按钮、加载状态与中英文反馈，并把简介、头像、邮箱公开性和密码分区独立保存。
+  简介与公开性写入互斥，避免并发请求用旧字段覆盖另一项。
+- 用户回答 `$grill-me` 为 C/A/A，已固化为：本阶段桌面端只提供图片区域内滚轮缩放和拖动，
+  不擅自增加移动端或纯键盘缩放控件；服务端上限为单边 `8192`、总像素
+  `32,000,000`、只接受单帧；图像库采用 MIT 的 SkiaSharp `4.151.0`，没有引入
+  ImageSharp 商业许可风险。移动端/纯键盘替代缩放仍是明确遗留的产品决策。
+- 头像编辑器已完全删除缩放/X/Y 滑槽。滚轮以指针位置为锚点并限制 `1x..4x`；拖动使用
+  Pointer Events、pointer capture、grab/grabbing 和边界钳制；90°/270° 旋转会交换宽高
+  重算 cover scale。预览和最终 `512x512` 导出调用同一变换函数，优先导出 WebP、失败时
+  回退 PNG。
+- 服务端头像不信任扩展名、Content-Type 或 magic bytes：SkiaSharp 完整解码 JPEG/PNG/WebP，
+  在像素分配前检查尺寸和总像素，并结合 codec 与 APNG/WebP 容器标记拒绝多帧、截断、
+  畸形和不支持格式；随后重绘为无原始元数据的 `512x512` WebP，只保存标准化对象。
+  服务端上传文件上限维持 3 MiB，multipart request 上限为文件上限加 64 KiB，并新增 subject/IP
+  维度每分钟 10 次限流。替换仍先切数据库对象键，再 best-effort 删除旧对象或失败新对象。
+- `User.IsEmailPublic` 默认 `false`；EF CLI 生成
+  `20260804185915_AddUserEmailVisibility`，未手改 migration 或 snapshot。匿名化注销会强制
+  清除此字段。本人和 Administrator 始终读取邮箱；匿名或其他用户只有在目标主动公开时
+  才能从新增 `GET /api/v1/users/{userId}` 得到邮箱。
+- 强类型契约变化：`CurrentUserResponse` 增加 `isEmailPublic`；
+  `UpdateMyProfileRequest` 必填 `isEmailPublic`；头像 400 使用 `SizeInvalid`、
+  `SourceMetadataMismatch`、`UnsupportedFormat`、`InvalidDimensions`、
+  `PixelLimitExceeded`、`MultipleFrames`、`MalformedImage`；当前密码错误使用稳定 409
+  `CurrentPasswordInvalid`。改密在同一 SaveChanges 中更新哈希并递增 TokenVersion，204 前
+  删除当前 Refresh Cookie；前端成功后清空 query/auth/score 状态并回到命名登录路由。
+- OpenAPI 已重新导出并生成 TypeScript SDK；公开路由清单精确计数为 152。两份 OpenAPI
+  artifact SHA-256 均为
+  `BD2D1DF5590761EF531C2A3852C58C176C295D160A93021D41666EB6D4ED0A04`。
+- 最终验证：solution Debug build 0 warning/0 error；545/545 non-Integration passed；
+  `UserProfilePersistenceTests` 2/2 passed，覆盖邮箱公开性持久化及旧 Access/Refresh version
+  在改密后失效；Skia 真实图片测试 8/8 passed；EF 10.0.4
+  `has-pending-model-changes` 返回无漂移。Frontend 目标测试 11/11、scoped ESLint、
+  `vue-tsc` 与 Vite production build passed。全量 Frontend lint 仍有仓库既存的 9,109 项
+  generated/vendor/旧文件基线错误，本阶段触及文件 scoped lint 为 0。
+- 全量 Integration 发现 134 项：并发运行结果为 130 passed、2 skipped、2 failed；失败是
+  KoH advisory-lock 等待者采样和 Docker 本机端口可达性在全套高并发下超时。两项原命令
+  随后各自独立重跑均 1/1 passed，本阶段关键 Profile PostgreSQL 用例另行 2/2 passed。
+- 使用内置浏览器连接隔离的本地 PostgreSQL/Redis/API/Vite 完成实际验收：简介和公开性
+  分别保存并持久化、首页只剩摘要、头像滚轮从 100% 到 157%、Pointer 拖动无控制台错误、
+  旋转后裁剪上传成功、三组密码明文切换可用。未执行最终改密提交，Token 失效由上述集成与
+  HTTP 测试覆盖。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2224,6 +2272,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   离线 `Provisioning + no receipt` fail-closed；
 - 团队 logical Runtime slot 事务额度、方案 A 必填 API 和 AWD start-time completeness。
 - CTF 排行榜按题公开一血、二血、三血，顶层 blood summary 与队伍 slot 强类型一致。
+- 独立 `/profile`、后端邮箱投影、TokenVersion 改密失效和受控头像解码/重编码。
 
 当前尚未执行的交付边界：
 
@@ -2231,33 +2280,26 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
+- `809f825` 与本节 HANDOFF 提交是当前任务新增的本地提交，明确未 push、未部署；历史 push
+  授权不覆盖本阶段“未经授权不得 push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
   不属于剩余工作。
 
 ## 7. 建议的下一交接顺序
 
-Frontend 协作者正在并行优化，本会话不再修改 Frontend。其待办以当前生成 OpenAPI 为准：
+最新版 `TODO.md` 是后续优先级来源。P0 `/profile` 已由 6.49 完成；下一阶段是 P0
+“SMTP 投递迁移到 MailKit”：
 
-1. 先从 6.47/6.48 的最新 OpenAPI 重新生成客户端；Competition Create/Update 必须提交
-   `maxConcurrentRuntimeInstancesPerTeam`，读取使用 response 的强类型 `int`。继续通过
-   生成 SDK 与既有运行时配置解析 API base URL，不得在页面或 composable 写死 URL。
-   Leaderboard 将旧 `firstBloods[]` 改为 `bloods[]`，必须展示每题
-   `First/Second/Third`，并可使用 subject slot 的 `bloodRank`/`bloodAt`。
-2. 迁移 Runtime start/get/reset/stop/extend、numeric state 与 `urls[]`；不能用 Challenge
-   direction 猜 capability，Extend 的 seconds/TTL 产品语义若仍有冲突必须先 `$grill-me`。
-3. 按 6.44 的可替换 draft 实现 multipart Patch upload → Submit Fix → status polling；
-   不再使用 pre-signed PUT、teamId、checksum 或 `/patch-submissions` 假协议。
-4. 删除无后端契约的 AWDP screen/SSE 原型，以及 QQBot、Plugins、Penetration Operations、
-   live logs、global audit logs、dynamic SMTP/Infrastructure 等管理入口；Containers 不能
-   硬接 `/api/admin/containers`，应另行重建为 competition-scoped Runtime surface。
-5. 逐页把仍有真实语义的 Competition、Challenge Bank、CompetitionChallenge 和 Team
-   管理调用改为生成 SDK，最后删除 `sdk: any` Proxy，让缺失 operation 在编译期失败。
-6. 每个纵切继续先写失败 contract test，再跑受版本控制 Frontend tests、`vue-tsc`、
-   production build、scoped lint 与 `git diff --check`，独立提交。
-
-此前列出的三个 Backend 高置信 bug 已全部由 6.45 至 6.47 闭合；当前没有已知、未实现的
-Backend 代码待办。在用户提供真实环境细则前，不再猜测新部署协议；只处理新发现且可复现
-的缺陷，或配合 Frontend 协作者确认生成契约。
+1. 先审计 `SmtpEmailVerificationDelivery`、平台邮箱配置、测试邮件端点和日志脱敏，不重复
+   已完成的邮箱配置 UI/验证开关工作。
+2. 当前 TLS 布尔值若无法无歧义表达 465 implicit TLS、587 STARTTLS 和无 TLS，必须先用
+   `$grill-me` 确认 `SecureSocketOptions` 映射与是否迁移配置，不能猜默认值。
+3. 在 `Directory.Packages.props` 集中锁定 MailKit，只在 Infrastructure 引用；使用
+   `MimeMessage`/`BodyBuilder` 和异步 Connect/Authenticate/Send/Disconnect，完整透传取消，
+   不把 SMTP 密码写入异常、日志、平台日志或审计。
+4. 以真实 SMTP 测试服务或容器覆盖 465、587、无认证/认证失败、超时、取消和服务器拒收；
+   通过对应 build/test/lint 后做独立功能提交，再单独提交 HANDOFF。
+5. 未经新任务明确授权，继续不 push、不部署；不要因为历史部署凭据或旧 push 授权而扩大范围。
 
 用户稍后会提供真实环境部署细则。在此之前：
 
@@ -2268,7 +2310,8 @@ Backend 代码待办。在用户提供真实环境细则前，不再猜测新部
 3. 有真实 Libvirt 环境与 fixture disk 后设置 `NOCTF_LIBVIRT_DISK_PATH`，执行 OVA
    import/public URL/exact cleanup 与生产式生命周期演练。
 4. 在目标生产环境执行部署、监控、备份恢复和运维验收；本地代码通过不等于生产部署。
-5. 用户已授权本工作分支 push；仍不得自行创建 PR、合入 `main` 或执行生产部署。
+5. 当前任务明确禁止 push/deploy；任何历史授权均不自动续用。仍不得自行创建 PR、合入
+   `main` 或执行生产部署。
 
 不要重新引入 HAProxy/ingress、firewall executor/sidecar、transparent gateway、
 TargetPort ACL 或 callback-only gateway。Docker Runtime 公开访问只使用题目服务自己的
@@ -2300,7 +2343,8 @@ Docker port mapping，host port 固定请求 `0`。
 4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做。最新 Frontend 迁移状态
    使用 6.34 至 6.40；最新 outcome、上传补偿、Runtime scope 和 Patch draft Backend 状态
    使用 6.41 至 6.44；Runtime cleanup/replacement/quota 使用 6.45 至 6.47；CTF 排行榜
-   三血契约使用 6.48。Frontend 协作者正在并行工作，本会话避免修改 Frontend 文件。
+   三血契约使用 6.48；个人资料、邮箱可见性、头像安全和改密失效使用 6.49。下一纵切按
+   `TODO.md` 进入 MailKit SMTP 迁移，不要回滚或重做 `/profile`。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
