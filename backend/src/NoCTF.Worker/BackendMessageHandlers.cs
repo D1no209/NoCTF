@@ -11,6 +11,7 @@ using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Challenges;
@@ -57,6 +58,30 @@ public static class BackendMessageHandlers
                 "Email verification delivery was queued without a complete SMTP configuration.");
         }
     }
+
+    public static async Task Handle(
+        SendPasswordReset message,
+        IPasswordResetEmailDelivery delivery,
+        CancellationToken cancellationToken)
+    {
+        var state = await delivery.SendResetAsync(
+            message.UserId,
+            message.Token,
+            cancellationToken);
+        if (state == PasswordResetEmailDeliveryState.NotConfigured)
+        {
+            throw new InvalidOperationException(
+                "Password reset delivery was queued without a complete SMTP configuration.");
+        }
+    }
+
+    public static async Task Handle(
+        SendPasswordChangedNotification message,
+        IPasswordResetEmailDelivery delivery,
+        CancellationToken cancellationToken) =>
+        _ = await delivery.SendChangedNotificationAsync(
+            message.UserId,
+            cancellationToken);
 
     public static async Task Handle(
         DispatchAwdCheckers message,

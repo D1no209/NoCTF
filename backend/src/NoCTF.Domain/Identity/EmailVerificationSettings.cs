@@ -22,6 +22,12 @@ public sealed class EmailVerificationSettings
     public int TokenLifetimeMinutes { get; set; }
     public int ResendCooldownSeconds { get; set; }
 
+    public int PasswordResetTokenLifetimeMinutes { get; set; }
+
+    public int PasswordResetCooldownSeconds { get; set; }
+
+    public int PasswordResetMaxRequestsPerHour { get; set; }
+
     [MaxLength(253)]
     public string SmtpHost { get; set; } = string.Empty;
 

@@ -18,6 +18,19 @@ describe('login localization', () => {
   })
 
   test.each([
+    ['en', en],
+    ['zh-CN', zhCN],
+  ])('renders the email-only placeholder for %s without a message compilation error', (locale, messages) => {
+    const i18n = createI18n({
+      legacy: false,
+      locale,
+      messages: { [locale]: messages },
+    })
+
+    expect(i18n.global.t('auth.emailPlaceholder')).toBe('name@example.com')
+  })
+
+  test.each([
     ['en', en, 'Show password', 'Hide password'],
     ['zh-CN', zhCN, '显示密码', '隐藏密码'],
   ])('provides password visibility labels for %s', (locale, messages, showLabel, hideLabel) => {

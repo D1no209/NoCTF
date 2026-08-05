@@ -8,7 +8,7 @@
 
 公开注册只创建 `UserKind.Human` 和 `UserRole.User`。Human 用户名 3..64、邮箱最大 320，分别以 Normalized 值做大小写不敏感唯一。密码 8..1024 字符，不 Trim、不 Unicode 归一化、不强制字符组合。
 
-使用 ASP.NET Core `IPasswordHasher<User>` / Identity V3：PBKDF2-HMAC-SHA512，IterationCount=210000。成功验证返回 SuccessRehashNeeded 时更新 Hash。密码修改递增 TokenVersion；首版不提供“忘记密码”Token/Endpoint。
+使用 ASP.NET Core `IPasswordHasher<User>` / Identity V3：PBKDF2-HMAC-SHA512，IterationCount=210000。成功验证返回 SuccessRehashNeeded 时更新 Hash。密码修改和密码重置都会递增 TokenVersion，使既有 Access/Refresh Token 与会话立即失效。
 
 `UserKind.Bot` 只能由 Administrator 创建。Bot 的 Email、NormalizedEmail 和 PasswordHash
 仍为非空：服务端生成 `bot-<user-id-N>@bot.invalid`，并用一次性随机 GUID 生成 dummy
@@ -43,6 +43,12 @@ Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未�
 
 部署可开关。开启时新 Human 账号在 EmailVerifiedAt 前不能登录。Bot 不参与邮箱验证。验证 Token 只保存 SHA-256、单次使用且有过期时间。Resend 对未知、已验证、冷却中与待验证地址返回同样 Accepted，避免枚举。
 
+## 密码找回
+
+密码找回独立于注册邮箱验证开关，只接受 `Active`、已验证邮箱的 `Human` 账号。请求接口仅接受邮箱，合法邮箱格式始终返回 `202 Accepted`；未知、未验证、Bot、Banned、Disabled、Anonymized、冷却中和超过账号限额的请求都不得泄露不同响应。
+
+重置 Token 使用 32-byte CSPRNG，业务表仅保存 SHA-256。Token 单次使用、默认 30 分钟过期；同一账号新令牌会使此前未消费令牌失效。默认账号冷却 60 秒、每小时最多 3 次，API 另按来源 IP 限制 15 分钟 5 次。消费时使用 PostgreSQL 事务和账号级 advisory lock，原子更新 PasswordHash、TokenVersion、Token 消费/失效状态与通知 Outbox。成功不自动登录，清除当前 Refresh Cookie，并异步发送密码变更通知。
+
 ## 平台与比赛授权
 
 平台角色与比赛 Owner/Manager/Judge/Observer 的矩阵见 [产品与领域模型](product-domain.md#权限矩阵)。授权必须在 Endpoint Configure 中声明基础 policy，再由 Application 对 Competition/Challenge 资源关系做二次检查。不可仅相信客户端 CompetitionId。
@@ -66,4 +72,4 @@ version 和最小写权限。只有 sequence/version 与 Runtime 当前值精确
 
 ## 日志中的敏感内容
 
-选手永远不能通过 API 看到正确 Flag。管理者可查看 Submission 原始 Flag，日志允许记录 Flag，且不建立 Flag 读取审计日志。密码、PasswordHash、InvitationToken、Access/Refresh/Internal JWT、邮箱验证 Token、FlagDerivationSecret 永远不得记录。
+选手永远不能通过 API 看到正确 Flag。管理者可查看 Submission 原始 Flag，日志允许记录 Flag，且不建立 Flag 读取审计日志。密码、PasswordHash、InvitationToken、Access/Refresh/Internal JWT、邮箱验证 Token、密码重置 Token、FlagDerivationSecret 永远不得记录。

@@ -29,6 +29,15 @@ public sealed class EmailVerificationConfigurationStore(
                 .SetProperty(settings => settings.PublicBaseUrl, command.PublicBaseUrl.TrimEnd('/'))
                 .SetProperty(settings => settings.TokenLifetimeMinutes, command.TokenLifetimeMinutes)
                 .SetProperty(settings => settings.ResendCooldownSeconds, command.ResendCooldownSeconds)
+                .SetProperty(
+                    settings => settings.PasswordResetTokenLifetimeMinutes,
+                    command.PasswordResetTokenLifetimeMinutes)
+                .SetProperty(
+                    settings => settings.PasswordResetCooldownSeconds,
+                    command.PasswordResetCooldownSeconds)
+                .SetProperty(
+                    settings => settings.PasswordResetMaxRequestsPerHour,
+                    command.PasswordResetMaxRequestsPerHour)
                 .SetProperty(settings => settings.SmtpHost, command.SmtpHost.Trim())
                 .SetProperty(settings => settings.SmtpPort, command.SmtpPort)
                 .SetProperty(settings => settings.SmtpSecurityMode, command.SmtpSecurityMode)
@@ -100,6 +109,9 @@ public sealed class EmailVerificationConfigurationStore(
             settings.PublicBaseUrl,
             settings.TokenLifetimeMinutes,
             settings.ResendCooldownSeconds,
+            settings.PasswordResetTokenLifetimeMinutes,
+            settings.PasswordResetCooldownSeconds,
+            settings.PasswordResetMaxRequestsPerHour,
             settings.SmtpHost,
             settings.SmtpPort,
             ResolveSecurityMode(settings),

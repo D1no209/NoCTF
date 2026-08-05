@@ -50,11 +50,11 @@ defineProps<{
       </div>
     </section>
 
-    <section class="relative flex min-h-[100dvh] items-center justify-center px-4 py-16 sm:px-8">
+    <section class="relative flex min-h-[100dvh] min-w-0 items-center justify-center px-4 py-16 sm:px-8">
       <div class="absolute right-6 top-6 z-10">
         <LanguageSwitch />
       </div>
-      <div class="relative z-10 w-full max-w-[470px]">
+      <div class="relative z-10 min-w-0 w-full max-w-[470px]">
         <div class="mb-8 flex items-center justify-center gap-3 lg:hidden">
           <BrandLogo class="h-10" />
         </div>

@@ -600,6 +600,17 @@ export type NoCtfapiEndpointsAuthenticationChangePasswordRequest = {
     newPassword: string;
 };
 
+export type NoCtfapiEndpointsAuthenticationCompletePasswordResetFailureResponse = {
+    code?: NoCtfapiEndpointsAuthenticationCompletePasswordResetFailureCode;
+};
+
+export type NoCtfapiEndpointsAuthenticationCompletePasswordResetFailureCode = 'InvalidOrExpired';
+
+export type NoCtfapiEndpointsAuthenticationCompletePasswordResetRequest = {
+    token: string;
+    newPassword: string;
+};
+
 export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     userId?: string;
     userName?: string;
@@ -666,6 +677,14 @@ export type NoCtfapiEndpointsAuthenticationRegisterRequest = {
     userName: string;
     email: string;
     password: string;
+};
+
+export type NoCtfapiEndpointsAuthenticationRequestPasswordResetAcceptedResponse = {
+    accepted?: boolean;
+};
+
+export type NoCtfapiEndpointsAuthenticationRequestPasswordResetRequest = {
+    email: string;
 };
 
 export type NoCtfapiEndpointsAuthenticationUpdateMyProfileRequest = {
@@ -862,6 +881,9 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
     publicBaseUrl?: string;
     tokenLifetimeMinutes?: number;
     resendCooldownSeconds?: number;
+    passwordResetTokenLifetimeMinutes?: number;
+    passwordResetCooldownSeconds?: number;
+    passwordResetMaxRequestsPerHour?: number;
     smtpHost?: string;
     smtpPort?: number;
     smtpSecurityMode?: NoCtfDomainIdentitySmtpSecurityMode;
@@ -997,6 +1019,9 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfig
     publicBaseUrl: string;
     tokenLifetimeMinutes: number;
     resendCooldownSeconds: number;
+    passwordResetTokenLifetimeMinutes: number;
+    passwordResetCooldownSeconds: number;
+    passwordResetMaxRequestsPerHour: number;
     smtpHost: string;
     smtpPort: number;
     smtpSecurityMode: NoCtfDomainIdentitySmtpSecurityMode;
@@ -3113,6 +3138,31 @@ export type NoCtfapiEndpointsAuthenticationChangePasswordEndpointResponses = {
 
 export type NoCtfapiEndpointsAuthenticationChangePasswordEndpointResponse = NoCtfapiEndpointsAuthenticationChangePasswordEndpointResponses[keyof NoCtfapiEndpointsAuthenticationChangePasswordEndpointResponses];
 
+export type AuthenticationCompletePasswordResetData = {
+    body: NoCtfapiEndpointsAuthenticationCompletePasswordResetRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/password-reset/complete';
+};
+
+export type AuthenticationCompletePasswordResetErrors = {
+    /**
+     * Bad Request
+     */
+    400: NoCtfapiEndpointsAuthenticationCompletePasswordResetFailureResponse;
+};
+
+export type AuthenticationCompletePasswordResetError = AuthenticationCompletePasswordResetErrors[keyof AuthenticationCompletePasswordResetErrors];
+
+export type AuthenticationCompletePasswordResetResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AuthenticationCompletePasswordResetResponse = AuthenticationCompletePasswordResetResponses[keyof AuthenticationCompletePasswordResetResponses];
+
 export type NoCtfapiEndpointsAuthenticationGetMeEndpointData = {
     body?: never;
     path?: never;
@@ -3298,6 +3348,35 @@ export type NoCtfapiEndpointsAuthenticationRegisterEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsAuthenticationRegisterEndpointResponse = NoCtfapiEndpointsAuthenticationRegisterEndpointResponses[keyof NoCtfapiEndpointsAuthenticationRegisterEndpointResponses];
+
+export type AuthenticationRequestPasswordResetData = {
+    body: NoCtfapiEndpointsAuthenticationRequestPasswordResetRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/password-reset/request';
+};
+
+export type AuthenticationRequestPasswordResetErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: unknown;
+};
+
+export type AuthenticationRequestPasswordResetError = AuthenticationRequestPasswordResetErrors[keyof AuthenticationRequestPasswordResetErrors];
+
+export type AuthenticationRequestPasswordResetResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAuthenticationRequestPasswordResetAcceptedResponse;
+};
+
+export type AuthenticationRequestPasswordResetResponse = AuthenticationRequestPasswordResetResponses[keyof AuthenticationRequestPasswordResetResponses];
 
 export type NoCtfapiEndpointsAuthenticationResendEmailVerificationEndpointData = {
     body?: never;

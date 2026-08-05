@@ -21,6 +21,8 @@ POST /api/v1/auth/refresh
 POST /api/v1/auth/logout
 POST /api/v1/auth/email-verification/verify
 POST /api/v1/auth/email-verification/resend
+POST /api/v1/auth/password-reset/request
+POST /api/v1/auth/password-reset/complete
 GET  /api/v1/auth/me
 PUT  /api/v1/auth/me/profile
 POST /api/v1/auth/me/avatar
@@ -32,6 +34,7 @@ GET  /api/v1/users/{userId}/avatar
 
 Login/Refresh 返回 AccessToken 与 ExpiresAt；Refresh Cookie 不出现在 body。
 公开用户资料默认隐藏邮箱；本人和 Administrator 始终可见，其他访问者仅在用户主动公开后可见。
+密码重置请求对所有合法邮箱格式统一返回 202；完成接口成功返回 204，无效、过期或已消费 Token 返回 typed 400 `InvalidOrExpired`。完成后不会签发新 Token，并清除当前 Refresh Cookie。
 
 ## Competition 与 Team
 

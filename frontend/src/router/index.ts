@@ -30,6 +30,18 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('@/views/ForgotPasswordView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: () => import('@/views/ResetPasswordView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/competitions',
       name: 'competitions',
       component: () => import('@/views/CompetitionsView.vue'),
@@ -183,6 +195,8 @@ router.beforeEach(async (to) => {
     && auth.emailVerified === false
     && to.name !== 'verify-email'
     && to.name !== 'login'
+    && to.name !== 'forgot-password'
+    && to.name !== 'reset-password'
   ) {
     return { name: 'verify-email' }
   }

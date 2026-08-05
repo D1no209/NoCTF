@@ -1,5 +1,6 @@
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.RefreshSession;
+using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Application.Common;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Status;
@@ -154,6 +155,22 @@ internal sealed class SwaggerEmailVerificationStore : IEmailVerificationStore
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult(EmailVerificationState.Verified);
+}
+
+internal sealed class SwaggerPasswordResetStore : IPasswordResetStore
+{
+    public Task<PasswordResetRequestState> IssueAsync(
+        string email,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(PasswordResetRequestState.Ignored);
+
+    public Task<PasswordResetCompletionState> CompleteAsync(
+        string token,
+        string newPassword,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(PasswordResetCompletionState.InvalidOrExpired);
 }
 
 internal sealed class SwaggerTokenIssuer : IAccessTokenIssuer
