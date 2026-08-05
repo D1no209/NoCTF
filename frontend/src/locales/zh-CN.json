@@ -210,6 +210,14 @@
         "title": "咨询状态已变化",
         "body": "“{title}”的状态已更新。"
       },
+      "cheatIncidentDetected": {
+        "title": "发现跨队 Flag 线索",
+        "body": "一条受保护的反作弊线索正在等待工作人员核查。"
+      },
+      "teamBanCorrected": {
+        "title": "队伍封禁已纠正",
+        "body": "{team} 的违规封禁已被纠正。"
+      },
       "unknown": {
         "title": "系统事件",
         "body": "系统记录了一条暂不支持展示类型的事件。"
@@ -532,7 +540,12 @@
       "questionReplied": "咨询已回复",
       "questionStatusChanged": "咨询状态变更",
       "questionPublished": "咨询回答已公开",
-      "protectedSubmissionFlagAccessed": "受保护 Flag 已访问"
+        "protectedSubmissionFlagAccessed": "受保护 Flag 已访问",
+        "cheatIncidentDetected": "发现跨队 Flag 线索",
+        "cheatIncidentConfirmed": "作弊线索已确认",
+        "cheatIncidentDismissed": "作弊线索已驳回",
+        "cheatIncidentSuperseded": "作弊线索已被重评取代",
+        "cheatIncidentCorrected": "作弊判定已纠错"
     }
   },
   "challenges": {
@@ -1474,8 +1487,67 @@
       "teamBanned": "队伍已封禁",
       "teamUnbanned": "队伍已解除封禁",
       "cheatTitle": "作弊信息",
-      "cheatDescription": "动态容器 flag 与队伍绑定，提交其他队伍 flag 会记录在这里。",
+      "cheatDescription": "CTF Flag 与 AWDP Break 的跨队 Flag 命中会进入待核查队列。列表不展示 Flag；显式读取完整证据会写入审计日志。",
       "noCheatIncidents": "暂无疑似作弊信息。",
+      "cheatPendingCount": "{count} 条待核查",
+      "cheatLive": "实时更新",
+      "cheatPolling": "15 秒轮询",
+      "cheatFrom": "开始时间",
+      "cheatTo": "结束时间",
+      "cheatSourceTeam": "提交队伍",
+      "cheatOwnerTeam": "Flag 所属队伍",
+      "cheatSubmitterId": "提交者 ID",
+      "cheatChallengeId": "比赛题目 ID",
+      "cheatOptionalUuid": "可选 UUID",
+      "cheatSubmitter": "提交者",
+      "cheatChallenge": "题目",
+      "cheatDetectedAt": "发现时间",
+      "cheatApplyFilters": "应用筛选",
+      "cheatDateRangeError": "时间范围必须有效且不超过 31 天。",
+      "cheatLoadError": "无法加载作弊信息，请检查权限或稍后重试。",
+      "cheatPageCount": "本页 {count} 条",
+      "cheatReviewEvidence": "查看完整证据",
+      "cheatEvidenceTitle": "受保护的完整证据",
+      "cheatEvidenceLoading": "正在读取并记录审计事件…",
+      "cheatEvidenceLoadError": "无法读取完整证据。Judge 及以上权限才可访问。",
+      "cheatEvidenceAuditHint": "本次完整 Flag 读取已记录操作人和时间。请勿把证据复制到公开公告或通知。",
+      "cheatCopyFlag": "复制 Flag",
+      "cheatFlagCopied": "Flag 已复制。",
+      "cheatFlagCopyError": "无法复制 Flag。",
+      "cheatResolution": "处置记录",
+      "cheatReason": "处置原因",
+      "cheatReasonPlaceholder": "输入仅工作人员可见的具体判断依据",
+      "cheatReasonHint": "至少 8 个字符，最多 512 个字符；禁止包含密码、Token 或 SMTP 凭据。",
+      "cheatActionError": "处置失败，事件状态可能已变化；列表已重新加载。",
+      "cheatStatuses": {
+        "pending": "待核查",
+        "confirmed": "已确认",
+        "dismissed": "已驳回",
+        "superseded": "已被重评取代",
+        "corrected": "已纠错"
+      },
+      "cheatActions": {
+        "dismiss": {
+          "button": "驳回线索",
+          "title": "驳回这条作弊线索",
+          "description": "驳回不会通知参赛者，也不会封禁队伍。Judge 及以上权限可执行。"
+        },
+        "confirm": {
+          "button": "确认并封禁",
+          "title": "确认作弊并封禁队伍",
+          "description": "该操作会立即封禁提交队伍，并向全场发送不含证据细节的通用违规通知。"
+        },
+        "correct": {
+          "button": "纠错并解封",
+          "title": "纠正误判并解除封禁",
+          "description": "该操作会解除由本事件造成的封禁，并向全场发送通用纠错通知。"
+        }
+      },
+      "cheatActionSuccess": {
+        "dismiss": "线索已驳回。",
+        "confirm": "事件已确认，提交队伍已封禁。",
+        "correct": "误判已纠正，提交队伍已解封。"
+      },
       "logsTitle": "比赛日志",
       "logsDescription": "仅展示本场比赛的报名、容器、提交和告警事件。",
       "submittedFlag": "选手提交的 Flag",

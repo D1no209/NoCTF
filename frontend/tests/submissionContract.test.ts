@@ -222,6 +222,8 @@ describe('generated public submission contract', () => {
       .toThrow('Submission response is missing submissionId.')
     expect(() => toPublicSubmissionStatus({ ...status, result: undefined }))
       .toThrow('Submission response is missing result.')
+    expect(() => toPublicSubmissionStatus({ ...status, failureCode: 29 }))
+      .toThrow('Submission response has an unsupported failureCode.')
     expect(() => toPublicSubmissionPage({ nextCursor: null }))
       .toThrow('Submission list response is missing items.')
     expect(() => toPublicSubmissionPage({ items: [firstListItem] }))

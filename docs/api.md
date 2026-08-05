@@ -173,6 +173,11 @@ POST /api/v1/admin/competitions/{competitionId}/owner/transfer
 GET  /api/v1/admin/competitions/{competitionId}/start-validation
 POST /api/v1/admin/competitions/{competitionId}/flags/generate-missing
 GET  /api/v1/admin/competitions/{competitionId}/events/export
+GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents
+GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}
+POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/dismiss
+POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/confirm
+POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/correct
 ```
 
 Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍是独立文件/路由/TypedResults。
@@ -186,6 +191,11 @@ Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍�
 完整的安全摘要。查询时间窗最大 31 天并使用签名 keyset cursor；JSONL 导出最多 50,000 条，
 仅 Administrator、Owner、Manager 可用。实时通知只携带事件 Id、类型、级别与发生时间，客户端
 收到后通过本 GET 重新读取，不通过 SignalR 传输敏感正文。
+
+跨队 Flag 线索从不可变 ScoringEvent 事实与 CompetitionEvent 处置事件推导，不新增独立业务表。
+Observer 可读取不含 Flag 的列表，Judge 可显式读取完整 Flag 并驳回线索；每次完整证据读取都会写入
+审计事件且响应禁止缓存。只有 Administrator、Owner、Manager 可确认并封禁，或纠正误判并解封。
+驳回不通知参赛者；确认与纠错只发送不含 Flag 和工作人员原因的全场通用通知。
 
 权限 snapshot 与候选用户只允许 Competition Owner 或平台 Administrator 读取。候选响应仅含
 Id、UserName、Kind、Role 与 EmailVerified，不开放平台用户目录中的 Email、TokenVersion。

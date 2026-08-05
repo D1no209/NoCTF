@@ -210,6 +210,14 @@
         "title": "Question status changed",
         "body": "The status of “{title}” was updated."
       },
+      "cheatIncidentDetected": {
+        "title": "Cross-team Flag signal detected",
+        "body": "A protected anti-cheat signal is waiting for staff review."
+      },
+      "teamBanCorrected": {
+        "title": "Team ban corrected",
+        "body": "The rule-violation ban for {team} was corrected."
+      },
       "unknown": {
         "title": "System event",
         "body": "An event with an unsupported type was recorded."
@@ -532,7 +540,12 @@
       "questionReplied": "Question replied",
       "questionStatusChanged": "Question status changed",
       "questionPublished": "Question answer published",
-      "protectedSubmissionFlagAccessed": "Protected Flag accessed"
+        "protectedSubmissionFlagAccessed": "Protected Flag accessed",
+        "cheatIncidentDetected": "Cross-team Flag signal detected",
+        "cheatIncidentConfirmed": "Cheat signal confirmed",
+        "cheatIncidentDismissed": "Cheat signal dismissed",
+        "cheatIncidentSuperseded": "Cheat signal superseded by rejudge",
+        "cheatIncidentCorrected": "Cheat decision corrected"
     }
   },
   "challenges": {
@@ -1474,8 +1487,67 @@
       "teamBanned": "Team banned",
       "teamUnbanned": "Team unbanned",
       "cheatTitle": "Cheat signals",
-      "cheatDescription": "Dynamic container flags are bound to teams. Cross-team submissions appear here.",
+      "cheatDescription": "Cross-team Flag matches from CTF Flag and AWDP Break submissions enter this review queue. The list never exposes Flags; explicit evidence access is audited.",
       "noCheatIncidents": "No suspected cheat incidents.",
+      "cheatPendingCount": "{count} pending",
+      "cheatLive": "Live updates",
+      "cheatPolling": "15s polling",
+      "cheatFrom": "From",
+      "cheatTo": "To",
+      "cheatSourceTeam": "Submitting team",
+      "cheatOwnerTeam": "Flag owner team",
+      "cheatSubmitterId": "Submitter ID",
+      "cheatChallengeId": "Competition challenge ID",
+      "cheatOptionalUuid": "Optional UUID",
+      "cheatSubmitter": "Submitter",
+      "cheatChallenge": "Challenge",
+      "cheatDetectedAt": "Detected",
+      "cheatApplyFilters": "Apply filters",
+      "cheatDateRangeError": "The time range must be valid and no longer than 31 days.",
+      "cheatLoadError": "Cheat signals could not be loaded. Check your permission or retry later.",
+      "cheatPageCount": "{count} on this page",
+      "cheatReviewEvidence": "Review full evidence",
+      "cheatEvidenceTitle": "Protected full evidence",
+      "cheatEvidenceLoading": "Reading evidence and recording the audit event…",
+      "cheatEvidenceLoadError": "Full evidence could not be read. Judge or higher access is required.",
+      "cheatEvidenceAuditHint": "This full Flag access was recorded with the actor and time. Do not paste evidence into public announcements or notifications.",
+      "cheatCopyFlag": "Copy Flag",
+      "cheatFlagCopied": "Flag copied.",
+      "cheatFlagCopyError": "The Flag could not be copied.",
+      "cheatResolution": "Resolution record",
+      "cheatReason": "Resolution reason",
+      "cheatReasonPlaceholder": "Enter the staff-only evidence behind this decision",
+      "cheatReasonHint": "8–512 characters. Do not include passwords, Tokens, or SMTP credentials.",
+      "cheatActionError": "Resolution failed. The incident may have changed; the list has been refreshed.",
+      "cheatStatuses": {
+        "pending": "Pending",
+        "confirmed": "Confirmed",
+        "dismissed": "Dismissed",
+        "superseded": "Superseded by rejudge",
+        "corrected": "Corrected"
+      },
+      "cheatActions": {
+        "dismiss": {
+          "button": "Dismiss signal",
+          "title": "Dismiss this cheat signal",
+          "description": "Dismissal is silent and does not ban the team. Judge or higher access may perform it."
+        },
+        "confirm": {
+          "button": "Confirm and ban",
+          "title": "Confirm cheating and ban the team",
+          "description": "This immediately bans the submitting team and sends the whole competition a generic rule-violation notice without evidence details."
+        },
+        "correct": {
+          "button": "Correct and unban",
+          "title": "Correct the decision and remove the ban",
+          "description": "This removes the ban caused by this incident and sends the whole competition a generic correction notice."
+        }
+      },
+      "cheatActionSuccess": {
+        "dismiss": "The signal was dismissed.",
+        "confirm": "The incident was confirmed and the submitting team was banned.",
+        "correct": "The decision was corrected and the submitting team was unbanned."
+      },
       "logsTitle": "Competition logs",
       "logsDescription": "Registration, container, submission, warning, and exception events for this competition only.",
       "submittedFlag": "Submitted flag",

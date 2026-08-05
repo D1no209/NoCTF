@@ -57,6 +57,7 @@ builder.UseWolverine(options =>
         options.PublishMessage<ChallengePublished>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<TeamBanned>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<TeamBanCorrected>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<CompetitionEventCommitted>()
             .ToPostgresqlQueue("noctf-worker");
     }

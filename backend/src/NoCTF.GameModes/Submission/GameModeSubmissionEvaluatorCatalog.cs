@@ -26,14 +26,57 @@ internal static class ModeSubmissionEvaluatorRules
     public static ScoringEventDecision Reject(SubmissionEntity submission, ScoringFailureCode code) =>
         new(ScoringEventKind.SubmissionEvaluation, ScoringResult.Rejected, code,
             submission.ReceivedAt, "mode-admission-v2");
+
+    public static ScoringEventDecision DetectForeignTeamFlag(
+        SubmissionProcessingContext context,
+        ScoringEventDecision normalDecision)
+    {
+        var submission = context.Submission;
+        var activeMatches = context.ApplicableFlags
+            .Where(flag => DefaultEfSubmissionEvaluator.Matches(submission, flag))
+            .Where(flag => flag.ValidStart is null || flag.ValidStart <= submission.ReceivedAt)
+            .Where(flag => flag.ValidUntil is null || submission.ReceivedAt < flag.ValidUntil)
+            .ToArray();
+        if (activeMatches.Any(flag => flag.TeamId is null || flag.TeamId == submission.TeamId))
+            return normalDecision;
+
+        var ownerTeamIds = activeMatches
+            .Where(flag => flag.TeamId is not null && flag.TeamId != submission.TeamId)
+            .Select(flag => flag.TeamId!.Value)
+            .Distinct()
+            .ToArray();
+        return ownerTeamIds.Length switch
+        {
+            0 => normalDecision,
+            1 => new(
+                ScoringEventKind.SubmissionEvaluation,
+                ScoringResult.Rejected,
+                ScoringFailureCode.ForeignTeamFlagDetected,
+                submission.ReceivedAt,
+                "cross-team-flag-v1",
+                ownerTeamIds[0]),
+            _ => new(
+                ScoringEventKind.SubmissionEvaluation,
+                ScoringResult.Rejected,
+                ScoringFailureCode.AmbiguousFlagMatch,
+                submission.ReceivedAt,
+                "cross-team-flag-v1")
+        };
+    }
 }
 
 public sealed class CtfSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmissionEvaluator
 {
-    public ScoringEventDecision Evaluate(SubmissionProcessingContext context) =>
-        context.Submission.Kind == SubmissionKind.Flag
-            ? inner.Evaluate(context)
-            : ModeSubmissionEvaluatorRules.Reject(context.Submission, ScoringFailureCode.FixNotSupported);
+    public ScoringEventDecision Evaluate(SubmissionProcessingContext context)
+    {
+        if (context.Submission.Kind != SubmissionKind.Flag)
+            return ModeSubmissionEvaluatorRules.Reject(
+                context.Submission,
+                ScoringFailureCode.FixNotSupported);
+        return ModeSubmissionEvaluatorRules.DetectForeignTeamFlag(
+            context,
+            inner.Evaluate(context));
+    }
 }
 
 public sealed class AwdSubmissionEvaluator : ISubmissionEvaluator
@@ -92,11 +135,14 @@ public sealed class AwdpSubmissionEvaluator(ISubmissionEvaluator inner) : ISubmi
         var submission = context.Submission;
         if (submission.Kind == SubmissionKind.Flag)
             return ModeSubmissionEvaluatorRules.Reject(submission, ScoringFailureCode.FlagNotSupported);
-        if (submission.Kind == SubmissionKind.Break
-            && HasCorrectPrior(context, submission.Kind))
-            return new(ScoringEventKind.SubmissionEvaluation, ScoringResult.Duplicate,
-                ScoringFailureCode.DuplicateAchievement, submission.ReceivedAt, "awdp-evaluator-v2");
-        return inner.Evaluate(context);
+        if (submission.Kind != SubmissionKind.Break)
+            return inner.Evaluate(context);
+
+        var normalDecision = HasCorrectPrior(context, submission.Kind)
+            ? new ScoringEventDecision(ScoringEventKind.SubmissionEvaluation, ScoringResult.Duplicate,
+                ScoringFailureCode.DuplicateAchievement, submission.ReceivedAt, "awdp-evaluator-v2")
+            : inner.Evaluate(context);
+        return ModeSubmissionEvaluatorRules.DetectForeignTeamFlag(context, normalDecision);
     }
 
     private static bool HasCorrectPrior(SubmissionProcessingContext context, SubmissionKind kind)

@@ -179,6 +179,16 @@ function requireNullableEnum<T extends number>(
   return value
 }
 
+function requirePublicScoringFailureCode(
+  value: NoCtfDomainSubmissionsScoringFailureCode | null | undefined,
+): PublicScoringFailureCode | null {
+  return requireNullableEnum(
+    value,
+    scoringFailureCodes,
+    'failureCode',
+  ) as PublicScoringFailureCode | null
+}
+
 function commonSubmissionFields(
   value: NoCtfapiEndpointsSubmissionsSubmissionListItemResponse
     | NoCtfapiEndpointsSubmissionsSubmissionStatusResponse,
@@ -197,11 +207,7 @@ function commonSubmissionFields(
       'evaluationState',
     ),
     result: requireNullableEnum(value.result, scoringResults, 'result'),
-    failureCode: requireNullableEnum(
-      value.failureCode,
-      scoringFailureCodes,
-      'failureCode',
-    ),
+    failureCode: requirePublicScoringFailureCode(value.failureCode),
     receivedAt: requireString(value.receivedAt, 'receivedAt'),
     processingVersion: requireNonNegativeInteger(
       value.processingVersion,

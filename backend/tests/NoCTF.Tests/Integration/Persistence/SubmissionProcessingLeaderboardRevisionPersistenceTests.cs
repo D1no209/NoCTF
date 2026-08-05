@@ -14,6 +14,11 @@ using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Submissions.Processing;
 using NoCTF.Tests.Fixtures;
+using NoCTF.GameModes.Registration;
+using NoCTF.GameModes.Submission;
+using NoCTF.Infrastructure.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
+using NoCTF.Worker;
 using NSubstitute;
 using Testcontainers.PostgreSql;
 
@@ -22,6 +27,117 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Ctf_foreign_team_flag_persists_rejected_evidence_and_safe_outbox_message(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_submission_foreign_flag")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var arrange = new NoCtfDbContext(options))
+            {
+                arrange.ChallengeFlags.Add(new ChallengeFlag
+                {
+                    Id = Guid.CreateVersion7(),
+                    CompetitionChallengeId = fixture.CompetitionChallengeId,
+                    TeamId = fixture.TeamIds[1],
+                    Flag = "flag-0",
+                    FlagSha256 = new byte[32],
+                    CreatedAt = fixture.Now
+                });
+                await arrange.SaveChangesAsync(cancellationToken);
+            }
+
+            var outbox = new RecordingOutbox();
+            await ProcessAsync(
+                options,
+                new GameModeSubmissionEvaluatorCatalog(),
+                new GameModeSubmissionAdmissionPolicy(),
+                Substitute.For<IRuntimePlacementPolicy>(),
+                outbox,
+                fixture.SubmissionIds[0],
+                cancellationToken);
+
+            await using var verify = new NoCtfDbContext(options);
+            var scoringEvent = await verify.ScoringEvents.AsNoTracking()
+                .SingleAsync(
+                    item => item.SubmissionId == fixture.SubmissionIds[0],
+                    cancellationToken);
+            await Assert.That(scoringEvent.Result).IsEqualTo(ScoringResult.Rejected);
+            await Assert.That(scoringEvent.FailureCode)
+                .IsEqualTo(ScoringFailureCode.ForeignTeamFlagDetected);
+            await Assert.That(scoringEvent.TeamId).IsEqualTo(fixture.TeamIds[0]);
+            await Assert.That(scoringEvent.VictimTeamId).IsEqualTo(fixture.TeamIds[1]);
+            var detected = outbox.Published.OfType<ForeignTeamFlagDetected>().ToArray();
+            await Assert.That(detected).Count().IsEqualTo(1);
+            await Assert.That(detected[0].ScoringEventId).IsEqualTo(scoringEvent.Id);
+            await Assert.That(detected[0].SubmissionId).IsEqualTo(fixture.SubmissionIds[0]);
+            await Assert.That(detected[0].SourceTeamId).IsEqualTo(fixture.TeamIds[0]);
+            await Assert.That(detected[0].OwnerTeamId).IsEqualTo(fixture.TeamIds[1]);
+
+            var detectionAudit = await verify.CompetitionEvents.AsNoTracking()
+                .SingleAsync(item =>
+                    item.ScoringEventId == scoringEvent.Id
+                    && item.Kind == CompetitionEventKind.CheatIncidentDetected,
+                    cancellationToken);
+            await Assert.That(detectionAudit.SubmissionId).IsEqualTo(fixture.SubmissionIds[0]);
+
+            await using (var rejudge = new NoCtfDbContext(options))
+            {
+                var flag = await rejudge.ChallengeFlags.SingleAsync(cancellationToken);
+                flag.DeletedAt = fixture.Now.AddSeconds(1);
+                await rejudge.SaveChangesAsync(cancellationToken);
+                await BackendMessageHandlers.Handle(
+                    new DrainSubmissions(
+                        fixture.CompetitionId,
+                        fixture.CompetitionChallengeId,
+                        fixture.Now.AddMinutes(1),
+                        true,
+                        fixture.SubmissionIds[0]),
+                    rejudge,
+                    outbox,
+                    cancellationToken);
+            }
+            var rejudgeMessage = outbox.Published.OfType<EvaluateSubmission>().Last();
+            await ProcessAsync(
+                options,
+                new GameModeSubmissionEvaluatorCatalog(),
+                new GameModeSubmissionAdmissionPolicy(),
+                Substitute.For<IRuntimePlacementPolicy>(),
+                outbox,
+                rejudgeMessage.SubmissionId,
+                cancellationToken,
+                rejudgeMessage.ProcessingVersion);
+
+            verify.ChangeTracker.Clear();
+            var scoringEvents = await verify.ScoringEvents.IgnoreQueryFilters().AsNoTracking()
+                .Where(item => item.SubmissionId == fixture.SubmissionIds[0])
+                .OrderBy(item => item.CreatedAt)
+                .ToArrayAsync(cancellationToken);
+            await Assert.That(scoringEvents).Count().IsEqualTo(2);
+            await Assert.That(scoringEvents[0].DeletedAt).IsNotNull();
+            await Assert.That(scoringEvents[1].Result).IsEqualTo(ScoringResult.Wrong);
+            var superseded = await verify.CompetitionEvents.AsNoTracking()
+                .SingleAsync(item =>
+                    item.ScoringEventId == scoringEvent.Id
+                    && item.Kind == CompetitionEventKind.CheatIncidentSuperseded,
+                    cancellationToken);
+            await Assert.That(superseded.Reason)
+                .IsEqualTo("Superseded by submission re-evaluation.");
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Concurrent_submissions_increment_the_shared_leaderboard_revision_atomically(
@@ -298,7 +414,13 @@ public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
                     EvaluationUpdatedAt = now
                 })));
         await db.SaveChangesAsync(cancellationToken);
-        return new(now, competitionId, submissionIds, bloodSubmissionIds);
+        return new(
+            now,
+            competitionId,
+            competitionChallengeId,
+            teamIds,
+            submissionIds,
+            bloodSubmissionIds);
     }
 
     private static async Task ProcessAsync(
@@ -308,16 +430,19 @@ public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
         IRuntimePlacementPolicy placementPolicy,
         ITransactionalMessageOutbox outbox,
         Guid submissionId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        long processingVersion = 0)
     {
         await using var db = new NoCtfDbContext(options);
+        var events = new CompetitionEventStore(db, outbox);
         var processor = new SubmissionProcessor(
             db,
             evaluatorCatalog,
             admissionPolicy,
             placementPolicy,
-            outbox);
-        await processor.ProcessAsync(submissionId, 0, cancellationToken);
+            outbox,
+            events);
+        await processor.ProcessAsync(submissionId, processingVersion, cancellationToken);
     }
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
@@ -362,6 +487,8 @@ public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
     private sealed record Fixture(
         DateTimeOffset Now,
         Guid CompetitionId,
+        Guid CompetitionChallengeId,
+        IReadOnlyList<Guid> TeamIds,
         IReadOnlyList<Guid> SubmissionIds,
         IReadOnlyList<Guid> BloodSubmissionIds);
 }

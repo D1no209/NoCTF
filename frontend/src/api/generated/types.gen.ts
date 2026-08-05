@@ -80,7 +80,7 @@ export type NoCtfDomainSubmissionsSubmissionEvaluationState = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfDomainSubmissionsScoringResult = 0 | 1 | 2 | 3 | 4 | 5;
 
-export type NoCtfDomainSubmissionsScoringFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28;
+export type NoCtfDomainSubmissionsScoringFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29;
 
 export type NoCtfapiEndpointsSubmissionsGetSubmissionStatusRequest = {
     [key: string]: never;
@@ -230,7 +230,7 @@ export type NoCtfapiEndpointsNotificationsNotificationResponse = {
     createdAt?: string;
 };
 
-export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
 
 export type NoCtfapiEndpointsNotificationsListNotificationsRequest = {
     [key: string]: never;
@@ -382,7 +382,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfDomainCompetitionsEventsCompetitionEventKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37;
+export type NoCtfDomainCompetitionsEventsCompetitionEventKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42;
 
 export type NoCtfDomainCompetitionsEventsCompetitionEventLevel = 0 | 1 | 2;
 
@@ -414,6 +414,7 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     hintId?: string | null;
     runtimeInstanceId?: string | null;
     submissionId?: string | null;
+    scoringEventId?: string | null;
     questionId?: string | null;
     competitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
     leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
@@ -1126,6 +1127,91 @@ export type NoCtfApplicationCompetitionsLifecycleStartGateError = {
     code?: string;
     competitionChallengeId?: string | null;
     message?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsConfirmCheatIncidentRequest = {
+    reason: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsCorrectCheatIncidentRequest = {
+    reason: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsDismissCheatIncidentRequest = {
+    reason: string;
+};
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse = {
+    scoringEventId?: string;
+    submissionId?: string;
+    submittedFlag?: string;
+    sourceTeamId?: string;
+    sourceTeamName?: string;
+    ownerTeamId?: string;
+    ownerTeamName?: string;
+    submittedByUserId?: string;
+    submittedByUserName?: string;
+    competitionChallengeId?: string;
+    challengeTitle?: string;
+    submissionKind?: NoCtfDomainSubmissionsSubmissionKind;
+    result?: NoCtfDomainSubmissionsScoringResult;
+    failureCode?: NoCtfDomainSubmissionsScoringFailureCode;
+    status?: NoCtfDomainSubmissionsCheatIncidentStatus;
+    resolvedByUserId?: string | null;
+    resolvedByUserName?: string | null;
+    resolvedAt?: string | null;
+    resolutionReason?: string | null;
+    submittedAt?: string;
+    detectedAt?: string;
+    sourceTeamIsBanned?: boolean;
+    sourceTeamBannedAt?: string | null;
+    sourceTeamBannedByUserId?: string | null;
+    sourceTeamBanReason?: string | null;
+    canDismiss?: boolean;
+    canConfirm?: boolean;
+    canCorrect?: boolean;
+};
+
+export type NoCtfDomainSubmissionsCheatIncidentStatus = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsGetCheatIncidentRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse>;
+    pendingCount?: number;
+    canDismiss?: boolean;
+    canConfirm?: boolean;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse = {
+    scoringEventId?: string;
+    submissionId?: string;
+    sourceTeamId?: string;
+    sourceTeamName?: string;
+    ownerTeamId?: string;
+    ownerTeamName?: string;
+    submittedByUserId?: string;
+    submittedByUserName?: string;
+    competitionChallengeId?: string;
+    challengeTitle?: string;
+    submissionKind?: NoCtfDomainSubmissionsSubmissionKind;
+    result?: NoCtfDomainSubmissionsScoringResult;
+    failureCode?: NoCtfDomainSubmissionsScoringFailureCode;
+    status?: NoCtfDomainSubmissionsCheatIncidentStatus;
+    resolvedByUserId?: string | null;
+    resolvedByUserName?: string | null;
+    resolvedAt?: string | null;
+    resolutionReason?: string | null;
+    submittedAt?: string;
+    detectedAt?: string;
+    sourceTeamIsBanned?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationCheatIncidentsListCheatIncidentsRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse = {
@@ -5543,6 +5629,209 @@ export type AdminValidateCompetitionStartResponses = {
 };
 
 export type AdminValidateCompetitionStartResponse = AdminValidateCompetitionStartResponses[keyof AdminValidateCompetitionStartResponses];
+
+export type AdminConfirmCheatIncidentData = {
+    body: NoCtfapiEndpointsAdministrationCheatIncidentsConfirmCheatIncidentRequest;
+    path: {
+        competitionId: string;
+        scoringEventId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/confirm';
+};
+
+export type AdminConfirmCheatIncidentErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminConfirmCheatIncidentError = AdminConfirmCheatIncidentErrors[keyof AdminConfirmCheatIncidentErrors];
+
+export type AdminConfirmCheatIncidentResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminConfirmCheatIncidentResponse = AdminConfirmCheatIncidentResponses[keyof AdminConfirmCheatIncidentResponses];
+
+export type AdminCorrectCheatIncidentData = {
+    body: NoCtfapiEndpointsAdministrationCheatIncidentsCorrectCheatIncidentRequest;
+    path: {
+        competitionId: string;
+        scoringEventId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/correct';
+};
+
+export type AdminCorrectCheatIncidentErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminCorrectCheatIncidentError = AdminCorrectCheatIncidentErrors[keyof AdminCorrectCheatIncidentErrors];
+
+export type AdminCorrectCheatIncidentResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminCorrectCheatIncidentResponse = AdminCorrectCheatIncidentResponses[keyof AdminCorrectCheatIncidentResponses];
+
+export type AdminDismissCheatIncidentData = {
+    body: NoCtfapiEndpointsAdministrationCheatIncidentsDismissCheatIncidentRequest;
+    path: {
+        competitionId: string;
+        scoringEventId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/dismiss';
+};
+
+export type AdminDismissCheatIncidentErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminDismissCheatIncidentError = AdminDismissCheatIncidentErrors[keyof AdminDismissCheatIncidentErrors];
+
+export type AdminDismissCheatIncidentResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminDismissCheatIncidentResponse = AdminDismissCheatIncidentResponses[keyof AdminDismissCheatIncidentResponses];
+
+export type AdminGetCheatIncidentData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        scoringEventId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}';
+};
+
+export type AdminGetCheatIncidentErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetCheatIncidentResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse;
+};
+
+export type AdminGetCheatIncidentResponse = AdminGetCheatIncidentResponses[keyof AdminGetCheatIncidentResponses];
+
+export type AdminListCheatIncidentsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        sourceTeamId?: string | null;
+        ownerTeamId?: string | null;
+        userId?: string | null;
+        competitionChallengeId?: string | null;
+        status?: NoCtfDomainSubmissionsCheatIncidentStatus | null;
+        from: string;
+        to: string;
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/cheat-incidents';
+};
+
+export type AdminListCheatIncidentsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListCheatIncidentsError = AdminListCheatIncidentsErrors[keyof AdminListCheatIncidentsErrors];
+
+export type AdminListCheatIncidentsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListResponse;
+};
+
+export type AdminListCheatIncidentsResponse = AdminListCheatIncidentsResponses[keyof AdminListCheatIncidentsResponses];
 
 export type AdminListCompetitionChallengesData = {
     body?: never;

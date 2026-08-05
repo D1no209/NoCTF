@@ -21,6 +21,92 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Foreign_flag_detection_notifies_only_evidence_readers_and_is_idempotent(
+        CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_cheat_incident_notifications")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            var competitionId = Guid.CreateVersion7();
+            var administratorId = Guid.CreateVersion7();
+            var ownerId = Guid.CreateVersion7();
+            var managerId = Guid.CreateVersion7();
+            var judgeId = Guid.CreateVersion7();
+            var observerId = Guid.CreateVersion7();
+            var participantId = Guid.CreateVersion7();
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(ct);
+            db.Users.AddRange(
+                Human(administratorId, "incident-administrator", UserRole.Administrator, now),
+                Human(ownerId, "incident-owner", UserRole.Organizer, now),
+                Human(managerId, "incident-manager", UserRole.Organizer, now),
+                Human(judgeId, "incident-judge", UserRole.Organizer, now),
+                Human(observerId, "incident-observer", UserRole.Organizer, now),
+                Human(participantId, "incident-participant", UserRole.User, now));
+            db.Competitions.Add(new Competition
+            {
+                Id = competitionId,
+                OwnerId = ownerId,
+                ManagerIds = [managerId],
+                JudgeIds = [judgeId],
+                ObserverIds = [observerId],
+                Title = "Cheat incident notifications",
+                Mode = GameMode.Ctf,
+                ConfigurationUpdatedAt = now,
+                FlagDerivationSecret = new byte[32],
+                StartAt = now.AddHours(-1),
+                EndAt = now.AddHours(1),
+                Status = CompetitionStatus.Running,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            await db.SaveChangesAsync(ct);
+
+            var message = new ForeignTeamFlagDetected(
+                competitionId,
+                Guid.CreateVersion7(),
+                Guid.CreateVersion7(),
+                Guid.CreateVersion7(),
+                Guid.CreateVersion7(),
+                participantId,
+                Guid.CreateVersion7(),
+                now);
+            var delivery = new CompetitionNotificationDelivery(
+                db,
+                new CompetitionNotificationAudienceResolver(db));
+            await CompetitionNotificationMessageHandlers.Handle(message, db, delivery, ct);
+            await CompetitionNotificationMessageHandlers.Handle(message, db, delivery, ct);
+
+            var notifications = await db.Notifications.AsNoTracking().ToArrayAsync(ct);
+            await Assert.That(notifications).Count().IsEqualTo(4);
+            await Assert.That(notifications.Select(item => item.UserId)).IsEquivalentTo([
+                administratorId,
+                ownerId,
+                managerId,
+                judgeId
+            ]);
+            await Assert.That(notifications.Select(item => item.UserId)).DoesNotContain(observerId);
+            await Assert.That(notifications.Select(item => item.UserId)).DoesNotContain(participantId);
+            await Assert.That(notifications.All(item =>
+                item.Kind == NotificationKind.CheatIncidentDetected
+                && item.SourceEventKey == $"cheat-incident:{message.SubmissionId:N}"
+                && !item.PayloadJson.Contains("flag", StringComparison.OrdinalIgnoreCase)))
+                .IsTrue();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Audience_is_scoped_deduplicated_and_delivery_is_idempotent(
         CancellationToken ct)
     {

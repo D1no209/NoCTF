@@ -23,3 +23,18 @@ public interface ISubmissionStatusReader
         Guid userId,
         CancellationToken cancellationToken);
 }
+
+public static class SubmissionResultDisclosure
+{
+    public static ScoringResult? PlayerResult(
+        ScoringResult? result,
+        ScoringFailureCode? failureCode) =>
+        IsProtected(failureCode) ? ScoringResult.Wrong : result;
+
+    public static ScoringFailureCode? PlayerFailureCode(ScoringFailureCode? failureCode) =>
+        IsProtected(failureCode) ? null : failureCode;
+
+    private static bool IsProtected(ScoringFailureCode? failureCode) =>
+        failureCode is ScoringFailureCode.ForeignTeamFlagDetected
+            or ScoringFailureCode.AmbiguousFlagMatch;
+}

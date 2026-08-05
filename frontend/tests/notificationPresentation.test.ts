@@ -100,6 +100,21 @@ describe('notification presentation', () => {
       bodyKey: 'notifications.events.competitionQuestionStatusChanged.body',
       bodyParams: { title: 'Runtime connectivity' },
     })
+    expect(notificationCopy(createNotification(
+      NotificationKind.CheatIncidentDetected,
+      { submittedFlag: 'must not render', ownerTeamName: 'must not render' },
+    ))).toEqual({
+      titleKey: 'notifications.events.cheatIncidentDetected.title',
+      bodyKey: 'notifications.events.cheatIncidentDetected.body',
+    })
+    expect(notificationCopy(createNotification(
+      NotificationKind.TeamBanCorrected,
+      { teamName: 'Snow', reason: 'must not render' },
+    ))).toEqual({
+      titleKey: 'notifications.events.teamBanCorrected.title',
+      bodyKey: 'notifications.events.teamBanCorrected.body',
+      bodyParams: { team: 'Snow' },
+    })
   })
 
   test('uses safe fallback copy for a future unsupported kind', () => {

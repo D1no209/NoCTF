@@ -40,6 +40,13 @@ public sealed class CompetitionEventConfiguration
             item.OccurredAt,
             item.Id
         });
+        builder.HasIndex(item => new
+        {
+            item.CompetitionId,
+            item.ScoringEventId,
+            item.OccurredAt,
+            item.Id
+        });
         builder.HasOne<Competition>()
             .WithMany()
             .HasForeignKey(item => item.CompetitionId)
@@ -71,6 +78,10 @@ public sealed class CompetitionEventConfiguration
         builder.HasOne<Submission>()
             .WithMany()
             .HasForeignKey(item => item.SubmissionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<ScoringEvent>()
+            .WithMany()
+            .HasForeignKey(item => item.ScoringEventId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<CompetitionQuestion>()
             .WithMany()

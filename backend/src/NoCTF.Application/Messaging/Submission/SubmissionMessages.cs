@@ -8,3 +8,13 @@ public sealed record DrainSubmissions(
     DateTimeOffset Cutoff,
     bool Rejudge,
     Guid? SubmissionId = null);
+
+public sealed record ForeignTeamFlagDetected(
+    Guid CompetitionId,
+    Guid ScoringEventId,
+    Guid SubmissionId,
+    Guid SourceTeamId,
+    Guid OwnerTeamId,
+    Guid SubmittedByUserId,
+    Guid CompetitionChallengeId,
+    DateTimeOffset DetectedAt);
