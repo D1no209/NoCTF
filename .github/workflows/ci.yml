@@ -102,6 +102,12 @@ jobs:
           LOCAL_STORAGE_URL_SIGNING_KEY: ci-local-storage-signing-key-with-at-least-32-characters
         run: docker compose -f deploy/docker-compose.yml config -q
 
+      - name: Rehearse PostgreSQL, Wolverine, and object recovery
+        shell: bash
+        run: |
+          for script in deploy/recovery/*.sh; do bash -n "$script"; done
+          bash deploy/recovery/rehearse.sh
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: bun install --frozen-lockfile

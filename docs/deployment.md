@@ -102,4 +102,7 @@ Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL/W
 
 ## 运维边界
 
-平台不实现数据库/对象备份、PITR 或恢复编排；由外部运维负责。Redis 可丢失并重建。QQBot 不部署。
+平台进程和管理后台不实现数据库/对象备份或恢复 API；由外部运维负责。仓库提供强制停写、age
+加密、完整保留 Wolverine PostgreSQL schema、对象元数据和恢复后校验的外部工具及隔离演练，见
+[备份恢复](backup-recovery.md)。当前工具生成离散恢复点，不是 PITR。Redis 可丢失并重建。
+QQBot 不部署。

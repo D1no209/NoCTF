@@ -18,8 +18,9 @@
 12. 模式规范：[CTF](game-modes/ctf.md)、[AWD](game-modes/awd.md)、[AWDP](game-modes/awdp.md)、[KoH](game-modes/koh.md)
 13. [实时与站内通知](realtime-notifications.md)
 14. [QQBOT JWT 接入](qqbot-jwt.md)
-14. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)
-15. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
+15. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)
+16. [PostgreSQL、对象存储与 Wolverine 备份恢复](backup-recovery.md)
+17. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
 
 ## 强制边界
 
