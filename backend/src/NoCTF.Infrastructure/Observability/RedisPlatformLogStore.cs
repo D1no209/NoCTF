@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -9,20 +10,23 @@ namespace NoCTF.Infrastructure.Observability;
 
 public sealed record PlatformLogWriterOptions(
     PlatformLogService Service,
-    int MaximumEntries);
+    int MaximumEntriesPerDay,
+    int RetentionDays);
 
 public static class PlatformLoggingRegistration
 {
+    public const int MaximumEntriesPerDay = 50_000;
+    public const int RetentionDays = 14;
+
     public static IServiceCollection AddNoCtfPlatformLogging(
         this IServiceCollection services,
-        IConfiguration configuration,
+        IConfiguration _,
         PlatformLogService service)
     {
-        var maximumEntries = configuration.GetValue("PlatformLogs:MaximumEntries", 100_000);
-        if (maximumEntries is < 1_000 or > 1_000_000)
-            throw new InvalidOperationException(
-                "PlatformLogs:MaximumEntries must be between 1000 and 1000000.");
-        services.AddSingleton(new PlatformLogWriterOptions(service, maximumEntries));
+        services.AddSingleton(new PlatformLogWriterOptions(
+            service,
+            MaximumEntriesPerDay,
+            RetentionDays));
         services.AddSingleton<ILoggerProvider, RedisPlatformLoggerProvider>();
         return services;
     }
@@ -33,7 +37,7 @@ public sealed class RedisPlatformLoggerProvider(
     PlatformLogWriterOptions options)
     : ILoggerProvider, ISupportExternalScope
 {
-    public const string StreamKey = "platform-logs:v1";
+    public const string StreamKeyPrefix = "platform-logs:v2:";
     public const string Channel = "platform-logs:v1:live";
     private static readonly System.Text.Json.JsonSerializerOptions JsonOptions =
         new(System.Text.Json.JsonSerializerDefaults.Web);
@@ -91,14 +95,20 @@ public sealed class RedisPlatformLoggerProvider(
                 : Limit(PlatformLogRedactor.Redact(exception.ToString(), properties), 32_768);
             var competitionId = ReadGuid(properties, "CompetitionId");
             var runtimeInstanceId = ReadGuid(properties, "RuntimeInstanceId");
+            var teamId = ReadGuid(properties, "TeamId");
+            var userId = ReadGuid(properties, "UserId", "ActorUserId", "RelatedUserId");
+            var competitionChallengeId = ReadGuid(properties, "CompetitionChallengeId");
+            var submissionId = ReadGuid(properties, "SubmissionId");
             var level = ToPlatformLevel(logLevel);
             if (!redis.IsConnected)
                 return;
             var database = redis.GetDatabase();
             try
             {
+                var partition = DateOnly.FromDateTime(timestamp.UtcDateTime);
+                var streamKey = StreamKeyFor(partition);
                 var cursor = database.StreamAdd(
-                    StreamKey,
+                    streamKey,
                     [
                         new("timestamp", timestamp.ToString("O", CultureInfo.InvariantCulture)),
                         new("service", ((short)options.Service).ToString(CultureInfo.InvariantCulture)),
@@ -110,12 +120,22 @@ public sealed class RedisPlatformLoggerProvider(
                         new("exceptionType", exception?.GetType().FullName ?? string.Empty),
                         new("exceptionMessage", exceptionMessage ?? string.Empty),
                         new("competitionId", competitionId?.ToString("D") ?? string.Empty),
-                        new("runtimeInstanceId", runtimeInstanceId?.ToString("D") ?? string.Empty)
+                        new("runtimeInstanceId", runtimeInstanceId?.ToString("D") ?? string.Empty),
+                        new("teamId", teamId?.ToString("D") ?? string.Empty),
+                        new("userId", userId?.ToString("D") ?? string.Empty),
+                        new(
+                            "competitionChallengeId",
+                            competitionChallengeId?.ToString("D") ?? string.Empty),
+                        new("submissionId", submissionId?.ToString("D") ?? string.Empty)
                     ],
-                    maxLength: options.MaximumEntries,
-                    useApproximateMaxLength: true);
+                    maxLength: options.MaximumEntriesPerDay,
+                    useApproximateMaxLength: false);
+                var expiresAt = partition
+                    .ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)
+                    .AddDays(options.RetentionDays);
+                _ = database.KeyExpire(streamKey, expiresAt);
                 var notification = new PlatformLogView(
-                    cursor.ToString(),
+                    ComposeCursor(partition, cursor.ToString()),
                     timestamp,
                     options.Service,
                     level,
@@ -126,7 +146,11 @@ public sealed class RedisPlatformLoggerProvider(
                     exception?.GetType().FullName,
                     exceptionMessage,
                     competitionId,
-                    runtimeInstanceId);
+                    runtimeInstanceId,
+                    teamId,
+                    userId,
+                    competitionChallengeId,
+                    submissionId);
                 redis.GetSubscriber().Publish(
                     RedisChannel.Literal(Channel),
                     System.Text.Json.JsonSerializer.Serialize(notification, JsonOptions));
@@ -147,11 +171,11 @@ public sealed class RedisPlatformLoggerProvider(
 
         private static Guid? ReadGuid(
             IEnumerable<KeyValuePair<string, object?>> properties,
-            string key)
+            params string[] keys)
         {
             foreach (var property in properties)
             {
-                if (!string.Equals(property.Key, key, StringComparison.OrdinalIgnoreCase))
+                if (!keys.Contains(property.Key, StringComparer.OrdinalIgnoreCase))
                     continue;
                 if (property.Value is Guid guid)
                     return guid;
@@ -177,61 +201,131 @@ public sealed class RedisPlatformLoggerProvider(
         private static string Limit(string value, int maximumLength) =>
             value.Length <= maximumLength ? value : value[..maximumLength];
     }
+
+    public static string StreamKeyFor(DateOnly partition) =>
+        $"{StreamKeyPrefix}{partition:yyyyMMdd}";
+
+    internal static string ComposeCursor(DateOnly partition, string streamId) =>
+        $"{partition:yyyyMMdd}:{streamId}";
 }
 
-public sealed class RedisPlatformLogStore(IConnectionMultiplexer redis) : IPlatformLogReader
+public sealed class RedisPlatformLogStore(
+    IConnectionMultiplexer redis,
+    PlatformLogWriterOptions options) : IPlatformLogReader
 {
     private const int ScanBatchSize = 500;
     private const int MaximumScannedEntries = 20_000;
+    private const int MaximumExportScannedEntries = 700_000;
+    private static readonly JsonSerializerOptions ExportJsonOptions =
+        new(JsonSerializerDefaults.Web);
 
     public async Task<PlatformLogQueryResult> QueryAsync(
         PlatformLogQuery query,
+        CancellationToken ct) =>
+        await QueryCoreAsync(query, MaximumScannedEntries, ct);
+
+    public async Task<PlatformLogExportResult> ExportAsync(
+        PlatformLogQuery query,
+        CancellationToken ct)
+    {
+        var result = await QueryCoreAsync(query, MaximumExportScannedEntries, ct);
+        if (result.State != PlatformLogReadState.Available)
+            return new(result.State);
+        var stream = new MemoryStream();
+        foreach (var item in result.Items)
+        {
+            await JsonSerializer.SerializeAsync(stream, item, ExportJsonOptions, ct);
+            stream.WriteByte((byte)'\n');
+        }
+        stream.Position = 0;
+        return new(
+            PlatformLogReadState.Available,
+            new PlatformLogExport(
+                stream,
+                $"platform-logs-{query.From!.Value:yyyyMMdd}-{query.To!.Value:yyyyMMdd}.jsonl"));
+    }
+
+    private async Task<PlatformLogQueryResult> QueryCoreAsync(
+        PlatformLogQuery query,
+        int maximumScannedEntries,
         CancellationToken ct)
     {
         try
         {
             var database = redis.GetDatabase();
-            RedisValue minimumId = query.From is null
-                ? "-"
-                : $"{query.From.Value.ToUnixTimeMilliseconds()}-0";
-            RedisValue maximumId = query.Cursor is not null
-                ? $"({query.Cursor}"
-                : query.To is null
-                    ? "+"
-                    : $"{query.To.Value.ToUnixTimeMilliseconds()}-999999999";
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var earliestRetained = today.AddDays(-(options.RetentionDays - 1));
+            var fromPartition = query.From is null
+                ? earliestRetained
+                : DateOnly.FromDateTime(query.From.Value.UtcDateTime);
+            if (fromPartition < earliestRetained)
+                fromPartition = earliestRetained;
+            var toPartition = query.To is null
+                ? today
+                : DateOnly.FromDateTime(query.To.Value.UtcDateTime);
+            if (toPartition > today)
+                toPartition = today;
+
+            DateOnly? cursorPartition = null;
+            string? cursorStreamId = null;
+            if (query.Cursor is not null
+                && !TryParseCursor(query.Cursor, out cursorPartition, out cursorStreamId))
+                return new(PlatformLogReadState.Unavailable, []);
+            if (cursorPartition is not null)
+                toPartition = cursorPartition.Value;
+
             var items = new List<PlatformLogView>(query.Limit);
             var scanned = 0;
             string? lastCursor = null;
-            while (items.Count < query.Limit && scanned < MaximumScannedEntries)
+            var partition = toPartition;
+            while (partition >= fromPartition
+                && items.Count < query.Limit
+                && scanned < maximumScannedEntries)
             {
-                ct.ThrowIfCancellationRequested();
-                var entries = await database.StreamRangeAsync(
-                    RedisPlatformLoggerProvider.StreamKey,
-                    minimumId,
-                    maximumId,
-                    ScanBatchSize,
-                    Order.Descending);
-                if (entries.Length == 0)
-                    break;
-                scanned += entries.Length;
-                foreach (var entry in entries)
+                RedisValue minimumId = query.From is not null && partition == fromPartition
+                    ? $"{query.From.Value.ToUnixTimeMilliseconds()}-0"
+                    : "-";
+                RedisValue maximumId = cursorPartition == partition && cursorStreamId is not null
+                    ? $"({cursorStreamId}"
+                    : query.To is not null && partition == toPartition
+                        ? $"{query.To.Value.ToUnixTimeMilliseconds()}-999999999"
+                        : "+";
+                while (items.Count < query.Limit && scanned < maximumScannedEntries)
                 {
-                    lastCursor = entry.Id.ToString();
-                    if (TryMap(entry, out var item) && Matches(item, query))
+                    ct.ThrowIfCancellationRequested();
+                    var entries = await database.StreamRangeAsync(
+                        RedisPlatformLoggerProvider.StreamKeyFor(partition),
+                        minimumId,
+                        maximumId,
+                        ScanBatchSize,
+                        Order.Descending);
+                    if (entries.Length == 0)
+                        break;
+                    scanned += entries.Length;
+                    foreach (var entry in entries)
                     {
-                        items.Add(item);
-                        if (items.Count == query.Limit)
-                            break;
+                        lastCursor = RedisPlatformLoggerProvider.ComposeCursor(
+                            partition,
+                            entry.Id.ToString());
+                        if (TryMap(partition, entry, out var item) && Matches(item, query))
+                        {
+                            items.Add(item);
+                            if (items.Count == query.Limit)
+                                break;
+                        }
                     }
+                    maximumId = $"({entries[^1].Id}";
+                    if (entries.Length < ScanBatchSize)
+                        break;
                 }
-                maximumId = $"({entries[^1].Id}";
-                if (entries.Length < ScanBatchSize)
-                    break;
+                cursorPartition = null;
+                cursorStreamId = null;
+                partition = partition.AddDays(-1);
             }
             return new(
                 PlatformLogReadState.Available,
                 items,
-                items.Count == query.Limit || scanned >= MaximumScannedEntries
+                items.Count == query.Limit || scanned >= maximumScannedEntries
                     ? lastCursor
                     : null);
         }
@@ -246,11 +340,29 @@ public sealed class RedisPlatformLogStore(IConnectionMultiplexer redis) : IPlatf
         && (query.Service is null || item.Service == query.Service)
         && (query.From is null || item.Timestamp >= query.From)
         && (query.To is null || item.Timestamp <= query.To)
+        && (query.Category is null
+            || string.Equals(item.Category, query.Category, StringComparison.OrdinalIgnoreCase))
+        && (query.Search is null || MatchesSearch(item, query.Search))
         && (query.CompetitionId is null || item.CompetitionId == query.CompetitionId)
         && (query.RuntimeInstanceId is null
-            || item.RuntimeInstanceId == query.RuntimeInstanceId);
+            || item.RuntimeInstanceId == query.RuntimeInstanceId)
+        && (query.TeamId is null || item.TeamId == query.TeamId)
+        && (query.UserId is null || item.UserId == query.UserId)
+        && (query.CompetitionChallengeId is null
+            || item.CompetitionChallengeId == query.CompetitionChallengeId)
+        && (query.SubmissionId is null || item.SubmissionId == query.SubmissionId);
 
-    private static bool TryMap(StreamEntry entry, out PlatformLogView item)
+    private static bool MatchesSearch(PlatformLogView item, string search) =>
+        item.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || item.EventName?.Contains(search, StringComparison.OrdinalIgnoreCase) == true
+        || item.Message.Contains(search, StringComparison.OrdinalIgnoreCase)
+        || item.ExceptionType?.Contains(search, StringComparison.OrdinalIgnoreCase) == true
+        || item.ExceptionMessage?.Contains(search, StringComparison.OrdinalIgnoreCase) == true;
+
+    private static bool TryMap(
+        DateOnly partition,
+        StreamEntry entry,
+        out PlatformLogView item)
     {
         var values = entry.Values.ToDictionary(
             value => value.Name.ToString(),
@@ -278,21 +390,33 @@ public sealed class RedisPlatformLogStore(IConnectionMultiplexer redis) : IPlatf
         values.TryGetValue("exceptionMessage", out var exceptionMessage);
         values.TryGetValue("competitionId", out var competitionIdText);
         values.TryGetValue("runtimeInstanceId", out var runtimeInstanceIdText);
+        values.TryGetValue("teamId", out var teamIdText);
+        values.TryGetValue("userId", out var userIdText);
+        values.TryGetValue("competitionChallengeId", out var competitionChallengeIdText);
+        values.TryGetValue("submissionId", out var submissionIdText);
         item = new(
-            entry.Id.ToString(),
+            RedisPlatformLoggerProvider.ComposeCursor(partition, entry.Id.ToString()),
             timestamp,
             service,
             level,
             category,
             eventId,
             EmptyToNull(eventName),
-            message,
+            PlatformLogRedactor.Redact(message, []),
             EmptyToNull(exceptionType),
-            EmptyToNull(exceptionMessage),
+            exceptionMessage is null
+                ? null
+                : PlatformLogRedactor.Redact(exceptionMessage, []),
             Guid.TryParse(competitionIdText, out var competitionId) ? competitionId : null,
             Guid.TryParse(runtimeInstanceIdText, out var runtimeInstanceId)
                 ? runtimeInstanceId
-                : null);
+                : null,
+            Guid.TryParse(teamIdText, out var teamId) ? teamId : null,
+            Guid.TryParse(userIdText, out var userId) ? userId : null,
+            Guid.TryParse(competitionChallengeIdText, out var competitionChallengeId)
+                ? competitionChallengeId
+                : null,
+            Guid.TryParse(submissionIdText, out var submissionId) ? submissionId : null);
         return true;
     }
 
@@ -315,4 +439,31 @@ public sealed class RedisPlatformLogStore(IConnectionMultiplexer redis) : IPlatf
 
     private static string? EmptyToNull(string? value) =>
         string.IsNullOrEmpty(value) ? null : value;
+
+    private static bool TryParseCursor(
+        string cursor,
+        out DateOnly? partition,
+        out string? streamId)
+    {
+        partition = null;
+        streamId = null;
+        var separator = cursor.IndexOf(':', StringComparison.Ordinal);
+        if (separator != 8
+            || !DateOnly.TryParseExact(
+                cursor[..separator],
+                "yyyyMMdd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsedPartition))
+            return false;
+        var candidate = cursor[(separator + 1)..];
+        var idSeparator = candidate.IndexOf('-', StringComparison.Ordinal);
+        if (idSeparator <= 0
+            || !long.TryParse(candidate[..idSeparator], out _)
+            || !long.TryParse(candidate[(idSeparator + 1)..], out _))
+            return false;
+        partition = parsedPartition;
+        streamId = candidate;
+        return true;
+    }
 }

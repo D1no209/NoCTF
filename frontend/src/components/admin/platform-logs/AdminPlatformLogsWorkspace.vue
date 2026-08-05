@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PlatformLogFilter } from './platformLogPresentation'
 import type {
+  PlatformAuditKind,
   PlatformAuditLog,
   PlatformDeadLetter,
   PlatformLog,
@@ -10,6 +11,7 @@ import type {
 import {
   AlertTriangle,
   Check,
+  Download,
   FileClock,
   Loader2,
   Pause,
@@ -26,6 +28,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { platformLogsApi } from '@/api/platformLogs'
+import { competitionEventKindKey } from '@/components/competition-events/competitionEventPresentation'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -46,9 +49,6 @@ import {
   DEFAULT_PLATFORM_LOG_LEVEL,
   matchesPlatformLog,
   PLATFORM_LOG_HUB_PATH,
-  platformAuditActionName,
-  platformAuditKindName,
-
   platformLogLevelName,
   platformLogServiceName,
 } from './platformLogPresentation'
@@ -60,8 +60,10 @@ const paused = ref(false)
 const connecting = ref(false)
 const historyLoading = ref(false)
 const historyLoadingMore = ref(false)
+const exporting = ref(false)
 const historyError = ref(false)
 const auditLoading = ref(false)
+const auditLoadingMore = ref(false)
 const auditError = ref(false)
 const deadLetterLoading = ref(false)
 const deadLetterError = ref(false)
@@ -70,17 +72,39 @@ const requeueingId = ref<string | null>(null)
 const historyEntries = ref<PlatformLog[]>([])
 const liveEntries = ref<PlatformLog[]>([])
 const nextCursor = ref<string | null>(null)
+const auditNextCursor = ref<string | null>(null)
 const auditEntries = ref<PlatformAuditLog[]>([])
 const deadLetters = ref<PlatformDeadLetter[]>([])
 const deadLetterSearch = ref('')
 
+function toLocalInput(value: Date) {
+  const offset = value.getTimezoneOffset() * 60_000
+  return new Date(value.getTime() - offset).toISOString().slice(0, 16)
+}
+
+function defaultLogRange() {
+  const now = new Date()
+  return {
+    from: toLocalInput(new Date(now.getTime() - 24 * 60 * 60 * 1000)),
+    to: toLocalInput(now),
+  }
+}
+
+const initialRange = defaultLogRange()
+
 const draft = reactive({
   minimumLevel: String(DEFAULT_PLATFORM_LOG_LEVEL),
   service: 'all',
-  from: '',
-  to: '',
+  from: initialRange.from,
+  to: initialRange.to,
+  category: '',
+  search: '',
   competitionId: '',
   runtimeInstanceId: '',
+  teamId: '',
+  userId: '',
+  competitionChallengeId: '',
+  submissionId: '',
 })
 
 const auditDraft = reactive({
@@ -94,10 +118,16 @@ const auditDraft = reactive({
 const appliedFilter = ref<PlatformLogFilter>({
   minimumLevel: DEFAULT_PLATFORM_LOG_LEVEL,
   service: null,
-  from: null,
-  to: null,
+  from: new Date(initialRange.from).toISOString(),
+  to: new Date(initialRange.to).toISOString(),
+  category: null,
+  search: null,
   competitionId: null,
   runtimeInstanceId: null,
+  teamId: null,
+  userId: null,
+  competitionChallengeId: null,
+  submissionId: null,
 })
 
 const {
@@ -125,8 +155,14 @@ function buildAppliedFilter(): PlatformLogFilter {
     service: draft.service === 'all' ? null : Number(draft.service) as PlatformLogService,
     from: toIso(draft.from),
     to: toIso(draft.to),
+    category: normalized(draft.category),
+    search: normalized(draft.search),
     competitionId: normalized(draft.competitionId),
     runtimeInstanceId: normalized(draft.runtimeInstanceId),
+    teamId: normalized(draft.teamId),
+    userId: normalized(draft.userId),
+    competitionChallengeId: normalized(draft.competitionChallengeId),
+    submissionId: normalized(draft.submissionId),
   }
 }
 
@@ -147,8 +183,14 @@ async function fetchLogs(reset = true) {
       service: filter.service,
       from: filter.from,
       to: filter.to,
+      category: filter.category,
+      search: filter.search,
       competitionId: filter.competitionId,
       runtimeInstanceId: filter.runtimeInstanceId,
+      teamId: filter.teamId,
+      userId: filter.userId,
+      competitionChallengeId: filter.competitionChallengeId,
+      submissionId: filter.submissionId,
       cursor: reset ? null : nextCursor.value,
       limit: 100,
     })
@@ -174,28 +216,83 @@ async function applyLogFilters() {
 }
 
 async function resetLogFilters() {
+  const range = defaultLogRange()
   draft.minimumLevel = String(DEFAULT_PLATFORM_LOG_LEVEL)
   draft.service = 'all'
-  draft.from = ''
-  draft.to = ''
+  draft.from = range.from
+  draft.to = range.to
+  draft.category = ''
+  draft.search = ''
   draft.competitionId = ''
   draft.runtimeInstanceId = ''
+  draft.teamId = ''
+  draft.userId = ''
+  draft.competitionChallengeId = ''
+  draft.submissionId = ''
   await applyLogFilters()
 }
 
-async function fetchAudits() {
-  auditLoading.value = true
-  auditError.value = false
+async function exportLogs() {
+  const filter = appliedFilter.value
+  if (!filter.from || !filter.to) {
+    toast.error(t('admin.platformLogs.errors.exportRange'))
+    return
+  }
+  exporting.value = true
+  try {
+    const result = await platformLogsApi.export({
+      minimumLevel: filter.minimumLevel,
+      service: filter.service,
+      from: filter.from,
+      to: filter.to,
+      category: filter.category,
+      search: filter.search,
+      competitionId: filter.competitionId,
+      runtimeInstanceId: filter.runtimeInstanceId,
+      teamId: filter.teamId,
+      userId: filter.userId,
+      competitionChallengeId: filter.competitionChallengeId,
+      submissionId: filter.submissionId,
+    })
+    const url = URL.createObjectURL(result.content)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = result.fileName
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success(t('admin.platformLogs.exported'))
+  }
+  catch {
+    toast.error(t('admin.platformLogs.errors.export'))
+  }
+  finally {
+    exporting.value = false
+  }
+}
+
+async function fetchAudits(reset = true) {
+  if (reset) {
+    auditLoading.value = true
+    auditError.value = false
+    auditNextCursor.value = null
+  }
+  else {
+    auditLoadingMore.value = true
+  }
   try {
     const response = await platformLogsApi.audits({
-      kind: auditDraft.kind === 'all' ? null : Number(auditDraft.kind) as 0 | 1,
+      kind: auditDraft.kind === 'all' ? null : Number(auditDraft.kind) as PlatformAuditKind,
       from: toIso(auditDraft.from),
       to: toIso(auditDraft.to),
       competitionId: normalized(auditDraft.competitionId),
       actorId: normalized(auditDraft.actorId),
+      cursor: reset ? null : auditNextCursor.value,
       limit: 200,
     })
-    auditEntries.value = response.items ?? []
+    auditEntries.value = reset
+      ? response.items ?? []
+      : [...auditEntries.value, ...(response.items ?? [])]
+    auditNextCursor.value = response.nextCursor ?? null
   }
   catch {
     auditError.value = true
@@ -203,6 +300,7 @@ async function fetchAudits() {
   }
   finally {
     auditLoading.value = false
+    auditLoadingMore.value = false
   }
 }
 
@@ -302,6 +400,47 @@ function levelClass(level?: number) {
   return 'border-sky-500/40 bg-sky-500/10 text-sky-700'
 }
 
+function auditKindLabel(entry: PlatformAuditLog) {
+  const keys = [
+    'competitionLifecycle',
+    'accountLifecycle',
+    'leaderboardVisibility',
+    'competitionEvent',
+  ]
+  const key = keys[entry.kind ?? -1]
+  return key ? t(`admin.platformLogs.audit.${key}`) : t('common.unknown')
+}
+
+function auditActionLabel(entry: PlatformAuditLog) {
+  if (entry.kind === 0) {
+    const keys = ['draft', 'visible', 'published', 'running', 'paused', 'finished']
+    const key = keys[entry.toCompetitionStatus ?? -1]
+    return key ? t(`competitions.status.${key}`) : t('common.unknown')
+  }
+  if (entry.kind === 2) {
+    const keys = ['normal', 'frozen', 'blackout']
+    const key = keys[entry.toLeaderboardVisibility ?? -1]
+    return key ? t(`leaderboardVisibility.${key}`) : t('common.unknown')
+  }
+  if (entry.kind === 3) {
+    const key = competitionEventKindKey(entry.competitionEventKind)
+    return key ? t(`competitionEvents.kinds.${key}`) : t('common.unknown')
+  }
+  const keys = ['banned', 'disabled', 'anonymized', 'physicallyDeleted']
+  const key = keys[entry.userAccountAction ?? -1]
+  return key ? t(`admin.platformLogs.audit.accountActions.${key}`) : t('common.unknown')
+}
+
+function auditRelations(entry: PlatformAuditLog) {
+  return [
+    ['team', entry.teamId],
+    ['user', entry.relatedUserId],
+    ['challenge', entry.competitionChallengeId],
+    ['runtime', entry.runtimeInstanceId],
+    ['submission', entry.submissionId],
+  ].filter((item): item is [string, string] => Boolean(item[1]))
+}
+
 function refreshActiveTab() {
   if (activeTab.value === 'audit')
     return fetchAudits()
@@ -337,6 +476,9 @@ onUnmounted(() => {
             <ShieldCheck class="size-3" />
             {{ t('admin.platformLogs.adminOnly') }}
           </Badge>
+          <Badge variant="secondary" class="rounded-none font-mono">
+            {{ t('admin.platformLogs.retention') }}
+          </Badge>
         </div>
         <p class="max-w-3xl text-sm leading-6 text-muted-foreground">
           {{ t('admin.platformLogs.subtitle') }}
@@ -345,7 +487,7 @@ onUnmounted(() => {
           {{ t('admin.platformLogs.redaction') }}
         </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <div
           class="inline-flex h-9 items-center gap-2 border-2 px-3 text-xs font-bold"
           :class="isConnected ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700' : 'border-amber-500/40 bg-amber-500/10 text-amber-800'"
@@ -353,6 +495,11 @@ onUnmounted(() => {
           <Radio class="size-3.5" :class="{ 'animate-pulse': isConnected }" />
           {{ isConnected ? t('admin.platformLogs.connected') : t('admin.platformLogs.reconnecting') }}
         </div>
+        <Button variant="outline" :disabled="exporting" @click="exportLogs">
+          <Loader2 v-if="exporting" class="size-4 animate-spin" />
+          <Download v-else class="size-4" />
+          {{ t('admin.platformLogs.export') }}
+        </Button>
         <Button variant="outline" :disabled="historyLoading || auditLoading || deadLetterLoading" @click="refreshActiveTab">
           <RefreshCw class="size-4" :class="{ 'animate-spin': historyLoading || auditLoading || deadLetterLoading }" />
           {{ t('common.refresh') }}
@@ -427,13 +574,37 @@ onUnmounted(() => {
               <span>{{ t('admin.platformLogs.filters.to') }}</span>
               <Input v-model="draft.to" type="datetime-local" />
             </label>
-            <label class="space-y-1 text-xs font-bold md:col-span-1 xl:col-span-2">
+            <label class="space-y-1 text-xs font-bold md:col-span-2">
+              <span>{{ t('admin.platformLogs.filters.search') }}</span>
+              <Input v-model="draft.search" :placeholder="t('admin.platformLogs.filters.searchPlaceholder')" />
+            </label>
+            <label class="space-y-1 text-xs font-bold md:col-span-2">
+              <span>{{ t('admin.platformLogs.filters.category') }}</span>
+              <Input v-model="draft.category" spellcheck="false" :placeholder="t('admin.platformLogs.filters.categoryPlaceholder')" class="font-mono" />
+            </label>
+            <label class="space-y-1 text-xs font-bold">
               <span>{{ t('admin.platformLogs.filters.competition') }}</span>
               <Input v-model="draft.competitionId" spellcheck="false" placeholder="UUID" class="font-mono" />
             </label>
-            <label class="space-y-1 text-xs font-bold md:col-span-1 xl:col-span-2">
+            <label class="space-y-1 text-xs font-bold">
               <span>{{ t('admin.platformLogs.filters.runtime') }}</span>
               <Input v-model="draft.runtimeInstanceId" spellcheck="false" placeholder="UUID" class="font-mono" />
+            </label>
+            <label class="space-y-1 text-xs font-bold">
+              <span>{{ t('admin.platformLogs.filters.team') }}</span>
+              <Input v-model="draft.teamId" spellcheck="false" placeholder="UUID" class="font-mono" />
+            </label>
+            <label class="space-y-1 text-xs font-bold">
+              <span>{{ t('admin.platformLogs.filters.user') }}</span>
+              <Input v-model="draft.userId" spellcheck="false" placeholder="UUID" class="font-mono" />
+            </label>
+            <label class="space-y-1 text-xs font-bold md:col-span-2">
+              <span>{{ t('admin.platformLogs.filters.challenge') }}</span>
+              <Input v-model="draft.competitionChallengeId" spellcheck="false" placeholder="UUID" class="font-mono" />
+            </label>
+            <label class="space-y-1 text-xs font-bold md:col-span-2">
+              <span>{{ t('admin.platformLogs.filters.submission') }}</span>
+              <Input v-model="draft.submissionId" spellcheck="false" placeholder="UUID" class="font-mono" />
             </label>
             <div class="flex flex-wrap gap-2 md:col-span-2 xl:col-span-4">
               <Button :disabled="historyLoading" @click="applyLogFilters">
@@ -496,9 +667,16 @@ onUnmounted(() => {
                 <span v-if="entry.eventName" class="font-mono">{{ entry.eventName }} · {{ entry.eventId }}</span>
               </div>
               <pre class="whitespace-pre-wrap break-words font-mono text-xs leading-5 text-foreground">{{ entry.message || '—' }}</pre>
-              <div v-if="entry.competitionId || entry.runtimeInstanceId" class="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+              <div
+                v-if="entry.competitionId || entry.runtimeInstanceId || entry.teamId || entry.userId || entry.competitionChallengeId || entry.submissionId"
+                class="flex flex-wrap gap-2 text-[11px] text-muted-foreground"
+              >
                 <code v-if="entry.competitionId">competition={{ entry.competitionId }}</code>
                 <code v-if="entry.runtimeInstanceId">runtime={{ entry.runtimeInstanceId }}</code>
+                <code v-if="entry.teamId">team={{ entry.teamId }}</code>
+                <code v-if="entry.userId">user={{ entry.userId }}</code>
+                <code v-if="entry.competitionChallengeId">challenge={{ entry.competitionChallengeId }}</code>
+                <code v-if="entry.submissionId">submission={{ entry.submissionId }}</code>
               </div>
               <details v-if="entry.exceptionMessage" class="border-l-2 border-red-500 pl-3 text-xs">
                 <summary class="cursor-pointer font-bold text-red-700">
@@ -528,6 +706,8 @@ onUnmounted(() => {
                   <SelectItem value="all">{{ t('common.all') }}</SelectItem>
                   <SelectItem value="0">{{ t('admin.platformLogs.audit.competitionLifecycle') }}</SelectItem>
                   <SelectItem value="1">{{ t('admin.platformLogs.audit.accountLifecycle') }}</SelectItem>
+                  <SelectItem value="2">{{ t('admin.platformLogs.audit.leaderboardVisibility') }}</SelectItem>
+                  <SelectItem value="3">{{ t('admin.platformLogs.audit.competitionEvent') }}</SelectItem>
                 </SelectContent>
               </Select>
             </label>
@@ -547,7 +727,7 @@ onUnmounted(() => {
               <span>{{ t('admin.platformLogs.audit.actor') }}</span>
               <Input v-model="auditDraft.actorId" placeholder="UUID" class="font-mono" />
             </label>
-            <Button class="md:col-span-2 xl:col-span-1" :disabled="auditLoading" @click="fetchAudits">
+            <Button class="md:col-span-2 xl:col-span-1" :disabled="auditLoading" @click="fetchAudits()">
               <Search class="size-4" />
               {{ t('admin.platformLogs.filters.apply') }}
             </Button>
@@ -598,17 +778,22 @@ onUnmounted(() => {
                 </td>
                 <td class="px-4 py-3">
                   <Badge variant="outline" class="rounded-none">
-                    {{ platformAuditKindName(entry) }}
+                    {{ auditKindLabel(entry) }}
                   </Badge>
                 </td>
                 <td class="px-4 py-3 font-bold">
-                  {{ platformAuditActionName(entry) }}
+                  {{ auditActionLabel(entry) }}
                 </td>
                 <td class="max-w-60 px-4 py-3">
                   <p class="truncate font-bold">
                     {{ entry.subjectDisplayName || entry.subjectId || '—' }}
                   </p>
                   <code v-if="entry.competitionId" class="text-[11px] text-muted-foreground">{{ entry.competitionId }}</code>
+                  <div class="mt-1 space-y-0.5 font-mono text-[11px] text-muted-foreground">
+                    <p v-for="[name, value] in auditRelations(entry)" :key="name">
+                      {{ name }}={{ value }}
+                    </p>
+                  </div>
                 </td>
                 <td class="px-4 py-3 font-mono text-xs">
                   {{ entry.actorId || '—' }}
@@ -619,6 +804,12 @@ onUnmounted(() => {
               </tr>
             </tbody>
           </table>
+        </div>
+        <div v-if="auditNextCursor" class="flex justify-center">
+          <Button variant="outline" :disabled="auditLoadingMore" @click="fetchAudits(false)">
+            <Loader2 v-if="auditLoadingMore" class="size-4 animate-spin" />
+            {{ t('admin.platformLogs.loadOlderAudits') }}
+          </Button>
         </div>
       </TabsContent>
 

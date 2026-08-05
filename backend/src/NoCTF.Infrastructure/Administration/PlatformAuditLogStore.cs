@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Administration;
@@ -12,80 +13,82 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
         CancellationToken ct)
     {
         var items = new List<PlatformAuditView>(query.Limit * 2);
-        if (query.Kind is null or PlatformAuditKind.CompetitionLifecycle)
+        if (query.Kind is not PlatformAuditKind.UserAccountLifecycle)
         {
-            var competitionAudits = db.Set<CompetitionLifecycleAudit>().AsNoTracking();
+            var competitionEvents = db.CompetitionEvents.AsNoTracking();
             if (query.From is not null)
-                competitionAudits = competitionAudits.Where(audit =>
-                    audit.OccurredAt >= query.From.Value);
+                competitionEvents = competitionEvents.Where(item =>
+                    item.OccurredAt >= query.From.Value);
             if (query.To is not null)
-                competitionAudits = competitionAudits.Where(audit =>
-                    audit.OccurredAt <= query.To.Value);
+                competitionEvents = competitionEvents.Where(item =>
+                    item.OccurredAt <= query.To.Value);
             if (query.CompetitionId is not null)
-                competitionAudits = competitionAudits.Where(audit =>
-                    audit.CompetitionId == query.CompetitionId.Value);
+                competitionEvents = competitionEvents.Where(item =>
+                    item.CompetitionId == query.CompetitionId.Value);
             if (query.ActorId is not null)
-                competitionAudits = competitionAudits.Where(audit =>
-                    audit.ActorId == query.ActorId.Value);
+                competitionEvents = competitionEvents.Where(item =>
+                    item.ActorUserId == query.ActorId.Value);
+            if (query.BeforeOccurredAt is DateTimeOffset beforeOccurredAt
+                && query.BeforeId is Guid beforeId)
+            {
+                competitionEvents = competitionEvents.Where(item =>
+                    item.OccurredAt < beforeOccurredAt
+                    || item.OccurredAt == beforeOccurredAt
+                    && item.Id.CompareTo(beforeId) < 0);
+            }
+            competitionEvents = query.Kind switch
+            {
+                PlatformAuditKind.CompetitionLifecycle => competitionEvents.Where(item =>
+                    item.Kind == CompetitionEventKind.CompetitionLifecycleChanged),
+                PlatformAuditKind.CompetitionLeaderboardVisibility => competitionEvents.Where(item =>
+                    item.Kind == CompetitionEventKind.LeaderboardVisibilityChanged),
+                PlatformAuditKind.CompetitionEvent => competitionEvents.Where(item =>
+                    item.Kind != CompetitionEventKind.CompetitionLifecycleChanged
+                    && item.Kind != CompetitionEventKind.LeaderboardVisibilityChanged),
+                _ => competitionEvents
+            };
 
-            items.AddRange((await competitionAudits
-                .OrderByDescending(audit => audit.OccurredAt)
-                .ThenByDescending(audit => audit.Id)
+            var eventItems = await competitionEvents
+                .OrderByDescending(item => item.OccurredAt)
+                .ThenByDescending(item => item.Id)
                 .Take(query.Limit)
-                .ToArrayAsync(ct))
-                .Select(audit => new PlatformAuditView(
-                    audit.Id,
-                    PlatformAuditKind.CompetitionLifecycle,
-                    audit.CompetitionId,
-                    audit.CompetitionId,
-                    audit.ActorId,
-                    audit.From,
-                    audit.To,
-                    null,
-                    null,
-                    null,
-                    null,
-                    audit.Reason,
-                    audit.Automatic,
-                    audit.OccurredAt)));
-        }
-
-        if (query.Kind is null or PlatformAuditKind.CompetitionLeaderboardVisibility)
-        {
-            var visibilityAudits = db.Set<CompetitionLeaderboardVisibilityAudit>().AsNoTracking();
-            if (query.From is not null)
-                visibilityAudits = visibilityAudits.Where(audit =>
-                    audit.OccurredAt >= query.From.Value);
-            if (query.To is not null)
-                visibilityAudits = visibilityAudits.Where(audit =>
-                    audit.OccurredAt <= query.To.Value);
-            if (query.CompetitionId is not null)
-                visibilityAudits = visibilityAudits.Where(audit =>
-                    audit.CompetitionId == query.CompetitionId.Value);
-            if (query.ActorId is not null)
-                visibilityAudits = visibilityAudits.Where(audit =>
-                    audit.ActorId == query.ActorId.Value);
-
-            items.AddRange((await visibilityAudits
-                .OrderByDescending(audit => audit.OccurredAt)
-                .ThenByDescending(audit => audit.Id)
-                .Take(query.Limit)
-                .ToArrayAsync(ct))
-                .Select(audit => new PlatformAuditView(
-                    audit.Id,
-                    PlatformAuditKind.CompetitionLeaderboardVisibility,
-                    audit.CompetitionId,
-                    audit.CompetitionId,
-                    audit.ActorId,
-                    null,
-                    null,
-                    audit.From,
-                    audit.To,
-                    null,
-                    null,
-                    audit.Reason,
-                    audit.Automatic,
-                    audit.OccurredAt)));
+                .ToArrayAsync(ct);
+            var competitionIds = eventItems
+                .Select(item => item.CompetitionId)
+                .Distinct()
+                .ToArray();
+            var competitionTitles = await db.Competitions.AsNoTracking()
+                .Where(item => competitionIds.Contains(item.Id))
+                .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
+            items.AddRange(eventItems.Select(item => new PlatformAuditView(
+                item.Id,
+                MapKind(item.Kind),
+                item.CompetitionId,
+                item.CompetitionId,
+                item.ActorUserId,
+                null,
+                item.CompetitionStatus,
+                null,
+                item.LeaderboardVisibility,
+                null,
+                item.Kind,
+                item.Level,
+                item.Visibility,
+                item.RelatedUserId,
+                item.TeamId,
+                item.CompetitionChallengeId,
+                item.RuntimeInstanceId,
+                item.SubmissionId,
+                item.ScoringEventId,
+                item.QuestionId,
+                item.SubmissionKind,
+                item.SubmissionState,
+                item.ScoringEventKind,
+                item.ScoringResult,
+                competitionTitles.GetValueOrDefault(item.CompetitionId),
+                item.Reason,
+                false,
+                item.OccurredAt)));
         }
 
         if (query.CompetitionId is null
@@ -101,6 +104,14 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
             if (query.ActorId is not null)
                 accountAudits = accountAudits.Where(audit =>
                     audit.ActorUserId == query.ActorId.Value);
+            if (query.BeforeOccurredAt is DateTimeOffset beforeOccurredAt
+                && query.BeforeId is Guid beforeId)
+            {
+                accountAudits = accountAudits.Where(audit =>
+                    audit.OccurredAt < beforeOccurredAt
+                    || audit.OccurredAt == beforeOccurredAt
+                    && audit.Id.CompareTo(beforeId) < 0);
+            }
 
             items.AddRange((await accountAudits
                 .OrderByDescending(audit => audit.OccurredAt)
@@ -118,6 +129,20 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     null,
                     null,
                     audit.Action,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
                     audit.TargetUserName,
                     audit.Reason,
                     false,
@@ -130,4 +155,14 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
             .Take(query.Limit)
             .ToArray();
     }
+
+    private static PlatformAuditKind MapKind(CompetitionEventKind kind) => kind switch
+    {
+        CompetitionEventKind.CompetitionLifecycleChanged =>
+            PlatformAuditKind.CompetitionLifecycle,
+        CompetitionEventKind.LeaderboardVisibilityChanged =>
+            PlatformAuditKind.CompetitionLeaderboardVisibility,
+        _ => PlatformAuditKind.CompetitionEvent
+    };
+
 }

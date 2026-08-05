@@ -55,6 +55,13 @@ public sealed class OpenApiPlatformLogReader : IPlatformLogReader
         PlatformLogQuery query,
         CancellationToken cancellationToken) =>
         Task.FromResult(new PlatformLogQueryResult(PlatformLogReadState.Available, []));
+
+    public Task<PlatformLogExportResult> ExportAsync(
+        PlatformLogQuery query,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new PlatformLogExportResult(
+            PlatformLogReadState.Available,
+            new PlatformLogExport(new MemoryStream(), "platform-logs.jsonl")));
 }
 
 public sealed class OpenApiPlatformAuditLogStore : IPlatformAuditLogStore

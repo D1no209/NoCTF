@@ -840,6 +840,14 @@ export type NoCtfapiEndpointsAdministrationPlatformDeletePlatformUserRequest = {
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode = 'HardDelete' | 'Anonymize';
 
+export type NoCtfapiEndpointsAdministrationPlatformExportPlatformLogsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type NoCtfApplicationAdministrationPlatformLogsPlatformLogService = 0 | 1 | 2;
+
 export type NoCtfapiEndpointsAdministrationPlatformDeadLetterResponse = {
     messageId?: string;
     messageType?: string;
@@ -905,6 +913,7 @@ export type NoCtfapiEndpointsAdministrationPlatformListDeadLettersRequest = {
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse>;
+    nextCursor?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
@@ -918,13 +927,27 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     fromLeaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
     toLeaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
     userAccountAction?: NoCtfDomainIdentityUserAccountLifecycleAction | null;
+    competitionEventKind?: NoCtfDomainCompetitionsEventsCompetitionEventKind | null;
+    competitionEventLevel?: NoCtfDomainCompetitionsEventsCompetitionEventLevel | null;
+    competitionEventVisibility?: NoCtfDomainCompetitionsEventsCompetitionEventVisibility | null;
+    relatedUserId?: string | null;
+    teamId?: string | null;
+    competitionChallengeId?: string | null;
+    runtimeInstanceId?: string | null;
+    submissionId?: string | null;
+    scoringEventId?: string | null;
+    questionId?: string | null;
+    submissionKind?: NoCtfDomainSubmissionsSubmissionKind | null;
+    submissionState?: NoCtfDomainSubmissionsSubmissionEvaluationState | null;
+    scoringEventKind?: NoCtfDomainSubmissionsScoringEventKind | null;
+    scoringResult?: NoCtfDomainSubmissionsScoringResult | null;
     subjectDisplayName?: string | null;
     reason?: string | null;
     automatic?: boolean;
     occurredAt?: string;
 };
 
-export type NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind = 0 | 1 | 2;
+export type NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind = 0 | 1 | 2 | 3;
 
 export type NoCtfDomainIdentityUserAccountLifecycleAction = 0 | 1 | 2 | 3;
 
@@ -950,11 +973,11 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse = {
     exceptionMessage?: string | null;
     competitionId?: string | null;
     runtimeInstanceId?: string | null;
+    teamId?: string | null;
+    userId?: string | null;
+    competitionChallengeId?: string | null;
+    submissionId?: string | null;
 };
-
-export type NoCtfApplicationAdministrationPlatformLogsPlatformLogService = 0 | 1 | 2;
-
-export type NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel = 0 | 1 | 2 | 3 | 4 | 5;
 
 export type NoCtfapiEndpointsAdministrationPlatformListPlatformLogsRequest = {
     [key: string]: never;
@@ -4228,6 +4251,44 @@ export type AdminPlatformGetUserResponses = {
 
 export type AdminPlatformGetUserResponse = AdminPlatformGetUserResponses[keyof AdminPlatformGetUserResponses];
 
+export type AdminPlatformExportLogsData = {
+    body?: never;
+    path?: never;
+    query: {
+        minimumLevel: NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel;
+        service?: NoCtfApplicationAdministrationPlatformLogsPlatformLogService | null;
+        from: string;
+        to: string;
+        category?: string | null;
+        search?: string | null;
+        competitionId?: string | null;
+        runtimeInstanceId?: string | null;
+        teamId?: string | null;
+        userId?: string | null;
+        competitionChallengeId?: string | null;
+        submissionId?: string | null;
+    };
+    url: '/api/v1/admin/platform/logs/export';
+};
+
+export type AdminPlatformExportLogsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    503: MicrosoftAspNetCoreMvcProblemDetails;
+};
+
+export type AdminPlatformExportLogsError = AdminPlatformExportLogsErrors[keyof AdminPlatformExportLogsErrors];
+
 export type AdminPlatformGetDeadLetterData = {
     body?: never;
     path: {
@@ -4524,6 +4585,7 @@ export type AdminPlatformListAuditLogsData = {
         to?: string | null;
         competitionId?: string | null;
         actorId?: string | null;
+        cursor?: string | null;
         limit: number;
     };
     url: '/api/v1/admin/platform/audit-logs';
@@ -4563,8 +4625,14 @@ export type AdminPlatformListLogsData = {
         service?: NoCtfApplicationAdministrationPlatformLogsPlatformLogService | null;
         from?: string | null;
         to?: string | null;
+        category?: string | null;
+        search?: string | null;
         competitionId?: string | null;
         runtimeInstanceId?: string | null;
+        teamId?: string | null;
+        userId?: string | null;
+        competitionChallengeId?: string | null;
+        submissionId?: string | null;
         cursor?: string | null;
         limit: number;
     };

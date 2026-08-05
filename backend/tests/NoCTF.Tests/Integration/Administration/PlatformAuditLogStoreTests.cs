@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -77,23 +78,84 @@ public sealed class PlatformAuditLogStoreTests
                     Reason = "policy",
                     OccurredAt = now.AddMinutes(2)
                 });
+                seed.CompetitionEvents.Add(new CompetitionEvent
+                {
+                    Id = Guid.CreateVersion7(now.AddMilliseconds(5)),
+                    CompetitionId = competitionId,
+                    Kind = CompetitionEventKind.CompetitionLifecycleChanged,
+                    Level = CompetitionEventLevel.Information,
+                    Visibility = CompetitionEventVisibility.Public,
+                    ActorUserId = actorId,
+                    CompetitionStatus = CompetitionStatus.Running,
+                    Reason = "started from immutable event",
+                    OccurredAt = now.AddMinutes(1)
+                });
+                seed.CompetitionEvents.Add(new CompetitionEvent
+                {
+                    Id = Guid.CreateVersion7(now.AddMilliseconds(6)),
+                    CompetitionId = competitionId,
+                    Kind = CompetitionEventKind.RuntimeStateChanged,
+                    Level = CompetitionEventLevel.Warning,
+                    Visibility = CompetitionEventVisibility.Staff,
+                    ActorUserId = actorId,
+                    Reason = "runtime state changed",
+                    OccurredAt = now.AddMinutes(1.5)
+                });
                 await seed.SaveChangesAsync(cancellationToken);
             }
 
             await using var db = new NoCtfDbContext(options);
             var store = new PlatformAuditLogStore(db);
             var all = await store.QueryAsync(
-                new(null, null, null, null, actorId, 10),
+                new(null, null, null, null, actorId, null, null, 10),
                 cancellationToken);
-            await Assert.That(all).Count().IsEqualTo(2);
+            await Assert.That(all).Count().IsEqualTo(3);
             await Assert.That(all[0].Kind).IsEqualTo(PlatformAuditKind.UserAccountLifecycle);
-            await Assert.That(all[1].Kind).IsEqualTo(PlatformAuditKind.CompetitionLifecycle);
+            await Assert.That(all[1].Kind).IsEqualTo(PlatformAuditKind.CompetitionEvent);
+            await Assert.That(all[2].Kind).IsEqualTo(PlatformAuditKind.CompetitionLifecycle);
+            await Assert.That(all[2].CompetitionEventKind)
+                .IsEqualTo(CompetitionEventKind.CompetitionLifecycleChanged);
+            await Assert.That(all[2].CompetitionEventVisibility)
+                .IsEqualTo(CompetitionEventVisibility.Public);
+            await Assert.That(all[2].Reason).IsEqualTo("started from immutable event");
 
             var competitionOnly = await store.QueryAsync(
-                new(null, null, null, competitionId, null, 10),
+                new(null, null, null, competitionId, null, null, null, 10),
                 cancellationToken);
-            await Assert.That(competitionOnly).Count().IsEqualTo(1);
+            await Assert.That(competitionOnly).Count().IsEqualTo(2);
             await Assert.That(competitionOnly[0].CompetitionId).IsEqualTo(competitionId);
+
+            var eventOnly = await store.QueryAsync(
+                new(
+                    PlatformAuditKind.CompetitionEvent,
+                    null,
+                    null,
+                    competitionId,
+                    null,
+                    null,
+                    null,
+                    10),
+                cancellationToken);
+            await Assert.That(eventOnly).Count().IsEqualTo(1);
+            await Assert.That(eventOnly[0].CompetitionEventKind)
+                .IsEqualTo(CompetitionEventKind.RuntimeStateChanged);
+
+            var firstPage = await store.QueryAsync(
+                new(null, null, null, null, actorId, null, null, 1),
+                cancellationToken);
+            var secondPage = await store.QueryAsync(
+                new(
+                    null,
+                    null,
+                    null,
+                    null,
+                    actorId,
+                    firstPage[0].OccurredAt,
+                    firstPage[0].Id,
+                    1),
+                cancellationToken);
+            await Assert.That(secondPage).Count().IsEqualTo(1);
+            await Assert.That(secondPage[0].Id).IsEqualTo(all[1].Id);
         });
     }
 
