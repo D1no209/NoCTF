@@ -17,6 +17,7 @@ export type NoCtfapiEndpointsTeamsTeamResponse = {
     memberIds?: Array<string>;
     registrationStatus?: NoCtfDomainTeamsTeamRegistrationStatus;
     isLocked?: boolean;
+    isBanned?: boolean;
     registeredAt?: string;
 };
 
@@ -25,6 +26,39 @@ export type NoCtfDomainTeamsTeamRegistrationStatus = 0 | 1 | 2;
 export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
     name?: string;
     avatarUrl?: string | null;
+};
+
+export type NoCtfapiEndpointsTeamsMyTeamBanCaseResponse = {
+    banEventId?: string;
+    competitionId?: string;
+    teamId?: string;
+    teamName?: string;
+    source?: NoCtfDomainTeamsTeamBanSource;
+    bannedAt?: string;
+    isCurrentlyBanned?: boolean;
+    canAppeal?: boolean;
+    appeal?: NoCtfapiEndpointsTeamsMyTeamBanAppealResponse | null;
+};
+
+export type NoCtfDomainTeamsTeamBanSource = 0 | 1;
+
+export type NoCtfapiEndpointsTeamsMyTeamBanAppealResponse = {
+    id?: string;
+    submittedByUserId?: string;
+    submittedByUserName?: string;
+    statement?: string;
+    submittedAt?: string;
+    status?: NoCtfDomainTeamsTeamBanAppealStatus;
+    resolvedByUserId?: string | null;
+    resolvedByUserName?: string | null;
+    resolutionReason?: string | null;
+    resolvedAt?: string | null;
+};
+
+export type NoCtfDomainTeamsTeamBanAppealStatus = 0 | 1 | 2;
+
+export type NoCtfapiEndpointsTeamsGetMyTeamBanCaseRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsTeamsGetMyTeamRequest = {
@@ -49,6 +83,41 @@ export type NoCtfapiEndpointsTeamsListCompetitionTeamsRequest = {
 
 export type NoCtfapiEndpointsTeamsRotateTeamInvitationResponse = {
     invitationToken?: string;
+};
+
+export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+};
+
+export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+};
+
+export type MicrosoftAspNetCoreMvcProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    [key: string]: unknown;
+};
+
+export type NoCtfapiEndpointsTeamsSubmitTeamBanAppealRequest = {
+    statement?: string;
+};
+
+export type FastEndpointsErrorResponse = {
+    statusCode?: number;
+    message?: string;
+    errors?: {
+        [key: string]: Array<string>;
+    };
 };
 
 export type NoCtfapiEndpointsTeamsTransferTeamCaptainRequest = {
@@ -103,29 +172,6 @@ export type NoCtfapiEndpointsSubmissionsSubmissionListItemResponse = {
     failureCode?: NoCtfDomainSubmissionsScoringFailureCode | null;
     receivedAt?: string;
     processingVersion?: number;
-};
-
-export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
-    errors?: {
-        [key: string]: Array<string>;
-    };
-    [key: string]: unknown;
-};
-
-export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
-    errors?: {
-        [key: string]: Array<string>;
-    };
-    [key: string]: unknown;
-};
-
-export type MicrosoftAspNetCoreMvcProblemDetails = {
-    type?: string | null;
-    title?: string | null;
-    status?: number | null;
-    detail?: string | null;
-    instance?: string | null;
-    [key: string]: unknown;
 };
 
 export type NoCtfapiEndpointsSubmissionsListSubmissionsRequest = {
@@ -382,7 +428,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfDomainCompetitionsEventsCompetitionEventKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43;
+export type NoCtfDomainCompetitionsEventsCompetitionEventKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45 | 46 | 47;
 
 export type NoCtfDomainCompetitionsEventsCompetitionEventLevel = 0 | 1 | 2;
 
@@ -416,6 +462,7 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     submissionId?: string | null;
     scoringEventId?: string | null;
     questionId?: string | null;
+    parentEventId?: string | null;
     competitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
     leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
     teamRegistrationStatus?: NoCtfDomainTeamsTeamRegistrationStatus | null;
@@ -706,20 +753,57 @@ export type NoCtfapiEndpointsAuthenticationVerifyEmailRequest = {
     token: string;
 };
 
-export type FastEndpointsErrorResponse = {
-    statusCode?: number;
-    message?: string;
-    errors?: {
-        [key: string]: Array<string>;
-    };
+export type NoCtfapiEndpointsAdministrationTeamsAcceptTeamBanAppealRequest = {
+    reason?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationTeamsBanTeamRequest = {
-    reason: string;
+    reason?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationTeamsCorrectTeamBanRequest = {
+    reason?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationTeamsAdminTeamBanAppealListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse = {
+    banEventId?: string;
+    competitionId?: string;
+    teamId?: string;
+    teamName?: string;
+    source?: NoCtfDomainTeamsTeamBanSource;
+    bannedAt?: string;
+    isCurrentlyBanned?: boolean;
+    canResolve?: boolean;
+    appeal?: NoCtfapiEndpointsAdministrationTeamsAdminTeamBanAppealResponse;
+};
+
+export type NoCtfapiEndpointsAdministrationTeamsAdminTeamBanAppealResponse = {
+    id?: string;
+    submittedByUserId?: string;
+    submittedByUserName?: string;
+    statement?: string;
+    submittedAt?: string;
+    status?: NoCtfDomainTeamsTeamBanAppealStatus;
+    resolvedByUserId?: string | null;
+    resolvedByUserName?: string | null;
+    resolutionReason?: string | null;
+    resolvedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationTeamsListTeamBanAppealsRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationTeamsUnbanTeamRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsAdministrationTeamsUpholdTeamBanAppealRequest = {
+    reason?: string;
 };
 
 export type NoCtfapiEndpointsSubmissionsAdminSubmissionStatusResponse = {
@@ -1659,6 +1743,39 @@ export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses = {
 
 export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponse = NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses];
 
+export type GetMyTeamBanCaseData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/team-ban-case';
+};
+
+export type GetMyTeamBanCaseErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetMyTeamBanCaseResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsMyTeamBanCaseResponse;
+};
+
+export type GetMyTeamBanCaseResponse = GetMyTeamBanCaseResponses[keyof GetMyTeamBanCaseResponses];
+
 export type NoCtfapiEndpointsTeamsGetMyTeamEndpointData = {
     body?: never;
     path: {
@@ -1857,6 +1974,46 @@ export type NoCtfapiEndpointsTeamsRotateTeamInvitationEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsTeamsRotateTeamInvitationEndpointResponse = NoCtfapiEndpointsTeamsRotateTeamInvitationEndpointResponses[keyof NoCtfapiEndpointsTeamsRotateTeamInvitationEndpointResponses];
+
+export type SubmitTeamBanAppealData = {
+    body: NoCtfapiEndpointsTeamsSubmitTeamBanAppealRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/team-ban-appeals';
+};
+
+export type SubmitTeamBanAppealErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+};
+
+export type SubmitTeamBanAppealError = SubmitTeamBanAppealErrors[keyof SubmitTeamBanAppealErrors];
+
+export type SubmitTeamBanAppealResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type SubmitTeamBanAppealResponse = SubmitTeamBanAppealResponses[keyof SubmitTeamBanAppealResponses];
 
 export type NoCtfapiEndpointsTeamsTransferTeamCaptainEndpointData = {
     body: NoCtfapiEndpointsTeamsTransferTeamCaptainRequest;
@@ -3542,6 +3699,47 @@ export type NoCtfapiEndpointsAuthenticationVerifyEmailEndpointResponses = {
 
 export type NoCtfapiEndpointsAuthenticationVerifyEmailEndpointResponse = NoCtfapiEndpointsAuthenticationVerifyEmailEndpointResponses[keyof NoCtfapiEndpointsAuthenticationVerifyEmailEndpointResponses];
 
+export type AdminAcceptTeamBanAppealData = {
+    body: NoCtfapiEndpointsAdministrationTeamsAcceptTeamBanAppealRequest;
+    path: {
+        competitionId: string;
+        appealId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/accept';
+};
+
+export type AdminAcceptTeamBanAppealErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+};
+
+export type AdminAcceptTeamBanAppealError = AdminAcceptTeamBanAppealErrors[keyof AdminAcceptTeamBanAppealErrors];
+
+export type AdminAcceptTeamBanAppealResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminAcceptTeamBanAppealResponse = AdminAcceptTeamBanAppealResponses[keyof AdminAcceptTeamBanAppealResponses];
+
 export type AdminApproveTeamData = {
     body?: never;
     path: {
@@ -3620,6 +3818,47 @@ export type AdminBanTeamResponses = {
 
 export type AdminBanTeamResponse = AdminBanTeamResponses[keyof AdminBanTeamResponses];
 
+export type AdminCorrectTeamBanData = {
+    body: NoCtfapiEndpointsAdministrationTeamsCorrectTeamBanRequest;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/teams/{teamId}/correct-ban';
+};
+
+export type AdminCorrectTeamBanErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+};
+
+export type AdminCorrectTeamBanError = AdminCorrectTeamBanErrors[keyof AdminCorrectTeamBanErrors];
+
+export type AdminCorrectTeamBanResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminCorrectTeamBanResponse = AdminCorrectTeamBanResponses[keyof AdminCorrectTeamBanResponses];
+
 export type AdminListTeamsData = {
     body?: never;
     path: {
@@ -3648,6 +3887,39 @@ export type AdminListTeamsResponses = {
 };
 
 export type AdminListTeamsResponse = AdminListTeamsResponses[keyof AdminListTeamsResponses];
+
+export type AdminListTeamBanAppealsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/team-ban-appeals';
+};
+
+export type AdminListTeamBanAppealsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListTeamBanAppealsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationTeamsAdminTeamBanAppealListResponse;
+};
+
+export type AdminListTeamBanAppealsResponse = AdminListTeamBanAppealsResponses[keyof AdminListTeamBanAppealsResponses];
 
 export type AdminRejectTeamData = {
     body?: never;
@@ -3722,6 +3994,47 @@ export type AdminUnbanTeamResponses = {
 };
 
 export type AdminUnbanTeamResponse = AdminUnbanTeamResponses[keyof AdminUnbanTeamResponses];
+
+export type AdminUpholdTeamBanAppealData = {
+    body: NoCtfapiEndpointsAdministrationTeamsUpholdTeamBanAppealRequest;
+    path: {
+        competitionId: string;
+        appealId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/uphold';
+};
+
+export type AdminUpholdTeamBanAppealErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+};
+
+export type AdminUpholdTeamBanAppealError = AdminUpholdTeamBanAppealErrors[keyof AdminUpholdTeamBanAppealErrors];
+
+export type AdminUpholdTeamBanAppealResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminUpholdTeamBanAppealResponse = AdminUpholdTeamBanAppealResponses[keyof AdminUpholdTeamBanAppealResponses];
 
 export type AdminGetSubmissionData = {
     body?: never;

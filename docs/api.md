@@ -200,7 +200,14 @@ Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍�
 跨队 Flag 线索从不可变 ScoringEvent 事实与 CompetitionEvent 处置事件推导，不新增独立业务表。
 Observer 可读取不含 Flag 的列表，Judge 可显式读取完整 Flag 并驳回线索；每次完整证据读取都会写入
 审计事件且响应禁止缓存。只有 Administrator、Owner、Manager 可确认并封禁，或纠正误判并解封。
-驳回不通知参赛者；确认与纠错只发送不含 Flag 和工作人员原因的全场通用通知。
+驳回不通知参赛者；确认与纠错只发送不含 Flag 和工作人员原因的全场通用通知。误判纠错允许在
+Finished 后执行，只恢复历史计分投影，不重启 Runtime。
+
+比赛队伍封禁申诉同样只投影 `competition_events`，不新增申诉表。队长可针对当前 `TeamBanned`
+事件提交一次 16–512 字符的私密申诉，全队可读取状态；受影响队伍只看到 `ManualModeration` 或
+`CheatIncident` 来源类别，不读取工作人员理由和证据。Observer/Judge 只读，Administrator、Owner、
+Manager 可私密维持封禁或接受申诉。接受申诉和管理员主动纠错都可在 Finished 后解除当前封禁、
+递增 leaderboard revision 并重投影历史事实；公开事件和通知仅包含比赛、队伍和纠错时间。
 
 权限 snapshot 与候选用户只允许 Competition Owner 或平台 Administrator 读取。候选响应仅含
 Id、UserName、Kind、Role 与 EmailVerified，不开放平台用户目录中的 Email、TokenVersion。
@@ -218,6 +225,13 @@ POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/approve
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/reject
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/ban
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/unban
+POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/correct-ban
+GET  /api/v1/admin/competitions/{competitionId}/team-ban-appeals
+POST /api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/uphold
+POST /api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/accept
+
+GET  /api/v1/competitions/{competitionId}/team-ban-case
+POST /api/v1/competitions/{competitionId}/team-ban-appeals
 ```
 
 ## Global Challenge Bank

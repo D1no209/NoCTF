@@ -17,7 +17,9 @@ public sealed class BanTeamRequest
 public sealed class BanTeamValidator : Validator<BanTeamRequest>
 {
     public BanTeamValidator() =>
-        RuleFor(request => request.Reason).NotEmpty();
+        RuleFor(request => request.Reason)
+            .Must(reason => !string.IsNullOrWhiteSpace(reason))
+            .MaximumLength(512);
 }
 
 public sealed class BanTeamEndpoint(

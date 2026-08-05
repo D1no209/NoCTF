@@ -120,7 +120,10 @@ public sealed class CheatIncidentPersistenceTests
             await Assert.That(correctedTeam.IsBanned).IsFalse();
             await Assert.That(correctedTeam.BanReason).IsNull();
             var correction = outbox.Published.OfType<TeamBanCorrected>().Single();
-            await Assert.That(correction.ScoringEventId)
+            var correctedBan = await db.CompetitionEvents.AsNoTracking().SingleAsync(
+                item => item.Id == correction.BanEventId,
+                cancellationToken);
+            await Assert.That(correctedBan.ScoringEventId)
                 .IsEqualTo(fixture.ScoringEventIds[1]);
 
             var final = await store.ListAsync(new(

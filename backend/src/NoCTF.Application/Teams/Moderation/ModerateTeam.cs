@@ -45,8 +45,10 @@ public sealed class ModerateTeam(ITeamModerationStore store)
         TeamModerationCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (command.Ban && string.IsNullOrWhiteSpace(command.Reason))
+        var reason = command.Reason?.Trim();
+        if (command.Ban && (string.IsNullOrWhiteSpace(reason) || reason.Length > 512))
             return OperationResult.Failure("ban_reason_required", "A ban reason is required.");
+        command = command with { Reason = reason };
         var status = await store.GetCompetitionStatusAsync(command.CompetitionId, cancellationToken);
         if (status is null)
             return OperationResult.Failure("competition_not_found", "Competition was not found.");

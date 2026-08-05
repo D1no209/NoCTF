@@ -14,6 +14,7 @@ public sealed record TeamView(
     IReadOnlyList<Guid> MemberIds,
     TeamRegistrationStatus RegistrationStatus,
     bool IsLocked,
+    bool IsBanned,
     DateTimeOffset RegisteredAt);
 public sealed record TeamRegistrationPolicy(CompetitionStatus Status, bool AutoApprove, bool CompetitionDeleted);
 public enum TeamRegistrationFailure

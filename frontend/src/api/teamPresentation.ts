@@ -15,6 +15,7 @@ export interface PublicTeam {
   memberCount: number
   registrationStatus: PublicTeamRegistrationStatus
   isLocked: boolean
+  isBanned: boolean
   registeredAt: string
 }
 
@@ -44,6 +45,8 @@ export function toPublicTeam(value: NoCtfapiEndpointsTeamsTeamResponse): PublicT
     throw new TypeError('Team response has an unsupported registrationStatus.')
   if (typeof value.isLocked !== 'boolean')
     throw new TypeError('Team response is missing isLocked.')
+  if (typeof value.isBanned !== 'boolean')
+    throw new TypeError('Team response is missing isBanned.')
   if (value.avatarUrl !== undefined && value.avatarUrl !== null && typeof value.avatarUrl !== 'string')
     throw new TypeError('Team response has an invalid avatarUrl.')
 
@@ -57,6 +60,7 @@ export function toPublicTeam(value: NoCtfapiEndpointsTeamsTeamResponse): PublicT
     memberCount: value.memberIds.length,
     registrationStatus,
     isLocked: value.isLocked,
+    isBanned: value.isBanned,
     registeredAt: requireString(value.registeredAt, 'registeredAt'),
   }
 }

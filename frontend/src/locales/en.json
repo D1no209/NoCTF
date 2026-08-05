@@ -709,6 +709,29 @@
     "ruleManualReview": "An administrator must approve the team before challenges unlock.",
     "createSuccess": "Team created.",
     "joinSuccess": "Joined team.",
+    "banAppeal": {
+      "banned": "Banned",
+      "currentBanTitle": "Competition access suspended",
+      "correctedTitle": "Moderation decision corrected",
+      "sourceLabel": "Source",
+      "source": {
+        "manualModeration": "Manual moderation",
+        "cheatIncident": "Cross-team Flag incident"
+      },
+      "status": {
+        "submitted": "Under private review",
+        "upheld": "Ban upheld",
+        "accepted": "Appeal accepted"
+      },
+      "statement": "Appeal statement",
+      "resolution": "Private decision",
+      "privateDescription": "The captain may submit one private appeal for this ban. Staff evidence and internal discussion remain confidential.",
+      "placeholder": "Explain the facts that should be reviewed (16–512 characters)",
+      "submit": "Submit private appeal",
+      "captainOnly": "Only the team captain can submit the appeal. All team members can read its status.",
+      "submitSuccess": "The private appeal was submitted.",
+      "submitError": "The appeal could not be submitted. It may already exist or the ban may have changed."
+    },
     "actionError": "Team action failed."
   },
   "leaderboardVisibility": {
@@ -1519,6 +1542,38 @@
       "unbanTeam": "Unban team",
       "teamBanned": "Team banned",
       "teamUnbanned": "Team unbanned",
+      "teamBanCorrected": "The team ban was corrected.",
+      "correctTeamBan": "Correct ban",
+      "banDialogTitle": "Ban {team}",
+      "banDialogDescription": "Provide the staff-only basis for this moderation decision. The affected team sees only the source category.",
+      "moderationReason": "Staff-only reason",
+      "correctionDialogTitle": "Correct the ban for {team}",
+      "correctionDialogDescription": "This restores historical scoring eligibility, including after the competition has finished.",
+      "correctionReason": "Private correction reason",
+      "correctionPrivacy": "The public notice includes only the competition, team, and correction time.",
+      "banAppealsTitle": "Private ban appeals",
+      "banAppealsDescription": "Permanent appeal facts are projected from the competition event stream. Judges and observers are read-only.",
+      "noBanAppeals": "No team has submitted a ban appeal.",
+      "banSource": {
+        "manualModeration": "Manual moderation",
+        "cheatIncident": "Cross-team Flag incident"
+      },
+      "appealStatus": {
+        "submitted": "Submitted",
+        "upheld": "Upheld",
+        "accepted": "Accepted"
+      },
+      "appealSubmittedBy": "Submitted by {user} · {time}",
+      "appealStatement": "Private appeal",
+      "resolutionReason": "Private resolution reason",
+      "upholdAppeal": "Uphold ban",
+      "acceptAppeal": "Accept appeal",
+      "upholdAppealTitle": "Uphold this team ban",
+      "upholdAppealDescription": "The decision and reason remain private to the affected team and staff.",
+      "acceptAppealTitle": "Accept and correct this ban",
+      "acceptAppealDescription": "The team is unbanned, historical results are reprojected, and a generic public correction is issued.",
+      "appealResolved": "The appeal decision was recorded.",
+      "appealResolutionFailed": "The appeal could not be resolved. Its state may have changed.",
       "cheatTitle": "Cheat signals",
       "cheatDescription": "Cross-team Flag matches from CTF Flag and AWDP Break submissions enter this review queue. The list never exposes Flags; explicit evidence access is audited.",
       "noCheatIncidents": "No suspected cheat incidents.",

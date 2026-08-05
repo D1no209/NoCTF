@@ -98,6 +98,7 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 - Running/Paused/Finished 冻结成员与审核状态；违规处置使用 Ban。
 - CaptainId 是唯一队长来源。转让队长原子更新 CaptainId；成员数组无顺序。
 - Ban 立即拒绝私有数据、Runtime 与 Submission，回收该队 CTF/AWD Runtime，并把该队及与其相关的攻防事实从投影排除。Unban 恢复历史事实；CTF Runtime 由选手重新启动，AWD 由系统重新配置。
+- 每次 Ban 对应一个不可变事件。队长可提交一次私密申诉，全队可读；Judge/Observer 只读，Administrator、Owner、Manager 裁决。接受申诉或主动纠错允许赛后恢复历史投影，但 Finished 比赛不重新配置 Runtime。申诉、裁决和公开纠错都保留原始事件关联，不公开工作人员原因或证据。
 
 ## 权限矩阵
 

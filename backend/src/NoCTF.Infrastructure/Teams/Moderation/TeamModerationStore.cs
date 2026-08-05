@@ -5,6 +5,7 @@ using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Infrastructure.Observability;
 
 namespace NoCTF.Infrastructure.Teams.Moderation;
 
@@ -38,10 +39,24 @@ public sealed class TeamModerationStore(
         if (team.IsBanned == command.Ban)
             return new();
 
+        var ban = command.Ban
+            ? null
+            : await db.CompetitionEvents.AsNoTracking()
+                .Where(@event =>
+                    @event.CompetitionId == command.CompetitionId
+                    && @event.TeamId == team.Id
+                    && @event.Kind == CompetitionEventKind.TeamBanned)
+                .OrderByDescending(@event => @event.OccurredAt)
+                .ThenByDescending(@event => @event.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        var safeReason = command.Ban
+            ? PlatformLogRedactor.Redact(command.Reason!, [])
+            : null;
+
         team.IsBanned = command.Ban;
         team.BannedAt = command.Ban ? command.OccurredAt : null;
         team.BannedById = command.Ban ? command.ActorId : null;
-        team.BanReason = command.Ban ? command.Reason : null;
+        team.BanReason = safeReason;
         await events.RecordAsync(new(
             command.CompetitionId,
             command.Ban
@@ -53,7 +68,9 @@ public sealed class TeamModerationStore(
             CompetitionEventVisibility.Staff,
             command.OccurredAt,
             ActorUserId: command.ActorId,
-            TeamId: team.Id), cancellationToken);
+            TeamId: team.Id,
+            ParentEventId: ban?.Id,
+            Reason: safeReason), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, cancellationToken);
         await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));

@@ -122,6 +122,10 @@ registered_at
 deleted_at?
 ```
 
+封禁申诉不建独立业务表。`competition_events.parent_event_id` 是指向同表的 Restrict 外键：申诉提交
+事件关联 `TeamBanned`，申诉裁决关联提交事件，解封与公开纠错事件关联原封禁事件。事件保持
+append-only；该关联不能用于级联删除或覆盖原始事实。
+
 约束与索引：
 
 - Name 在接入时 Trim，NormalizedName=`Name.Normalize(FormKC).ToUpperInvariant()`；`(competition_id, normalized_name)` 在未删除记录中唯一。

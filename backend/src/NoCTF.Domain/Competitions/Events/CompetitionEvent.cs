@@ -51,7 +51,11 @@ public enum CompetitionEventKind : short
     CheatIncidentDismissed,
     CheatIncidentSuperseded,
     CheatIncidentCorrected,
-    ProtectedCompetitionExportCreated
+    ProtectedCompetitionExportCreated,
+    TeamBanAppealSubmitted,
+    TeamBanAppealUpheld,
+    TeamBanAppealAccepted,
+    TeamBanCorrectionPublished
 }
 
 public enum CompetitionEventLevel : short
@@ -84,6 +88,7 @@ public sealed class CompetitionEvent
     public Guid? SubmissionId { get; set; }
     public Guid? ScoringEventId { get; set; }
     public Guid? QuestionId { get; set; }
+    public Guid? ParentEventId { get; set; }
     public CompetitionStatus? CompetitionStatus { get; set; }
     public CompetitionLeaderboardVisibility? LeaderboardVisibility { get; set; }
     public TeamRegistrationStatus? TeamRegistrationStatus { get; set; }

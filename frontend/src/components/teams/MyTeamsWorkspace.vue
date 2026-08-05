@@ -11,6 +11,8 @@ import {
   Pencil,
   Plus,
   Save,
+  ShieldAlert,
+  ShieldCheck,
   UsersRound,
   X,
 } from 'lucide-vue-next'
@@ -19,6 +21,11 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { authApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import {
+  teamBanAppealApi,
+  TeamBanAppealStatus,
+  TeamBanSource,
+} from '@/api/teamBanAppealApi'
 import { isPlatformAdministrator } from '@/api/userRole'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
@@ -38,6 +45,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Textarea } from '@/components/ui/textarea'
 
 type TeamAction = 'create' | 'join' | null
 
@@ -51,6 +59,7 @@ const invitationToken = ref('')
 const editingTeamId = ref<string | null>(null)
 const editTeamName = ref('')
 const editAvatarUrl = ref('')
+const appealDrafts = ref<Record<string, string>>({})
 
 const {
   data: workspace,
@@ -168,6 +177,22 @@ const updateTeamMutation = useMutation({
   onError: () => toast.error(t('errors.updateTeam')),
 })
 
+const submitAppealMutation = useMutation({
+  mutationFn: (registration: MyTeamRegistration) => teamBanAppealApi.submit(
+    registration.competition.id,
+    appealDrafts.value[registration.team.id]?.trim() ?? '',
+  ),
+  onSuccess: (_, registration) => {
+    appealDrafts.value[registration.team.id] = ''
+    void queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.myTeamBanCase(registration.competition.id),
+    })
+    toast.success(t('teams.banAppeal.submitSuccess'))
+  },
+  onError: () => toast.error(t('teams.banAppeal.submitError')),
+})
+
 function teamStatusVariant(status: 'pending' | 'approved' | 'rejected') {
   if (status === 'approved')
     return 'default'
@@ -177,10 +202,20 @@ function teamStatusVariant(status: 'pending' | 'approved' | 'rejected') {
 }
 
 function formatDate(value: string) {
+  if (!value)
+    return '-'
   return new Intl.DateTimeFormat(locale.value, {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
+}
+
+function appealStatusKey(status?: number) {
+  if (status === TeamBanAppealStatus.Accepted)
+    return 'accepted'
+  if (status === TeamBanAppealStatus.Upheld)
+    return 'upheld'
+  return 'submitted'
 }
 </script>
 
@@ -369,6 +404,9 @@ function formatDate(value: string) {
                 <Badge :variant="teamStatusVariant(item.team.registrationStatus)">
                   {{ t(`teams.status.${item.team.registrationStatus}`) }}
                 </Badge>
+                <Badge v-if="item.team.isBanned" variant="destructive">
+                  {{ t('teams.banAppeal.banned') }}
+                </Badge>
               </div>
             </div>
 
@@ -415,6 +453,77 @@ function formatDate(value: string) {
                   {{ item.team.isLocked ? t('teams.locked') : t('teams.unlocked') }}
                 </p>
               </div>
+            </Panel>
+
+            <Panel
+              v-if="item.banCase"
+              class="space-y-4 border-l-4 p-4"
+              :class="item.banCase.isCurrentlyBanned ? 'border-l-destructive' : 'border-l-emerald-600'"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="flex items-center gap-2 font-semibold">
+                    <ShieldAlert v-if="item.banCase.isCurrentlyBanned" class="size-4 text-destructive" />
+                    <ShieldCheck v-else class="size-4 text-emerald-700" />
+                    {{ item.banCase.isCurrentlyBanned
+                      ? t('teams.banAppeal.currentBanTitle')
+                      : t('teams.banAppeal.correctedTitle') }}
+                  </p>
+                  <p class="mt-1 text-xs text-muted-foreground">
+                    {{ t('teams.banAppeal.sourceLabel') }}:
+                    {{ item.banCase.source === TeamBanSource.CheatIncident
+                      ? t('teams.banAppeal.source.cheatIncident')
+                      : t('teams.banAppeal.source.manualModeration') }}
+                    · {{ formatDate(item.banCase.bannedAt ?? '') }}
+                  </p>
+                </div>
+                <Badge v-if="item.banCase.appeal" variant="outline">
+                  {{ t(`teams.banAppeal.status.${appealStatusKey(item.banCase.appeal.status)}`) }}
+                </Badge>
+              </div>
+
+              <template v-if="item.banCase.appeal">
+                <div class="border-l-2 border-border pl-3">
+                  <p class="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                    {{ t('teams.banAppeal.statement') }}
+                  </p>
+                  <p class="mt-1 whitespace-pre-wrap text-sm">
+                    {{ item.banCase.appeal.statement }}
+                  </p>
+                </div>
+                <div v-if="item.banCase.appeal.resolutionReason" class="border-l-2 border-primary/30 pl-3">
+                  <p class="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                    {{ t('teams.banAppeal.resolution') }}
+                  </p>
+                  <p class="mt-1 whitespace-pre-wrap text-sm">
+                    {{ item.banCase.appeal.resolutionReason }}
+                  </p>
+                </div>
+              </template>
+
+              <div v-else-if="item.banCase.canAppeal" class="space-y-3">
+                <p class="text-sm text-muted-foreground">
+                  {{ t('teams.banAppeal.privateDescription') }}
+                </p>
+                <Textarea
+                  v-model="appealDrafts[item.team.id]"
+                  rows="4"
+                  maxlength="512"
+                  :placeholder="t('teams.banAppeal.placeholder')"
+                />
+                <div class="flex justify-end">
+                  <Button
+                    :disabled="(appealDrafts[item.team.id]?.trim().length ?? 0) < 16 || submitAppealMutation.isPending.value"
+                    @click="submitAppealMutation.mutate(item)"
+                  >
+                    <Loader2 v-if="submitAppealMutation.isPending.value" class="size-4 animate-spin" />
+                    {{ t('teams.banAppeal.submit') }}
+                  </Button>
+                </div>
+              </div>
+              <p v-else-if="item.banCase.isCurrentlyBanned" class="text-sm text-muted-foreground">
+                {{ t('teams.banAppeal.captainOnly') }}
+              </p>
             </Panel>
 
             <Panel v-if="editingTeamId === item.team.id" class="space-y-4 p-4">
