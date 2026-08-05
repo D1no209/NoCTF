@@ -80,9 +80,9 @@ async function handleLogout() {
         <NotificationCenter />
 
         <template v-if="auth.isAuthenticated">
-          <div v-if="displayName" class="flex min-w-0 items-center gap-2 border-2 border-border bg-card px-2 py-1.5 text-sm">
+          <RouterLink v-if="displayName" :to="{ name: 'profile' }" class="flex min-w-0 items-center gap-2 border-2 border-border bg-card px-2 py-1.5 text-sm transition-colors hover:bg-accent">
             <span class="text-muted-foreground hidden lg:inline">{{ displayName }}</span>
-          </div>
+          </RouterLink>
           <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="handleLogout">
             {{ t('auth.logout') }}
           </Button>
@@ -115,6 +115,9 @@ async function handleLogout() {
               </RouterLink>
               <RouterLink to="/teams" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
                 {{ t('nav.teams') }}
+              </RouterLink>
+              <RouterLink :to="{ name: 'profile' }" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
+                {{ t('nav.profile') }}
               </RouterLink>
               <RouterLink v-if="canManage" to="/admin" class="text-lg font-medium hover:text-primary transition-colors" @click="menuOpen = false">
                 {{ t('nav.admin') }}

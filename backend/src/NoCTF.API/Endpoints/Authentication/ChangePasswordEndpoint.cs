@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -24,8 +25,17 @@ public sealed class ChangePasswordValidator : Validator<ChangePasswordRequest>
     }
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<ChangePasswordFailureCode>))]
+public enum ChangePasswordFailureCode
+{
+    CurrentPasswordInvalid
+}
+
+public sealed record ChangePasswordFailureResponse(ChangePasswordFailureCode Code);
+
 public sealed class ChangePasswordEndpoint(ChangePassword change, IUserContext user)
-    : Endpoint<ChangePasswordRequest, Results<NoContent, ProblemHttpResult>>
+    : Endpoint<ChangePasswordRequest,
+        Results<NoContent, Conflict<ChangePasswordFailureResponse>>>
 {
     public override void Configure()
     {
@@ -38,7 +48,7 @@ public sealed class ChangePasswordEndpoint(ChangePassword change, IUserContext u
         });
     }
 
-    public override async Task<Results<NoContent, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<NoContent, Conflict<ChangePasswordFailureResponse>>> ExecuteAsync(
         ChangePasswordRequest request,
         CancellationToken ct)
     {
@@ -48,11 +58,13 @@ public sealed class ChangePasswordEndpoint(ChangePassword change, IUserContext u
             request.NewPassword,
             DateTimeOffset.UtcNow,
             ct);
-        return result.Succeeded
-            ? TypedResults.NoContent()
-            : TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Password was not changed.",
-                detail: result.ErrorMessage);
+        if (result != ChangePasswordState.Changed)
+            return TypedResults.Conflict(new ChangePasswordFailureResponse(
+                ChangePasswordFailureCode.CurrentPasswordInvalid));
+
+        HttpContext.Response.Cookies.Delete(
+            "__Secure-noctf_refresh",
+            new CookieOptions { Path = "/api/v1/auth" });
+        return TypedResults.NoContent();
     }
 }

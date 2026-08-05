@@ -21,9 +21,18 @@ public sealed record UserProfile(
     UserKind Kind,
     bool EmailVerified,
     string? Description = null,
-    string? AvatarObjectKey = null);
+    string? AvatarObjectKey = null,
+    bool IsEmailPublic = false);
+public sealed record PublicUserProfile(
+    Guid Id,
+    string UserName,
+    string? Email,
+    string? Description,
+    string? AvatarObjectKey,
+    bool IsEmailPublic);
 public sealed record UserAvatarReplacement(UserProfile Profile, string? PreviousObjectKey);
 public enum CreateUserState { Created, UserNameConflict, EmailConflict }
+public enum ChangePasswordState { Changed, CurrentPasswordInvalid }
 
 public interface IUserAuthenticationStore
 {
@@ -34,6 +43,7 @@ public interface IUserAuthenticationStore
     Task<UserProfile?> UpdateProfileAsync(
         Guid userId,
         string? description,
+        bool isEmailPublic,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<UserAvatarReplacement?> ReplaceAvatarAsync(
@@ -50,7 +60,7 @@ public interface IUserAuthenticationStore
         bool emailVerified,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task<bool> ChangePasswordAsync(
+    Task<ChangePasswordState> ChangePasswordAsync(
         Guid userId,
         string currentPassword,
         string newPassword,

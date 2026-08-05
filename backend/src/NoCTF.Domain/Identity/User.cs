@@ -19,6 +19,7 @@ public sealed class User
     public string? Description { get; set; }
     [MaxLength(1024)]
     public string? AvatarObjectKey { get; set; }
+    public bool IsEmailPublic { get; set; }
     public DateTimeOffset? EmailVerifiedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

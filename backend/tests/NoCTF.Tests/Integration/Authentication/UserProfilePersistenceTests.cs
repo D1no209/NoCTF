@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Authentication.RefreshJwt;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
@@ -49,9 +50,12 @@ public sealed class UserProfilePersistenceTests
                     true,
                     now,
                     cancellationToken);
+                var initialProfile = await users.GetProfileAsync(userId, cancellationToken);
+                await Assert.That(initialProfile!.IsEmailPublic).IsFalse();
                 await users.UpdateProfileAsync(
                     userId,
                     "Persistent profile",
+                    true,
                     now.AddMinutes(1),
                     cancellationToken);
                 await users.ReplaceAvatarAsync(
@@ -69,7 +73,85 @@ public sealed class UserProfilePersistenceTests
                 await Assert.That(profile).IsNotNull();
                 await Assert.That(profile!.Description).IsEqualTo("Persistent profile");
                 await Assert.That(profile.AvatarObjectKey).IsEqualTo(avatarObjectKey);
+                await Assert.That(profile.IsEmailPublic).IsTrue();
             }
         });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Password_change_is_atomic_and_invalidates_existing_access_and_refresh_versions(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_password_change")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var hasher = new PasswordHasher<User>(Options.Create(new PasswordHasherOptions
+            {
+                IterationCount = 10_000
+            }));
+            var now = DateTimeOffset.UtcNow;
+            var userId = Guid.CreateVersion7(now);
+
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+            var users = new AuthenticationStore(db, hasher);
+            await users.CreateAsync(
+                userId,
+                "PasswordOwner",
+                "password-owner@example.test",
+                "old-pass",
+                true,
+                now,
+                cancellationToken);
+            var before = await users.FindByIdAsync(userId, cancellationToken);
+
+            var state = await users.ChangePasswordAsync(
+                userId,
+                "old-pass",
+                "new-pass",
+                now.AddMinutes(1),
+                cancellationToken);
+            var after = await users.FindByIdAsync(userId, cancellationToken);
+
+            await Assert.That(state).IsEqualTo(ChangePasswordState.Changed);
+            await Assert.That(after!.TokenVersion).IsEqualTo(before!.TokenVersion + 1);
+            await Assert.That(await users.VerifyPasswordAsync(
+                userId, "old-pass", cancellationToken)).IsFalse();
+            await Assert.That(await users.VerifyPasswordAsync(
+                userId, "new-pass", cancellationToken)).IsTrue();
+            await Assert.That(await new AccessTokenVersionReader(db).IsCurrentAsync(
+                userId, before.TokenVersion, cancellationToken)).IsFalse();
+
+            var refresh = await new RefreshAccessToken(
+                users,
+                new StaleRefreshIssuer(new(userId, before.TokenVersion)))
+                .ExecuteAsync("old-refresh", cancellationToken);
+            await Assert.That(refresh.Succeeded).IsFalse();
+            await Assert.That(refresh.ErrorCode).IsEqualTo("refresh_invalid");
+        });
+    }
+
+    private sealed class StaleRefreshIssuer(RefreshTokenPrincipal principal) : IAccessTokenIssuer
+    {
+        public IssuedAccessToken Issue(
+            AuthenticatedUser user,
+            DateTimeOffset now,
+            TimeSpan? lifetime = null) =>
+            new("unused-access", now.AddMinutes(15));
+
+        public IssuedRefreshToken IssueRefresh(AuthenticatedUser user) =>
+            new("unused-refresh", DateTimeOffset.UtcNow.AddDays(30));
+
+        public RefreshTokenPrincipal? ValidateRefresh(string token) => principal;
     }
 }

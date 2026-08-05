@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using NoCTF.Application.Authentication.Account;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
@@ -69,7 +70,7 @@ public sealed class BotAuthenticationTests
                     "ReplacementPassword123!",
                     DateTimeOffset.UtcNow,
                     cancellationToken))
-                .IsFalse();
+                .IsEqualTo(ChangePasswordState.CurrentPasswordInvalid);
         });
     }
 }

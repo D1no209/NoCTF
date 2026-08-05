@@ -128,6 +128,7 @@ public sealed class UserAccountDeletionPersistenceTests
                 await Assert.That(anonymized.UserName)
                     .IsEqualTo($"anonymous-{referencedUserId:N}");
                 await Assert.That(anonymized.Email).IsEmpty();
+                await Assert.That(anonymized.IsEmailPublic).IsFalse();
                 await Assert.That(anonymized.PasswordHash).IsEmpty();
                 await Assert.That(anonymized.Role).IsEqualTo(UserRole.User);
                 await Assert.That(await db.Competitions.IgnoreQueryFilters().AnyAsync(
@@ -164,6 +165,7 @@ public sealed class UserAccountDeletionPersistenceTests
             Kind = UserKind.Human,
             Role = role,
             AccountStatus = UserAccountStatus.Active,
+            IsEmailPublic = true,
             EmailVerifiedAt = now,
             CreatedAt = now,
             UpdatedAt = now

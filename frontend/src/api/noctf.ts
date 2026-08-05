@@ -30,6 +30,8 @@ import type {
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformConfigurationRequest,
   NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse,
   NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+  NoCtfapiEndpointsAuthenticationChangePasswordRequest,
+  NoCtfapiEndpointsAuthenticationUpdateMyProfileRequest,
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
   NoCtfapiEndpointsCompetitionsGetLeaderboardEndpointResponse,
@@ -322,9 +324,9 @@ export const authApi = {
       throw new ApiError(tt('errors.requestFailed'))
     return response
   },
-  async updateProfile(description: string | null) {
+  async updateProfile(body: NoCtfapiEndpointsAuthenticationUpdateMyProfileRequest) {
     return unwrap(
-      await generatedSdk.authenticationUpdateMyProfile({ body: { description } }),
+      await generatedSdk.authenticationUpdateMyProfile({ body }),
       tt('errors.requestFailed'),
     )
   },
@@ -368,6 +370,12 @@ export const authApi = {
   },
   async refresh() {
     return unwrap(await requestAuthenticationRefresh(), tt('errors.refreshToken'))
+  },
+  async changePassword(body: NoCtfapiEndpointsAuthenticationChangePasswordRequest): Promise<void> {
+    await requireSuccess(
+      generatedSdk.noCtfapiEndpointsAuthenticationChangePasswordEndpoint({ body }),
+      tt('errors.requestFailed'),
+    )
   },
 }
 
