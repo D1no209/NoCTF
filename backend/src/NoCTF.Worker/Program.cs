@@ -58,6 +58,8 @@ builder.UseWolverine(options =>
     options.PublishMessage<ChallengePublished>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<TeamBanned>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<DeliverCompetitionQuestionNotification>()
+        .ToPostgresqlQueue("noctf-worker");
 });
 
 var host = builder.Build();

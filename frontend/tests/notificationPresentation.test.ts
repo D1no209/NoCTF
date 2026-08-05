@@ -76,6 +76,30 @@ describe('notification presentation', () => {
       bodyKey: 'notifications.events.teamBanned.body',
       bodyParams: { team: 'Abuse Team' },
     })
+    expect(notificationCopy(createNotification(
+      NotificationKind.CompetitionQuestionOpened,
+      { title: 'Runtime connectivity', body: 'must not render' },
+    ))).toEqual({
+      titleKey: 'notifications.events.competitionQuestionOpened.title',
+      bodyKey: 'notifications.events.competitionQuestionOpened.body',
+      bodyParams: { title: 'Runtime connectivity' },
+    })
+    expect(notificationCopy(createNotification(
+      NotificationKind.CompetitionQuestionReplied,
+      { title: 'Runtime connectivity', body: 'must not render' },
+    ))).toEqual({
+      titleKey: 'notifications.events.competitionQuestionReplied.title',
+      bodyKey: 'notifications.events.competitionQuestionReplied.body',
+      bodyParams: { title: 'Runtime connectivity' },
+    })
+    expect(notificationCopy(createNotification(
+      NotificationKind.CompetitionQuestionStatusChanged,
+      { title: 'Runtime connectivity', status: 'Closed' },
+    ))).toEqual({
+      titleKey: 'notifications.events.competitionQuestionStatusChanged.title',
+      bodyKey: 'notifications.events.competitionQuestionStatusChanged.body',
+      bodyParams: { title: 'Runtime connectivity' },
+    })
   })
 
   test('uses safe fallback copy for a future unsupported kind', () => {

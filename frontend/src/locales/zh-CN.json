@@ -198,6 +198,18 @@
         "title": "队伍已封禁",
         "body": "{team} 已被本场比赛封禁。"
       },
+      "competitionQuestionOpened": {
+        "title": "收到新的私密咨询",
+        "body": "参赛者发起了私密咨询“{title}”。"
+      },
+      "competitionQuestionReplied": {
+        "title": "私密咨询有新回复",
+        "body": "“{title}”新增了一条回复。"
+      },
+      "competitionQuestionStatusChanged": {
+        "title": "咨询状态已变化",
+        "body": "“{title}”的状态已更新。"
+      },
       "unknown": {
         "title": "系统事件",
         "body": "系统记录了一条暂不支持展示类型的事件。"
@@ -392,6 +404,45 @@
       "visible": "可见",
       "published": "已发布",
       "paused": "已暂停"
+    }
+  },
+  "questions": {
+    "challengeTitle": "咨询出题人",
+    "platformTitle": "平台咨询",
+    "privateByDefault": "默认私密",
+    "description": "用于私下咨询出题人或比赛管理员。面向所有人的答案请优先通过 Hint 或平台公告发布。",
+    "sensitiveWarning": "请勿填写密码、访问令牌、SMTP 凭据或 Flag；当前不支持附件。",
+    "newQuestion": "发起咨询",
+    "created": "私密咨询已提交。",
+    "createFailed": "无法提交咨询。",
+    "operationFailed": "无法更新咨询。",
+    "replySent": "回复已发送。",
+    "statusUpdated": "咨询状态已更新。",
+    "published": "已匿名公开审核后的回复。",
+    "subjectLabel": "主题",
+    "subjectPlaceholder": "简要说明问题",
+    "bodyLabel": "问题详情",
+    "bodyPlaceholder": "说明你观察到的现象和预期结果……",
+    "submit": "私密提交",
+    "loading": "正在加载咨询……",
+    "loadFailed": "咨询加载失败。",
+    "empty": "暂无咨询",
+    "emptyHint": "私密对话与被明确公开的回答会显示在这里。",
+    "anonymousParticipant": "匿名参赛者",
+    "publishedBadge": "已公开回答",
+    "loadingDetail": "正在加载对话……",
+    "publishHint": "例外操作：匿名公开这条已审核回复。通用说明请优先发布为 Hint 或公告。",
+    "publishReviewed": "公开审核回复",
+    "statusTransition": "状态由 {from} 变更为 {to}",
+    "replyPlaceholder": "填写私密回复……",
+    "sendReply": "发送回复",
+    "resolve": "标记已解决",
+    "closePermanently": "永久关闭",
+    "status": {
+      "Pending": "待回复",
+      "Replied": "已回复",
+      "Resolved": "已解决",
+      "Closed": "已关闭"
     }
   },
   "challenges": {

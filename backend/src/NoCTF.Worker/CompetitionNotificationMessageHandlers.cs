@@ -101,4 +101,23 @@ public static class CompetitionNotificationMessageHandlers
                 message.BannedAt),
             message.TeamId,
             ct);
+
+    public static Task Handle(
+        DeliverCompetitionQuestionNotification message,
+        CompetitionNotificationDelivery delivery,
+        CancellationToken ct) =>
+        delivery.DeliverToUsersAsync(
+            message.CompetitionId,
+            message.QuestionId,
+            message.Kind,
+            $"competition-question:{message.QuestionId:N}:{message.EntryId?.ToString("N") ?? "root"}:{message.Revision}:{(short)message.Event}",
+            new CompetitionQuestionActivityPayload(
+                message.CompetitionId,
+                message.QuestionId,
+                message.EntryId,
+                message.Event,
+                message.Title,
+                message.OccurredAt),
+            message.RecipientUserIds,
+            ct);
 }

@@ -7,6 +7,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
+using NoCTF.Domain.Challenges.Questions;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -20,6 +21,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();
+    public DbSet<CompetitionQuestion> CompetitionQuestions => Set<CompetitionQuestion>();
     public DbSet<ChallengeFlag> ChallengeFlags => Set<ChallengeFlag>();
     public DbSet<RuntimeInstance> RuntimeInstances => Set<RuntimeInstance>();
     public DbSet<PatchUpload> PatchUploads => Set<PatchUpload>();

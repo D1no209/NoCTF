@@ -46,3 +46,22 @@ public sealed record TeamBanned(
     Guid TeamId,
     string TeamName,
     DateTimeOffset BannedAt);
+
+public sealed record DeliverCompetitionQuestionNotification(
+    Guid CompetitionId,
+    Guid QuestionId,
+    Guid? EntryId,
+    Guid[] RecipientUserIds,
+    NotificationKind Kind,
+    CompetitionQuestionNotificationEvent Event,
+    string Title,
+    DateTimeOffset OccurredAt,
+    int Revision);
+
+public enum CompetitionQuestionNotificationEvent : short
+{
+    Opened,
+    HandlerReplied,
+    AskerFollowedUp,
+    StatusChanged
+}

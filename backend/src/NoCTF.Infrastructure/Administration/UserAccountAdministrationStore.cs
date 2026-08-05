@@ -153,6 +153,18 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
             db.Set<NoCTF.Domain.Competitions.CompetitionLifecycleAudit>()
                 .CountAsync(audit => audit.ActorId == user.Id, ct));
         await AddReferenceAsync(
+            UserDeletionReferenceKind.CompetitionQuestion,
+            db.CompetitionQuestions.CountAsync(question =>
+                question.AskedByUserId == user.Id
+                || question.PublishedByUserId == user.Id,
+                ct));
+        await AddReferenceAsync(
+            UserDeletionReferenceKind.CompetitionQuestionEntry,
+            db.Set<NoCTF.Domain.Challenges.Questions.CompetitionQuestionEntry>()
+                .CountAsync(entry => entry.ActorUserId == user.Id
+                    || entry.PublishedByUserId == user.Id,
+                    ct));
+        await AddReferenceAsync(
             UserDeletionReferenceKind.UserAccountLifecycleAudit,
             db.UserAccountLifecycleAudits.CountAsync(
                 audit => audit.TargetUserId == user.Id || audit.ActorUserId == user.Id,

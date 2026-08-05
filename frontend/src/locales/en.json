@@ -198,6 +198,18 @@
         "title": "Team banned",
         "body": "{team} was banned from the competition."
       },
+      "competitionQuestionOpened": {
+        "title": "New private question",
+        "body": "A participant opened the private question “{title}”."
+      },
+      "competitionQuestionReplied": {
+        "title": "Private question updated",
+        "body": "A new reply was added to “{title}”."
+      },
+      "competitionQuestionStatusChanged": {
+        "title": "Question status changed",
+        "body": "The status of “{title}” was updated."
+      },
       "unknown": {
         "title": "System event",
         "body": "An event with an unsupported type was recorded."
@@ -392,6 +404,45 @@
       "visible": "Visible",
       "published": "Published",
       "paused": "Paused"
+    }
+  },
+  "questions": {
+    "challengeTitle": "Ask the challenge author",
+    "platformTitle": "Platform support",
+    "privateByDefault": "Private by default",
+    "description": "Ask challenge authors or competition staff privately. Use published hints and announcements for answers intended for everyone.",
+    "sensitiveWarning": "Do not include passwords, access tokens, SMTP credentials, or Flag values. Attachments are not supported.",
+    "newQuestion": "New question",
+    "created": "Private question submitted.",
+    "createFailed": "Unable to submit the question.",
+    "operationFailed": "Unable to update the question.",
+    "replySent": "Reply sent.",
+    "statusUpdated": "Question status updated.",
+    "published": "Reviewed reply published anonymously.",
+    "subjectLabel": "Subject",
+    "subjectPlaceholder": "Summarize the issue",
+    "bodyLabel": "Details",
+    "bodyPlaceholder": "Describe what you observed and what you expected...",
+    "submit": "Submit privately",
+    "loading": "Loading questions...",
+    "loadFailed": "Questions could not be loaded.",
+    "empty": "No questions yet",
+    "emptyHint": "Private conversations and explicitly published answers will appear here.",
+    "anonymousParticipant": "Anonymous participant",
+    "publishedBadge": "Published answer",
+    "loadingDetail": "Loading conversation...",
+    "publishHint": "Exceptional action: publish this reviewed reply anonymously. Prefer a Hint or announcement for general guidance.",
+    "publishReviewed": "Publish reviewed reply",
+    "statusTransition": "Status changed from {from} to {to}",
+    "replyPlaceholder": "Write a private reply...",
+    "sendReply": "Send reply",
+    "resolve": "Resolve",
+    "closePermanently": "Close permanently",
+    "status": {
+      "Pending": "Pending",
+      "Replied": "Replied",
+      "Resolved": "Resolved",
+      "Closed": "Closed"
     }
   },
   "challenges": {

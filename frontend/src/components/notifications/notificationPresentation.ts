@@ -56,6 +56,18 @@ export function notificationCopy(notification: PublicNotification): Notification
       return copy('teamBanned', {
         team: readPayloadString(notification.payload, 'teamName'),
       })
+    case NotificationKind.CompetitionQuestionOpened:
+      return copy('competitionQuestionOpened', {
+        title: readPayloadString(notification.payload, 'title'),
+      })
+    case NotificationKind.CompetitionQuestionReplied:
+      return copy('competitionQuestionReplied', {
+        title: readPayloadString(notification.payload, 'title'),
+      })
+    case NotificationKind.CompetitionQuestionStatusChanged:
+      return copy('competitionQuestionStatusChanged', {
+        title: readPayloadString(notification.payload, 'title'),
+      })
     default:
       return copy('unknown')
   }

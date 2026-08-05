@@ -230,7 +230,7 @@ export type NoCtfapiEndpointsNotificationsNotificationResponse = {
     createdAt?: string;
 };
 
-export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
 export type NoCtfapiEndpointsNotificationsListNotificationsRequest = {
     [key: string]: never;
@@ -425,6 +425,94 @@ export type NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse = {
     deletedAt?: string | null;
     createdAt?: string;
     updatedAt?: string;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse = {
+    id?: string;
+    competitionId?: string;
+    competitionChallengeId?: string | null;
+    teamId?: string | null;
+    askedByUserId?: string | null;
+    askerDisplayName?: string;
+    teamDisplayName?: string | null;
+    submissionId?: string | null;
+    subject?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode;
+    title?: string;
+    body?: string;
+    status?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode;
+    access?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode;
+    revision?: number;
+    publishedAt?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+    canReply?: boolean;
+    canResolve?: boolean;
+    canClose?: boolean;
+    canPublish?: boolean;
+    canViewPrivate?: boolean;
+    entries?: Array<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryResponse>;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode = 'Challenge' | 'Platform';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode = 'Pending' | 'Replied' | 'Resolved' | 'Closed';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode = 'Public' | 'Asker' | 'Observer' | 'Handler';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryResponse = {
+    id?: string;
+    kind?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode;
+    actorRole?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode;
+    actorUserId?: string | null;
+    actorDisplayName?: string;
+    body?: string | null;
+    fromStatus?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode | null;
+    toStatus?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode | null;
+    targetEntryId?: string | null;
+    publishedAt?: string | null;
+    createdAt?: string;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode = 'Message' | 'StatusTransition' | 'Publication';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode = 'Asker' | 'Handler';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse = {
+    code?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode;
+    current?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse | null;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode = 'InvalidRequest' | 'SpamRejected' | 'LifecycleConflict' | 'TeamNotEligible' | 'RevisionConflict' | 'InvalidTransition' | 'QuestionClosed' | 'ReplyNotPublishable';
+
+export type NoCtfapiEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest = {
+    body: string;
+    expectedRevision: number;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsChangeCompetitionQuestionStatusRequest = {
+    status: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode;
+    expectedRevision: number;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCreateCompetitionQuestionRequest = {
+    subject: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode;
+    competitionChallengeId?: string | null;
+    submissionId?: string | null;
+    title: string;
+    body: string;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionListResponse = {
+    items?: Array<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse>;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsListCompetitionQuestionsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsChallengesQuestionsPublishCompetitionQuestionRequest = {
+    replyEntryId: string;
+    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAuthenticationChangePasswordFailureResponse = {
@@ -2441,6 +2529,244 @@ export type NoCtfapiEndpointsChallengesUnlockChallengeHintEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsChallengesUnlockChallengeHintEndpointResponse = NoCtfapiEndpointsChallengesUnlockChallengeHintEndpointResponses[keyof NoCtfapiEndpointsChallengesUnlockChallengeHintEndpointResponses];
+
+export type AddCompetitionQuestionMessageData = {
+    body: NoCtfapiEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest;
+    path: {
+        competitionId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/questions/{questionId}/messages';
+};
+
+export type AddCompetitionQuestionMessageErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse;
+};
+
+export type AddCompetitionQuestionMessageError = AddCompetitionQuestionMessageErrors[keyof AddCompetitionQuestionMessageErrors];
+
+export type AddCompetitionQuestionMessageResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse;
+};
+
+export type AddCompetitionQuestionMessageResponse = AddCompetitionQuestionMessageResponses[keyof AddCompetitionQuestionMessageResponses];
+
+export type ChangeCompetitionQuestionStatusData = {
+    body: NoCtfapiEndpointsChallengesQuestionsChangeCompetitionQuestionStatusRequest;
+    path: {
+        competitionId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/questions/{questionId}/status';
+};
+
+export type ChangeCompetitionQuestionStatusErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse;
+};
+
+export type ChangeCompetitionQuestionStatusError = ChangeCompetitionQuestionStatusErrors[keyof ChangeCompetitionQuestionStatusErrors];
+
+export type ChangeCompetitionQuestionStatusResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse;
+};
+
+export type ChangeCompetitionQuestionStatusResponse = ChangeCompetitionQuestionStatusResponses[keyof ChangeCompetitionQuestionStatusResponses];
+
+export type ListCompetitionQuestionsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        competitionChallengeId?: string | null;
+        subject?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode | null;
+        status?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode | null;
+        publishedOnly: boolean;
+        limit: number;
+    };
+    url: '/api/v1/competitions/{competitionId}/questions';
+};
+
+export type ListCompetitionQuestionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type ListCompetitionQuestionsError = ListCompetitionQuestionsErrors[keyof ListCompetitionQuestionsErrors];
+
+export type ListCompetitionQuestionsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionListResponse;
+};
+
+export type ListCompetitionQuestionsResponse = ListCompetitionQuestionsResponses[keyof ListCompetitionQuestionsResponses];
+
+export type CreateCompetitionQuestionData = {
+    body: NoCtfapiEndpointsChallengesQuestionsCreateCompetitionQuestionRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/questions';
+};
+
+export type CreateCompetitionQuestionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse;
+};
+
+export type CreateCompetitionQuestionError = CreateCompetitionQuestionErrors[keyof CreateCompetitionQuestionErrors];
+
+export type CreateCompetitionQuestionResponses = {
+    /**
+     * Created
+     */
+    201: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse;
+};
+
+export type CreateCompetitionQuestionResponse = CreateCompetitionQuestionResponses[keyof CreateCompetitionQuestionResponses];
+
+export type GetCompetitionQuestionData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/questions/{questionId}';
+};
+
+export type GetCompetitionQuestionErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetCompetitionQuestionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse;
+};
+
+export type GetCompetitionQuestionResponse = GetCompetitionQuestionResponses[keyof GetCompetitionQuestionResponses];
+
+export type PublishCompetitionQuestionData = {
+    body: NoCtfapiEndpointsChallengesQuestionsPublishCompetitionQuestionRequest;
+    path: {
+        competitionId: string;
+        questionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/questions/{questionId}/publication';
+};
+
+export type PublishCompetitionQuestionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse;
+};
+
+export type PublishCompetitionQuestionError = PublishCompetitionQuestionErrors[keyof PublishCompetitionQuestionErrors];
+
+export type PublishCompetitionQuestionResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse;
+};
+
+export type PublishCompetitionQuestionResponse = PublishCompetitionQuestionResponses[keyof PublishCompetitionQuestionResponses];
 
 export type NoCtfapiEndpointsAuthenticationChangePasswordEndpointData = {
     body: NoCtfapiEndpointsAuthenticationChangePasswordRequest;

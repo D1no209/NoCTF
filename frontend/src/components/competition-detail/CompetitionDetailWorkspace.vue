@@ -3,7 +3,7 @@ import type { PublicChallenge } from '@/api/challengePresentation'
 import type { NoCtfApplicationScoringLeaderboardLeaderboardResponse } from '@/api/generated/types.gen'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, Puzzle, Trophy, UserPlus, Users } from 'lucide-vue-next'
+import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, MessageCircleQuestion, Puzzle, Trophy, UserPlus, Users } from 'lucide-vue-next'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
@@ -16,6 +16,7 @@ import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
 import ScoreboardView from '@/components/game/ScoreboardView.vue'
 import StatTile from '@/components/layout/StatTile.vue'
+import CompetitionQuestionsPanel from '@/components/questions/CompetitionQuestionsPanel.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -134,7 +135,7 @@ const effectiveChallenges = computed<PublicChallenge[]>(() => {
 const modalOpen = ref(false)
 const selectedChallenge = ref<PublicChallenge | null>(null)
 const ui = reactive({
-  activeTab: 'challenges' as 'challenges' | 'scoreboard',
+  activeTab: 'challenges' as 'challenges' | 'scoreboard' | 'support',
 })
 const activeDirection = ref('ALL')
 const hideSolved = ref(false)
@@ -181,6 +182,8 @@ const isAwdpMode = computed(() => competition.value?.mode === 'awdp')
 const isKohMode = computed(() => competition.value?.mode === 'koh')
 const canManageCompetition = computed(() => canManagePlatformResources(auth.userRole))
 const canUseParticipantActions = computed(() => Boolean(approvedTeam.value))
+const canAskCompetitionQuestion = computed(() => canUseParticipantActions.value
+  && (competition.value?.status === 'running' || competition.value?.status === 'paused'))
 const canAccessChallenges = computed(() => canManageCompetition.value || Boolean(approvedTeam.value))
 const canDownloadAttachments = computed(() =>
   canUseParticipantActions.value && competition.value?.status === 'running',
@@ -483,18 +486,6 @@ function rotationClass(id: string) {
             </Badge>
           </div>
         </div>
-        <Button
-          v-if="isAwdpMode"
-          variant="outline"
-          size="sm"
-          as-child
-          class="shrink-0 border-border bg-secondary/50 text-foreground hover:bg-secondary"
-        >
-          <RouterLink :to="{ name: 'awdp-screen', params: { gameId: competitionId } }">
-            {{ t('awdp.screenEntry') }}
-            <ArrowRight class="size-4" />
-          </RouterLink>
-        </Button>
       </div>
 
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -612,7 +603,7 @@ function rotationClass(id: string) {
 
     <!-- Main Content Tabs -->
     <Tabs v-model="ui.activeTab" class="w-full">
-      <TabsList class="mb-8 w-full max-w-md grid grid-cols-2">
+      <TabsList class="mb-8 grid h-auto w-full max-w-2xl grid-cols-3">
         <TabsTrigger value="challenges">
           <Puzzle class="size-4" />
           {{ t('challenges.title') }}
@@ -620,6 +611,10 @@ function rotationClass(id: string) {
         <TabsTrigger value="scoreboard">
           <Trophy class="size-4" />
           {{ t('scoreboard.title') }}
+        </TabsTrigger>
+        <TabsTrigger value="support">
+          <MessageCircleQuestion class="size-4" />
+          {{ t('questions.platformTitle') }}
         </TabsTrigger>
       </TabsList>
 
@@ -792,6 +787,14 @@ function rotationClass(id: string) {
           </CardContent>
         </Card>
       </TabsContent>
+
+      <TabsContent value="support" class="mt-0">
+        <CompetitionQuestionsPanel
+          :competition-id="competitionId"
+          subject="Platform"
+          :can-create="canAskCompetitionQuestion"
+        />
+      </TabsContent>
     </Tabs>
 
     <!-- Challenge Modal -->
@@ -814,6 +817,7 @@ function rotationClass(id: string) {
       :can-request-defense="canUseParticipantActions && (!isAwdpMode || selectedChallengeAwdpState?.canRequestDefense !== false)"
       :can-download-attachments="canDownloadAttachments"
       :has-challenge-detail="Boolean(activeChallengeDetail)"
+      :can-ask-question="canAskCompetitionQuestion"
       @create-instance="handleInstanceCreated(selectedChallenge.id)"
       @request-defense="markDefenseRequested(selectedChallenge.id)"
       @patch-uploaded="handlePatchUploaded"
