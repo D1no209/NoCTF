@@ -7,6 +7,58 @@ public static class UserProfileRules
 {
     public const int MaximumDescriptionLength = 500;
     public const int MaximumAvatarBytes = 3 * 1024 * 1024;
+    public const int MaximumAvatarRequestBytes = MaximumAvatarBytes + 64 * 1024;
+    public const int AvatarOutputSize = 512;
+    public const int MaximumAvatarDimension = 8192;
+    public const long MaximumAvatarPixels = 32_000_000;
+}
+
+public enum AvatarImageFailure
+{
+    SizeInvalid,
+    SourceMetadataMismatch,
+    UnsupportedFormat,
+    InvalidDimensions,
+    PixelLimitExceeded,
+    MultipleFrames,
+    MalformedImage
+}
+
+public sealed record NormalizedAvatarImage(
+    ReadOnlyMemory<byte> Content,
+    string ContentType,
+    string Extension,
+    string SourceContentType);
+
+public sealed record AvatarImageProcessingResult(
+    NormalizedAvatarImage? Image,
+    AvatarImageFailure? Failure)
+{
+    public static AvatarImageProcessingResult Success(NormalizedAvatarImage image) =>
+        new(image, null);
+
+    public static AvatarImageProcessingResult Rejected(AvatarImageFailure failure) =>
+        new(null, failure);
+}
+
+public interface IAvatarImageProcessor
+{
+    AvatarImageProcessingResult Process(ReadOnlyMemory<byte> content);
+}
+
+public sealed record AvatarReplacementResult(
+    UserProfile? Profile,
+    AvatarImageFailure? Failure,
+    bool UserNotFound = false)
+{
+    public static AvatarReplacementResult Success(UserProfile profile) =>
+        new(profile, null);
+
+    public static AvatarReplacementResult Rejected(AvatarImageFailure failure) =>
+        new(null, failure);
+
+    public static AvatarReplacementResult MissingUser() =>
+        new(null, null, true);
 }
 
 public sealed class UpdateCurrentUserProfile(IUserAuthenticationStore users)
@@ -14,21 +66,23 @@ public sealed class UpdateCurrentUserProfile(IUserAuthenticationStore users)
     public Task<UserProfile?> ExecuteAsync(
         Guid userId,
         string? description,
+        bool isEmailPublic,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
         var normalizedDescription = string.IsNullOrWhiteSpace(description)
             ? null
             : description.Trim();
-        return users.UpdateProfileAsync(userId, normalizedDescription, now, ct);
+        return users.UpdateProfileAsync(userId, normalizedDescription, isEmailPublic, now, ct);
     }
 }
 
 public sealed class ReplaceCurrentUserAvatar(
     IUserAuthenticationStore users,
-    IObjectStorage objects)
+    IObjectStorage objects,
+    IAvatarImageProcessor imageProcessor)
 {
-    public async Task<OperationResult<UserProfile>> ExecuteAsync(
+    public async Task<AvatarReplacementResult> ExecuteAsync(
         Guid userId,
         string fileName,
         string contentType,
@@ -37,24 +91,24 @@ public sealed class ReplaceCurrentUserAvatar(
         CancellationToken ct = default)
     {
         if (content.IsEmpty || content.Length > UserProfileRules.MaximumAvatarBytes)
-            return OperationResult<UserProfile>.Failure(
-                "avatar_size_invalid",
-                $"Avatar must be between 1 byte and {UserProfileRules.MaximumAvatarBytes} bytes.");
+            return AvatarReplacementResult.Rejected(AvatarImageFailure.SizeInvalid);
 
-        var image = DetectImage(content.Span);
-        if (image is null || !string.Equals(contentType, image.Value.ContentType, StringComparison.OrdinalIgnoreCase))
-            return OperationResult<UserProfile>.Failure(
-                "avatar_format_invalid",
-                "Avatar must be a JPEG, PNG, or WebP image with matching content type.");
+        var processing = imageProcessor.Process(content);
+        if (processing.Failure is not null || processing.Image is null)
+            return AvatarReplacementResult.Rejected(
+                processing.Failure ?? AvatarImageFailure.MalformedImage);
+        var image = processing.Image;
+        if (!MatchesSourceMetadata(fileName, contentType, image.SourceContentType))
+            return AvatarReplacementResult.Rejected(AvatarImageFailure.SourceMetadataMismatch);
 
-        var objectKey = $"users/{userId:N}/avatars/{Guid.CreateVersion7(now):N}.{image.Value.Extension}";
+        var objectKey = $"users/{userId:N}/avatars/{Guid.CreateVersion7(now):N}.{image.Extension}";
         StoredObject stored;
-        await using (var stream = new MemoryStream(content.ToArray(), writable: false))
+        await using (var stream = new MemoryStream(image.Content.ToArray(), writable: false))
         {
             stored = await objects.PutAsync(
                 objectKey,
-                fileName,
-                image.Value.ContentType,
+                $"avatar.{image.Extension}",
+                image.ContentType,
                 stream,
                 ct);
         }
@@ -73,14 +127,14 @@ public sealed class ReplaceCurrentUserAvatar(
         if (replacement is null)
         {
             await TryDeleteAsync(stored.ObjectKey);
-            return OperationResult<UserProfile>.Failure("user_not_found", "User was not found.");
+            return AvatarReplacementResult.MissingUser();
         }
 
         if (!string.IsNullOrWhiteSpace(replacement.PreviousObjectKey)
             && !string.Equals(replacement.PreviousObjectKey, stored.ObjectKey, StringComparison.Ordinal))
             await TryDeleteAsync(replacement.PreviousObjectKey);
 
-        return OperationResult<UserProfile>.Success(replacement.Profile);
+        return AvatarReplacementResult.Success(replacement.Profile);
     }
 
     private async Task TryDeleteAsync(string objectKey)
@@ -95,23 +149,24 @@ public sealed class ReplaceCurrentUserAvatar(
         }
     }
 
-    private static RasterImage? DetectImage(ReadOnlySpan<byte> content)
+    private static bool MatchesSourceMetadata(
+        string fileName,
+        string declaredContentType,
+        string actualContentType)
     {
-        if (content.Length >= 8
-            && content[..8].SequenceEqual(
-                new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }))
-            return new("image/png", "png");
-        if (content.Length >= 3
-            && content[..3].SequenceEqual(new byte[] { 0xFF, 0xD8, 0xFF }))
-            return new("image/jpeg", "jpg");
-        if (content.Length >= 12
-            && content[..4].SequenceEqual("RIFF"u8)
-            && content.Slice(8, 4).SequenceEqual("WEBP"u8))
-            return new("image/webp", "webp");
-        return null;
-    }
+        if (!string.Equals(declaredContentType, actualContentType, StringComparison.OrdinalIgnoreCase))
+            return false;
 
-    private readonly record struct RasterImage(string ContentType, string Extension);
+        var extension = Path.GetExtension(fileName);
+        return actualContentType.ToLowerInvariant() switch
+        {
+            "image/jpeg" => extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".jpeg", StringComparison.OrdinalIgnoreCase),
+            "image/png" => extension.Equals(".png", StringComparison.OrdinalIgnoreCase),
+            "image/webp" => extension.Equals(".webp", StringComparison.OrdinalIgnoreCase),
+            _ => false
+        };
+    }
 }
 
 public sealed record UserAvatarContent(Stream Content, string ContentType);

@@ -64,6 +64,7 @@ public sealed class RefreshAccessTokenTests
         public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken) =>
             Task.FromResult<UserProfile?>(null);
         public Task<UserProfile?> UpdateProfileAsync(Guid userId, string? description,
+            bool isEmailPublic,
             DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.FromResult<UserProfile?>(null);
         public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, string objectKey,
@@ -75,9 +76,9 @@ public sealed class RefreshAccessTokenTests
             string password, bool emailVerified, DateTimeOffset now,
             CancellationToken cancellationToken) =>
             Task.FromResult(CreateUserState.Created);
-        public Task<bool> ChangePasswordAsync(Guid userId, string currentPassword,
+        public Task<ChangePasswordState> ChangePasswordAsync(Guid userId, string currentPassword,
             string newPassword, DateTimeOffset now, CancellationToken cancellationToken) =>
-            Task.FromResult(false);
+            Task.FromResult(ChangePasswordState.CurrentPasswordInvalid);
         public Task<bool> IncrementTokenVersionAsync(Guid userId, DateTimeOffset now,
             CancellationToken cancellationToken) => Task.FromResult(false);
     }

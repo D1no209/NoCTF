@@ -67,6 +67,7 @@ public static class ServiceRegistration
             services.AddScoped<RefreshAccessToken>();
             services.AddScoped<RegisterUser>();
             services.AddScoped<GetCurrentUser>();
+            services.AddScoped<GetPublicUserProfile>();
             services.AddScoped<ChangePassword>();
             services.AddScoped<LogoutAll>();
             services.AddScoped<ResendEmailVerification>();
@@ -88,12 +89,20 @@ public static class ServiceRegistration
             services.AddSingleton<ISubmissionAdmissionModePolicy, SwaggerSubmissionAdmissionModePolicy>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
+            services.AddScoped<GetCurrentUser>();
+            services.AddScoped<GetPublicUserProfile>();
+            services.AddScoped<UpdateCurrentUserProfile>();
+            services.AddScoped<ReplaceCurrentUserAvatar>();
+            services.AddScoped<GetUserAvatar>();
+            services.AddScoped<ChangePassword>();
+            services.AddScoped<LogoutAll>();
             services.AddScoped<ModerateTeam>();
             services.AddScoped<ITeamModerationStore, SwaggerModerationStore>();
             services.AddScoped<ICompetitionModerationAuthorizer, SwaggerModerationAuthorizer>();
             services.AddSingleton<IBackendMessagePublisher, SwaggerBackendMessagePublisher>();
             services.AddScoped<ILeaderboardCache, SwaggerLeaderboardCache>();
             services.AddSingleton<IObjectStorage, SwaggerObjectStorage>();
+            services.AddSingleton<IAvatarImageProcessor, SwaggerAvatarImageProcessor>();
         }
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
@@ -120,6 +129,18 @@ public static class ServiceRegistration
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 30,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+            options.AddPolicy("avatar", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                        ?? context.User.FindFirstValue("sub")
+                        ?? context.Connection.RemoteIpAddress?.ToString()
+                        ?? "anonymous",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 10,
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0
                     }));

@@ -82,6 +82,7 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
         user.EmailVerifiedAt = null;
         user.Description = null;
         user.AvatarObjectKey = null;
+        user.IsEmailPublic = false;
         user.UpdatedAt = now;
         AddAudit(
             userId,

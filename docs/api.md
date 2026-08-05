@@ -26,10 +26,12 @@ PUT  /api/v1/auth/me/profile
 POST /api/v1/auth/me/avatar
 PUT  /api/v1/auth/password
 POST /api/v1/auth/logout-all
+GET  /api/v1/users/{userId}
 GET  /api/v1/users/{userId}/avatar
 ```
 
 Login/Refresh 返回 AccessToken 与 ExpiresAt；Refresh Cookie 不出现在 body。
+公开用户资料默认隐藏邮箱；本人和 Administrator 始终可见，其他访问者仅在用户主动公开后可见。
 
 ## Competition 与 Team
 

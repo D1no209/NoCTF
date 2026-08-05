@@ -90,6 +90,7 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
     public Task<UserProfile?> UpdateProfileAsync(
         Guid userId,
         string? description,
+        bool isEmailPublic,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult<UserProfile?>(null);
@@ -112,13 +113,13 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult(CreateUserState.Created);
-    public Task<bool> ChangePasswordAsync(
+    public Task<ChangePasswordState> ChangePasswordAsync(
         Guid userId,
         string currentPassword,
         string newPassword,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
-        Task.FromResult(false);
+        Task.FromResult(ChangePasswordState.CurrentPasswordInvalid);
     public Task<bool> IncrementTokenVersionAsync(
         Guid userId,
         DateTimeOffset now,
@@ -130,6 +131,12 @@ internal sealed class SwaggerAccessTokenVersionReader : IAccessTokenVersionReade
 {
     public Task<bool> IsCurrentAsync(Guid userId, int tokenVersion, CancellationToken cancellationToken) =>
         Task.FromResult(false);
+}
+
+internal sealed class SwaggerAvatarImageProcessor : IAvatarImageProcessor
+{
+    public AvatarImageProcessingResult Process(ReadOnlyMemory<byte> content) =>
+        AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage);
 }
 
 internal sealed class SwaggerEmailVerificationStore : IEmailVerificationStore

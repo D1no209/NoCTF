@@ -69,19 +69,40 @@ public sealed class GetCurrentUser(IUserAuthenticationStore store)
         store.GetProfileAsync(userId, ct);
 }
 
+public sealed class GetPublicUserProfile(IUserAuthenticationStore store)
+{
+    public async Task<PublicUserProfile?> ExecuteAsync(
+        Guid targetUserId,
+        Guid requesterUserId,
+        bool requesterIsAdministrator,
+        CancellationToken ct = default)
+    {
+        var profile = await store.GetProfileAsync(targetUserId, ct);
+        if (profile is null)
+            return null;
+
+        var mayViewEmail = requesterIsAdministrator
+            || requesterUserId == targetUserId
+            || profile.IsEmailPublic;
+        return new(
+            profile.Id,
+            profile.UserName,
+            mayViewEmail ? profile.Email : null,
+            profile.Description,
+            profile.AvatarObjectKey,
+            profile.IsEmailPublic);
+    }
+}
+
 public sealed class ChangePassword(IUserAuthenticationStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public Task<ChangePasswordState> ExecuteAsync(
         Guid userId,
         string currentPassword,
         string newPassword,
         DateTimeOffset now,
         CancellationToken ct = default) =>
-        await store.ChangePasswordAsync(userId, currentPassword, newPassword, now, ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure(
-                "current_password_invalid",
-                "The current password is invalid.");
+        store.ChangePasswordAsync(userId, currentPassword, newPassword, now, ct);
 }
 
 public sealed class LogoutAll(IUserAuthenticationStore store)

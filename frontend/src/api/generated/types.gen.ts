@@ -415,6 +415,12 @@ export type NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse = {
     updatedAt?: string;
 };
 
+export type NoCtfapiEndpointsAuthenticationChangePasswordFailureResponse = {
+    code?: NoCtfapiEndpointsAuthenticationChangePasswordFailureCode;
+};
+
+export type NoCtfapiEndpointsAuthenticationChangePasswordFailureCode = 'CurrentPasswordInvalid';
+
 export type NoCtfapiEndpointsAuthenticationChangePasswordRequest = {
     currentPassword: string;
     newPassword: string;
@@ -429,11 +435,25 @@ export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     emailVerified?: boolean;
     description?: string | null;
     avatarUrl?: string | null;
+    isEmailPublic?: boolean;
 };
 
 export type NoCtfDomainIdentityUserRole = 0 | 1 | 2;
 
 export type NoCtfDomainIdentityUserKind = 0 | 1;
+
+export type NoCtfapiEndpointsAuthenticationPublicUserProfileResponse = {
+    userId?: string;
+    userName?: string;
+    email?: string | null;
+    description?: string | null;
+    avatarUrl?: string | null;
+    isEmailPublic?: boolean;
+};
+
+export type NoCtfapiEndpointsAuthenticationGetUserProfileRequest = {
+    [key: string]: never;
+};
 
 export type NoCtfapiEndpointsAuthenticationLoginResponse = {
     userId?: string;
@@ -476,7 +496,14 @@ export type NoCtfapiEndpointsAuthenticationRegisterRequest = {
 
 export type NoCtfapiEndpointsAuthenticationUpdateMyProfileRequest = {
     description?: string | null;
+    isEmailPublic: boolean;
 };
+
+export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse = {
+    code?: NoCtfapiEndpointsAuthenticationAvatarUploadFailureCode;
+};
+
+export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureCode = 'SizeInvalid' | 'SourceMetadataMismatch' | 'UnsupportedFormat' | 'InvalidDimensions' | 'PixelLimitExceeded' | 'MultipleFrames' | 'MalformedImage';
 
 export type NoCtfapiEndpointsAuthenticationUploadMyAvatarRequest = {
     file: Blob | File;
@@ -2389,6 +2416,7 @@ export type NoCtfapiEndpointsAuthenticationChangePasswordEndpointErrors = {
      * Forbidden
      */
     403: unknown;
+    409: NoCtfapiEndpointsAuthenticationChangePasswordFailureResponse;
 };
 
 export type NoCtfapiEndpointsAuthenticationChangePasswordEndpointError = NoCtfapiEndpointsAuthenticationChangePasswordEndpointErrors[keyof NoCtfapiEndpointsAuthenticationChangePasswordEndpointErrors];
@@ -2448,6 +2476,31 @@ export type UserAvatarGetErrors = {
      */
     404: unknown;
 };
+
+export type UserProfileGetData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/users/{userId}';
+};
+
+export type UserProfileGetErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type UserProfileGetResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAuthenticationPublicUserProfileResponse;
+};
+
+export type UserProfileGetResponse = UserProfileGetResponses[keyof UserProfileGetResponses];
 
 export type NoCtfapiEndpointsAuthenticationLoginEndpointData = {
     body: NoCtfapiEndpointsAuthenticationLoginRequest;
@@ -2638,7 +2691,7 @@ export type AuthenticationUploadMyAvatarErrors = {
     /**
      * Bad Request
      */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    400: NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse;
     /**
      * Unauthorized
      */

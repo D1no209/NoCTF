@@ -52,7 +52,8 @@ public sealed class AuthenticationStore(
 
     public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken ct) =>
         db.Users.AsNoTracking()
-            .Where(user => user.Id == userId)
+            .Where(user => user.Id == userId
+                && user.AccountStatus == UserAccountStatus.Active)
             .Select(user => new UserProfile(
                 user.Id,
                 user.UserName,
@@ -61,12 +62,14 @@ public sealed class AuthenticationStore(
                 user.Kind,
                 user.EmailVerifiedAt != null,
                 user.Description,
-                user.AvatarObjectKey))
+                user.AvatarObjectKey,
+                user.IsEmailPublic))
             .SingleOrDefaultAsync(ct);
 
     public async Task<UserProfile?> UpdateProfileAsync(
         Guid userId,
         string? description,
+        bool isEmailPublic,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -77,6 +80,7 @@ public sealed class AuthenticationStore(
             return null;
 
         user.Description = description;
+        user.IsEmailPublic = isEmailPublic;
         user.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         return ToProfile(user);
@@ -156,7 +160,7 @@ public sealed class AuthenticationStore(
         }
     }
 
-    public async Task<bool> ChangePasswordAsync(
+    public async Task<ChangePasswordState> ChangePasswordAsync(
         Guid userId,
         string currentPassword,
         string newPassword,
@@ -170,13 +174,13 @@ public sealed class AuthenticationStore(
             || user.Kind != UserKind.Human
             || passwordHasher.VerifyHashedPassword(
                 user, user.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
-            return false;
+            return ChangePasswordState.CurrentPasswordInvalid;
 
         user.PasswordHash = passwordHasher.HashPassword(user, newPassword);
         user.TokenVersion = checked(user.TokenVersion + 1);
         user.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        return true;
+        return ChangePasswordState.Changed;
     }
 
     public async Task<bool> IncrementTokenVersionAsync(
@@ -211,5 +215,6 @@ public sealed class AuthenticationStore(
             user.Kind,
             user.EmailVerifiedAt is not null,
             user.Description,
-            user.AvatarObjectKey);
+            user.AvatarObjectKey,
+            user.IsEmailPublic);
 }

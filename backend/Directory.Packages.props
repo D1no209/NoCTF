@@ -30,6 +30,8 @@
     <PackageVersion Include="TUnit" Version="1.61.0" />
     <PackageVersion Include="TUnit.Assertions" Version="1.61.0" />
     <PackageVersion Include="Riok.Mapperly" Version="4.3.1" />
+    <PackageVersion Include="SkiaSharp" Version="4.151.0" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.151.0" />
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
     <PackageVersion Include="WolverineFx" Version="6.21.0" />
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.21.0" />

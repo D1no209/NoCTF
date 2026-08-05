@@ -1,6 +1,8 @@
+using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Security;
 using NoCTF.Application.Authentication.Account;
@@ -14,39 +16,44 @@ public sealed class UploadMyAvatarRequest
 
 public sealed class UploadMyAvatarValidator : Validator<UploadMyAvatarRequest>
 {
-    private static readonly string[] SupportedContentTypes =
-        ["image/jpeg", "image/png", "image/webp"];
-
-    public UploadMyAvatarValidator()
-    {
-        RuleFor(request => request.File).NotNull();
-        RuleFor(request => request.File.Length)
-            .InclusiveBetween(1, UserProfileRules.MaximumAvatarBytes)
-            .When(request => request.File is not null);
-        RuleFor(request => request.File.ContentType)
-            .Must(contentType => SupportedContentTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
-            .When(request => request.File is not null)
-            .WithMessage("Avatar must be a JPEG, PNG, or WebP image.");
-    }
+    public UploadMyAvatarValidator() => RuleFor(request => request.File).NotNull();
 }
+
+[JsonConverter(typeof(JsonStringEnumConverter<AvatarUploadFailureCode>))]
+public enum AvatarUploadFailureCode
+{
+    SizeInvalid,
+    SourceMetadataMismatch,
+    UnsupportedFormat,
+    InvalidDimensions,
+    PixelLimitExceeded,
+    MultipleFrames,
+    MalformedImage
+}
+
+public sealed record AvatarUploadFailureResponse(AvatarUploadFailureCode Code);
 
 public sealed class UploadMyAvatarEndpoint(
     ReplaceCurrentUserAvatar replace,
     IUserContext user,
     LinkGenerator links)
     : Endpoint<UploadMyAvatarRequest,
-        Results<Ok<CurrentUserResponse>, NotFound, ProblemHttpResult>>
+        Results<Ok<CurrentUserResponse>, NotFound, BadRequest<AvatarUploadFailureResponse>>>
 {
     public override void Configure()
     {
         Post("/auth/me/avatar");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.WithName("Authentication_UploadMyAvatar"));
+        MaxRequestBodySize(UserProfileRules.MaximumAvatarRequestBytes);
+        Description(builder => builder
+            .WithName("Authentication_UploadMyAvatar")
+            .WithMetadata(new EnableRateLimitingAttribute("avatar")));
         Summary(summary => summary.Summary = "Replaces the current user's cropped avatar.");
     }
 
-    public override async Task<Results<Ok<CurrentUserResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<CurrentUserResponse>, NotFound,
+        BadRequest<AvatarUploadFailureResponse>>> ExecuteAsync(
         UploadMyAvatarRequest request,
         CancellationToken ct)
     {
@@ -59,15 +66,26 @@ public sealed class UploadMyAvatarEndpoint(
             content.ToArray(),
             DateTimeOffset.UtcNow,
             ct);
-        if (result.ErrorCode == "user_not_found")
+        if (result.UserNotFound)
             return TypedResults.NotFound();
-        if (!result.Succeeded)
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Avatar was not updated.",
-                detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
+        if (result.Failure is not null)
+            return TypedResults.BadRequest(new AvatarUploadFailureResponse(
+                ToProtocolFailure(result.Failure.Value)));
 
-        return TypedResults.Ok(CurrentUserMapping.ToResponse(result.Value!, links, HttpContext));
+        return TypedResults.Ok(CurrentUserMapping.ToResponse(result.Profile!, links, HttpContext));
     }
+
+    private static AvatarUploadFailureCode ToProtocolFailure(AvatarImageFailure failure) =>
+        failure switch
+        {
+            AvatarImageFailure.SizeInvalid => AvatarUploadFailureCode.SizeInvalid,
+            AvatarImageFailure.SourceMetadataMismatch =>
+                AvatarUploadFailureCode.SourceMetadataMismatch,
+            AvatarImageFailure.UnsupportedFormat => AvatarUploadFailureCode.UnsupportedFormat,
+            AvatarImageFailure.InvalidDimensions => AvatarUploadFailureCode.InvalidDimensions,
+            AvatarImageFailure.PixelLimitExceeded => AvatarUploadFailureCode.PixelLimitExceeded,
+            AvatarImageFailure.MultipleFrames => AvatarUploadFailureCode.MultipleFrames,
+            AvatarImageFailure.MalformedImage => AvatarUploadFailureCode.MalformedImage,
+            _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
+        };
 }

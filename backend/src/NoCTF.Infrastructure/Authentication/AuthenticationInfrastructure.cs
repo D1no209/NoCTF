@@ -21,7 +21,9 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<AdministratorBootstrapper>();
         services.AddScoped<RegisterUser>();
         services.AddScoped<GetCurrentUser>();
+        services.AddScoped<GetPublicUserProfile>();
         services.AddScoped<UpdateCurrentUserProfile>();
+        services.AddSingleton<IAvatarImageProcessor, SkiaAvatarImageProcessor>();
         services.AddScoped<ReplaceCurrentUserAvatar>();
         services.AddScoped<GetUserAvatar>();
         services.AddScoped<ChangePassword>();

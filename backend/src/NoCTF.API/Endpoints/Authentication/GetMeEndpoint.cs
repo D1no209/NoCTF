@@ -15,7 +15,8 @@ public sealed record CurrentUserResponse(
     UserKind Kind,
     bool EmailVerified,
     string? Description,
-    string? AvatarUrl);
+    string? AvatarUrl,
+    bool IsEmailPublic);
 
 internal static class CurrentUserMapping
 {
@@ -24,19 +25,7 @@ internal static class CurrentUserMapping
         LinkGenerator links,
         HttpContext httpContext)
     {
-        string? avatarUrl = null;
-        if (!string.IsNullOrWhiteSpace(profile.AvatarObjectKey))
-        {
-            var path = links.GetPathByName(
-                httpContext,
-                "UserAvatar_Get",
-                new { userId = profile.Id });
-            if (path is not null)
-            {
-                var revision = Uri.EscapeDataString(Path.GetFileName(profile.AvatarObjectKey));
-                avatarUrl = $"{path}?revision={revision}";
-            }
-        }
+        var avatarUrl = AvatarUrl(profile.Id, profile.AvatarObjectKey, links, httpContext);
 
         return new(
             profile.Id,
@@ -46,7 +35,31 @@ internal static class CurrentUserMapping
             profile.Kind,
             profile.EmailVerified,
             profile.Description,
-            avatarUrl);
+            avatarUrl,
+            profile.IsEmailPublic);
+    }
+
+    public static string? AvatarUrl(
+        Guid userId,
+        string? avatarObjectKey,
+        LinkGenerator links,
+        HttpContext httpContext)
+    {
+        string? avatarUrl = null;
+        if (!string.IsNullOrWhiteSpace(avatarObjectKey))
+        {
+            var path = links.GetPathByName(
+                httpContext,
+                "UserAvatar_Get",
+                new { userId });
+            if (path is not null)
+            {
+                var revision = Uri.EscapeDataString(Path.GetFileName(avatarObjectKey));
+                avatarUrl = $"{path}?revision={revision}";
+            }
+        }
+
+        return avatarUrl;
     }
 }
 
