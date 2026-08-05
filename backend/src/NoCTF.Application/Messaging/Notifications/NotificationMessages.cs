@@ -51,7 +51,7 @@ public sealed record TeamBanCorrected(
     Guid CompetitionId,
     Guid TeamId,
     string TeamName,
-    Guid ScoringEventId,
+    Guid BanEventId,
     DateTimeOffset CorrectedAt);
 
 public sealed record DeliverCompetitionQuestionNotification(

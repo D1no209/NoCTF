@@ -30,6 +30,7 @@ public sealed record TeamResponse(
     IReadOnlyList<Guid> MemberIds,
     TeamRegistrationStatus RegistrationStatus,
     bool IsLocked,
+    bool IsBanned,
     DateTimeOffset RegisteredAt);
 
 public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);

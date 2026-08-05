@@ -13,6 +13,7 @@ import {
   competitionTeamAdminApi,
 } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import { teamBanAppealApi } from '@/api/teamBanAppealApi'
 import { isPlatformAdministrator } from '@/api/userRole'
 import AdminCompetitionChallengesPanel from '@/components/admin/competition-detail/AdminCompetitionChallengesPanel.vue'
 import AdminCompetitionCheatIncidentsPanel from '@/components/admin/competition-detail/AdminCompetitionCheatIncidentsPanel.vue'
@@ -20,6 +21,7 @@ import AdminCompetitionLeaderboardVisibilityPanel from '@/components/admin/compe
 import AdminCompetitionPermissionsPanel from '@/components/admin/competition-detail/AdminCompetitionPermissionsPanel.vue'
 import AdminCompetitionRuntimesPanel from '@/components/admin/competition-detail/AdminCompetitionRuntimesPanel.vue'
 import AdminCompetitionSettingsPanel from '@/components/admin/competition-detail/AdminCompetitionSettingsPanel.vue'
+import AdminCompetitionTeamBanAppealsPanel from '@/components/admin/competition-detail/AdminCompetitionTeamBanAppealsPanel.vue'
 import AdminCompetitionTeamsPanel from '@/components/admin/competition-detail/AdminCompetitionTeamsPanel.vue'
 import AdminDataExportsPanel from '@/components/admin/data-exports/AdminDataExportsPanel.vue'
 import { Badge } from '@/components/ui/badge'
@@ -154,6 +156,7 @@ const saveCompetitionMutation = useMutation({
 
 function refreshTeams() {
   qc.invalidateQueries({ queryKey: queryKeys.adminCompetitionTeams(competitionId.value) })
+  qc.invalidateQueries({ queryKey: queryKeys.adminCompetitionTeamBanAppeals(competitionId.value) })
 }
 
 const approveTeamMutation = useMutation({
@@ -175,14 +178,32 @@ const rejectTeamMutation = useMutation({
 })
 
 const banTeamMutation = useMutation({
-  mutationFn: (teamId: string) => competitionTeamAdminApi.ban(competitionId.value, teamId, 'suspected cheat'),
-  onSuccess: () => toast.success(t('admin.competitionDetail.teamBanned')),
+  mutationFn: ({ teamId, reason }: { teamId: string, reason: string }) =>
+    competitionTeamAdminApi.ban(competitionId.value, teamId, reason),
+  onSuccess: () => {
+    refreshTeams()
+    toast.success(t('admin.competitionDetail.teamBanned'))
+  },
   onError: () => toast.error(t('admin.competitionDetail.teamActionError')),
 })
 
 const unbanTeamMutation = useMutation({
   mutationFn: (teamId: string) => competitionTeamAdminApi.unban(competitionId.value, teamId),
-  onSuccess: () => toast.success(t('admin.competitionDetail.teamUnbanned')),
+  onSuccess: () => {
+    refreshTeams()
+    toast.success(t('admin.competitionDetail.teamUnbanned'))
+  },
+  onError: () => toast.error(t('admin.competitionDetail.teamActionError')),
+})
+
+const correctTeamBanMutation = useMutation({
+  mutationFn: ({ teamId, reason }: { teamId: string, reason: string }) =>
+    teamBanAppealApi.correct(competitionId.value, teamId, reason),
+  onSuccess: () => {
+    refreshTeams()
+    qc.invalidateQueries({ queryKey: queryKeys.leaderboard(competitionId.value) })
+    toast.success(t('admin.competitionDetail.teamBanCorrected'))
+  },
   onError: () => toast.error(t('admin.competitionDetail.teamActionError')),
 })
 
@@ -282,16 +303,19 @@ async function refreshAll() {
           <AdminCompetitionChallengesPanel v-if="activeSection === 'challenges'" :competition-id="competitionId" />
         </TabsContent>
         <TabsContent value="teams" class="min-w-0">
-          <AdminCompetitionTeamsPanel
-            v-if="activeSection === 'teams'"
-            :competition-teams="competitionTeams"
-            :loading-teams="loadingTeams"
-            :max-team-members="competitionForm.maxTeamMembers"
-            @approve="approveTeamMutation.mutate($event)"
-            @reject="rejectTeamMutation.mutate($event)"
-            @ban="banTeamMutation.mutate($event)"
-            @unban="unbanTeamMutation.mutate($event)"
-          />
+          <div v-if="activeSection === 'teams'" class="space-y-6">
+            <AdminCompetitionTeamsPanel
+              :competition-teams="competitionTeams"
+              :loading-teams="loadingTeams"
+              :max-team-members="competitionForm.maxTeamMembers"
+              @approve="approveTeamMutation.mutate($event)"
+              @reject="rejectTeamMutation.mutate($event)"
+              @ban="banTeamMutation.mutate($event)"
+              @unban="unbanTeamMutation.mutate($event)"
+              @correct="correctTeamBanMutation.mutate($event)"
+            />
+            <AdminCompetitionTeamBanAppealsPanel :competition-id="competitionId" />
+          </div>
         </TabsContent>
         <TabsContent value="cheats" class="min-w-0">
           <AdminCompetitionCheatIncidentsPanel

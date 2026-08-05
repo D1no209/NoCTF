@@ -709,6 +709,29 @@
     "ruleManualReview": "需要管理员审核通过后才能解锁题目。",
     "createSuccess": "队伍已创建",
     "joinSuccess": "已加入队伍",
+    "banAppeal": {
+      "banned": "已封禁",
+      "currentBanTitle": "比赛访问已暂停",
+      "correctedTitle": "封禁决定已纠正",
+      "sourceLabel": "封禁来源",
+      "source": {
+        "manualModeration": "人工管理处置",
+        "cheatIncident": "跨队 Flag 事件"
+      },
+      "status": {
+        "submitted": "私密复核中",
+        "upheld": "维持封禁",
+        "accepted": "申诉已接受"
+      },
+      "statement": "申诉陈述",
+      "resolution": "私密裁决",
+      "privateDescription": "队长可针对本次封禁提交一次私密申诉。工作人员证据和内部讨论不会公开。",
+      "placeholder": "说明需要复核的事实（16–512 个字符）",
+      "submit": "提交私密申诉",
+      "captainOnly": "仅队长可提交申诉；所有队员都可以查看申诉状态。",
+      "submitSuccess": "私密申诉已提交",
+      "submitError": "无法提交申诉；可能已经提交过，或封禁状态已经变化。"
+    },
     "actionError": "队伍操作失败"
   },
   "leaderboardVisibility": {
@@ -1519,6 +1542,38 @@
       "unbanTeam": "解除封禁",
       "teamBanned": "队伍已封禁",
       "teamUnbanned": "队伍已解除封禁",
+      "teamBanCorrected": "队伍封禁已纠正",
+      "correctTeamBan": "纠正封禁",
+      "banDialogTitle": "封禁 {team}",
+      "banDialogDescription": "填写仅工作人员可见的处置依据；受影响队伍只能看到封禁来源类别。",
+      "moderationReason": "仅工作人员可见的理由",
+      "correctionDialogTitle": "纠正 {team} 的封禁",
+      "correctionDialogDescription": "该操作会恢复历史成绩资格，比赛结束后仍可执行。",
+      "correctionReason": "私密纠错理由",
+      "correctionPrivacy": "公开通知仅包含比赛、队伍和纠错时间。",
+      "banAppealsTitle": "私密封禁申诉",
+      "banAppealsDescription": "申诉事实永久记录在比赛事件流中；Judge 和 Observer 仅可查看。",
+      "noBanAppeals": "暂无队伍提交封禁申诉。",
+      "banSource": {
+        "manualModeration": "人工管理处置",
+        "cheatIncident": "跨队 Flag 事件"
+      },
+      "appealStatus": {
+        "submitted": "已提交",
+        "upheld": "维持封禁",
+        "accepted": "申诉通过"
+      },
+      "appealSubmittedBy": "由 {user} 于 {time} 提交",
+      "appealStatement": "私密申诉",
+      "resolutionReason": "私密裁决理由",
+      "upholdAppeal": "维持封禁",
+      "acceptAppeal": "接受申诉",
+      "upholdAppealTitle": "维持本次队伍封禁",
+      "upholdAppealDescription": "裁决和理由仅对受影响队伍及工作人员可见。",
+      "acceptAppealTitle": "接受申诉并纠正封禁",
+      "acceptAppealDescription": "队伍将被解封，历史成绩重新投影，并发布不含理由的公开纠错通知。",
+      "appealResolved": "申诉裁决已记录",
+      "appealResolutionFailed": "无法裁决申诉；申诉或封禁状态可能已经变化。",
       "cheatTitle": "作弊信息",
       "cheatDescription": "CTF Flag 与 AWDP Break 的跨队 Flag 命中会进入待核查队列。列表不展示 Flag；显式读取完整证据会写入审计日志。",
       "noCheatIncidents": "暂无疑似作弊信息。",

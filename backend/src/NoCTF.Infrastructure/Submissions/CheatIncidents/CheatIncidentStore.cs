@@ -145,7 +145,8 @@ public sealed class CheatIncidentStore(
             cancellationToken);
         if (competitionStatus is null)
             return new(CheatIncidentResolutionFailure.NotFound);
-        if (competitionStatus == CompetitionStatus.Finished)
+        if (competitionStatus == CompetitionStatus.Finished
+            && operation != ResolutionOperation.CorrectAndUnban)
             return new(CheatIncidentResolutionFailure.CompetitionFinished);
 
         var scoringEvent = await db.ScoringEvents
@@ -190,6 +191,21 @@ public sealed class CheatIncidentStore(
             return new(CheatIncidentResolutionFailure.AlreadyBanned);
         if (operation == ResolutionOperation.CorrectAndUnban && !team.IsBanned)
             return new(CheatIncidentResolutionFailure.TeamNotBanned);
+
+        CompetitionEvent? ban = null;
+        if (operation == ResolutionOperation.CorrectAndUnban)
+        {
+            ban = await db.CompetitionEvents.AsNoTracking()
+                .Where(@event =>
+                    @event.CompetitionId == command.CompetitionId
+                    && @event.TeamId == team.Id
+                    && @event.Kind == CompetitionEventKind.TeamBanned)
+                .OrderByDescending(@event => @event.OccurredAt)
+                .ThenByDescending(@event => @event.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (ban?.ScoringEventId != scoringEvent.Id)
+                return new(CheatIncidentResolutionFailure.TeamNotBanned);
+        }
 
         var submittedFlag = await db.Submissions.AsNoTracking()
             .Where(item => item.Id == scoringEvent.SubmissionId.Value)
@@ -246,6 +262,31 @@ public sealed class CheatIncidentStore(
         }
         else if (operation == ResolutionOperation.CorrectAndUnban)
         {
+            var pendingAppeal = await db.CompetitionEvents.AsNoTracking()
+                .Where(@event =>
+                    @event.CompetitionId == command.CompetitionId
+                    && @event.Kind == CompetitionEventKind.TeamBanAppealSubmitted
+                    && @event.ParentEventId == ban!.Id
+                    && !db.CompetitionEvents.Any(appealResolution =>
+                        appealResolution.ParentEventId == @event.Id
+                        && (appealResolution.Kind == CompetitionEventKind.TeamBanAppealUpheld
+                            || appealResolution.Kind == CompetitionEventKind.TeamBanAppealAccepted)))
+                .OrderBy(@event => @event.OccurredAt)
+                .ThenBy(@event => @event.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (pendingAppeal is not null)
+            {
+                await events.RecordAsync(new(
+                    command.CompetitionId,
+                    CompetitionEventKind.TeamBanAppealAccepted,
+                    CompetitionEventLevel.Warning,
+                    CompetitionEventVisibility.Staff,
+                    command.OccurredAt,
+                    ActorUserId: command.ActorUserId,
+                    TeamId: team.Id,
+                    ParentEventId: pendingAppeal.Id,
+                    Reason: safeReason), cancellationToken);
+            }
             team.IsBanned = false;
             team.BannedAt = null;
             team.BannedById = null;
@@ -260,14 +301,23 @@ public sealed class CheatIncidentStore(
                 TeamId: team.Id,
                 SubmissionId: scoringEvent.SubmissionId,
                 ScoringEventId: scoringEvent.Id,
+                ParentEventId: ban!.Id,
                 Reason: safeReason), cancellationToken);
+            await events.RecordAsync(new(
+                command.CompetitionId,
+                CompetitionEventKind.TeamBanCorrectionPublished,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Public,
+                command.OccurredAt,
+                TeamId: team.Id,
+                ParentEventId: ban.Id), cancellationToken);
             await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, cancellationToken);
             await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
             await outbox.PublishAsync(new TeamBanCorrected(
                 command.CompetitionId,
                 team.Id,
                 team.Name,
-                scoringEvent.Id,
+                ban.Id,
                 command.OccurredAt));
         }
 

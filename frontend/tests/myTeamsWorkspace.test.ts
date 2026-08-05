@@ -49,6 +49,7 @@ const team: PublicTeam = {
   memberCount: 1,
   registrationStatus: 'approved',
   isLocked: false,
+  isBanned: false,
   registeredAt: '2026-08-01T00:00:00Z',
 }
 
@@ -62,11 +63,12 @@ describe('my teams workspace', () => {
         requestedCompetitionIds.push(competitionId)
         return competitionId === competitions[0]!.id ? team : null
       },
+      async () => null,
     )
 
     expect(requestedCompetitionIds).toEqual(competitions.map(competition => competition.id))
     expect(result).toEqual({
-      registrations: [{ competition: competitions[0], team }],
+      registrations: [{ competition: competitions[0], team, banCase: null }],
       availableCompetitions: [competitions[1]],
     })
   })

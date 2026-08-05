@@ -21,6 +21,7 @@ const team = {
   ],
   registrationStatus: 1,
   isLocked: false,
+  isBanned: false,
   registeredAt: '2026-08-01T00:00:00Z',
 } as const
 

@@ -264,6 +264,53 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/team-ban-case": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Gets the signed-in member's latest team ban case.",
+        "description": "Returns the source category and private appeal state without exposing staff evidence.",
+        "operationId": "GetMyTeamBanCase",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsMyTeamBanCaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/teams/me": {
       "get": {
         "tags": [
@@ -539,6 +586,79 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/team-ban-appeals": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Submits one private appeal for the current team ban.",
+        "description": "Only the captain may submit, and each immutable ban event accepts at most one appeal.",
+        "operationId": "SubmitTeamBanAppeal",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "SubmitTeamBanAppealRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsSubmitTeamBanAppealRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3566,6 +3686,88 @@
         }
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/accept": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Accepts a private team ban appeal.",
+        "description": "Corrects the ban, restores historical scoring eligibility, and publishes a generic correction.",
+        "operationId": "AdminAcceptTeamBanAppeal",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "appealId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "AcceptTeamBanAppealRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationTeamsAcceptTeamBanAppealRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/teams/{teamId}/approve": {
       "post": {
         "tags": [
@@ -3712,6 +3914,88 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/teams/{teamId}/correct-ban": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Corrects the current team ban without requiring an appeal.",
+        "description": "Available after competition finish; it restores the historical projection and publishes only a generic correction.",
+        "operationId": "AdminCorrectTeamBan",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CorrectTeamBanRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationTeamsCorrectTeamBanRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/teams": {
       "get": {
         "tags": [
@@ -3740,6 +4024,53 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/team-ban-appeals": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists private team ban appeals.",
+        "description": "Observers and judges may read; only administrators, owners, and managers may resolve.",
+        "operationId": "AdminListTeamBanAppeals",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationTeamsAdminTeamBanAppealListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -3859,6 +4190,88 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/team-ban-appeals/{appealId}/uphold": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Upholds a team ban appeal privately.",
+        "description": "Records a terminal private decision without publishing a correction.",
+        "operationId": "AdminUpholdTeamBanAppeal",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "appealId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpholdTeamBanAppealRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationTeamsUpholdTeamBanAppealRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
           },
           "409": {
             "description": "",
@@ -10887,6 +11300,9 @@
           "isLocked": {
             "type": "boolean"
           },
+          "isBanned": {
+            "type": "boolean"
+          },
           "registeredAt": {
             "type": "string",
             "format": "date-time"
@@ -10919,6 +11335,123 @@
             "nullable": true
           }
         }
+      },
+      "NoCTFAPIEndpointsTeamsMyTeamBanCaseResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "banEventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanSource"
+          },
+          "bannedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isCurrentlyBanned": {
+            "type": "boolean"
+          },
+          "canAppeal": {
+            "type": "boolean"
+          },
+          "appeal": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsMyTeamBanAppealResponse"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFDomainTeamsTeamBanSource": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "ManualModeration",
+          "CheatIncident"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFAPIEndpointsTeamsMyTeamBanAppealResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submittedByUserId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submittedByUserName": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanAppealStatus"
+          },
+          "resolvedByUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "resolvedByUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolutionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainTeamsTeamBanAppealStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Submitted",
+          "Upheld",
+          "Accepted"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
+      "NoCTFAPIEndpointsTeamsGetMyTeamBanCaseRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsTeamsGetMyTeamRequest": {
         "type": "object",
@@ -10959,6 +11492,118 @@
         "properties": {
           "invitationToken": {
             "type": "string"
+          }
+        }
+      },
+      "MicrosoftAspNetCoreMvcValidationProblemDetails": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "properties": {
+              "errors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MicrosoftAspNetCoreHttpHttpValidationProblemDetails": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+          },
+          {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "properties": {
+              "errors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MicrosoftAspNetCoreMvcProblemDetails": {
+        "type": "object",
+        "additionalProperties": {
+          "nullable": true
+        },
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsSubmitTeamBanAppealRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "statement": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 16
+          }
+        }
+      },
+      "FastEndpointsErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "statusCode": {
+            "type": "integer",
+            "format": "int32",
+            "default": 400
+          },
+          "message": {
+            "type": "string",
+            "default": "One or more errors occurred!"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -11234,83 +11879,6 @@
           "processingVersion": {
             "type": "integer",
             "format": "int64"
-          }
-        }
-      },
-      "MicrosoftAspNetCoreMvcValidationProblemDetails": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/MicrosoftAspNetCoreHttpHttpValidationProblemDetails"
-          },
-          {
-            "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
-            "properties": {
-              "errors": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        ]
-      },
-      "MicrosoftAspNetCoreHttpHttpValidationProblemDetails": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
-          },
-          {
-            "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            },
-            "properties": {
-              "errors": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        ]
-      },
-      "MicrosoftAspNetCoreMvcProblemDetails": {
-        "type": "object",
-        "additionalProperties": {
-          "nullable": true
-        },
-        "properties": {
-          "type": {
-            "type": "string",
-            "nullable": true
-          },
-          "title": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
-          "detail": {
-            "type": "string",
-            "nullable": true
-          },
-          "instance": {
-            "type": "string",
-            "nullable": true
           }
         }
       },
@@ -12296,7 +12864,11 @@
           "CheatIncidentDismissed",
           "CheatIncidentSuperseded",
           "CheatIncidentCorrected",
-          "ProtectedCompetitionExportCreated"
+          "ProtectedCompetitionExportCreated",
+          "TeamBanAppealSubmitted",
+          "TeamBanAppealUpheld",
+          "TeamBanAppealAccepted",
+          "TeamBanCorrectionPublished"
         ],
         "enum": [
           0,
@@ -12342,7 +12914,11 @@
           40,
           41,
           42,
-          43
+          43,
+          44,
+          45,
+          46,
+          47
         ]
       },
       "NoCTFDomainCompetitionsEventsCompetitionEventLevel": {
@@ -12481,6 +13057,11 @@
             "nullable": true
           },
           "questionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "parentEventId": {
             "type": "string",
             "format": "guid",
             "nullable": true
@@ -13616,47 +14197,151 @@
           }
         }
       },
-      "FastEndpointsErrorResponse": {
+      "NoCTFAPIEndpointsAdministrationTeamsAcceptTeamBanAppealRequest": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "statusCode": {
-            "type": "integer",
-            "format": "int32",
-            "default": 400
-          },
-          "message": {
+          "reason": {
             "type": "string",
-            "default": "One or more errors occurred!"
-          },
-          "errors": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
+            "maxLength": 512,
+            "minLength": 8
           }
         }
       },
       "NoCTFAPIEndpointsAdministrationTeamsBanTeamRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "reason"
-        ],
         "properties": {
           "reason": {
             "type": "string",
-            "minLength": 1,
-            "nullable": false
+            "maxLength": 512,
+            "minLength": 0
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationTeamsCorrectTeamBanRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 8
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationTeamsAdminTeamBanAppealListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationTeamsAdminTeamBanCaseResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationTeamsAdminTeamBanCaseResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "banEventId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanSource"
+          },
+          "bannedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isCurrentlyBanned": {
+            "type": "boolean"
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "appeal": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationTeamsAdminTeamBanAppealResponse"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationTeamsAdminTeamBanAppealResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submittedByUserId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "submittedByUserName": {
+            "type": "string"
+          },
+          "statement": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanAppealStatus"
+          },
+          "resolvedByUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "resolvedByUserName": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolutionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationTeamsListTeamBanAppealsRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationTeamsUnbanTeamRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationTeamsUpholdTeamBanAppealRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 8
+          }
+        }
       },
       "NoCTFAPIEndpointsSubmissionsAdminSubmissionStatusResponse": {
         "type": "object",

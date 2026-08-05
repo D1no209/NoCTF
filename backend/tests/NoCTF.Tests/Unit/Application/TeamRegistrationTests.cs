@@ -55,6 +55,7 @@ public class TeamRegistrationTests
                 [command.UserId],
                 status,
                 false,
+                false,
                 command.RegisteredAt);
             return Task.FromResult(new TeamCreateStoreResult(team, null));
         }

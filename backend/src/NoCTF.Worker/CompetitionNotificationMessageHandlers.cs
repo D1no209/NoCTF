@@ -177,9 +177,9 @@ public static class CompetitionNotificationMessageHandlers
         CancellationToken ct) =>
         delivery.DeliverAsync(
             message.CompetitionId,
-            message.ScoringEventId,
+            message.BanEventId,
             NotificationKind.TeamBanCorrected,
-            $"team-ban-corrected:{message.ScoringEventId:N}:{message.CorrectedAt.UtcTicks}",
+            $"team-ban-corrected:{message.BanEventId:N}:{message.CorrectedAt.UtcTicks}",
             new TeamBanCorrectedPayload(
                 message.CompetitionId,
                 message.TeamId,

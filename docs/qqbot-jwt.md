@@ -96,6 +96,7 @@ Authorization: Bearer <bot-access-token>
 - `ChallengePublished`：包含题目标题、方向和发布时间，不含 Flag、运行定义或附件密钥。
 - `HintPublished`：包含 Hint ID、题目标题、花费与发布时间，不含提示正文。
 - `TeamBanned`：包含队伍 ID、名称与封禁时间，不含原始封禁原因。
+- `TeamBanCorrected`：包含队伍 ID、名称与纠错时间，不含申诉正文、工作人员理由、Flag 或证据。
 
 客户端必须忽略未知字段，并对未知 `kind` 做可观测的安全降级，不能因此停止推进 cursor。
 已改期或删除的定时提示由平台版本栅栏淘汰；机器人不会收到尚未到发布时间的提示。

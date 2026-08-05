@@ -45,7 +45,53 @@
       "method": "GET",
       "path": "/api/v1/admin/competitions/:competitionId/teams",
       "status": 200,
-      "body": { "items": [] }
+      "body": {
+        "items": [
+          {
+            "id": "team-byte-guild",
+            "competitionId": "11111111-1111-1111-1111-111111111111",
+            "name": "ByteGuild",
+            "avatarUrl": null,
+            "captainId": "mock-user-1",
+            "memberIds": ["mock-user-1", "mock-user-2"],
+            "registrationStatus": 1,
+            "isLocked": false,
+            "isBanned": true,
+            "registeredAt": "2026-08-06T00:15:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/competitions/:competitionId/team-ban-appeals",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "banEventId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "competitionId": "11111111-1111-1111-1111-111111111111",
+            "teamId": "team-byte-guild",
+            "teamName": "ByteGuild",
+            "source": 1,
+            "bannedAt": "2026-08-06T01:30:00Z",
+            "isCurrentlyBanned": true,
+            "canResolve": true,
+            "appeal": {
+              "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+              "submittedByUserId": "mock-user-1",
+              "submittedByUserName": "mock-captain",
+              "statement": "The flagged traffic came from the organizer-provided health checker. Please review the immutable event trail.",
+              "submittedAt": "2026-08-06T01:45:00Z",
+              "status": 0,
+              "resolvedByUserId": null,
+              "resolvedByUserName": null,
+              "resolutionReason": null,
+              "resolvedAt": null
+            }
+          }
+        ]
+      }
     },
     {
       "method": "GET",
@@ -383,6 +429,7 @@
         "memberIds": ["mock-user-1", "mock-user-2", "mock-user-3", "mock-user-4"],
         "registrationStatus": 1,
         "isLocked": false,
+        "isBanned": false,
         "registeredAt": "2026-07-01T00:00:00Z"
       }
     },
@@ -399,6 +446,7 @@
         "memberIds": ["mock-user-1", "mock-user-2", "mock-user-3"],
         "registrationStatus": 1,
         "isLocked": false,
+        "isBanned": false,
         "registeredAt": "2026-07-02T00:00:00Z"
       }
     },
@@ -415,7 +463,47 @@
         "memberIds": ["mock-user-1", "mock-user-2", "mock-user-3", "mock-user-4", "mock-user-5"],
         "registrationStatus": 1,
         "isLocked": false,
+        "isBanned": true,
         "registeredAt": "2026-07-03T00:00:00Z"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/competitions/comp-2026-awdp/team-ban-case",
+      "status": 404,
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/competitions/comp-2026-koh/team-ban-case",
+      "status": 404,
+      "body": null
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/competitions/comp-2026-ctf/team-ban-case",
+      "status": 200,
+      "body": {
+        "banEventId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "competitionId": "comp-2026-ctf",
+        "teamId": "team-ctf-mock",
+        "teamName": "ByteGuild",
+        "source": 1,
+        "bannedAt": "2026-07-12T10:30:00Z",
+        "isCurrentlyBanned": true,
+        "canAppeal": true,
+        "appeal": {
+          "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+          "submittedByUserId": "mock-user-1",
+          "submittedByUserName": "mock-admin",
+          "statement": "The traffic was produced by the organizer health checker. Please review the immutable event trail.",
+          "submittedAt": "2026-07-12T10:45:00Z",
+          "status": 0,
+          "resolvedByUserId": null,
+          "resolvedByUserName": null,
+          "resolutionReason": null,
+          "resolvedAt": null
+        }
       }
     },
     {
@@ -433,6 +521,7 @@
             "memberIds": ["mock-user-1", "mock-user-2", "mock-user-3", "mock-user-4"],
             "registrationStatus": 1,
             "isLocked": false,
+            "isBanned": false,
             "registeredAt": "2026-07-01T00:00:00Z"
           },
           {
@@ -444,6 +533,7 @@
             "memberIds": ["mock-user-6", "mock-user-7", "mock-user-8"],
             "registrationStatus": 1,
             "isLocked": false,
+            "isBanned": false,
             "registeredAt": "2026-07-01T00:05:00Z"
           }
         ]
