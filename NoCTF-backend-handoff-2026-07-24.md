@@ -2255,6 +2255,43 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   旋转后裁剪上传成功、三组密码明文切换可用。未执行最终改密提交，Token 失效由上述集成与
   HTTP 测试覆盖。
 
+### 6.50 MailKit SMTP 投递与显式 TLS 模式（2026-08-05）
+
+- 功能提交：`dbf534a feat(email): migrate SMTP delivery to MailKit`。本提交只在本地分支，
+  未 push、未部署；平台信息当前取程序集元数据，仓库没有需要随本纵切递增的显式运行版本。
+- 用户通过 `$grill-me` 回答 A/A，已固化为：TLS 使用强类型 `SmtpSecurityMode`，只允许
+  `None`、`SslOnConnect`、`StartTls`；SMTP 用户名允许留空，留空时跳过认证且不要求密码。
+  没有使用端口自动推断新配置，也没有把有界安全模式继续建模为布尔值或字符串。
+- Domain、Application、Infrastructure 和协议契约现在共同使用显式 TLS 枚举。平台邮箱配置
+  API 将 `smtpEnableSsl: bool` 替换为 `smtpSecurityMode` 字符串枚举，JSON 枚举转换器拒绝
+  整数。旧数据库行仍由保留的 `SmtpEnableSsl` 列兼容解析：`true + 465` 推导
+  `SslOnConnect`，其他 `true` 推导 `StartTls`，`false` 推导 `None`；新保存同时写入显式
+  nullable 枚举列并同步 legacy bool，避免已有生产配置在迁移后改变投递语义。
+- EF CLI 生成 `20260805022318_AddSmtpSecurityMode` 及 designer/snapshot，未手改 migration
+  或 snapshot。MailKit `4.17.0` 在 `Directory.Packages.props` 集中锁定且只由
+  Infrastructure 引用；投递已从 `System.Net.Mail` 改为 MimeKit `MimeMessage`、
+  `BodyBuilder` 和 MailKit SMTP client，同时产生 UTF-8 text/plain 与 text/html 正文。
+- Connect、Authenticate、Send、Disconnect 均为 async，透传调用方取消并受配置的总超时
+  约束。连接、认证、拒收、超时和传输失败映射为强类型
+  `EmailVerificationDeliveryFailure`；对外异常使用固定消息、不携带原始 inner exception，
+  API 只返回固定 503 problem 与失败枚举，Worker 只按受控投递异常重试，避免密码、Token 或
+  SMTP 凭据通过日志、ProblemDetails、死信或平台日志泄漏。
+- 管理前端改为显式安全模式选择器；无认证模式会说明用户名可选，用户名为空时不要求密码，
+  测试邮件按钮的可用性也使用同一规则。OpenAPI 已重新导出并生成 TypeScript SDK，前端没有
+  手写 DTO、枚举、失败码或端点路径。两份 OpenAPI artifact 字节一致，共 153 endpoints，
+  SHA-256 均为
+  `449CBE007AE53F4A3301977AE65B337E8F7186BA71D92D775DEDD087505DE647`。
+- 最终验证：solution build 0 warning/0 error；547/547 non-Integration passed；真实
+  Mailpit `1.30.0` STARTTLS、真实 GreenMail `2.1.11` implicit TLS/认证/无认证/认证失败/MIME
+  正文，以及 loopback SMTP 的超时、取消、拒绝连接和 550 拒收目标测试全部通过；SMTP
+  Integration 3/3、配置持久化 1/1 passed。全量 Integration 共 137 项，135 passed、
+  0 failed、2 skipped；Kubernetes 与 Libvirt 各因目标环境未配置而显式 skipped。
+- EF `has-pending-model-changes` 返回无漂移；Frontend `bun test` 157/157、scoped ESLint、
+  `vue-tsc` 和 Vite production build passed；全量 lint 仍有仓库既存的 9,437 项
+  generated/vendor/旧文件基线问题，本纵切触及文件 scoped lint 为 0。`git diff --check`
+  passed。没有进行浏览器生产验收，因为本阶段明确禁止 push/deploy，且 SMTP 协议行为已由
+  上述真实服务集成测试覆盖。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2273,6 +2310,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 团队 logical Runtime slot 事务额度、方案 A 必填 API 和 AWD start-time completeness。
 - CTF 排行榜按题公开一血、二血、三血，顶层 blood summary 与队伍 slot 强类型一致。
 - 独立 `/profile`、后端邮箱投影、TokenVersion 改密失效和受控头像解码/重编码。
+- MailKit 双正文 SMTP 投递、显式 TLS 安全模式、可选认证和稳定脱敏失败契约。
 
 当前尚未执行的交付边界：
 
@@ -2280,26 +2318,27 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
-- `809f825` 与本节 HANDOFF 提交是当前任务新增的本地提交，明确未 push、未部署；历史 push
-  授权不覆盖本阶段“未经授权不得 push/deploy”的要求。
+- `809f825`、`dbf534a` 及各自 HANDOFF 提交是当前任务新增的本地提交，明确未 push、
+  未部署；历史 push 授权不覆盖本阶段“未经授权不得 push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
   不属于剩余工作。
 
 ## 7. 建议的下一交接顺序
 
-最新版 `TODO.md` 是后续优先级来源。P0 `/profile` 已由 6.49 完成；下一阶段是 P0
-“SMTP 投递迁移到 MailKit”：
+最新版 `TODO.md` 是后续优先级来源。P0 `/profile` 已由 6.49 完成，P0 MailKit SMTP 已由
+6.50 完成；下一阶段是 P1“排行榜冻结与黑灯模式”：
 
-1. 先审计 `SmtpEmailVerificationDelivery`、平台邮箱配置、测试邮件端点和日志脱敏，不重复
-   已完成的邮箱配置 UI/验证开关工作。
-2. 当前 TLS 布尔值若无法无歧义表达 465 implicit TLS、587 STARTTLS 和无 TLS，必须先用
-   `$grill-me` 确认 `SecureSocketOptions` 映射与是否迁移配置，不能猜默认值。
-3. 在 `Directory.Packages.props` 集中锁定 MailKit，只在 Infrastructure 引用；使用
-   `MimeMessage`/`BodyBuilder` 和异步 Connect/Authenticate/Send/Disconnect，完整透传取消，
-   不把 SMTP 密码写入异常、日志、平台日志或审计。
-4. 以真实 SMTP 测试服务或容器覆盖 465、587、无认证/认证失败、超时、取消和服务器拒收；
-   通过对应 build/test/lint 后做独立功能提交，再单独提交 HANDOFF。
-5. 未经新任务明确授权，继续不 push、不部署；不要因为历史部署凭据或旧 push 授权而扩大范围。
+1. 先审计 Competition 配置、排行榜/题目统计投影、Redis snapshot、实时事件及现有自动开始
+   /结束流程；冻结和黑灯必须由服务端按角色投影，禁止前端获取真实数据后再隐藏。
+2. 正常、冻结、黑灯使用单一 enum/value object 表达，不能堆叠布尔值。冻结继续内部计分但
+   参与者只读冻结快照；黑灯不向参与者暴露当前分值、解出数、血位或排行榜，本人的提交结果
+   仍可见；可信办赛角色读取实时状态。
+3. 自动开始/结束、手工覆盖优先级、冻结时刻和比赛结束揭榜策略是产品语义，进入数据模型或
+   migration 前必须用 `$grill-me` 一次确认，不能从现有 UI 或旧代码猜测。
+4. 需要覆盖 Participant、Observer、Judge、Manager、Owner、Administrator 的 HTTP、缓存和
+   realtime 可见性边界，并验证揭榜幂等、可审计且不会由旧缓存/SignalR 泄漏。
+5. 阶段完成后运行对应 build/test/EF/OpenAPI/Frontend 门禁，做独立功能提交并单独提交
+   HANDOFF。未经新任务明确授权，继续不 push、不部署。
 
 用户稍后会提供真实环境部署细则。在此之前：
 
@@ -2343,8 +2382,9 @@ Docker port mapping，host port 固定请求 `0`。
 4. 旧目标迁移、后端收口、本地部署与 GitOps 实机演练无需重做。最新 Frontend 迁移状态
    使用 6.34 至 6.40；最新 outcome、上传补偿、Runtime scope 和 Patch draft Backend 状态
    使用 6.41 至 6.44；Runtime cleanup/replacement/quota 使用 6.45 至 6.47；CTF 排行榜
-   三血契约使用 6.48；个人资料、邮箱可见性、头像安全和改密失效使用 6.49。下一纵切按
-   `TODO.md` 进入 MailKit SMTP 迁移，不要回滚或重做 `/profile`。
+   三血契约使用 6.48；个人资料、邮箱可见性、头像安全和改密失效使用 6.49；MailKit、显式
+   TLS 模式、可选 SMTP 认证和脱敏失败使用 6.50。下一纵切按 `TODO.md` 进入排行榜冻结与
+   黑灯模式，不要回滚或重做 `/profile` 或 SMTP 迁移。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
