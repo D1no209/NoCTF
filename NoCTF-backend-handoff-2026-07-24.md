@@ -1,6 +1,6 @@
 # NoCTF 后端目标架构交接
 
-> 创建于 2026-07-24，最后核验于 2026-07-31。文件名保留原日期，本文内容以最后核验日期为准。
+> 创建于 2026-07-24，最后核验于 2026-08-05。文件名保留原日期，本文内容以最后核验日期为准。
 
 ## 1. 下一会话目标
 
@@ -48,6 +48,8 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
   状态机，以及 `MaxConcurrentRuntimeInstancesPerTeam` 事务额度、方案 A API 与 AWD
   start gate。
 - 6.48 已完成 CTF 排行榜一血、二血、三血的统一强类型投影与 OpenAPI 契约；计分公式未改。
+- 6.49 至 6.51 已完成独立个人资料、MailKit SMTP，以及排行榜冻结/黑灯的服务端权限投影、
+  管理配置、前端状态和 BOT 边界。
 - 用户已明确授权 push；`codex/backend-gitops-completion` 已推送，不创建 PR、不合入
   `main`。Frontend 后续优化由协作者并行推进，本会话避免再修改 Frontend。
 - 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
@@ -2292,6 +2294,54 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   passed。没有进行浏览器生产验收，因为本阶段明确禁止 push/deploy，且 SMTP 协议行为已由
   上述真实服务集成测试覆盖。
 
+### 6.51 排行榜冻结、黑灯与 BOT 常规播报边界（2026-08-05）
+
+- 功能提交：`bf3d393 feat(scoring): add leaderboard freeze and blackout`。本提交只在本地
+  分支，未 push、未部署；没有需要递增的显式平台运行版本。
+- 用户通过 `$grill-me` 回答 AAAAA，并补充确认：管理员可立即覆盖或设置定时生效；比赛
+  Finished 自动、幂等恢复 Normal 并公开最终实时榜单；Frozen 使用生效时刻的精确历史计分
+  事实；Administrator、Owner、Manager、Judge、Observer 人类在 Frozen/Blackout 均读实时
+  数据；Observer Bot 在 Frozen 读实时数据，在 Blackout 只能得到 Hidden。黑灯隐藏分数、
+  解出数、一二三血与排行榜，但题目、附件、Runtime、提交和本人提交结果继续可用。
+- Domain 使用单一 `CompetitionLeaderboardVisibility` 枚举（Normal/Frozen/Blackout），没有
+  组合布尔值。Competition 仅增加配置、修订、生效时间和有界 Frozen snapshot JSON 列；
+  生命周期审计沿用 Competition aggregate 的一个子表，没有新增独立业务根或大量数据表。
+  EF CLI 生成 `20260805033207_AddCompetitionLeaderboardVisibility` 及 designer/snapshot，
+  未手改 migration 或 snapshot。
+- Application/Infrastructure 在 serializable transaction 与 competition advisory lock 内再次
+  校验 schedule 和 revision。定时 Wolverine message 带 visibility revision fence，旧消息重放
+  无副作用；Frozen 即使延迟执行也按原定 cutoff 重建历史 snapshot；切换状态会原子递增
+  LeaderboardRevision、发布 invalidation 并清理旧缓存。Finish 会写自动揭榜审计、清除冻结
+  snapshot/schedule 并使最终 live board 立即可重新投影。
+- 新增强类型管理契约：
+  `GET/PUT /api/v1/admin/competitions/{competitionId}/leaderboard-visibility`。PUT 的
+  `visibility` 和 `expectedRevision` 在 OpenAPI 中为必填；非法定时返回 typed 400 Problem，
+  revision/Finished 冲突返回 typed 409。排行榜响应增加 `visibility`、`dataScope`、
+  `dataAsOf`；题目列表/详情增加 visibility/scope，Hidden 时 `baseScore=null`。所有接口仍使用
+  FastEndpoints 8.2.0 强类型基类、`ExecuteAsync`、`Results<T...>` 与 `TypedResults`。
+- 前端已从同一 OpenAPI 重新生成 TypeScript SDK，并通过现有薄封装调用新操作；没有写死 URL、
+  `/api/v1`、DTO、枚举或失败码。管理员比赛设置增加 Pixel Industrial 风格的 Normal/Frozen/
+  Blackout 即时/定时面板；比赛页和排行榜分别展示冻结 cutoff、可信角色实时视图或黑灯空态，
+  Hidden 不会被解释为零分，题目弹窗也不会显示空分值。平台审计页可显示可见性变更。
+- QQBOT 契约明确：`dataScope=Hidden` 时停止 `/rank`、定时排名、分数、解出数、血榜和其他
+  常规战况播报，不能播报“全员零分”；通知 feed cursor、平台通知和比赛通告继续正常消费，
+  不受黑灯影响。下一次读到 `dataScope=Live` 后恢复常规播报。
+- OpenAPI 导出共 154 条文档化 v1 路由（另有 `GET /health`，总计 155 endpoints）；两份
+  artifact 字节一致，SHA-256 均为
+  `F246AD781D60246550A83FB206F0C833DDCCDA0006F9A48507E21A694BC0BAAC`。TypeScript SDK
+  连续生成字节稳定。
+- 最终验证：solution Debug build 0 warning/0 error；555/555 non-Integration passed；全量
+  Integration 共 141 项，139 passed、0 failed、2 skipped，只有未配置
+  `NOCTF_KUBERNETES_INTEGRATION` 与 `NOCTF_LIBVIRT_DISK_PATH` 的目标环境用例显式跳过。
+  Frozen 历史 Redis/PostgreSQL、visibility persistence/revision/replay/Bot/finish reveal 和通知
+  feed 持久化用例均通过。EF `has-pending-model-changes` 无漂移，`git diff --check` passed。
+- Frontend production build passed，`bun test` 158/158，触及的非生成文件 scoped ESLint
+  0 warning/0 error。全量 lint 仍被仓库既有 generated/mock/config 基线阻塞：9,589 项
+  （9,316 errors、273 warnings），未运行全局 `--fix`，避免污染用户和协作者文件。
+- 使用内置浏览器连接隔离 PostgreSQL/Redis、当前 API 源码和 Vite 完成真实验收：管理员可保存
+  Blackout，配置与生效 badge 同步并出现成功 toast；普通参赛者得分显示 `-`，比赛页显示黑灯
+  说明，排行榜显示专用 Hidden 空态；控制台 0 error。隔离容器与本地进程已清理。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2311,6 +2361,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - CTF 排行榜按题公开一血、二血、三血，顶层 blood summary 与队伍 slot 强类型一致。
 - 独立 `/profile`、后端邮箱投影、TokenVersion 改密失效和受控头像解码/重编码。
 - MailKit 双正文 SMTP 投递、显式 TLS 安全模式、可选认证和稳定脱敏失败契约。
+- 排行榜 Normal/Frozen/Blackout、精确 cutoff、可信角色/BOT 服务端投影、自动揭榜及前端空态。
 
 当前尚未执行的交付边界：
 
@@ -2318,26 +2369,25 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
-- `809f825`、`dbf534a` 及各自 HANDOFF 提交是当前任务新增的本地提交，明确未 push、
-  未部署；历史 push 授权不覆盖本阶段“未经授权不得 push/deploy”的要求。
+- `809f825`、`dbf534a`、`bf3d393` 及各自 HANDOFF 提交是当前任务新增的本地提交，明确未
+  push、未部署；历史 push 授权不覆盖本阶段“未经授权不得 push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
   不属于剩余工作。
 
 ## 7. 建议的下一交接顺序
 
-最新版 `TODO.md` 是后续优先级来源。P0 `/profile` 已由 6.49 完成，P0 MailKit SMTP 已由
-6.50 完成；下一阶段是 P1“排行榜冻结与黑灯模式”：
+最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP 和 P1 排行榜冻结/黑灯
+已分别由 6.49、6.50、6.51 完成；下一阶段是 P1“选手与出题人交流”：
 
-1. 先审计 Competition 配置、排行榜/题目统计投影、Redis snapshot、实时事件及现有自动开始
-   /结束流程；冻结和黑灯必须由服务端按角色投影，禁止前端获取真实数据后再隐藏。
-2. 正常、冻结、黑灯使用单一 enum/value object 表达，不能堆叠布尔值。冻结继续内部计分但
-   参与者只读冻结快照；黑灯不向参与者暴露当前分值、解出数、血位或排行榜，本人的提交结果
-   仍可见；可信办赛角色读取实时状态。
-3. 自动开始/结束、手工覆盖优先级、冻结时刻和比赛结束揭榜策略是产品语义，进入数据模型或
-   migration 前必须用 `$grill-me` 一次确认，不能从现有 UI 或旧代码猜测。
-4. 需要覆盖 Participant、Observer、Judge、Manager、Owner、Administrator 的 HTTP、缓存和
-   realtime 可见性边界，并验证揭榜幂等、可审计且不会由旧缓存/SignalR 泄漏。
-5. 阶段完成后运行对应 build/test/EF/OpenAPI/Frontend 门禁，做独立功能提交并单独提交
+1. 先审计 CompetitionChallenge、Challenge 模板所有权、现有通知/outbox、审计和权限模型；
+   不重复已有通知能力，不把问答塞进平台运行日志或通用模型文件。
+2. 在创建数据模型或 migration 前必须用 `$grill-me` 确认：问题默认私密还是公开、是否允许
+   附件、是否匿名，以及公开回复是否需要审批。等待答复时只推进不依赖这些语义的只读审计。
+3. 问题必须关联 CompetitionChallenge、提问队伍、用户和可选 Submission，禁止把明文 Flag
+   复制进消息正文；状态使用 Pending/Replied/Resolved/Closed 等强类型枚举并审计转换。
+4. 处理权限为 Challenge 出题人及比赛 Owner/Manager/Judge，Observer 默认只读；回复通知通过
+   Wolverine transactional outbox 保证一致与幂等，并补齐长度/频率/垃圾信息保护。
+5. 阶段完成后运行 build/test/EF/OpenAPI/Frontend 与浏览器门禁，做独立功能提交并单独提交
    HANDOFF。未经新任务明确授权，继续不 push、不部署。
 
 用户稍后会提供真实环境部署细则。在此之前：
@@ -2383,8 +2433,9 @@ Docker port mapping，host port 固定请求 `0`。
    使用 6.34 至 6.40；最新 outcome、上传补偿、Runtime scope 和 Patch draft Backend 状态
    使用 6.41 至 6.44；Runtime cleanup/replacement/quota 使用 6.45 至 6.47；CTF 排行榜
    三血契约使用 6.48；个人资料、邮箱可见性、头像安全和改密失效使用 6.49；MailKit、显式
-   TLS 模式、可选 SMTP 认证和脱敏失败使用 6.50。下一纵切按 `TODO.md` 进入排行榜冻结与
-   黑灯模式，不要回滚或重做 `/profile` 或 SMTP 迁移。
+   TLS 模式、可选 SMTP 认证和脱敏失败使用 6.50；排行榜冻结、黑灯、BOT/通知边界使用
+   6.51。下一纵切按 `TODO.md` 进入“选手与出题人交流”，不要回滚或重做 `/profile`、SMTP
+   或排行榜可见性。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
