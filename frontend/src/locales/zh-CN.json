@@ -242,6 +242,14 @@
         "title": "队伍封禁已纠正",
         "body": "{team} 的违规封禁已被纠正。"
       },
+      "dataExportReady": {
+        "title": "数据导出已就绪",
+        "body": "{file} 已生成，请在 24 小时内下载。"
+      },
+      "dataExportFailed": {
+        "title": "数据导出失败",
+        "body": "后台未能生成导出文件，请打开对应导出面板查看失败原因。"
+      },
       "unknown": {
         "title": "系统事件",
         "body": "系统记录了一条暂不支持展示类型的事件。"
@@ -564,12 +572,12 @@
       "questionReplied": "咨询已回复",
       "questionStatusChanged": "咨询状态变更",
       "questionPublished": "咨询回答已公开",
-        "protectedSubmissionFlagAccessed": "受保护 Flag 已访问",
-        "cheatIncidentDetected": "发现跨队 Flag 线索",
-        "cheatIncidentConfirmed": "作弊线索已确认",
-        "cheatIncidentDismissed": "作弊线索已驳回",
-        "cheatIncidentSuperseded": "作弊线索已被重评取代",
-        "cheatIncidentCorrected": "作弊判定已纠错"
+      "protectedSubmissionFlagAccessed": "受保护 Flag 已访问",
+      "cheatIncidentDetected": "发现跨队 Flag 线索",
+      "cheatIncidentConfirmed": "作弊线索已确认",
+      "cheatIncidentDismissed": "作弊线索已驳回",
+      "cheatIncidentSuperseded": "作弊线索已被重评取代",
+      "cheatIncidentCorrected": "作弊判定已纠错"
     }
   },
   "challenges": {
@@ -1327,6 +1335,7 @@
       "navChallenges": "题目管理",
       "navTeams": "队伍审核",
       "navRuntimes": "运行实例",
+      "navDataExports": "数据导出",
       "navOperations": "赛事运维",
       "navCheats": "作弊信息",
       "navLogs": "比赛日志",
@@ -1873,6 +1882,55 @@
       "checking": "正在检查健康状态...",
       "checkFailed": "系统健康检查失败",
       "autoRefresh": "每 10 秒自动刷新"
+    },
+    "dataExports": {
+      "competitionTitle": "完整比赛归档",
+      "competitionDescription": "异步生成包含比赛、题目、队伍、全部提交、计分事件、反作弊投影和不可变比赛事件的 ZIP。附件二进制、运行诊断日志与平台凭据不会进入归档。",
+      "auditTitle": "平台审计归档",
+      "auditDescription": "从不可变比赛事件和用户生命周期事实生成完整 NDJSON，不复制或改写原始业务历史。",
+      "create": "创建导出",
+      "inProgress": "导出处理中",
+      "queued": "导出任务已进入队列。完成或失败后会收到站内通知。",
+      "alreadyActive": "已有导出任务正在处理。",
+      "createFailed": "无法创建数据导出任务。",
+      "loading": "正在加载导出任务...",
+      "loadFailed": "无法加载导出任务",
+      "loadFailedDescription": "导出任务状态暂时不可用，请刷新后重试。",
+      "empty": "尚无导出任务",
+      "emptyDescription": "创建后可以在这里查看进度、失败原因和下载入口。",
+      "protectionTitle": "默认排除明文 Flag",
+      "protectionDescription": "归档保留 Flag 哈希和历史关联，但默认不包含明文 Flag；密码、Token、SMTP 凭据和附件二进制始终排除。",
+      "includeProtectedFlags": "包含受保护的明文 Flag",
+      "includeProtectedFlagsHint": "仅人类平台 Administrator 可以启用；成功生成后会写入永久比赛审计。",
+      "reason": "访问理由",
+      "reasonPlaceholder": "说明评奖、追罚、申诉或误判更正用途",
+      "reasonHint": "至少 8 个字符，最多 512 个字符。",
+      "requestedAt": "请求时间",
+      "status": "状态",
+      "file": "文件",
+      "retention": "保留策略",
+      "protected": "含明文 Flag · 永久审计",
+      "expiresAt": "文件过期：{time}",
+      "metadataRetained": "文件已删除 · 元数据保留 30 天",
+      "metadataWindow": "任务元数据保留 30 天",
+      "download": "下载",
+      "downloadStarted": "已开始下载数据导出。",
+      "downloadFailed": "数据导出文件不可用或已经过期。",
+      "statuses": {
+        "queued": "排队中",
+        "processing": "生成中",
+        "available": "可下载",
+        "failed": "失败",
+        "expired": "已过期",
+        "unknown": "未知"
+      },
+      "failures": {
+        "subjectNotFound": "导出对象已经不存在。",
+        "sizeLimit": "压缩文件超过 2 GiB 上限，任务已整体失败且未生成截断文件。",
+        "generation": "归档生成失败。",
+        "storage": "对象存储写入失败。",
+        "unknown": "导出任务失败。"
+      }
     },
     "logs": {
       "title": "实时日志",

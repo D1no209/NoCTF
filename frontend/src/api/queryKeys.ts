@@ -56,6 +56,8 @@ export const queryKeys = {
   adminCompetitionRuntimes: (id: string) => ['admin-competition-runtimes', id] as const,
   adminCompetitionLogs: (id: string) => ['admin-competition-logs', id] as const,
   adminCompetitionCheatIncidents: (id: string) => ['admin-competition-cheat-incidents', id] as const,
+  adminCompetitionDataExports: (id: string) => ['admin-competition-data-exports', id] as const,
+  adminPlatformAuditDataExports: ['admin-platform-audit-data-exports'] as const,
   adminUsers: ['admin-users'] as const,
   adminTeams: ['admin-teams'] as const,
   adminChallenges: ['admin-challenges'] as const,

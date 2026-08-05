@@ -13,6 +13,7 @@ import {
   competitionTeamAdminApi,
 } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import { isPlatformAdministrator } from '@/api/userRole'
 import AdminCompetitionChallengesPanel from '@/components/admin/competition-detail/AdminCompetitionChallengesPanel.vue'
 import AdminCompetitionCheatIncidentsPanel from '@/components/admin/competition-detail/AdminCompetitionCheatIncidentsPanel.vue'
 import AdminCompetitionLeaderboardVisibilityPanel from '@/components/admin/competition-detail/AdminCompetitionLeaderboardVisibilityPanel.vue'
@@ -20,14 +21,17 @@ import AdminCompetitionPermissionsPanel from '@/components/admin/competition-det
 import AdminCompetitionRuntimesPanel from '@/components/admin/competition-detail/AdminCompetitionRuntimesPanel.vue'
 import AdminCompetitionSettingsPanel from '@/components/admin/competition-detail/AdminCompetitionSettingsPanel.vue'
 import AdminCompetitionTeamsPanel from '@/components/admin/competition-detail/AdminCompetitionTeamsPanel.vue'
+import AdminDataExportsPanel from '@/components/admin/data-exports/AdminDataExportsPanel.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const qc = useQueryClient()
 const { t } = useI18n()
+const auth = useAuthStore()
 const competitionId = computed(() => String(route.params.id))
 const competitionModes = ['CTF', 'AWD', 'AWDP', 'KoH'] as const
 const competitionStatuses = ['Draft', 'Visible', 'Published', 'Running', 'Paused', 'Finished'] as const
@@ -38,6 +42,7 @@ const sections = [
   { key: 'teams', labelKey: 'admin.competitionDetail.navTeams' },
   { key: 'cheats', labelKey: 'admin.competitionDetail.navCheats' },
   { key: 'runtimes', labelKey: 'admin.competitionDetail.navRuntimes' },
+  { key: 'exports', labelKey: 'admin.competitionDetail.navDataExports' },
 ] as const
 type Section = typeof sections[number]['key']
 
@@ -253,7 +258,7 @@ async function refreshAll() {
       <Loader2 class="mr-2 size-4 animate-spin" />{{ t('admin.competitionDetail.loadingCompetition') }}
     </div>
 
-    <Tabs v-else :model-value="activeSection" @update:model-value="(value: string | undefined) => value && router.replace(sectionRoute(value as Section))">
+    <Tabs v-else class="min-w-0" :model-value="activeSection" @update:model-value="(value: string | undefined) => value && router.replace(sectionRoute(value as Section))">
       <TabsList class="h-auto flex-wrap justify-start">
         <TabsTrigger v-for="section in sections" :key="section.key" :value="section.key">
           {{ t(section.labelKey) }}
@@ -263,20 +268,20 @@ async function refreshAll() {
         </TabsTrigger>
       </TabsList>
 
-      <div class="grid min-w-0 gap-6">
-        <TabsContent value="settings">
+      <div class="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6">
+        <TabsContent value="settings" class="min-w-0">
           <div v-if="activeSection === 'settings'" class="space-y-6">
             <AdminCompetitionSettingsPanel :competition-form="competitionForm" :saving="saveCompetitionMutation.isPending.value" @save="saveCompetitionMutation.mutate()" />
             <AdminCompetitionLeaderboardVisibilityPanel :competition-id="competitionId" />
           </div>
         </TabsContent>
-        <TabsContent value="permissions">
+        <TabsContent value="permissions" class="min-w-0">
           <AdminCompetitionPermissionsPanel v-if="activeSection === 'permissions'" :competition-id="competitionId" />
         </TabsContent>
-        <TabsContent value="challenges">
+        <TabsContent value="challenges" class="min-w-0">
           <AdminCompetitionChallengesPanel v-if="activeSection === 'challenges'" :competition-id="competitionId" />
         </TabsContent>
-        <TabsContent value="teams">
+        <TabsContent value="teams" class="min-w-0">
           <AdminCompetitionTeamsPanel
             v-if="activeSection === 'teams'"
             :competition-teams="competitionTeams"
@@ -295,7 +300,7 @@ async function refreshAll() {
             :competition-teams="competitionTeams"
           />
         </TabsContent>
-        <TabsContent value="runtimes">
+        <TabsContent value="runtimes" class="min-w-0">
           <AdminCompetitionRuntimesPanel
             v-if="activeSection === 'runtimes'"
             :runtimes="runtimes"
@@ -303,6 +308,14 @@ async function refreshAll() {
             :operating-id="runtimeOperatingId"
             @reset="runtimeMutation.mutate({ action: 'reset', runtime: $event })"
             @stop="runtimeMutation.mutate({ action: 'stop', runtime: $event })"
+          />
+        </TabsContent>
+        <TabsContent value="exports" class="min-w-0">
+          <AdminDataExportsPanel
+            v-if="activeSection === 'exports'"
+            scope="competition"
+            :competition-id="competitionId"
+            :allow-protected-flags="isPlatformAdministrator(auth.userRole)"
           />
         </TabsContent>
       </div>

@@ -106,13 +106,15 @@ describe('generated permanent notification contract', () => {
       CompetitionQuestionStatusChanged: 12,
       CheatIncidentDetected: 13,
       TeamBanCorrected: 14,
+      DataExportReady: 15,
+      DataExportFailed: 16,
     })
 
     for (const kind of Object.values(NotificationKind)) {
       expect(toPublicNotification({ ...runtimeFailure, kind }).kind).toBe(kind)
     }
 
-    expect(() => toPublicNotification({ ...runtimeFailure, kind: 15 as never }))
+    expect(() => toPublicNotification({ ...runtimeFailure, kind: 17 as never }))
       .toThrow('Notification response has an unsupported kind.')
     expect(() => toPublicNotification({ ...runtimeFailure, id: undefined }))
       .toThrow('Notification response is missing id.')

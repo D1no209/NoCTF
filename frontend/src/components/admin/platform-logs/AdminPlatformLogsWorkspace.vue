@@ -26,8 +26,10 @@ import {
 } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { platformLogsApi } from '@/api/platformLogs'
+import AdminDataExportsPanel from '@/components/admin/data-exports/AdminDataExportsPanel.vue'
 import { competitionEventKindKey } from '@/components/competition-events/competitionEventPresentation'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -54,8 +56,11 @@ import {
 } from './platformLogPresentation'
 
 const { locale, t } = useI18n()
+const route = useRoute()
 const auth = useAuthStore()
-const activeTab = ref('live')
+const activeTab = ref(route.query.tab === 'audit' || route.query.tab === 'dead-letters'
+  ? route.query.tab
+  : 'live')
 const paused = ref(false)
 const connecting = ref(false)
 const historyLoading = ref(false)
@@ -733,6 +738,8 @@ onUnmounted(() => {
             </Button>
           </CardContent>
         </Card>
+
+        <AdminDataExportsPanel scope="platform-audit" />
 
         <div v-if="auditLoading" class="space-y-2">
           <Skeleton v-for="index in 4" :key="index" class="h-20 rounded-none" />

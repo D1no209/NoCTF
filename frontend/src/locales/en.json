@@ -242,6 +242,14 @@
         "title": "Team ban corrected",
         "body": "The rule-violation ban for {team} was corrected."
       },
+      "dataExportReady": {
+        "title": "Data export ready",
+        "body": "{file} is ready. Download it within 24 hours."
+      },
+      "dataExportFailed": {
+        "title": "Data export failed",
+        "body": "The background export failed. Open the relevant export panel for the failure reason."
+      },
       "unknown": {
         "title": "System event",
         "body": "An event with an unsupported type was recorded."
@@ -564,12 +572,12 @@
       "questionReplied": "Question replied",
       "questionStatusChanged": "Question status changed",
       "questionPublished": "Question answer published",
-        "protectedSubmissionFlagAccessed": "Protected Flag accessed",
-        "cheatIncidentDetected": "Cross-team Flag signal detected",
-        "cheatIncidentConfirmed": "Cheat signal confirmed",
-        "cheatIncidentDismissed": "Cheat signal dismissed",
-        "cheatIncidentSuperseded": "Cheat signal superseded by rejudge",
-        "cheatIncidentCorrected": "Cheat decision corrected"
+      "protectedSubmissionFlagAccessed": "Protected Flag accessed",
+      "cheatIncidentDetected": "Cross-team Flag signal detected",
+      "cheatIncidentConfirmed": "Cheat signal confirmed",
+      "cheatIncidentDismissed": "Cheat signal dismissed",
+      "cheatIncidentSuperseded": "Cheat signal superseded by rejudge",
+      "cheatIncidentCorrected": "Cheat decision corrected"
     }
   },
   "challenges": {
@@ -1327,6 +1335,7 @@
       "navChallenges": "Challenge management",
       "navTeams": "Team review",
       "navRuntimes": "Runtimes",
+      "navDataExports": "Data exports",
       "navOperations": "Operations",
       "navCheats": "Cheat signals",
       "navLogs": "Competition logs",
@@ -1873,6 +1882,55 @@
       "checking": "Checking health...",
       "checkFailed": "System health check failed.",
       "autoRefresh": "Auto-refreshes every 10 seconds."
+    },
+    "dataExports": {
+      "competitionTitle": "Complete competition archive",
+      "competitionDescription": "Asynchronously builds a ZIP containing the competition, challenges, teams, every submission, scoring events, anti-cheat projections, and immutable competition events. Attachment binaries, runtime diagnostics, and platform credentials are excluded.",
+      "auditTitle": "Platform audit archive",
+      "auditDescription": "Builds complete NDJSON from immutable competition events and user lifecycle facts without copying or rewriting the source history.",
+      "create": "Create export",
+      "inProgress": "Export in progress",
+      "queued": "The export was queued. An in-app notification will report completion or failure.",
+      "alreadyActive": "An export is already in progress.",
+      "createFailed": "The data export could not be created.",
+      "loading": "Loading export jobs...",
+      "loadFailed": "Export jobs unavailable",
+      "loadFailedDescription": "Export status is temporarily unavailable. Refresh and try again.",
+      "empty": "No export jobs yet",
+      "emptyDescription": "Create an export to track progress, review failures, and download the result here.",
+      "protectionTitle": "Plaintext Flags excluded by default",
+      "protectionDescription": "The archive keeps Flag hashes and historical relationships but excludes plaintext Flags by default. Passwords, Tokens, SMTP credentials, and attachment binaries are always excluded.",
+      "includeProtectedFlags": "Include protected plaintext Flags",
+      "includeProtectedFlagsHint": "Only a human platform Administrator may enable this. Successful generation creates a permanent competition audit fact.",
+      "reason": "Access reason",
+      "reasonPlaceholder": "Explain the award, penalty, appeal, or correction purpose",
+      "reasonHint": "Use 8 to 512 characters.",
+      "requestedAt": "Requested",
+      "status": "Status",
+      "file": "File",
+      "retention": "Retention",
+      "protected": "Plaintext Flags · permanently audited",
+      "expiresAt": "File expires: {time}",
+      "metadataRetained": "File removed · metadata retained for 30 days",
+      "metadataWindow": "Job metadata retained for 30 days",
+      "download": "Download",
+      "downloadStarted": "Data export download started.",
+      "downloadFailed": "The data export file is unavailable or expired.",
+      "statuses": {
+        "queued": "Queued",
+        "processing": "Processing",
+        "available": "Available",
+        "failed": "Failed",
+        "expired": "Expired",
+        "unknown": "Unknown"
+      },
+      "failures": {
+        "subjectNotFound": "The export subject no longer exists.",
+        "sizeLimit": "The compressed archive exceeded the 2 GiB limit. The entire job failed without a truncated file.",
+        "generation": "Archive generation failed.",
+        "storage": "Object storage failed.",
+        "unknown": "The export job failed."
+      }
     },
     "logs": {
       "title": "Live Logs",

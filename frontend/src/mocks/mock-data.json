@@ -2,6 +2,140 @@
   "routes": [
     {
       "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200,
+      "body": {
+        "accessToken": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJleHAiOjQxMDAwMDAwMDAsInN1YiI6IjExMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsInVzZXJOYW1lIjoibW9jay1hZG1pbiIsInJvbGUiOiJBZG1pbmlzdHJhdG9yIn0.mock",
+        "userName": "mock-admin",
+        "role": 2,
+        "emailVerified": true
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "status": 200,
+      "body": {
+        "accessToken": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJleHAiOjQxMDAwMDAwMDAsInN1YiI6IjExMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsInVzZXJOYW1lIjoibW9jay1hZG1pbiIsInJvbGUiOiJBZG1pbmlzdHJhdG9yIn0.mock",
+        "userName": "mock-admin",
+        "role": 2,
+        "emailVerified": true
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/competitions/:competitionId",
+      "status": 200,
+      "body": {
+        "id": "11111111-1111-1111-1111-111111111111",
+        "title": "Archive acceptance competition",
+        "description": "Local browser acceptance fixture for durable exports.",
+        "mode": 0,
+        "startTime": "2026-08-06T00:00:00Z",
+        "endTime": "2026-08-07T00:00:00Z",
+        "status": 3,
+        "teamRegistrationAutoApprove": true,
+        "maxTeamMembers": 5,
+        "maxConcurrentRuntimeInstancesPerTeam": 2,
+        "ownerId": "22222222-2222-2222-2222-222222222222",
+        "leaderboardVisibility": 0
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/competitions/:competitionId/teams",
+      "status": 200,
+      "body": { "items": [] }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/competitions/:competitionId/runtimes",
+      "status": 200,
+      "body": { "items": [] }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/competitions/:competitionId/cheat-incidents",
+      "status": 200,
+      "body": { "items": [], "nextCursor": null }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/competitions/:competitionId/data-exports",
+      "status": 200,
+      "body": {
+        "items": [
+          {
+            "id": "33333333-3333-3333-3333-333333333333",
+            "scope": 0,
+            "competitionId": "11111111-1111-1111-1111-111111111111",
+            "requestedByUserId": "11111111-1111-1111-1111-111111111111",
+            "requestedAt": "2026-08-06T01:00:00Z",
+            "includeProtectedFlags": false,
+            "status": 2,
+            "completedAt": "2026-08-06T01:00:10Z",
+            "expiresAt": "2026-08-07T01:00:10Z",
+            "fileName": "competition-archive.zip",
+            "length": 1048576,
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/competitions/:competitionId/data-exports",
+      "status": 202,
+      "body": {
+        "id": "44444444-4444-4444-4444-444444444444",
+        "scope": 0,
+        "competitionId": "11111111-1111-1111-1111-111111111111",
+        "requestedByUserId": "11111111-1111-1111-1111-111111111111",
+        "requestedAt": "2026-08-06T02:00:00Z",
+        "includeProtectedFlags": false,
+        "status": 0
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/platform/logs",
+      "status": 200,
+      "body": { "items": [], "nextCursor": null }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/platform/audit-logs",
+      "status": 200,
+      "body": { "items": [], "nextCursor": null }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/platform/dead-letters",
+      "status": 200,
+      "body": { "items": [] }
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/platform/audit-logs/data-exports",
+      "status": 200,
+      "body": { "items": [] }
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/platform/audit-logs/data-exports",
+      "status": 202,
+      "body": {
+        "id": "55555555-5555-5555-5555-555555555555",
+        "scope": 1,
+        "competitionId": null,
+        "requestedByUserId": "11111111-1111-1111-1111-111111111111",
+        "requestedAt": "2026-08-06T02:00:00Z",
+        "includeProtectedFlags": false,
+        "status": 0
+      }
+    },
+    {
+      "method": "POST",
       "path": "/api/auth/login",
       "status": 200,
       "body": {
