@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Http.Features;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Application.Competitions.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 var exportSwagger = args.Contains("--export-openapi", StringComparer.OrdinalIgnoreCase)
@@ -56,6 +57,8 @@ builder.UseWolverine(options =>
         options.PublishMessage<ChallengePublished>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<TeamBanned>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<CompetitionEventCommitted>()
+            .ToPostgresqlQueue("noctf-worker");
     }
 });
 

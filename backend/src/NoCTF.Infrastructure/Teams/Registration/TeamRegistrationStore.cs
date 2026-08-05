@@ -5,13 +5,21 @@ using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Teams.Registration;
 
 public sealed class TeamRegistrationStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : ITeamRegistrationStore
+    ITransactionalMessageOutbox outbox,
+    TimeProvider? clock = null,
+    ICompetitionEventRecorder? eventRecorder = null) : ITeamRegistrationStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+
     public Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
             .Select(x => new TeamRegistrationPolicy(x.Status, x.TeamRegistrationAutoApprove, x.DeletedAt != null))
@@ -44,6 +52,18 @@ public sealed class TeamRegistrationStore(
             RegisteredAt = command.RegisteredAt
         };
         db.Teams.Add(team);
+        await events.RecordAsync(new(
+            team.CompetitionId,
+            CompetitionEventKind.TeamRegistered,
+            CompetitionEventLevel.Information,
+            status == TeamRegistrationStatus.Approved
+                ? CompetitionEventVisibility.Public
+                : CompetitionEventVisibility.Staff,
+            command.RegisteredAt,
+            ActorUserId: command.UserId,
+            RelatedUserId: command.UserId,
+            TeamId: team.Id,
+            TeamRegistrationStatus: status), ct);
         try
         {
             await db.SaveChangesAsync(ct);
@@ -82,6 +102,19 @@ public sealed class TeamRegistrationStore(
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
         if (changed == 1)
         {
+            await events.RecordAsync(new(
+                competitionId,
+                CompetitionEventKind.TeamRegistrationChanged,
+                status == TeamRegistrationStatus.Rejected
+                    ? CompetitionEventLevel.Warning
+                    : CompetitionEventLevel.Information,
+                status == TeamRegistrationStatus.Approved
+                    ? CompetitionEventVisibility.Public
+                    : CompetitionEventVisibility.Staff,
+                timeProvider.GetUtcNow(),
+                TeamId: teamId,
+                TeamRegistrationStatus: status), ct);
+            await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
             await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         }
@@ -115,6 +148,17 @@ public sealed class TeamRegistrationStore(
                 ct);
         if (changed == 1)
         {
+            await events.RecordAsync(new(
+                competitionId,
+                CompetitionEventKind.TeamRegistrationChanged,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Staff,
+                timeProvider.GetUtcNow(),
+                ActorUserId: userId,
+                RelatedUserId: userId,
+                TeamId: teamId,
+                TeamRegistrationStatus: TeamRegistrationStatus.Pending), ct);
+            await db.SaveChangesAsync(ct);
             await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
             await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         }
@@ -163,6 +207,14 @@ public sealed class TeamRegistrationStore(
         entity.Name = name;
         entity.NormalizedName = name.ToUpperInvariant();
         entity.AvatarUrl = command.AvatarUrl;
+        await events.RecordAsync(new(
+            entity.CompetitionId,
+            CompetitionEventKind.TeamUpdated,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            timeProvider.GetUtcNow(),
+            TeamId: entity.Id,
+            TeamRegistrationStatus: entity.RegistrationStatus), ct);
         try
         {
             await db.SaveChangesAsync(ct);
@@ -186,6 +238,15 @@ public sealed class TeamRegistrationStore(
             && x.CompetitionId == competitionId && x.DeletedAt == null, ct);
         if (entity is null) return TeamRegistrationFailure.TeamNotFound;
         entity.DeletedAt = deletedAt;
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.TeamDeleted,
+            CompetitionEventLevel.Warning,
+            CompetitionEventVisibility.Staff,
+            deletedAt,
+            ActorUserId: actorId,
+            TeamId: teamId,
+            TeamRegistrationStatus: entity.RegistrationStatus), ct);
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));

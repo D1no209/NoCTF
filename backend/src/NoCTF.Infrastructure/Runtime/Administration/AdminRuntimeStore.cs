@@ -7,6 +7,8 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Runtime.Instances;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Runtime.Administration;
 
@@ -15,8 +17,12 @@ public sealed class AdminRuntimeStore(
     IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placementPolicy,
     IPerTeamRuntimeFlagStore runtimeFlags,
-    ITransactionalMessageOutbox outbox) : IAdminRuntimeStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : IAdminRuntimeStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<IReadOnlyList<RuntimeInstanceView>> ListAsync(
         AdminRuntimeFilter filter,
         DateTimeOffset? beforeCreatedAt,
@@ -203,6 +209,19 @@ public sealed class AdminRuntimeStore(
                 await outbox.PublishAsync(new StopRuntime(
                     cleanupTarget.Id,
                     cleanupTarget.ProcessingVersion));
+                await events.RecordAsync(new(
+                    cleanupTarget.CompetitionId,
+                    CompetitionEventKind.RuntimeStateChanged,
+                    CompetitionEventLevel.Warning,
+                    cleanupTarget.TeamId is null
+                        ? CompetitionEventVisibility.Public
+                        : CompetitionEventVisibility.Team,
+                    now,
+                    TeamId: cleanupTarget.TeamId,
+                    CompetitionChallengeId: cleanupTarget.CompetitionChallengeId,
+                    RuntimeInstanceId: cleanupTarget.Id,
+                    RuntimeState: cleanupTarget.State,
+                    RuntimeGeneration: cleanupTarget.Generation), ct);
             }
             var template = templates.Get(scope.Competition.Mode, scope.Template.DefinitionJson);
             if (template is null)
@@ -283,6 +302,29 @@ public sealed class AdminRuntimeStore(
         }
         try
         {
+            var eventKind = action switch
+            {
+                RuntimeAction.Start => CompetitionEventKind.RuntimeCreated,
+                RuntimeAction.Reset => CompetitionEventKind.RuntimeReset,
+                RuntimeAction.Stop => CompetitionEventKind.RuntimeStateChanged,
+                RuntimeAction.Extend => CompetitionEventKind.RuntimeExtended,
+                _ => throw new InvalidOperationException("Unsupported runtime event action.")
+            };
+            await events.RecordAsync(new(
+                entity.CompetitionId,
+                eventKind,
+                entity.State == RuntimeState.Failed
+                    ? CompetitionEventLevel.Error
+                    : CompetitionEventLevel.Information,
+                entity.TeamId is null
+                    ? CompetitionEventVisibility.Public
+                    : CompetitionEventVisibility.Team,
+                now,
+                TeamId: entity.TeamId,
+                CompetitionChallengeId: entity.CompetitionChallengeId,
+                RuntimeInstanceId: entity.Id,
+                RuntimeState: entity.State,
+                RuntimeGeneration: entity.Generation), ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();

@@ -3,7 +3,7 @@ import type { PublicChallenge } from '@/api/challengePresentation'
 import type { NoCtfApplicationScoringLeaderboardLeaderboardResponse } from '@/api/generated/types.gen'
 import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, MessageCircleQuestion, Puzzle, Trophy, UserPlus, Users } from 'lucide-vue-next'
+import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, MessageCircleQuestion, Puzzle, ScrollText, Trophy, UserPlus, Users } from 'lucide-vue-next'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
@@ -12,6 +12,7 @@ import { challengeApi, competitionApi, submissionApi, teamApi } from '@/api/noct
 import { queryKeys } from '@/api/queryKeys'
 import { solvedCompetitionChallengeIds } from '@/api/submissionPresentation'
 import { canManagePlatformResources } from '@/api/userRole'
+import CompetitionEventsPanel from '@/components/competition-events/CompetitionEventsPanel.vue'
 import ChallengeModal from '@/components/game/ChallengeModal.vue'
 import { asLeaderboardSnapshot } from '@/components/game/leaderboardPresentation'
 import ScoreboardView from '@/components/game/ScoreboardView.vue'
@@ -135,7 +136,7 @@ const effectiveChallenges = computed<PublicChallenge[]>(() => {
 const modalOpen = ref(false)
 const selectedChallenge = ref<PublicChallenge | null>(null)
 const ui = reactive({
-  activeTab: 'challenges' as 'challenges' | 'scoreboard' | 'support',
+  activeTab: 'challenges' as 'challenges' | 'scoreboard' | 'support' | 'events',
 })
 const activeDirection = ref('ALL')
 const hideSolved = ref(false)
@@ -603,7 +604,7 @@ function rotationClass(id: string) {
 
     <!-- Main Content Tabs -->
     <Tabs v-model="ui.activeTab" class="w-full">
-      <TabsList class="mb-8 grid h-auto w-full max-w-2xl grid-cols-3">
+      <TabsList class="mb-8 grid h-auto w-full max-w-3xl grid-cols-2 md:grid-cols-4">
         <TabsTrigger value="challenges">
           <Puzzle class="size-4" />
           {{ t('challenges.title') }}
@@ -615,6 +616,10 @@ function rotationClass(id: string) {
         <TabsTrigger value="support">
           <MessageCircleQuestion class="size-4" />
           {{ t('questions.platformTitle') }}
+        </TabsTrigger>
+        <TabsTrigger value="events">
+          <ScrollText class="size-4" />
+          {{ t('competitionEvents.tab') }}
         </TabsTrigger>
       </TabsList>
 
@@ -794,6 +799,10 @@ function rotationClass(id: string) {
           subject="Platform"
           :can-create="canAskCompetitionQuestion"
         />
+      </TabsContent>
+
+      <TabsContent value="events" class="mt-0">
+        <CompetitionEventsPanel :competition-id="competitionId" />
       </TabsContent>
     </Tabs>
 

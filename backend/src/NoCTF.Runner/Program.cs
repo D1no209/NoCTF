@@ -13,6 +13,7 @@ using Wolverine.ErrorHandling;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Application.Competitions.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddNoCtfRunner(builder.Configuration);
@@ -49,6 +50,8 @@ builder.UseWolverine(options =>
     options.PublishMessage<ExpireAwdpFixVerification>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<DispatchRuntime>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<AwdFlagInjectionFailed>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<CompetitionEventCommitted>()
+        .ToPostgresqlQueue("noctf-worker");
 });
 var app = builder.Build();
 app.MapGet("/health/live", () => TypedResults.Ok(new { status = "live" }));

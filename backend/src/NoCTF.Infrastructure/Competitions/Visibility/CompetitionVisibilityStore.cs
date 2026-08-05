@@ -6,14 +6,20 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Competitions.Visibility;
 
 public sealed class CompetitionVisibilityStore(
     NoCtfDbContext db,
     ILeaderboardSnapshotFactory snapshots,
-    ITransactionalMessageOutbox outbox) : ICompetitionVisibilityStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : ICompetitionVisibilityStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
@@ -112,6 +118,15 @@ public sealed class CompetitionVisibilityStore(
                 Automatic = false,
                 OccurredAt = command.Now
             });
+            await events.RecordAsync(new(
+                competition.Id,
+                CompetitionEventKind.LeaderboardVisibilityChanged,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Public,
+                command.Now,
+                ActorUserId: command.ActorId,
+                CompetitionStatus: competition.Status,
+                LeaderboardVisibility: after), ct);
         }
 
         if (scheduled)
@@ -200,6 +215,14 @@ public sealed class CompetitionVisibilityStore(
             Automatic = true,
             OccurredAt = now
         });
+        await events.RecordAsync(new(
+            competition.Id,
+            CompetitionEventKind.LeaderboardVisibilityChanged,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Public,
+            now,
+            CompetitionStatus: competition.Status,
+            LeaderboardVisibility: competition.LeaderboardVisibility), ct);
         await LeaderboardRevision.IncrementAsync(db, competition.Id, ct);
         await outbox.PublishAsync(new InvalidateLeaderboard(competition.Id));
         await db.SaveChangesAsync(ct);

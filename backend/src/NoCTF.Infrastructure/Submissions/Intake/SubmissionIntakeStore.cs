@@ -5,13 +5,19 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Submissions.Intake;
 
 public sealed class SubmissionIntakeStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : ISubmissionIntakeStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : ISubmissionIntakeStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -78,7 +84,21 @@ public sealed class SubmissionIntakeStore(
         }).ToArray();
         db.Submissions.AddRange(entities);
         foreach (var entity in entities)
+        {
             await outbox.PublishAsync(new EvaluateSubmission(entity.Id, entity.ProcessingVersion));
+            await events.RecordAsync(new(
+                entity.CompetitionId,
+                CompetitionEventKind.SubmissionReceived,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Team,
+                entity.ReceivedAt,
+                ActorUserId: entity.SubmittedByUserId,
+                TeamId: entity.TeamId,
+                CompetitionChallengeId: entity.CompetitionChallengeId,
+                SubmissionId: entity.Id,
+                SubmissionKind: entity.Kind,
+                SubmissionState: entity.EvaluationState), cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
@@ -136,6 +156,18 @@ public sealed class SubmissionIntakeStore(
         patch.SubmissionId = entity.Id;
         db.Submissions.Add(entity);
         await outbox.PublishAsync(new EvaluateSubmission(entity.Id, entity.ProcessingVersion));
+        await events.RecordAsync(new(
+            entity.CompetitionId,
+            CompetitionEventKind.SubmissionReceived,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            entity.ReceivedAt,
+            ActorUserId: entity.SubmittedByUserId,
+            TeamId: entity.TeamId,
+            CompetitionChallengeId: entity.CompetitionChallengeId,
+            SubmissionId: entity.Id,
+            SubmissionKind: entity.Kind,
+            SubmissionState: entity.EvaluationState), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();

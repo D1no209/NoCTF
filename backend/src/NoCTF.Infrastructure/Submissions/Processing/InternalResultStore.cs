@@ -8,13 +8,19 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Awdp.Scoring;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Submissions.Processing;
 
 public sealed class InternalResultStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : IInternalResultStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : IInternalResultStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<InternalResultDisposition> RecordAwdAsync(
         AwdCheckResult result,
         CancellationToken ct)
@@ -67,7 +73,7 @@ public sealed class InternalResultStore(
             result.State);
         if (transitionResult is ScoringResult scoringResult)
         {
-            db.ScoringEvents.Add(new ScoringEvent
+            var scoringEvent = new ScoringEvent
             {
                 Id = Guid.CreateVersion7(appliedAt),
                 CompetitionId = runtime.CompetitionId,
@@ -79,7 +85,23 @@ public sealed class InternalResultStore(
                 CompetitionChallengeRevision = revisions.ChallengeRevision,
                 OccurredAt = appliedAt,
                 CreatedAt = DateTimeOffset.UtcNow
-            });
+            };
+            db.ScoringEvents.Add(scoringEvent);
+            await events.RecordAsync(new(
+                runtime.CompetitionId,
+                CompetitionEventKind.ScoringRecorded,
+                scoringResult == ScoringResult.Wrong
+                    ? CompetitionEventLevel.Warning
+                    : CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Team,
+                appliedAt,
+                TeamId: runtime.TeamId,
+                CompetitionChallengeId: runtime.CompetitionChallengeId,
+                RuntimeInstanceId: runtime.Id,
+                ScoringEventKind: scoringEvent.Kind,
+                ScoringResult: scoringEvent.Result,
+                RuntimeState: runtime.State,
+                RuntimeGeneration: runtime.Generation), ct);
             await LeaderboardRevision.IncrementAsync(
                 db,
                 runtime.CompetitionId,
@@ -195,12 +217,55 @@ public sealed class InternalResultStore(
                 submission.CompetitionId,
                 ct);
             await outbox.PublishAsync(new InvalidateLeaderboard(submission.CompetitionId));
+            await events.RecordAsync(new(
+                submission.CompetitionId,
+                CompetitionEventKind.ScoringRecorded,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Team,
+                result.OccurredAt,
+                TeamId: submission.TeamId,
+                CompetitionChallengeId: submission.CompetitionChallengeId,
+                RuntimeInstanceId: runtime.Id,
+                SubmissionId: submission.Id,
+                ScoringEventKind: scoringEvent.Kind,
+                ScoringResult: scoringEvent.Result,
+                RuntimeGeneration: runtime.Generation), ct);
         }
         submission.EvaluationResultBodySha256 = result.BodySha256;
         submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
         runtime.State = RuntimeState.Stopping;
         runtime.RunnerAssignmentReleaseToken = null;
         runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
+        await events.RecordAsync(new(
+            submission.CompetitionId,
+            CompetitionEventKind.SubmissionEvaluated,
+            submission.EvaluationState == SubmissionEvaluationState.PlatformFailed
+                ? CompetitionEventLevel.Error
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            result.OccurredAt,
+            ActorUserId: submission.SubmittedByUserId,
+            TeamId: submission.TeamId,
+            CompetitionChallengeId: submission.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            SubmissionId: submission.Id,
+            SubmissionKind: submission.Kind,
+            SubmissionState: submission.EvaluationState,
+            ScoringResult: decision.Result,
+            RuntimeState: runtime.State,
+            RuntimeGeneration: runtime.Generation), ct);
+        await events.RecordAsync(new(
+            runtime.CompetitionId,
+            CompetitionEventKind.RuntimeStateChanged,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            result.OccurredAt,
+            TeamId: runtime.TeamId,
+            CompetitionChallengeId: runtime.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            SubmissionId: submission.Id,
+            RuntimeState: RuntimeState.Stopping,
+            RuntimeGeneration: runtime.Generation), ct);
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
             runtime.ProcessingVersion,

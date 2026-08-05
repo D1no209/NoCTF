@@ -9,13 +9,19 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Challenges.Questions;
 
 public sealed class CompetitionQuestionStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : ICompetitionQuestionStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : ICompetitionQuestionStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<CompetitionQuestionMutationResult> CreateAsync(
         CreateCompetitionQuestionCommand command,
         CancellationToken ct)
@@ -59,7 +65,7 @@ public sealed class CompetitionQuestionStore(
         var hasValidChallenge = command.Subject switch
         {
             CompetitionQuestionSubject.Challenge => challengeId is not null,
-            CompetitionQuestionSubject.Platform => command.CompetitionChallengeId is not null,
+            CompetitionQuestionSubject.Platform => command.CompetitionChallengeId is null,
             _ => false
         };
         var hasValidSubmission = command.SubmissionId is null
@@ -125,6 +131,18 @@ public sealed class CompetitionQuestionStore(
             question.Title,
             command.Now,
             question.Revision));
+        await events.RecordAsync(new(
+            question.CompetitionId,
+            CompetitionEventKind.QuestionOpened,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            command.Now,
+            ActorUserId: command.ActorUserId,
+            TeamId: question.TeamId,
+            CompetitionChallengeId: question.CompetitionChallengeId,
+            SubmissionId: question.SubmissionId,
+            QuestionId: question.Id,
+            QuestionStatus: question.Status), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -279,6 +297,18 @@ public sealed class CompetitionQuestionStore(
             question.Title,
             command.Now,
             question.Revision));
+        await events.RecordAsync(new(
+            question.CompetitionId,
+            CompetitionEventKind.QuestionReplied,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            command.Now,
+            ActorUserId: command.ActorUserId,
+            TeamId: question.TeamId,
+            CompetitionChallengeId: question.CompetitionChallengeId,
+            SubmissionId: question.SubmissionId,
+            QuestionId: question.Id,
+            QuestionStatus: question.Status), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -343,6 +373,20 @@ public sealed class CompetitionQuestionStore(
             question.Title,
             command.Now,
             question.Revision));
+        await events.RecordAsync(new(
+            question.CompetitionId,
+            CompetitionEventKind.QuestionStatusChanged,
+            command.Status == CompetitionQuestionStatus.Closed
+                ? CompetitionEventLevel.Warning
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            command.Now,
+            ActorUserId: command.ActorUserId,
+            TeamId: question.TeamId,
+            CompetitionChallengeId: question.CompetitionChallengeId,
+            SubmissionId: question.SubmissionId,
+            QuestionId: question.Id,
+            QuestionStatus: question.Status), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -399,8 +443,21 @@ public sealed class CompetitionQuestionStore(
         db.Set<CompetitionQuestionEntry>().Add(publication);
         question.Revision = checked(question.Revision + 1);
         question.UpdatedAt = command.Now;
+        await events.RecordAsync(new(
+            question.CompetitionId,
+            CompetitionEventKind.QuestionPublished,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Public,
+            command.Now,
+            ActorUserId: command.ActorUserId,
+            TeamId: question.TeamId,
+            CompetitionChallengeId: question.CompetitionChallengeId,
+            SubmissionId: question.SubmissionId,
+            QuestionId: question.Id,
+            QuestionStatus: question.Status), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return new(await BuildViewAsync(question, access.Value, true, ct));
     }
 

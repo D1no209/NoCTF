@@ -13,6 +13,7 @@ using NoCTF.Worker;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Application.Competitions.Events;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddNoCtfInfrastructure(builder.Configuration);
@@ -23,6 +24,7 @@ builder.UseWolverine(options =>
 {
     options.Discovery.IncludeType(typeof(BackendMessageHandlers));
     options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
+    options.Discovery.IncludeType(typeof(CompetitionEventMessageHandlers));
     var postgres = builder.Configuration.GetConnectionString("PostgreSql")
         ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
     options.PersistMessagesWithPostgresql(postgres, WolverinePersistenceSchemas.Worker);
@@ -59,6 +61,8 @@ builder.UseWolverine(options =>
     options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<TeamBanned>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<DeliverCompetitionQuestionNotification>()
+        .ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<CompetitionEventCommitted>()
         .ToPostgresqlQueue("noctf-worker");
 });
 

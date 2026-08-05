@@ -94,6 +94,7 @@ GET  /api/v1/competitions/{competitionId}/questions/{questionId}
 POST /api/v1/competitions/{competitionId}/questions/{questionId}/messages
 PUT  /api/v1/competitions/{competitionId}/questions/{questionId}/status
 PUT  /api/v1/competitions/{competitionId}/questions/{questionId}/publication
+GET  /api/v1/competitions/{competitionId}/events
 ```
 
 咨询默认私密。Challenge 咨询绑定一个 CompetitionChallenge，由比赛
@@ -171,6 +172,7 @@ GET  /api/v1/admin/competitions/{competitionId}/permission-candidates
 POST /api/v1/admin/competitions/{competitionId}/owner/transfer
 GET  /api/v1/admin/competitions/{competitionId}/start-validation
 POST /api/v1/admin/competitions/{competitionId}/flags/generate-missing
+GET  /api/v1/admin/competitions/{competitionId}/events/export
 ```
 
 Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍是独立文件/路由/TypedResults。
@@ -178,6 +180,12 @@ Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍�
 排行榜可见性 PUT 使用独立 `expectedRevision` 栅栏，可立即应用 Frozen/Blackout，也可在比赛时间窗
 内定时应用。Frozen 在生效时按精确截止时间重建并持久化快照；新配置会淘汰旧的定时消息。每次
 实际切换记录 Actor、原因、发生时间和冻结截止时间。Finished 只接受 Normal。
+
+比赛事件使用不可变的单表事实流，保留期与比赛一致。公共参与者只能读取公开事件，已审批且
+未封禁队伍还能读取本队事件，Administrator 与该比赛的 Owner/Manager/Judge/Observer 可读取
+完整的安全摘要。查询时间窗最大 31 天并使用签名 keyset cursor；JSONL 导出最多 50,000 条，
+仅 Administrator、Owner、Manager 可用。实时通知只携带事件 Id、类型、级别与发生时间，客户端
+收到后通过本 GET 重新读取，不通过 SignalR 传输敏感正文。
 
 权限 snapshot 与候选用户只允许 Competition Owner 或平台 Administrator 读取。候选响应仅含
 Id、UserName、Kind、Role 与 EmailVerified，不开放平台用户目录中的 Email、TokenVersion。
@@ -279,6 +287,7 @@ transaction lock，并在同一事务内递增父聚合 revision 与 leaderboard
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/submissions
 GET  /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}
+POST /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/flag-access
 POST /api/v1/admin/competitions/{competitionId}/submissions/queue-evaluation
 POST /api/v1/admin/competitions/{competitionId}/submissions/rejudge
 POST /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/rejudge

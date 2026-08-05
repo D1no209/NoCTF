@@ -8,6 +8,8 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Runtime.Instances;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Competitions.Awd;
 
@@ -16,8 +18,12 @@ public sealed class PostgresAwdRuntimeProvisioner(
     IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
-    TimeProvider timeProvider) : IAwdRuntimeProvisioner
+    TimeProvider timeProvider,
+    ICompetitionEventRecorder? eventRecorder = null) : IAwdRuntimeProvisioner
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<AwdRuntimeProvisioningOutcome> EnsureAsync(
         Guid competitionId,
         CancellationToken cancellationToken)
@@ -156,6 +162,13 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     CreatedAt = createdAt
                 };
                 db.RuntimeInstances.Add(replacement);
+                await RecordCreatedAsync(events, replacement, createdAt, cancellationToken);
+                await RecordStateAsync(
+                    events,
+                    cleanupTarget,
+                    CompetitionEventLevel.Warning,
+                    createdAt,
+                    cancellationToken);
                 await outbox.PublishAsync(new StopRuntime(
                     cleanupTarget.Id,
                     cleanupTarget.ProcessingVersion));
@@ -200,10 +213,48 @@ public sealed class PostgresAwdRuntimeProvisioner(
         if (created.Count == 0)
             return AwdRuntimeProvisioningOutcome.Idempotent;
         foreach (var runtime in created)
+        {
             await outbox.PublishAsync(new DispatchRuntime(runtime.Id, runtime.ProcessingVersion));
+            await RecordCreatedAsync(events, runtime, createdAt, cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return AwdRuntimeProvisioningOutcome.Applied;
     }
+
+    private static ValueTask<Guid> RecordCreatedAsync(
+        ICompetitionEventRecorder events,
+        RuntimeInstance runtime,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken) =>
+        events.RecordAsync(new(
+            runtime.CompetitionId,
+            CompetitionEventKind.RuntimeCreated,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            occurredAt,
+            TeamId: runtime.TeamId,
+            CompetitionChallengeId: runtime.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            RuntimeState: runtime.State,
+            RuntimeGeneration: runtime.Generation), cancellationToken);
+
+    private static ValueTask<Guid> RecordStateAsync(
+        ICompetitionEventRecorder events,
+        RuntimeInstance runtime,
+        CompetitionEventLevel level,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken) =>
+        events.RecordAsync(new(
+            runtime.CompetitionId,
+            CompetitionEventKind.RuntimeStateChanged,
+            level,
+            CompetitionEventVisibility.Team,
+            occurredAt,
+            TeamId: runtime.TeamId,
+            CompetitionChallengeId: runtime.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            RuntimeState: runtime.State,
+            RuntimeGeneration: runtime.Generation), cancellationToken);
 }

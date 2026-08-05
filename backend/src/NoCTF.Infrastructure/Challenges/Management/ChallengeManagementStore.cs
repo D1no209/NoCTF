@@ -6,13 +6,19 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Challenges;
 using NoCTF.Application.Messaging;
 using Npgsql;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Challenges.Management;
 
 public sealed class ChallengeManagementStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : IChallengeManagementStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : IChallengeManagementStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)
@@ -55,6 +61,13 @@ public sealed class ChallengeManagementStore(
             UpdatedAt = command.CreatedAt
         };
         db.CompetitionChallenges.Add(entity);
+        await events.RecordAsync(new(
+            entity.CompetitionId,
+            CompetitionEventKind.ChallengeCreated,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Staff,
+            command.CreatedAt,
+            CompetitionChallengeId: entity.Id), ct);
         try
         {
             await db.SaveChangesAsync(ct);
@@ -108,12 +121,28 @@ public sealed class ChallengeManagementStore(
         if (entity.Revision != command.ExpectedRevision)
             return new(null, ChallengeMutationFailure.RevisionConflict);
 
-        var becamePublished = !entity.IsPublished && command.IsPublished;
+        var wasPublished = entity.IsPublished;
+        var becamePublished = !wasPublished && command.IsPublished;
         entity.BaseScore = command.BaseScore;
         entity.Order = command.Order;
         entity.IsPublished = command.IsPublished;
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
+        var eventKind = (wasPublished, command.IsPublished) switch
+        {
+            (false, true) => CompetitionEventKind.ChallengePublished,
+            (true, false) => CompetitionEventKind.ChallengeUnpublished,
+            _ => CompetitionEventKind.ChallengeUpdated
+        };
+        await events.RecordAsync(new(
+            entity.CompetitionId,
+            eventKind,
+            CompetitionEventLevel.Information,
+            command.IsPublished
+                ? CompetitionEventVisibility.Public
+                : CompetitionEventVisibility.Staff,
+            command.UpdatedAt,
+            CompetitionChallengeId: entity.Id), ct);
         try
         {
             await db.SaveChangesAsync(ct);
@@ -213,6 +242,17 @@ public sealed class ChallengeManagementStore(
         entity.DeletedAt = restore ? null : now;
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
+        await events.RecordAsync(new(
+            entity.CompetitionId,
+            restore
+                ? CompetitionEventKind.ChallengeUpdated
+                : CompetitionEventKind.ChallengeDeleted,
+            restore
+                ? CompetitionEventLevel.Information
+                : CompetitionEventLevel.Warning,
+            CompetitionEventVisibility.Staff,
+            now,
+            CompetitionChallengeId: entity.Id), ct);
         try
         {
             await db.SaveChangesAsync(ct);

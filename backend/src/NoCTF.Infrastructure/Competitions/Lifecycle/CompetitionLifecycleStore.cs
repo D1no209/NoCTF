@@ -4,14 +4,20 @@ using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Challenges;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Competitions.Lifecycle;
 
 public sealed class CompetitionLifecycleStore(
     NoCtfDbContext db,
     CompetitionStartGate startGate,
-    ITransactionalMessageOutbox outbox) : ICompetitionLifecycleStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : ICompetitionLifecycleStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public Task<CompetitionStatus?> GetStatusAsync(Guid competitionId, CancellationToken cancellationToken) =>
         db.Competitions.AsNoTracking()
             .Where(item => item.Id == competitionId && item.DeletedAt == null)
@@ -167,6 +173,16 @@ public sealed class CompetitionLifecycleStore(
                     Automatic = true,
                     OccurredAt = now
                 });
+                await events.RecordAsync(new(
+                    competition.Id,
+                    CompetitionEventKind.LeaderboardVisibilityChanged,
+                    CompetitionEventLevel.Information,
+                    CompetitionEventVisibility.Public,
+                    now,
+                    ActorUserId: actorId,
+                    CompetitionStatus: to,
+                    LeaderboardVisibility: CompetitionLeaderboardVisibility.Normal),
+                    cancellationToken);
             }
             competition.LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal;
             competition.LeaderboardVisibilityStartsAt = null;
@@ -189,6 +205,14 @@ public sealed class CompetitionLifecycleStore(
         };
         competition.LifecycleAudits.Add(lifecycleAudit);
         db.Entry(lifecycleAudit).State = EntityState.Added;
+        await events.RecordAsync(new(
+            competition.Id,
+            CompetitionEventKind.CompetitionLifecycleChanged,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Public,
+            now,
+            ActorUserId: actorId,
+            CompetitionStatus: to), cancellationToken);
         await LeaderboardRevision.IncrementAsync(
             db,
             competitionId,

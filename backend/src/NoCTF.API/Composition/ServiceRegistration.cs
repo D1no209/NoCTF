@@ -117,6 +117,7 @@ public static class ServiceRegistration
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisSubmissionResultRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisLeaderboardRefreshRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisPlatformLogRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisCompetitionEventRefreshRelay>();
         }
         services.AddRateLimiter(options =>
         {

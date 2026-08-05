@@ -165,6 +165,12 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
                     || entry.PublishedByUserId == user.Id,
                     ct));
         await AddReferenceAsync(
+            UserDeletionReferenceKind.CompetitionEvent,
+            db.CompetitionEvents.CountAsync(entry =>
+                entry.ActorUserId == user.Id
+                || entry.RelatedUserId == user.Id,
+                ct));
+        await AddReferenceAsync(
             UserDeletionReferenceKind.UserAccountLifecycleAudit,
             db.UserAccountLifecycleAudits.CountAsync(
                 audit => audit.TargetUserId == user.Id || audit.ActorUserId == user.Id,

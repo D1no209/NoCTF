@@ -6,6 +6,8 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Runtime.Instances;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Competitions.Koh;
 
@@ -14,8 +16,12 @@ public sealed class PostgresKohRuntimeProvisioner(
     IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
-    TimeProvider timeProvider) : IKohRuntimeProvisioner
+    TimeProvider timeProvider,
+    ICompetitionEventRecorder? eventRecorder = null) : IKohRuntimeProvisioner
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<KohRuntimeProvisioningOutcome> EnsureAsync(
         Guid competitionId,
         CancellationToken cancellationToken)
@@ -119,6 +125,13 @@ public sealed class PostgresKohRuntimeProvisioner(
                     CreatedAt = createdAt
                 };
                 db.RuntimeInstances.Add(replacement);
+                await RecordCreatedAsync(events, replacement, createdAt, cancellationToken);
+                await RecordStateAsync(
+                    events,
+                    cleanupTarget,
+                    CompetitionEventLevel.Warning,
+                    createdAt,
+                    cancellationToken);
                 await outbox.PublishAsync(new StopRuntime(
                     cleanupTarget.Id,
                     cleanupTarget.ProcessingVersion));
@@ -159,10 +172,46 @@ public sealed class PostgresKohRuntimeProvisioner(
         if (created.Count == 0)
             return KohRuntimeProvisioningOutcome.Idempotent;
         foreach (var runtime in created)
+        {
             await outbox.PublishAsync(new DispatchRuntime(runtime.Id, runtime.ProcessingVersion));
+            await RecordCreatedAsync(events, runtime, createdAt, cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return KohRuntimeProvisioningOutcome.Applied;
     }
+
+    private static ValueTask<Guid> RecordCreatedAsync(
+        ICompetitionEventRecorder events,
+        RuntimeInstance runtime,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken) =>
+        events.RecordAsync(new(
+            runtime.CompetitionId,
+            CompetitionEventKind.RuntimeCreated,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Public,
+            occurredAt,
+            CompetitionChallengeId: runtime.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            RuntimeState: runtime.State,
+            RuntimeGeneration: runtime.Generation), cancellationToken);
+
+    private static ValueTask<Guid> RecordStateAsync(
+        ICompetitionEventRecorder events,
+        RuntimeInstance runtime,
+        CompetitionEventLevel level,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken) =>
+        events.RecordAsync(new(
+            runtime.CompetitionId,
+            CompetitionEventKind.RuntimeStateChanged,
+            level,
+            CompetitionEventVisibility.Public,
+            occurredAt,
+            CompetitionChallengeId: runtime.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            RuntimeState: runtime.State,
+            RuntimeGeneration: runtime.Generation), cancellationToken);
 }

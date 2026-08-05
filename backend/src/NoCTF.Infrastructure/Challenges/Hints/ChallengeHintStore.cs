@@ -7,14 +7,20 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Challenges.Hints;
 
 public sealed class ChallengeHintStore(
     NoCtfDbContext db,
     ILeaderboardProjectionEngine projection,
-    ITransactionalMessageOutbox outbox) : IChallengeHintStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : IChallengeHintStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<IReadOnlyList<ChallengeHintView>?> ListAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -251,6 +257,18 @@ public sealed class ChallengeHintStore(
             OccurredAt = now,
             CreatedAt = now
         });
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.HintUnlocked,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            now,
+            ActorUserId: userId,
+            TeamId: teamId,
+            CompetitionChallengeId: competitionChallengeId,
+            HintId: hintId,
+            ScoringEventKind: ScoringEventKind.HintUnlock,
+            ScoringResult: ScoringResult.Correct), ct);
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));

@@ -7,6 +7,8 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
@@ -15,8 +17,12 @@ public sealed class RuntimeInstanceStore(
     IChallengeRuntimeTemplateCatalog templates,
     IRuntimePlacementPolicy placementPolicy,
     IPerTeamRuntimeFlagStore runtimeFlags,
-    ITransactionalMessageOutbox outbox) : IRuntimeInstanceStore
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : IRuntimeInstanceStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<RuntimeInstanceView?> FindPlayerRuntimeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -112,6 +118,18 @@ public sealed class RuntimeInstanceStore(
                     await outbox.PublishAsync(new StopRuntime(
                         cleanupTarget.Id,
                         cleanupTarget.ProcessingVersion));
+                    await events.RecordAsync(new(
+                        cleanupTarget.CompetitionId,
+                        CompetitionEventKind.RuntimeStateChanged,
+                        CompetitionEventLevel.Warning,
+                        CompetitionEventVisibility.Team,
+                        command.Now,
+                        ActorUserId: command.UserId,
+                        TeamId: cleanupTarget.TeamId,
+                        CompetitionChallengeId: cleanupTarget.CompetitionChallengeId,
+                        RuntimeInstanceId: cleanupTarget.Id,
+                        RuntimeState: cleanupTarget.State,
+                        RuntimeGeneration: cleanupTarget.Generation), ct);
                 }
                 try
                 {
@@ -190,6 +208,28 @@ public sealed class RuntimeInstanceStore(
 
         try
         {
+            var eventKind = command.Action switch
+            {
+                RuntimeAction.Start => CompetitionEventKind.RuntimeCreated,
+                RuntimeAction.Reset => CompetitionEventKind.RuntimeReset,
+                RuntimeAction.Stop => CompetitionEventKind.RuntimeStateChanged,
+                RuntimeAction.Extend => CompetitionEventKind.RuntimeExtended,
+                _ => throw new InvalidOperationException("Unsupported runtime event action.")
+            };
+            await events.RecordAsync(new(
+                entity.CompetitionId,
+                eventKind,
+                entity.State == RuntimeState.Failed
+                    ? CompetitionEventLevel.Error
+                    : CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Team,
+                command.Now,
+                ActorUserId: command.UserId,
+                TeamId: entity.TeamId,
+                CompetitionChallengeId: entity.CompetitionChallengeId,
+                RuntimeInstanceId: entity.Id,
+                RuntimeState: entity.State,
+                RuntimeGeneration: entity.Generation), ct);
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();

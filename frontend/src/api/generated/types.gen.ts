@@ -367,6 +367,79 @@ export type NoCtfapiEndpointsCompetitionsCompetitionListResponse = {
     items?: Array<NoCtfapiEndpointsCompetitionsCompetitionResponse>;
 };
 
+export type NoCtfapiEndpointsCompetitionsEventsAccessCompetitionSubmissionFlagResponse = {
+    submissionId?: string;
+    submissionKind?: NoCtfDomainSubmissionsSubmissionKind;
+    submittedFlag?: string;
+    accessedAt?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsEventsAccessCompetitionSubmissionFlagRequest = {
+    reason: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfDomainCompetitionsEventsCompetitionEventKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37;
+
+export type NoCtfDomainCompetitionsEventsCompetitionEventLevel = 0 | 1 | 2;
+
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventListResponse = {
+    accessLevel?: NoCtfApplicationCompetitionsEventsCompetitionEventAccessLevel;
+    viewerTeamId?: string | null;
+    canExport?: boolean;
+    canAccessSubmissionFlags?: boolean;
+    items?: Array<NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse>;
+    nextCursor?: string | null;
+};
+
+export type NoCtfApplicationCompetitionsEventsCompetitionEventAccessLevel = 0 | 1 | 2;
+
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
+    id?: string;
+    competitionId?: string;
+    kind?: NoCtfDomainCompetitionsEventsCompetitionEventKind;
+    level?: NoCtfDomainCompetitionsEventsCompetitionEventLevel;
+    visibility?: NoCtfDomainCompetitionsEventsCompetitionEventVisibility;
+    actorUserId?: string | null;
+    actorDisplayName?: string | null;
+    relatedUserId?: string | null;
+    relatedUserDisplayName?: string | null;
+    teamId?: string | null;
+    teamDisplayName?: string | null;
+    competitionChallengeId?: string | null;
+    challengeTitle?: string | null;
+    hintId?: string | null;
+    runtimeInstanceId?: string | null;
+    submissionId?: string | null;
+    questionId?: string | null;
+    competitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
+    leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
+    teamRegistrationStatus?: NoCtfDomainTeamsTeamRegistrationStatus | null;
+    submissionKind?: NoCtfDomainSubmissionsSubmissionKind | null;
+    submissionState?: NoCtfDomainSubmissionsSubmissionEvaluationState | null;
+    scoringEventKind?: NoCtfDomainSubmissionsScoringEventKind | null;
+    scoringResult?: NoCtfDomainSubmissionsScoringResult | null;
+    runtimeState?: NoCtfDomainRuntimeRuntimeState | null;
+    questionStatus?: NoCtfDomainChallengesQuestionsCompetitionQuestionStatus | null;
+    runtimeGeneration?: number | null;
+    hostPort?: number | null;
+    reason?: string | null;
+    occurredAt?: string;
+};
+
+export type NoCtfDomainCompetitionsEventsCompetitionEventVisibility = 0 | 1 | 2;
+
+export type NoCtfDomainSubmissionsScoringEventKind = 0 | 1 | 2 | 3;
+
+export type NoCtfDomainChallengesQuestionsCompetitionQuestionStatus = 0 | 1 | 2 | 3;
+
+export type NoCtfapiEndpointsCompetitionsEventsListCompetitionEventsRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsChallengesChallengeResponse = {
     id?: string;
     competitionId?: string;
@@ -757,7 +830,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReference
     count?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode = 'CompetitionOwner' | 'CompetitionCollaborator' | 'ChallengeOwner' | 'ChallengeManager' | 'TeamCaptain' | 'TeamMember' | 'Submission' | 'PatchUpload' | 'Notification' | 'ScoringEvent' | 'CompetitionLifecycleAudit' | 'UserAccountLifecycleAudit';
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode = 'CompetitionOwner' | 'CompetitionCollaborator' | 'ChallengeOwner' | 'ChallengeManager' | 'TeamCaptain' | 'TeamMember' | 'Submission' | 'PatchUpload' | 'Notification' | 'ScoringEvent' | 'CompetitionLifecycleAudit' | 'CompetitionQuestion' | 'CompetitionQuestionEntry' | 'CompetitionEvent' | 'UserAccountLifecycleAudit';
 
 export type NoCtfapiEndpointsAdministrationPlatformDeletePlatformUserRequest = {
     mode: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode;
@@ -2353,6 +2426,135 @@ export type NoCtfapiEndpointsCompetitionsListCompetitionsEndpointResponses = {
 };
 
 export type NoCtfapiEndpointsCompetitionsListCompetitionsEndpointResponse = NoCtfapiEndpointsCompetitionsListCompetitionsEndpointResponses[keyof NoCtfapiEndpointsCompetitionsListCompetitionsEndpointResponses];
+
+export type AdminAccessCompetitionSubmissionFlagData = {
+    body: NoCtfapiEndpointsCompetitionsEventsAccessCompetitionSubmissionFlagRequest;
+    path: {
+        competitionId: string;
+        submissionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/flag-access';
+};
+
+export type AdminAccessCompetitionSubmissionFlagErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminAccessCompetitionSubmissionFlagError = AdminAccessCompetitionSubmissionFlagErrors[keyof AdminAccessCompetitionSubmissionFlagErrors];
+
+export type AdminAccessCompetitionSubmissionFlagResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsEventsAccessCompetitionSubmissionFlagResponse;
+};
+
+export type AdminAccessCompetitionSubmissionFlagResponse = AdminAccessCompetitionSubmissionFlagResponses[keyof AdminAccessCompetitionSubmissionFlagResponses];
+
+export type AdminExportCompetitionEventsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        kind?: NoCtfDomainCompetitionsEventsCompetitionEventKind | null;
+        minimumLevel?: NoCtfDomainCompetitionsEventsCompetitionEventLevel | null;
+        teamId?: string | null;
+        userId?: string | null;
+        competitionChallengeId?: string | null;
+        runtimeInstanceId?: string | null;
+        from: string;
+        to: string;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/events/export';
+};
+
+export type AdminExportCompetitionEventsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminExportCompetitionEventsError = AdminExportCompetitionEventsErrors[keyof AdminExportCompetitionEventsErrors];
+
+export type ListCompetitionEventsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        kind?: NoCtfDomainCompetitionsEventsCompetitionEventKind | null;
+        minimumLevel?: NoCtfDomainCompetitionsEventsCompetitionEventLevel | null;
+        teamId?: string | null;
+        userId?: string | null;
+        competitionChallengeId?: string | null;
+        runtimeInstanceId?: string | null;
+        from: string;
+        to: string;
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/competitions/{competitionId}/events';
+};
+
+export type ListCompetitionEventsErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type ListCompetitionEventsError = ListCompetitionEventsErrors[keyof ListCompetitionEventsErrors];
+
+export type ListCompetitionEventsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsEventsCompetitionEventListResponse;
+};
+
+export type ListCompetitionEventsResponse = ListCompetitionEventsResponses[keyof ListCompetitionEventsResponses];
 
 export type NoCtfapiEndpointsChallengesDownloadChallengeAttachmentEndpointData = {
     body?: never;

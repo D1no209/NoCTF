@@ -10,6 +10,8 @@ public sealed class DeploymentTopologyTests
         var dockerfile = await ReadAsync("backend", "Dockerfile");
         var compose = await ReadAsync("deploy", "docker-compose.yml");
         var workerProgram = await ReadAsync("backend", "src", "NoCTF.Worker", "Program.cs");
+        var apiProgram = await ReadAsync("backend", "src", "NoCTF.API", "Program.cs");
+        var runnerProgram = await ReadAsync("backend", "src", "NoCTF.Runner", "Program.cs");
         var workerDeployment = Path.Combine(
             RepositoryRoot,
             "deploy",
@@ -30,6 +32,15 @@ public sealed class DeploymentTopologyTests
             .Contains("options.PublishMessage<InvalidateLeaderboard>().ToPostgresqlQueue(\"noctf-worker\");");
         await Assert.That(workerProgram)
             .Contains("options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue(\"noctf-worker\");");
+        foreach (var program in new[] { apiProgram, workerProgram, runnerProgram })
+        {
+            await Assert.That(program)
+                .Contains("options.PublishMessage<CompetitionEventCommitted>()");
+            await Assert.That(program)
+                .Contains(".ToPostgresqlQueue(\"noctf-worker\");");
+        }
+        await Assert.That(workerProgram)
+            .Contains("options.Discovery.IncludeType(typeof(CompetitionEventMessageHandlers));");
         foreach (var runnerAvailabilitySetting in new[]
                  {
                      "Runner__Capacity__MemoryBytes",
