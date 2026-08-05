@@ -2401,6 +2401,62 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   题目弹窗正常展示“咨询出题人”、已有私密问答与 Hint/公告引导；控制台 0 error。临时 Mock、
   浏览器标签和本地 Vite 监听均已清理，仓库没有残留验收数据。
 
+### 6.53 单比赛不可变事件日志（2026-08-05）
+
+- 功能提交：`dbccb72 feat(events): add immutable competition event log`。本提交只在本地分支，
+  未 push、未部署；本阶段没有需要递增的显式平台运行版本。
+- 用户通过 `$grill-me` 回答 `AAAAAA`，确认使用单一不可变 `competition_events` 表；事件随
+  Competition 永久保留，不提供独立删除；查询按公开参赛者事件、本队事件和工作人员安全摘要
+  分层；Administrator/Owner/Manager 可执行有界 JSONL 导出；用户匿名化注销保留历史关系；
+  完整提交 Flag 只能由 Administrator/Owner/Manager/Judge 通过单独受审计端点读取，Observer
+  明确禁止。
+- Domain/Application 增加强类型 CompetitionEvent kind/level/visibility、append-only draft、查询
+  与 Flag 访问用例。事件可关联操作用户、相关用户、队伍、比赛题目、Hint、Runtime、Submission
+  和咨询，并以有界枚举承载生命周期、排行榜可见性、提交、计分、Runtime 与咨询状态；普通事件
+  不持久化 Flag、Token、密码、邀请令牌或 SMTP 凭据。Hint 使用独立 `HintId`，同一题同一时刻
+  发布多条 Hint 仍可逐条追溯。
+- `NoCtfDbContext` 在普通 SaveChanges 路径拒绝更新或删除 CompetitionEvent；所有外键均为
+  Restrict。比赛 hard delete 检查事件依赖，用户删除预览计入 Actor/RelatedUser 引用，因此有
+  历史时只能匿名化并注销，不会破坏成绩、提交、咨询或事件关系。EF CLI 生成
+  `20260805104614_AddCompetitionEvents` 及 designer/snapshot，未手改 migration 或 snapshot。
+- 新增强类型 FastEndpoints 契约：
+  `GET /api/v1/competitions/{competitionId}/events`、
+  `GET /api/v1/admin/competitions/{competitionId}/events/export`、
+  `POST /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/flag-access`。
+  查询使用签名 keyset cursor，单次最多 200，时间跨度最多 31 天；导出最多 50,000 条 JSONL。
+  Endpoint 均使用 `ExecuteAsync`、具体 HttpResults、`Results<T...>` 与 `TypedResults`，权限和业务
+  规则留在 Application/Infrastructure use case。
+- Competition/Challenge/Hint/Team/Submission/Scoring/Blood/Runtime/Port/Question 的关键写路径在
+  原事务中追加事件。API、Worker、Runner 都将 `CompetitionEventCommitted` 通过 Wolverine
+  PostgreSQL durable queue 路由到 Worker；Worker 只向 Redis 发布事件 ID/type/level/time 的
+  刷新提示，API SignalR relay 再通知比赛组。前端永远用 generated SDK 重取服务器授权投影，
+  不把实时 payload 当作事实或权限来源。
+- OpenAPI 共注册 164 个端点，其中 163 个为文档化 v1 路由，另有 `GET /health`。两份 artifact
+  字节一致，SHA-256 均为
+  `7BABA1EF5D99305415913B9DAF898FAE743B801371160F8B720B2AFDCA4F4E92`。TypeScript SDK
+  连续生成字节稳定：index
+  `CD4E791C229282BD328944EBB7B9B542D97A4E432FD10A9C504870E72D80503B`，sdk
+  `FF961C0B9FA14BC5445DD21F334F4994AFABBB84F6F0E3C01E8DD89FBCE36F34`，types
+  `BDE416BF287FE2EC6FE5FB86EC39D0DB3221A5532860C739DFF815B722E3005B`。
+- 前端比赛工作区新增第四个“比赛日志”标签，提供 24 小时默认范围、类型/最低级别/队伍/用户/
+  比赛题目/Runtime 筛选、签名分页、15 秒降级轮询、SignalR 刷新、权限驱动 JSONL 导出和受审计
+  Flag 查看。Flag 只存在于打开的对话框内，关闭即清空，不写 local/session storage；网络层只
+  调用生成 SDK/现有薄封装，没有手拼 URL、路径、DTO、枚举或失败码。
+- 最终验证：Release solution build 0 warning/0 error；569/569 non-Integration passed；真实
+  PostgreSQL 的事件权限、分页、导出、脱敏、Flag 审计、HintId、outbox 和 append-only 目标用例
+  独立通过。全量 Integration 共 143 项：140 passed、2 skipped、1 failed；skipped 仍是未配置
+  Kubernetes/Libvirt 目标环境，failure 是既有 KoH advisory-lock waiter 在全套并行容器压力下
+  期望 2、观测 1，随后低干扰独立重跑 1/1 passed。EF pending-model 检查无漂移，
+  `git diff --check` passed。
+- Frontend `bun test` 165/165、scoped ESLint 0 warning/0 error、`vue-tsc` 与 production build
+  passed。仓库级 ESLint 仍被 generated/vendor/config/旧文件的大量既存基线阻塞，没有执行全局
+  `--fix`，避免污染用户与协作者修改。
+- 使用内置浏览器将本地未部署前端代理到现网已有数据完成实际验收：管理员登录、进入真实比赛、
+  打开第四个“比赛日志”标签、展开高级筛选、检查实时 badge、筛选布局和错误态均正常，控制台
+  只有既有 Three.js deprecation warning。现网尚无本提交的新 API，列表出现预期 404 错误态；
+  数据行、导出、权限与 Flag 对话框由上述生成契约、前端测试及真实 PostgreSQL 用例覆盖。本地
+  Vite 监听和浏览器验收标签已清理，没有修改或部署现网。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2422,6 +2478,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - MailKit 双正文 SMTP 投递、显式 TLS 安全模式、可选认证和稳定脱敏失败契约。
 - 排行榜 Normal/Frozen/Blackout、精确 cutoff、可信角色/BOT 服务端投影、自动揭榜及前端空态。
 - 默认私密的题目/平台咨询、强类型状态与权限、Wolverine 通知和可选匿名公开回答。
+- 单比赛永久不可变事件、三层可见性、签名分页/JSONL 导出、受审计 Flag 读取及可靠实时刷新。
 
 当前尚未执行的交付边界：
 
@@ -2429,7 +2486,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
-- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef` 及各自 HANDOFF 提交是当前任务新增的
+- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72` 及各自 HANDOFF 提交是当前任务新增的
   本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
   push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
@@ -2437,19 +2494,21 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 
 ## 7. 建议的下一交接顺序
 
-最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯和
-P1 选手与出题人交流已分别由 6.49 至 6.52 完成；下一阶段是 P1“单比赛独立日志”：
+最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
+P1 选手与出题人交流和 P1 单比赛独立日志已分别由 6.49 至 6.53 完成；下一阶段是 P1
+“CTF 与 AWDP 跨队 Flag 反作弊”：
 
-1. 先审计现有 Competition 生命周期审计、提交/计分事实、Runtime 事件、平台日志和管理员审计，
-   明确哪些事实可以投影，避免把单比赛日志与平台运行日志或管理员审计混为一个页面。
-2. 在创建表或 migration 前必须用 `$grill-me` 确认 TODO 中尚未决定的存储语义：采用不可变
-   独立事件表还是从既有事实表投影，以及保留期限、导出范围和删除策略。未经确认不得新增表。
-3. 访问权限、可见事件类型、Flag 脱敏边界和分页/实时策略必须使用强类型契约；普通比赛日志
-   不输出明文 Flag、Token、密码、邀请令牌、SMTP 密码或容器秘密。
-4. 复用现有实时通道、签名 keyset 分页和 generated SDK 边界，不手拼 URL、DTO、枚举、游标或
-   SignalR 路径；若现有事实足以投影，优先不引入新的业务表。
-5. 阶段完成后运行 build/test/EF/OpenAPI/Frontend 与浏览器门禁，做独立功能提交并单独提交
-   HANDOFF。未经新任务明确授权，继续不 push、不部署。
+1. 先审计 CTF/AWDP Flag 生成、提交、ScoringEvent、重判、队伍封禁、通知和当前 CompetitionEvent
+   事实，固定普通选手仍只看到普通 Flag 错误，不能利用响应探测其他队伍 Flag。
+2. TODO 6.3 的事件处理状态来源、最终封禁角色、公开原因粒度、解封和误判更正通知策略尚未
+   决定，开始数据模型或人工裁决实现前必须用 `$grill-me` 集中询问；不得擅自新增业务表或把
+   Team ban 状态误当作 incident 处理状态。
+3. 检测事实必须与 Submission/ScoringEvent/CompetitionEvent 保持强类型、事务一致和重放幂等；
+   普通日志与消息不能携带完整 Flag。完整 Flag 继续复用独立受审计读取边界，Observer 禁止。
+4. 前端继续只使用 OpenAPI generated SDK/薄封装，管理比赛详情的“反作弊”标签位于“队伍”和
+   “实例”之间；未完成 `/grilling` 的交互不能自行拍板。
+5. 阶段完成后运行 build/test/EF/OpenAPI/Frontend 与按角色浏览器门禁，做独立功能提交并单独
+   提交 HANDOFF。未经新任务明确授权，继续不 push、不部署。
 
 用户稍后会提供真实环境部署细则。在此之前：
 
@@ -2495,8 +2554,9 @@ Docker port mapping，host port 固定请求 `0`。
    使用 6.41 至 6.44；Runtime cleanup/replacement/quota 使用 6.45 至 6.47；CTF 排行榜
    三血契约使用 6.48；个人资料、邮箱可见性、头像安全和改密失效使用 6.49；MailKit、显式
    TLS 模式、可选 SMTP 认证和脱敏失败使用 6.50；排行榜冻结、黑灯、BOT/通知边界使用
-   6.51；默认私密咨询、可选匿名公开回答和通知使用 6.52。下一纵切按 `TODO.md` 进入
-   “单比赛独立日志”，不要回滚或重做 `/profile`、SMTP、排行榜可见性或咨询。
+   6.51；默认私密咨询、可选匿名公开回答和通知使用 6.52；单比赛不可变事件、三层可见性、
+   导出、Flag 审计和实时刷新使用 6.53。下一纵切按 `TODO.md` 进入“CTF 与 AWDP 跨队 Flag
+   反作弊”，不要回滚或重做 `/profile`、SMTP、排行榜可见性、咨询或比赛日志。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
