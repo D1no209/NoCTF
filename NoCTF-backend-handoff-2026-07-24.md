@@ -2516,6 +2516,54 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   未实现 Competition SignalR negotiate 的预期 404（15 秒 polling fallback 正常）和既有
   Three.js deprecation warning。浏览器标签、三个本地监听和临时 mock 文件均已清理。
 
+### 6.55 管理员平台日志保留、审计投影与导出（2026-08-05）
+
+- 功能提交：`567ed02e feat(observability): enforce platform log retention`。本提交只在本地
+  分支，未 push、未部署；平台信息读取程序集元数据，仓库没有需要随本纵切递增的显式运行版本。
+- 用户确认三类日志边界：单比赛历史继续写 PostgreSQL 不可变 `competition_events`，永久保留、
+  禁止修改/自动清理，历史事件阻止比赛物理删除；管理审计只投影工作人员可见比赛事实与用户生命
+  周期审计，不复制事实、不设置 TTL；API、Worker、Runner 诊断日志使用每日 UTC Redis Stream
+  分片，固定保留 14 天、每日精确最多 50,000 条，到期删除且不归档。可信 Administrator 可查看
+  Flag，密码、Token、Cookie、Authorization、SMTP 凭据与部署秘密继续强制脱敏。
+- 用户通过 `$grill-me` 回答 `AAA`，确认运行日志导出为 JSONL，单次最多 50,000 条且只能覆盖
+  14 天保留窗口；关联筛选分别使用 Competition、RuntimeInstance、Team、User、
+  CompetitionChallenge、Submission 六类强类型 ID；全文检索对 category、event、message、
+  exception 执行有界、大小写不敏感匹配。分类筛选为大小写不敏感精确匹配。
+- `RedisPlatformLoggerProvider` 写入 `platform-logs:v2:yyyyMMdd`，`XADD MAXLEN` 精确限制每日容量，
+  shard 过期时间固定为分片日加 14 天；实时 pub/sub channel 保持兼容。读取端跨保留期分片倒序
+  查询，使用 filter-bound HMAC opaque cursor，增加读侧二次脱敏；导出沿用同一筛选和脱敏规则，
+  生成 `application/x-ndjson` 流。没有新增 PostgreSQL 表或 EF migration。
+- 管理审计不再读取 legacy Competition lifecycle/leaderboard audit child collection，而是直接投影
+  append-only CompetitionEvent 与 UserAccountLifecycleAudit。比赛生命周期、排行榜可见性、普通
+  比赛事件和账号生命周期为四类强类型视图；比赛事件同时保留相关用户、队伍、题目、Runtime、
+  Submission、ScoringEvent、咨询和强类型状态字段。签名 keyset cursor 支持跨两类事实稳定翻页；
+  普通比赛事件筛选不会混入已单列的生命周期或排行榜事件。
+- 新增强类型 FastEndpoint：
+  `GET /api/v1/admin/platform/logs/export`；既有 logs/audit-list 契约增加完整筛选、签名 cursor、
+  关联字段和 `nextCursor`。Endpoint 使用 `ExecuteAsync`、具体 HttpResults、`Results<T...>` 与
+  `TypedResults`，导出规则位于 Application use case。OpenAPI 共注册 170 个端点，其中 169 个
+  为文档化 v1 路由，Admin 路由 110 条。两份 artifact 字节一致，SHA-256 均为
+  `4473E43FAF6E052EFFF87DA827432D3649DB9FE76C8582FE1F462FEA0E3A2E5E`；SDK 二次生成
+  字节稳定：index `F454659242EDC0633E533CA47D0AC0F6BF5DB153D2B80B0126B1EE17B6B39E65`，
+  sdk `DF68CD03C2BC8E6E28143B93C0E6A85E2DA5E16272C8105EDE38426451805DC0`，types
+  `3D2B076D96E1E3CA545D609676C4ECCC303E22658B9CE3FB41842FC674B3E4E1`。
+- 前端仅通过 generated SDK 与 `platformLogsApi` 薄封装调用接口。平台日志工作台默认 Warning、
+  最近 24 小时，补齐分类/全文和六类关联 ID 筛选、同语义实时过滤、14 天/每日 5 万条提示、
+  JSONL 导出、管理审计四类筛选与签名 cursor“加载更早”。比赛事件名称映射抽为复用展示模块，
+  保持 Pixel Industrial 风格、中英文文案和无整页横向溢出。
+- 后端验证：Debug solution build 0 warning/0 error；Redis 真实依赖 3/3、PostgreSQL 审计投影
+  1/1、signed opaque cursor 1/1、Admin OpenAPI rules 2/2、route drift 1/1 passed；EF pending
+  model 无漂移（全局 EF CLI 8.0.11 对 runtime 10.0.4 仅提示版本较旧）；OpenAPI 导出、SDK
+  二次生成和 `git diff --check` passed。前端 scoped `bun test` 6/6、scoped ESLint 0 warning/
+  0 error、`vue-tsc` 与 production `bun run build` passed；构建只有既有依赖 annotation 与大
+  chunk 警告。
+- 使用内置浏览器连接一次性隔离 PostgreSQL/Redis/API/Vite 完成实际验收：管理员登录、真实
+  SignalR 连接、默认 Warning、完整筛选字段、大小写不敏感全文检索（6 条缩至唯一匹配）、审计
+  四类选项、导出动作及 1024/768 宽度均正常，document scrollWidth 等于 viewport，控制台零
+  error。JSONL body、50,000 上限和脱敏由真实 Redis 集成用例验证；浏览器控制器未捕获由 Blob
+  anchor 触发的 download 事件。验收标签、临时配置、监听进程和两个一次性容器均已清理，未触碰
+  既有 `deploy-*` 数据或服务。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2539,6 +2587,8 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 默认私密的题目/平台咨询、强类型状态与权限、Wolverine 通知和可选匿名公开回答。
 - 单比赛永久不可变事件、三层可见性、签名分页/JSONL 导出、受审计 Flag 读取及可靠实时刷新。
 - CTF/AWDP 跨队 Flag 隐蔽检测、事件派生裁决、受审计证据、封禁/更正和管理前端。
+- 管理员平台运行日志每日 Redis 分片、固定保留/容量、强类型筛选、签名分页、JSONL 导出与事实
+  投影审计。
 
 当前尚未执行的交付边界：
 
@@ -2546,7 +2596,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
-- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e` 及各自 HANDOFF 提交是当前任务新增的
+- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e` 及各自 HANDOFF 提交是当前任务新增的
   本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
   push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
@@ -2556,18 +2606,15 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 
 最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
 P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
-6.54 完成。下一阶段是 P2“管理员平台日志”：
+6.54 完成；P2 管理员平台日志由 6.55 完成。下一阶段进入 TODO 第 8 节后续安全与运维待办：
 
-1. 先审计现有平台日志已提交实现和当前受保护的协作者文件，只补齐 TODO 第 7 节真实缺口，
-   不重复平台日志导航、实时/审计/死信队列等已完成工作。
-2. 在新增持久化、保留、轮转、归档或导出协议前，必须用 `$grill-me` 确认存储后端、保留期限、
-   轮转、归档和导出上限；继续遵守“不新增大量数据表”的约束。
-3. 管理员平台日志必须与单比赛不可变事件和审计日志明确分区，默认 Warning 以上；Flag 可按
-   当前可信 Administrator 边界明文显示，密码、Token、Cookie、邀请令牌、SMTP 与部署秘密仍
-   必须强制脱敏。
-4. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
+1. 先按 TODO 顺序审计“忘记密码/邮箱重置”现状与真实缺口；涉及 Token 失效、邮件枚举防护、
+   限流或恢复语义且无法从现有模型确定时，使用 `$grill-me`。
+2. 不重做平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、导出或管理审计
+   投影；单比赛永久事实仍以 `competition_events` 为唯一来源。
+3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
-5. 未经新任务明确授权，继续不 push、不部署。
+4. 未经新任务明确授权，继续不 push、不部署。
 
 用户稍后会提供真实环境部署细则。在此之前：
 
@@ -2615,8 +2662,9 @@ Docker port mapping，host port 固定请求 `0`。
    TLS 模式、可选 SMTP 认证和脱敏失败使用 6.50；排行榜冻结、黑灯、BOT/通知边界使用
    6.51；默认私密咨询、可选匿名公开回答和通知使用 6.52；单比赛不可变事件、三层可见性、
    导出、Flag 审计和实时刷新使用 6.53；跨队 Flag 检测、事件派生裁决、受审计证据、封禁和
-   更正使用 6.54。下一纵切按 `TODO.md` 审计 P2“管理员平台日志”缺口，不要回滚或重做
-   `/profile`、SMTP、排行榜可见性、咨询、比赛日志或反作弊。
+   更正使用 6.54；管理员平台日志保留、筛选、签名分页、导出和投影审计使用 6.55。下一纵切按
+   `TODO.md` 第 8 节审计“忘记密码/邮箱重置”缺口，不要回滚或重做 `/profile`、SMTP、排行榜
+   可见性、咨询、比赛日志、反作弊或平台日志。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
