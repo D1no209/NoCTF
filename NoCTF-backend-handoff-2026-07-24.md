@@ -2342,6 +2342,65 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   Blackout，配置与生效 badge 同步并出现成功 toast；普通参赛者得分显示 `-`，比赛页显示黑灯
   说明，排行榜显示专用 Hidden 空态；控制台 0 error。隔离容器与本地进程已清理。
 
+### 6.52 默认私密的比赛咨询与可选公开回答（2026-08-05）
+
+- 功能提交：`8dca6ef feat(questions): add private competition support`。本提交只在本地分支，
+  未 push、未部署；本阶段没有需要递增的显式平台运行版本。
+- 用户通过 `$grill-me` 完成七项产品决策并补充最终语义：咨询默认且通常保持私密，用于选手
+  向出题人或比赛管理员询问题目或平台问题；需要面向全场公开的内容，产品主路径应使用 Hint
+  或平台公告。后端仍保留显式公开回答接口，但前端不把公开对话当作常规工作流。
+- Domain 只新增 `CompetitionQuestion` 与有序审计式 `CompetitionQuestionEntry` 两个模型，
+  对应 `competition_questions`、`competition_question_entries` 两张表，没有建立通用消息、
+  附件或会话 dumping ground。EF CLI 生成
+  `20260805045027_AddCompetitionQuestions` 及 designer/snapshot，未手改 migration 或
+  snapshot。
+- 问题使用强类型 `Challenge`/`Platform` subject。题目咨询必须关联
+  CompetitionChallenge；平台咨询只关联 Competition。每个问题固化提问 Team/User，可选关联
+  Submission；v1 明确不支持附件，正文提示不得填写密码、Token、SMTP 凭据或 Flag。
+- 新问题只允许在 Running/Paused 比赛创建；Finished 后只读。状态为
+  Pending/Replied/Resolved/Closed；提问者在 Resolved 后继续追问会重新打开问题，Closed 为
+  终态。创建与追加消息应用 subject/IP 维度每分钟 8 次限流，Bot 身份被服务端拒绝。
+- 私密处理权限包含比赛 Administrator、Owner/Manager/Judge，以及题目模板 Owner/Manager；
+  Observer 只读。处理者可见提问者和队伍身份；显式公开投影会匿名化提问者与队伍，不把私密
+  上下文泄露给其他参赛者。
+- 六个强类型 FastEndpoints 契约已加入：
+  `POST/GET /api/v1/competitions/{competitionId}/questions`、
+  `GET /api/v1/competitions/{competitionId}/questions/{questionId}`、
+  `POST .../{questionId}/messages`、`PUT .../{questionId}/status` 和
+  `PUT .../{questionId}/publication`。所有端点使用 `ExecuteAsync`、最小
+  `Results<T...>` 与 `TypedResults`；业务规则在 Application use case，Endpoint 只负责
+  认证、授权、限流与传输映射。
+- 新问题、处理者回复和状态变化通过 Wolverine transactional outbox 向明确的人类收件人投递
+  永久通知，使用稳定 NotificationKind 与幂等键；通知投影只使用受控字段。用户删除影响预览
+  计入问题及消息历史，避免硬删除破坏咨询审计关系。
+- OpenAPI 已重新导出并生成 TypeScript SDK；共有 161 个注册端点，其中 160 个为文档化 v1
+  路由，另有 `GET /health`。两份 OpenAPI artifact 字节一致，SHA-256 均为
+  `FE9BCDEF738A3E792DF6A84A89F7AFEFA81AD6C8BB3CE2575C2FCB4F131F6A21`。
+  SDK 连续生成字节稳定：index
+  `166B6BC2B9F25A8B2FDE0B885988E245CA032E307DBE6C027DBD3930F9251EAB`，
+  sdk `4A2562E144F891472047CCE61B9531A9D515F7731BF4532836E048A25F0D9440`，
+  types `40940703794B9B324FFD27BBDED45F78FE6E26D99273CC1C981D1EF3AA8AE0F6`。
+- 前端只通过生成 SDK 和 `questionApi` 薄封装调用接口。比赛工作区增加“平台咨询”，题目弹窗
+  增加“咨询出题人”；两处均显示“默认私密”、敏感信息警告及使用 Hint/平台公告公开回答的
+  引导，保持 Pixel Industrial 风格与中英文文案。
+- 浏览器验收同时发现旧 `awdp-screen` 命名路由已在历史提交中删除，但比赛工作区仍渲染
+  RouterLink，导致任意响应式更新抛错并表现为标签页/按钮无响应。本提交删除该废弃入口，没有
+  复活旧方案，并增加源契约回归测试防止重新引入。
+- 最终验证：solution build 0 warning/0 error；569/569 non-Integration passed；HTTP 咨询限流
+  1/1 passed；EF `has-pending-model-changes` 无漂移（本机全局 EF CLI 8.0.11 对 runtime
+  10.0.4 仅给出版本提示）。真实 PostgreSQL 咨询持久化/权限/公开匿名化/outbox/幂等目标用例
+  在全套后独立重跑 1/1 passed。
+- 全量 Integration 共 142 项：138 passed、2 skipped、2 failed。Skipped 为未配置
+  Kubernetes 与 Libvirt 目标环境；两项失败均是仓库既有高并发 advisory-lock waiter 采样
+  不稳定：KoH 期望 2、观测 1，Patch/Fix 期望 2、观测 0，不涉及本阶段咨询模型。关键咨询
+  PostgreSQL 用例随后独立重跑通过。
+- Frontend production build passed，`bun test` 162/162，咨询、通知与回归文件 scoped
+  ESLint 0 warning/0 error，`git diff --check` passed。全量 ESLint 仍有约 9,993 项
+  generated/vendor/旧文件基线问题，未执行全局 `--fix`。
+- 使用内置浏览器与显式启用的临时本地 Mock 完成实际验收：平台私密咨询可创建并进入详情；
+  题目弹窗正常展示“咨询出题人”、已有私密问答与 Hint/公告引导；控制台 0 error。临时 Mock、
+  浏览器标签和本地 Vite 监听均已清理，仓库没有残留验收数据。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2362,6 +2421,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 独立 `/profile`、后端邮箱投影、TokenVersion 改密失效和受控头像解码/重编码。
 - MailKit 双正文 SMTP 投递、显式 TLS 安全模式、可选认证和稳定脱敏失败契约。
 - 排行榜 Normal/Frozen/Blackout、精确 cutoff、可信角色/BOT 服务端投影、自动揭榜及前端空态。
+- 默认私密的题目/平台咨询、强类型状态与权限、Wolverine 通知和可选匿名公开回答。
 
 当前尚未执行的交付边界：
 
@@ -2369,24 +2429,25 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
-- `809f825`、`dbf534a`、`bf3d393` 及各自 HANDOFF 提交是当前任务新增的本地提交，明确未
-  push、未部署；历史 push 授权不覆盖本阶段“未经授权不得 push/deploy”的要求。
+- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef` 及各自 HANDOFF 提交是当前任务新增的
+  本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
+  push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
   不属于剩余工作。
 
 ## 7. 建议的下一交接顺序
 
-最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP 和 P1 排行榜冻结/黑灯
-已分别由 6.49、6.50、6.51 完成；下一阶段是 P1“选手与出题人交流”：
+最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯和
+P1 选手与出题人交流已分别由 6.49 至 6.52 完成；下一阶段是 P1“单比赛独立日志”：
 
-1. 先审计 CompetitionChallenge、Challenge 模板所有权、现有通知/outbox、审计和权限模型；
-   不重复已有通知能力，不把问答塞进平台运行日志或通用模型文件。
-2. 在创建数据模型或 migration 前必须用 `$grill-me` 确认：问题默认私密还是公开、是否允许
-   附件、是否匿名，以及公开回复是否需要审批。等待答复时只推进不依赖这些语义的只读审计。
-3. 问题必须关联 CompetitionChallenge、提问队伍、用户和可选 Submission，禁止把明文 Flag
-   复制进消息正文；状态使用 Pending/Replied/Resolved/Closed 等强类型枚举并审计转换。
-4. 处理权限为 Challenge 出题人及比赛 Owner/Manager/Judge，Observer 默认只读；回复通知通过
-   Wolverine transactional outbox 保证一致与幂等，并补齐长度/频率/垃圾信息保护。
+1. 先审计现有 Competition 生命周期审计、提交/计分事实、Runtime 事件、平台日志和管理员审计，
+   明确哪些事实可以投影，避免把单比赛日志与平台运行日志或管理员审计混为一个页面。
+2. 在创建表或 migration 前必须用 `$grill-me` 确认 TODO 中尚未决定的存储语义：采用不可变
+   独立事件表还是从既有事实表投影，以及保留期限、导出范围和删除策略。未经确认不得新增表。
+3. 访问权限、可见事件类型、Flag 脱敏边界和分页/实时策略必须使用强类型契约；普通比赛日志
+   不输出明文 Flag、Token、密码、邀请令牌、SMTP 密码或容器秘密。
+4. 复用现有实时通道、签名 keyset 分页和 generated SDK 边界，不手拼 URL、DTO、枚举、游标或
+   SignalR 路径；若现有事实足以投影，优先不引入新的业务表。
 5. 阶段完成后运行 build/test/EF/OpenAPI/Frontend 与浏览器门禁，做独立功能提交并单独提交
    HANDOFF。未经新任务明确授权，继续不 push、不部署。
 
@@ -2434,8 +2495,8 @@ Docker port mapping，host port 固定请求 `0`。
    使用 6.41 至 6.44；Runtime cleanup/replacement/quota 使用 6.45 至 6.47；CTF 排行榜
    三血契约使用 6.48；个人资料、邮箱可见性、头像安全和改密失效使用 6.49；MailKit、显式
    TLS 模式、可选 SMTP 认证和脱敏失败使用 6.50；排行榜冻结、黑灯、BOT/通知边界使用
-   6.51。下一纵切按 `TODO.md` 进入“选手与出题人交流”，不要回滚或重做 `/profile`、SMTP
-   或排行榜可见性。
+   6.51；默认私密咨询、可选匿名公开回答和通知使用 6.52。下一纵切按 `TODO.md` 进入
+   “单比赛独立日志”，不要回滚或重做 `/profile`、SMTP、排行榜可见性或咨询。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
