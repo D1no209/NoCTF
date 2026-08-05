@@ -1,10 +1,17 @@
+using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
+
+public sealed class SmtpSecurityModeJsonConverter()
+    : JsonStringEnumConverter<SmtpSecurityMode>(
+        namingPolicy: null,
+        allowIntegerValues: false);
 
 public sealed class UpdateEmailVerificationConfigurationRequest
 {
@@ -14,7 +21,8 @@ public sealed class UpdateEmailVerificationConfigurationRequest
     public required int ResendCooldownSeconds { get; set; }
     public required string SmtpHost { get; set; }
     public required int SmtpPort { get; set; }
-    public required bool SmtpEnableSsl { get; set; }
+    [JsonConverter(typeof(SmtpSecurityModeJsonConverter))]
+    public required SmtpSecurityMode SmtpSecurityMode { get; set; }
     public required string SmtpUserName { get; set; }
     public required string SmtpFromAddress { get; set; }
     public required string SmtpFromName { get; set; }
@@ -71,7 +79,7 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
             request.ResendCooldownSeconds,
             request.SmtpHost,
             request.SmtpPort,
-            request.SmtpEnableSsl,
+            request.SmtpSecurityMode,
             request.SmtpUserName,
             request.SmtpFromAddress,
             request.SmtpFromName,

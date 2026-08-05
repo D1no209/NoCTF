@@ -682,7 +682,7 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
     resendCooldownSeconds?: number;
     smtpHost?: string;
     smtpPort?: number;
-    smtpEnableSsl?: boolean;
+    smtpSecurityMode?: NoCtfDomainIdentitySmtpSecurityMode;
     smtpUserName?: string;
     smtpPasswordConfigured?: boolean;
     smtpFromAddress?: string;
@@ -691,6 +691,8 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
     revision?: number;
     updatedAt?: string;
 };
+
+export type NoCtfDomainIdentitySmtpSecurityMode = 'None' | 'SslOnConnect' | 'StartTls';
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse = {
     name?: string;
@@ -798,7 +800,7 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfig
     resendCooldownSeconds: number;
     smtpHost: string;
     smtpPort: number;
-    smtpEnableSsl: boolean;
+    smtpSecurityMode: NoCtfDomainIdentitySmtpSecurityMode;
     smtpUserName: string;
     smtpFromAddress: string;
     smtpFromName: string;

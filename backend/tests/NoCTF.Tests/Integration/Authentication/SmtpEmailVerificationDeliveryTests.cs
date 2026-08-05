@@ -1,0 +1,478 @@
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Configurations;
+using DotNet.Testcontainers.Containers;
+using MailKit;
+using MailKit.Net.Imap;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
+using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Domain.Identity;
+using NoCTF.Infrastructure.Authentication;
+
+namespace NoCTF.Tests.Integration.Authentication;
+
+[Category("Integration")]
+[NotInParallel]
+public sealed class SmtpEmailVerificationDeliveryTests
+{
+    private const ushort SmtpPort = 3025;
+    private const ushort SmtpsPort = 3465;
+    private const ushort ImapPort = 3143;
+    private const ushort MailpitSmtpPort = 1025;
+    private static readonly Guid UserId = Guid.Parse("62a0c83d-3249-43f7-af40-e9fc79df7712");
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task GreenMail_accepts_StartTls_and_SslOnConnect_with_utf8_alternative_bodies(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            using var tlsMaterial = new TemporaryTlsMaterial();
+            await using var mailpit = BuildMailpit(tlsMaterial.DirectoryPath);
+            await mailpit.StartAsync(cancellationToken);
+            var startTls = Configuration(
+                mailpit.GetMappedPublicPort(MailpitSmtpPort),
+                SmtpSecurityMode.StartTls,
+                string.Empty,
+                null);
+            var firstState = await CreateDelivery(startTls).SendVerificationAsync(
+                UserId,
+                "token-one",
+                cancellationToken);
+            await Assert.That(firstState).IsEqualTo(EmailVerificationDeliveryState.Sent);
+
+            await using var greenMail = BuildGreenMail(authenticationDisabled: false);
+            await greenMail.StartAsync(cancellationToken);
+            var sslOnConnect = Configuration(
+                greenMail.GetMappedPublicPort(SmtpsPort),
+                SmtpSecurityMode.SslOnConnect,
+                "mailer",
+                "secret");
+            var secondState = await CreateDelivery(sslOnConnect).SendVerificationAsync(
+                UserId,
+                "token-two",
+                cancellationToken);
+            await Assert.That(secondState).IsEqualTo(EmailVerificationDeliveryState.Sent);
+
+            var messages = await ReadMessagesAsync(greenMail, cancellationToken);
+            await Assert.That(messages.Count).IsEqualTo(1);
+            await Assert.That(messages[0].TextBody).Contains("你好-admin");
+            await Assert.That(messages[0].TextBody).Contains("token-two");
+            await Assert.That(messages[0].HtmlBody).Contains("verify-email?token=token-two");
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task GreenMail_accepts_no_authentication_and_reports_authentication_failure(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using (var openRelay = BuildGreenMail(authenticationDisabled: true))
+            {
+                await openRelay.StartAsync(cancellationToken);
+                var configuration = Configuration(
+                    openRelay.GetMappedPublicPort(SmtpPort),
+                    SmtpSecurityMode.None,
+                    string.Empty,
+                    null);
+
+                var state = await CreateDelivery(configuration).SendTestAsync(
+                    UserId,
+                    cancellationToken);
+
+                await Assert.That(state).IsEqualTo(EmailVerificationDeliveryState.Sent);
+            }
+
+            await using var authenticated = BuildGreenMail(authenticationDisabled: false);
+            await authenticated.StartAsync(cancellationToken);
+            var invalidCredentials = Configuration(
+                authenticated.GetMappedPublicPort(SmtpsPort),
+                SmtpSecurityMode.SslOnConnect,
+                "mailer",
+                "wrong-secret");
+
+            var exception = await CaptureDeliveryFailureAsync(() =>
+                CreateDelivery(invalidCredentials).SendTestAsync(UserId, cancellationToken));
+
+            await Assert.That(exception.Failure)
+                .IsEqualTo(EmailVerificationDeliveryFailure.AuthenticationFailed);
+            await Assert.That(exception.ToString()).DoesNotContain("wrong-secret");
+            await Assert.That(exception.ToString()).DoesNotContain("mailer");
+        });
+    }
+
+    [Test]
+    [Timeout(30_000)]
+    public async Task Timeout_cancellation_connection_and_rejection_results_are_stable(
+        CancellationToken cancellationToken)
+    {
+        await using (var stalled = new StalledSmtpServer())
+        {
+            var timedOut = await CaptureDeliveryFailureAsync(() =>
+                CreateDelivery(Configuration(
+                    stalled.Port,
+                    SmtpSecurityMode.None,
+                    string.Empty,
+                    null) with { SmtpTimeoutSeconds = 1 })
+                    .SendTestAsync(UserId, cancellationToken));
+            await Assert.That(timedOut.Failure)
+                .IsEqualTo(EmailVerificationDeliveryFailure.TimedOut);
+        }
+
+        await using (var stalled = new StalledSmtpServer())
+        {
+            using var cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken);
+            cancellationSource.CancelAfter(TimeSpan.FromMilliseconds(100));
+            var canceled = false;
+            try
+            {
+                await CreateDelivery(Configuration(
+                    stalled.Port,
+                    SmtpSecurityMode.None,
+                    string.Empty,
+                    null) with { SmtpTimeoutSeconds = 30 })
+                    .SendTestAsync(UserId, cancellationSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                canceled = true;
+            }
+
+            await Assert.That(canceled).IsTrue();
+        }
+
+        var unavailablePort = ReserveUnavailablePort();
+        var connectionFailure = await CaptureDeliveryFailureAsync(() =>
+            CreateDelivery(Configuration(
+                unavailablePort,
+                SmtpSecurityMode.None,
+                string.Empty,
+                null)).SendTestAsync(UserId, cancellationToken));
+        await Assert.That(connectionFailure.Failure)
+            .IsEqualTo(EmailVerificationDeliveryFailure.ConnectionFailed);
+
+        await using var rejecting = new RejectingSmtpServer();
+        var rejection = await CaptureDeliveryFailureAsync(() =>
+            CreateDelivery(Configuration(
+                rejecting.Port,
+                SmtpSecurityMode.None,
+                string.Empty,
+                null)).SendTestAsync(UserId, cancellationToken));
+        await Assert.That(rejection.Failure)
+            .IsEqualTo(EmailVerificationDeliveryFailure.MessageRejected);
+    }
+
+    private static IContainer BuildGreenMail(bool authenticationDisabled)
+    {
+        var options = "-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 "
+            + "-Dgreenmail.users=mailer:secret@noctf.test,admin:admin-secret@noctf.test "
+            + "-Dgreenmail.users.login=local_part";
+        if (authenticationDisabled)
+            options += " -Dgreenmail.auth.disabled";
+
+        return new ContainerBuilder("greenmail/standalone:2.1.11")
+            .WithEnvironment("GREENMAIL_OPTS", options)
+            .WithPortBinding(SmtpPort, true)
+            .WithPortBinding(SmtpsPort, true)
+            .WithPortBinding(ImapPort, true)
+            .WithWaitStrategy(Wait.ForUnixContainer()
+                .UntilInternalTcpPortIsAvailable(SmtpPort)
+                .UntilInternalTcpPortIsAvailable(SmtpsPort)
+                .UntilInternalTcpPortIsAvailable(ImapPort))
+            .Build();
+    }
+
+    private static IContainer BuildMailpit(string tlsDirectory) =>
+        new ContainerBuilder("axllent/mailpit:v1.30.0")
+            .WithEnvironment("MP_DISABLE_VERSION_CHECK", "true")
+            .WithEnvironment("MP_SMTP_TLS_CERT", "/certs/cert.pem")
+            .WithEnvironment("MP_SMTP_TLS_KEY", "/certs/key.pem")
+            .WithEnvironment("MP_SMTP_REQUIRE_STARTTLS", "true")
+            .WithBindMount(tlsDirectory, "/certs", AccessMode.ReadOnly)
+            .WithPortBinding(MailpitSmtpPort, true)
+            .WithWaitStrategy(Wait.ForUnixContainer()
+                .UntilInternalTcpPortIsAvailable(MailpitSmtpPort))
+            .Build();
+
+    private static SmtpEmailVerificationDelivery CreateDelivery(
+        EmailVerificationDeliveryConfiguration configuration)
+    {
+        var configurationStore = Substitute.For<IEmailVerificationConfigurationStore>();
+        configurationStore.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(ConfigurationView(configuration));
+        var configurationReader = Substitute.For<IEmailVerificationDeliveryConfigurationReader>();
+        configurationReader.GetDeliveryConfigurationAsync(
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .Returns(configuration);
+        var users = Substitute.For<IUserAuthenticationStore>();
+        users.GetProfileAsync(UserId, Arg.Any<CancellationToken>())
+            .Returns(new UserProfile(
+                UserId,
+                "你好-admin",
+                "admin@noctf.test",
+                UserRole.Administrator,
+                UserKind.Human,
+                EmailVerified: true));
+        return new(
+            configurationStore,
+            configurationReader,
+            users,
+            new TrustedTestSmtpClientFactory(),
+            NullLogger<SmtpEmailVerificationDelivery>.Instance);
+    }
+
+    private static EmailVerificationDeliveryConfiguration Configuration(
+        int port,
+        SmtpSecurityMode securityMode,
+        string userName,
+        string? password) =>
+        new(
+            Enabled: true,
+            PublicBaseUrl: "https://noctf.test",
+            SmtpHost: "127.0.0.1",
+            SmtpPort: port,
+            SmtpSecurityMode: securityMode,
+            SmtpUserName: userName,
+            SmtpPassword: password,
+            SmtpFromAddress: "no-reply@noctf.test",
+            SmtpFromName: "NoCTF 测试",
+            SmtpTimeoutSeconds: 10);
+
+    private static EmailVerificationConfigurationView ConfigurationView(
+        EmailVerificationDeliveryConfiguration configuration) =>
+        new(
+            Enabled: configuration.Enabled,
+            PublicBaseUrl: configuration.PublicBaseUrl,
+            TokenLifetimeMinutes: 1440,
+            ResendCooldownSeconds: 60,
+            SmtpHost: configuration.SmtpHost,
+            SmtpPort: configuration.SmtpPort,
+            SmtpSecurityMode: configuration.SmtpSecurityMode,
+            SmtpUserName: configuration.SmtpUserName,
+            SmtpPasswordConfigured: configuration.SmtpPassword is not null,
+            SmtpFromAddress: configuration.SmtpFromAddress,
+            SmtpFromName: configuration.SmtpFromName,
+            SmtpTimeoutSeconds: configuration.SmtpTimeoutSeconds,
+            Revision: 1,
+            UpdatedAt: DateTimeOffset.UnixEpoch);
+
+    private static async Task<IReadOnlyList<MimeKit.MimeMessage>> ReadMessagesAsync(
+        IContainer greenMail,
+        CancellationToken cancellationToken)
+    {
+        using var client = new ImapClient
+        {
+            ServerCertificateValidationCallback = static (_, _, _, _) => true
+        };
+        await client.ConnectAsync(
+            "127.0.0.1",
+            greenMail.GetMappedPublicPort(ImapPort),
+            SecureSocketOptions.None,
+            cancellationToken);
+        await client.AuthenticateAsync("admin", "admin-secret", cancellationToken);
+        await client.Inbox.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
+        var messages = new List<MimeKit.MimeMessage>(client.Inbox.Count);
+        for (var index = 0; index < client.Inbox.Count; index++)
+            messages.Add(await client.Inbox.GetMessageAsync(index, cancellationToken));
+        await client.DisconnectAsync(true, cancellationToken);
+        return messages;
+    }
+
+    private static async Task<EmailVerificationDeliveryException> CaptureDeliveryFailureAsync(
+        Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (EmailVerificationDeliveryException exception)
+        {
+            return exception;
+        }
+
+        throw new InvalidOperationException("Expected email delivery to fail.");
+    }
+
+    private static int ReserveUnavailablePort()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    private sealed class TrustedTestSmtpClientFactory : IEmailVerificationSmtpClientFactory
+    {
+        public SmtpClient Create() =>
+            new()
+            {
+                ServerCertificateValidationCallback = static (_, _, _, _) => true
+            };
+    }
+
+    private sealed class TemporaryTlsMaterial : IDisposable
+    {
+        public TemporaryTlsMaterial()
+        {
+            DirectoryPath = Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-smtp-tls-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(DirectoryPath);
+            using var key = RSA.Create(2048);
+            var request = new CertificateRequest(
+                "CN=localhost",
+                key,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pkcs1);
+            request.CertificateExtensions.Add(new X509BasicConstraintsExtension(
+                certificateAuthority: false,
+                hasPathLengthConstraint: false,
+                pathLengthConstraint: 0,
+                critical: false));
+            request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(
+                request.PublicKey,
+                critical: false));
+            using var certificate = request.CreateSelfSigned(
+                DateTimeOffset.UtcNow.AddMinutes(-1),
+                DateTimeOffset.UtcNow.AddDays(1));
+            File.WriteAllText(
+                Path.Combine(DirectoryPath, "cert.pem"),
+                certificate.ExportCertificatePem());
+            File.WriteAllText(
+                Path.Combine(DirectoryPath, "key.pem"),
+                key.ExportPkcs8PrivateKeyPem());
+        }
+
+        public string DirectoryPath { get; }
+
+        public void Dispose() => Directory.Delete(DirectoryPath, recursive: true);
+    }
+
+    private sealed class StalledSmtpServer : IAsyncDisposable
+    {
+        private readonly CancellationTokenSource cancellationSource = new();
+        private readonly TcpListener listener = new(IPAddress.Loopback, 0);
+        private readonly Task serverTask;
+
+        public StalledSmtpServer()
+        {
+            listener.Start();
+            Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            serverTask = HoldConnectionAsync(cancellationSource.Token);
+        }
+
+        public int Port { get; }
+
+        public async ValueTask DisposeAsync()
+        {
+            await cancellationSource.CancelAsync();
+            listener.Stop();
+            await IgnoreCancellationAsync(serverTask);
+            cancellationSource.Dispose();
+        }
+
+        private async Task HoldConnectionAsync(CancellationToken cancellationToken)
+        {
+            using var client = await listener.AcceptTcpClientAsync(cancellationToken);
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+        }
+    }
+
+    private sealed class RejectingSmtpServer : IAsyncDisposable
+    {
+        private readonly CancellationTokenSource cancellationSource = new();
+        private readonly TcpListener listener = new(IPAddress.Loopback, 0);
+        private readonly Task serverTask;
+
+        public RejectingSmtpServer()
+        {
+            listener.Start();
+            Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            serverTask = RejectRecipientAsync(cancellationSource.Token);
+        }
+
+        public int Port { get; }
+
+        public async ValueTask DisposeAsync()
+        {
+            await cancellationSource.CancelAsync();
+            listener.Stop();
+            await IgnoreCancellationAsync(serverTask);
+            cancellationSource.Dispose();
+        }
+
+        private async Task RejectRecipientAsync(CancellationToken cancellationToken)
+        {
+            using var client = await listener.AcceptTcpClientAsync(cancellationToken);
+            await using var stream = client.GetStream();
+            using var reader = new StreamReader(
+                stream,
+                Encoding.UTF8,
+                detectEncodingFromByteOrderMarks: false,
+                leaveOpen: true);
+            await using var writer = new StreamWriter(
+                stream,
+                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+                leaveOpen: true)
+            {
+                AutoFlush = true,
+                NewLine = "\r\n"
+            };
+            await writer.WriteLineAsync("220 smtp.noctf.test ESMTP");
+            while (await reader.ReadLineAsync(cancellationToken) is { } command)
+            {
+                if (command.StartsWith("EHLO", StringComparison.OrdinalIgnoreCase))
+                {
+                    await writer.WriteLineAsync("250-smtp.noctf.test");
+                    await writer.WriteLineAsync("250 PIPELINING");
+                }
+                else if (command.StartsWith("HELO", StringComparison.OrdinalIgnoreCase)
+                    || command.StartsWith("MAIL FROM", StringComparison.OrdinalIgnoreCase))
+                {
+                    await writer.WriteLineAsync("250 OK");
+                }
+                else if (command.StartsWith("RCPT TO", StringComparison.OrdinalIgnoreCase))
+                {
+                    await writer.WriteLineAsync("550 mailbox unavailable");
+                }
+                else if (command.StartsWith("QUIT", StringComparison.OrdinalIgnoreCase))
+                {
+                    await writer.WriteLineAsync("221 bye");
+                    return;
+                }
+                else
+                {
+                    await writer.WriteLineAsync("250 OK");
+                }
+            }
+        }
+    }
+
+    private static async Task IgnoreCancellationAsync(Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (SocketException)
+        {
+        }
+    }
+}

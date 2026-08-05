@@ -1,5 +1,6 @@
 using NSubstitute;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -18,6 +19,29 @@ public sealed class EmailVerificationConfigurationManagementTests
         await Assert.That(result.Errors).Contains(EmailVerificationConfigurationError.SmtpPasswordRequired);
         await store.DidNotReceive().UpdateAsync(
             Arg.Any<UpdateEmailVerificationConfigurationCommand>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task Enabling_without_an_smtp_username_does_not_require_a_password()
+    {
+        var store = Substitute.For<IEmailVerificationConfigurationStore>();
+        store.GetAsync(Arg.Any<CancellationToken>()).Returns(Configuration(passwordConfigured: false));
+        store.UpdateAsync(
+                Arg.Any<UpdateEmailVerificationConfigurationCommand>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Configuration(passwordConfigured: false) with { Revision = 4 });
+        var manage = new ManageEmailVerificationConfiguration(store);
+
+        var result = await manage.UpdateAsync(Command(enabled: true) with
+        {
+            SmtpUserName = string.Empty
+        });
+
+        await Assert.That(result.State).IsEqualTo(EmailVerificationConfigurationUpdateState.Updated);
+        await store.Received(1).UpdateAsync(
+            Arg.Is<UpdateEmailVerificationConfigurationCommand>(command =>
+                command != null && command.SmtpUserName == string.Empty),
             Arg.Any<CancellationToken>());
     }
 
@@ -53,7 +77,7 @@ public sealed class EmailVerificationConfigurationManagementTests
             ResendCooldownSeconds: 60,
             SmtpHost: "smtp.example",
             SmtpPort: 587,
-            SmtpEnableSsl: true,
+            SmtpSecurityMode: SmtpSecurityMode.StartTls,
             SmtpUserName: "mailer",
             SmtpPasswordConfigured: passwordConfigured,
             SmtpFromAddress: "no-reply@noctf.example",
@@ -70,7 +94,7 @@ public sealed class EmailVerificationConfigurationManagementTests
             ResendCooldownSeconds: 60,
             SmtpHost: "smtp.example",
             SmtpPort: 587,
-            SmtpEnableSsl: true,
+            SmtpSecurityMode: SmtpSecurityMode.StartTls,
             SmtpUserName: "mailer",
             SmtpFromAddress: "no-reply@noctf.example",
             SmtpFromName: "NoCTF",

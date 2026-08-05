@@ -11355,8 +11355,8 @@
             "type": "integer",
             "format": "int32"
           },
-          "smtpEnableSsl": {
-            "type": "boolean"
+          "smtpSecurityMode": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentitySmtpSecurityMode"
           },
           "smtpUserName": {
             "type": "string"
@@ -11383,6 +11383,20 @@
             "format": "date-time"
           }
         }
+      },
+      "NoCTFDomainIdentitySmtpSecurityMode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "None",
+          "SslOnConnect",
+          "StartTls"
+        ],
+        "enum": [
+          "None",
+          "SslOnConnect",
+          "StartTls"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformConfigurationResponse": {
         "type": "object",
@@ -11736,7 +11750,7 @@
           "resendCooldownSeconds",
           "smtpHost",
           "smtpPort",
-          "smtpEnableSsl",
+          "smtpSecurityMode",
           "smtpUserName",
           "smtpFromAddress",
           "smtpFromName",
@@ -11776,8 +11790,8 @@
             "maximum": 65535.0,
             "minimum": 1.0
           },
-          "smtpEnableSsl": {
-            "type": "boolean"
+          "smtpSecurityMode": {
+            "$ref": "#/components/schemas/NoCTFDomainIdentitySmtpSecurityMode"
           },
           "smtpUserName": {
             "type": "string",

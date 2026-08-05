@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -46,7 +45,7 @@ public sealed class SendEmailVerificationTestEndpoint(
                     })
             };
         }
-        catch (SmtpException)
+        catch (EmailVerificationDeliveryException exception)
         {
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status503ServiceUnavailable,
@@ -54,7 +53,8 @@ public sealed class SendEmailVerificationTestEndpoint(
                 detail: "Check the SMTP host, credentials, encryption mode, and network access.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "smtp_delivery_failed"
+                    ["code"] = "smtp_delivery_failed",
+                    ["failure"] = exception.Failure.ToString()
                 });
         }
     }

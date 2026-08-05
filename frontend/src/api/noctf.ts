@@ -38,6 +38,7 @@ import type {
   NoCtfapiEndpointsPlatformPublicPlatformConfigurationResponse,
   NoCtfapiEndpointsTeamsCreateTeamRequest,
   NoCtfapiEndpointsTeamsUpdateTeamRequest,
+  NoCtfDomainIdentitySmtpSecurityMode,
   NoCtfDomainIdentityUserRole,
 } from './generated/types.gen'
 import type { PublicSubmissionListItem } from './submissionPresentation'
@@ -1086,6 +1087,7 @@ export type PlatformUserDeletionOutcome
   = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode
 export type EmailVerificationConfiguration
   = NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse
+export type SmtpSecurityMode = NoCtfDomainIdentitySmtpSecurityMode
 
 export interface IssuedBotToken {
   accessToken: string

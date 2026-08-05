@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Domain.Identity;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Authentication;
@@ -42,9 +43,19 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 db,
                 new EmailVerificationSecretProtector(configuration));
             var initial = await store.GetAsync(cancellationToken);
+            await Assert.That(initial.SmtpSecurityMode)
+                .IsEqualTo(SmtpSecurityMode.StartTls);
+            await db.EmailVerificationSettings.ExecuteUpdateAsync(setters => setters
+                .SetProperty(settings => settings.SmtpPort, 465)
+                .SetProperty(settings => settings.SmtpEnableSsl, true)
+                .SetProperty(settings => settings.SmtpSecurityMode, (SmtpSecurityMode?)null),
+                cancellationToken);
+            var legacy = await store.GetAsync(cancellationToken);
+            await Assert.That(legacy.SmtpSecurityMode)
+                .IsEqualTo(SmtpSecurityMode.SslOnConnect);
 
             var passwordUpdated = await store.ReplacePasswordAsync(
-                initial.Revision,
+                legacy.Revision,
                 "smtp-secret",
                 DateTimeOffset.UtcNow,
                 cancellationToken);
@@ -60,7 +71,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 ResendCooldownSeconds: 45,
                 SmtpHost: "smtp.example",
                 SmtpPort: 587,
-                SmtpEnableSsl: true,
+                SmtpSecurityMode: SmtpSecurityMode.SslOnConnect,
                 SmtpUserName: "mailer",
                 SmtpFromAddress: "no-reply@noctf.example",
                 SmtpFromName: "NoCTF",
@@ -74,6 +85,8 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 cancellationToken);
             await Assert.That(delivery).IsNotNull();
             await Assert.That(delivery!.SmtpPassword).IsEqualTo("smtp-secret");
+            await Assert.That(delivery.SmtpSecurityMode)
+                .IsEqualTo(SmtpSecurityMode.SslOnConnect);
 
             var staleUpdate = await store.UpdateAsync(new(
                 Enabled: false,
@@ -82,7 +95,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 ResendCooldownSeconds: 45,
                 SmtpHost: "smtp.example",
                 SmtpPort: 587,
-                SmtpEnableSsl: true,
+                SmtpSecurityMode: SmtpSecurityMode.StartTls,
                 SmtpUserName: "mailer",
                 SmtpFromAddress: "no-reply@noctf.example",
                 SmtpFromName: "NoCTF",

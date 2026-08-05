@@ -35,6 +35,9 @@ internal static class AuthenticationInfrastructure
             provider.GetRequiredService<EmailVerificationConfigurationStore>());
         services.AddScoped<IEmailVerificationDeliveryConfigurationReader>(provider =>
             provider.GetRequiredService<EmailVerificationConfigurationStore>());
+        services.AddSingleton<
+            IEmailVerificationSmtpClientFactory,
+            EmailVerificationSmtpClientFactory>();
         services.AddScoped<IEmailVerificationDelivery, SmtpEmailVerificationDelivery>();
         services.AddScoped<ManageEmailVerificationConfiguration>();
         services.AddScoped<SendEmailVerificationTest>();

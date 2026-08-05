@@ -1,6 +1,8 @@
+using System.Text.Json.Serialization;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -11,7 +13,8 @@ public sealed record EmailVerificationConfigurationResponse(
     int ResendCooldownSeconds,
     string SmtpHost,
     int SmtpPort,
-    bool SmtpEnableSsl,
+    [property: JsonConverter(typeof(SmtpSecurityModeJsonConverter))]
+    SmtpSecurityMode SmtpSecurityMode,
     string SmtpUserName,
     bool SmtpPasswordConfigured,
     string SmtpFromAddress,
@@ -31,7 +34,7 @@ internal static class EmailVerificationConfigurationMapping
             configuration.ResendCooldownSeconds,
             configuration.SmtpHost,
             configuration.SmtpPort,
-            configuration.SmtpEnableSsl,
+            configuration.SmtpSecurityMode,
             configuration.SmtpUserName,
             configuration.SmtpPasswordConfigured,
             configuration.SmtpFromAddress,
