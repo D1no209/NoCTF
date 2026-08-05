@@ -6,7 +6,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { notificationApi } from '@/api/noctf'
-import { nextNotificationPageParam } from '@/api/notificationPresentation'
+import { nextNotificationPageParam, NotificationKind } from '@/api/notificationPresentation'
 import { queryKeys } from '@/api/queryKeys'
 import { Button } from '@/components/ui/button'
 import {
@@ -56,6 +56,20 @@ watch(open, (isOpen) => {
 
 async function selectNotification(notification: PublicNotification) {
   open.value = false
+  if (notification.kind === NotificationKind.DataExportReady
+    || notification.kind === NotificationKind.DataExportFailed) {
+    if (notification.competitionId) {
+      await router.push({
+        name: 'admin-competition-detail',
+        params: { id: notification.competitionId },
+        query: { section: 'exports' },
+      })
+    }
+    else {
+      await router.push({ name: 'admin-platform-logs', query: { tab: 'audit' } })
+    }
+    return
+  }
   if (notification.competitionId)
     await router.push(`/competitions/${notification.competitionId}`)
 }

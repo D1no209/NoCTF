@@ -230,7 +230,7 @@ export type NoCtfapiEndpointsNotificationsNotificationResponse = {
     createdAt?: string;
 };
 
-export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
 
 export type NoCtfapiEndpointsNotificationsListNotificationsRequest = {
     [key: string]: never;
@@ -382,7 +382,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfDomainCompetitionsEventsCompetitionEventKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42;
+export type NoCtfDomainCompetitionsEventsCompetitionEventKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43;
 
 export type NoCtfDomainCompetitionsEventsCompetitionEventLevel = 0 | 1 | 2;
 
@@ -1053,6 +1053,40 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest
 export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
     file: Blob | File;
     expectedRevision: number;
+};
+
+export type NoCtfapiEndpointsAdministrationDataExportsDataExportResponse = {
+    id?: string;
+    scope?: NoCtfDomainDataExportsDataExportScope;
+    competitionId?: string | null;
+    requestedByUserId?: string;
+    requestedAt?: string;
+    includeProtectedFlags?: boolean;
+    reason?: string | null;
+    status?: NoCtfDomainDataExportsDataExportStatus;
+    startedAt?: string | null;
+    completedAt?: string | null;
+    expiresAt?: string | null;
+    fileName?: string | null;
+    length?: number | null;
+    sha256?: string | null;
+    failureCode?: NoCtfDomainDataExportsDataExportFailureCode | null;
+    failureDetail?: string | null;
+};
+
+export type NoCtfDomainDataExportsDataExportScope = 0 | 1;
+
+export type NoCtfDomainDataExportsDataExportStatus = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfDomainDataExportsDataExportFailureCode = 0 | 1 | 2 | 3;
+
+export type NoCtfapiEndpointsAdministrationDataExportsCreateCompetitionDataExportRequest = {
+    includeProtectedFlags?: boolean;
+    reason?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationDataExportsDataExportListResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationDataExportsDataExportResponse>;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse = {
@@ -4968,6 +5002,160 @@ export type AdminPlatformUploadLogoResponses = {
 };
 
 export type AdminPlatformUploadLogoResponse = AdminPlatformUploadLogoResponses[keyof AdminPlatformUploadLogoResponses];
+
+export type AdminListCompetitionDataExportsData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/data-exports';
+};
+
+export type AdminListCompetitionDataExportsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminListCompetitionDataExportsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationDataExportsDataExportListResponse;
+};
+
+export type AdminListCompetitionDataExportsResponse = AdminListCompetitionDataExportsResponses[keyof AdminListCompetitionDataExportsResponses];
+
+export type AdminCreateCompetitionDataExportData = {
+    body: NoCtfapiEndpointsAdministrationDataExportsCreateCompetitionDataExportRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/data-exports';
+};
+
+export type AdminCreateCompetitionDataExportErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse;
+};
+
+export type AdminCreateCompetitionDataExportError = AdminCreateCompetitionDataExportErrors[keyof AdminCreateCompetitionDataExportErrors];
+
+export type AdminCreateCompetitionDataExportResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse;
+};
+
+export type AdminCreateCompetitionDataExportResponse = AdminCreateCompetitionDataExportResponses[keyof AdminCreateCompetitionDataExportResponses];
+
+export type AdminListPlatformAuditDataExportsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/audit-logs/data-exports';
+};
+
+export type AdminListPlatformAuditDataExportsErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminListPlatformAuditDataExportsResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationDataExportsDataExportListResponse;
+};
+
+export type AdminListPlatformAuditDataExportsResponse = AdminListPlatformAuditDataExportsResponses[keyof AdminListPlatformAuditDataExportsResponses];
+
+export type AdminCreatePlatformAuditDataExportData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/audit-logs/data-exports';
+};
+
+export type AdminCreatePlatformAuditDataExportErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    409: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse;
+};
+
+export type AdminCreatePlatformAuditDataExportError = AdminCreatePlatformAuditDataExportErrors[keyof AdminCreatePlatformAuditDataExportErrors];
+
+export type AdminCreatePlatformAuditDataExportResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse;
+};
+
+export type AdminCreatePlatformAuditDataExportResponse = AdminCreatePlatformAuditDataExportResponses[keyof AdminCreatePlatformAuditDataExportResponses];
+
+export type AdminDownloadDataExportData = {
+    body?: never;
+    path: {
+        dataExportId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/data-exports/{dataExportId}/download';
+};
+
+export type AdminDownloadDataExportErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
 
 export type AdminListCompetitionsData = {
     body?: never;

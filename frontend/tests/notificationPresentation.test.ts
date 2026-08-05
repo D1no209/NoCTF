@@ -115,6 +115,21 @@ describe('notification presentation', () => {
       bodyKey: 'notifications.events.teamBanCorrected.body',
       bodyParams: { team: 'Snow' },
     })
+    expect(notificationCopy(createNotification(
+      NotificationKind.DataExportReady,
+      { fileName: 'competition.zip', objectKey: 'must not render' },
+    ))).toEqual({
+      titleKey: 'notifications.events.dataExportReady.title',
+      bodyKey: 'notifications.events.dataExportReady.body',
+      bodyParams: { file: 'competition.zip' },
+    })
+    expect(notificationCopy(createNotification(
+      NotificationKind.DataExportFailed,
+      { failureDetail: 'must not render' },
+    ))).toEqual({
+      titleKey: 'notifications.events.dataExportFailed.title',
+      bodyKey: 'notifications.events.dataExportFailed.body',
+    })
   })
 
   test('uses safe fallback copy for a future unsupported kind', () => {

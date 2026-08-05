@@ -74,6 +74,12 @@ export function notificationCopy(notification: PublicNotification): Notification
       return copy('teamBanCorrected', {
         team: readPayloadString(notification.payload, 'teamName'),
       })
+    case NotificationKind.DataExportReady:
+      return copy('dataExportReady', {
+        file: readPayloadString(notification.payload, 'fileName'),
+      })
+    case NotificationKind.DataExportFailed:
+      return copy('dataExportFailed')
     default:
       return copy('unknown')
   }
