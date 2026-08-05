@@ -153,6 +153,9 @@ git log --oneline 003b75c..2c6b4ce -- backend
 22. GitOps 采用方案 A：平台 Bot 是普通 `UserKind.Bot` Organizer，令牌是普通 Access
     JWT；同步逐个调用既有细粒度管理 API。Manifest UUID 是稳定资源身份，删除后可通过
     `includeDeleted` 找回并恢复。不增加 Repository 专用身份、专用 JWT 或原子 bundle API。
+23. 2026-08-06 用户明确决定 Administrator MFA 暂缓。不得创建 TOTP/Passkey/WebAuthn 模型、
+    migration、Token claim、认证分流或前端页面，也不得再次为本轮追问其产品语义；只有用户以后
+    明确恢复该范围时才重新审计。TODO 第 8 节应跳到数据导出。
 
 ## 4. 2026-07-28 至 2026-07-31 早期门禁历史
 
@@ -2663,14 +2666,14 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 
 最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
 P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
-6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成。下一阶段继续
-TODO 第 8 节后续安全与运维待办：
+6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成。Administrator
+MFA 已由用户明确暂缓。下一阶段继续 TODO 第 8 节后续安全与运维待办：
 
-1. 先审计 Administrator TOTP/Passkey 二次验证的现有模型与真实缺口。TOTP 与 Passkey 的首发
-   范围、恢复码、强制策略、敏感操作 step-up 和凭据撤销语义会改变安全产品边界，必须先使用
-   `$grill-me`，不得自行混合两套协议。
+1. 跳过 Administrator MFA，先审计“比赛、提交、计分、反作弊和审计数据导出”已有端点、权限、
+   格式和真实缺口。优先复用既有不可变事实与生成 SDK，不复制 `competition_events` 或管理审计。
 2. 不重做平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、导出或管理审计
-   投影，也不重做忘记密码流程；单比赛永久事实仍以 `competition_events` 为唯一来源。
+   投影，也不重做忘记密码流程；单比赛永久事实仍以 `competition_events` 为唯一来源。未经用户
+   后续明确恢复范围，不实现或重新规划 Administrator MFA。
 3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
 4. 未经新任务明确授权，继续不 push、不部署。
@@ -2723,9 +2726,9 @@ Docker port mapping，host port 固定请求 `0`。
    导出、Flag 审计和实时刷新使用 6.53；跨队 Flag 检测、事件派生裁决、受审计证据、封禁和
    更正使用 6.54；管理员平台日志保留、筛选、签名分页、导出和投影审计使用 6.55；忘记密码
    流程以 6.56 的 hash-only Token、枚举防护、双层限流、全会话失效、密码变更通知和恢复前端为准。
-   下一纵切按 `TODO.md` 第 8 节审计 Administrator TOTP/Passkey 二次验证，并先使用
-   `$grill-me` 固定安全产品边界；不要回滚或重做 `/profile`、SMTP、排行榜可见性、咨询、比赛
-   日志、反作弊、平台日志或忘记密码流程。
+   Administrator MFA 已由用户明确暂缓，不得继续实现或追问。下一纵切按 `TODO.md` 第 8 节
+   审计比赛、提交、计分、反作弊和审计数据导出；不要回滚或重做 `/profile`、SMTP、排行榜
+   可见性、咨询、比赛日志、反作弊、平台日志或忘记密码流程。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
