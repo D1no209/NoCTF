@@ -24,6 +24,7 @@ describe('platform logs', () => {
   test('uses only generated strongly typed platform operations', () => {
     for (const operation of [
       'adminPlatformListLogs',
+      'adminPlatformExportLogs',
       'adminPlatformListAuditLogs',
       'adminPlatformListDeadLetters',
       'adminPlatformRequeueDeadLetter',
@@ -33,6 +34,7 @@ describe('platform logs', () => {
     }
 
     expect(generatedTypes).toContain('url: \'/api/v1/admin/platform/logs\'')
+    expect(generatedTypes).toContain('url: \'/api/v1/admin/platform/logs/export\'')
     expect(generatedTypes).toContain('url: \'/api/v1/admin/platform/audit-logs\'')
     expect(apiSource).not.toMatch(/https?:\/\//)
   })
@@ -55,22 +57,55 @@ describe('platform logs', () => {
       level: 4,
       competitionId: 'competition-id',
       runtimeInstanceId: 'runtime-id',
+      teamId: 'team-id',
+      userId: 'user-id',
+      competitionChallengeId: 'challenge-id',
+      submissionId: 'submission-id',
+      category: 'NoCTF.Runner',
+      eventName: 'RuntimeFailed',
+      message: 'Container startup failed',
     }
-    expect(matchesPlatformLog(log, {
+    const filter = {
       minimumLevel: 3,
       service: 2,
       from: '2026-08-05T09:00:00Z',
       to: '2026-08-05T11:00:00Z',
+      category: 'NoCTF.Runner',
+      search: 'STARTUP FAILED',
       competitionId: 'competition-id',
       runtimeInstanceId: 'runtime-id',
-    })).toBe(true)
+      teamId: 'team-id',
+      userId: 'user-id',
+      competitionChallengeId: 'challenge-id',
+      submissionId: 'submission-id',
+    } as const
+    expect(matchesPlatformLog(log, filter)).toBe(true)
+    expect(matchesPlatformLog(log, { ...filter, category: 'noctf.runner' })).toBe(true)
+    for (const [key, value] of [
+      ['category', 'another-category'],
+      ['search', 'not-present'],
+      ['competitionId', 'another-competition'],
+      ['runtimeInstanceId', 'another-runtime'],
+      ['teamId', 'another-team'],
+      ['userId', 'another-user'],
+      ['competitionChallengeId', 'another-challenge'],
+      ['submissionId', 'another-submission'],
+    ] as const) {
+      expect(matchesPlatformLog(log, { ...filter, [key]: value })).toBe(false)
+    }
     expect(matchesPlatformLog(log, {
       minimumLevel: 5,
       service: null,
       from: null,
       to: null,
+      category: null,
+      search: null,
       competitionId: null,
       runtimeInstanceId: null,
+      teamId: null,
+      userId: null,
+      competitionChallengeId: null,
+      submissionId: null,
     })).toBe(false)
   })
 
@@ -83,5 +118,16 @@ describe('platform logs', () => {
     expect(messages.admin.platformLogs.tabs.audit).toBeTruthy()
     expect(messages.admin.platformLogs.tabs.deadLetters).toBeTruthy()
     expect(messages.admin.platformLogs.redaction).toMatch(/Flag/)
+    expect(messages.admin.platformLogs.retention).toBeTruthy()
+    expect(messages.admin.platformLogs.export).toMatch(/JSONL/)
+  })
+
+  test('exposes bounded export and signed pagination controls', () => {
+    expect(apiSource).toContain('parseAs: \'blob\'')
+    expect(workspaceSource).toContain('platformLogsApi.export')
+    expect(workspaceSource).toContain('auditNextCursor')
+    expect(workspaceSource).toContain('fetchAudits(false)')
+    expect(workspaceSource).toContain('competitionChallengeId')
+    expect(workspaceSource).toContain('submissionId')
   })
 })

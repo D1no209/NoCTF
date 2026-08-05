@@ -1875,6 +1875,7 @@
       "title": "Platform Logs",
       "subtitle": "Inspect API, Worker, and Runner runtime logs, immutable business audits, and Wolverine dead letters in one place. Warning and above is the default view.",
       "adminOnly": "Platform administrators only",
+      "retention": "14 days · 50,000/day",
       "redaction": "Passwords, tokens, cookies, Authorization values, SMTP credentials, and other secrets are always redacted. Trusted platform administrators may view plaintext Flags in logs.",
       "connected": "Live connection active",
       "reconnecting": "Restoring live connection",
@@ -1883,6 +1884,9 @@
       "pause": "Pause live stream",
       "resume": "Resume live stream",
       "loadOlder": "Load older logs",
+      "loadOlderAudits": "Load older audits",
+      "export": "Export JSONL",
+      "exported": "Platform logs exported.",
       "exception": "Exception details",
       "tabs": {
         "live": "Live Logs",
@@ -1895,8 +1899,16 @@
         "service": "Service",
         "from": "From",
         "to": "To",
+        "search": "Full-text search",
+        "searchPlaceholder": "Category, event, message, or exception...",
+        "category": "Exact category",
+        "categoryPlaceholder": "Namespace or logger category",
         "competition": "Competition ID",
         "runtime": "Runtime instance ID",
+        "team": "Team ID",
+        "user": "User ID",
+        "challenge": "Competition challenge ID",
+        "submission": "Submission ID",
         "apply": "Apply filters",
         "reset": "Restore defaults"
       },
@@ -1904,12 +1916,20 @@
         "kind": "Audit kind",
         "competitionLifecycle": "Competition lifecycle",
         "accountLifecycle": "Account lifecycle",
+        "leaderboardVisibility": "Leaderboard visibility",
+        "competitionEvent": "Competition event",
         "time": "Time",
         "action": "Action",
         "subject": "Subject",
         "actor": "Actor ID",
         "reason": "Reason",
-        "automatic": "Automatic system action"
+        "automatic": "Automatic system action",
+        "accountActions": {
+          "banned": "Account banned",
+          "disabled": "Account disabled",
+          "anonymized": "Account anonymized and closed",
+          "physicallyDeleted": "Account physically deleted"
+        }
       },
       "deadLetters": {
         "search": "Search message type, source, exception, or message ID...",
@@ -1932,6 +1952,8 @@
       },
       "errors": {
         "history": "Failed to load platform logs.",
+        "export": "Failed to export platform logs.",
+        "exportRange": "Apply a start and end time before exporting.",
         "audit": "Failed to load audit logs.",
         "deadLetters": "Failed to load dead letters."
       }

@@ -330,6 +330,7 @@ PUT  /api/v1/admin/platform/configuration
 POST /api/v1/admin/platform/configuration/logo
 GET  /api/v1/admin/platform/information
 GET  /api/v1/admin/platform/logs
+GET  /api/v1/admin/platform/logs/export
 GET  /api/v1/admin/platform/audit-logs
 POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
@@ -352,13 +353,20 @@ Dead Letter DTO 只返回投递元数据，省略消息 body、异常正文和 a
 delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作
 DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
 
-平台日志使用有上限的 Redis Stream 聚合 API、Worker、Runner 的结构化日志，并通过管理员
-专用 SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。历史查询默认从 Warning 开始，
-支持按服务、最低级别、时间、Competition 与 RuntimeInstance 筛选和游标翻页。日志入口与
-读取投影都会保留结构化作用域；密码、Token、Authorization/Cookie、SMTP 凭据和通用
-Secret 必须在写入 Redis 前脱敏。平台管理员属于可信角色，Flag 不在日志层强制脱敏，但业务
-代码仍不得为调试目的主动打印 Flag。审计查询直接聚合现有 Competition lifecycle 与用户账号
-lifecycle 不可变事实，不复制业务历史，也不新增日志业务表。
+平台运行日志使用每日 Redis Stream 分片聚合 API、Worker、Runner 的结构化诊断日志，并通过
+管理员专用 SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。每个 UTC 日分片精确保留最多
+50,000 条，保留 14 天后由 Redis TTL 删除，不自动归档。历史查询默认从 Warning 开始，使用
+与筛选条件绑定的签名游标，支持按服务、最低级别、UTC 时间、Category、Competition、
+RuntimeInstance、Team、User、CompetitionChallenge、Submission 以及有界全文摘要筛选；全文
+搜索不区分大小写，覆盖 Category、Event、Message 和 Exception。JSONL 导出沿用相同筛选，
+范围最多 14 天且最多 50,000 条。
+
+日志入口与读取投影都会保留结构化作用域；密码、Token、Authorization/Cookie、SMTP 凭据和
+通用 Secret 必须在写入 Redis 前脱敏。平台管理员属于可信角色，Flag 不在日志层强制脱敏，
+但业务代码仍不得为调试目的主动打印 Flag。管理审计使用签名 keyset 分页，从用户账号生命周期
+审计和工作人员可见的 PostgreSQL `competition_events` 投影，不复制事实、不设置 TTL 或新增
+审计业务表。`competition_events` 永久、append-only，存在历史事件时禁止比赛物理删除；比赛
+结束、队伍解散和用户匿名化注销不会清理事件关系。
 
 删除用户前必须读取影响预览。没有任何业务引用时可物理删除；存在比赛、题目、队伍、
 提交、计分、通知或生命周期审计引用时，只允许不可逆匿名化并停用。匿名化会清除个人

@@ -5118,6 +5118,165 @@
         ]
       }
     },
+    "/api/v1/admin/platform/logs/export": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Exports bounded platform runtime logs as JSON Lines.",
+        "description": "Exports at most 50,000 redacted API, Worker, and Runner entries within the 14-day retention window.",
+        "operationId": "AdminPlatformExportLogs",
+        "parameters": [
+          {
+            "name": "minimumLevel",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformLogLevel"
+                }
+              ]
+            }
+          },
+          {
+            "name": "service",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformLogService"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "competitionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "runtimeInstanceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "submissionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          }
+        ],
+        "responses": {
+          "503": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/dead-letters/{messageId}": {
       "get": {
         "tags": [
@@ -5564,7 +5723,7 @@
           "Admin"
         ],
         "summary": "Queries immutable platform audit facts.",
-        "description": "Aggregates existing competition and user-account lifecycle audits without duplicating business history.",
+        "description": "Projects immutable competition events and user-account lifecycle audits without duplicating business history.",
         "operationId": "AdminPlatformListAuditLogs",
         "parameters": [
           {
@@ -5612,6 +5771,14 @@
             "schema": {
               "type": "string",
               "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
               "nullable": true
             }
           },
@@ -5714,6 +5881,22 @@
             }
           },
           {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
             "name": "competitionId",
             "in": "query",
             "schema": {
@@ -5724,6 +5907,42 @@
           },
           {
             "name": "runtimeInstanceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "submissionId",
             "in": "query",
             "schema": {
               "type": "string",
@@ -13557,6 +13776,44 @@
           "Anonymize"
         ]
       },
+      "NoCTFAPIEndpointsAdministrationPlatformExportPlatformLogsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFApplicationAdministrationPlatformLogsPlatformLogLevel": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Trace",
+          "Debug",
+          "Information",
+          "Warning",
+          "Error",
+          "Critical"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "NoCTFApplicationAdministrationPlatformLogsPlatformLogService": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Api",
+          "Worker",
+          "Runner"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -13753,6 +14010,10 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformAuditLogResponse"
             }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -13821,6 +14082,97 @@
               }
             ]
           },
+          "competitionEventKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventKind"
+              }
+            ]
+          },
+          "competitionEventLevel": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventLevel"
+              }
+            ]
+          },
+          "competitionEventVisibility": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventVisibility"
+              }
+            ]
+          },
+          "relatedUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "submissionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "scoringEventId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "questionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "submissionKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+              }
+            ]
+          },
+          "submissionState": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionEvaluationState"
+              }
+            ]
+          },
+          "scoringEventKind": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringEventKind"
+              }
+            ]
+          },
+          "scoringResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+              }
+            ]
+          },
           "subjectDisplayName": {
             "type": "string",
             "nullable": true
@@ -13844,12 +14196,14 @@
         "x-enumNames": [
           "CompetitionLifecycle",
           "UserAccountLifecycle",
-          "CompetitionLeaderboardVisibility"
+          "CompetitionLeaderboardVisibility",
+          "CompetitionEvent"
         ],
         "enum": [
           0,
           1,
-          2
+          2,
+          3
         ]
       },
       "NoCTFDomainIdentityUserAccountLifecycleAction": {
@@ -13936,42 +14290,28 @@
             "type": "string",
             "format": "guid",
             "nullable": true
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "userId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "submissionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
           }
         }
-      },
-      "NoCTFApplicationAdministrationPlatformLogsPlatformLogService": {
-        "type": "integer",
-        "description": "",
-        "x-enumNames": [
-          "Api",
-          "Worker",
-          "Runner"
-        ],
-        "enum": [
-          0,
-          1,
-          2
-        ]
-      },
-      "NoCTFApplicationAdministrationPlatformLogsPlatformLogLevel": {
-        "type": "integer",
-        "description": "",
-        "x-enumNames": [
-          "Trace",
-          "Debug",
-          "Information",
-          "Warning",
-          "Error",
-          "Critical"
-        ],
-        "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
-        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformListPlatformLogsRequest": {
         "type": "object",

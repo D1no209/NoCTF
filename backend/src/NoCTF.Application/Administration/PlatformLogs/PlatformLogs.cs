@@ -1,5 +1,7 @@
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Application.Administration.PlatformLogs;
 
@@ -32,15 +34,25 @@ public sealed record PlatformLogView(
     string? ExceptionType,
     string? ExceptionMessage,
     Guid? CompetitionId,
-    Guid? RuntimeInstanceId);
+    Guid? RuntimeInstanceId,
+    Guid? TeamId,
+    Guid? UserId,
+    Guid? CompetitionChallengeId,
+    Guid? SubmissionId);
 
 public sealed record PlatformLogQuery(
     PlatformLogLevel MinimumLevel,
     PlatformLogService? Service,
     DateTimeOffset? From,
     DateTimeOffset? To,
+    string? Category,
+    string? Search,
     Guid? CompetitionId,
     Guid? RuntimeInstanceId,
+    Guid? TeamId,
+    Guid? UserId,
+    Guid? CompetitionChallengeId,
+    Guid? SubmissionId,
     string? Cursor,
     int Limit);
 
@@ -60,13 +72,24 @@ public interface IPlatformLogReader
     Task<PlatformLogQueryResult> QueryAsync(
         PlatformLogQuery query,
         CancellationToken cancellationToken);
+
+    Task<PlatformLogExportResult> ExportAsync(
+        PlatformLogQuery query,
+        CancellationToken cancellationToken);
 }
+
+public sealed record PlatformLogExport(Stream Content, string FileName);
+
+public sealed record PlatformLogExportResult(
+    PlatformLogReadState State,
+    PlatformLogExport? Export = null);
 
 public enum PlatformAuditKind : short
 {
     CompetitionLifecycle,
     UserAccountLifecycle,
-    CompetitionLeaderboardVisibility
+    CompetitionLeaderboardVisibility,
+    CompetitionEvent
 }
 
 public sealed record PlatformAuditView(
@@ -80,6 +103,20 @@ public sealed record PlatformAuditView(
     CompetitionLeaderboardVisibility? FromLeaderboardVisibility,
     CompetitionLeaderboardVisibility? ToLeaderboardVisibility,
     UserAccountLifecycleAction? UserAccountAction,
+    CompetitionEventKind? CompetitionEventKind,
+    CompetitionEventLevel? CompetitionEventLevel,
+    CompetitionEventVisibility? CompetitionEventVisibility,
+    Guid? RelatedUserId,
+    Guid? TeamId,
+    Guid? CompetitionChallengeId,
+    Guid? RuntimeInstanceId,
+    Guid? SubmissionId,
+    Guid? ScoringEventId,
+    Guid? QuestionId,
+    SubmissionKind? SubmissionKind,
+    SubmissionEvaluationState? SubmissionState,
+    ScoringEventKind? ScoringEventKind,
+    ScoringResult? ScoringResult,
     string? SubjectDisplayName,
     string? Reason,
     bool Automatic,
@@ -91,6 +128,8 @@ public sealed record PlatformAuditQuery(
     DateTimeOffset? To,
     Guid? CompetitionId,
     Guid? ActorId,
+    DateTimeOffset? BeforeOccurredAt,
+    Guid? BeforeId,
     int Limit);
 
 public interface IPlatformAuditLogStore
@@ -113,4 +152,24 @@ public sealed class ObservePlatform(
         PlatformAuditQuery query,
         CancellationToken cancellationToken = default) =>
         audits.QueryAsync(query, cancellationToken);
+}
+
+public sealed class ExportPlatformLogs(IPlatformLogReader logs)
+{
+    public Task<PlatformLogExportResult> ExecuteAsync(
+        PlatformLogQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        if (query.From is null
+            || query.To is null
+            || query.From > query.To
+            || query.To - query.From > TimeSpan.FromDays(14)
+            || query.Limit != 50_000
+            || query.Cursor is not null)
+        {
+            return Task.FromResult(new PlatformLogExportResult(
+                PlatformLogReadState.Unavailable));
+        }
+        return logs.ExportAsync(query, cancellationToken);
+    }
 }

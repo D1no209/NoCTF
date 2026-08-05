@@ -39,6 +39,7 @@ internal static class AdministrationInfrastructure
         services.AddScoped<ManageUserAccounts>();
         services.AddScoped<ManagePlatformConfiguration>();
         services.AddScoped<ObservePlatform>();
+        services.AddScoped<ExportPlatformLogs>();
         return services;
     }
 }
