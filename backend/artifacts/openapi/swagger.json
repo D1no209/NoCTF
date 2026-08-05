@@ -6450,6 +6450,243 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/data-exports": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Queues a complete competition archive.",
+        "description": "Administrator, competition owner, and manager only. Plaintext Flags are excluded unless a human Administrator explicitly supplies a reason.",
+        "operationId": "AdminCreateCompetitionDataExport",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CreateCompetitionDataExportRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsCreateCompetitionDataExportRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists recent competition archive jobs.",
+        "description": "Administrator, competition owner, and manager only. Administrators can inspect every recent job; other callers see only their own jobs.",
+        "operationId": "AdminListCompetitionDataExports",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/platform/audit-logs/data-exports": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Queues a complete platform audit export.",
+        "description": "Exports projections of immutable competition events and user lifecycle audits as NDJSON.",
+        "operationId": "AdminCreatePlatformAuditDataExport",
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Lists recent platform audit export jobs.",
+        "description": "Administrator only. Returns the latest durable platform audit export jobs and their retention state.",
+        "operationId": "AdminListPlatformAuditDataExports",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/data-exports/{dataExportId}/download": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Downloads an available data export artifact.",
+        "description": "Revalidates current scope access before streaming an available, unexpired export artifact.",
+        "operationId": "AdminDownloadDataExport",
+        "parameters": [
+          {
+            "name": "dataExportId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions": {
       "post": {
         "tags": [
@@ -11466,7 +11703,9 @@
           "CompetitionQuestionReplied",
           "CompetitionQuestionStatusChanged",
           "CheatIncidentDetected",
-          "TeamBanCorrected"
+          "TeamBanCorrected",
+          "DataExportReady",
+          "DataExportFailed"
         ],
         "enum": [
           0,
@@ -11483,7 +11722,9 @@
           11,
           12,
           13,
-          14
+          14,
+          15,
+          16
         ]
       },
       "NoCTFAPIEndpointsNotificationsListNotificationsRequest": {
@@ -12054,7 +12295,8 @@
           "CheatIncidentConfirmed",
           "CheatIncidentDismissed",
           "CheatIncidentSuperseded",
-          "CheatIncidentCorrected"
+          "CheatIncidentCorrected",
+          "ProtectedCompetitionExportCreated"
         ],
         "enum": [
           0,
@@ -12099,7 +12341,8 @@
           39,
           40,
           41,
-          42
+          42,
+          43
         ]
       },
       "NoCTFDomainCompetitionsEventsCompetitionEventLevel": {
@@ -14708,6 +14951,155 @@
             "minimum": 0.0,
             "nullable": false,
             "exclusiveMinimum": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationDataExportsDataExportResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/NoCTFDomainDataExportsDataExportScope"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "requestedByUserId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "includeProtectedFlags": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFDomainDataExportsDataExportStatus"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "length": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "sha256": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainDataExportsDataExportFailureCode"
+              }
+            ]
+          },
+          "failureDetail": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFDomainDataExportsDataExportScope": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionArchive",
+          "PlatformAudit"
+        ],
+        "enum": [
+          0,
+          1
+        ]
+      },
+      "NoCTFDomainDataExportsDataExportStatus": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Queued",
+          "Processing",
+          "Available",
+          "Failed",
+          "Expired"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFDomainDataExportsDataExportFailureCode": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "SubjectNotFound",
+          "SizeLimitExceeded",
+          "GenerationFailed",
+          "ObjectStorageFailed"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationDataExportsCreateCompetitionDataExportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "includeProtectedFlags": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 0,
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationDataExportsDataExportListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportResponse"
+            }
           }
         }
       },

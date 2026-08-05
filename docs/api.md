@@ -176,6 +176,8 @@ POST /api/v1/admin/competitions/{competitionId}/owner/transfer
 GET  /api/v1/admin/competitions/{competitionId}/start-validation
 POST /api/v1/admin/competitions/{competitionId}/flags/generate-missing
 GET  /api/v1/admin/competitions/{competitionId}/events/export
+GET  /api/v1/admin/competitions/{competitionId}/data-exports
+POST /api/v1/admin/competitions/{competitionId}/data-exports
 GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents
 GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}
 POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/dismiss
@@ -335,6 +337,9 @@ GET  /api/v1/admin/platform/information
 GET  /api/v1/admin/platform/logs
 GET  /api/v1/admin/platform/logs/export
 GET  /api/v1/admin/platform/audit-logs
+GET  /api/v1/admin/platform/audit-logs/data-exports
+POST /api/v1/admin/platform/audit-logs/data-exports
+GET  /api/v1/admin/data-exports/{dataExportId}/download
 POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
 PUT  /api/v1/admin/platform/users/{userId}/role
