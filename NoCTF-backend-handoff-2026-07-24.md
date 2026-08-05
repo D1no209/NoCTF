@@ -2724,6 +2724,48 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   未触及该文件。Actionlint 在既有 OpenAPI workflow 的 `for i in {1..60}` 报唯一 SC2034；忽略该
   既有 warning 后 workflow lint passed，本阶段新增 recovery step 无新增诊断。
 
+### 6.59 私密队伍封禁申诉、误判更正与公开更正通知（2026-08-06）
+
+- 功能提交：`f20193c feat(teams): add private ban appeals and corrections`。本阶段未 push、未部署；
+  未修改用户的 `TODO.md` 或其他 Agent 的 Runner、本地端口、实例状态与脚本工作树。平台信息仍
+  来自程序集元数据，本纵切没有需要递增的独立运行版本。
+- 用户通过 `$grill-me` 确认：仅处理比赛 Team 封禁；队长可对每个不可变 TeamBanned 事实提交一次
+  私密申诉，全队成员可读；Administrator、Owner、Manager 可作最终裁决，Judge、Observer 只读；
+  维持封禁始终私密；接受申诉或工作人员直接纠错可在 Finished 后解封并重新投影历史排行榜；公开
+  更正只包含比赛、队伍和时间，不公开工作人员、理由、证据或 Flag。v1 不提供附件、公开对话或重复
+  申诉，公开解释继续使用 Hint/公告。
+- 没有新增申诉业务表。`competition_events` 新增 nullable `ParentEventId` 自关联，将申诉连接原始
+  TeamBanned、将裁决连接申诉、将 TeamUnbanned/TeamBanCorrectionPublished 连接原始封禁；原始
+  事实永久保留，公开事件不含 Actor/Reason。EF migration `20260805210255_AddTeamBanAppeals` 完全由
+  `dotnet ef` 生成，只有 `parent_event_id`、索引和 Restrict self-FK；模型漂移检查通过。
+- 新增六个强类型 FastEndpoints：参赛端 GET ban case、POST appeal；管理端 GET appeals、POST
+  uphold、POST accept、POST direct correction。Endpoint 全部使用 `Endpoint<TRequest, Results<...>>`、
+  `ExecuteAsync`、具体 HttpResults 和 `TypedResults`；权限、一次性约束、当前封禁判断、Finished 后
+  更正与 leaderboard revision/outbox 失效均位于 Application/Infrastructure。Team API 增加
+  `IsBanned`；CompetitionEvent API 增加 `ParentEventId`。
+- 一般人工封禁现在保存经过秘密脱敏的 staff-only 原因，参赛端仅投影 `ManualModeration` 或
+  `CheatIncident` 来源类别。接受/直接纠错会清空 Team 当前封禁字段、递增 LeaderboardRevision、
+  发布 `InvalidateLeaderboard` 与只含资源标识的 `TeamBanCorrected`；不写补偿 ScoringEvent、不删除
+  Submission/成绩/审计，也不重启 Runtime。现有反作弊更正路径同样支持 Finished 后纠错并复用上述
+  私密/公开事件边界。
+- OpenAPI 现在有 182 条文档化 v1 路由，另有 `GET /health`；Admin 路由 119 条。两份 OpenAPI
+  artifact SHA-256 均为 `09E79962150AFC4A39426F5551ECD9E6050EB967B199103E7F419F3B798A5769`，
+  generated TypeScript SDK 已重新生成，前端只通过 generated operation 和
+  `teamBanAppealApi` 薄封装调用，没有手写 API URL、版本前缀、路径或 DTO。
+- 管理比赛的“队伍审核”页显示封禁状态、显式封禁理由、直接纠错和私密申诉队列；只有可裁决角色
+  看见接受/维持按钮。参赛 `/teams` 显示封禁来源、当前私密申诉/裁决，只有队长且尚未申诉时能提交
+  16–512 字符陈述。中英文、加载/错误/空状态和本地 mock fixture 已补齐。
+- 后端最终验证：solution build 0 warning/0 error；新增 Application/validator 定向 3/3 passed；
+  真实 PostgreSQL 申诉/Finished 更正和既有反作弊事件流 2/2 passed；Admin metadata、runtime quota
+  contract、OpenAPI route drift 3/3 passed；EF pending model 无漂移；两份 OpenAPI artifact 字节
+  一致；`git diff --check` passed。non-Integration 全套发现 597 项，594 passed、3 failed，仍为
+  既有 FastEndpoints Validator 进程内注册隔离：Null collection、BanTeam reason、challenge revision；
+  本阶段触及的 `BanTeam_RequiresAReason` 随后独立进程 1/1 passed，未修改另外两个失败文件。
+- 前端最终验证：`bun test` 183/183 passed；`vue-tsc` 与 production `bun run build` passed；触及
+  文件和 mock JSON scoped ESLint 0 warning/0 error；OpenAPI SDK 重生成功。使用内置浏览器连接
+  本地 Vite mock 实际验收管理端封禁队伍、私密申诉、来源、只读内容、维持/接受按钮，以及接受后
+  解封、历史重投影和无理由公开通知说明；浏览器标签与 5173 本地监听已清理，未访问或修改现网。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2755,6 +2797,8 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   24 小时对象/30 天元数据生命周期及 generated-SDK 管理前端。
 - PostgreSQL 业务与 Wolverine durable state、S3 对象/元数据的一体化停写恢复点、age 加密、
   Minisign 来源认证、空目标 fail-closed 恢复及真实 Docker 自动演练。
+- 每个不可变 TeamBanned 事实一次私密队长申诉、工作人员裁决/直接纠错、Finished 后排行榜重投影、
+  无敏感内容的公开更正事实和 generated-SDK 前后端工作区。
 
 当前尚未执行的交付边界：
 
@@ -2763,7 +2807,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
 - `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e`、
-  `03647e7f`、`7b479f4`、`5923e57`、`92a6205` 及各自 HANDOFF 提交是当前任务新增的
+  `03647e7f`、`7b479f4`、`5923e57`、`92a6205`、`f20193c` 及各自 HANDOFF 提交是当前任务新增的
   本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
   push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
@@ -2775,11 +2819,13 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
 6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成，完整比赛与审计
 数据导出由 6.57 完成，PostgreSQL/对象存储/Wolverine 灾难恢复工具与演练由 6.58 完成。
-Administrator MFA 已由用户明确暂缓。下一阶段继续 TODO 第 8 节后续安全与运维待办：
+Administrator MFA 已由用户明确暂缓，封禁申诉/误判更正/公开更正通知由 6.59 完成。下一阶段继续
+TODO 第 8 节后续安全与运维待办：
 
-1. 跳过 Administrator MFA，下一纵切审计“封禁申诉、误判更正和公开更正通知”的既有封禁来源、
-   CompetitionEvent、通知、权限与匿名化边界；申诉人资格、处理角色、公开粒度、时限及对比赛
-   计分/队伍状态的影响必须先 `$grill-me`，不得直接新增申诉表或复用私密咨询冒充正式申诉。
+1. 跳过 Administrator MFA，下一纵切审计登录、注册、邮件、头像、提交、题目问答和管理详情接口
+   的现有限流、可信代理/IP 来源、Redis 依赖、失败语义与 OpenAPI 429 契约；分层 key、窗口、突发
+   容量、匿名/账号维度及 Redis 故障策略如无法从现有约束确定，先 `$grill-me`，不得把内存单机
+   限流冒充横向扩展保护。
 2. 不重做灾备工具、比赛/审计导出、平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、
    管理审计投影或忘记密码流程；单比赛永久事实仍以 `competition_events` 为唯一来源。未经用户
    后续明确恢复范围，不实现或重新规划 Administrator MFA。
@@ -2837,9 +2883,10 @@ Docker port mapping，host port 固定请求 `0`。
    流程以 6.56 的 hash-only Token、枚举防护、双层限流、全会话失效、密码变更通知和恢复前端为准；
    完整比赛/审计导出以 6.57 的单表任务、Repeatable Read、对象生命周期、Flag 边界和 generated-SDK
    前端为准；灾难恢复以 6.58 的停写一致性、完整 Wolverine schema、age+Minisign、外部 Secret、
-   空目标和逐表/逐对象校验为准。Administrator MFA 已由用户明确暂缓，不得继续实现或追问。
-   下一纵切按 `TODO.md` 第 8 节审计封禁申诉、误判更正和公开更正通知；不要回滚或重做 `/profile`、SMTP、
-   排行榜可见性、咨询、比赛日志、反作弊、平台日志、忘记密码或数据导出流程。
+   空目标和逐表/逐对象校验为准；封禁申诉与更正以 6.59 的 competition event 自关联、一次私密申诉、
+   Finished 后重投影和最小公开事件为准。Administrator MFA 已由用户明确暂缓，不得继续实现或追问。
+   下一纵切按 `TODO.md` 第 8 节审计分层限流；不要回滚或重做 `/profile`、SMTP、排行榜可见性、咨询、
+   比赛日志、反作弊、平台日志、忘记密码、数据导出、灾备或封禁申诉流程。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
