@@ -15,6 +15,9 @@ export const NotificationKind = {
   ChallengePublished: 7,
   HintPublished: 8,
   TeamBanned: 9,
+  CompetitionQuestionOpened: 10,
+  CompetitionQuestionReplied: 11,
+  CompetitionQuestionStatusChanged: 12,
 } as const satisfies Record<string, NoCtfDomainNotificationsNotificationKind>
 
 export interface PublicNotification {
@@ -121,6 +124,9 @@ function toNotificationKind(
     case NotificationKind.ChallengePublished:
     case NotificationKind.HintPublished:
     case NotificationKind.TeamBanned:
+    case NotificationKind.CompetitionQuestionOpened:
+    case NotificationKind.CompetitionQuestionReplied:
+    case NotificationKind.CompetitionQuestionStatusChanged:
       return kind
     default:
       throw new TypeError('Notification response has an unsupported kind.')

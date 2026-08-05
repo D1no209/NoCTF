@@ -41,6 +41,7 @@ import { challengeTypeLabel } from '@/lib/challengeLabels'
 import { normalizeDirection } from '@/lib/challengeDirections'
 import { toast } from 'vue-sonner'
 import { Activity, CheckCircle2, Copy, Crosshair, Download, FileArchive, Loader2, Shield, ShieldCheck, Server, Timer, Trash2, Upload } from 'lucide-vue-next'
+import CompetitionQuestionsPanel from '@/components/questions/CompetitionQuestionsPanel.vue'
 
 interface PatchSubmissionStatus {
   id?: string
@@ -117,6 +118,7 @@ const props = defineProps<{
   canRequestDefense?: boolean
   canDownloadAttachments?: boolean
   hasChallengeDetail?: boolean
+  canAskQuestion?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -695,6 +697,15 @@ function getApiErrorDetail(error: unknown) {
             <p v-else class="text-sm italic text-muted-foreground">{{ t('challenges.noDescription') }}</p>
           </Panel>
         </Card>
+
+        <CompetitionQuestionsPanel
+          v-if="challenge?.id"
+          :competition-id="competitionId"
+          subject="Challenge"
+          :competition-challenge-id="challenge.id"
+          :can-create="canAskQuestion !== false"
+          compact
+        />
 
         <Card v-if="(showContainerControls && !isAwdpMode) || isAwdMode" class="p-1">
           <Panel class="grid gap-3 p-3 sm:grid-cols-2">

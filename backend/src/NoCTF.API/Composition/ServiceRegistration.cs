@@ -144,6 +144,17 @@ public static class ServiceRegistration
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0
                     }));
+            options.AddPolicy("question", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    $"{context.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                        ?? context.User.FindFirstValue("sub")
+                        ?? "anonymous"}:{context.Connection.RemoteIpAddress}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 8,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
         });
         return services;
     }

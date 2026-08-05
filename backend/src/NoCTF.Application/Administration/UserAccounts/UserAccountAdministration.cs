@@ -16,6 +16,8 @@ public enum UserDeletionReferenceKind
     Notification,
     ScoringEvent,
     CompetitionLifecycleAudit,
+    CompetitionQuestion,
+    CompetitionQuestionEntry,
     UserAccountLifecycleAudit
 }
 

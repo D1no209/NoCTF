@@ -85,6 +85,27 @@ Hint unlock 成功首次返回 201+HintUnlock 事实；已解锁或 Cost=0 直�
 Blackout 不隐藏题面、附件、Runtime 或提交入口，但 Challenge 的 `baseScore` 返回 null，并随列表/
 详情返回同一 `leaderboardVisibility` 与 `dataScope`。
 
+## Competition Questions
+
+```text
+GET  /api/v1/competitions/{competitionId}/questions
+POST /api/v1/competitions/{competitionId}/questions
+GET  /api/v1/competitions/{competitionId}/questions/{questionId}
+POST /api/v1/competitions/{competitionId}/questions/{questionId}/messages
+PUT  /api/v1/competitions/{competitionId}/questions/{questionId}/status
+PUT  /api/v1/competitions/{competitionId}/questions/{questionId}/publication
+```
+
+咨询默认私密。Challenge 咨询绑定一个 CompetitionChallenge，由比赛
+Administrator/Owner/Manager/Judge 与关联模板 Owner/Manager 处理；Platform 咨询由比赛处理者处理。
+Observer 只读。只有 Running/Paused 且已批准队伍内的 Human 用户可以发起咨询，Bot 不允许使用。
+Finished 后对话只读。Resolved 可由提问者通过追问重新打开，Closed 为终态。
+
+公开接口仅作为例外保留：处理者可显式匿名公开一条已审核回复，参与者投影不返回提问者、队伍或
+Submission 身份。面向全体参赛者的通用说明应优先发布为 Hint、比赛公告或平台公告。v1 不接受附件，
+可选 Submission 只保存引用。所有写操作使用 Revision 乐观并发控制，发起与回复共享每用户/IP
+每分钟 8 次的限流策略。
+
 ## Submission
 
 ```text

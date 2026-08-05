@@ -1,3 +1,5 @@
+import type { CompetitionQuestionSubject } from './questionApi'
+
 export const queryKeys = {
   platformConfiguration: ['platform-configuration'] as const,
   adminPlatformConfiguration: ['admin-platform-configuration'] as const,
@@ -15,6 +17,15 @@ export const queryKeys = {
     competitionId: string,
     competitionChallengeId: string,
   ) => ['challenge-attachments', competitionId, competitionChallengeId] as const,
+  competitionQuestions: (
+    competitionId: string,
+    subject: CompetitionQuestionSubject,
+    competitionChallengeId?: string | null,
+  ) => ['competition-questions', competitionId, subject, competitionChallengeId ?? null] as const,
+  competitionQuestion: (
+    competitionId: string,
+    questionId: string,
+  ) => ['competition-question', competitionId, questionId] as const,
   submissions: (competitionId: string) => ['submissions', competitionId] as const,
   submission: (
     competitionId: string,

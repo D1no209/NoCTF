@@ -13,6 +13,8 @@ using NoCTF.Infrastructure.Challenges.Configuration;
 using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Challenges.Hints;
 using NoCTF.Infrastructure.Challenges.Management;
+using NoCTF.Application.Challenges.Questions;
+using NoCTF.Infrastructure.Challenges.Questions;
 
 namespace NoCTF.Infrastructure.Challenges;
 
@@ -51,6 +53,13 @@ internal static class ChallengeInfrastructure
         services.AddScoped<IChallengeConfigurationStore, ChallengeConfigurationStore>();
         services.AddScoped<GetChallengeConfiguration>();
         services.AddScoped<UpdateChallengeConfiguration>();
+        services.AddScoped<ICompetitionQuestionStore, CompetitionQuestionStore>();
+        services.AddScoped<CreateCompetitionQuestion>();
+        services.AddScoped<ListCompetitionQuestions>();
+        services.AddScoped<GetCompetitionQuestion>();
+        services.AddScoped<AddCompetitionQuestionMessage>();
+        services.AddScoped<ChangeCompetitionQuestionStatus>();
+        services.AddScoped<PublishCompetitionQuestion>();
         return services;
     }
 }

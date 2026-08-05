@@ -2136,6 +2136,501 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/questions/{questionId}/messages": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Adds a private message to a competition question.",
+        "description": "Asker follow-ups return Replied or Resolved questions to Pending; handler replies move Pending questions to Replied. Closed questions are terminal.",
+        "operationId": "AddCompetitionQuestionMessage",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "AddCompetitionQuestionMessageRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/questions/{questionId}/status": {
+      "put": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Transitions a competition question state.",
+        "description": "Every accepted transition creates an immutable audit entry. The asker may resolve a replied question; handlers may resolve or irreversibly close it.",
+        "operationId": "ChangeCompetitionQuestionStatus",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ChangeCompetitionQuestionStatusRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsChangeCompetitionQuestionStatusRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/questions": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Creates a private competition question.",
+        "description": "Challenge questions target one published CompetitionChallenge; platform questions target competition management. Attachments are not accepted and an optional Submission is referenced without copying its protected content.",
+        "operationId": "CreateCompetitionQuestion",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CreateCompetitionQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCreateCompetitionQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Lists competition questions visible to the current user.",
+        "description": "The asker receives private questions, observers receive read-only private projections, handlers receive their authorized queue, and publishedOnly exposes only explicitly published anonymized questions.",
+        "operationId": "ListCompetitionQuestions",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionSubjectCode"
+                }
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionStatusCode"
+                }
+              ]
+            }
+          },
+          {
+            "name": "publishedOnly",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/questions/{questionId}": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Returns one accessible competition question.",
+        "description": "Private content is projected only to the asker, read-only observers, competition handlers, and the linked challenge authors.",
+        "operationId": "GetCompetitionQuestion",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/competitions/{competitionId}/questions/{questionId}/publication": {
+      "put": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Explicitly publishes one reviewed question and handler reply.",
+        "description": "This exceptional workflow anonymizes the asker in participant projections. Hint or competition announcement should normally be preferred for broadly useful guidance.",
+        "operationId": "PublishCompetitionQuestion",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "questionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "PublishCompetitionQuestionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsPublishCompetitionQuestionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/password": {
       "put": {
         "tags": [
@@ -9902,7 +10397,10 @@
           "BloodAwarded",
           "ChallengePublished",
           "HintPublished",
-          "TeamBanned"
+          "TeamBanned",
+          "CompetitionQuestionOpened",
+          "CompetitionQuestionReplied",
+          "CompetitionQuestionStatusChanged"
         ],
         "enum": [
           0,
@@ -9914,7 +10412,10 @@
           6,
           7,
           8,
-          9
+          9,
+          10,
+          11,
+          12
         ]
       },
       "NoCTFAPIEndpointsNotificationsListNotificationsRequest": {
@@ -10584,6 +11085,393 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "askedByUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "askerDisplayName": {
+            "type": "string"
+          },
+          "teamDisplayName": {
+            "type": "string",
+            "nullable": true
+          },
+          "submissionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "subject": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionSubjectCode"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionStatusCode"
+          },
+          "access": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionAccessCode"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canReply": {
+            "type": "boolean"
+          },
+          "canResolve": {
+            "type": "boolean"
+          },
+          "canClose": {
+            "type": "boolean"
+          },
+          "canPublish": {
+            "type": "boolean"
+          },
+          "canViewPrivate": {
+            "type": "boolean"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionEntryResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionSubjectCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Challenge",
+          "Platform"
+        ],
+        "enum": [
+          "Challenge",
+          "Platform"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionStatusCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "Replied",
+          "Resolved",
+          "Closed"
+        ],
+        "enum": [
+          "Pending",
+          "Replied",
+          "Resolved",
+          "Closed"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionAccessCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Public",
+          "Asker",
+          "Observer",
+          "Handler"
+        ],
+        "enum": [
+          "Public",
+          "Asker",
+          "Observer",
+          "Handler"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionEntryResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode"
+          },
+          "actorRole": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode"
+          },
+          "actorUserId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "actorDisplayName": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "fromStatus": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionStatusCode"
+              }
+            ]
+          },
+          "toStatus": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionStatusCode"
+              }
+            ]
+          },
+          "targetEntryId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Message",
+          "StatusTransition",
+          "Publication"
+        ],
+        "enum": [
+          "Message",
+          "StatusTransition",
+          "Publication"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Asker",
+          "Handler"
+        ],
+        "enum": [
+          "Asker",
+          "Handler"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode"
+          },
+          "current": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "InvalidRequest",
+          "SpamRejected",
+          "LifecycleConflict",
+          "TeamNotEligible",
+          "RevisionConflict",
+          "InvalidTransition",
+          "QuestionClosed",
+          "ReplyNotPublishable"
+        ],
+        "enum": [
+          "InvalidRequest",
+          "SpamRejected",
+          "LifecycleConflict",
+          "TeamNotEligible",
+          "RevisionConflict",
+          "InvalidTransition",
+          "QuestionClosed",
+          "ReplyNotPublishable"
+        ]
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body",
+          "expectedRevision"
+        ],
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 4,
+            "nullable": false
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsChangeCompetitionQuestionStatusRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "status",
+          "expectedRevision"
+        ],
+        "properties": {
+          "status": {
+            "nullable": false,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionStatusCode"
+              }
+            ]
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCreateCompetitionQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subject",
+          "title",
+          "body"
+        ],
+        "properties": {
+          "subject": {
+            "nullable": false,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionSubjectCode"
+              }
+            ]
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "submissionId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 4,
+            "nullable": false
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 4,
+            "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionListResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsListCompetitionQuestionsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsChallengesQuestionsPublishCompetitionQuestionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "replyEntryId",
+          "expectedRevision"
+        ],
+        "properties": {
+          "replyEntryId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": false
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "nullable": false
           }
         }
       },

@@ -6,6 +6,7 @@ public interface IUserContext
 {
     Guid UserId { get; }
     bool IsAdministrator { get; }
+    bool IsHuman => true;
 }
 
 public sealed class HttpUserContext(IHttpContextAccessor accessor) : IUserContext
@@ -18,4 +19,9 @@ public sealed class HttpUserContext(IHttpContextAccessor accessor) : IUserContex
 
     public bool IsAdministrator =>
         accessor.HttpContext?.User.IsInRole("Administrator") == true;
+
+    public bool IsHuman => string.Equals(
+        accessor.HttpContext?.User.FindFirstValue("user_kind"),
+        "Human",
+        StringComparison.Ordinal);
 }

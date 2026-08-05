@@ -24,5 +24,8 @@ public enum NotificationKind : short
     BloodAwarded,
     ChallengePublished,
     HintPublished,
-    TeamBanned
+    TeamBanned,
+    CompetitionQuestionOpened,
+    CompetitionQuestionReplied,
+    CompetitionQuestionStatusChanged
 }

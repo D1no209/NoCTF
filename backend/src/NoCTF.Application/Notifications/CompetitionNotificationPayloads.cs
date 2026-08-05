@@ -1,4 +1,5 @@
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Messaging;
 
 namespace NoCTF.Application.Notifications;
 
@@ -31,3 +32,11 @@ public sealed record TeamBannedPayload(
     Guid TeamId,
     string TeamName,
     DateTimeOffset BannedAt);
+
+public sealed record CompetitionQuestionActivityPayload(
+    Guid CompetitionId,
+    Guid QuestionId,
+    Guid? EntryId,
+    CompetitionQuestionNotificationEvent Event,
+    string Title,
+    DateTimeOffset OccurredAt);
