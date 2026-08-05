@@ -2,6 +2,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace NoCTF.Domain.Identity;
 
+public enum SmtpSecurityMode
+{
+    None,
+    SslOnConnect,
+    StartTls
+}
+
 public sealed class EmailVerificationSettings
 {
     [Key]
@@ -19,6 +26,10 @@ public sealed class EmailVerificationSettings
     public string SmtpHost { get; set; } = string.Empty;
 
     public int SmtpPort { get; set; }
+
+    public SmtpSecurityMode? SmtpSecurityMode { get; set; }
+
+    // Retained while rows created before the explicit security-mode contract still exist.
     public bool SmtpEnableSsl { get; set; }
 
     [MaxLength(320)]

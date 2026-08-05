@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { EmailVerificationConfiguration } from '@/api/noctf'
+import type { EmailVerificationConfiguration, SmtpSecurityMode } from '@/api/noctf'
 import {
   CircleCheck,
   CircleX,
@@ -21,6 +21,13 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -41,7 +48,7 @@ const form = reactive({
   resendCooldownSeconds: 60,
   smtpHost: '',
   smtpPort: 587,
-  smtpEnableSsl: true,
+  smtpSecurityMode: 'StartTls' as SmtpSecurityMode,
   smtpUserName: '',
   smtpPasswordConfigured: false,
   smtpFromAddress: '',
@@ -55,6 +62,12 @@ const lastUpdated = computed(() => form.updatedAt
   ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
       .format(new Date(form.updatedAt))
   : t('admin.emailVerification.neverSaved'))
+const usesAuthentication = computed(() => Boolean(form.smtpUserName.trim()))
+const smtpReady = computed(() => Boolean(
+  form.smtpHost.trim()
+  && form.smtpFromAddress.trim()
+  && (!usesAuthentication.value || form.smtpPasswordConfigured),
+))
 
 watch(form, () => {
   if (!saving.value)
@@ -68,7 +81,7 @@ function applyConfiguration(configuration: EmailVerificationConfiguration) {
   form.resendCooldownSeconds = configuration.resendCooldownSeconds ?? 60
   form.smtpHost = configuration.smtpHost ?? ''
   form.smtpPort = configuration.smtpPort ?? 587
-  form.smtpEnableSsl = configuration.smtpEnableSsl ?? true
+  form.smtpSecurityMode = configuration.smtpSecurityMode ?? 'StartTls'
   form.smtpUserName = configuration.smtpUserName ?? ''
   form.smtpPasswordConfigured = configuration.smtpPasswordConfigured ?? false
   form.smtpFromAddress = configuration.smtpFromAddress ?? ''
@@ -107,7 +120,7 @@ async function saveConfiguration() {
       resendCooldownSeconds: form.resendCooldownSeconds,
       smtpHost: form.smtpHost.trim(),
       smtpPort: form.smtpPort,
-      smtpEnableSsl: form.smtpEnableSsl,
+      smtpSecurityMode: form.smtpSecurityMode,
       smtpUserName: form.smtpUserName.trim(),
       smtpFromAddress: form.smtpFromAddress.trim(),
       smtpFromName: form.smtpFromName.trim(),
@@ -225,7 +238,11 @@ onMounted(loadConfiguration)
               {{ t('admin.emailVerification.smtpCredential') }}
             </p>
             <p class="font-bold">
-              {{ form.smtpPasswordConfigured ? t('admin.emailVerification.configured') : t('admin.emailVerification.notConfigured') }}
+              {{ !usesAuthentication
+                ? t('admin.emailVerification.notRequired')
+                : form.smtpPasswordConfigured
+                  ? t('admin.emailVerification.configured')
+                  : t('admin.emailVerification.notConfigured') }}
             </p>
           </div>
         </div>
@@ -235,7 +252,9 @@ onMounted(loadConfiguration)
             <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
               {{ t('common.lastUpdated') }}
             </p>
-            <p class="truncate font-bold">{{ lastUpdated }}</p>
+            <p class="truncate font-bold">
+              {{ lastUpdated }}
+            </p>
           </div>
         </div>
       </div>
@@ -258,15 +277,19 @@ onMounted(loadConfiguration)
             </span>
           </label>
 
-          <Alert v-if="form.enabled && !form.smtpPasswordConfigured" variant="warning" class="rounded-none border-2">
+          <Alert v-if="form.enabled && usesAuthentication && !form.smtpPasswordConfigured" variant="warning" class="rounded-none border-2">
             <AlertTitle>{{ t('admin.emailVerification.passwordRequiredTitle') }}</AlertTitle>
             <AlertDescription>{{ t('admin.emailVerification.passwordRequiredDescription') }}</AlertDescription>
           </Alert>
 
           <section class="space-y-4">
             <div>
-              <h3 class="font-bold">{{ t('admin.emailVerification.linkSettings') }}</h3>
-              <p class="text-sm text-muted-foreground">{{ t('admin.emailVerification.publicBaseUrlHelp') }}</p>
+              <h3 class="font-bold">
+                {{ t('admin.emailVerification.linkSettings') }}
+              </h3>
+              <p class="text-sm text-muted-foreground">
+                {{ t('admin.emailVerification.publicBaseUrlHelp') }}
+              </p>
             </div>
             <div class="grid gap-4 md:grid-cols-2">
               <div class="space-y-2 md:col-span-2">
@@ -288,8 +311,12 @@ onMounted(loadConfiguration)
 
           <section class="space-y-4">
             <div>
-              <h3 class="font-bold">{{ t('admin.emailVerification.smtpSettings') }}</h3>
-              <p class="text-sm text-muted-foreground">{{ t('admin.emailVerification.smtpSettingsDescription') }}</p>
+              <h3 class="font-bold">
+                {{ t('admin.emailVerification.smtpSettings') }}
+              </h3>
+              <p class="text-sm text-muted-foreground">
+                {{ t('admin.emailVerification.smtpSettingsDescription') }}
+              </p>
             </div>
             <div class="grid gap-4 md:grid-cols-2">
               <div class="space-y-2">
@@ -303,6 +330,9 @@ onMounted(loadConfiguration)
               <div class="space-y-2">
                 <Label for="smtp-user">{{ t('admin.emailVerification.smtpUsername') }}</Label>
                 <Input id="smtp-user" v-model="form.smtpUserName" autocomplete="off" />
+                <p class="text-xs text-muted-foreground">
+                  {{ t('admin.emailVerification.smtpUsernameHelp') }}
+                </p>
               </div>
               <div class="space-y-2">
                 <Label for="smtp-timeout">{{ t('admin.emailVerification.timeout') }}</Label>
@@ -316,17 +346,35 @@ onMounted(loadConfiguration)
                 <Label for="smtp-from-name">{{ t('admin.emailVerification.fromName') }}</Label>
                 <Input id="smtp-from-name" v-model="form.smtpFromName" autocomplete="off" />
               </div>
+              <div class="space-y-2 md:col-span-2">
+                <Label for="smtp-security-mode">{{ t('admin.emailVerification.securityMode') }}</Label>
+                <Select v-model="form.smtpSecurityMode">
+                  <SelectTrigger id="smtp-security-mode" class="rounded-none border-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="None">
+                      {{ t('admin.emailVerification.securityNone') }}
+                    </SelectItem>
+                    <SelectItem value="SslOnConnect">
+                      {{ t('admin.emailVerification.securitySslOnConnect') }}
+                    </SelectItem>
+                    <SelectItem value="StartTls">
+                      {{ t('admin.emailVerification.securityStartTls') }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p class="text-xs text-muted-foreground">
+                  {{ t('admin.emailVerification.securityModeHelp') }}
+                </p>
+              </div>
             </div>
-            <label class="inline-flex cursor-pointer items-center gap-3 border-2 border-border px-4 py-3">
-              <input v-model="form.smtpEnableSsl" type="checkbox" class="size-4 accent-foreground">
-              <span class="font-medium">{{ t('admin.emailVerification.enableTls') }}</span>
-            </label>
           </section>
 
           <div class="flex flex-col gap-3 border-t-2 border-border pt-5 sm:flex-row sm:justify-between">
             <Button
               variant="outline"
-              :disabled="testing || !form.smtpPasswordConfigured"
+              :disabled="testing || !smtpReady"
               @click="sendTest"
             >
               <Loader2 v-if="testing" class="size-4 animate-spin" />

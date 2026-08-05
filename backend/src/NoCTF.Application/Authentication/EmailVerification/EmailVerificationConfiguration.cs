@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using NoCTF.Domain.Identity;
 
 namespace NoCTF.Application.Authentication.EmailVerification;
 
@@ -9,7 +10,7 @@ public sealed record EmailVerificationConfigurationView(
     int ResendCooldownSeconds,
     string SmtpHost,
     int SmtpPort,
-    bool SmtpEnableSsl,
+    SmtpSecurityMode SmtpSecurityMode,
     string SmtpUserName,
     bool SmtpPasswordConfigured,
     string SmtpFromAddress,
@@ -25,7 +26,7 @@ public sealed record UpdateEmailVerificationConfigurationCommand(
     int ResendCooldownSeconds,
     string SmtpHost,
     int SmtpPort,
-    bool SmtpEnableSsl,
+    SmtpSecurityMode SmtpSecurityMode,
     string SmtpUserName,
     string SmtpFromAddress,
     string SmtpFromName,
@@ -48,7 +49,7 @@ public enum EmailVerificationConfigurationError
     SmtpHostRequired,
     SmtpHostInvalid,
     SmtpPortInvalid,
-    SmtpUserNameRequired,
+    SmtpSecurityModeInvalid,
     SmtpUserNameInvalid,
     SmtpPasswordRequired,
     SmtpFromAddressRequired,
@@ -146,6 +147,8 @@ public sealed class ManageEmailVerificationConfiguration(
             errors.Add(EmailVerificationConfigurationError.ResendCooldownInvalid);
         if (command.SmtpPort is < 1 or > 65_535)
             errors.Add(EmailVerificationConfigurationError.SmtpPortInvalid);
+        if (!Enum.IsDefined(command.SmtpSecurityMode))
+            errors.Add(EmailVerificationConfigurationError.SmtpSecurityModeInvalid);
         if (command.SmtpTimeoutSeconds is < 1 or > 120)
             errors.Add(EmailVerificationConfigurationError.SmtpTimeoutInvalid);
         if (command.SmtpHost.Length > 253)
@@ -166,9 +169,7 @@ public sealed class ManageEmailVerificationConfiguration(
 
         if (string.IsNullOrWhiteSpace(command.SmtpHost))
             errors.Add(EmailVerificationConfigurationError.SmtpHostRequired);
-        if (string.IsNullOrWhiteSpace(command.SmtpUserName))
-            errors.Add(EmailVerificationConfigurationError.SmtpUserNameRequired);
-        if (!passwordConfigured)
+        if (!string.IsNullOrWhiteSpace(command.SmtpUserName) && !passwordConfigured)
             errors.Add(EmailVerificationConfigurationError.SmtpPasswordRequired);
         if (string.IsNullOrWhiteSpace(command.SmtpFromAddress))
             errors.Add(EmailVerificationConfigurationError.SmtpFromAddressRequired);
@@ -183,9 +184,9 @@ public sealed record EmailVerificationDeliveryConfiguration(
     string PublicBaseUrl,
     string SmtpHost,
     int SmtpPort,
-    bool SmtpEnableSsl,
+    SmtpSecurityMode SmtpSecurityMode,
     string SmtpUserName,
-    string SmtpPassword,
+    string? SmtpPassword,
     string SmtpFromAddress,
     string SmtpFromName,
     int SmtpTimeoutSeconds);
@@ -203,6 +204,22 @@ public enum EmailVerificationDeliveryState
     Disabled,
     NotConfigured,
     RecipientNotFound
+}
+
+public enum EmailVerificationDeliveryFailure
+{
+    ConnectionFailed,
+    AuthenticationFailed,
+    MessageRejected,
+    TimedOut,
+    TransportFailed
+}
+
+public sealed class EmailVerificationDeliveryException(
+    EmailVerificationDeliveryFailure failure)
+    : Exception("Email verification delivery failed.")
+{
+    public EmailVerificationDeliveryFailure Failure { get; } = failure;
 }
 
 public interface IEmailVerificationDelivery

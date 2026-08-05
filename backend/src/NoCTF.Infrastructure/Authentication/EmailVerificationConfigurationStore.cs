@@ -31,7 +31,10 @@ public sealed class EmailVerificationConfigurationStore(
                 .SetProperty(settings => settings.ResendCooldownSeconds, command.ResendCooldownSeconds)
                 .SetProperty(settings => settings.SmtpHost, command.SmtpHost.Trim())
                 .SetProperty(settings => settings.SmtpPort, command.SmtpPort)
-                .SetProperty(settings => settings.SmtpEnableSsl, command.SmtpEnableSsl)
+                .SetProperty(settings => settings.SmtpSecurityMode, command.SmtpSecurityMode)
+                .SetProperty(
+                    settings => settings.SmtpEnableSsl,
+                    command.SmtpSecurityMode != SmtpSecurityMode.None)
                 .SetProperty(settings => settings.SmtpUserName, command.SmtpUserName.Trim())
                 .SetProperty(settings => settings.SmtpFromAddress, command.SmtpFromAddress.Trim())
                 .SetProperty(settings => settings.SmtpFromName, command.SmtpFromName.Trim())
@@ -66,10 +69,10 @@ public sealed class EmailVerificationConfigurationStore(
     {
         var settings = await db.EmailVerificationSettings.AsNoTracking()
             .SingleAsync(candidate => candidate.Id == SettingsId, ct);
+        var usesAuthentication = !string.IsNullOrWhiteSpace(settings.SmtpUserName);
         if ((requireEnabled && !settings.Enabled)
-            || settings.SmtpPasswordCiphertext is null
+            || (usesAuthentication && settings.SmtpPasswordCiphertext is null)
             || string.IsNullOrWhiteSpace(settings.SmtpHost)
-            || string.IsNullOrWhiteSpace(settings.SmtpUserName)
             || string.IsNullOrWhiteSpace(settings.SmtpFromAddress))
         {
             return null;
@@ -80,9 +83,11 @@ public sealed class EmailVerificationConfigurationStore(
             settings.PublicBaseUrl,
             settings.SmtpHost,
             settings.SmtpPort,
-            settings.SmtpEnableSsl,
+            ResolveSecurityMode(settings),
             settings.SmtpUserName,
-            secrets.Unprotect(settings.SmtpPasswordCiphertext),
+            usesAuthentication
+                ? secrets.Unprotect(settings.SmtpPasswordCiphertext!)
+                : null,
             settings.SmtpFromAddress,
             settings.SmtpFromName,
             settings.SmtpTimeoutSeconds);
@@ -97,7 +102,7 @@ public sealed class EmailVerificationConfigurationStore(
             settings.ResendCooldownSeconds,
             settings.SmtpHost,
             settings.SmtpPort,
-            settings.SmtpEnableSsl,
+            ResolveSecurityMode(settings),
             settings.SmtpUserName,
             settings.SmtpPasswordCiphertext is { Length: > 0 },
             settings.SmtpFromAddress,
@@ -105,4 +110,12 @@ public sealed class EmailVerificationConfigurationStore(
             settings.SmtpTimeoutSeconds,
             settings.Revision,
             settings.UpdatedAt);
+
+    private static SmtpSecurityMode ResolveSecurityMode(EmailVerificationSettings settings) =>
+        settings.SmtpSecurityMode
+        ?? (settings.SmtpEnableSsl
+            ? settings.SmtpPort == 465
+                ? SmtpSecurityMode.SslOnConnect
+                : SmtpSecurityMode.StartTls
+            : SmtpSecurityMode.None);
 }
