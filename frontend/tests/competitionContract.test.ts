@@ -19,6 +19,16 @@ const competition = {
   maxTeamMembers: 5,
   maxConcurrentRuntimeInstancesPerTeam: 2,
   ownerId: '22222222-2222-2222-2222-222222222222',
+  leaderboardVisibility: 1,
+} as const
+
+const visibilityConfiguration = {
+  competitionId: competition.id,
+  configuredVisibility: 1,
+  effectiveVisibility: 0,
+  startsAt: '2026-08-01T18:00:00Z',
+  appliedAt: null,
+  revision: 3,
 } as const
 
 const contractFetch: typeof fetch = async (input, init) => {
@@ -43,6 +53,8 @@ const contractFetch: typeof fetch = async (input, init) => {
     return Response.json(competition)
   if (pathname === `/api/v1/admin/competitions/${competition.id}` && request.method === 'DELETE')
     return new Response(null, { status: 204 })
+  if (pathname === `/api/v1/admin/competitions/${competition.id}/leaderboard-visibility`)
+    return Response.json(visibilityConfiguration)
 
   return Response.json({}, { status: 404 })
 }
@@ -150,5 +162,28 @@ describe('generated public competition contract', () => {
       ['GET', `/api/v1/admin/competitions/${competition.id}`],
       ['DELETE', `/api/v1/admin/competitions/${competition.id}`],
     ])
+  })
+
+  test('admin reads and updates leaderboard visibility through generated operations', async () => {
+    await expect(
+      competitionAdminApi.getLeaderboardVisibility(competition.id),
+    ).resolves.toEqual(visibilityConfiguration)
+    await expect(competitionAdminApi.updateLeaderboardVisibility(competition.id, {
+      visibility: 2,
+      startsAt: null,
+      expectedRevision: visibilityConfiguration.revision,
+      reason: 'final hour blackout',
+    })).resolves.toEqual(visibilityConfiguration)
+
+    expect(requests.map(request => [request.method, new URL(request.url).pathname])).toEqual([
+      ['GET', `/api/v1/admin/competitions/${competition.id}/leaderboard-visibility`],
+      ['PUT', `/api/v1/admin/competitions/${competition.id}/leaderboard-visibility`],
+    ])
+    expect(await requests[1]!.clone().json()).toEqual({
+      visibility: 2,
+      startsAt: null,
+      expectedRevision: 3,
+      reason: 'final hour blackout',
+    })
   })
 })

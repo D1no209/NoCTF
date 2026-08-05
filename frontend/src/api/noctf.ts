@@ -10,12 +10,14 @@ import type {
   NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictResponse,
   NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest,
   NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode,
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse,
   NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest,
+  NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest,
   NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest,
   NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse,
@@ -796,6 +798,28 @@ export const competitionAdminApi = {
   ) {
     return unwrap(
       await generatedSdk.adminUpdateCompetition({ path: { competitionId }, body }),
+      tt('errors.updateCompetition'),
+    )
+  },
+  async getLeaderboardVisibility(
+    competitionId: string,
+  ): Promise<NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse> {
+    return unwrap(
+      await generatedSdk.adminGetCompetitionLeaderboardVisibility({
+        path: { competitionId },
+      }),
+      tt('errors.loadCompetition'),
+    )
+  },
+  async updateLeaderboardVisibility(
+    competitionId: string,
+    body: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest,
+  ): Promise<NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse> {
+    return unwrap(
+      await generatedSdk.adminUpdateCompetitionLeaderboardVisibility({
+        path: { competitionId },
+        body,
+      }),
       tt('errors.updateCompetition'),
     )
   },

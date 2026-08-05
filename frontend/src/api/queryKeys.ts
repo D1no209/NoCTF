@@ -29,6 +29,7 @@ export const queryKeys = {
   patchSubmissions: (competitionId: string) => ['patch-submissions', competitionId] as const,
   adminCompetitions: ['admin-competitions'] as const,
   adminCompetition: (id: string) => ['admin-competition', id] as const,
+  adminCompetitionLeaderboardVisibility: (id: string) => ['admin-competition-leaderboard-visibility', id] as const,
   adminCompetitionSummary: (id: string) => ['admin-competition-summary', id] as const,
   adminCompetitionChallenges: (id: string) => ['admin-competition-challenges', id] as const,
   adminCompetitionChallenge: (

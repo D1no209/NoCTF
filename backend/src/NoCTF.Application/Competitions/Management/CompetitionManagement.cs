@@ -27,7 +27,9 @@ public sealed record CompetitionView(
     bool TeamRegistrationAutoApprove,
     int MaxTeamMembers,
     int MaxConcurrentRuntimeInstancesPerTeam,
-    Guid OwnerId);
+    Guid OwnerId,
+    CompetitionLeaderboardVisibility LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal,
+    DateTimeOffset? LeaderboardVisibilityStartsAt = null);
 
 public enum CompetitionCreationState
 {

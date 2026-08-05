@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Builder;
@@ -7,7 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Competitions;
-using NoCTF.Application.Competitions.Management;
+using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
@@ -106,10 +107,63 @@ public sealed class LeaderboardEndpointTests
         await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
     }
 
+    [Test]
+    public async Task Blackout_returns_hidden_empty_projection_without_queueing_work()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var messages = new RecordingMessagePublisher();
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(stale: false),
+            messages,
+            CompetitionLeaderboardVisibility.Blackout,
+            LeaderboardDataScope.Hidden);
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var body = await response.Content.ReadFromJsonAsync<LeaderboardResponse>();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(body).IsNotNull();
+        await Assert.That(body!.Visibility)
+            .IsEqualTo(CompetitionLeaderboardVisibility.Blackout);
+        await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScope.Hidden);
+        await Assert.That(body.Entries).IsEmpty();
+        await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
+    }
+
+    [Test]
+    public async Task Frozen_projection_uses_persisted_snapshot_without_live_refresh()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var messages = new RecordingMessagePublisher();
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(stale: false, frozen: true),
+            messages,
+            CompetitionLeaderboardVisibility.Frozen,
+            LeaderboardDataScope.Frozen);
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var body = await response.Content.ReadFromJsonAsync<LeaderboardResponse>();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(body).IsNotNull();
+        await Assert.That(body!.Visibility)
+            .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
+        await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
+        await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
         Guid competitionId,
         ILeaderboardCache leaderboard,
-        IBackendMessagePublisher messages)
+        IBackendMessagePublisher messages,
+        CompetitionLeaderboardVisibility visibility = CompetitionLeaderboardVisibility.Normal,
+        LeaderboardDataScope dataScope = LeaderboardDataScope.Live)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -123,11 +177,9 @@ public sealed class LeaderboardEndpointTests
         builder.Services.SwaggerDocument();
         builder.Services.AddSingleton(leaderboard);
         builder.Services.AddSingleton(messages);
-        builder.Services.AddSingleton<ICompetitionLeaderboardAccess>(new DenyPrivateAccess());
+        builder.Services.AddSingleton<ICompetitionVisibilityAccess>(
+            new PublicVisibilityAccess(competitionId, visibility, dataScope));
         builder.Services.AddSingleton<IUserContext>(new AnonymousUserContext());
-        builder.Services.AddSingleton<ICompetitionManagementStore>(
-            new CompetitionStore(competitionId));
-        builder.Services.AddScoped<GetCompetition>();
 
         var app = builder.Build();
         app.UseNoCtfEndpoints();
@@ -135,13 +187,25 @@ public sealed class LeaderboardEndpointTests
         return app;
     }
 
-    private sealed class DenyPrivateAccess : ICompetitionLeaderboardAccess
+    private sealed class PublicVisibilityAccess(
+        Guid competitionId,
+        CompetitionLeaderboardVisibility visibility,
+        LeaderboardDataScope dataScope)
+        : ICompetitionVisibilityAccess
     {
-        public Task<bool> CanReadPrivateAsync(
+        public Task<CompetitionVisibilityAccessDecision?> ResolveAsync(
             Guid userId,
-            Guid competitionId,
+            Guid requestedCompetitionId,
+            DateTimeOffset now,
             CancellationToken cancellationToken) =>
-            Task.FromResult(false);
+            Task.FromResult<CompetitionVisibilityAccessDecision?>(
+                requestedCompetitionId == competitionId
+                    ? new(
+                        visibility,
+                        dataScope,
+                        0,
+                        2)
+                    : null);
     }
 
     private sealed class AnonymousUserContext : IUserContext
@@ -153,6 +217,7 @@ public sealed class LeaderboardEndpointTests
     private sealed class CachedLeaderboard(
         bool stale,
         bool missing = false,
+        bool frozen = false,
         DateTimeOffset? lastFailureAt = null) : ILeaderboardCache
     {
         public Task<LeaderboardResponse?> GetAsync(
@@ -170,6 +235,23 @@ public sealed class LeaderboardEndpointTests
                         TargetRevision = 2,
                         Stale = stale
                     });
+
+        public Task<LeaderboardResponse?> GetFrozenAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LeaderboardResponse?>(frozen
+                ? new LeaderboardResponse(
+                    competitionId,
+                    DateTimeOffset.UtcNow.AddMinutes(-5),
+                    [])
+                {
+                    Visibility = CompetitionLeaderboardVisibility.Frozen,
+                    DataScope = LeaderboardDataScope.Frozen,
+                    DataAsOf = DateTimeOffset.UtcNow.AddMinutes(-5),
+                    SnapshotRevision = 1,
+                    TargetRevision = 1
+                }
+                : null);
 
         public Task<LeaderboardCacheStatus> GetStatusAsync(
             Guid competitionId,
@@ -215,51 +297,4 @@ public sealed class LeaderboardEndpointTests
             ValueTask.CompletedTask;
     }
 
-    private sealed class CompetitionStore(Guid competitionId)
-        : ICompetitionManagementStore
-    {
-        public Task<CompetitionView?> FindAsync(
-            Guid requestedCompetitionId,
-            bool includeDraft,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<CompetitionView?>(
-                requestedCompetitionId == competitionId
-                    ? new(
-                        competitionId,
-                        "Leaderboard",
-                        null,
-                        GameMode.Ctf,
-                        DateTimeOffset.UtcNow.AddHours(-1),
-                        DateTimeOffset.UtcNow.AddHours(1),
-                        CompetitionStatus.Running,
-                        true,
-                        5,
-                        0,
-                        Guid.CreateVersion7())
-                    : null);
-
-        public Task<CompetitionCreationResult> CreateAsync(
-            CreateCompetitionCommand command,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<IReadOnlyList<CompetitionView>> ListAsync(
-            bool includeDraft,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<CompetitionView?> UpdateAsync(
-            UpdateCompetitionCommand command,
-            CompetitionStatus expectedStatus,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<bool> SoftDeleteAsync(
-            Guid requestedCompetitionId,
-            CompetitionStatus expectedStatus,
-            Guid actorId,
-            DateTimeOffset deletedAt,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-    }
 }

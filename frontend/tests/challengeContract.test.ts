@@ -29,6 +29,8 @@ const challenge = {
   updatedAt: '2026-08-01T01:00:00Z',
   controlFlag: 'flag{control}',
   urls: ['https://runtime.noctf.test'],
+  leaderboardVisibility: 0,
+  dataScope: 0,
 } as const
 
 const attachment = {
@@ -106,9 +108,8 @@ describe('generated public challenge contract', () => {
       .toBe(`/api/v1/competitions/${competitionId}/challenges/${competitionChallengeId}`)
   })
 
-  test('rejects incomplete responses instead of inventing challenge fields', () => {
-    expect(() => toPublicChallenge({ ...challenge, baseScore: undefined }))
-      .toThrow('Challenge response is missing baseScore.')
+  test('preserves hidden scores while rejecting missing identity fields', () => {
+    expect(toPublicChallenge({ ...challenge, baseScore: null }).baseScore).toBeNull()
     expect(() => toPublicChallenge({ ...challenge, id: undefined }))
       .toThrow('Challenge response is missing id.')
   })

@@ -1,5 +1,6 @@
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
+  NoCtfDomainCompetitionsCompetitionLeaderboardVisibility,
   NoCtfDomainCompetitionsCompetitionStatus,
   NoCtfDomainCompetitionsGameMode,
 } from './generated/types.gen'
@@ -25,6 +26,7 @@ export interface PublicCompetition {
   maxTeamMembers: number
   maxConcurrentRuntimeInstancesPerTeam: number
   ownerId: string
+  leaderboardVisibility: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility
 }
 
 const competitionModes: Record<NoCtfDomainCompetitionsGameMode, PublicCompetitionMode> = {
@@ -78,5 +80,6 @@ export function toPublicCompetition(
     maxTeamMembers: value.maxTeamMembers,
     maxConcurrentRuntimeInstancesPerTeam: value.maxConcurrentRuntimeInstancesPerTeam,
     ownerId: requireString(value.ownerId, 'ownerId'),
+    leaderboardVisibility: value.leaderboardVisibility ?? 0,
   }
 }

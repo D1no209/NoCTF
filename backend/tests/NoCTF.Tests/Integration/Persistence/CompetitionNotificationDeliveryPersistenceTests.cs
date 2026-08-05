@@ -1,12 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Permissions;
+using NoCTF.Infrastructure.Competitions.Visibility;
 using NoCTF.Infrastructure.Notifications;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
@@ -115,15 +117,17 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 [ownerId, managerAndMemberId, observerBotId, approvedMemberId, bannedMemberId]);
             await Assert.That(normalAudience).DoesNotContain(pendingMemberId);
 
-            var leaderboardAccess = new CompetitionLeaderboardAccess(db);
-            await Assert.That(await leaderboardAccess.CanReadPrivateAsync(
+            var leaderboardAccess = new CompetitionVisibilityAccess(db);
+            await Assert.That((await leaderboardAccess.ResolveAsync(
                 observerBotId,
                 competitionId,
-                ct)).IsTrue();
-            await Assert.That(await leaderboardAccess.CanReadPrivateAsync(
+                now,
+                ct))?.DataScope).IsEqualTo(LeaderboardDataScope.Live);
+            await Assert.That(await leaderboardAccess.ResolveAsync(
                 approvedMemberId,
                 competitionId,
-                ct)).IsFalse();
+                now,
+                ct)).IsNotNull();
 
             var delivery = new CompetitionNotificationDelivery(db, resolver);
             var payload = new TeamBannedPayload(

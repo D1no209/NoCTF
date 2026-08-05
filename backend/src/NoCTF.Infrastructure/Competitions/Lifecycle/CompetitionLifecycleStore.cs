@@ -146,6 +146,35 @@ public sealed class CompetitionLifecycleStore(
                 }
             }
         }
+        if (to == CompetitionStatus.Finished
+            && competition.LeaderboardVisibility != CompetitionLeaderboardVisibility.Normal)
+        {
+            var effectiveVisibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+                competition.Status,
+                competition.LeaderboardVisibility,
+                competition.LeaderboardVisibilityStartsAt,
+                now);
+            if (effectiveVisibility != CompetitionLeaderboardVisibility.Normal)
+            {
+                db.Set<CompetitionLeaderboardVisibilityAudit>().Add(new()
+                {
+                    Id = Guid.CreateVersion7(now),
+                    CompetitionId = competition.Id,
+                    From = effectiveVisibility,
+                    To = CompetitionLeaderboardVisibility.Normal,
+                    ActorId = actorId,
+                    Reason = "competition_finished",
+                    Automatic = true,
+                    OccurredAt = now
+                });
+            }
+            competition.LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal;
+            competition.LeaderboardVisibilityStartsAt = null;
+            competition.LeaderboardVisibilityAppliedAt = now;
+            competition.LeaderboardVisibilityRevision = checked(
+                competition.LeaderboardVisibilityRevision + 1);
+            competition.FrozenLeaderboardSnapshotJson = null;
+        }
         competition.Status = to;
         competition.UpdatedAt = now;
         var lifecycleAudit = new CompetitionLifecycleAudit

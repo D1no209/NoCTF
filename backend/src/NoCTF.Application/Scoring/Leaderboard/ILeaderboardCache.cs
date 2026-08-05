@@ -1,4 +1,13 @@
+using NoCTF.Domain.Competitions;
+
 namespace NoCTF.Application.Scoring.Leaderboard;
+
+public enum LeaderboardDataScope
+{
+    Live,
+    Frozen,
+    Hidden
+}
 
 public sealed record LeaderboardResponse(Guid CompetitionId, DateTimeOffset GeneratedAt, IReadOnlyList<LeaderboardEntry> Entries)
 {
@@ -8,6 +17,9 @@ public sealed record LeaderboardResponse(Guid CompetitionId, DateTimeOffset Gene
     public long TargetRevision { get; init; }
     public bool Stale { get; init; }
     public DateTimeOffset? LastFailureAt { get; init; }
+    public CompetitionLeaderboardVisibility Visibility { get; init; }
+    public LeaderboardDataScope DataScope { get; init; }
+    public DateTimeOffset? DataAsOf { get; init; }
 }
 public enum LeaderboardProjectionState { Processing }
 public sealed record LeaderboardProcessingResponse(
@@ -20,10 +32,21 @@ public sealed record LeaderboardCacheStatus(long TargetRevision, DateTimeOffset?
 public interface ILeaderboardCache
 {
     Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken);
+    Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken cancellationToken) =>
+        Task.FromResult<LeaderboardResponse?>(null);
     Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken);
     Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<LeaderboardCacheStatus> GetStatusAsync(
         Guid competitionId,
         CancellationToken cancellationToken) =>
         Task.FromResult(new LeaderboardCacheStatus(0, null));
+}
+
+public interface ILeaderboardSnapshotFactory
+{
+    Task<LeaderboardResponse?> CreateAsync(
+        Guid competitionId,
+        DateTimeOffset projectedAt,
+        bool historical,
+        CancellationToken cancellationToken);
 }

@@ -23,6 +23,35 @@ public sealed class RedisLeaderboardCacheTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Historical_snapshot_uses_the_exact_projection_cutoff(
+        CancellationToken cancellationToken)
+    {
+        await RunAsync("noctf_leaderboard_historical_cutoff", async fixture =>
+        {
+            await AddTeamsAsync(fixture.Options, fixture.CompetitionId, cancellationToken);
+            var engine = new CapturingProjectionEngine();
+            await using var db = new NoCtfDbContext(fixture.Options);
+            var cache = CreateCache(db, engine, new RecordingPublisher(), fixture.Redis);
+
+            await cache.CreateAsync(
+                fixture.CompetitionId,
+                DateTimeOffset.Parse("2026-07-31T00:00:30Z"),
+                historical: true,
+                cancellationToken);
+            await Assert.That(engine.Teams).IsEmpty();
+
+            await cache.CreateAsync(
+                fixture.CompetitionId,
+                DateTimeOffset.Parse("2026-07-31T00:02:00Z"),
+                historical: true,
+                cancellationToken);
+            await Assert.That(engine.Teams.Select(team => team.Name))
+                .IsEquivalentTo(["Approved team"]);
+        }, cancellationToken);
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Older_projection_cannot_overwrite_a_newer_snapshot(
         CancellationToken cancellationToken)
     {

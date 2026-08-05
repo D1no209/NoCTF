@@ -65,7 +65,8 @@ public interface IPlatformLogReader
 public enum PlatformAuditKind : short
 {
     CompetitionLifecycle,
-    UserAccountLifecycle
+    UserAccountLifecycle,
+    CompetitionLeaderboardVisibility
 }
 
 public sealed record PlatformAuditView(
@@ -76,6 +77,8 @@ public sealed record PlatformAuditView(
     Guid? ActorId,
     CompetitionStatus? FromCompetitionStatus,
     CompetitionStatus? ToCompetitionStatus,
+    CompetitionLeaderboardVisibility? FromLeaderboardVisibility,
+    CompetitionLeaderboardVisibility? ToLeaderboardVisibility,
     UserAccountLifecycleAction? UserAccountAction,
     string? SubjectDisplayName,
     string? Reason,

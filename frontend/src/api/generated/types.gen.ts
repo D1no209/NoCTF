@@ -273,11 +273,14 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     maxTeamMembers?: number;
     maxConcurrentRuntimeInstancesPerTeam?: number;
     ownerId?: string;
+    leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
 };
 
 export type NoCtfDomainCompetitionsGameMode = 0 | 1 | 2 | 3;
 
 export type NoCtfDomainCompetitionsCompetitionStatus = 0 | 1 | 2 | 3 | 4 | 5;
+
+export type NoCtfDomainCompetitionsCompetitionLeaderboardVisibility = 0 | 1 | 2;
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
     [key: string]: never;
@@ -293,6 +296,9 @@ export type NoCtfApplicationScoringLeaderboardLeaderboardResponse = {
     targetRevision?: number;
     stale?: boolean;
     lastFailureAt?: string | null;
+    visibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    dataScope?: NoCtfApplicationScoringLeaderboardLeaderboardDataScope;
+    dataAsOf?: string | null;
 };
 
 export type NoCtfApplicationScoringLeaderboardLeaderboardEntry = {
@@ -342,6 +348,8 @@ export type NoCtfApplicationScoringLeaderboardLeaderboardBloodSummary = {
     occurredAt?: string;
 };
 
+export type NoCtfApplicationScoringLeaderboardLeaderboardDataScope = 0 | 1 | 2;
+
 export type NoCtfApplicationScoringLeaderboardLeaderboardProcessingResponse = {
     competitionId?: string;
     state?: NoCtfApplicationScoringLeaderboardLeaderboardProjectionState;
@@ -366,7 +374,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     title?: string;
     description?: string | null;
     direction?: string;
-    baseScore?: number;
+    baseScore?: number | null;
     order?: number;
     isPublished?: boolean;
     revision?: number;
@@ -375,6 +383,8 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     updatedAt?: string;
     controlFlag?: string | null;
     urls?: Array<string> | null;
+    leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    dataScope?: NoCtfApplicationScoringLeaderboardLeaderboardDataScope;
 };
 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
@@ -398,6 +408,8 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentRespo
 
 export type NoCtfapiEndpointsChallengesChallengeListResponse = {
     items?: Array<NoCtfapiEndpointsChallengesChallengeResponse>;
+    leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    dataScope?: NoCtfApplicationScoringLeaderboardLeaderboardDataScope;
 };
 
 export type NoCtfapiEndpointsChallengesListChallengesRequest = {
@@ -741,6 +753,8 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     actorId?: string | null;
     fromCompetitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
     toCompetitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
+    fromLeaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
+    toLeaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
     userAccountAction?: NoCtfDomainIdentityUserAccountLifecycleAction | null;
     subjectDisplayName?: string | null;
     reason?: string | null;
@@ -748,7 +762,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     occurredAt?: string;
 };
 
-export type NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind = 0 | 1;
+export type NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind = 0 | 1 | 2;
 
 export type NoCtfDomainIdentityUserAccountLifecycleAction = 0 | 1 | 2 | 3;
 
@@ -869,6 +883,15 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationR
     updatedAt?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse = {
+    competitionId?: string;
+    configuredVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    effectiveVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    startsAt?: string | null;
+    appliedAt?: string | null;
+    revision?: number;
+};
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse = {
     competitionId?: string;
     ownerId?: string;
@@ -911,6 +934,20 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest 
     teamRegistrationAutoApprove?: boolean;
     maxTeamMembers?: number;
     maxConcurrentRuntimeInstancesPerTeam: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityFailureResponse = {
+    code?: NoCtfApplicationCompetitionsVisibilityCompetitionVisibilityMutationState;
+    current?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse | null;
+};
+
+export type NoCtfApplicationCompetitionsVisibilityCompetitionVisibilityMutationState = 0 | 1 | 2 | 3 | 4;
+
+export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest = {
+    visibility: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    startsAt?: string | null;
+    expectedRevision: number;
+    reason?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissionsRequest = {
@@ -2347,6 +2384,13 @@ export type NoCtfapiEndpointsChallengesListChallengesEndpointData = {
     };
     query?: never;
     url: '/api/v1/competitions/{competitionId}/challenges';
+};
+
+export type NoCtfapiEndpointsChallengesListChallengesEndpointErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
 };
 
 export type NoCtfapiEndpointsChallengesListChallengesEndpointResponses = {
@@ -4471,6 +4515,79 @@ export type AdminCompetitionConfigurationUpdateResponses = {
 };
 
 export type AdminCompetitionConfigurationUpdateResponse = AdminCompetitionConfigurationUpdateResponses[keyof AdminCompetitionConfigurationUpdateResponses];
+
+export type AdminGetCompetitionLeaderboardVisibilityData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/leaderboard-visibility';
+};
+
+export type AdminGetCompetitionLeaderboardVisibilityErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminGetCompetitionLeaderboardVisibilityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse;
+};
+
+export type AdminGetCompetitionLeaderboardVisibilityResponse = AdminGetCompetitionLeaderboardVisibilityResponses[keyof AdminGetCompetitionLeaderboardVisibilityResponses];
+
+export type AdminUpdateCompetitionLeaderboardVisibilityData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/leaderboard-visibility';
+};
+
+export type AdminUpdateCompetitionLeaderboardVisibilityErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityFailureResponse;
+};
+
+export type AdminUpdateCompetitionLeaderboardVisibilityError = AdminUpdateCompetitionLeaderboardVisibilityErrors[keyof AdminUpdateCompetitionLeaderboardVisibilityErrors];
+
+export type AdminUpdateCompetitionLeaderboardVisibilityResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse;
+};
+
+export type AdminUpdateCompetitionLeaderboardVisibilityResponse = AdminUpdateCompetitionLeaderboardVisibilityResponses[keyof AdminUpdateCompetitionLeaderboardVisibilityResponses];
 
 export type AdminGetCompetitionPermissionsData = {
     body?: never;

@@ -189,6 +189,7 @@ internal sealed class SwaggerBackendMessagePublisher : IBackendMessagePublisher
 {
     public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask ApplyCompetitionVisibilityAsync(Guid competitionId, int visibilityRevision, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     public ValueTask CleanupCompetitionRuntimesAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     public ValueTask ProvisionCompetitionRuntimesAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }
@@ -196,6 +197,7 @@ internal sealed class SwaggerBackendMessagePublisher : IBackendMessagePublisher
 internal sealed class SwaggerLeaderboardCache : ILeaderboardCache
 {
     public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
+    public Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
     public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
     public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
 }

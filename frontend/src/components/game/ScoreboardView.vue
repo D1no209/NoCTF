@@ -6,6 +6,7 @@ import type {
 } from '@/api/generated/types.gen'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { leaderboardDataScope, leaderboardVisibility, leaderboardVisibilityLabelKey } from '@/api/leaderboardVisibility'
 import { competitionApi } from '@/api/noctf'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -36,6 +37,13 @@ const auth = useAuthStore()
 const scoreStore = useScoreStore()
 const entries = ref<LeaderboardEntry[]>([])
 const bloods = ref<NoCtfApplicationScoringLeaderboardLeaderboardBloodSummary[]>([])
+const visibility = ref<NoCtfApplicationScoringLeaderboardLeaderboardResponse['visibility']>(
+  leaderboardVisibility.normal,
+)
+const dataScope = ref<NoCtfApplicationScoringLeaderboardLeaderboardResponse['dataScope']>(
+  leaderboardDataScope.live,
+)
+const dataAsOf = ref<string | null>(null)
 const loading = ref(true)
 const usingFallback = ref(false)
 let pollInterval: ReturnType<typeof setInterval> | null = null
@@ -62,6 +70,12 @@ const { connection, isConnected, start } = useSignalR({
 
 const sortedEntries = computed(() => leaderboardRows(entries.value))
 const displayedBloods = computed(() => leaderboardBloodRows(bloods.value))
+const isHidden = computed(() => dataScope.value === leaderboardDataScope.hidden)
+const isFrozen = computed(() => dataScope.value === leaderboardDataScope.frozen)
+const hasPrivilegedLiveView = computed(() =>
+  dataScope.value === leaderboardDataScope.live
+  && visibility.value !== leaderboardVisibility.normal,
+)
 
 const displayedEntries = computed(() => {
   if (props.full === false)
@@ -99,9 +113,24 @@ function formatBloodTime(value: string) {
   }).format(date)
 }
 
+function formatDataAsOf(value: string | null) {
+  if (!value)
+    return t('common.unknown')
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()))
+    return value
+  return new Intl.DateTimeFormat(locale.value, {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  }).format(date)
+}
+
 function applyLeaderboard(snapshot: NoCtfApplicationScoringLeaderboardLeaderboardResponse) {
   entries.value = snapshot.entries ?? []
   bloods.value = snapshot.bloods ?? []
+  visibility.value = snapshot.visibility ?? leaderboardVisibility.normal
+  dataScope.value = snapshot.dataScope ?? leaderboardDataScope.live
+  dataAsOf.value = snapshot.dataAsOf ?? null
   scoreStore.updateFromLeaderboard(entries.value, props.teamId, props.competitionId)
   emit('scoreUpdate', entries.value)
 }
@@ -217,7 +246,13 @@ onUnmounted(() => {
         <HandDrawnUnderline :width="120" color="#E63946" />
       </div>
       <div class="flex items-center gap-2">
-        <Badge v-if="isConnected && !usingFallback" class="bg-green-600 text-white border-transparent text-xs">
+        <Badge v-if="isHidden" variant="destructive" class="text-xs">
+          {{ t(leaderboardVisibilityLabelKey(visibility)) }}
+        </Badge>
+        <Badge v-else-if="isFrozen" variant="secondary" class="text-xs">
+          {{ t(leaderboardVisibilityLabelKey(visibility)) }}
+        </Badge>
+        <Badge v-else-if="isConnected && !usingFallback" class="bg-green-600 text-white border-transparent text-xs">
           {{ t('common.live') }}
         </Badge>
         <Badge v-else-if="usingFallback" variant="secondary" class="text-xs">
@@ -233,6 +268,18 @@ onUnmounted(() => {
       {{ t('scoreboard.loading') }}
     </div>
 
+    <Card v-else-if="isHidden" class="relative flex min-h-56 flex-col items-center justify-center gap-3 border-2 border-dashed border-foreground/30 bg-muted/40 p-6 text-center">
+      <span class="flex size-10 items-center justify-center border-2 border-foreground text-xl" aria-hidden="true">×</span>
+      <div class="space-y-1">
+        <p class="font-bold">
+          {{ t('scoreboard.blackoutTitle') }}
+        </p>
+        <p class="mx-auto max-w-2xl text-sm text-muted-foreground">
+          {{ t('scoreboard.blackoutDescription') }}
+        </p>
+      </div>
+    </Card>
+
     <div v-else-if="sortedEntries.length === 0">
       <Card class="relative flex min-h-48 flex-col items-center justify-center gap-2 border-2 border-dashed border-foreground/20 bg-[#FDFBF7] p-6 text-center dark:bg-[#1C1917]">
         <span class="text-4xl">📋</span>
@@ -243,6 +290,14 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="space-y-3">
+      <div v-if="isFrozen" class="flex flex-col gap-1 border-2 border-dashed border-border bg-muted/40 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+        <span class="font-bold">{{ t('scoreboard.frozenTitle') }}</span>
+        <span class="text-muted-foreground">{{ t('scoreboard.dataAsOf', { time: formatDataAsOf(dataAsOf) }) }}</span>
+      </div>
+      <div v-else-if="hasPrivilegedLiveView" class="border-2 border-dashed border-border bg-muted/40 p-3 text-sm">
+        <span class="font-bold">{{ t('scoreboard.privilegedLiveTitle') }}</span>
+        <span class="ml-2 text-muted-foreground">{{ t('scoreboard.privilegedLiveDescription') }}</span>
+      </div>
       <div v-if="displayedBloods.length" class="space-y-2">
         <h3 class="text-sm font-bold">
           {{ t('scoreboard.bloods') }}
