@@ -48,8 +48,8 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
   状态机，以及 `MaxConcurrentRuntimeInstancesPerTeam` 事务额度、方案 A API 与 AWD
   start gate。
 - 6.48 已完成 CTF 排行榜一血、二血、三血的统一强类型投影与 OpenAPI 契约；计分公式未改。
-- 6.49 至 6.51 已完成独立个人资料、MailKit SMTP，以及排行榜冻结/黑灯的服务端权限投影、
-  管理配置、前端状态和 BOT 边界。
+- 6.49 至 6.54 已完成独立个人资料、MailKit SMTP、排行榜冻结/黑灯、默认私密咨询、单比赛
+  不可变事件日志，以及 CTF/AWDP 跨队 Flag 检测与人工裁决纵切。
 - 用户已明确授权 push；`codex/backend-gitops-completion` 已推送，不创建 PR、不合入
   `main`。Frontend 后续优化由协作者并行推进，本会话避免再修改 Frontend。
 - 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
@@ -85,6 +85,7 @@ git log --oneline 003b75c..2c6b4ce -- backend
 
 以下工作树内容属于用户或仅为换行差异，未纳入后端提交；后续不得顺手清理或暂存：
 
+- `TODO.md`
 - `backend/src/NoCTF.Infrastructure/Messaging/WolverineTransactionalMessageOutbox.cs`：
   当前 clean；因前序用户所有权记录继续视为保护文件。
 - `backend/src/NoCTF.Runner/Properties/`
@@ -2457,6 +2458,64 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   数据行、导出、权限与 Flag 对话框由上述生成契约、前端测试及真实 PostgreSQL 用例覆盖。本地
   Vite 监听和浏览器验收标签已清理，没有修改或部署现网。
 
+### 6.54 CTF 与 AWDP 跨队 Flag 反作弊（2026-08-05）
+
+- 功能提交：`c11328e feat(submissions): add cross-team flag adjudication`。本提交只在本地分支，
+  未 push、未部署；本阶段没有需要递增的显式平台运行版本。
+- 用户通过 `$grill-me` 回答 `AAAAAA`，确认六项产品决策：不新增反作弊业务表，使用关联
+  `ScoringEventId` 的 append-only `CompetitionEvent` 推导处理状态；Administrator、Owner、
+  Manager 可最终确认封禁或更正，Judge 可查看证据和驳回，Observer 只看脱敏列表；封禁和更正
+  只发布比赛范围的通用通知，工作人员理由保持私密；驳回静默且理由至少 8 字符；更正必须填写
+  理由、解除封禁并发布通用更正；重判只 supersede 未处理事件，若仍命中则产生新的未处理事件，
+  检测通知以 SubmissionId 幂等，已确认事件只有显式更正才会失效。
+- CTF Flag 与 AWDP Break 现在会在同一比赛题目内精确匹配其他活跃队伍的动态 Flag。唯一命中
+  时产生 `ForeignTeamFlagDetected` 和 victim team；多队同值时产生不暴露 victim 的 ambiguous
+  事件。自队 Flag、公开模板 Flag 和正确 Flag 仍走原有评分；AWD 行为没有改变。普通选手的
+  submission status/list 将两种内部判定统一投影为普通 Wrong，不返回 victim、内部失败码或
+  反作弊状态，避免把接口变成 Flag 探测器。
+- Processor 在评分事务内追加 `CheatIncidentDetected` 事件并通过 Wolverine 发送仅含 ID 的消息；
+  日志不包含 Flag。Worker 只通知 Administrator、Owner/Manager/Judge，使用稳定幂等键。新增
+  `Pending/Confirmed/Dismissed/Superseded/Corrected` 强类型状态，以及检测、封禁、更正对应的
+  CompetitionEvent/Notification kinds；完整 Flag 只在单独、`no-store`、会写审计的详情读取中
+  返回，Observer 明确禁止。
+- 新增强类型管理契约：
+  `GET /api/v1/admin/competitions/{competitionId}/cheat-incidents`、
+  `GET /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}`、
+  `POST .../{scoringEventId}/dismiss`、`POST .../{scoringEventId}/confirm`、
+  `POST .../{scoringEventId}/correct`。列表使用签名 cursor 和有界时间/队伍/用户/题目/状态筛选；
+  Endpoint 全部使用 FastEndpoints 8.2.0 强类型基类、`ExecuteAsync`、具体 HttpResults、
+  `Results<T...>` 与 `TypedResults`，裁决、权限和事务规则位于 Application/Infrastructure。
+- 确认操作在同一 serializable transaction 和 competition advisory lock 内再次验证状态、封禁
+  来源队伍并追加不可变事件；更正只允许处理已确认事件，解除由该事件导致的封禁并追加更正。
+  rejudge 会锁定旧 ScoringEvent 并只 supersede Pending 事件。没有修改既有 ScoringEvent 事实，
+  也没有新增反作弊表。EF CLI 生成
+  `20260805122032_AddCheatIncidentAdjudication` 及 designer/snapshot，未手改 migration 或 snapshot。
+- OpenAPI 已重新导出，共 169 个注册端点，其中 168 个为文档化 v1 路由，另有
+  `GET /health`；Admin 路由为 109 条。两份 OpenAPI artifact 字节一致，SHA-256 均为
+  `80522F48974B1EB39B5795C92B43AFBEFBE6E4C46FE478B6E5D485398CE34097`。TypeScript SDK
+  连续生成字节稳定：index
+  `1FADC204B3CD159AE59E6A93A8826862D6B9D1E2B38A3439992DE62E09508846`，sdk
+  `0EA4CA102258164F107DBAE206BC20C2EDAF8B89C0CA3C76FB0FB20DF1A0F0E1`，types
+  `C99D6CE16DB1BCBD0B5AAB19617069366AA0636791EB041F5456B0EBC148E615`。
+- 前端仅通过生成 SDK 和 `cheatIncidentApi` 薄封装调用接口。比赛管理详情在“队伍”和“实例”
+  之间增加“反作弊”标签，包含未处理计数、完整筛选、签名分页、15 秒轮询和 SignalR 刷新、
+  脱敏列表、显式受审计证据读取/复制，以及按角色展示的驳回、确认封禁和更正操作。证据仅存在
+  当前组件内存，关闭立即清空，不写 browser storage。最后修复 TabsContent/table 的 intrinsic
+  width，使窄侧栏布局不再产生整页横向溢出，保持 Pixel Industrial 风格和完整中英文状态。
+- 后端验证命令与结果：`dotnet build backend/NoCTF.slnx --no-restore` 和 Release build 均为
+  0 warning/0 error；TUnit non-Integration 584/584 passed；真实 PostgreSQL 目标用例
+  `CheatIncidentPersistenceTests` 1/1、
+  `SubmissionProcessingLeaderboardRevisionPersistenceTests` 3/3、
+  `CompetitionNotificationDeliveryPersistenceTests` 3/3 passed；
+  `dotnet ef migrations has-pending-model-changes` 无漂移（全局 EF CLI 8.0.11 对 runtime 10.0.4
+  仅提示版本较旧）；OpenAPI 导出和 SDK 二次生成字节稳定；`git diff --check` passed。
+- 前端最终验证：`bun test` 169/169、触及文件 scoped ESLint 0 warning/0 error、`vue-tsc` 与
+  production `bun run build` passed。构建只有依赖 PURE annotation 与既有大 chunk 警告。
+- 使用内置浏览器代理到隔离本地 mock 完成实际验收：列表、筛选、未处理 badge、证据展开与复制、
+  权限按钮、理由长度门禁、确认弹窗和窄宽布局均正常；文档宽度与 viewport 一致。控制台只有 mock
+  未实现 Competition SignalR negotiate 的预期 404（15 秒 polling fallback 正常）和既有
+  Three.js deprecation warning。浏览器标签、三个本地监听和临时 mock 文件均已清理。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2479,6 +2538,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 排行榜 Normal/Frozen/Blackout、精确 cutoff、可信角色/BOT 服务端投影、自动揭榜及前端空态。
 - 默认私密的题目/平台咨询、强类型状态与权限、Wolverine 通知和可选匿名公开回答。
 - 单比赛永久不可变事件、三层可见性、签名分页/JSONL 导出、受审计 Flag 读取及可靠实时刷新。
+- CTF/AWDP 跨队 Flag 隐蔽检测、事件派生裁决、受审计证据、封禁/更正和管理前端。
 
 当前尚未执行的交付边界：
 
@@ -2486,7 +2546,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   环境部署、监控、备份恢复与运维验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
-- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72` 及各自 HANDOFF 提交是当前任务新增的
+- `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e` 及各自 HANDOFF 提交是当前任务新增的
   本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
   push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
@@ -2495,20 +2555,19 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 ## 7. 建议的下一交接顺序
 
 最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
-P1 选手与出题人交流和 P1 单比赛独立日志已分别由 6.49 至 6.53 完成；下一阶段是 P1
-“CTF 与 AWDP 跨队 Flag 反作弊”：
+P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
+6.54 完成。下一阶段是 P2“管理员平台日志”：
 
-1. 先审计 CTF/AWDP Flag 生成、提交、ScoringEvent、重判、队伍封禁、通知和当前 CompetitionEvent
-   事实，固定普通选手仍只看到普通 Flag 错误，不能利用响应探测其他队伍 Flag。
-2. TODO 6.3 的事件处理状态来源、最终封禁角色、公开原因粒度、解封和误判更正通知策略尚未
-   决定，开始数据模型或人工裁决实现前必须用 `$grill-me` 集中询问；不得擅自新增业务表或把
-   Team ban 状态误当作 incident 处理状态。
-3. 检测事实必须与 Submission/ScoringEvent/CompetitionEvent 保持强类型、事务一致和重放幂等；
-   普通日志与消息不能携带完整 Flag。完整 Flag 继续复用独立受审计读取边界，Observer 禁止。
-4. 前端继续只使用 OpenAPI generated SDK/薄封装，管理比赛详情的“反作弊”标签位于“队伍”和
-   “实例”之间；未完成 `/grilling` 的交互不能自行拍板。
-5. 阶段完成后运行 build/test/EF/OpenAPI/Frontend 与按角色浏览器门禁，做独立功能提交并单独
-   提交 HANDOFF。未经新任务明确授权，继续不 push、不部署。
+1. 先审计现有平台日志已提交实现和当前受保护的协作者文件，只补齐 TODO 第 7 节真实缺口，
+   不重复平台日志导航、实时/审计/死信队列等已完成工作。
+2. 在新增持久化、保留、轮转、归档或导出协议前，必须用 `$grill-me` 确认存储后端、保留期限、
+   轮转、归档和导出上限；继续遵守“不新增大量数据表”的约束。
+3. 管理员平台日志必须与单比赛不可变事件和审计日志明确分区，默认 Warning 以上；Flag 可按
+   当前可信 Administrator 边界明文显示，密码、Token、Cookie、邀请令牌、SMTP 与部署秘密仍
+   必须强制脱敏。
+4. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
+   运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
+5. 未经新任务明确授权，继续不 push、不部署。
 
 用户稍后会提供真实环境部署细则。在此之前：
 
@@ -2555,8 +2614,9 @@ Docker port mapping，host port 固定请求 `0`。
    三血契约使用 6.48；个人资料、邮箱可见性、头像安全和改密失效使用 6.49；MailKit、显式
    TLS 模式、可选 SMTP 认证和脱敏失败使用 6.50；排行榜冻结、黑灯、BOT/通知边界使用
    6.51；默认私密咨询、可选匿名公开回答和通知使用 6.52；单比赛不可变事件、三层可见性、
-   导出、Flag 审计和实时刷新使用 6.53。下一纵切按 `TODO.md` 进入“CTF 与 AWDP 跨队 Flag
-   反作弊”，不要回滚或重做 `/profile`、SMTP、排行榜可见性、咨询或比赛日志。
+   导出、Flag 审计和实时刷新使用 6.53；跨队 Flag 检测、事件派生裁决、受审计证据、封禁和
+   更正使用 6.54。下一纵切按 `TODO.md` 审计 P2“管理员平台日志”缺口，不要回滚或重做
+   `/profile`、SMTP、排行榜可见性、咨询、比赛日志或反作弊。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
