@@ -2621,6 +2621,65 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   增加 `min-w-0`；复验失效页和有效表单 document scrollWidth 均等于 viewport，桌面 1265px
   同样无溢出。本地 Vite 监听和浏览器标签已清理，未访问或修改现网。
 
+### 6.57 完整比赛归档与平台审计导出（2026-08-06）
+
+- 功能提交：`7b479f4a feat(exports): add durable competition and audit archives`；前端提交：
+  `5923e577 feat(frontend): add data export workspaces`。两项提交均只在本地分支，未 push、未部署；
+  平台信息继续读取程序集元数据，仓库没有需要随本纵切递增的独立运行版本。
+- 用户通过 `$grill-me` 的八组 `A` 确认完整契约：每个比赛导出一个 ZIP，包含 manifest 及
+  competition、challenges、teams、submissions、scoring-events、cheat-incidents、
+  competition-events 七个 NDJSON 数据集；平台审计是独立 NDJSON。比赛归档允许 Administrator、
+  Owner、Manager，平台审计仅 Administrator。默认不含明文 Flag；仅 Human Administrator 可在
+  提供 8 至 512 字符理由后显式包含，成功生成会写永久比赛审计。导出包含删除、取代、匿名化和
+  全部历史行，排除附件二进制、运行诊断日志、密码、Token 与 SMTP 凭据。
+- 只新增一个 `data_exports` 表，保存异步任务与对象元数据；没有复制 competition events 或平台
+  审计事实，也没有为比赛/请求人增加阻塞删除的外键。EF migration
+  `20260805174833_AddDataExports` 完全由 `dotnet ef` 生成，未手改 migration 或 snapshot。
+  Wolverine 负责 Generate/Expire/Purge durable message；对象文件 24 小时失效并删除，任务元数据
+  30 天后删除。每个请求人/导出 scope 全局最多一个 Queued/Processing 任务，PostgreSQL advisory
+  transaction lock 固定并发单赢家；默认最大产物 2 GiB，超限整任务失败且不保留截断文件。
+- 生成器在 PostgreSQL Repeatable Read transaction 中读取一致快照。比赛 ZIP manifest 使用
+  `noctf.competition-export/1` schema version，记录 ExportId、scope、competition、导出时间、
+  protected-Flag 边界和每个数据集行数；Flag 默认只输出 SHA-256，附件只输出名称、类型、大小和
+  SHA-256，队伍邀请令牌、Competition derivation secret 与对象 key 永不导出。平台审计直接遍历
+  既有 CompetitionEvent/UserAccountLifecycleAudit 投影视图，不复制数据。文件上传到既有
+  `IObjectStorage`，完成/失败均产生幂等站内通知；下载时重新校验当前角色，protected artifact
+  永远只允许 Administrator。
+- 新增五个强类型 FastEndpoints：比赛任务 GET/POST、平台审计任务 GET/POST、统一下载 GET。
+  Endpoint 全部使用 `ExecuteAsync`、具体 HttpResults、`Results<T...>` 和 `TypedResults`，权限、
+  业务状态和生成规则位于 Application/Infrastructure。OpenAPI 为 176 条文档化 v1 路由，另有
+  `GET /health`；Admin 路由 115 条。两份 OpenAPI artifact 字节一致，SHA-256 均为
+  `145FBCC6AA269FE0B1FE09207F1AD69AE18CF6A0B13EA66B7E83B3B436AEE05F`；generated SDK hash：
+  index `AD368712EC2B48CEE388369DD0CAAE65ECAB7B8CD85AEB8DAD50BDD6803F3AD0`，sdk
+  `DF31A50E1FA506E5EDD09401FBC8BDCCE299CF57F65C75C6E9BF7BD3F8FBE557`，types
+  `DC5ED9F7F962FFC7082AF024704B549C47208569A1AB95A730634C85786BD7CE`。
+- 前端只通过 regenerated SDK 与 `dataExportApi` 薄封装调用接口，没有新增手写 URL。比赛管理详情
+  增加“数据导出”标签；平台日志的审计页增加“平台审计归档”。共用 Pixel Industrial 面板显示
+  Queued/Processing/Available/Failed/Expired、轮询、失败码、文件大小、保留期限和下载入口；仅平台
+  Administrator 看见 protected-Flag 开关与理由。DataExportReady/DataExportFailed 站内通知会
+  导航到对应比赛导出页或平台审计页。浏览器验收发现并修复 Tabs grid/table intrinsic width 导致
+  的整页横向溢出；本地 mock 补齐本纵切真实交互所需的强类型响应。
+- 最终验证：Debug solution build 0 warning/0 error；真实 PostgreSQL DataExports 2/2 passed，覆盖
+  默认脱敏、protected Flag 与永久审计、全部历史行、平台审计投影、24h/30d 生命周期、不同比赛
+  同 scope 并发单赢家和 2 GiB 原子失败；DataExport Application 2/2、Admin OpenAPI/route drift
+  2/2 passed；`dotnet ef migrations has-pending-model-changes` 无漂移。non-Integration 全套发现
+  595 项，591 passed、4 failed，仍是 6.56 已记录的既有 FastEndpoints Validator 进程内注册隔离
+  问题，失败文件不在本阶段改动范围。前端 `bun test` 181/181、`vue-tsc`、production build、触及
+  文件和 mock JSON scoped ESLint 0 warning/0 error、`git diff --check` 均 passed；全仓 lint 仍被
+  generated/vendor/config/旧文件约 1.1 万条既有格式基线阻塞。
+- 关键验证命令：`dotnet build backend/NoCTF.slnx --no-restore`；
+  `dotnet backend/tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll --treenode-filter
+  '/*/*/*/*[Category=DataExports]' --minimum-expected-tests 2`；以 `--filter-uid` 独立执行两项
+  Admin OpenAPI/route drift 测试；`dotnet ef migrations has-pending-model-changes --project
+  backend/src/NoCTF.Infrastructure/NoCTF.Infrastructure.csproj --startup-project
+  backend/src/NoCTF.API/NoCTF.API.csproj --no-build`；前端执行 `bun test`、`bun run build` 和触及文件
+  `bunx eslint ... --max-warnings 0`；最后执行 `git diff --check`。
+- 使用内置浏览器连接本地 Vite mock 完成比赛归档和平台审计实际验收：Human Administrator 的
+  protected-Flag 开关、理由长度门禁、创建成功 toast、可下载/空状态、导航和中英文布局均正常；
+  1265px 视口下 document scrollWidth 等于 clientWidth，右侧按钮不再裁切。平台日志 SignalR 因
+  本地 mock 没有 hub 而显示预期的降级提示，历史/审计操作不受影响。浏览器标签和本地 Vite 监听
+  已清理，未访问或修改现网。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2648,6 +2707,8 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   投影审计。
 - 安全忘记密码/邮箱重置、hash-only 单次 Token、账号/IP 双层限流、全会话失效、变更通知与
   generated-SDK 前端恢复流程。
+- 完整比赛 ZIP 归档、平台审计 NDJSON、默认 Flag 脱敏/受审计明文例外、Wolverine 异步任务、
+  24 小时对象/30 天元数据生命周期及 generated-SDK 管理前端。
 
 当前尚未执行的交付边界：
 
@@ -2656,7 +2717,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
 - `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e`、
-  `03647e7f` 及各自 HANDOFF 提交是当前任务新增的
+  `03647e7f`、`7b479f4`、`5923e57` 及各自 HANDOFF 提交是当前任务新增的
   本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
   push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
@@ -2666,13 +2727,15 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 
 最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
 P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
-6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成。Administrator
-MFA 已由用户明确暂缓。下一阶段继续 TODO 第 8 节后续安全与运维待办：
+6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成，完整比赛与审计
+数据导出由 6.57 完成。Administrator MFA 已由用户明确暂缓。下一阶段继续 TODO 第 8 节后续安全
+与运维待办：
 
-1. 跳过 Administrator MFA，先审计“比赛、提交、计分、反作弊和审计数据导出”已有端点、权限、
-   格式和真实缺口。优先复用既有不可变事实与生成 SDK，不复制 `competition_events` 或管理审计。
-2. 不重做平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、导出或管理审计
-   投影，也不重做忘记密码流程；单比赛永久事实仍以 `competition_events` 为唯一来源。未经用户
+1. 跳过 Administrator MFA，下一纵切先审计 PostgreSQL、对象存储和 Wolverine 队列的现有备份、
+   恢复、校验和演练入口；涉及生产保留、RPO/RTO、加密、对象版本或队列恢复语义时必须先
+   `$grill-me`，不得猜测生产策略。
+2. 不重做比赛/审计导出、平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、
+   管理审计投影或忘记密码流程；单比赛永久事实仍以 `competition_events` 为唯一来源。未经用户
    后续明确恢复范围，不实现或重新规划 Administrator MFA。
 3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
@@ -2725,10 +2788,11 @@ Docker port mapping，host port 固定请求 `0`。
    6.51；默认私密咨询、可选匿名公开回答和通知使用 6.52；单比赛不可变事件、三层可见性、
    导出、Flag 审计和实时刷新使用 6.53；跨队 Flag 检测、事件派生裁决、受审计证据、封禁和
    更正使用 6.54；管理员平台日志保留、筛选、签名分页、导出和投影审计使用 6.55；忘记密码
-   流程以 6.56 的 hash-only Token、枚举防护、双层限流、全会话失效、密码变更通知和恢复前端为准。
-   Administrator MFA 已由用户明确暂缓，不得继续实现或追问。下一纵切按 `TODO.md` 第 8 节
-   审计比赛、提交、计分、反作弊和审计数据导出；不要回滚或重做 `/profile`、SMTP、排行榜
-   可见性、咨询、比赛日志、反作弊、平台日志或忘记密码流程。
+   流程以 6.56 的 hash-only Token、枚举防护、双层限流、全会话失效、密码变更通知和恢复前端为准；
+   完整比赛/审计导出以 6.57 的单表任务、Repeatable Read、对象生命周期、Flag 边界和 generated-SDK
+   前端为准。Administrator MFA 已由用户明确暂缓，不得继续实现或追问。下一纵切按 `TODO.md`
+   第 8 节审计 PostgreSQL、对象存储与 Wolverine 备份恢复演练；不要回滚或重做 `/profile`、SMTP、
+   排行榜可见性、咨询、比赛日志、反作弊、平台日志、忘记密码或数据导出流程。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
