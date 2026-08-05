@@ -8,6 +8,7 @@ using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Challenges.Questions;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -18,6 +19,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<UserAccountLifecycleAudit> UserAccountLifecycleAudits =>
         Set<UserAccountLifecycleAudit>();
     public DbSet<Competition> Competitions => Set<Competition>();
+    public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();
@@ -37,5 +39,29 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NoCtfDbContext).Assembly);
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EnsureCompetitionEventsAreAppendOnly();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureCompetitionEventsAreAppendOnly();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void EnsureCompetitionEventsAreAppendOnly()
+    {
+        if (ChangeTracker.Entries<CompetitionEvent>().Any(entry =>
+                entry.State is EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException(
+                "Competition events are immutable and cannot be updated or deleted.");
+        }
     }
 }

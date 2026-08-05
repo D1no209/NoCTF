@@ -17,6 +17,8 @@ using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Infrastructure.Competitions.Permissions;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Infrastructure.Competitions.Visibility;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Infrastructure.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Competitions;
 
@@ -68,6 +70,15 @@ internal static class CompetitionInfrastructure
         services.AddScoped<GetCompetitionVisibility>();
         services.AddScoped<UpdateCompetitionVisibility>();
         services.AddScoped<ApplyScheduledCompetitionVisibility>();
+        services.AddScoped<CompetitionEventStore>();
+        services.AddScoped<ICompetitionEventStore>(provider =>
+            provider.GetRequiredService<CompetitionEventStore>());
+        services.AddScoped<ICompetitionEventRecorder>(provider =>
+            provider.GetRequiredService<CompetitionEventStore>());
+        services.AddScoped<ListCompetitionEvents>();
+        services.AddScoped<ExportCompetitionEvents>();
+        services.AddScoped<AccessSubmissionFlag>();
+        services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
         return services;
     }
 }

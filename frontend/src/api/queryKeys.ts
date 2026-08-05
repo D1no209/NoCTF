@@ -26,6 +26,8 @@ export const queryKeys = {
     competitionId: string,
     questionId: string,
   ) => ['competition-question', competitionId, questionId] as const,
+  competitionEvents: (competitionId: string) =>
+    ['competition-events', competitionId] as const,
   submissions: (competitionId: string) => ['submissions', competitionId] as const,
   submission: (
     competitionId: string,

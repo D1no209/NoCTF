@@ -21,6 +21,9 @@ public enum PlatformUserDeletionReferenceCode
     Notification,
     ScoringEvent,
     CompetitionLifecycleAudit,
+    CompetitionQuestion,
+    CompetitionQuestionEntry,
+    CompetitionEvent,
     UserAccountLifecycleAudit
 }
 
@@ -78,6 +81,12 @@ internal static class PlatformUserDeletionMapping
                 PlatformUserDeletionReferenceCode.ScoringEvent,
             UserDeletionReferenceKind.CompetitionLifecycleAudit =>
                 PlatformUserDeletionReferenceCode.CompetitionLifecycleAudit,
+            UserDeletionReferenceKind.CompetitionQuestion =>
+                PlatformUserDeletionReferenceCode.CompetitionQuestion,
+            UserDeletionReferenceKind.CompetitionQuestionEntry =>
+                PlatformUserDeletionReferenceCode.CompetitionQuestionEntry,
+            UserDeletionReferenceKind.CompetitionEvent =>
+                PlatformUserDeletionReferenceCode.CompetitionEvent,
             UserDeletionReferenceKind.UserAccountLifecycleAudit =>
                 PlatformUserDeletionReferenceCode.UserAccountLifecycleAudit,
             _ => throw new InvalidOperationException(

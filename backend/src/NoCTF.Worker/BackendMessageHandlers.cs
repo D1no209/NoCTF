@@ -24,6 +24,8 @@ using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
 using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Worker;
 
@@ -397,8 +399,10 @@ public static class BackendMessageHandlers
         ExpireAwdpFixVerification message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events = null)
     {
+        events ??= NullCompetitionEventRecorder.Instance;
         if (DateTimeOffset.UtcNow < message.Deadline)
         {
             await outbox.ScheduleAsync(message, message.Deadline);
@@ -432,6 +436,28 @@ public static class BackendMessageHandlers
         runtime.State = RuntimeState.Stopping;
         runtime.RunnerAssignmentReleaseToken = null;
         runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
+        await events.RecordAsync(new(
+            submission.CompetitionId,
+            CompetitionEventKind.SubmissionEvaluated,
+            CompetitionEventLevel.Error,
+            CompetitionEventVisibility.Team,
+            submission.EvaluationUpdatedAt,
+            ActorUserId: submission.SubmittedByUserId,
+            TeamId: submission.TeamId,
+            CompetitionChallengeId: submission.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            SubmissionId: submission.Id,
+            SubmissionKind: submission.Kind,
+            SubmissionState: submission.EvaluationState,
+            ScoringResult: NoCTF.Domain.Submissions.ScoringResult.PlatformFailed,
+            RuntimeState: runtime.State,
+            RuntimeGeneration: runtime.Generation), cancellationToken);
+        await RecordRuntimeStateAsync(
+            events,
+            runtime,
+            CompetitionEventLevel.Warning,
+            submission.EvaluationUpdatedAt,
+            cancellationToken);
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
             runtime.ProcessingVersion,
@@ -448,8 +474,10 @@ public static class BackendMessageHandlers
         IChallengeRuntimeTemplateCatalog templates,
         IRuntimePublishedPortAllocator publishedPorts,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events = null)
     {
+        events ??= NullCompetitionEventRecorder.Instance;
         var target = await db.RuntimeInstances
             .Join(
                 db.CompetitionChallenges,
@@ -492,7 +520,14 @@ public static class BackendMessageHandlers
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
             await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
+            await RecordRuntimeStateAsync(
+                events,
+                target.Instance,
+                CompetitionEventLevel.Error,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
             return;
         }
 
@@ -517,7 +552,14 @@ public static class BackendMessageHandlers
                 target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
                 target.Instance.ProcessingVersion =
                     checked(target.Instance.ProcessingVersion + 1);
+                await RecordRuntimeStateAsync(
+                    events,
+                    target.Instance,
+                    CompetitionEventLevel.Error,
+                    DateTimeOffset.UtcNow,
+                    cancellationToken);
                 await db.SaveChangesAsync(cancellationToken);
+                await outbox.FlushOutgoingMessagesAsync();
                 return;
             }
         }
@@ -556,7 +598,14 @@ public static class BackendMessageHandlers
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
             await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
+            await RecordRuntimeStateAsync(
+                events,
+                target.Instance,
+                CompetitionEventLevel.Error,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
             return;
         }
         if (target.Instance.RuntimeProvider == RuntimeProvider.Docker)
@@ -580,9 +629,16 @@ public static class BackendMessageHandlers
                 target.Instance.ProcessingVersion =
                     checked(target.Instance.ProcessingVersion + 1);
                 await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
+                await RecordRuntimeStateAsync(
+                    events,
+                    target.Instance,
+                    CompetitionEventLevel.Error,
+                    DateTimeOffset.UtcNow,
+                    cancellationToken);
                 await db.SaveChangesAsync(cancellationToken);
                 if (allocationTransaction is not null)
                     await allocationTransaction.CommitAsync(cancellationToken);
+                await outbox.FlushOutgoingMessagesAsync();
                 return;
             }
             claim = RuntimePublishedPortClaims.Apply(claim, allocation.Mappings);
@@ -619,8 +675,10 @@ public static class BackendMessageHandlers
         StopRuntime message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events = null)
     {
+        events ??= NullCompetitionEventRecorder.Instance;
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
@@ -643,6 +701,12 @@ public static class BackendMessageHandlers
                 cancellationToken);
             if (replacement is not null)
                 await outbox.PublishAsync(new DispatchRuntime(replacement.Id, replacement.ProcessingVersion));
+            await RecordRuntimeStateAsync(
+                events,
+                instance,
+                CompetitionEventLevel.Information,
+                instance.StoppedAt.Value,
+                cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
@@ -659,8 +723,10 @@ public static class BackendMessageHandlers
         CleanupCompetitionRuntimes message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events = null)
     {
+        events ??= NullCompetitionEventRecorder.Instance;
         var runtimes = await db.RuntimeInstances
             .Where(instance => instance.CompetitionId == message.CompetitionId
                 && (instance.State == RuntimeState.Queued
@@ -676,6 +742,12 @@ public static class BackendMessageHandlers
                 instance.State = RuntimeState.Stopped;
                 instance.StoppedAt = now;
                 instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+                await RecordRuntimeStateAsync(
+                    events,
+                    instance,
+                    CompetitionEventLevel.Information,
+                    now,
+                    cancellationToken);
                 continue;
             }
 
@@ -683,6 +755,12 @@ public static class BackendMessageHandlers
             instance.RunnerAssignmentReleaseToken = null;
             instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
+            await RecordRuntimeStateAsync(
+                events,
+                instance,
+                CompetitionEventLevel.Information,
+                now,
+                cancellationToken);
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -1081,6 +1159,28 @@ public static class BackendMessageHandlers
             _ => throw new InvalidOperationException(
                 $"Unsupported runtime claim type '{claim.GetType().Name}'.")
         };
+
+    private static ValueTask<Guid> RecordRuntimeStateAsync(
+        ICompetitionEventRecorder events,
+        RuntimeInstance instance,
+        CompetitionEventLevel level,
+        DateTimeOffset occurredAt,
+        CancellationToken cancellationToken) =>
+        events.RecordAsync(new(
+            instance.CompetitionId,
+            CompetitionEventKind.RuntimeStateChanged,
+            level,
+            instance.TeamId is null
+                ? CompetitionEventVisibility.Public
+                : CompetitionEventVisibility.Team,
+            occurredAt,
+            TeamId: instance.TeamId,
+            CompetitionChallengeId: instance.CompetitionChallengeId,
+            RuntimeInstanceId: instance.Id,
+            SubmissionId: instance.SubmissionId,
+            RuntimeState: instance.State,
+            RuntimeGeneration: instance.Generation),
+            cancellationToken);
 
     private static ValueTask PublishRuntimeStopAsync(
         ITransactionalMessageOutbox outbox,

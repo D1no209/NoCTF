@@ -18,6 +18,7 @@ public enum UserDeletionReferenceKind
     CompetitionLifecycleAudit,
     CompetitionQuestion,
     CompetitionQuestionEntry,
+    CompetitionEvent,
     UserAccountLifecycleAudit
 }
 

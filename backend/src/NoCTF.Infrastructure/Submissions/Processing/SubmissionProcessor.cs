@@ -12,6 +12,8 @@ using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Submissions.Processing;
 
@@ -20,8 +22,12 @@ public sealed class SubmissionProcessor(
     ISubmissionEvaluatorCatalog evaluatorCatalog,
     ISubmissionAdmissionModePolicy admissionModePolicy,
     IRuntimePlacementPolicy placementPolicy,
-    ITransactionalMessageOutbox outbox) : ISubmissionProcessor
+    ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder? eventRecorder = null) : ISubmissionProcessor
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task ProcessAsync(
         Guid submissionId,
         long processingVersion,
@@ -265,6 +271,18 @@ public sealed class SubmissionProcessor(
                         await outbox.PublishAsync(new DispatchRuntime(
                             target.Id,
                             target.ProcessingVersion));
+                        await events.RecordAsync(new(
+                            target.CompetitionId,
+                            CompetitionEventKind.RuntimeCreated,
+                            CompetitionEventLevel.Information,
+                            CompetitionEventVisibility.Team,
+                            now,
+                            TeamId: target.TeamId,
+                            CompetitionChallengeId: target.CompetitionChallengeId,
+                            RuntimeInstanceId: target.Id,
+                            SubmissionId: submission.Id,
+                            RuntimeState: target.State,
+                            RuntimeGeneration: target.Generation), cancellationToken);
                         submission.EvaluationFailureCode = null;
                         submission.EvaluationUpdatedAt = now;
                         await db.SaveChangesAsync(cancellationToken);
@@ -278,6 +296,19 @@ public sealed class SubmissionProcessor(
             submission.EvaluationFailureCode =
                 evaluation.Decision.FailureCode ?? ScoringFailureCode.CheckerPlatformError;
             submission.EvaluationUpdatedAt = now;
+            await events.RecordAsync(new(
+                submission.CompetitionId,
+                CompetitionEventKind.SubmissionEvaluated,
+                CompetitionEventLevel.Error,
+                CompetitionEventVisibility.Team,
+                now,
+                ActorUserId: submission.SubmittedByUserId,
+                TeamId: submission.TeamId,
+                CompetitionChallengeId: submission.CompetitionChallengeId,
+                SubmissionId: submission.Id,
+                SubmissionKind: submission.Kind,
+                SubmissionState: submission.EvaluationState,
+                ScoringResult: ScoringResult.PlatformFailed), cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return;
@@ -324,6 +355,56 @@ public sealed class SubmissionProcessor(
         await outbox.PublishAsync(new InvalidateLeaderboard(submission.CompetitionId));
         if (bloodAward is not null)
             await outbox.PublishAsync(bloodAward);
+        await events.RecordAsync(new(
+            submission.CompetitionId,
+            CompetitionEventKind.SubmissionEvaluated,
+            evaluation.Decision.Result == ScoringResult.PlatformFailed
+                ? CompetitionEventLevel.Error
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            now,
+            ActorUserId: submission.SubmittedByUserId,
+            TeamId: submission.TeamId,
+            CompetitionChallengeId: submission.CompetitionChallengeId,
+            SubmissionId: submission.Id,
+            SubmissionKind: submission.Kind,
+            SubmissionState: submission.EvaluationState,
+            ScoringResult: scoringEvent.Result), cancellationToken);
+        await events.RecordAsync(new(
+            submission.CompetitionId,
+            CompetitionEventKind.ScoringRecorded,
+            scoringEvent.Result == ScoringResult.PlatformFailed
+                ? CompetitionEventLevel.Error
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            scoringEvent.OccurredAt,
+            TeamId: scoringEvent.TeamId,
+            CompetitionChallengeId: scoringEvent.CompetitionChallengeId,
+            SubmissionId: scoringEvent.SubmissionId,
+            ScoringEventKind: scoringEvent.Kind,
+            ScoringResult: scoringEvent.Result), cancellationToken);
+        if (bloodAward is not null)
+        {
+            var bloodKind = bloodAward.BloodRank switch
+            {
+                LeaderboardBloodRank.First => CompetitionEventKind.FirstBloodAwarded,
+                LeaderboardBloodRank.Second => CompetitionEventKind.SecondBloodAwarded,
+                LeaderboardBloodRank.Third => CompetitionEventKind.ThirdBloodAwarded,
+                _ => throw new InvalidOperationException("Unsupported leaderboard blood rank.")
+            };
+            await events.RecordAsync(new(
+                submission.CompetitionId,
+                bloodKind,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Public,
+                bloodAward.OccurredAt,
+                TeamId: submission.TeamId,
+                CompetitionChallengeId: submission.CompetitionChallengeId,
+                SubmissionId: submission.Id,
+                SubmissionKind: submission.Kind,
+                ScoringEventKind: scoringEvent.Kind,
+                ScoringResult: scoringEvent.Result), cancellationToken);
+        }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();

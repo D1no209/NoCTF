@@ -104,7 +104,8 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
                 challenge => challenge.CompetitionId == competitionId, ct) ||
             await db.Submissions.IgnoreQueryFilters().AnyAsync(
                 submission => submission.CompetitionId == competitionId, ct) ||
-            await db.RuntimeInstances.AnyAsync(runtime => runtime.CompetitionId == competitionId, ct);
+            await db.RuntimeInstances.AnyAsync(runtime => runtime.CompetitionId == competitionId, ct) ||
+            await db.CompetitionEvents.AnyAsync(item => item.CompetitionId == competitionId, ct);
         if (hasDependents)
             return false;
         db.Competitions.Remove(entity);

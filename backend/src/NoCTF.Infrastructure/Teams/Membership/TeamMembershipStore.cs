@@ -2,13 +2,21 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Membership;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Teams.Membership;
 
 public sealed class TeamMembershipStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : ITeamMembershipStore
+    ITransactionalMessageOutbox outbox,
+    TimeProvider? clock = null,
+    ICompetitionEventRecorder? eventRecorder = null) : ITeamMembershipStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
+
     public async Task<TeamMembershipFailure?> JoinByInvitationAsync(
         Guid competitionId,
         string invitationToken,
@@ -45,6 +53,15 @@ public sealed class TeamMembershipStore(
             return TeamMembershipFailure.TeamFull;
 
         team.MemberIds = [.. team.MemberIds, userId];
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.TeamMemberJoined,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            now,
+            ActorUserId: userId,
+            RelatedUserId: userId,
+            TeamId: team.Id), ct);
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
@@ -67,7 +84,16 @@ public sealed class TeamMembershipStore(
             return (null, TeamMembershipFailure.TeamForbidden);
 
         team.InvitationToken = token;
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.TeamUpdated,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Staff,
+            timeProvider.GetUtcNow(),
+            ActorUserId: actorId,
+            TeamId: teamId), ct);
         await db.SaveChangesAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return (token, null);
     }
 
@@ -91,6 +117,15 @@ public sealed class TeamMembershipStore(
             return TeamMembershipFailure.MemberNotFound;
 
         team.MemberIds = team.MemberIds.Where(id => id != targetUserId).ToArray();
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.TeamMemberRemoved,
+            CompetitionEventLevel.Warning,
+            CompetitionEventVisibility.Team,
+            timeProvider.GetUtcNow(),
+            ActorUserId: actorId,
+            RelatedUserId: targetUserId,
+            TeamId: teamId), ct);
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
@@ -117,6 +152,15 @@ public sealed class TeamMembershipStore(
             return TeamMembershipFailure.CaptainMustTransfer;
 
         team.MemberIds = team.MemberIds.Where(id => id != userId).ToArray();
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.TeamMemberRemoved,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            timeProvider.GetUtcNow(),
+            ActorUserId: userId,
+            RelatedUserId: userId,
+            TeamId: team.Id), ct);
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
@@ -143,6 +187,15 @@ public sealed class TeamMembershipStore(
             return TeamMembershipFailure.MemberNotFound;
 
         team.CaptainId = newCaptainId;
+        await events.RecordAsync(new(
+            competitionId,
+            CompetitionEventKind.TeamCaptainTransferred,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            timeProvider.GetUtcNow(),
+            ActorUserId: actorId,
+            RelatedUserId: newCaptainId,
+            TeamId: teamId), ct);
         await db.SaveChangesAsync(ct);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
         await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));

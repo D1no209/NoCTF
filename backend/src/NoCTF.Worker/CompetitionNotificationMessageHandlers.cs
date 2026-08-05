@@ -4,6 +4,8 @@ using NoCTF.Application.Notifications;
 using NoCTF.Domain.Notifications;
 using NoCTF.Infrastructure.Notifications;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Worker;
 
@@ -51,7 +53,8 @@ public static class CompetitionNotificationMessageHandlers
         PublishHintNotification message,
         NoCtfDbContext db,
         CompetitionNotificationDelivery delivery,
-        CancellationToken ct)
+        CancellationToken ct,
+        ICompetitionEventRecorder? eventRecorder = null)
     {
         var isCurrent = await db.Set<NoCTF.Domain.Challenges.CompetitionChallengeHint>()
             .AsNoTracking()
@@ -69,6 +72,25 @@ public static class CompetitionNotificationMessageHandlers
         if (!isCurrent)
             return;
 
+        var alreadyRecorded = await db.CompetitionEvents.AsNoTracking().AnyAsync(
+            item => item.CompetitionId == message.CompetitionId
+                && item.HintId == message.HintId
+                && item.Kind == CompetitionEventKind.HintPublished
+                && item.OccurredAt == message.PublishedAt,
+            ct);
+        if (!alreadyRecorded)
+        {
+            var events = eventRecorder ?? NullCompetitionEventRecorder.Instance;
+            await events.RecordAsync(new(
+                message.CompetitionId,
+                CompetitionEventKind.HintPublished,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Public,
+                message.PublishedAt,
+                CompetitionChallengeId: message.CompetitionChallengeId,
+                HintId: message.HintId), ct);
+        }
+
         await delivery.DeliverAsync(
             message.CompetitionId,
             message.HintId,
@@ -83,6 +105,7 @@ public static class CompetitionNotificationMessageHandlers
                 message.PublishedAt),
             requiredTeamId: null,
             ct);
+        await db.SaveChangesAsync(ct);
     }
 
     public static Task Handle(

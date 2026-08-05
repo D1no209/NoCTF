@@ -4,13 +4,19 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
 public sealed class PostgresRuntimePublishedPortAllocator(
     NoCtfDbContext db,
-    RuntimePublishedPortRange range) : IRuntimePublishedPortAllocator
+    RuntimePublishedPortRange range,
+    ICompetitionEventRecorder? eventRecorder = null) : IRuntimePublishedPortAllocator
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<RuntimePublishedPortAllocationResult> AllocateAsync(
         RuntimeInstance instance,
         IReadOnlyList<RuntimePublishedPortTarget> targets,
@@ -78,7 +84,7 @@ public sealed class PostgresRuntimePublishedPortAllocator(
             var hostPort = available[index];
             available[index] = available[^1];
             available.RemoveAt(available.Count - 1);
-            instance.PublishedPorts.Add(new RuntimePublishedPort
+            var publishedPort = new RuntimePublishedPort
             {
                 Id = Guid.CreateVersion7(allocatedAt),
                 RuntimeInstanceId = instance.Id,
@@ -87,7 +93,23 @@ public sealed class PostgresRuntimePublishedPortAllocator(
                 ContainerPort = target.ContainerPort,
                 HostPort = hostPort,
                 AllocatedAt = allocatedAt
-            });
+            };
+            instance.PublishedPorts.Add(publishedPort);
+            await events.RecordAsync(new(
+                instance.CompetitionId,
+                CompetitionEventKind.RuntimePortAllocated,
+                CompetitionEventLevel.Information,
+                instance.TeamId is null
+                    ? CompetitionEventVisibility.Public
+                    : CompetitionEventVisibility.Team,
+                allocatedAt,
+                TeamId: instance.TeamId,
+                CompetitionChallengeId: instance.CompetitionChallengeId,
+                RuntimeInstanceId: instance.Id,
+                SubmissionId: instance.SubmissionId,
+                RuntimeState: instance.State,
+                RuntimeGeneration: instance.Generation,
+                HostPort: publishedPort.HostPort), cancellationToken);
             mappings.Add(new(target.ServiceName, target.ContainerPort, hostPort));
         }
         return new(mappings);
