@@ -111,12 +111,20 @@ Authorization: Bearer <bot-access-token>
 
 处理结果：
 
-- `200`：展示 `entries`、`bloods` 等现有强类型排行榜数据。
+- `200` 且 `dataScope=Live/Frozen`：展示 `entries`、`bloods` 等现有强类型排行榜数据；
+  `Frozen` 必须同时标注 `dataAsOf`，不能伪装成实时榜单。
+- `200` 且 `visibility=Blackout`、`dataScope=Hidden`：平台返回空的排行榜集合。BOT 必须进入
+  黑灯状态，停止 `/rank` 结果、定时排名、分数、解出数、血榜及其他常规战况播报，不能把
+  空集合解释为“所有队伍零分”。
 - `202`：读取 `Retry-After`，等待后重试同一 URL。
 - `404`：比赛不存在，或该 Bot 不是私有比赛的显式 Observer。
 - `503`：排行榜投影暂不可用，向群内返回简短故障提示并稍后重试。
 
 不要从通知事件自行累计分数，通知不是排行榜事实来源。
+
+黑灯只限制常规战况读取。BOT 必须继续推进通知 feed 的 cursor，并照常转发平台通知与比赛
+通告；不得因为 `dataScope=Hidden` 暂停通知消费。比赛结束后平台自动恢复最终实时榜单，BOT
+在下一次排行榜读取看到 `dataScope=Live` 后恢复常规播报。
 
 ## 9. 撤销与轮换
 

@@ -19,6 +19,11 @@ public sealed class Competition
     public int ConfigurationRevision { get; set; }
     public DateTimeOffset ConfigurationUpdatedAt { get; set; }
     public long LeaderboardRevision { get; set; }
+    public CompetitionLeaderboardVisibility LeaderboardVisibility { get; set; }
+    public DateTimeOffset? LeaderboardVisibilityStartsAt { get; set; }
+    public DateTimeOffset? LeaderboardVisibilityAppliedAt { get; set; }
+    public int LeaderboardVisibilityRevision { get; set; }
+    public string? FrozenLeaderboardSnapshotJson { get; set; }
     [MaxLength(32)]
     public byte[] FlagDerivationSecret { get; set; } = [];
     public DateTimeOffset StartAt { get; set; }
@@ -33,4 +38,5 @@ public sealed class Competition
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public List<CompetitionLifecycleAudit> LifecycleAudits { get; set; } = [];
+    public List<CompetitionLeaderboardVisibilityAudit> LeaderboardVisibilityAudits { get; set; } = [];
 }

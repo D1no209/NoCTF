@@ -7,6 +7,10 @@ namespace NoCTF.Application.Messaging;
 public interface IBackendMessagePublisher
 {
     ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken);
+    ValueTask ApplyCompetitionVisibilityAsync(
+        Guid competitionId,
+        int visibilityRevision,
+        CancellationToken cancellationToken) => ValueTask.CompletedTask;
     ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken);
     ValueTask CleanupCompetitionRuntimesAsync(
         Guid competitionId,

@@ -2,7 +2,6 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Competitions;
-using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
@@ -17,12 +16,29 @@ public sealed record CompetitionResponse(
     bool TeamRegistrationAutoApprove,
     int MaxTeamMembers,
     int MaxConcurrentRuntimeInstancesPerTeam,
-    Guid OwnerId);
+    Guid OwnerId,
+    CompetitionLeaderboardVisibility LeaderboardVisibility);
 
-[Mapper]
-internal static partial class CompetitionMapper
+internal static class CompetitionMapper
 {
-    public static partial CompetitionResponse ToResponse(CompetitionView view);
+    public static CompetitionResponse ToResponse(CompetitionView view) =>
+        new(
+            view.Id,
+            view.Title,
+            view.Description,
+            view.Mode,
+            view.StartTime,
+            view.EndTime,
+            view.Status,
+            view.TeamRegistrationAutoApprove,
+            view.MaxTeamMembers,
+            view.MaxConcurrentRuntimeInstancesPerTeam,
+            view.OwnerId,
+            CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+                view.Status,
+                view.LeaderboardVisibility,
+                view.LeaderboardVisibilityStartsAt,
+                DateTimeOffset.UtcNow));
 }
 
 public sealed class GetCompetitionRequest { public Guid CompetitionId { get; set; } }

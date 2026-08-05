@@ -61,6 +61,10 @@ Competition 列表只返回调用者可见状态：匿名可见 Visible/Publishe
 Leaderboard GET 的 statusUrl 指回自身：无快照且投影中返回 202+targetRevision+Retry-After；有旧快照返回 200 并标 stale/revision；无快照且最后投影失败返回 503 ProblemDetails。它不创建独立 ProjectionOperation。
 CTF Leaderboard 的 `bloods[]` 同时返回每题一血、二血、三血，每项带强类型 `bloodRank`；
 `subjects[].slots[]` 以 nullable `bloodRank`/`bloodAt` 表示该队在该题是否获得前三血。
+排行榜响应同时返回 `visibility`、`dataScope` 与 nullable `dataAsOf`。Frozen 返回截止时刻的持久化
+快照；Blackout 对参赛者和 Bot 返回 `Hidden` 与空集合，但不关闭题目、Runtime、提交或本人
+提交结果。比赛结束时自动恢复最终实时榜单。人工 Administrator/Owner/Manager/Judge/Observer
+保持实时视图；Observer Bot 在 Blackout 中仍为 Hidden。
 
 ## Player Challenge
 
@@ -78,6 +82,8 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hi
 Hint unlock 成功首次返回 201+HintUnlock 事实；已解锁或 Cost=0 直接可见时返回 200 且不创建新事件。未发布/不可见返回 404，权威当前分数不足返回 409 `InsufficientScoreForHint`。
 
 玩家 Challenge 列表/详情绝不返回 FlagId、正确答案、Flag 数量、RandomOne 候选附件数量/文件名、内部 Runtime 配置或 ObjectKey。All 的列表返回 AttachmentId、显示名、MIME、字节数；RandomOne 首次单数下载请求完成原子抽取后直接 302/stream 被选文件，客户端不能选择，之后固定返回同一附件。
+Blackout 不隐藏题面、附件、Runtime 或提交入口，但 Challenge 的 `baseScore` 返回 null，并随列表/
+详情返回同一 `leaderboardVisibility` 与 `dataScope`。
 
 ## Submission
 
@@ -127,6 +133,8 @@ GET  /api/v1/admin/competitions/{competitionId}
 PUT  /api/v1/admin/competitions/{competitionId}
 GET  /api/v1/admin/competitions/{competitionId}/configuration
 PUT  /api/v1/admin/competitions/{competitionId}/configuration
+GET  /api/v1/admin/competitions/{competitionId}/leaderboard-visibility
+PUT  /api/v1/admin/competitions/{competitionId}/leaderboard-visibility
 DELETE /api/v1/admin/competitions/{competitionId}
 POST /api/v1/admin/competitions/{competitionId}/restore
 DELETE /api/v1/admin/competitions/{competitionId}/hard-delete
@@ -145,6 +153,10 @@ POST /api/v1/admin/competitions/{competitionId}/flags/generate-missing
 ```
 
 Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍是独立文件/路由/TypedResults。
+
+排行榜可见性 PUT 使用独立 `expectedRevision` 栅栏，可立即应用 Frozen/Blackout，也可在比赛时间窗
+内定时应用。Frozen 在生效时按精确截止时间重建并持久化快照；新配置会淘汰旧的定时消息。每次
+实际切换记录 Actor、原因、发生时间和冻结截止时间。Finished 只接受 Normal。
 
 权限 snapshot 与候选用户只允许 Competition Owner 或平台 Administrator 读取。候选响应仅含
 Id、UserName、Kind、Role 与 EmailVerified，不开放平台用户目录中的 Email、TokenVersion。

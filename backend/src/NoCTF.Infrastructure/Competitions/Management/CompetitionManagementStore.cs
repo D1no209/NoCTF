@@ -115,10 +115,12 @@ public sealed class CompetitionManagementStore(NoCtfDbContext db) : ICompetition
     private static IQueryable<CompetitionView> Project(IQueryable<Competition> query) =>
         query.Select(x => new CompetitionView(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt,
             x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
-            x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId));
+            x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
+            x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
             x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
-            x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId);
+            x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
+            x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt);
 }

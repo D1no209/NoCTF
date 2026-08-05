@@ -53,6 +53,7 @@ builder.UseWolverine(options =>
     options.PublishMessage<RecordKohObservation>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<InvalidateLeaderboard>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue("noctf-worker");
+    options.PublishMessage<ApplyCompetitionVisibility>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<BloodAwarded>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<ChallengePublished>().ToPostgresqlQueue("noctf-worker");
     options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");

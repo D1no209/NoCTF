@@ -21,6 +21,7 @@ const competitions: PublicCompetition[] = [
     maxTeamMembers: 5,
     maxConcurrentRuntimeInstancesPerTeam: 1,
     ownerId: 'owner-one',
+    leaderboardVisibility: 0,
   },
   {
     id: 'competition-two',
@@ -34,6 +35,7 @@ const competitions: PublicCompetition[] = [
     maxTeamMembers: 4,
     maxConcurrentRuntimeInstancesPerTeam: 2,
     ownerId: 'owner-two',
+    leaderboardVisibility: 0,
   },
 ]
 

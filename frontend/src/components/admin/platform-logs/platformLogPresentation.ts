@@ -41,6 +41,8 @@ export function platformAuditKindName(audit: PlatformAuditLog) {
     return 'Competition'
   if (audit.kind === 1)
     return 'User account'
+  if (audit.kind === 2)
+    return 'Leaderboard visibility'
   return 'Unknown'
 }
 
@@ -48,6 +50,10 @@ export function platformAuditActionName(audit: PlatformAuditLog) {
   if (audit.kind === 0) {
     const statuses = ['Draft', 'Visible', 'Published', 'Running', 'Paused', 'Finished']
     return `${statuses[audit.fromCompetitionStatus ?? -1] ?? 'Unknown'} → ${statuses[audit.toCompetitionStatus ?? -1] ?? 'Unknown'}`
+  }
+  if (audit.kind === 2) {
+    const visibilities = ['Normal', 'Frozen', 'Blackout']
+    return `${visibilities[audit.fromLeaderboardVisibility ?? -1] ?? 'Unknown'} → ${visibilities[audit.toLeaderboardVisibility ?? -1] ?? 'Unknown'}`
   }
   return ['Banned', 'Disabled', 'Anonymized', 'Physically deleted'][audit.userAccountAction ?? -1]
     ?? 'Unknown'

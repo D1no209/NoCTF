@@ -15,6 +15,8 @@ using NoCTF.Infrastructure.Competitions.Koh;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Infrastructure.Competitions.Permissions;
+using NoCTF.Application.Competitions.Visibility;
+using NoCTF.Infrastructure.Competitions.Visibility;
 
 namespace NoCTF.Infrastructure.Competitions;
 
@@ -61,6 +63,11 @@ internal static class CompetitionInfrastructure
         services.AddScoped<UpdateCompetitionPermissions>();
         services.AddScoped<NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase>();
         services.AddScoped<TransitionCompetitionLifecycle>();
+        services.AddScoped<ICompetitionVisibilityAccess, CompetitionVisibilityAccess>();
+        services.AddScoped<ICompetitionVisibilityStore, CompetitionVisibilityStore>();
+        services.AddScoped<GetCompetitionVisibility>();
+        services.AddScoped<UpdateCompetitionVisibility>();
+        services.AddScoped<ApplyScheduledCompetitionVisibility>();
         return services;
     }
 }

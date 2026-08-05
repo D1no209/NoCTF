@@ -1,6 +1,8 @@
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
+  NoCtfApplicationScoringLeaderboardLeaderboardDataScope,
+  NoCtfDomainCompetitionsCompetitionLeaderboardVisibility,
 } from './generated/types.gen'
 
 export interface PublicChallenge {
@@ -10,7 +12,7 @@ export interface PublicChallenge {
   title: string
   description: string | null
   direction: string
-  baseScore: number
+  baseScore: number | null
   order: number
   isPublished: boolean
   revision: number
@@ -19,6 +21,8 @@ export interface PublicChallenge {
   updatedAt: string
   controlFlag: string | null
   urls: string[] | null
+  leaderboardVisibility: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility
+  dataScope: NoCtfApplicationScoringLeaderboardLeaderboardDataScope
 }
 
 export interface PublicChallengeAttachment {
@@ -53,6 +57,12 @@ function requireNumber(value: number | undefined, field: string) {
   return value
 }
 
+function nullableNumber(value: number | null | undefined, field: string) {
+  if (value !== undefined && value !== null && (!Number.isFinite(value)))
+    throw new TypeError(`Challenge response has an invalid ${field}.`)
+  return value ?? null
+}
+
 function optionalString(value: string | null | undefined, field: string) {
   if (value !== undefined && value !== null && typeof value !== 'string')
     throw new TypeError(`Challenge response has an invalid ${field}.`)
@@ -79,7 +89,7 @@ export function toPublicChallenge(
     title: requireString(value.title, 'title'),
     description: optionalString(value.description, 'description'),
     direction: requireString(value.direction, 'direction'),
-    baseScore: requireNumber(value.baseScore, 'baseScore'),
+    baseScore: nullableNumber(value.baseScore, 'baseScore'),
     order: requireNumber(value.order, 'order'),
     isPublished: value.isPublished,
     revision: requireNumber(value.revision, 'revision'),
@@ -88,6 +98,8 @@ export function toPublicChallenge(
     updatedAt: requireString(value.updatedAt, 'updatedAt'),
     controlFlag: optionalString(value.controlFlag, 'controlFlag'),
     urls: value.urls ? [...value.urls] : null,
+    leaderboardVisibility: value.leaderboardVisibility ?? 0,
+    dataScope: value.dataScope ?? 0,
   }
 }
 

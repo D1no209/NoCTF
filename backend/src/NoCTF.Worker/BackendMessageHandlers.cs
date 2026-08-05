@@ -9,6 +9,7 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Competitions.Koh;
+using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
@@ -356,6 +357,16 @@ public static class BackendMessageHandlers
         ILeaderboardCache leaderboard,
         CancellationToken cancellationToken) =>
         leaderboard.RefreshAsync(message.CompetitionId, cancellationToken);
+
+    public static Task Handle(
+        ApplyCompetitionVisibility message,
+        ApplyScheduledCompetitionVisibility visibility,
+        CancellationToken cancellationToken) =>
+        visibility.ExecuteAsync(
+            message.CompetitionId,
+            message.VisibilityRevision,
+            DateTimeOffset.UtcNow,
+            cancellationToken);
 
     public static async Task Handle(
         InvalidateLeaderboard message,

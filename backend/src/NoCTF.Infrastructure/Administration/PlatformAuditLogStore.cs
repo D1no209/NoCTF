@@ -43,6 +43,46 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     audit.To,
                     null,
                     null,
+                    null,
+                    null,
+                    audit.Reason,
+                    audit.Automatic,
+                    audit.OccurredAt)));
+        }
+
+        if (query.Kind is null or PlatformAuditKind.CompetitionLeaderboardVisibility)
+        {
+            var visibilityAudits = db.Set<CompetitionLeaderboardVisibilityAudit>().AsNoTracking();
+            if (query.From is not null)
+                visibilityAudits = visibilityAudits.Where(audit =>
+                    audit.OccurredAt >= query.From.Value);
+            if (query.To is not null)
+                visibilityAudits = visibilityAudits.Where(audit =>
+                    audit.OccurredAt <= query.To.Value);
+            if (query.CompetitionId is not null)
+                visibilityAudits = visibilityAudits.Where(audit =>
+                    audit.CompetitionId == query.CompetitionId.Value);
+            if (query.ActorId is not null)
+                visibilityAudits = visibilityAudits.Where(audit =>
+                    audit.ActorId == query.ActorId.Value);
+
+            items.AddRange((await visibilityAudits
+                .OrderByDescending(audit => audit.OccurredAt)
+                .ThenByDescending(audit => audit.Id)
+                .Take(query.Limit)
+                .ToArrayAsync(ct))
+                .Select(audit => new PlatformAuditView(
+                    audit.Id,
+                    PlatformAuditKind.CompetitionLeaderboardVisibility,
+                    audit.CompetitionId,
+                    audit.CompetitionId,
+                    audit.ActorId,
+                    null,
+                    null,
+                    audit.From,
+                    audit.To,
+                    null,
+                    null,
                     audit.Reason,
                     audit.Automatic,
                     audit.OccurredAt)));
@@ -73,6 +113,8 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     audit.TargetUserId,
                     null,
                     audit.ActorUserId,
+                    null,
+                    null,
                     null,
                     null,
                     audit.Action,

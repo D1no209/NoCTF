@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Management;
+using NoCTF.Application.Competitions.Visibility;
 using NoCTF.API.Security;
 
 namespace NoCTF.API.Endpoints.Competitions;
@@ -16,8 +17,7 @@ public sealed class GetLeaderboardRequest
 public sealed class GetLeaderboardEndpoint(
     ILeaderboardCache leaderboard,
     IBackendMessagePublisher messages,
-    GetCompetition getCompetition,
-    ICompetitionLeaderboardAccess access,
+    ICompetitionVisibilityAccess access,
     IUserContext user)
     : Endpoint<GetLeaderboardRequest, Results<Ok<LeaderboardResponse>, Accepted<LeaderboardProcessingResponse>, NotFound, ProblemHttpResult>>
 {
@@ -33,22 +33,47 @@ public sealed class GetLeaderboardEndpoint(
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        if (await getCompetition.ExecuteAsync(request.CompetitionId, false, cancellationToken) is null)
+        var visibility = await access.ResolveAsync(
+            user.UserId,
+            request.CompetitionId,
+            DateTimeOffset.UtcNow,
+            cancellationToken);
+        if (visibility is null)
+            return TypedResults.NotFound();
+        if (visibility.DataScope == LeaderboardDataScope.Hidden)
         {
-            if (await getCompetition.ExecuteAsync(request.CompetitionId, true, cancellationToken) is null
-                || user.UserId == Guid.Empty
-                || !await access.CanReadPrivateAsync(
-                    user.UserId,
-                    request.CompetitionId,
-                    cancellationToken))
-                return TypedResults.NotFound();
+            return TypedResults.Ok(new LeaderboardResponse(
+                request.CompetitionId,
+                DateTimeOffset.UtcNow,
+                [])
+            {
+                Visibility = visibility.Visibility,
+                DataScope = LeaderboardDataScope.Hidden
+            });
         }
-        var snapshot = await leaderboard.GetAsync(request.CompetitionId, cancellationToken);
+        var snapshot = visibility.DataScope == LeaderboardDataScope.Frozen
+            ? await leaderboard.GetFrozenAsync(request.CompetitionId, cancellationToken)
+            : await leaderboard.GetAsync(request.CompetitionId, cancellationToken);
         if (snapshot is not null)
         {
-            if (snapshot.Stale)
+            if (visibility.DataScope == LeaderboardDataScope.Live && snapshot.Stale)
                 await messages.ProjectLeaderboardAsync(request.CompetitionId, cancellationToken);
-            return TypedResults.Ok(snapshot);
+            return TypedResults.Ok(snapshot with
+            {
+                Visibility = visibility.Visibility,
+                DataScope = visibility.DataScope,
+                DataAsOf = visibility.DataScope == LeaderboardDataScope.Frozen
+                    ? snapshot.DataAsOf
+                    : snapshot.GeneratedAt
+            });
+        }
+        if (visibility.DataScope == LeaderboardDataScope.Frozen)
+        {
+            await messages.ApplyCompetitionVisibilityAsync(
+                request.CompetitionId,
+                visibility.VisibilityRevision,
+                cancellationToken);
+            return Processing(request.CompetitionId, visibility.LeaderboardRevision);
         }
         var status = await leaderboard.GetStatusAsync(request.CompetitionId, cancellationToken);
         if (status.LastFailureAt is not null)
@@ -62,12 +87,19 @@ public sealed class GetLeaderboardEndpoint(
                     ["lastFailureAt"] = status.LastFailureAt
                 });
         await messages.ProjectLeaderboardAsync(request.CompetitionId, cancellationToken);
+        return Processing(request.CompetitionId, status.TargetRevision);
+    }
+
+    private Accepted<LeaderboardProcessingResponse> Processing(
+        Guid competitionId,
+        long targetRevision)
+    {
         HttpContext.Response.Headers.RetryAfter = "2";
-        var statusUrl = $"/api/v1/competitions/{request.CompetitionId}/leaderboard";
+        var statusUrl = $"/api/v1/competitions/{competitionId}/leaderboard";
         return TypedResults.Accepted(statusUrl, new LeaderboardProcessingResponse(
-            request.CompetitionId,
+            competitionId,
             LeaderboardProjectionState.Processing,
-            status.TargetRevision,
+            targetRevision,
             statusUrl));
     }
 }

@@ -42,6 +42,7 @@ builder.UseWolverine(options =>
         options.PublishMessage<EvaluateSubmission>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<InvalidateLeaderboard>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<ApplyCompetitionVisibility>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<CleanupCompetitionRuntimes>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ProvisionCompetitionRuntimes>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<AdvanceCompetitionLifecycle>().ToPostgresqlQueue("noctf-worker");

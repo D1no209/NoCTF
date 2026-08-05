@@ -13,6 +13,7 @@ import {
 } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import AdminCompetitionChallengesPanel from '@/components/admin/competition-detail/AdminCompetitionChallengesPanel.vue'
+import AdminCompetitionLeaderboardVisibilityPanel from '@/components/admin/competition-detail/AdminCompetitionLeaderboardVisibilityPanel.vue'
 import AdminCompetitionPermissionsPanel from '@/components/admin/competition-detail/AdminCompetitionPermissionsPanel.vue'
 import AdminCompetitionRuntimesPanel from '@/components/admin/competition-detail/AdminCompetitionRuntimesPanel.vue'
 import AdminCompetitionSettingsPanel from '@/components/admin/competition-detail/AdminCompetitionSettingsPanel.vue'
@@ -225,7 +226,10 @@ async function refreshAll() {
 
       <div class="grid gap-6">
         <TabsContent value="settings">
-          <AdminCompetitionSettingsPanel v-if="activeSection === 'settings'" :competition-form="competitionForm" :saving="saveCompetitionMutation.isPending.value" @save="saveCompetitionMutation.mutate()" />
+          <div v-if="activeSection === 'settings'" class="space-y-6">
+            <AdminCompetitionSettingsPanel :competition-form="competitionForm" :saving="saveCompetitionMutation.isPending.value" @save="saveCompetitionMutation.mutate()" />
+            <AdminCompetitionLeaderboardVisibilityPanel :competition-id="competitionId" />
+          </div>
         </TabsContent>
         <TabsContent value="permissions">
           <AdminCompetitionPermissionsPanel v-if="activeSection === 'permissions'" :competition-id="competitionId" />

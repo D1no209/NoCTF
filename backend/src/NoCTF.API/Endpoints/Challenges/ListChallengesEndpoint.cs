@@ -1,6 +1,8 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Challenges.Management;
+using NoCTF.API.Security;
+using NoCTF.Application.Competitions.Visibility;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -9,7 +11,10 @@ public sealed class ListChallengesRequest
     public Guid CompetitionId { get; set; }
 }
 
-public sealed class ListChallengesEndpoint(ListChallenges list) : Endpoint<ListChallengesRequest, Ok<ChallengeListResponse>>
+public sealed class ListChallengesEndpoint(
+    ListChallenges list,
+    ICompetitionVisibilityAccess visibilityAccess,
+    IUserContext user) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
 {
     public override void Configure()
     {
@@ -18,15 +23,26 @@ public sealed class ListChallengesEndpoint(ListChallenges list) : Endpoint<ListC
         Summary(summary => summary.Summary = "Lists published challenges for a competition.");
     }
 
-    public override async Task<Ok<ChallengeListResponse>> ExecuteAsync(
+    public override async Task<Results<Ok<ChallengeListResponse>, NotFound>> ExecuteAsync(
         ListChallengesRequest request,
         CancellationToken ct)
     {
+        var competitionId = Route<Guid>("competitionId");
+        var visibility = await visibilityAccess.ResolveAsync(
+            user.UserId,
+            competitionId,
+            DateTimeOffset.UtcNow,
+            ct);
+        if (visibility is null)
+            return TypedResults.NotFound();
         var items = await list.ExecuteAsync(
-            Route<Guid>("competitionId"),
+            competitionId,
             includeUnpublished: false,
             includeDeleted: false,
             ct);
-        return TypedResults.Ok(ChallengeMapper.ToListResponse(items));
+        return TypedResults.Ok(ChallengeMapper.ToListResponse(
+            items,
+            visibility.Visibility,
+            visibility.DataScope));
     }
 }

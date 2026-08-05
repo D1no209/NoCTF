@@ -2054,6 +2054,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       }
@@ -5768,6 +5771,129 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/leaderboard-visibility": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Gets the scheduled and effective leaderboard visibility policy.",
+        "description": "Returns the revision-fenced Normal, Frozen, or Blackout configuration for a competition.",
+        "operationId": "AdminGetCompetitionLeaderboardVisibility",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Schedules or immediately applies leaderboard visibility.",
+        "description": "Uses a dedicated revision fence and persists the exact Frozen cutoff snapshot when the restriction takes effect.",
+        "operationId": "AdminUpdateCompetitionLeaderboardVisibility",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdateCompetitionLeaderboardVisibilityRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityFailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -9918,6 +10044,9 @@
           "ownerId": {
             "type": "string",
             "format": "guid"
+          },
+          "leaderboardVisibility": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
           }
         }
       },
@@ -9955,6 +10084,20 @@
           3,
           4,
           5
+        ]
+      },
+      "NoCTFDomainCompetitionsCompetitionLeaderboardVisibility": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Normal",
+          "Frozen",
+          "Blackout"
+        ],
+        "enum": [
+          0,
+          1,
+          2
         ]
       },
       "NoCTFAPIEndpointsCompetitionsGetCompetitionRequest": {
@@ -10003,6 +10146,17 @@
             "type": "boolean"
           },
           "lastFailureAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+          },
+          "dataScope": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardDataScope"
+          },
+          "dataAsOf": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -10186,6 +10340,20 @@
           }
         }
       },
+      "NoCTFApplicationScoringLeaderboardLeaderboardDataScope": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Live",
+          "Frozen",
+          "Hidden"
+        ],
+        "enum": [
+          0,
+          1,
+          2
+        ]
+      },
       "NoCTFApplicationScoringLeaderboardLeaderboardProcessingResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -10260,7 +10428,8 @@
           },
           "baseScore": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "nullable": true
           },
           "order": {
             "type": "integer",
@@ -10296,6 +10465,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "leaderboardVisibility": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+          },
+          "dataScope": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardDataScope"
           }
         }
       },
@@ -10360,6 +10535,12 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesChallengeResponse"
             }
+          },
+          "leaderboardVisibility": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+          },
+          "dataScope": {
+            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardDataScope"
           }
         }
       },
@@ -11544,6 +11725,22 @@
               }
             ]
           },
+          "fromLeaderboardVisibility": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+              }
+            ]
+          },
+          "toLeaderboardVisibility": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+              }
+            ]
+          },
           "userAccountAction": {
             "nullable": true,
             "oneOf": [
@@ -11574,11 +11771,13 @@
         "description": "",
         "x-enumNames": [
           "CompetitionLifecycle",
-          "UserAccountLifecycle"
+          "UserAccountLifecycle",
+          "CompetitionLeaderboardVisibility"
         ],
         "enum": [
           0,
-          1
+          1,
+          2
         ]
       },
       "NoCTFDomainIdentityUserAccountLifecycleAction": {
@@ -12054,6 +12253,36 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "configuredVisibility": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+          },
+          "effectiveVisibility": {
+            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionsResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -12212,6 +12441,76 @@
             "type": "integer",
             "format": "int32",
             "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsVisibilityCompetitionVisibilityMutationState"
+          },
+          "current": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFApplicationCompetitionsVisibilityCompetitionVisibilityMutationState": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "Updated",
+          "NotFound",
+          "RevisionConflict",
+          "InvalidSchedule",
+          "CompetitionFinished"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "visibility",
+          "expectedRevision"
+        ],
+        "properties": {
+          "visibility": {
+            "nullable": false,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+              }
+            ]
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "nullable": false
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0,
+            "nullable": true
           }
         }
       },

@@ -671,7 +671,10 @@ function getApiErrorDetail(error: unknown) {
           <div class="min-w-0">
             <DialogTitle class="text-xl leading-tight">{{ challenge?.title }}</DialogTitle>
             <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span class="font-medium text-foreground">{{ challenge?.baseScore }}pt</span>
+              <span v-if="challenge?.baseScore !== null && challenge?.baseScore !== undefined" class="font-medium text-foreground">
+                {{ challenge.baseScore }}pt
+              </span>
+              <span v-else class="font-medium text-muted-foreground">{{ t('scoreboard.scoreHidden') }}</span>
             </div>
           </div>
         </div>

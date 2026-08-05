@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Competitions.Koh;
+using NoCTF.Application.Competitions.Visibility;
+using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -13,7 +16,7 @@ public sealed record ChallengeResponse(
     string Title,
     string? Description,
     string Direction,
-    long BaseScore,
+    long? BaseScore,
     int Order,
     bool IsPublished,
     int Revision,
@@ -21,15 +24,22 @@ public sealed record ChallengeResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string? ControlFlag = null,
-    IReadOnlyList<string>? Urls = null);
+    IReadOnlyList<string>? Urls = null,
+    CompetitionLeaderboardVisibility LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal,
+    LeaderboardDataScope DataScope = LeaderboardDataScope.Live);
 
-public sealed record ChallengeListResponse(IReadOnlyList<ChallengeResponse> Items);
+public sealed record ChallengeListResponse(
+    IReadOnlyList<ChallengeResponse> Items,
+    CompetitionLeaderboardVisibility LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal,
+    LeaderboardDataScope DataScope = LeaderboardDataScope.Live);
 
 internal static class ChallengeMapper
 {
     public static ChallengeResponse ToResponse(
         ChallengeView view,
-        KohChallengeAccessView? koh = null) =>
+        KohChallengeAccessView? koh = null,
+        CompetitionLeaderboardVisibility visibility = CompetitionLeaderboardVisibility.Normal,
+        LeaderboardDataScope dataScope = LeaderboardDataScope.Live) =>
         new(
             view.Id,
             view.CompetitionId,
@@ -37,7 +47,7 @@ internal static class ChallengeMapper
             view.Title,
             view.Description,
             view.Direction,
-            view.BaseScore,
+            dataScope == LeaderboardDataScope.Hidden ? null : view.BaseScore,
             view.Order,
             view.IsPublished,
             view.Revision,
@@ -45,10 +55,21 @@ internal static class ChallengeMapper
             view.CreatedAt,
             view.UpdatedAt,
             koh?.ControlFlag,
-            koh?.Urls);
+            koh?.Urls,
+            visibility,
+            dataScope);
 
-    public static ChallengeListResponse ToListResponse(IReadOnlyList<ChallengeView> views) =>
-        new(views.Select(view => ToResponse(view)).ToArray());
+    public static ChallengeListResponse ToListResponse(
+        IReadOnlyList<ChallengeView> views,
+        CompetitionLeaderboardVisibility visibility = CompetitionLeaderboardVisibility.Normal,
+        LeaderboardDataScope dataScope = LeaderboardDataScope.Live) =>
+        new(
+            views.Select(view => ToResponse(
+                view,
+                visibility: visibility,
+                dataScope: dataScope)).ToArray(),
+            visibility,
+            dataScope);
 }
 
 public sealed class GetChallengeRequest
@@ -60,6 +81,7 @@ public sealed class GetChallengeRequest
 public sealed class GetChallengeEndpoint(
     GetChallenge get,
     IKohChallengeAccessReader kohAccess,
+    ICompetitionVisibilityAccess visibilityAccess,
     IUserContext user) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
 {
     public override void Configure()
@@ -73,8 +95,16 @@ public sealed class GetChallengeEndpoint(
         GetChallengeRequest request,
         CancellationToken ct)
     {
+        var competitionId = Route<Guid>("competitionId");
+        var visibility = await visibilityAccess.ResolveAsync(
+            user.UserId,
+            competitionId,
+            DateTimeOffset.UtcNow,
+            ct);
+        if (visibility is null)
+            return TypedResults.NotFound();
         var item = await get.ExecuteAsync(
-            Route<Guid>("competitionId"),
+            competitionId,
             Route<Guid>("competitionChallengeId"),
             includeUnpublished: false,
             includeDeleted: false,
@@ -87,6 +117,10 @@ public sealed class GetChallengeEndpoint(
             item.Id,
             user.UserId,
             ct);
-        return TypedResults.Ok(ChallengeMapper.ToResponse(item, access));
+        return TypedResults.Ok(ChallengeMapper.ToResponse(
+            item,
+            access,
+            visibility.Visibility,
+            visibility.DataScope));
     }
 }

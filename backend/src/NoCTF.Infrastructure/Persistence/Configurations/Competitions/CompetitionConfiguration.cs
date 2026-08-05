@@ -17,12 +17,23 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(competition => competition.ObserverIds).HasColumnType("uuid[]");
         builder.Property(competition => competition.Mode).HasConversion<short>();
         builder.Property(competition => competition.Status).HasConversion<short>();
+        builder.Property(competition => competition.LeaderboardVisibility).HasConversion<short>();
+        builder.Property(competition => competition.FrozenLeaderboardSnapshotJson).HasColumnType("jsonb");
         builder.HasMany(competition => competition.LifecycleAudits)
+            .WithOne()
+            .HasForeignKey(audit => audit.CompetitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasMany(competition => competition.LeaderboardVisibilityAudits)
             .WithOne()
             .HasForeignKey(audit => audit.CompetitionId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(competition => competition.DeletedAt == null);
         builder.HasIndex(competition => new { competition.Status, competition.StartAt });
+        builder.HasIndex(competition => new
+        {
+            competition.LeaderboardVisibility,
+            competition.LeaderboardVisibilityStartsAt
+        });
         builder.HasIndex(competition => competition.ManagerIds).HasMethod("gin");
         builder.HasIndex(competition => competition.JudgeIds).HasMethod("gin");
         builder.HasIndex(competition => competition.ObserverIds).HasMethod("gin");
@@ -43,7 +54,28 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
             table.HasCheckConstraint(
                 "ck_competitions_flag_secret_length",
                 "octet_length(flag_derivation_secret) = 32");
+            table.HasCheckConstraint(
+                "ck_competitions_leaderboard_visibility_state",
+                "leaderboard_visibility BETWEEN 0 AND 2 AND "
+                + "((leaderboard_visibility = 0 AND leaderboard_visibility_starts_at IS NULL AND frozen_leaderboard_snapshot_json IS NULL) "
+                + "OR (leaderboard_visibility = 1 AND leaderboard_visibility_starts_at IS NOT NULL "
+                + "AND ((leaderboard_visibility_applied_at IS NULL AND frozen_leaderboard_snapshot_json IS NULL) "
+                + "OR (leaderboard_visibility_applied_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NOT NULL))) "
+                + "OR (leaderboard_visibility = 2 AND leaderboard_visibility_starts_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NULL))");
         });
+    }
+}
+
+internal sealed class CompetitionLeaderboardVisibilityAuditConfiguration
+    : IEntityTypeConfiguration<CompetitionLeaderboardVisibilityAudit>
+{
+    public void Configure(EntityTypeBuilder<CompetitionLeaderboardVisibilityAudit> builder)
+    {
+        builder.ToTable("competition_leaderboard_visibility_audits");
+        builder.HasKey(audit => audit.Id);
+        builder.Property(audit => audit.From).HasConversion<short>();
+        builder.Property(audit => audit.To).HasConversion<short>();
+        builder.HasIndex(audit => new { audit.CompetitionId, audit.OccurredAt });
     }
 }
 

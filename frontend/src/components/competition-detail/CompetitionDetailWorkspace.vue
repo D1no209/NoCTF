@@ -7,6 +7,7 @@ import { ArrowRight, Calendar, CheckCircle2, Clock, EyeOff, Loader2, Lock, Puzzl
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
+import { leaderboardDataScope, leaderboardVisibility } from '@/api/leaderboardVisibility'
 import { challengeApi, competitionApi, submissionApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
 import { solvedCompetitionChallengeIds } from '@/api/submissionPresentation'
@@ -216,8 +217,28 @@ const { data: headerLeaderboard } = useQuery<
   refetchInterval: computed(() => approvedTeam.value?.id ? 10_000 : false),
 })
 
+const currentLeaderboardScope = computed(() =>
+  headerLeaderboard.value?.dataScope ?? effectiveChallenges.value[0]?.dataScope,
+)
+const blackoutActive = computed(() =>
+  competition.value?.leaderboardVisibility === leaderboardVisibility.blackout,
+)
+const frozenActive = computed(() =>
+  competition.value?.leaderboardVisibility === leaderboardVisibility.frozen,
+)
+const privilegedLiveLeaderboard = computed(() =>
+  (blackoutActive.value || frozenActive.value)
+  && currentLeaderboardScope.value === leaderboardDataScope.live,
+)
+
 watch(
-  () => [competitionId.value, approvedTeam.value?.id, currentTeam.value?.id, headerLeaderboard.value?.entries],
+  () => [
+    competitionId.value,
+    approvedTeam.value?.id,
+    currentTeam.value?.id,
+    headerLeaderboard.value?.entries,
+    headerLeaderboard.value?.dataScope,
+  ],
   () => {
     if (!competitionId.value) {
       scoreStore.reset()
@@ -229,6 +250,16 @@ watch(
         competitionId.value,
         currentTeam.value?.id ?? null,
         currentTeam.value?.name ?? auth.user?.userName ?? null,
+        null,
+      )
+      return
+    }
+
+    if (headerLeaderboard.value?.dataScope === leaderboardDataScope.hidden) {
+      scoreStore.setCurrentTeamScore(
+        competitionId.value,
+        approvedTeam.value.id,
+        approvedTeam.value.name,
         null,
       )
       return
@@ -494,6 +525,24 @@ function rotationClass(id: string) {
       </div>
     </Panel>
 
+    <Card
+      v-if="competition && (blackoutActive || frozenActive)"
+      class="border-2 border-dashed border-foreground/35 bg-muted/50 p-4"
+    >
+      <div class="flex items-start gap-3">
+        <EyeOff v-if="blackoutActive" class="mt-0.5 size-5 shrink-0" />
+        <Clock v-else class="mt-0.5 size-5 shrink-0" />
+        <div class="space-y-1">
+          <p class="font-bold">
+            {{ t(blackoutActive ? 'scoreboard.blackoutTitle' : 'scoreboard.frozenTitle') }}
+          </p>
+          <p class="text-sm text-muted-foreground">
+            {{ t(privilegedLiveLeaderboard ? 'scoreboard.privilegedLiveDescription' : blackoutActive ? 'scoreboard.blackoutCompetitionDescription' : 'scoreboard.frozenCompetitionDescription') }}
+          </p>
+        </div>
+      </div>
+    </Card>
+
     <!-- Registration Card -->
     <Card>
       <Panel class="p-4">
@@ -691,7 +740,7 @@ function rotationClass(id: string) {
 
                     <div class="flex flex-1 flex-col items-center justify-center py-2">
                       <span class="text-3xl font-black tabular-nums text-foreground">
-                        {{ challenge.baseScore }}
+                        {{ challenge.baseScore ?? t('scoreboard.scoreHidden') }}
                       </span>
                     </div>
 
