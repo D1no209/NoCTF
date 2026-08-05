@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { toTypedSchema } from '@vee-validate/zod'
+import { AlertCircle, CircleCheck, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
+import { useForm } from 'vee-validate'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import AuthLayout from '@/components/layout/AuthLayout.vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   FormControl,
   FormField,
@@ -18,10 +19,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
-import AuthLayout from '@/components/layout/AuthLayout.vue'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -30,6 +30,7 @@ const route = useRoute()
 const loading = ref(false)
 const loginError = ref('')
 const passwordVisible = ref(false)
+const passwordResetSucceeded = computed(() => route.query.passwordReset === 'success')
 
 const formSchema = toTypedSchema(z.object({
   email: z.string().trim().min(1, t('validation.loginIdentifierRequired')),
@@ -54,10 +55,12 @@ const onSubmit = form.handleSubmit(async (values) => {
       ? route.query.redirect
       : '/'
     await router.push(redirect)
-  } catch {
+  }
+  catch {
     loginError.value = t('errors.loginFailed')
     toast.error(loginError.value)
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 })
@@ -67,14 +70,23 @@ const onSubmit = form.handleSubmit(async (values) => {
   <AuthLayout :subtitle="t('auth.loginSubtitle')">
     <Card class="w-full max-w-[470px]">
       <CardHeader class="border-b-2 border-border pb-3 text-center">
-        <CardTitle class="text-2xl font-bold tracking-[0.08em]">{{ t('auth.loginTitle') }}</CardTitle>
-        <p class="mt-2 text-sm text-muted-foreground">{{ t('auth.loginSubtitle') }}</p>
+        <CardTitle class="text-2xl font-bold tracking-[0.08em]">
+          {{ t('auth.loginTitle') }}
+        </CardTitle>
+        <p class="mt-2 text-sm text-muted-foreground">
+          {{ t('auth.loginSubtitle') }}
+        </p>
       </CardHeader>
       <CardContent class="pt-5">
-        <form @submit="onSubmit" class="space-y-5">
+        <form class="space-y-5" @submit="onSubmit">
           <Alert v-if="loginError" variant="destructive">
             <AlertCircle class="size-4" />
             <AlertDescription>{{ loginError }}</AlertDescription>
+          </Alert>
+
+          <Alert v-if="passwordResetSucceeded" variant="success" role="status">
+            <CircleCheck class="size-4" />
+            <AlertDescription>{{ t('auth.passwordResetSucceeded') }}</AlertDescription>
           </Alert>
 
           <FormField v-slot="{ componentField }" name="email">
@@ -95,7 +107,15 @@ const onSubmit = form.handleSubmit(async (values) => {
 
           <FormField v-slot="{ componentField }" name="password">
             <FormItem>
-              <FormLabel>{{ t('auth.password') }}</FormLabel>
+              <div class="flex items-center justify-between gap-3">
+                <FormLabel>{{ t('auth.password') }}</FormLabel>
+                <RouterLink
+                  :to="{ name: 'forgot-password' }"
+                  class="text-sm font-bold underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  {{ t('auth.forgotPassword') }}
+                </RouterLink>
+              </div>
               <div class="relative">
                 <FormControl>
                   <Input

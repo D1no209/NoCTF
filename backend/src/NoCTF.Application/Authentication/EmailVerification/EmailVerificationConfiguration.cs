@@ -8,6 +8,9 @@ public sealed record EmailVerificationConfigurationView(
     string PublicBaseUrl,
     int TokenLifetimeMinutes,
     int ResendCooldownSeconds,
+    int PasswordResetTokenLifetimeMinutes,
+    int PasswordResetCooldownSeconds,
+    int PasswordResetMaxRequestsPerHour,
     string SmtpHost,
     int SmtpPort,
     SmtpSecurityMode SmtpSecurityMode,
@@ -24,6 +27,9 @@ public sealed record UpdateEmailVerificationConfigurationCommand(
     string PublicBaseUrl,
     int TokenLifetimeMinutes,
     int ResendCooldownSeconds,
+    int PasswordResetTokenLifetimeMinutes,
+    int PasswordResetCooldownSeconds,
+    int PasswordResetMaxRequestsPerHour,
     string SmtpHost,
     int SmtpPort,
     SmtpSecurityMode SmtpSecurityMode,
@@ -46,6 +52,9 @@ public enum EmailVerificationConfigurationError
     PublicBaseUrlInvalid,
     TokenLifetimeInvalid,
     ResendCooldownInvalid,
+    PasswordResetTokenLifetimeInvalid,
+    PasswordResetCooldownInvalid,
+    PasswordResetMaxRequestsInvalid,
     SmtpHostRequired,
     SmtpHostInvalid,
     SmtpPortInvalid,
@@ -145,6 +154,15 @@ public sealed class ManageEmailVerificationConfiguration(
             errors.Add(EmailVerificationConfigurationError.TokenLifetimeInvalid);
         if (command.ResendCooldownSeconds is < 30 or > 3600)
             errors.Add(EmailVerificationConfigurationError.ResendCooldownInvalid);
+        if (command.PasswordResetTokenLifetimeMinutes is < 5 or > 1440)
+        {
+            errors.Add(
+                EmailVerificationConfigurationError.PasswordResetTokenLifetimeInvalid);
+        }
+        if (command.PasswordResetCooldownSeconds is < 30 or > 3600)
+            errors.Add(EmailVerificationConfigurationError.PasswordResetCooldownInvalid);
+        if (command.PasswordResetMaxRequestsPerHour is < 1 or > 24)
+            errors.Add(EmailVerificationConfigurationError.PasswordResetMaxRequestsInvalid);
         if (command.SmtpPort is < 1 or > 65_535)
             errors.Add(EmailVerificationConfigurationError.SmtpPortInvalid);
         if (!Enum.IsDefined(command.SmtpSecurityMode))

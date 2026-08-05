@@ -19,6 +19,9 @@ public sealed class UpdateEmailVerificationConfigurationRequest
     public required string PublicBaseUrl { get; set; }
     public required int TokenLifetimeMinutes { get; set; }
     public required int ResendCooldownSeconds { get; set; }
+    public required int PasswordResetTokenLifetimeMinutes { get; set; }
+    public required int PasswordResetCooldownSeconds { get; set; }
+    public required int PasswordResetMaxRequestsPerHour { get; set; }
     public required string SmtpHost { get; set; }
     public required int SmtpPort { get; set; }
     [JsonConverter(typeof(SmtpSecurityModeJsonConverter))]
@@ -38,6 +41,9 @@ public sealed class UpdateEmailVerificationConfigurationValidator
         RuleFor(request => request.PublicBaseUrl).NotEmpty().MaximumLength(2048);
         RuleFor(request => request.TokenLifetimeMinutes).InclusiveBetween(5, 10_080);
         RuleFor(request => request.ResendCooldownSeconds).InclusiveBetween(30, 3600);
+        RuleFor(request => request.PasswordResetTokenLifetimeMinutes).InclusiveBetween(5, 1440);
+        RuleFor(request => request.PasswordResetCooldownSeconds).InclusiveBetween(30, 3600);
+        RuleFor(request => request.PasswordResetMaxRequestsPerHour).InclusiveBetween(1, 24);
         RuleFor(request => request.SmtpHost).MaximumLength(253);
         RuleFor(request => request.SmtpPort).InclusiveBetween(1, 65_535);
         RuleFor(request => request.SmtpUserName).MaximumLength(320);
@@ -77,6 +83,9 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
             request.PublicBaseUrl,
             request.TokenLifetimeMinutes,
             request.ResendCooldownSeconds,
+            request.PasswordResetTokenLifetimeMinutes,
+            request.PasswordResetCooldownSeconds,
+            request.PasswordResetMaxRequestsPerHour,
             request.SmtpHost,
             request.SmtpPort,
             request.SmtpSecurityMode,

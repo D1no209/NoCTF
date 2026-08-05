@@ -371,6 +371,23 @@ export const authApi = {
       tt('errors.resendVerification'),
     )
   },
+  async requestPasswordReset(email: string): Promise<void> {
+    await requireSuccess(
+      generatedSdk.authenticationRequestPasswordReset({
+        body: { email },
+      }),
+      tt('errors.requestPasswordReset'),
+    )
+  },
+  async completePasswordReset(token: string, newPassword: string): Promise<void> {
+    await requireSuccess(
+      generatedSdk.authenticationCompletePasswordReset({
+        body: { token, newPassword },
+        credentials: 'include',
+      }),
+      tt('errors.completePasswordReset'),
+    )
+  },
   async refresh() {
     return unwrap(await requestAuthenticationRefresh(), tt('errors.refreshToken'))
   },

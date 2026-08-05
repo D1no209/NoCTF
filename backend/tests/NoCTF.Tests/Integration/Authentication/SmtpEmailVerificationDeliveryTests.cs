@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Authentication;
 
@@ -28,6 +29,47 @@ public sealed class SmtpEmailVerificationDeliveryTests
     private const ushort ImapPort = 3143;
     private const ushort MailpitSmtpPort = 1025;
     private static readonly Guid UserId = Guid.Parse("62a0c83d-3249-43f7-af40-e9fc79df7712");
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Password_reset_and_change_notice_work_when_registration_verification_is_disabled(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var greenMail = BuildGreenMail(authenticationDisabled: false);
+            await greenMail.StartAsync(cancellationToken);
+            var configuration = Configuration(
+                greenMail.GetMappedPublicPort(SmtpsPort),
+                SmtpSecurityMode.SslOnConnect,
+                "mailer",
+                "secret") with { Enabled = false };
+            var delivery = CreateDelivery(configuration);
+
+            var resetState = await delivery.SendResetAsync(
+                UserId,
+                "single-use-reset-token",
+                cancellationToken);
+            var changedState = await delivery.SendChangedNotificationAsync(
+                UserId,
+                cancellationToken);
+
+            await Assert.That(resetState).IsEqualTo(PasswordResetEmailDeliveryState.Sent);
+            await Assert.That(changedState).IsEqualTo(PasswordResetEmailDeliveryState.Sent);
+            var messages = await ReadMessagesAsync(greenMail, cancellationToken);
+            await Assert.That(messages.Count).IsEqualTo(2);
+            var reset = messages.Single(message =>
+                message.Subject == "Reset your NoCTF password");
+            var changed = messages.Single(message =>
+                message.Subject == "Your NoCTF password was changed");
+            await Assert.That(reset.TextBody).Contains(
+                "reset-password?token=single-use-reset-token");
+            await Assert.That(reset.HtmlBody).Contains(
+                "reset-password?token=single-use-reset-token");
+            await Assert.That(changed.TextBody).DoesNotContain("single-use-reset-token");
+            await Assert.That(changed.TextBody).Contains("existing sessions were signed out");
+        });
+    }
 
     [Test]
     [Timeout(300_000)]
@@ -258,6 +300,9 @@ public sealed class SmtpEmailVerificationDeliveryTests
             PublicBaseUrl: configuration.PublicBaseUrl,
             TokenLifetimeMinutes: 1440,
             ResendCooldownSeconds: 60,
+            PasswordResetTokenLifetimeMinutes: 30,
+            PasswordResetCooldownSeconds: 60,
+            PasswordResetMaxRequestsPerHour: 3,
             SmtpHost: configuration.SmtpHost,
             SmtpPort: configuration.SmtpPort,
             SmtpSecurityMode: configuration.SmtpSecurityMode,

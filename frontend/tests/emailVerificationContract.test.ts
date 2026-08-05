@@ -12,6 +12,9 @@ const configuration = {
   publicBaseUrl: 'https://noctf.example',
   tokenLifetimeMinutes: 1440,
   resendCooldownSeconds: 60,
+  passwordResetTokenLifetimeMinutes: 30,
+  passwordResetCooldownSeconds: 60,
+  passwordResetMaxRequestsPerHour: 3,
   smtpHost: 'smtp.example',
   smtpPort: 587,
   smtpSecurityMode: 'StartTls' as const,
@@ -34,9 +37,12 @@ const contractFetch: typeof fetch = async (input, init) => {
 
   if (path === '/api/v1/admin/platform/email-verification/test'
     || path === '/api/v1/auth/email-verification/resend'
-    || path === '/api/v1/auth/email-verification/verify') {
+    || path === '/api/v1/auth/email-verification/verify'
+    || path === '/api/v1/auth/password-reset/complete') {
     return new Response(null, { status: 204 })
   }
+  if (path === '/api/v1/auth/password-reset/request')
+    return new Response(null, { status: 202 })
 
   return Response.json(configuration)
 }
@@ -68,6 +74,9 @@ describe('generated email verification contracts', () => {
       publicBaseUrl: configuration.publicBaseUrl,
       tokenLifetimeMinutes: configuration.tokenLifetimeMinutes,
       resendCooldownSeconds: configuration.resendCooldownSeconds,
+      passwordResetTokenLifetimeMinutes: configuration.passwordResetTokenLifetimeMinutes,
+      passwordResetCooldownSeconds: configuration.passwordResetCooldownSeconds,
+      passwordResetMaxRequestsPerHour: configuration.passwordResetMaxRequestsPerHour,
       smtpHost: configuration.smtpHost,
       smtpPort: configuration.smtpPort,
       smtpSecurityMode: configuration.smtpSecurityMode,
@@ -96,6 +105,9 @@ describe('generated email verification contracts', () => {
       publicBaseUrl: configuration.publicBaseUrl,
       tokenLifetimeMinutes: 1440,
       resendCooldownSeconds: 60,
+      passwordResetTokenLifetimeMinutes: 30,
+      passwordResetCooldownSeconds: 60,
+      passwordResetMaxRequestsPerHour: 3,
       smtpHost: configuration.smtpHost,
       smtpPort: 587,
       smtpSecurityMode: 'StartTls',
@@ -117,5 +129,23 @@ describe('generated email verification contracts', () => {
     ])
     expect(await requests[0]!.json()).toEqual({ token: 'single-use-token' })
     expect(requests[1]!.headers.get('Authorization')).toBe('Bearer admin-token')
+  })
+
+  test('password recovery uses generated anonymous endpoints without exposing account state', async () => {
+    client.setConfig({ headers: { Authorization: null } })
+
+    await authApi.requestPasswordReset('player@example.test')
+    await authApi.completePasswordReset('single-use-reset-token', 'eight888')
+
+    expect(requests.map(request => `${request.method} ${new URL(request.url).pathname}`)).toEqual([
+      'POST /api/v1/auth/password-reset/request',
+      'POST /api/v1/auth/password-reset/complete',
+    ])
+    expect(await requests[0]!.json()).toEqual({ email: 'player@example.test' })
+    expect(await requests[1]!.json()).toEqual({
+      token: 'single-use-reset-token',
+      newPassword: 'eight888',
+    })
+    expect(requests.every(request => request.headers.get('Authorization') === null)).toBe(true)
   })
 })

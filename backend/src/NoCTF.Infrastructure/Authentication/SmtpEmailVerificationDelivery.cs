@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using MimeKit;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Domain.Identity;
 
 namespace NoCTF.Infrastructure.Authentication;
@@ -27,7 +28,8 @@ public sealed class SmtpEmailVerificationDelivery(
     IUserAuthenticationStore users,
     IEmailVerificationSmtpClientFactory clientFactory,
     ILogger<SmtpEmailVerificationDelivery> logger)
-    : IEmailVerificationDelivery
+    : IEmailVerificationDelivery,
+        IPasswordResetEmailDelivery
 {
     public async Task<EmailVerificationDeliveryState> SendVerificationAsync(
         Guid userId,
@@ -95,6 +97,71 @@ public sealed class SmtpEmailVerificationDelivery(
         await SendAsync(configuration, message, ct);
         logger.LogInformation("Sent an SMTP configuration test to user {UserId}.", userId);
         return EmailVerificationDeliveryState.Sent;
+    }
+
+    public async Task<PasswordResetEmailDeliveryState> SendResetAsync(
+        Guid userId,
+        string token,
+        CancellationToken ct)
+    {
+        var configuration = await deliveryConfiguration.GetDeliveryConfigurationAsync(
+            requireEnabled: false,
+            ct);
+        if (configuration is null)
+            return PasswordResetEmailDeliveryState.NotConfigured;
+
+        var user = await users.GetProfileAsync(userId, ct);
+        if (user is null)
+            return PasswordResetEmailDeliveryState.RecipientNotFound;
+
+        var publicBaseUri = new Uri(
+            $"{configuration.PublicBaseUrl.TrimEnd('/')}/",
+            UriKind.Absolute);
+        var resetUrl = new Uri(
+            publicBaseUri,
+            $"reset-password?token={Uri.EscapeDataString(token)}").AbsoluteUri;
+        using var message = CreateMessage(
+            configuration,
+            user.Email,
+            "Reset your NoCTF password",
+            $"Hello {user.UserName},\n\n"
+                + "Use this single-use link to reset your NoCTF password:\n\n"
+                + $"{resetUrl}\n\n"
+                + "If you did not request a password reset, you can ignore this message.",
+            $"Hello {WebUtility.HtmlEncode(user.UserName)},<br><br>"
+                + "Use this single-use link to reset your NoCTF password:<br><br>"
+                + $"<a href=\"{WebUtility.HtmlEncode(resetUrl)}\">Reset password</a><br><br>"
+                + "If you did not request a password reset, you can ignore this message.");
+        await SendAsync(configuration, message, ct);
+        logger.LogInformation("Sent a password reset message to user {UserId}.", userId);
+        return PasswordResetEmailDeliveryState.Sent;
+    }
+
+    public async Task<PasswordResetEmailDeliveryState> SendChangedNotificationAsync(
+        Guid userId,
+        CancellationToken ct)
+    {
+        var configuration = await deliveryConfiguration.GetDeliveryConfigurationAsync(
+            requireEnabled: false,
+            ct);
+        if (configuration is null)
+            return PasswordResetEmailDeliveryState.NotConfigured;
+
+        var user = await users.GetProfileAsync(userId, ct);
+        if (user is null)
+            return PasswordResetEmailDeliveryState.RecipientNotFound;
+
+        const string body = "Your NoCTF password was changed. All existing sessions were signed out. "
+            + "If you did not make this change, contact a platform administrator immediately.";
+        using var message = CreateMessage(
+            configuration,
+            user.Email,
+            "Your NoCTF password was changed",
+            body,
+            body);
+        await SendAsync(configuration, message, ct);
+        logger.LogInformation("Sent a password change notice to user {UserId}.", userId);
+        return PasswordResetEmailDeliveryState.Sent;
     }
 
     private static MimeMessage CreateMessage(

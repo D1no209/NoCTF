@@ -28,6 +28,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<RuntimeInstance> RuntimeInstances => Set<RuntimeInstance>();
     public DbSet<PatchUpload> PatchUploads => Set<PatchUpload>();
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<EmailVerificationSettings> EmailVerificationSettings =>
         Set<EmailVerificationSettings>();
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();

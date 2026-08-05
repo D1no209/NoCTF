@@ -11,6 +11,7 @@ using NoCTF.Application.Submissions.Intake;
 using NoCTF.Infrastructure;
 using NoCTF.API.OpenApi;
 using NoCTF.Application.Authentication.RefreshSession;
+using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Application.Submissions.Status;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Storage;
@@ -72,6 +73,8 @@ public static class ServiceRegistration
             services.AddScoped<LogoutAll>();
             services.AddScoped<ResendEmailVerification>();
             services.AddScoped<VerifyEmail>();
+            services.AddScoped<RequestPasswordReset>();
+            services.AddScoped<CompletePasswordReset>();
             services.AddScoped<ModerateTeam>();
         }
         else
@@ -103,6 +106,9 @@ public static class ServiceRegistration
             services.AddScoped<ILeaderboardCache, SwaggerLeaderboardCache>();
             services.AddSingleton<IObjectStorage, SwaggerObjectStorage>();
             services.AddSingleton<IAvatarImageProcessor, SwaggerAvatarImageProcessor>();
+            services.AddScoped<IPasswordResetStore, SwaggerPasswordResetStore>();
+            services.AddScoped<RequestPasswordReset>();
+            services.AddScoped<CompletePasswordReset>();
         }
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
@@ -154,6 +160,15 @@ public static class ServiceRegistration
                     {
                         PermitLimit = 8,
                         Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+            options.AddPolicy("password-reset-request", context =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 5,
+                        Window = TimeSpan.FromMinutes(15),
                         QueueLimit = 0
                     }));
         });

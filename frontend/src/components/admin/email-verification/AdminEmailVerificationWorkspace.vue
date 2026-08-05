@@ -46,6 +46,9 @@ const form = reactive({
   publicBaseUrl: '',
   tokenLifetimeMinutes: 1440,
   resendCooldownSeconds: 60,
+  passwordResetTokenLifetimeMinutes: 30,
+  passwordResetCooldownSeconds: 60,
+  passwordResetMaxRequestsPerHour: 3,
   smtpHost: '',
   smtpPort: 587,
   smtpSecurityMode: 'StartTls' as SmtpSecurityMode,
@@ -79,6 +82,10 @@ function applyConfiguration(configuration: EmailVerificationConfiguration) {
   form.publicBaseUrl = configuration.publicBaseUrl ?? ''
   form.tokenLifetimeMinutes = configuration.tokenLifetimeMinutes ?? 1440
   form.resendCooldownSeconds = configuration.resendCooldownSeconds ?? 60
+  form.passwordResetTokenLifetimeMinutes
+    = configuration.passwordResetTokenLifetimeMinutes ?? 30
+  form.passwordResetCooldownSeconds = configuration.passwordResetCooldownSeconds ?? 60
+  form.passwordResetMaxRequestsPerHour = configuration.passwordResetMaxRequestsPerHour ?? 3
   form.smtpHost = configuration.smtpHost ?? ''
   form.smtpPort = configuration.smtpPort ?? 587
   form.smtpSecurityMode = configuration.smtpSecurityMode ?? 'StartTls'
@@ -118,6 +125,9 @@ async function saveConfiguration() {
       publicBaseUrl: form.publicBaseUrl.trim(),
       tokenLifetimeMinutes: form.tokenLifetimeMinutes,
       resendCooldownSeconds: form.resendCooldownSeconds,
+      passwordResetTokenLifetimeMinutes: form.passwordResetTokenLifetimeMinutes,
+      passwordResetCooldownSeconds: form.passwordResetCooldownSeconds,
+      passwordResetMaxRequestsPerHour: form.passwordResetMaxRequestsPerHour,
       smtpHost: form.smtpHost.trim(),
       smtpPort: form.smtpPort,
       smtpSecurityMode: form.smtpSecurityMode,
@@ -305,6 +315,60 @@ onMounted(loadConfiguration)
                 <Input id="email-resend-cooldown" v-model.number="form.resendCooldownSeconds" type="number" min="30" max="3600" />
               </div>
             </div>
+          </section>
+
+          <Separator />
+
+          <section class="space-y-4">
+            <div>
+              <h3 class="font-bold">
+                {{ t('admin.emailVerification.passwordResetPolicy') }}
+              </h3>
+              <p class="text-sm text-muted-foreground">
+                {{ t('admin.emailVerification.passwordResetPolicyDescription') }}
+              </p>
+            </div>
+            <div class="grid gap-4 md:grid-cols-3">
+              <div class="space-y-2">
+                <Label for="password-reset-token-lifetime">
+                  {{ t('admin.emailVerification.passwordResetTokenLifetime') }}
+                </Label>
+                <Input
+                  id="password-reset-token-lifetime"
+                  v-model.number="form.passwordResetTokenLifetimeMinutes"
+                  type="number"
+                  min="5"
+                  max="1440"
+                />
+              </div>
+              <div class="space-y-2">
+                <Label for="password-reset-cooldown">
+                  {{ t('admin.emailVerification.passwordResetCooldown') }}
+                </Label>
+                <Input
+                  id="password-reset-cooldown"
+                  v-model.number="form.passwordResetCooldownSeconds"
+                  type="number"
+                  min="30"
+                  max="3600"
+                />
+              </div>
+              <div class="space-y-2">
+                <Label for="password-reset-hourly-limit">
+                  {{ t('admin.emailVerification.passwordResetHourlyLimit') }}
+                </Label>
+                <Input
+                  id="password-reset-hourly-limit"
+                  v-model.number="form.passwordResetMaxRequestsPerHour"
+                  type="number"
+                  min="1"
+                  max="24"
+                />
+              </div>
+            </div>
+            <p class="border-2 border-dashed border-border p-3 text-sm text-muted-foreground">
+              {{ t('admin.emailVerification.passwordResetIndependent') }}
+            </p>
           </section>
 
           <Separator />

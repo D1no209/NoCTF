@@ -60,6 +60,10 @@ GUID 明文不返回、不记录，`email_verified_at` 必须为空。Bot 只能
 
 仅在邮箱验证开启时使用。字段：id、user_id、token_sha256 bytea(32)、expires_at、consumed_at、created_at。只保存 Token Hash；`token_sha256` 唯一。消费与设置 User.EmailVerifiedAt 同事务。
 
+## password_reset_tokens
+
+字段：id、user_id、token_sha256 bytea(32)、expires_at、consumed_at、invalidated_at、created_at。只保存 Token Hash；`token_sha256` 唯一，`user_id + created_at` 索引支持账号冷却和小时限额。外键使用 Restrict，不级联删除 User。成功消费会使同一账号其他有效令牌失效；账号物理删除或匿名化前由应用显式清理这些安全令牌，它们不是业务历史引用。
+
 ## competitions
 
 字段：

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Authentication;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Application.Authentication.RefreshSession;
 using NoCTF.Domain.Identity;
 
@@ -38,7 +39,14 @@ internal static class AuthenticationInfrastructure
         services.AddSingleton<
             IEmailVerificationSmtpClientFactory,
             EmailVerificationSmtpClientFactory>();
-        services.AddScoped<IEmailVerificationDelivery, SmtpEmailVerificationDelivery>();
+        services.AddScoped<SmtpEmailVerificationDelivery>();
+        services.AddScoped<IEmailVerificationDelivery>(provider =>
+            provider.GetRequiredService<SmtpEmailVerificationDelivery>());
+        services.AddScoped<IPasswordResetEmailDelivery>(provider =>
+            provider.GetRequiredService<SmtpEmailVerificationDelivery>());
+        services.AddScoped<IPasswordResetStore, PasswordResetStore>();
+        services.AddScoped<RequestPasswordReset>();
+        services.AddScoped<CompletePasswordReset>();
         services.AddScoped<ManageEmailVerificationConfiguration>();
         services.AddScoped<SendEmailVerificationTest>();
         services.AddScoped<ResendEmailVerification>();

@@ -54,6 +54,9 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
         await db.EmailVerificationTokens
             .Where(token => token.UserId == userId)
             .ExecuteDeleteAsync(ct);
+        await db.PasswordResetTokens
+            .Where(token => token.UserId == userId)
+            .ExecuteDeleteAsync(ct);
 
         if (mode == UserDeletionMode.HardDelete)
         {
