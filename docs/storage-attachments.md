@@ -38,4 +38,5 @@ Runner 在消费后再次验证 Hash/长度/格式并安全解包，拒绝绝对
 
 数据库先写待清理事实/Outbox，Worker 删除对象后完成硬删除。外部删除幂等；NotFound 视为成功；最终失败进入 DLQ。软删除不立即丢对象。
 
-平台不实现备份与恢复；PostgreSQL/对象存储备份完全由外部运维负责。
+平台进程不实现备份与恢复 API；外部运维使用统一加密恢复点备份 PostgreSQL、Wolverine schema
+和对象内容/元数据，具体停写、校验与隔离恢复流程见 [备份恢复](backup-recovery.md)。
