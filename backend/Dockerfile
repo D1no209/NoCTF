@@ -1,9 +1,9 @@
 FROM oven/bun:1.3.14 AS frontend-build
-WORKDIR /src/frontend
-COPY frontend/package.json frontend/bun.lock ./
-RUN bun install --frozen-lockfile
-COPY frontend/ ./
-RUN bun run build
+WORKDIR /src/ClientApp
+COPY backend/src/NoCTF.API/ClientApp/package.json backend/src/NoCTF.API/ClientApp/bun.lock ./
+RUN bun install --frozen-lockfile --ignore-scripts
+COPY backend/src/NoCTF.API/ClientApp/ ./
+RUN bun --bun run generate
 
 FROM docker:28-cli AS docker-cli
 
@@ -27,7 +27,7 @@ RUN dotnet publish src/NoCTF.Runner/NoCTF.Runner.csproj -c Release -o /app/runne
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS api
 WORKDIR /app
 COPY --from=build /app/api .
-COPY --from=frontend-build /src/frontend/dist ./wwwroot
+COPY --from=frontend-build /src/ClientApp/.output/public ./wwwroot
 RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
 USER 1654
 EXPOSE 8080

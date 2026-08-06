@@ -39,13 +39,13 @@ yarn-error.log*
 *.coveragexml
 
 # Frontend build/dependency outputs
-frontend/dist/
-frontend/node_modules/
-frontend/.vite/
-frontend/.turbo/
-frontend/.cache/
-frontend/playwright-report/
-frontend/test-results/
+backend/src/NoCTF.API/ClientApp/node_modules/
+backend/src/NoCTF.API/ClientApp/.nuxt/
+backend/src/NoCTF.API/ClientApp/.output/
+backend/src/NoCTF.API/ClientApp/dist
+backend/src/NoCTF.API/ClientApp/.data/
+backend/src/NoCTF.API/ClientApp/playwright-report/
+backend/src/NoCTF.API/ClientApp/test-results/
 
 # Backend generated artifacts. Keep the OpenAPI artifact when explicitly generated.
 backend/artifacts/*

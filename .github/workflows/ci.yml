@@ -38,6 +38,10 @@ jobs:
         with:
           dotnet-version: '10.0.300'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.14'
@@ -62,11 +66,14 @@ jobs:
       - name: Build backend
         run: dotnet build backend/NoCTF.slnx --configuration Release --no-restore
 
-      - name: Verify API publish artifact
+      - name: Verify API and frontend publish artifact
         shell: bash
         run: |
-          dotnet publish backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build --no-restore --output artifacts/api /p:BuildSpaOnPublish=false
+          dotnet publish backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build --no-restore --output artifacts/api
           test -f artifacts/api/NoCTF.API.dll
+          test -f artifacts/api/wwwroot/index.html
+          test -f artifacts/api/wwwroot/200.html
+          test -f artifacts/api/wwwroot/404.html
 
       - name: Test backend
         env:
@@ -108,41 +115,8 @@ jobs:
           for script in deploy/recovery/*.sh; do bash -n "$script"; done
           bash deploy/recovery/rehearse.sh
 
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: bun install --frozen-lockfile
-
-      - name: Build frontend
-        working-directory: frontend
-        run: bun run build
-
-      - name: Generate OpenAPI artifact and client
+      - name: Verify OpenAPI artifact
         shell: bash
-        env:
-          ASPNETCORE_ENVIRONMENT: Development
-          ASPNETCORE_URLS: http://localhost:5000
-          ConnectionStrings__PostgreSql: Host=localhost;Port=5432;Database=noctf;Username=noctf;Password=noctf_test_password
-          ConnectionStrings__Redis: localhost:6379
-          Authentication__SigningKey: ci_secret_value_with_at_least_32_chars
-          RunnerScoring__SigningKey: ci_runner_scoring_value_with_at_least_32_chars
-          SeedAdmin__Password: ci-admin-password-123456
         run: |
-          dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build -- --migrate-only
-          dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build &
-          api_pid=$!
-          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
-          for i in {1..60}; do
-            if curl -fsS http://localhost:5000/health >/dev/null; then
-              break
-            fi
-            sleep 2
-          done
-          curl -fsS http://localhost:5000/health >/dev/null
-          cd frontend
-          bun run fetch-openapi
-          bun run generate-api
-          cd ..
-          git diff --exit-code \
-            backend/artifacts/openapi/swagger.json \
-            frontend/src/api/generated \
-            frontend/src/api/client-config.ts
+          dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build --no-launch-profile -- --export-openapi
+          git diff --exit-code backend/artifacts/openapi/swagger.json backend/src/NoCTF.API/wwwroot/openapi/v1.json
