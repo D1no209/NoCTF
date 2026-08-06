@@ -10,7 +10,7 @@ namespace NoCTF.Infrastructure.Administration;
 
 public sealed class PlatformAdministrationStore(
     NoCtfDbContext db,
-    WolverineProcessDeadLetters deadLetters,
+    IProcessDeadLetterStore deadLetters,
     IPasswordHasher<User> passwordHasher) : IPlatformAdministrationStore
 {
     public async Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken ct) =>

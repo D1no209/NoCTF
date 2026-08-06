@@ -13,7 +13,8 @@ internal static class AdministrationInfrastructure
     internal static IServiceCollection AddNoCtfAdministration(
         this IServiceCollection services,
         IConfiguration configuration,
-        bool exporting)
+        bool exporting,
+        bool development)
     {
         if (exporting)
         {
@@ -23,11 +24,21 @@ internal static class AdministrationInfrastructure
             services.AddSingleton<IPlatformLogReader, OpenApiPlatformLogReader>();
             services.AddScoped<IPlatformAuditLogStore, OpenApiPlatformAuditLogStore>();
         }
+        else if (development)
+        {
+            services.AddSingleton<IProcessDeadLetterStore, DevelopmentProcessDeadLetterStore>();
+            services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
+            services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
+            services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();
+            services.AddSingleton<IPlatformLogReader, OpenApiPlatformLogReader>();
+            services.AddScoped<IPlatformAuditLogStore, PlatformAuditLogStore>();
+        }
         else
         {
             var postgres = configuration.GetConnectionString("PostgreSql")
                 ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
-            services.AddSingleton(_ => new WolverineProcessDeadLetters(postgres));
+            services.AddSingleton<IProcessDeadLetterStore>(_ =>
+                new WolverineProcessDeadLetters(postgres));
             services.AddScoped<IPlatformAdministrationStore, PlatformAdministrationStore>();
             services.AddScoped<IUserAccountAdministrationStore, UserAccountAdministrationStore>();
             services.AddScoped<IPlatformConfigurationStore, PlatformConfigurationStore>();

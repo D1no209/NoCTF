@@ -2,17 +2,27 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Caching;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Infrastructure.Administration;
 
-public sealed class PlatformConfigurationStore(NoCtfDbContext db)
+public sealed class PlatformConfigurationStore(
+    NoCtfDbContext db,
+    IFusionCacheProvider? cacheProvider = null)
     : IPlatformConfigurationStore
 {
     private const short SettingsId = 1;
+    private const string CacheKey = "platform-configuration";
+    private readonly IFusionCache? cache = cacheProvider?.GetCache(NoCtfCacheNames.ReadModels);
 
-    public async Task<PlatformConfigurationView> GetAsync(CancellationToken ct) =>
-        ToView(await db.PlatformSettings.AsNoTracking()
-            .SingleAsync(settings => settings.Id == SettingsId, ct));
+    public Task<PlatformConfigurationView> GetAsync(CancellationToken ct) =>
+        cache is null
+            ? LoadAsync(ct)
+            : cache.GetOrSetAsync<PlatformConfigurationView>(
+                CacheKey,
+                (_, token) => LoadAsync(token),
+                token: ct).AsTask();
 
     public async Task<PlatformConfigurationView?> UpdateAsync(
         string name,
@@ -61,13 +71,20 @@ public sealed class PlatformConfigurationStore(NoCtfDbContext db)
         try
         {
             await db.SaveChangesAsync(ct);
-            return ToView(settings);
+            var view = ToView(settings);
+            if (cache is not null)
+                await cache.SetAsync(CacheKey, view, token: ct);
+            return view;
         }
         catch (DbUpdateConcurrencyException)
         {
             return null;
         }
     }
+
+    private async Task<PlatformConfigurationView> LoadAsync(CancellationToken ct) =>
+        ToView(await db.PlatformSettings.AsNoTracking()
+            .SingleAsync(settings => settings.Id == SettingsId, ct));
 
     private static PlatformConfigurationView ToView(PlatformSettings settings) =>
         new(

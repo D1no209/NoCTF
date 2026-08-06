@@ -2,7 +2,12 @@ namespace NoCTF.GameModes.Awd.Configuration;
 
 public sealed record AwdFlagInjectionSettings(string Command, int TimeoutSeconds, string? ServiceName);
 
-public sealed class AwdFlagInjectionConfigurationCatalog
+public interface IAwdFlagInjectionConfigurationCatalog
+{
+    AwdFlagInjectionSettings? Get(string challengeConfigurationJson);
+}
+
+public sealed class AwdFlagInjectionConfigurationCatalog : IAwdFlagInjectionConfigurationCatalog
 {
     public AwdFlagInjectionSettings? Get(string challengeConfigurationJson)
     {

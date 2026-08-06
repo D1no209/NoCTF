@@ -9,7 +9,9 @@ internal static class ChallengeWriteLock
         NoCtfDbContext db,
         Guid challengeId,
         CancellationToken cancellationToken) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
+        !db.Database.IsRelational()
+            ? Task.CompletedTask
+            : db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({'h' + challengeId.ToString("N")}, 0))",
             cancellationToken);
 }

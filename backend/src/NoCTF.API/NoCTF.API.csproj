@@ -8,6 +8,8 @@
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.GameModes/NoCTF.GameModes.csproj" />
     <ProjectReference Include="../NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
+    <ProjectReference Include="../NoCTF.Worker/NoCTF.Worker.csproj" />
+    <ProjectReference Include="../NoCTF.Runner/NoCTF.Runner.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FastEndpoints" />

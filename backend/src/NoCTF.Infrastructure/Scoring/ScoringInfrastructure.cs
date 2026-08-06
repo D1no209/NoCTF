@@ -12,12 +12,10 @@ internal static class ScoringInfrastructure
     {
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
-        services.AddSingleton<ILeaderboardSubscriptionRegistry, RedisLeaderboardSubscriptionRegistry>();
-        services.AddScoped<RedisLeaderboardCache>();
-        services.AddScoped<ILeaderboardCache>(provider =>
-            provider.GetRequiredService<RedisLeaderboardCache>());
-        services.AddScoped<ILeaderboardSnapshotFactory>(provider =>
-            provider.GetRequiredService<RedisLeaderboardCache>());
+        services.AddSingleton<ILeaderboardSubscriptionRegistry,
+            FusionLeaderboardSubscriptionRegistry>();
+        services.AddScoped<ILeaderboardCache, FusionLeaderboardCache>();
+        services.AddScoped<ILeaderboardSnapshotFactory, FusionLeaderboardCache>();
         return services;
     }
 }

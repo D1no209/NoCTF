@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Application.Competitions.Management;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Management;
 using Testcontainers.PostgreSql;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
@@ -32,6 +36,12 @@ public sealed class CompetitionManagementPersistenceTests
             var competitionId = Guid.CreateVersion7();
             var laterCompetitionId = Guid.CreateVersion7();
             var draftCompetitionId = Guid.CreateVersion7();
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.ReadModels)
+                .Services
+                .BuildServiceProvider();
+            var readModels = new CompetitionReadModelCache(
+                cacheServices.GetRequiredService<IFusionCacheProvider>());
 
             await using var db = new NoCtfDbContext(options);
             await db.Database.MigrateAsync(cancellationToken);
@@ -56,16 +66,38 @@ public sealed class CompetitionManagementPersistenceTests
                     CompetitionStatus.Draft));
             await db.SaveChangesAsync(cancellationToken);
 
-            var store = new CompetitionManagementStore(db);
+            var store = new CompetitionManagementStore(db, readModels: readModels);
             var result = await store
                 .FindAsync(competitionId, includeDraft: false, cancellationToken);
             var listed = await store.ListAsync(includeDraft: false, cancellationToken);
+
+            var updated = await store.UpdateAsync(
+                new UpdateCompetitionCommand(
+                    competitionId,
+                    "Renamed competition",
+                    result!.Description,
+                    result.StartTime,
+                    result.EndTime,
+                    result.TeamRegistrationAutoApprove,
+                    result.MaxTeamMembers,
+                    result.MaxConcurrentRuntimeInstancesPerTeam,
+                    ownerId,
+                    now.AddMinutes(1)),
+                CompetitionStatus.Published,
+                cancellationToken);
+            var refreshed = await store
+                .FindAsync(competitionId, includeDraft: false, cancellationToken);
+            var refreshedList = await store.ListAsync(includeDraft: false, cancellationToken);
 
             await Assert.That(result).IsNotNull();
             await Assert.That(result!.Id).IsEqualTo(competitionId);
             await Assert.That(listed).Count().IsEqualTo(2);
             await Assert.That(listed[0].Id).IsEqualTo(laterCompetitionId);
             await Assert.That(listed[1].Id).IsEqualTo(competitionId);
+            await Assert.That(updated).IsNotNull();
+            await Assert.That(refreshed!.Title).IsEqualTo("Renamed competition");
+            await Assert.That(refreshedList.Single(item => item.Id == competitionId).Title)
+                .IsEqualTo("Renamed competition");
         });
     }
 

@@ -36,9 +36,12 @@ public sealed class PostgresRuntimePublishedPortAllocator(
 
         // Docker host ports are shared by every competition on this Runner host. Serialize
         // allocation globally, while the unique index retains the per-competition history rule.
-        await db.Database.ExecuteSqlRawAsync(
-            "SELECT pg_advisory_xact_lock(1315922772, 1347375700)",
-            cancellationToken);
+        if (db.Database.IsRelational())
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                "SELECT pg_advisory_xact_lock(1315922772, 1347375700)",
+                cancellationToken);
+        }
 
         await db.RuntimeInstances
             .Where(owner => owner.Id == instance.Id)

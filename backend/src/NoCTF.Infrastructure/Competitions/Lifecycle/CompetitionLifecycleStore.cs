@@ -13,7 +13,9 @@ public sealed class CompetitionLifecycleStore(
     NoCtfDbContext db,
     CompetitionStartGate startGate,
     ITransactionalMessageOutbox outbox,
-    ICompetitionEventRecorder? eventRecorder = null) : ICompetitionLifecycleStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
+    : ICompetitionLifecycleStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -42,6 +44,20 @@ public sealed class CompetitionLifecycleStore(
         CompetitionStatus to,
         CancellationToken cancellationToken)
     {
+        if (!db.Database.IsRelational())
+        {
+            var competition = await db.Competitions.SingleOrDefaultAsync(
+                item => item.Id == competitionId && item.Status == from,
+                cancellationToken);
+            if (competition is null)
+                return false;
+            competition.Status = to;
+            competition.UpdatedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+            if (readModels is not null)
+                await readModels.InvalidateAsync(competitionId, cancellationToken);
+            return true;
+        }
         var changed = await db.Competitions
             .Where(item => item.Id == competitionId && item.Status == from)
             .ExecuteUpdateAsync(
@@ -49,6 +65,8 @@ public sealed class CompetitionLifecycleStore(
                     .SetProperty(item => item.Status, to)
                     .SetProperty(item => item.UpdatedAt, DateTimeOffset.UtcNow),
                 cancellationToken);
+        if (changed == 1 && readModels is not null)
+            await readModels.InvalidateAsync(competitionId, cancellationToken);
         return changed == 1;
     }
 
@@ -265,6 +283,8 @@ public sealed class CompetitionLifecycleStore(
             await transaction.CommitAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
         }
+        if (readModels is not null)
+            await readModels.InvalidateAsync(competitionId, cancellationToken);
         return true;
     }
 }

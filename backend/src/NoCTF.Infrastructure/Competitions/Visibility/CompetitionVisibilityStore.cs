@@ -15,7 +15,9 @@ public sealed class CompetitionVisibilityStore(
     NoCtfDbContext db,
     ILeaderboardSnapshotFactory snapshots,
     ITransactionalMessageOutbox outbox,
-    ICompetitionEventRecorder? eventRecorder = null) : ICompetitionVisibilityStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
+    : ICompetitionVisibilityStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -144,6 +146,8 @@ public sealed class CompetitionVisibilityStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
+        if (readModels is not null)
+            await readModels.InvalidateAsync(competition.Id, ct);
         return new(
             CompetitionVisibilityMutationState.Updated,
             View(competition, command.Now));
@@ -228,6 +232,8 @@ public sealed class CompetitionVisibilityStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
+        if (readModels is not null)
+            await readModels.InvalidateAsync(competition.Id, ct);
     }
 
     private static CompetitionVisibilityConfigurationView View(

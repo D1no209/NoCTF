@@ -3,7 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Runtime;
+using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Runner.Composition;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Unit.Runner;
 
@@ -114,6 +117,29 @@ public sealed class RunnerAvailabilityOptionsTests
         var storage = services.GetService<IObjectStorage>();
 
         await Assert.That(storage).IsNull();
+    }
+
+    [Test]
+    public async Task Standalone_runner_registers_its_local_configuration_cache()
+    {
+        using var services = BuildServices(new Dictionary<string, string?>
+        {
+            ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
+            ["Runner:Pool"] = "docker",
+            ["Runner:Id"] = "docker-1",
+            ["Runner:Capacity:MemoryBytes"] = "1024",
+            ["Runner:Capacity:NanoCpus"] = "100",
+            ["Runner:Capacity:PidsLimit"] = "10",
+            ["Runner:Heartbeat:IntervalSeconds"] = "5",
+            ["Runner:Heartbeat:TtlSeconds"] = "15"
+        });
+
+        var caches = services.GetRequiredService<IFusionCacheProvider>();
+
+        await Assert.That(caches.GetCache(NoCtfCacheNames.LocalComputation)).IsNotNull();
+        await Assert.That(services
+                .GetRequiredService<IAwdFlagInjectionConfigurationCatalog>())
+            .IsTypeOf<FusionAwdFlagInjectionConfigurationCatalog>();
     }
 
     private static ServiceProvider BuildServices(

@@ -1,5 +1,3 @@
-using System.Data;
-using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
@@ -11,169 +9,39 @@ using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.Infrastructure.Persistence;
-using StackExchange.Redis;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 
-public sealed class RedisLeaderboardCache(
+public sealed class FusionLeaderboardCache(
     NoCtfDbContext db,
     ILeaderboardProjectionEngine projectionEngine,
     IConfiguration configuration,
     ILeaderboardRefreshPublisher publisher,
-    IConnectionMultiplexer? redis = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
+    IFusionCache cache) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
-    private const string SnapshotField = "snapshot";
-    private const string SnapshotRevisionField = "snapshotRevision";
-    private const string DirtyRevisionField = "dirtyRevision";
-    private const string FailureRevisionField = "failureRevision";
-    private const string FailureAtField = "failureAt";
-
-    private const string MarkDirtyScript = """
-        local function compareRevision(left, right)
-            if not left then return -1 end
-            left = string.gsub(left, '^0+', '')
-            right = string.gsub(right, '^0+', '')
-            if left == '' then left = '0' end
-            if right == '' then right = '0' end
-            if string.len(left) < string.len(right) then return -1 end
-            if string.len(left) > string.len(right) then return 1 end
-            if left < right then return -1 end
-            if left > right then return 1 end
-            return 0
-        end
-
-        local current = redis.call('HGET', KEYS[1], 'dirtyRevision')
-        local advances = compareRevision(current, ARGV[1]) < 0
-        if advances then
-            redis.call('HSET', KEYS[1], 'dirtyRevision', ARGV[1])
-        end
-        redis.call('PEXPIRE', KEYS[1], ARGV[2])
-        return advances and 1 or 0
-        """;
-
-    private const string StoreSnapshotScript = """
-        local function compareRevision(left, right)
-            if not left then return -1 end
-            left = string.gsub(left, '^0+', '')
-            right = string.gsub(right, '^0+', '')
-            if left == '' then left = '0' end
-            if right == '' then right = '0' end
-            if string.len(left) < string.len(right) then return -1 end
-            if string.len(left) > string.len(right) then return 1 end
-            if left < right then return -1 end
-            if left > right then return 1 end
-            return 0
-        end
-
-        local candidate = ARGV[1]
-        local current = redis.call('HGET', KEYS[1], 'snapshotRevision')
-        local comparison = compareRevision(current, candidate)
-        local hasSnapshot = redis.call('HEXISTS', KEYS[1], 'snapshot') == 1
-        local satisfied = candidate
-
-        if comparison > 0 or (comparison == 0 and hasSnapshot) then
-            satisfied = current
-        else
-            redis.call('HSET', KEYS[1],
-                'snapshotRevision', ARGV[1],
-                'snapshot', ARGV[2])
-        end
-
-        local dirty = redis.call('HGET', KEYS[1], 'dirtyRevision')
-        if dirty and compareRevision(dirty, satisfied) <= 0 then
-            redis.call('HDEL', KEYS[1], 'dirtyRevision')
-        end
-
-        local failure = redis.call('HGET', KEYS[1], 'failureRevision')
-        if failure and compareRevision(failure, satisfied) <= 0 then
-            redis.call('HDEL', KEYS[1], 'failureRevision', 'failureAt')
-        end
-
-        redis.call('PEXPIRE', KEYS[1], ARGV[3])
-        if comparison > 0 or (comparison == 0 and hasSnapshot) then
-            return 0
-        end
-        return 1
-        """;
-
-    private const string SatisfyStateScript = """
-        local function compareRevision(left, right)
-            if not left then return -1 end
-            left = string.gsub(left, '^0+', '')
-            right = string.gsub(right, '^0+', '')
-            if left == '' then left = '0' end
-            if right == '' then right = '0' end
-            if string.len(left) < string.len(right) then return -1 end
-            if string.len(left) > string.len(right) then return 1 end
-            if left < right then return -1 end
-            if left > right then return 1 end
-            return 0
-        end
-
-        local satisfied = ARGV[1]
-        local dirty = redis.call('HGET', KEYS[1], 'dirtyRevision')
-        if dirty and compareRevision(dirty, satisfied) <= 0 then
-            redis.call('HDEL', KEYS[1], 'dirtyRevision')
-        end
-        local failure = redis.call('HGET', KEYS[1], 'failureRevision')
-        if failure and compareRevision(failure, satisfied) <= 0 then
-            redis.call('HDEL', KEYS[1], 'failureRevision', 'failureAt')
-        end
-        redis.call('PEXPIRE', KEYS[1], ARGV[2])
-        return 1
-        """;
-
-    private const string RecordFailureScript = """
-        local function compareRevision(left, right)
-            if not left then return -1 end
-            left = string.gsub(left, '^0+', '')
-            right = string.gsub(right, '^0+', '')
-            if left == '' then left = '0' end
-            if right == '' then right = '0' end
-            if string.len(left) < string.len(right) then return -1 end
-            if string.len(left) > string.len(right) then return 1 end
-            if left < right then return -1 end
-            if left > right then return 1 end
-            return 0
-        end
-
-        local failed = ARGV[1]
-        local snapshot = redis.call('HGET', KEYS[1], 'snapshotRevision')
-        if snapshot and compareRevision(snapshot, failed) >= 0 then
-            return 0
-        end
-        local current = redis.call('HGET', KEYS[1], 'failureRevision')
-        if current and compareRevision(current, failed) > 0 then
-            return 0
-        end
-        redis.call('HSET', KEYS[1],
-            'failureRevision', ARGV[1],
-            'failureAt', ARGV[2])
-        redis.call('PEXPIRE', KEYS[1], ARGV[3])
-        return 1
-        """;
-
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly TimeSpan ttl = TimeSpan.FromSeconds(Math.Max(5, configuration.GetValue("Leaderboard:CacheTtlSeconds", 60)));
 
     public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct)
     {
-        if (redis is null) return null;
-        ct.ThrowIfCancellationRequested();
-        var payload = await redis.GetDatabase().HashGetAsync(
-            StateKey(competitionId),
-            SnapshotField);
-        if (payload.IsNullOrEmpty)
+        var targetRevision = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == competitionId)
+            .Select(competition => (long?)competition.LeaderboardRevision)
+            .SingleOrDefaultAsync(ct);
+        if (targetRevision is null)
             return null;
-        var snapshot = JsonSerializer.Deserialize<LeaderboardResponse>(payload.ToString(), JsonOptions);
+        var snapshot = await cache.GetOrDefaultAsync<LeaderboardResponse?>(
+            SnapshotKey(competitionId, targetRevision.Value),
+            null,
+            token: ct);
         if (snapshot is null)
             return null;
-        var status = await GetStatusAsync(competitionId, ct);
         return snapshot with
         {
-            TargetRevision = status.TargetRevision,
-            Stale = snapshot.SnapshotRevision < status.TargetRevision,
-            LastFailureAt = status.LastFailureAt
+            TargetRevision = targetRevision.Value,
+            Stale = false,
+            LastFailureAt = null
         };
     }
 
@@ -380,63 +248,37 @@ public sealed class RedisLeaderboardCache(
 
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
     {
-        if (redis is null) return;
-        long? attemptedRevision = null;
-        LeaderboardResponse? response = null;
-        var stored = false;
+        var attemptedRevision = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == competitionId)
+            .Select(competition => (long?)competition.LeaderboardRevision)
+            .SingleOrDefaultAsync(ct);
+        if (attemptedRevision is null)
+            return;
         try
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(
-                IsolationLevel.ReadCommitted,
-                ct);
-            await CompetitionWriteLock.AcquireTransactionLockAsync(
-                db,
-                competitionId,
-                ct);
-            var competition = await db.Competitions.AsNoTracking()
-                .SingleOrDefaultAsync(x => x.Id == competitionId, ct);
-            if (competition is null)
-            {
-                await transaction.CommitAsync(ct);
-                return;
-            }
-
-            attemptedRevision = competition.LeaderboardRevision;
-            var database = redis.GetDatabase();
-            var state = await database.HashGetAsync(
-                StateKey(competitionId),
-                [SnapshotRevisionField, SnapshotField]);
-            if (TryParseRevision(state[0], out var currentRevision)
-                && currentRevision >= attemptedRevision.Value
-                && !state[1].IsNullOrEmpty)
-            {
-                await database.ScriptEvaluateAsync(
-                    SatisfyStateScript,
-                    [StateKey(competitionId)],
-                    [currentRevision, TtlMilliseconds]);
-                await transaction.CommitAsync(ct);
-                return;
-            }
-
-            response = await CreateAsync(
-                competitionId,
-                DateTimeOffset.UtcNow,
-                historical: false,
-                ct);
+            var response = await cache.GetOrSetAsync<LeaderboardResponse?>(
+                SnapshotKey(competitionId, attemptedRevision.Value),
+                async (_, token) =>
+                {
+                    var projected = await CreateAsync(
+                        competitionId,
+                        DateTimeOffset.UtcNow,
+                        historical: false,
+                        token);
+                    if (projected is not null)
+                        await publisher.PublishAsync(
+                            competitionId,
+                            projected.GeneratedAt,
+                            token);
+                    return projected;
+                },
+                options => options.SetDuration(ttl),
+                token: ct);
             if (response is null)
-            {
-                await transaction.CommitAsync(ct);
                 return;
-            }
-            stored = (long)await database.ScriptEvaluateAsync(
-                StoreSnapshotScript,
-                [StateKey(competitionId)],
-                [
-                    response.SnapshotRevision,
-                    JsonSerializer.Serialize(response, JsonOptions),
-                    TtlMilliseconds
-                ]) == 1;
-            await transaction.CommitAsync(ct);
+            await cache.RemoveAsync(
+                FailureKey(competitionId, response.SnapshotRevision),
+                token: ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -444,44 +286,19 @@ public sealed class RedisLeaderboardCache(
         }
         catch
         {
-            if (attemptedRevision is long failedRevision)
-            {
-                try
-                {
-                    await redis.GetDatabase().ScriptEvaluateAsync(
-                        RecordFailureScript,
-                        [StateKey(competitionId)],
-                        [
-                            failedRevision,
-                            DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
-                            TtlMilliseconds
-                        ]);
-                }
-                catch (RedisException)
-                {
-                    // Preserve the original projection failure when Redis is also unavailable.
-                }
-            }
+            await cache.SetAsync(
+                FailureKey(competitionId, attemptedRevision.Value),
+                DateTimeOffset.UtcNow,
+                options => options.SetDuration(ttl),
+                token: CancellationToken.None);
             throw;
         }
-
-        if (stored && response is not null)
-            await publisher.PublishAsync(competitionId, response.GeneratedAt, ct);
     }
 
-    public async Task InvalidateAsync(Guid competitionId, CancellationToken ct)
+    public Task InvalidateAsync(Guid competitionId, CancellationToken ct)
     {
-        var targetRevision = await db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == competitionId)
-            .Select(competition => (long?)competition.LeaderboardRevision)
-            .SingleOrDefaultAsync(ct);
-        if (redis is null || targetRevision is null)
-            return;
         ct.ThrowIfCancellationRequested();
-        await redis.GetDatabase().ScriptEvaluateAsync(
-            MarkDirtyScript,
-            [StateKey(competitionId)],
-            [targetRevision.Value, TtlMilliseconds]);
+        return Task.CompletedTask;
     }
 
     public async Task<LeaderboardCacheStatus> GetStatusAsync(
@@ -492,36 +309,16 @@ public sealed class RedisLeaderboardCache(
             .Where(competition => competition.Id == competitionId)
             .Select(competition => competition.LeaderboardRevision)
             .SingleOrDefaultAsync(ct);
-        if (redis is null)
-            return new(targetRevision, null);
-        ct.ThrowIfCancellationRequested();
-        var failure = await redis.GetDatabase().HashGetAsync(
-            StateKey(competitionId),
-            [FailureRevisionField, FailureAtField]);
-        var failureRevision = TryParseRevision(failure[0], out var parsedFailureRevision)
-            ? parsedFailureRevision
-            : -1;
-        return new(
-            targetRevision,
-            failureRevision >= targetRevision
-                && DateTimeOffset.TryParse(
-                    failure[1].ToString(),
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.RoundtripKind,
-                    out var failedAt)
-                ? failedAt
-                : null);
+        var failure = await cache.GetOrDefaultAsync<DateTimeOffset?>(
+            FailureKey(competitionId, targetRevision),
+            null,
+            token: ct);
+        return new(targetRevision, failure);
     }
 
-    private long TtlMilliseconds => checked((long)ttl.TotalMilliseconds);
+    private static string SnapshotKey(Guid competitionId, long revision) =>
+        $"leaderboard:v3:{competitionId:N}:snapshot:{revision}";
 
-    private static bool TryParseRevision(RedisValue value, out long revision) =>
-        long.TryParse(
-            value.ToString(),
-            NumberStyles.Integer,
-            CultureInfo.InvariantCulture,
-            out revision);
-
-    private static RedisKey StateKey(Guid competitionId) =>
-        $"leaderboard:v2:{{{competitionId:N}}}:state";
+    private static string FailureKey(Guid competitionId, long revision) =>
+        $"leaderboard:v3:{competitionId:N}:failure:{revision}";
 }

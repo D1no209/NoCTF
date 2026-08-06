@@ -21,6 +21,7 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.3" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.8" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="NSubstitute" Version="6.0.0" />
     <PackageVersion Include="StackExchange.Redis" Version="2.10.1" />
@@ -38,5 +39,8 @@
     <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.21.0" />
     <PackageVersion Include="WolverineFx.Postgresql" Version="6.21.0" />
     <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.21.0" />
+    <PackageVersion Include="ZiggyCreatures.FusionCache" Version="2.6.0" />
+    <PackageVersion Include="ZiggyCreatures.FusionCache.Backplane.StackExchangeRedis" Version="2.6.0" />
+    <PackageVersion Include="ZiggyCreatures.FusionCache.Serialization.SystemTextJson" Version="2.6.0" />
   </ItemGroup>
 </Project>

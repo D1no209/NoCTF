@@ -10,6 +10,14 @@ internal static class CompetitionWriteLock
         Guid competitionId,
         CancellationToken cancellationToken)
     {
+        if (!db.Database.IsRelational())
+        {
+            return await db.Competitions.AsNoTracking()
+                .Where(competition => competition.Id == competitionId
+                    && competition.DeletedAt == null)
+                .Select(competition => (CompetitionStatus?)competition.Status)
+                .SingleOrDefaultAsync(cancellationToken);
+        }
         await AcquireTransactionLockAsync(db, competitionId, cancellationToken);
         var statuses = await db.Database.SqlQuery<short>(
                 $"""SELECT status AS "Value" FROM competitions WHERE id = {competitionId} AND deleted_at IS NULL""")
@@ -21,7 +29,9 @@ internal static class CompetitionWriteLock
         NoCtfDbContext db,
         Guid competitionId,
         CancellationToken cancellationToken) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
+        !db.Database.IsRelational()
+            ? Task.CompletedTask
+            : db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({'c' + competitionId.ToString("N")}, 0))",
             cancellationToken);
 }
