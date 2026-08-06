@@ -82,8 +82,6 @@ public static class CompetitionManagementPolicy
     {
         CompetitionStatus.Running or CompetitionStatus.Paused =>
             OperationResult.Failure("competition_active", "An active competition cannot be deleted."),
-        CompetitionStatus.Finished =>
-            OperationResult.Failure("competition_finished", "Finished competitions are read-only."),
         _ => OperationResult.Success()
     };
 }

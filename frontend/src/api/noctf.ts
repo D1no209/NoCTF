@@ -864,9 +864,15 @@ export const competitionAdminApi = {
       tt('errors.updateCompetition'),
     )
   },
-  async delete(competitionId: string): Promise<void> {
+  async archive(competitionId: string): Promise<void> {
     await requireSuccess(
       generatedSdk.adminDeleteCompetition({ path: { competitionId } }),
+      tt('errors.requestFailed'),
+    )
+  },
+  async hardDelete(competitionId: string): Promise<void> {
+    await requireSuccess(
+      generatedSdk.adminHardDeleteCompetition({ path: { competitionId } }),
       tt('errors.requestFailed'),
     )
   },

@@ -18,8 +18,8 @@ public sealed class DeleteCompetitionEndpoint(DeleteCompetition delete, ICompeti
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>
         {
-            summary.Summary = "Deletes a competition.";
-            summary.Description = "Soft-deletes an inactive competition owned or managed by the caller.";
+            summary.Summary = "Archives a competition.";
+            summary.Description = "Soft-deletes an inactive competition owned or managed by the caller. Archived competitions remain recoverable.";
         });
     }
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)

@@ -133,8 +133,7 @@ public sealed class CompetitionManagementStore(
                 && x.DeletedAt == null
                 && x.Status == expectedStatus
                 && x.Status != CompetitionStatus.Running
-                && x.Status != CompetitionStatus.Paused
-                && x.Status != CompetitionStatus.Finished, ct);
+                && x.Status != CompetitionStatus.Paused, ct);
         if (competition is null)
             return false;
         competition.DeletedAt = deletedAt;
