@@ -36,6 +36,7 @@ describe('admin challenge template presentation', () => {
     expect(workspaceSource).toContain('@click="toggleIncludeDeleted"')
     expect(workspaceSource).toContain('pagination.pageIndex !== 0')
     expect(workspaceSource).toContain('autoResetPageIndex: false')
+    expect(workspaceSource).not.toContain('<TableBody v-auto-animate>')
   })
 
   test('maps response modes and visibility values to localized labels', () => {
