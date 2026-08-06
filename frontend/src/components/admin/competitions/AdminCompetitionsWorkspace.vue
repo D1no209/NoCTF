@@ -16,6 +16,7 @@ import {
   useVueTable,
 } from '@tanstack/vue-table'
 import {
+  Archive,
   ExternalLink,
   Loader2,
   MoreHorizontal,
@@ -29,8 +30,12 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { competitionAdminApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
+import AdminCompetitionDeleteDialog from '@/components/admin/competitions/AdminCompetitionDeleteDialog.vue'
+import AdminCompetitionEditorDialog from '@/components/admin/competitions/AdminCompetitionEditorDialog.vue'
+import AdminCompetitionsToolbar from '@/components/admin/competitions/AdminCompetitionsToolbar.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,10 +52,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import AdminCompetitionDeleteDialog from '@/components/admin/competitions/AdminCompetitionDeleteDialog.vue'
-import AdminCompetitionEditorDialog from '@/components/admin/competitions/AdminCompetitionEditorDialog.vue'
-import AdminCompetitionsToolbar from '@/components/admin/competitions/AdminCompetitionsToolbar.vue'
-import { Card } from '@/components/ui/card'
 
 const { t } = useI18n()
 const qc = useQueryClient()
@@ -107,6 +108,7 @@ function toCompetitionAdminDto(value: Awaited<ReturnType<typeof competitionAdmin
 const globalFilter = ref('')
 const sorting = ref<SortingState>([])
 const editDialog = ref(false)
+const archiveDialog = ref(false)
 const deleteDialog = ref(false)
 const selectedComp = ref<CompetitionAdminDto | null>(null)
 const isCreating = ref(false)
@@ -198,9 +200,23 @@ const saveMutation = useMutation({
   },
 })
 
+const archiveMutation = useMutation({
+  mutationFn: async (id: string) => {
+    await competitionAdminApi.archive(id)
+  },
+  onSuccess: () => {
+    qc.invalidateQueries({ queryKey: queryKeys.adminCompetitions })
+    archiveDialog.value = false
+    toast.success(t('admin.competitions.archiveSuccess'))
+  },
+  onError: () => {
+    toast.error(t('admin.competitions.archiveError'))
+  },
+})
+
 const deleteMutation = useMutation({
   mutationFn: async (id: string) => {
-    await competitionAdminApi.delete(id)
+    await competitionAdminApi.hardDelete(id)
   },
   onSuccess: () => {
     qc.invalidateQueries({ queryKey: queryKeys.adminCompetitions })
@@ -226,6 +242,17 @@ function updateForm(nextForm: typeof form.value) {
 function openDelete(comp: CompetitionAdminDto) {
   selectedComp.value = comp
   deleteDialog.value = true
+}
+
+function openArchive(comp: CompetitionAdminDto) {
+  selectedComp.value = comp
+  archiveDialog.value = true
+}
+
+function archiveSelectedCompetition() {
+  const competitionId = selectedComp.value?.id
+  if (competitionId)
+    archiveMutation.mutate(competitionId)
 }
 
 function deleteSelectedCompetition() {
@@ -392,9 +419,20 @@ const table = useVueTable({
                     {{ t('admin.competitions.viewPublic') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem class="text-destructive focus:text-destructive" @select="openDelete(row.original)">
+                  <DropdownMenuItem
+                    v-if="row.original.status !== 'Running' && row.original.status !== 'Paused'"
+                    @select="openArchive(row.original)"
+                  >
+                    <Archive class="mr-2 size-4" />
+                    {{ t('admin.competitions.archive') }}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    v-if="row.original.status === 'Finished'"
+                    class="text-destructive focus:text-destructive"
+                    @select="openDelete(row.original)"
+                  >
                     <Trash2 class="mr-2 size-4" />
-                    {{ t('common.delete') }}
+                    {{ t('admin.competitions.deletePermanently') }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -439,7 +477,16 @@ const table = useVueTable({
     />
 
     <AdminCompetitionDeleteDialog
+      v-model:open="archiveDialog"
+      mode="archive"
+      :title="selectedComp?.title"
+      :deleting="archiveMutation.isPending.value"
+      @confirm="archiveSelectedCompetition"
+    />
+
+    <AdminCompetitionDeleteDialog
       v-model:open="deleteDialog"
+      mode="delete"
       :title="selectedComp?.title"
       :deleting="deleteMutation.isPending.value"
       @confirm="deleteSelectedCompetition"

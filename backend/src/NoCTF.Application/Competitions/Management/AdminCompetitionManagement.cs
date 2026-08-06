@@ -102,7 +102,7 @@ public sealed class HardDeleteCompetition(IAdminCompetitionStore store)
             ? OperationResult.Success()
             : OperationResult.Failure(
                 "competition_hard_delete_conflict",
-                "Competition was not found, still has dependent facts, or access was denied.");
+                "Only a finished competition with no active runtime can be permanently deleted by its owner or an administrator.");
 }
 
 public sealed class TransferCompetitionOwner(IAdminCompetitionStore store)

@@ -7287,8 +7287,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Deletes a competition.",
-        "description": "Soft-deletes an inactive competition owned or managed by the caller.",
+        "summary": "Archives a competition.",
+        "description": "Soft-deletes an inactive competition owned or managed by the caller. Archived competitions remain recoverable.",
         "operationId": "AdminDeleteCompetition",
         "parameters": [
           {
@@ -7912,8 +7912,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Permanently deletes an empty soft-deleted competition.",
-        "description": "Restrict foreign keys prevent deleting a competition that owns durable facts.",
+        "summary": "Permanently deletes a finished competition.",
+        "description": "Deletes the finished competition and all competition-scoped data after explicit confirmation. Users and reusable challenge templates are preserved.",
         "operationId": "AdminHardDeleteCompetition",
         "parameters": [
           {

@@ -19,8 +19,8 @@ public sealed class HardDeleteCompetitionEndpoint(
             .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>
         {
-            summary.Summary = "Permanently deletes an empty soft-deleted competition.";
-            summary.Description = "Restrict foreign keys prevent deleting a competition that owns durable facts.";
+            summary.Summary = "Permanently deletes a finished competition.";
+            summary.Description = "Deletes the finished competition and all competition-scoped data after explicit confirmation. Users and reusable challenge templates are preserved.";
         });
     }
 

@@ -1382,9 +1382,9 @@ export const adminCreateCompetition = <ThrowOnError extends boolean = false>(opt
 });
 
 /**
- * Deletes a competition.
+ * Archives a competition.
  *
- * Soft-deletes an inactive competition owned or managed by the caller.
+ * Soft-deletes an inactive competition owned or managed by the caller. Archived competitions remain recoverable.
  */
 export const adminDeleteCompetition = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteCompetitionData, ThrowOnError>) => (options.client ?? client).delete<AdminDeleteCompetitionResponses, AdminDeleteCompetitionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -1519,9 +1519,9 @@ export const adminUpdateCompetitionPermissions = <ThrowOnError extends boolean =
 });
 
 /**
- * Permanently deletes an empty soft-deleted competition.
+ * Permanently deletes a finished competition.
  *
- * Restrict foreign keys prevent deleting a competition that owns durable facts.
+ * Deletes the finished competition and all competition-scoped data after explicit confirmation. Users and reusable challenge templates are preserved.
  */
 export const adminHardDeleteCompetition = <ThrowOnError extends boolean = false>(options: Options<AdminHardDeleteCompetitionData, ThrowOnError>) => (options.client ?? client).delete<AdminHardDeleteCompetitionResponses, AdminHardDeleteCompetitionErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
