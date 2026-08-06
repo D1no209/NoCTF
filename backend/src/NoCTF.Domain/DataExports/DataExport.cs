@@ -36,6 +36,7 @@ public sealed class DataExport
     [MaxLength(512)]
     public string? Reason { get; set; }
     public DataExportStatus Status { get; set; }
+    public short? ActiveSlot { get; set; }
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }

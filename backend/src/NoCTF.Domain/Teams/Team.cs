@@ -6,6 +6,9 @@ namespace NoCTF.Domain.Teams;
 public sealed class Team
 {
     public Guid Id { get; set; }
+    [ConcurrencyCheck]
+    public long ConcurrencyVersion { get; set; }
+    public long CriticalSectionVersion { get; set; }
     public Guid CompetitionId { get; set; }
     [MaxLength(128)]
     public string Name { get; set; } = string.Empty;

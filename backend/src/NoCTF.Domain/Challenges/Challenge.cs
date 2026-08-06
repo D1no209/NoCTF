@@ -7,6 +7,8 @@ namespace NoCTF.Domain.Challenges;
 public sealed class Challenge
 {
     public Guid Id { get; set; }
+    [ConcurrencyCheck]
+    public long ConcurrencyVersion { get; set; }
     public Guid OwnerId { get; set; }
     public Guid[] ManagerIds { get; set; } = [];
     public GameMode Mode { get; set; }
