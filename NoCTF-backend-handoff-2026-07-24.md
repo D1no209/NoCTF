@@ -7,7 +7,7 @@
 2026-07-31 本轮 outcome、上传补偿、Runtime scope、Patch draft、Runtime cleanup/
 replacement、团队并发额度与 CTF 排行榜前三血纵切已在本机闭合；Frontend 正继续按生成 OpenAPI 契约逐项
 迁移。此前第 7 节列出的三个高置信 Backend 问题均已由 `a234ee6` 完成，最新状态以
-6.33 至 6.58 和第 7 节为准：
+6.33 至 6.59 和第 7 节为准：
 
 - Docker Container/Compose 公开服务最终采用题目容器直接映射 Docker 随机宿主端口；
 - 24 条 `LeaderboardRevision` 写路径均在同一事务发布 invalidation；
@@ -53,8 +53,9 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - 6.55 已完成管理员平台运行日志固定保留/容量、强类型筛选、导出和事实投影审计；6.56 已完成
   安全忘记密码/邮箱重置、会话全失效、密码变更通知和前端恢复流程。
 - 6.57 已完成完整比赛 ZIP 与平台审计导出；6.58 已完成 PostgreSQL、对象存储和 Wolverine
-  持久状态的加密备份、隔离恢复与自动演练工具。
-- 历史阶段曾明确授权 push；当前 6.49 至 6.58 任务明确禁止 push/deploy，新增本地提交均未推送。
+  持久状态的加密备份、隔离恢复与自动演练工具；6.59 已完成私密 Team 封禁申诉、Finished 后
+  误判更正、排行榜重投影和最小公开更正通知。
+- 历史阶段曾明确授权 push；当前 6.49 至 6.59 任务明确禁止 push/deploy，新增本地提交均未推送。
   6.56 明确包含前端恢复流程；协作者拥有的其他 Frontend 未提交文件继续受保护。
 - 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
   的旧条目重新列为待办。
@@ -73,7 +74,7 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - `5660dc3` 的首次推送已通过 GitHub API 核对远端 ref；6.42 至 6.44 的后续 bug fix 与
   handoff 已推送到同一工作分支。`a234ee6` 是 Runtime cleanup/quota 代码提交；
   `f9216b9` 是 CTF 排行榜前三血代码提交。
-- 当前本地功能 HEAD 为 `92a6205 feat(operations): add verified disaster recovery tooling`；该提交和随后
+- 当前本地功能 HEAD 为 `f20193c feat(teams): add private ban appeals and corrections`；该提交和随后
   的 HANDOFF 提交均遵循当前任务边界，仅保留在本地，未 push、未部署。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
@@ -158,6 +159,9 @@ git log --oneline 003b75c..2c6b4ce -- backend
 23. 2026-08-06 用户明确决定 Administrator MFA 暂缓。不得创建 TOTP/Passkey/WebAuthn 模型、
     migration、Token claim、认证分流或前端页面，也不得再次为本轮追问其产品语义；只有用户以后
     明确恢复该范围时才重新审计。TODO 第 8 节应跳到数据导出。
+24. 2026-08-06 用户明确决定分层限流暂缓。不得继续 Redis 分布式 limiter、可信代理/IP、额度、
+    429/503 契约或限流前端适配，也不得继续本轮 `$grill-me`；只有用户以后明确恢复该范围时才重新
+    审计。现有进程内 limiter 保持原样，本次决定不授权以相邻安全重构替代限流工作。
 
 ## 4. 2026-07-28 至 2026-07-31 早期门禁历史
 
@@ -2819,16 +2823,14 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
 6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成，完整比赛与审计
 数据导出由 6.57 完成，PostgreSQL/对象存储/Wolverine 灾难恢复工具与演练由 6.58 完成。
-Administrator MFA 已由用户明确暂缓，封禁申诉/误判更正/公开更正通知由 6.59 完成。下一阶段继续
-TODO 第 8 节后续安全与运维待办：
+Administrator MFA 和分层限流均已由用户明确暂缓，封禁申诉/误判更正/公开更正通知由 6.59 完成。
+当前 TODO 已没有获授权且不依赖真实环境细则的下一代码纵切：
 
-1. 跳过 Administrator MFA，下一纵切审计登录、注册、邮件、头像、提交、题目问答和管理详情接口
-   的现有限流、可信代理/IP 来源、Redis 依赖、失败语义与 OpenAPI 429 契约；分层 key、窗口、突发
-   容量、匿名/账号维度及 Redis 故障策略如无法从现有约束确定，先 `$grill-me`，不得把内存单机
-   限流冒充横向扩展保护。
+1. 跳过 Administrator MFA 和分层限流，不继续此前八项限流 grilling，也不自行选择额度、代理信任
+   或 Redis 故障策略。等待用户明确恢复其中一个范围，或提供新的产品纵切。
 2. 不重做灾备工具、比赛/审计导出、平台日志导航、实时通道、死信队列、每日 Redis shard、固定保留/容量、
    管理审计投影或忘记密码流程；单比赛永久事实仍以 `competition_events` 为唯一来源。未经用户
-   后续明确恢复范围，不实现或重新规划 Administrator MFA。
+   后续明确恢复范围，不实现或重新规划 Administrator MFA/分层限流。
 3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
 4. 未经新任务明确授权，继续不 push、不部署；生产备份调度、异地保留和真实恢复仍等待目标环境。
@@ -2884,9 +2886,9 @@ Docker port mapping，host port 固定请求 `0`。
    完整比赛/审计导出以 6.57 的单表任务、Repeatable Read、对象生命周期、Flag 边界和 generated-SDK
    前端为准；灾难恢复以 6.58 的停写一致性、完整 Wolverine schema、age+Minisign、外部 Secret、
    空目标和逐表/逐对象校验为准；封禁申诉与更正以 6.59 的 competition event 自关联、一次私密申诉、
-   Finished 后重投影和最小公开事件为准。Administrator MFA 已由用户明确暂缓，不得继续实现或追问。
-   下一纵切按 `TODO.md` 第 8 节审计分层限流；不要回滚或重做 `/profile`、SMTP、排行榜可见性、咨询、
-   比赛日志、反作弊、平台日志、忘记密码、数据导出、灾备或封禁申诉流程。
+   Finished 后重投影和最小公开事件为准。Administrator MFA 与分层限流均已由用户明确暂缓，不得
+   继续实现或追问。等待用户提供新的产品纵切或真实环境部署细则；不要回滚或重做 `/profile`、SMTP、
+   排行榜可见性、咨询、比赛日志、反作弊、平台日志、忘记密码、数据导出、灾备或封禁申诉流程。
 5. 继续实现时固定执行：
    - 失败测试；
    - 最小实现；
