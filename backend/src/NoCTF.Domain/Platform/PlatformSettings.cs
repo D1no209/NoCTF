@@ -19,7 +19,6 @@ public sealed class PlatformSettings
     [ConcurrencyCheck]
     public long Revision { get; set; }
 
-    public long CriticalSectionVersion { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
 }

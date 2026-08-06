@@ -421,9 +421,6 @@ public sealed class KohPollingPersistenceTests
                     new DispatchRuntime(fixture.RuntimeId, 0),
                     dispatchDb,
                     new ChallengeRuntimeTemplateCatalog(),
-                    new PostgresRuntimePublishedPortAllocator(
-                        dispatchDb,
-                        new RuntimePublishedPortRange()),
                     dispatchOutbox,
                     cancellationToken);
             }

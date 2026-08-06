@@ -77,7 +77,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                     "container_port BETWEEN 1 AND 65535");
                 table.HasCheckConstraint(
                     "ck_runtime_published_ports_host_port",
-                    "host_port BETWEEN 61000 AND 64999");
+                    "host_port BETWEEN 1 AND 65535");
             });
             ports.WithOwner()
                 .HasForeignKey(port => new { port.RuntimeInstanceId, port.CompetitionId })
@@ -85,7 +85,6 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             ports.HasKey(port => port.Id);
             ports.Property(port => port.Id).ValueGeneratedNever();
             ports.Property(port => port.ServiceName).HasMaxLength(63);
-            ports.HasIndex(port => new { port.CompetitionId, port.HostPort }).IsUnique();
             ports.HasIndex(port => new
             {
                 port.RuntimeInstanceId,

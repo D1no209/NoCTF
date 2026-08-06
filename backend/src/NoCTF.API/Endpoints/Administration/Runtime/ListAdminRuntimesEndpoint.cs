@@ -33,9 +33,7 @@ public sealed class ListAdminRuntimesValidator : Validator<ListAdminRuntimesRequ
     {
         RuleFor(request => request.Limit).InclusiveBetween(1, 200);
         RuleFor(request => request.HostPort)
-            .InclusiveBetween(
-                RuntimePublishedPortRange.StartPort,
-                RuntimePublishedPortRange.EndPort)
+            .InclusiveBetween(1, 65535)
             .When(request => request.HostPort.HasValue);
     }
 }

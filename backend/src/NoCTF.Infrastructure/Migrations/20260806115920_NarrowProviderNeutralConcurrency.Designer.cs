@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260806100903_AddPlatformCriticalSectionVersion")]
-    partial class AddPlatformCriticalSectionVersion
+    [Migration("20260806115920_NarrowProviderNeutralConcurrency")]
+    partial class NarrowProviderNeutralConcurrency
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -31,11 +31,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    b.Property<long>("ConcurrencyVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("concurrency_version");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -74,6 +69,7 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnName("owner_id");
 
                     b.Property<int>("Revision")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("revision");
 
@@ -276,11 +272,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
 
-                    b.Property<long>("ConcurrencyVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("concurrency_version");
-
                     b.Property<long>("CriticalSectionVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("critical_section_version");
@@ -302,6 +293,7 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnName("order");
 
                     b.Property<int>("Revision")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("revision");
 
@@ -565,17 +557,13 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("accumulated_running_seconds");
 
-                    b.Property<long>("ConcurrencyVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("concurrency_version");
-
                     b.Property<string>("ConfigurationJson")
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("configuration_json");
 
                     b.Property<int>("ConfigurationRevision")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("configuration_revision");
 
@@ -627,6 +615,7 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnName("leaderboard_visibility_applied_at");
 
                     b.Property<int>("LeaderboardVisibilityRevision")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("leaderboard_visibility_revision");
 
@@ -661,6 +650,7 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnName("owner_id");
 
                     b.Property<int>("PermissionRevision")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("permission_revision");
 
@@ -673,6 +663,7 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnName("start_at");
 
                     b.Property<short>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("smallint")
                         .HasColumnName("status");
 
@@ -1568,10 +1559,6 @@ namespace NoCTF.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<short>("Id"));
 
-                    b.Property<long>("CriticalSectionVersion")
-                        .HasColumnType("bigint")
-                        .HasColumnName("critical_section_version");
-
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -1606,7 +1593,6 @@ namespace NoCTF.Infrastructure.Migrations
                         new
                         {
                             Id = (short)1,
-                            CriticalSectionVersion = 0L,
                             Name = "NoCTF",
                             Revision = 1L,
                             UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
@@ -2570,10 +2556,6 @@ namespace NoCTF.Infrastructure.Migrations
                             b1.HasKey("Id")
                                 .HasName("pk_runtime_published_ports");
 
-                            b1.HasIndex("CompetitionId", "HostPort")
-                                .IsUnique()
-                                .HasDatabaseName("ix_runtime_published_ports_competition_id_host_port");
-
                             b1.HasIndex("RuntimeInstanceId", "CompetitionId")
                                 .HasDatabaseName("ix_runtime_published_ports_runtime_instance_id_competition_id");
 
@@ -2587,7 +2569,7 @@ namespace NoCTF.Infrastructure.Migrations
                                 {
                                     t.HasCheckConstraint("ck_runtime_published_ports_container_port", "container_port BETWEEN 1 AND 65535");
 
-                                    t.HasCheckConstraint("ck_runtime_published_ports_host_port", "host_port BETWEEN 61000 AND 64999");
+                                    t.HasCheckConstraint("ck_runtime_published_ports_host_port", "host_port BETWEEN 1 AND 65535");
                                 });
 
                             b1.WithOwner()

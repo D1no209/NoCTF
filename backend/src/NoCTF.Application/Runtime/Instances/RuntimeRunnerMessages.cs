@@ -118,7 +118,8 @@ public sealed record RuntimeProvisioned(
     IReadOnlyList<int> ParticipantUrlIndexes,
     DateTimeOffset? ExpiresAt,
     string? ControlCheckUrl = null,
-    string? AwdCheckerTargetHost = null);
+    string? AwdCheckerTargetHost = null,
+    IReadOnlyList<RuntimePublishedPortMapping>? PublishedPorts = null);
 
 public sealed record RuntimeProvisionFailed(
     Guid RuntimeInstanceId,
