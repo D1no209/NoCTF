@@ -43,23 +43,29 @@ GET  /api/v1/competitions
 GET  /api/v1/competitions/{competitionId}
 GET  /api/v1/competitions/{competitionId}/leaderboard
 
-POST /api/v1/competitions/{competitionId}/teams
 GET  /api/v1/competitions/{competitionId}/teams
 GET  /api/v1/competitions/{competitionId}/teams/me
 GET  /api/v1/competitions/{competitionId}/teams/{teamId}
-PUT  /api/v1/competitions/{competitionId}/teams/{teamId}
-DELETE /api/v1/competitions/{competitionId}/teams/{teamId}
-POST /api/v1/competitions/{competitionId}/teams/join
-POST /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate
-POST /api/v1/competitions/{competitionId}/teams/{teamId}/captain/transfer
-DELETE /api/v1/competitions/{competitionId}/teams/{teamId}/members/{userId}
-DELETE /api/v1/competitions/{competitionId}/teams/me/membership
 POST /api/v1/competitions/{competitionId}/teams/{teamId}/registration/resubmit
+POST /api/v1/competitions/{competitionId}/team-registrations
+
+POST /api/v1/teams
+GET  /api/v1/teams
+PUT  /api/v1/teams/{teamId}
+DELETE /api/v1/teams/{teamId}
+POST /api/v1/teams/join
+POST /api/v1/teams/{teamId}/invitation-token/rotate
+POST /api/v1/teams/{teamId}/captain/transfer
+DELETE /api/v1/teams/{teamId}/members/{userId}
+DELETE /api/v1/teams/{teamId}/members/me
 ```
 
-Team response 使用 CaptainId 与 MemberIds 数组，不返回成员顺序。
+全局 Team Profile 独立于比赛，创建和邀请加入不要求存在可报名比赛；同一队伍可报名多场比赛。
+报名时复制当时的名称、头像、CaptainId 与 MemberIds，形成不可被后续成员变动改写的比赛 Team
+快照。Team response 使用 CaptainId 与 MemberIds 数组，不返回成员顺序；比赛 Team 通过 nullable
+TeamProfileId 追溯全局身份，历史兼容记录可为 null。
 
-Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
+Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。全局 Team 的 InvitationToken 仅向当前 Captain 返回；比赛 Team DTO 永不包含 InvitationToken，Ban 原因仍按权限返回。
 
 Leaderboard GET 的 statusUrl 指回自身：无快照且投影中返回 202+targetRevision+Retry-After；有旧快照返回 200 并标 stale/revision；无快照且最后投影失败返回 503 ProblemDetails。它不创建独立 ProjectionOperation。
 CTF Leaderboard 的 `bloods[]` 同时返回每题一血、二血、三血，每项带强类型 `bloodRank`；

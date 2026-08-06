@@ -1,7 +1,9 @@
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
+using NoCTF.Application.Teams.Profiles;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
 using Riok.Mapperly.Abstractions;
@@ -12,7 +14,6 @@ public sealed class CreateTeamRequest
 {
     private string name = string.Empty;
 
-    public Guid CompetitionId { get; set; }
     public string Name
     {
         get => name;
@@ -20,6 +21,26 @@ public sealed class CreateTeamRequest
     }
     public string? AvatarUrl { get; set; }
 }
+
+public sealed class CreateTeamRequestValidator : Validator<CreateTeamRequest>
+{
+    public CreateTeamRequestValidator()
+    {
+        RuleFor(request => request.Name).NotEmpty().MaximumLength(128);
+        RuleFor(request => request.AvatarUrl).MaximumLength(2048);
+    }
+}
+
+public sealed record GlobalTeamResponse(
+    Guid Id,
+    string Name,
+    string? AvatarUrl,
+    Guid CaptainId,
+    IReadOnlyList<Guid> MemberIds,
+    string? InvitationToken,
+    DateTimeOffset CreatedAt);
+
+public sealed record GlobalTeamListResponse(IReadOnlyList<GlobalTeamResponse> Items);
 
 public sealed record TeamResponse(
     Guid Id,
@@ -31,46 +52,55 @@ public sealed record TeamResponse(
     TeamRegistrationStatus RegistrationStatus,
     bool IsLocked,
     bool IsBanned,
-    DateTimeOffset RegisteredAt);
+    DateTimeOffset RegisteredAt,
+    Guid? TeamProfileId);
 
 public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);
-
-public sealed class UpdateTeamRequest
-{
-    private string name = string.Empty;
-
-    public Guid CompetitionId { get; set; }
-    public Guid TeamId { get; set; }
-    public string Name
-    {
-        get => name;
-        set => name = value?.Trim() ?? string.Empty;
-    }
-    public string? AvatarUrl { get; set; }
-}
 
 [Mapper]
 internal static partial class TeamMapper
 {
-    public static partial CreateTeamCommand ToCommand(
-        CreateTeamRequest request,
-        Guid userId,
-        DateTimeOffset registeredAt);
     public static partial TeamResponse ToResponse(TeamView view);
-    public static partial UpdateTeamCommand ToCommand(UpdateTeamRequest request);
 }
 
-public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user)
-    : Endpoint<CreateTeamRequest, Results<Created<TeamResponse>, NotFound, ProblemHttpResult>>
+internal static class GlobalTeamMapper
 {
-    public override void Configure() { Post("/competitions/{competitionId}/teams"); AuthSchemes("Bearer"); }
-    public override async Task<Results<Created<TeamResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(CreateTeamRequest request, CancellationToken ct)
+    public static GlobalTeamResponse ToResponse(TeamProfileView view, Guid viewerId) => new(
+        view.Id,
+        view.Name,
+        view.AvatarUrl,
+        view.CaptainId,
+        view.MemberIds,
+        view.CaptainId == viewerId ? view.InvitationToken : null,
+        view.CreatedAt);
+}
+
+public sealed class CreateTeamEndpoint(CreateTeamProfile create, IUserContext user)
+    : Endpoint<CreateTeamRequest, Results<Created<GlobalTeamResponse>, ProblemHttpResult>>
+{
+    public override void Configure()
     {
-        request.CompetitionId = Route<Guid>("competitionId");
-        var result = await create.ExecuteAsync(TeamMapper.ToCommand(request, user.UserId, DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode == "competition_not_found") return TypedResults.NotFound();
-        if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Team was not created.", detail: result.ErrorMessage);
-        var response = TeamMapper.ToResponse(result.Value!);
-        return TypedResults.Created($"/competitions/{request.CompetitionId}/teams/{response.Id}", response);
+        Post("/teams");
+        AuthSchemes("Bearer");
+    }
+
+    public override async Task<Results<Created<GlobalTeamResponse>, ProblemHttpResult>> ExecuteAsync(
+        CreateTeamRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await create.ExecuteAsync(new(
+            user.UserId,
+            request.Name,
+            request.AvatarUrl,
+            DateTimeOffset.UtcNow), cancellationToken);
+        if (!result.Succeeded)
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Team was not created.",
+                detail: result.ErrorMessage);
+        }
+        var response = GlobalTeamMapper.ToResponse(result.Value!, user.UserId);
+        return TypedResults.Created($"/teams/{response.Id}", response);
     }
 }
