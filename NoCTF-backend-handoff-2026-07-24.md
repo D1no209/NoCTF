@@ -2770,6 +2770,41 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   本地 Vite mock 实际验收管理端封禁队伍、私密申诉、来源、只读内容、维持/接受按钮，以及接受后
   解封、历史重投影和无理由公开通知说明；浏览器标签与 5173 本地监听已清理，未访问或修改现网。
 
+### 6.60 Validator 测试隔离与参赛者端浏览器验收（2026-08-06）
+
+- 功能提交：`948b02f test: stabilize validators and participant acceptance`。本阶段没有业务实现、
+  API、OpenAPI、generated SDK、Domain、EF 模型或 migration 变化；未 push、未部署，也没有修改
+  用户的 `TODO.md` 或其他 Agent 的 Runner、本地端口、实例状态和脚本工作树。
+- 已稳定复现 6.56 至 6.59 记录的三个偶发失败：FastEndpoints 测试宿主执行
+  `AddFastEndpoints` 时会全局切换 FluentValidation 的 JSON 属性名解析；直接实例化 Validator 的
+  单元测试与宿主测试并行时，错误属性名可能是 `Reason`/`Flags[1]`/`Mode`，也可能是
+  `reason`/`flags[1]`/`mode`。Validator 规则和产品契约没有丢失，失败只来自进程全局命名格式与
+  大小写敏感断言的竞态。
+- 修复保持最小：三个协议测试改为使用 `StringComparer.OrdinalIgnoreCase` 或
+  `StringComparison.OrdinalIgnoreCase` 比较属性名；没有用 `[NotInParallel]` 串行化全部测试，也
+  没有改变 FastEndpoints/FluentValidation 生产注册或业务规则。修复前五轮压力命令第 1 轮稳定得到
+  594/597 和上述三个失败；修复后同一完整 non-Integration 命令连续五轮均为 597/597，阶段结束前
+  再次复验 597/597 passed。
+- 本地 Vite mock 原先缺少 generated `GET /api/v1/auth/me` 契约。登录后 `/teams` 的当前用户查询
+  会落到真实后端并返回 401，导致内存会话清空和登录页回跳。fixture 已补齐完整管理员当前用户响应；
+  浏览器验收时只临时把 login/refresh/current-user 设为普通参赛者并将现有申诉设为空，验收完成后
+  除新增 `/auth/me` route 外全部还原，临时身份和表单状态未进入提交。
+- 使用内置浏览器连接 `http://127.0.0.1:5173` 完成参赛者实际验收：登录后 SPA 正常进入
+  `/teams`；普通用户导航不显示管理后台；ByteGuild 显示已封禁、`跨队 Flag 事件` 来源和“工作人员
+  证据及内部讨论不会公开”的私密边界；申诉为空时按钮禁用，少于 16 字仍禁用，合法陈述后启用。
+  未提交 mock 申诉写操作；页面无 console error，仅有既有 THREE.Clock deprecation warning。
+  浏览器标签、临时 fixture 和 5173 监听均已清理，未访问或修改现网。
+- 验证结果：Debug solution build 0 warning/0 error；non-Integration 597/597 连续五轮加最终一轮
+  passed；真实 PostgreSQL `Captain_can_appeal_and_staff_can_correct_finished_competition` 1/1 passed；
+  PostgreSQL/Redis Testcontainers 可达性 1/1 passed；前端 `bun test` 183/183 passed；`bun run build`
+  的 `vue-tsc` 与 production Vite build passed；mock JSON 可解析且目标 `git diff --check` passed。
+  全量 Integration 当前发现 154 项，包含 Kubernetes、libvirt 和真实 Docker 环境型用例；本次整套
+  运行在 10 分钟内无失败输出但未产生汇总，超时后子进程和 Testcontainers 均自行退出/清理，因此
+  明确不记为通过，以上两个与当前范围相关的真实依赖用例为可判定依据。
+- 主机仍缺少仓库锁定的 SDK 10.0.300；build/test 期间仅临时把 `global.json` 指向已安装的
+  10.0.201，提交前已恢复 10.0.300，SDK 临时改动未进入提交。本阶段没有契约变化，因此没有重生
+  OpenAPI/TypeScript SDK，也不需要 EF pending-model 检查或平台运行版本递增。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2803,6 +2838,8 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   Minisign 来源认证、空目标 fail-closed 恢复及真实 Docker 自动演练。
 - 每个不可变 TeamBanned 事实一次私密队长申诉、工作人员裁决/直接纠错、Finished 后排行榜重投影、
   无敏感内容的公开更正事实和 generated-SDK 前后端工作区。
+- FastEndpoints/FluentValidation 全局 JSON 属性命名下稳定的 Validator 协议测试，以及普通参赛者
+  `/teams` 私密封禁申诉的实际浏览器验收和完整 current-user mock 契约。
 
 当前尚未执行的交付边界：
 
@@ -2811,7 +2848,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
 - `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e`、
-  `03647e7f`、`7b479f4`、`5923e57`、`92a6205`、`f20193c` 及各自 HANDOFF 提交是当前任务新增的
+  `03647e7f`、`7b479f4`、`5923e57`、`92a6205`、`f20193c`、`948b02f` 及各自 HANDOFF 提交是当前任务新增的
   本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
   push/deploy”的要求。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
@@ -2886,7 +2923,8 @@ Docker port mapping，host port 固定请求 `0`。
    完整比赛/审计导出以 6.57 的单表任务、Repeatable Read、对象生命周期、Flag 边界和 generated-SDK
    前端为准；灾难恢复以 6.58 的停写一致性、完整 Wolverine schema、age+Minisign、外部 Secret、
    空目标和逐表/逐对象校验为准；封禁申诉与更正以 6.59 的 competition event 自关联、一次私密申诉、
-   Finished 后重投影和最小公开事件为准。Administrator MFA 与分层限流均已由用户明确暂缓，不得
+   Finished 后重投影和最小公开事件为准；Validator 测试隔离和参赛者 `/teams` 浏览器门禁以 6.60
+   为准。Administrator MFA 与分层限流均已由用户明确暂缓，不得
    继续实现或追问。等待用户提供新的产品纵切或真实环境部署细则；不要回滚或重做 `/profile`、SMTP、
    排行榜可见性、咨询、比赛日志、反作弊、平台日志、忘记密码、数据导出、灾备或封禁申诉流程。
 5. 继续实现时固定执行：
