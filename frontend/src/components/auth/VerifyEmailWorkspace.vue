@@ -22,6 +22,7 @@ const state = ref<VerificationState>('waiting')
 const resending = ref(false)
 const retrySeconds = ref(0)
 const deliveryFailed = computed(() => route.query.delivery === 'failed')
+const resendToastId = 'email-verification-resend'
 let retryTimer: number | null = null
 
 function startRetryCountdown() {
@@ -58,11 +59,11 @@ async function resend() {
   resending.value = true
   try {
     await authApi.resendEmailVerification()
-    toast.success(t('auth.verificationResent'))
+    toast.success(t('auth.verificationResent'), { id: resendToastId })
     startRetryCountdown()
   }
   catch {
-    toast.error(t('errors.resendVerification'))
+    toast.error(t('errors.resendVerification'), { id: resendToastId })
   }
   finally {
     resending.value = false

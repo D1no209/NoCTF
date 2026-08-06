@@ -2,6 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.API.Composition;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Infrastructure.Authentication;
 
 namespace NoCTF.Tests.Unit.API;
@@ -27,5 +29,24 @@ public sealed class EmailVerificationServiceRegistrationTests
             descriptor.ServiceType == typeof(IEmailVerificationStore));
         await Assert.That(registration.ImplementationType)
             .IsEqualTo(typeof(EmailVerificationStore));
+
+        await AssertImplementationTypeAsync<IEmailVerificationConfigurationStore,
+            EmailVerificationConfigurationStore>(services);
+        await AssertImplementationTypeAsync<IEmailVerificationDeliveryConfigurationReader,
+            EmailVerificationConfigurationStore>(services);
+        await AssertImplementationTypeAsync<IEmailVerificationDelivery,
+            SmtpEmailVerificationDelivery>(services);
+        await AssertImplementationTypeAsync<IPasswordResetEmailDelivery,
+            SmtpEmailVerificationDelivery>(services);
+    }
+
+    private static async Task AssertImplementationTypeAsync<TService, TImplementation>(
+        IServiceCollection services)
+    {
+        var registration = services.Last(descriptor =>
+            descriptor.ServiceType == typeof(TService));
+        await Assert.That(registration.ImplementationFactory).IsNull();
+        await Assert.That(registration.ImplementationType)
+            .IsEqualTo(typeof(TImplementation));
     }
 }

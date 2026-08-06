@@ -5,6 +5,7 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using MimeKit;
+using MimeKit.Utils;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Application.Authentication.PasswordReset;
@@ -171,10 +172,14 @@ public sealed class SmtpEmailVerificationDelivery(
         string textBody,
         string htmlBody)
     {
-        var message = new MimeMessage();
-        message.From.Add(new MailboxAddress(
+        var sender = new MailboxAddress(
             configuration.SmtpFromName,
-            configuration.SmtpFromAddress));
+            configuration.SmtpFromAddress);
+        var messageId = MimeUtils.GenerateMessageId(sender.Domain);
+        var message = new MimeMessage([
+            new Header(HeaderId.MessageId, $"<{messageId}>")
+        ]);
+        message.From.Add(sender);
         message.To.Add(MailboxAddress.Parse(recipient));
         message.Subject = subject;
         message.Body = new BodyBuilder
