@@ -74,8 +74,9 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - `5660dc3` 的首次推送已通过 GitHub API 核对远端 ref；6.42 至 6.44 的后续 bug fix 与
   handoff 已推送到同一工作分支。`a234ee6` 是 Runtime cleanup/quota 代码提交；
   `f9216b9` 是 CTF 排行榜前三血代码提交。
-- 当前本地功能 HEAD 为 `f20193c feat(teams): add private ban appeals and corrections`；该提交和随后
-  的 HANDOFF 提交均遵循当前任务边界，仅保留在本地，未 push、未部署。
+- 当前远端工作分支 HEAD 为 `50d8aa9 docs(handoff): record production deployment`；当前本地功能
+  HEAD 为 `58f763f fix(email): restore verification delivery and toast styling`。6.62 的功能提交尚未
+  push、尚未部署，生产仍运行 6.61 记录的 `499f5cb8` 应用代码。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
 - 本轮只更新工作分支；没有创建 PR、直接推送 `main` 或执行部署。
@@ -2844,6 +2845,41 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 部署没有触碰用户/协作者的 `TODO.md`、Runner `Properties/`、本地端口 overlay、前端实例状态/
   Query 文件、测试和 `scripts/` 未提交工作。Administrator MFA 与分层限流仍按用户要求暂缓；
   生产备份调度、异地保留、监控告警和正式恢复演练仍是独立运维事项。
+
+### 6.62 邮箱验证投递与全局提示样式修复（2026-08-06）
+
+- 功能提交：`58f763f fix(email): restore verification delivery and toast styling`。本阶段没有 HTTP
+  endpoint、DTO、OpenAPI、generated SDK、Domain、EF 模型或 migration 变化；尚未 push、尚未
+  部署，6.61 的 push/deploy 授权不自动续用。
+- 生产只读诊断确认邮箱验证配置已启用，公开地址、SMTP host、465 端口、认证账号、加密密码和
+  From 地址均已配置；`FFS` 注册生成了一个未消费且未过期的验证 Token。该消息进入 Worker 后于
+  2026-08-06 09:02:22 UTC 触发 Wolverine `InvalidServiceLocationException`：
+  `IEmailVerificationDelivery` 使用 scoped opaque lambda factory，违反
+  `ServiceLocationPolicy.NotAllowed`。因此 SMTP 发送根本没有执行，不是收件箱拒收；失败消息没有
+  留在当前队列或死信，原始 Token 仅保留 hash，部署后必须重新发送才能生成可投递链接。
+- 修复把邮箱配置读取、验证邮件投递和密码重置投递接口全部改为带明确
+  `ImplementationType` 的直接 scoped 注册，移除 `GetRequiredService` 工厂别名；descriptor 回归
+  测试同时断言四项注册没有 `ImplementationFactory`，固定 Wolverine 静态代码生成边界。
+- MailKit 消息现在使用 From 域显式生成 `Message-Id` 并通过初始 Header 构造 `MimeMessage`，不再
+  依赖本机 hostname。该修复消除了 Windows 主机名导致的 SMTP 集成测试提前失败，也使容器/主机名
+  与 RFC Message-ID 域解耦；凭据、验证 Token 和邮件正文没有进入日志或测试输出。
+- Frontend `Sonner.vue` 重新显式引入 `vue-sonner/style.css`，并以 Pixel Industrial 的方角、两像素
+  边框、固体偏移阴影、主题字体和方形关闭按钮覆盖基础样式。验证邮件重新发送使用稳定 toast id，
+  相同失败只更新一条提示，不再把无样式通知 DOM 堆叠在页面底部。未写死 URL、域名、端口、API
+  前缀、端点路径、DTO、枚举或失败码。
+- 验证结果：`dotnet build backend/NoCTF.slnx --no-restore` 0 warning/0 error；邮件 DI 与 MailKit
+  定向 TUnit 5/5 passed；`bun run build` 的 `vue-tsc` 与 production Vite build passed；触及的两个
+  Vue 文件 scoped ESLint 0 warning/0 error；`git diff --check` passed。完整后端套件在 Message-ID
+  修复前执行 752 项，741 passed、9 failed、2 skipped；其中 4 个 SMTP 失败已由随后 5/5 定向回归
+  证明修复，剩余 5 个是既有/环境型 KoH advisory-lock 时序、两个 Docker Container 高端口连通、
+  Docker Compose lifecycle 和 Patch advisory-lock 时序失败，本阶段未修改这些业务文件，也没有把
+  它们记为通过。
+- 使用内置浏览器访问本地 Vite `/login` 并触发本地失败请求，实际 DOM 只存在一个通知项；截图确认
+  提示固定在右上区域、具有完整错误图标/关闭语义和 Pixel Industrial 边界，页面不再被通知内容撑开。
+  未向真实邮箱发送测试邮件，未操作生产账号；本地浏览器标签和 4173 监听在交接提交前清理。
+- 下一步需要用户重新明确授权 push/deploy。部署 Worker/Backend/Frontend 后，应由待验证账号重新发送
+  一封验证邮件，确认 Worker 不再出现 `InvalidServiceLocationException`、日志出现脱敏的成功投递且
+  收件箱收到验证链接；不要尝试恢复已经丢失明文的旧验证 Token。
 
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
