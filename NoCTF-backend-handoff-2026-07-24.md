@@ -2920,6 +2920,27 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   的明文 Token 在修复前失败后不可恢复；本次部署不会伪造或重放它，FFS 必须在验证页主动点击
   “重新发送”生成新 Token 和新邮件。SMTP/MailKit 与 Wolverine 注册的本地回归结果仍以 6.62 为准。
 
+### 6.64 个人资料入口、设置布局与头像裁剪视觉收敛（2026-08-06）
+
+- 功能提交为 `dca96ab fix(profile): streamline account workspace`。首页已完全移除重复的个人资料
+  摘要卡和对应 `current-user` 请求；顶部导航使用生成 SDK 获取的当前用户头像作为唯一资料入口，
+  无头像时显示用户名首字母，头像链接具备可访问名称并进入 `/profile`。资料更新仍通过共享
+  `queryKeys.currentUser` 缓存即时反映到导航，没有新增前端状态或手写接口。
+- `/profile` 从四块同权卡片重排为左侧身份摘要与右侧连续设置面板；简介、头像、邮箱公开性和改密
+  仍保持各自独立保存与原有安全语义，但信息层级、操作对齐和桌面/移动响应式结构已收敛。旧的
+  单边强调提示改为完整边框的 Pixel Industrial 面板，没有改变后端契约。
+- 头像编辑器的圆形裁剪指示层由 `inset-4` 改为覆盖完整 320×320 方形预览，因此圆形直径与矩形
+  宽度相等；Pointer Events、pointer capture、指针锚点滚轮缩放、旋转后的边界钳制和最终正方形
+  导出算法均未改动。
+- 验证结果：`bun test ./tests/userProfile.test.ts ./tests/passwordVisibility.test.ts` 12/12 passed；
+  scoped ESLint passed；`bun run build` 完成 `vue-tsc --noEmit` 与 Vite production build。Rollup
+  仍只有既有 PURE annotation 与大 chunk 警告，没有新增错误。尚未执行本地浏览器验收；应与后续
+  全局队伍前端一起验收。
+- 用户通过 `$grill-me` 回答 `AAA`，确认下一阶段采用全局可复用 Team、每场比赛报名保存成员快照、
+  全局邀请 Token 只用于加入 Team，比赛报名由队长单独操作。该决策会新增唯一必要的比赛报名状态
+  持久化结构并改变 Team/OpenAPI/前端流程；6.64 没有提前修改该数据模型。当前任务未授权 push 或
+  deploy，本提交和本 HANDOFF 只保留在本地。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
