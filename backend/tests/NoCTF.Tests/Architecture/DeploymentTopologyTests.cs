@@ -21,6 +21,11 @@ public sealed class DeploymentTopologyTests
 
         await Assert.That(dockerfile).Contains("AS worker");
         await Assert.That(dockerfile).Contains("NoCTF.Worker.dll");
+        await Assert.That(dockerfile).Contains("AS runtime");
+        await Assert.That(dockerfile).Contains("libgssapi-krb5-2");
+        await Assert.That(dockerfile).Contains("FROM runtime AS api");
+        await Assert.That(dockerfile).Contains("FROM runtime AS worker");
+        await Assert.That(dockerfile).Contains("FROM runtime AS runner");
         await Assert.That(compose).Contains("  worker:");
         await Assert.That(compose).Contains("GET /health HTTP/1.1");
         await Assert.That(compose).Contains("GET /health/ready HTTP/1.1");
