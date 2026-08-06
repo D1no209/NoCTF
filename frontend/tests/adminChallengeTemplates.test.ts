@@ -25,7 +25,19 @@ import {
 import en from '../src/locales/en.json'
 import zhCN from '../src/locales/zh-CN.json'
 
+const workspaceSource = await Bun.file(
+  new URL('../src/components/admin/challenges/AdminChallengesWorkspace.vue', import.meta.url),
+).text()
+
 describe('admin challenge template presentation', () => {
+  test('keeps lifecycle filtering pagination resets explicit and bounded', () => {
+    expect(workspaceSource).toContain('watch(globalFilter, () => table.setPageIndex(0))')
+    expect(workspaceSource).not.toContain('watch([globalFilter, includeDeleted]')
+    expect(workspaceSource).toContain('@click="toggleIncludeDeleted"')
+    expect(workspaceSource).toContain('pagination.pageIndex !== 0')
+    expect(workspaceSource).toContain('autoResetPageIndex: false')
+  })
+
   test('maps response modes and visibility values to localized labels', () => {
     expect(challengeModeLabelKey(CHALLENGE_MODE.ctf)).toBe('admin.challenges.modeCtf')
     expect(challengeModeLabelKey(CHALLENGE_MODE.awd)).toBe('admin.challenges.modeAwd')

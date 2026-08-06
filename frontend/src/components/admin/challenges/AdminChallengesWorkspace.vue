@@ -376,12 +376,20 @@ const table = useVueTable({
   getFilteredRowModel: getFilteredRowModel(),
   getPaginationRowModel: getPaginationRowModel(),
   getSortedRowModel: getSortedRowModel(),
+  autoResetPageIndex: false,
 })
 
 const filteredTemplateCount = computed(() => table.getFilteredRowModel().rows.length)
 const pageCount = computed(() => Math.max(1, table.getPageCount()))
 
-watch([globalFilter, includeDeleted], () => table.setPageIndex(0))
+function toggleIncludeDeleted() {
+  if (table.getState().pagination.pageIndex !== 0)
+    table.setPageIndex(0)
+
+  includeDeleted.value = !includeDeleted.value
+}
+
+watch(globalFilter, () => table.setPageIndex(0))
 </script>
 
 <template>
@@ -410,7 +418,7 @@ watch([globalFilter, includeDeleted], () => table.setPageIndex(0))
         <Button
           :variant="includeDeleted ? 'default' : 'outline'"
           :aria-pressed="includeDeleted"
-          @click="includeDeleted = !includeDeleted"
+          @click="toggleIncludeDeleted"
         >
           <ArchiveRestore class="size-4" />
           {{
