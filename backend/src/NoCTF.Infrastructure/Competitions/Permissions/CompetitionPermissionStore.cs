@@ -177,7 +177,14 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
         competition.ObserverIds = command.ObserverIds.Distinct().Order().ToArray();
         competition.PermissionRevision = checked(competition.PermissionRevision + 1);
         competition.UpdatedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(CompetitionPermissionUpdateState.RevisionConflict);
+        }
         await transaction.CommitAsync(ct);
         return new(CompetitionPermissionUpdateState.Updated);
     }

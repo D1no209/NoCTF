@@ -15,7 +15,7 @@ public sealed class PostgresPerTeamRuntimeFlagStore(NoCtfDbContext db)
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        await using var generationLease = await EfCriticalSection.AcquireAsync(
+        await using var generationLease = await CriticalSectionCoordinator.AcquireAsync(
             db,
             $"runtime-flag:{teamId:N}:{competitionChallengeId:N}",
             token => db.Teams.Where(team => team.Id == teamId)

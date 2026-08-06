@@ -6,6 +6,7 @@ public enum CompetitionRestoreState
 {
     Restored,
     NotFound,
+    RevisionConflict,
     UserNotFound,
     RoleNotEligible
 }
@@ -19,6 +20,7 @@ public enum CompetitionOwnerTransferState
     Transferred,
     InvalidOwnerId,
     NotFound,
+    RevisionConflict,
     UserNotFound,
     RoleNotEligible
 }

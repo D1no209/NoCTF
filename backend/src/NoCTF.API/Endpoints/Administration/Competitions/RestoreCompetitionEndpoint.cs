@@ -43,6 +43,11 @@ public sealed class RestoreCompetitionEndpoint(
         {
             CompetitionRestoreState.Restored => TypedResults.NoContent(),
             CompetitionRestoreState.NotFound => TypedResults.NotFound(),
+            CompetitionRestoreState.RevisionConflict =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.RevisionConflict,
+                        null)),
             CompetitionRestoreState.UserNotFound =>
                 TypedResults.Conflict(
                     CompetitionResourceManagerConflictMapper.ToResponse(

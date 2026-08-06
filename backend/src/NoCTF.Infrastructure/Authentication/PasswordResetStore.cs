@@ -89,6 +89,16 @@ public sealed class PasswordResetStore(
             ExpiresAt = now.AddMinutes(settings.PasswordResetTokenLifetimeMinutes),
             CreatedAt = now
         });
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return PasswordResetRequestState.RateLimited;
+        }
         await outbox.PublishAsync(new SendPasswordReset(userId.Value, rawToken));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -157,6 +167,16 @@ public sealed class PasswordResetStore(
                 && candidate.InvalidatedAt == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(candidate => candidate.InvalidatedAt, now), ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return PasswordResetCompletionState.InvalidOrExpired;
+        }
         await outbox.PublishAsync(new SendPasswordChangedNotification(user.Id));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

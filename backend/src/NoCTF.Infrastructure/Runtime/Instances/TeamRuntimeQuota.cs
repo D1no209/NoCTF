@@ -11,7 +11,7 @@ internal static class TeamRuntimeQuota
         Guid competitionId,
         Guid teamId,
         CancellationToken cancellationToken)
-        => EfCriticalSection.AcquireAsync(
+        => CriticalSectionCoordinator.AcquireAsync(
             db,
             $"team-runtime:{competitionId:N}:{teamId:N}",
             token => db.Teams

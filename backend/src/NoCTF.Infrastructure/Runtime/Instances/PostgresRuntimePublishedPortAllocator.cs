@@ -34,7 +34,7 @@ public sealed class PostgresRuntimePublishedPortAllocator(
             throw new InvalidOperationException(
                 "Published port allocation requires an active database transaction.");
 
-        await using var allocationLease = await EfCriticalSection.AcquireAsync(
+        await using var allocationLease = await CriticalSectionCoordinator.AcquireAsync(
             db,
             "runtime-port-allocation",
             token => db.PlatformSettings.Where(settings => settings.Id == 1)

@@ -9,7 +9,7 @@ internal static class SharedRuntimeScopeLock
         NoCtfDbContext db,
         Guid competitionChallengeId,
         CancellationToken cancellationToken)
-        => EfCriticalSection.AcquireAsync(
+        => CriticalSectionCoordinator.AcquireAsync(
             db,
             $"shared-runtime:{competitionChallengeId:N}",
             token => db.CompetitionChallenges.IgnoreQueryFilters()

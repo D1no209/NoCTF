@@ -627,7 +627,7 @@ public sealed class WolverineTransactionalOutboxTests
         builder.Services.AddScoped<ICompetitionLifecycleStore, EmptyLifecycleStore>();
         builder.Services.AddScoped<LifecycleAdvancer>();
         builder.Services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
-        builder.Services.AddSingleton<AwdRoundConfigurationCatalog>();
+        builder.Services.AddSingleton<IAwdRoundConfigurationCatalog, AwdRoundConfigurationCatalog>();
         builder.Services.AddSingleton<KohProducerConfigurationCatalog>();
         builder.Services.AddSingleton<IKohControlClient, UnusedKohControlClient>();
         builder.Services.AddSingleton(TimeProvider.System);

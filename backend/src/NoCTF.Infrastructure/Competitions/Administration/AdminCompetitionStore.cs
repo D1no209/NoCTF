@@ -81,7 +81,14 @@ public sealed class AdminCompetitionStore(
         }
         entity.DeletedAt = null;
         entity.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(CompetitionRestoreState.RevisionConflict);
+        }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(entity.Id, ct);
@@ -114,7 +121,14 @@ public sealed class AdminCompetitionStore(
         if (hasDependents)
             return false;
         db.Competitions.Remove(entity);
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(competitionId, ct);
@@ -174,7 +188,14 @@ public sealed class AdminCompetitionStore(
             .ToArray();
         entity.PermissionRevision = checked(entity.PermissionRevision + 1);
         entity.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(CompetitionOwnerTransferState.RevisionConflict);
+        }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(entity.Id, ct);
