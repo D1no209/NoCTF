@@ -5,18 +5,19 @@ namespace NoCTF.Infrastructure.Runtime.Instances;
 
 internal static class SharedRuntimeScopeLock
 {
-    public static Task AcquireAsync(
+    public static ValueTask<IAsyncDisposable> AcquireAsync(
         NoCtfDbContext db,
         Guid competitionChallengeId,
         CancellationToken cancellationToken)
-    {
-        if (!db.Database.IsRelational())
-            return Task.CompletedTask;
-        var key = LockKey(competitionChallengeId);
-        return db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",
+        => EfCriticalSection.AcquireAsync(
+            db,
+            $"shared-runtime:{competitionChallengeId:N}",
+            token => db.CompetitionChallenges.IgnoreQueryFilters()
+                .Where(challenge => challenge.Id == competitionChallengeId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    challenge => challenge.CriticalSectionVersion,
+                    challenge => challenge.CriticalSectionVersion + 1), token),
             cancellationToken);
-    }
 
     internal static string LockKey(Guid competitionChallengeId) =>
         $"{competitionChallengeId}:shared";

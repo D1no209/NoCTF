@@ -63,7 +63,7 @@ public sealed class PatchUploadStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
             ct);
-        await SubmissionAttemptLock.AcquireAsync(
+        await using var attemptLease = await SubmissionAttemptLock.AcquireAsync(
             db,
             scope.TeamId,
             scope.CompetitionChallengeId,

@@ -34,14 +34,14 @@ public sealed class PostgresRuntimePublishedPortAllocator(
             throw new InvalidOperationException(
                 "Published port allocation requires an active database transaction.");
 
-        // Docker host ports are shared by every competition on this Runner host. Serialize
-        // allocation globally, while the unique index retains the per-competition history rule.
-        if (db.Database.IsRelational())
-        {
-            await db.Database.ExecuteSqlRawAsync(
-                "SELECT pg_advisory_xact_lock(1315922772, 1347375700)",
-                cancellationToken);
-        }
+        await using var allocationLease = await EfCriticalSection.AcquireAsync(
+            db,
+            "runtime-port-allocation",
+            token => db.PlatformSettings.Where(settings => settings.Id == 1)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    settings => settings.CriticalSectionVersion,
+                    settings => settings.CriticalSectionVersion + 1), token),
+            cancellationToken);
 
         await db.RuntimeInstances
             .Where(owner => owner.Id == instance.Id)

@@ -69,13 +69,14 @@ public sealed class PostgresAwdRuntimeProvisioner(
             .Select(team => team.Id)
             .Order()
             .ToListAsync(cancellationToken);
+        await using var quotaLeases = new CriticalSectionLeaseCollection();
         foreach (var teamId in teamIds)
         {
-            await TeamRuntimeQuota.AcquireLockAsync(
+            quotaLeases.Add(await TeamRuntimeQuota.AcquireLockAsync(
                 db,
                 competitionId,
                 teamId,
-                cancellationToken);
+                cancellationToken));
         }
         var challengeIds = challenges.Select(challenge => challenge.Id).ToArray();
         var existing = await db.RuntimeInstances

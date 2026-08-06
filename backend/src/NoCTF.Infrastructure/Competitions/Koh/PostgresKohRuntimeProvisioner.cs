@@ -56,12 +56,13 @@ public sealed class PostgresKohRuntimeProvisioner(
                 })
             .ToListAsync(cancellationToken);
         var challengeIds = challenges.Select(challenge => challenge.Id).ToArray();
+        await using var scopeLeases = new CriticalSectionLeaseCollection();
         foreach (var challengeId in challengeIds.Order())
         {
-            await SharedRuntimeScopeLock.AcquireAsync(
+            scopeLeases.Add(await SharedRuntimeScopeLock.AcquireAsync(
                 db,
                 challengeId,
-                cancellationToken);
+                cancellationToken));
         }
         var existing = await db.RuntimeInstances
             .Where(runtime => runtime.CompetitionId == competitionId
