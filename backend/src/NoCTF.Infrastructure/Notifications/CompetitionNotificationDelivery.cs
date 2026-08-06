@@ -28,21 +28,14 @@ public sealed class CompetitionNotificationDelivery(
         if (recipients.Count == 0)
             return;
 
-        var payloadJson = JsonSerializer.Serialize(payload, JsonOptions);
-        var createdAt = DateTimeOffset.UtcNow;
-        foreach (var userId in recipients)
-        {
-            var notificationId = Guid.CreateVersion7(createdAt);
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO notifications
-                    (id, user_id, competition_id, entity_id, kind, source_event_key, payload_json, created_at)
-                VALUES
-                    ({notificationId}, {userId}, {competitionId}, {entityId}, {(short)kind}, {sourceEventKey}, {payloadJson}::jsonb, {createdAt})
-                ON CONFLICT (user_id, source_event_key) DO NOTHING
-                """,
-                ct);
-        }
+        await PersistAsync(
+            competitionId,
+            entityId,
+            kind,
+            sourceEventKey,
+            JsonSerializer.Serialize(payload, JsonOptions),
+            recipients,
+            ct);
     }
 
     public async Task DeliverToUsersAsync<TPayload>(
@@ -66,20 +59,79 @@ public sealed class CompetitionNotificationDelivery(
         if (recipients.Length == 0)
             return;
 
-        var payloadJson = JsonSerializer.Serialize(payload, JsonOptions);
+        await PersistAsync(
+            competitionId,
+            entityId,
+            kind,
+            sourceEventKey,
+            JsonSerializer.Serialize(payload, JsonOptions),
+            recipients,
+            ct);
+    }
+
+    private async Task PersistAsync(
+        Guid competitionId,
+        Guid entityId,
+        NotificationKind kind,
+        string sourceEventKey,
+        string payloadJson,
+        IReadOnlyCollection<Guid> recipients,
+        CancellationToken ct)
+    {
+        var existing = await db.Notifications.AsNoTracking()
+            .Where(notification => recipients.Contains(notification.UserId)
+                && notification.SourceEventKey == sourceEventKey)
+            .Select(notification => notification.UserId)
+            .ToArrayAsync(ct);
+        var missing = recipients.Except(existing).Order().ToArray();
+        if (missing.Length == 0)
+            return;
+
         var createdAt = DateTimeOffset.UtcNow;
-        foreach (var userId in recipients)
+        Add(missing, createdAt);
+        try
         {
-            var notificationId = Guid.CreateVersion7(createdAt);
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO notifications
-                    (id, user_id, competition_id, entity_id, kind, source_event_key, payload_json, created_at)
-                VALUES
-                    ({notificationId}, {userId}, {competitionId}, {entityId}, {(short)kind}, {sourceEventKey}, {payloadJson}::jsonb, {createdAt})
-                ON CONFLICT (user_id, source_event_key) DO NOTHING
-                """,
-                ct);
+            await db.SaveChangesAsync(ct);
         }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            var persisted = await db.Notifications.AsNoTracking()
+                .Where(notification => missing.Contains(notification.UserId)
+                    && notification.SourceEventKey == sourceEventKey)
+                .Select(notification => notification.UserId)
+                .ToArrayAsync(ct);
+            var retryMissing = missing.Except(persisted).Order().ToArray();
+            if (retryMissing.Length == 0)
+                return;
+
+            Add(retryMissing, DateTimeOffset.UtcNow);
+            try
+            {
+                await db.SaveChangesAsync(ct);
+            }
+            catch (DbUpdateException)
+            {
+                db.ChangeTracker.Clear();
+                var nowPersisted = await db.Notifications.AsNoTracking()
+                    .CountAsync(notification => retryMissing.Contains(notification.UserId)
+                        && notification.SourceEventKey == sourceEventKey, ct);
+                if (nowPersisted != retryMissing.Length)
+                    throw;
+            }
+        }
+
+        void Add(IEnumerable<Guid> userIds, DateTimeOffset timestamp) =>
+            db.Notifications.AddRange(userIds.Select(userId => new Notification
+            {
+                Id = Guid.CreateVersion7(timestamp),
+                UserId = userId,
+                CompetitionId = competitionId,
+                EntityId = entityId,
+                Kind = kind,
+                SourceEventKey = sourceEventKey,
+                PayloadJson = payloadJson,
+                CreatedAt = timestamp
+            }));
     }
 }

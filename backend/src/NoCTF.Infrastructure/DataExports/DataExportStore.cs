@@ -47,15 +47,6 @@ public sealed class DataExportStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
             cancellationToken);
-        var lockKey = string.Join(
-            ':',
-            "data-export",
-            command.RequestedByUserId.ToString("N"),
-            ((short)command.Scope).ToString());
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
-            cancellationToken);
-
         var existing = await db.DataExports.AsNoTracking()
             .Where(item => item.RequestedByUserId == command.RequestedByUserId
                 && item.Scope == command.Scope
@@ -75,13 +66,31 @@ public sealed class DataExportStore(
             IncludeProtectedFlags = command.IncludeProtectedFlags,
             Reason = command.Reason,
             Status = DataExportStatus.Queued,
+            ActiveSlot = 1,
             PurgeAt = now.AddDays(30)
         };
         db.DataExports.Add(entity);
         await outbox.PublishAsync(new GenerateDataExport(entity.Id));
         await outbox.ScheduleAsync(new PurgeDataExport(entity.Id), entity.PurgeAt);
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            var concurrent = await db.DataExports.AsNoTracking()
+                .Where(item => item.RequestedByUserId == command.RequestedByUserId
+                    && item.Scope == command.Scope
+                    && item.ActiveSlot == 1)
+                .OrderByDescending(item => item.RequestedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (concurrent is null)
+                throw;
+            return new(Map(concurrent), RequestDataExportFailure.ActiveExportExists);
+        }
         await outbox.FlushOutgoingMessagesAsync();
         return new(Map(entity));
     }

@@ -142,6 +142,7 @@ public sealed class DataExportProcessor(
         if (job.ObjectKey is not null)
             await objectStorage.DeleteAsync(job.ObjectKey, cancellationToken);
         job.Status = DataExportStatus.Expired;
+        job.ActiveSlot = null;
         job.ObjectKey = null;
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -686,6 +687,7 @@ public sealed class DataExportProcessor(
 
         var now = timeProvider.GetUtcNow();
         job.Status = DataExportStatus.Available;
+        job.ActiveSlot = null;
         job.CompletedAt = now;
         job.ExpiresAt = now.AddHours(24);
         job.ObjectKey = storedObject.ObjectKey;
@@ -726,6 +728,7 @@ public sealed class DataExportProcessor(
         if (job is null || job.Status is DataExportStatus.Available or DataExportStatus.Expired)
             return;
         job.Status = DataExportStatus.Failed;
+        job.ActiveSlot = null;
         job.CompletedAt = timeProvider.GetUtcNow();
         job.FailureCode = failureCode;
         job.FailureDetail = detail;

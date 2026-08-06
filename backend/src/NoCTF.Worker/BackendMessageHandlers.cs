@@ -436,12 +436,12 @@ public static class BackendMessageHandlers
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var runtime = await db.RuntimeInstances.FromSqlInterpolated(
-                $"SELECT * FROM runtime_instances WHERE id = {message.RuntimeInstanceId} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
-        var submission = await db.Submissions.FromSqlInterpolated(
-                $"SELECT * FROM submissions WHERE id = {message.SubmissionId} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
+        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
+            item => item.Id == message.RuntimeInstanceId,
+            cancellationToken);
+        var submission = await db.Submissions.SingleOrDefaultAsync(
+            item => item.Id == message.SubmissionId,
+            cancellationToken);
         if (runtime is null
             || submission is null
             || runtime.Purpose != RuntimePurpose.AwdpTarget
@@ -1103,71 +1103,72 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken)
     {
         const int batchSize = 500;
-        IQueryable<NoCTF.Domain.Submissions.Submission> query;
+        var candidates = db.Submissions.Where(submission =>
+            submission.CompetitionId == message.CompetitionId
+            && submission.CompetitionChallengeId == message.CompetitionChallengeId
+            && submission.ReceivedAt <= message.Cutoff);
         if (message.SubmissionId is Guid submissionId)
         {
-            query = db.Submissions.FromSqlInterpolated(
-                $"""
-                SELECT s.*
-                FROM submissions AS s
-                WHERE s.id = {submissionId}
-                  AND s.competition_id = {message.CompetitionId}
-                  AND s.competition_challenge_id = {message.CompetitionChallengeId}
-                  AND s.received_at <= {message.Cutoff}
-                FOR UPDATE SKIP LOCKED
-                """);
+            candidates = candidates.Where(submission =>
+                submission.Id == submissionId
+                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued
+                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing);
         }
         else if (message.Rejudge)
         {
-            query = db.Submissions.FromSqlInterpolated(
-                $"""
-                SELECT s.*
-                FROM submissions AS s
-                WHERE s.competition_id = {message.CompetitionId}
-                  AND s.competition_challenge_id = {message.CompetitionChallengeId}
-                  AND s.received_at <= {message.Cutoff}
-                  AND s.current_scoring_event_id IS NOT NULL
-                  AND s.kind IN (0, 1)
-                  AND s.evaluation_state <> 1
-                  AND s.evaluation_state <> 2
-                ORDER BY s.received_at, s.id
-                LIMIT {batchSize}
-                FOR UPDATE SKIP LOCKED
-                """);
+            candidates = candidates.Where(submission =>
+                submission.CurrentScoringEventId != null
+                && (submission.Kind == NoCTF.Domain.Submissions.SubmissionKind.Flag
+                    || submission.Kind == NoCTF.Domain.Submissions.SubmissionKind.Break)
+                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued
+                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing);
         }
         else
         {
-            query = db.Submissions.FromSqlInterpolated(
-                $"""
-                SELECT s.*
-                FROM submissions AS s
-                WHERE s.competition_id = {message.CompetitionId}
-                  AND s.competition_challenge_id = {message.CompetitionChallengeId}
-                  AND s.received_at <= {message.Cutoff}
-                  AND (
-                    s.evaluation_state = 0
-                    OR (s.evaluation_state = 4 AND s.current_scoring_event_id IS NULL)
-                  )
-                ORDER BY s.received_at, s.id
-                LIMIT {batchSize}
-                FOR UPDATE SKIP LOCKED
-                """);
+            candidates = candidates.Where(submission =>
+                submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Pending
+                || (submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed
+                    && submission.CurrentScoringEventId == null));
         }
 
-        var submissions = await query.ToListAsync(cancellationToken);
+        var candidateIds = await candidates.AsNoTracking()
+            .OrderBy(submission => submission.ReceivedAt)
+            .ThenBy(submission => submission.Id)
+            .Take(message.SubmissionId is null ? batchSize : 1)
+            .Select(submission => submission.Id)
+            .ToArrayAsync(cancellationToken);
+        if (candidateIds.Length == 0)
+            return;
+
+        var claimId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
+        await candidates.Where(submission => candidateIds.Contains(submission.Id))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(
+                    submission => submission.EvaluationState,
+                    NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued)
+                .SetProperty(submission => submission.EvaluationFailureCode,
+                    (NoCTF.Domain.Submissions.ScoringFailureCode?)null)
+                .SetProperty(submission => submission.EvaluationResultBodySha256,
+                    (byte[]?)null)
+                .SetProperty(submission => submission.EvaluationUpdatedAt, now)
+                .SetProperty(
+                    submission => submission.ProcessingVersion,
+                    submission => submission.ProcessingVersion + 1)
+                .SetProperty(submission => submission.EvaluationClaimId, claimId),
+                cancellationToken);
+        var submissions = await db.Submissions.AsNoTracking()
+            .Where(submission => submission.EvaluationClaimId == claimId)
+            .OrderBy(submission => submission.ReceivedAt)
+            .ThenBy(submission => submission.Id)
+            .ToArrayAsync(cancellationToken);
         foreach (var submission in submissions)
         {
-            submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued;
-            submission.EvaluationFailureCode = null;
-            submission.EvaluationResultBodySha256 = null;
-            submission.EvaluationUpdatedAt = now;
-            submission.ProcessingVersion = checked(submission.ProcessingVersion + 1);
             await outbox.PublishAsync(new EvaluateSubmission(
                 submission.Id,
                 submission.ProcessingVersion));
         }
-        if (submissions.Count == batchSize && message.SubmissionId is null)
+        if (candidateIds.Length == batchSize && message.SubmissionId is null)
             await outbox.PublishAsync(message);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
