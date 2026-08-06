@@ -22,5 +22,11 @@ internal sealed class DataExportConfiguration : IEntityTypeConfiguration<DataExp
         });
         builder.HasIndex(item => item.Status);
         builder.HasIndex(item => item.PurgeAt);
+        builder.HasIndex(item => new
+        {
+            item.RequestedByUserId,
+            item.Scope,
+            item.ActiveSlot
+        }).IsUnique();
     }
 }

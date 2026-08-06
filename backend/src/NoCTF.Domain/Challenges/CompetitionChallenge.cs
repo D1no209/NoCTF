@@ -1,9 +1,14 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace NoCTF.Domain.Challenges;
 
 /// <summary>Represents one competition-scoped use of a reusable challenge template.</summary>
 public sealed class CompetitionChallenge
 {
     public Guid Id { get; set; }
+    [ConcurrencyCheck]
+    public long ConcurrencyVersion { get; set; }
+    public long CriticalSectionVersion { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid ChallengeId { get; set; }
     public long BaseScore { get; set; }

@@ -6,6 +6,8 @@ namespace NoCTF.Domain.Competitions;
 public sealed class Competition
 {
     public Guid Id { get; set; }
+    [ConcurrencyCheck]
+    public long ConcurrencyVersion { get; set; }
     [MaxLength(160)]
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
