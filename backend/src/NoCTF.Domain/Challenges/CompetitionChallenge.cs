@@ -6,8 +6,6 @@ namespace NoCTF.Domain.Challenges;
 public sealed class CompetitionChallenge
 {
     public Guid Id { get; set; }
-    [ConcurrencyCheck]
-    public long ConcurrencyVersion { get; set; }
     public long CriticalSectionVersion { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid ChallengeId { get; set; }
@@ -15,6 +13,7 @@ public sealed class CompetitionChallenge
     public int Order { get; set; }
     public bool IsPublished { get; set; }
     public string RulesJson { get; set; } = """{"schemaVersion":1}""";
+    [ConcurrencyCheck]
     public int Revision { get; set; }
     public int LastScheduledAwdRound { get; set; }
     public int AwdScheduleCompetitionRevision { get; set; }

@@ -30,9 +30,8 @@ public sealed class ChallengeManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
-        await ChallengeWriteLock.AcquireAsync(db, command.ChallengeId, ct);
         var competitionMode = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == command.CompetitionId)
             .Select(competition => competition.Mode)
@@ -125,7 +124,7 @@ public sealed class ChallengeManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
 
         var entity = await db.CompetitionChallenges
@@ -242,7 +241,7 @@ public sealed class ChallengeManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return ChallengeMutationFailure.CompetitionNotFound;
 
         var entity = await db.CompetitionChallenges.IgnoreQueryFilters()
@@ -257,7 +256,6 @@ public sealed class ChallengeManagementStore(
             return ChallengeMutationFailure.LifecycleStateConflict;
         if (restore)
         {
-            await ChallengeWriteLock.AcquireAsync(db, entity.ChallengeId, ct);
             var templateMode = await db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.ChallengeId)
                 .Select(challenge => (GameMode?)challenge.Mode)

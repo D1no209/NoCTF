@@ -84,7 +84,7 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
         var competition = await db.Competitions.SingleOrDefaultAsync(
             item => item.Id == command.CompetitionId && item.DeletedAt == null,
             ct);

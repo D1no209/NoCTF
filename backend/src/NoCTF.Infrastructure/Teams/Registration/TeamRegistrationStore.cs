@@ -29,7 +29,7 @@ public sealed class TeamRegistrationStore(
     {
         var name = command.Name.Trim();
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-        var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        var competitionStatus = await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
         if (competitionStatus is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
         if (competitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
             return new(null, TeamRegistrationFailure.RegistrationClosed);
@@ -91,7 +91,7 @@ public sealed class TeamRegistrationStore(
     public async Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        var competitionStatus = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (competitionStatus is null) return new(false, TeamRegistrationFailure.CompetitionNotFound);
         if (competitionStatus == CompetitionStatus.Finished) return new(false, TeamRegistrationFailure.CompetitionFinished);
         var exists = await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId
@@ -130,7 +130,7 @@ public sealed class TeamRegistrationStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null)
             return new(false, TeamRegistrationFailure.CompetitionNotFound);
         if (status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
@@ -198,7 +198,7 @@ public sealed class TeamRegistrationStore(
     {
         var name = command.Name.Trim();
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        var status = await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
         if (status is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
         if (status == CompetitionStatus.Finished) return new(null, TeamRegistrationFailure.CompetitionFinished);
         var entity = await db.Teams.SingleOrDefaultAsync(x => x.Id == command.TeamId
@@ -231,7 +231,7 @@ public sealed class TeamRegistrationStore(
     public async Task<TeamRegistrationFailure?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null) return TeamRegistrationFailure.CompetitionNotFound;
         if (status is CompetitionStatus.Running or CompetitionStatus.Paused) return TeamRegistrationFailure.CompetitionActive;
         if (status == CompetitionStatus.Finished) return TeamRegistrationFailure.CompetitionFinished;

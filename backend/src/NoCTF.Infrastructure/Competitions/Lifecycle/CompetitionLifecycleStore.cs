@@ -86,7 +86,7 @@ public sealed class CompetitionLifecycleStore(
                 System.Data.IsolationLevel.Serializable,
                 cancellationToken)
             : null;
-        var lockedStatus = await CompetitionWriteLock.AcquireAsync(
+        var lockedStatus = await CompetitionStateReader.ReadAsync(
             db, competitionId, cancellationToken);
         if (lockedStatus != from)
             return false;
@@ -277,7 +277,14 @@ public sealed class CompetitionLifecycleStore(
                     now));
             }
         }
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return false;
+        }
         if (transaction is not null)
         {
             await transaction.CommitAsync(cancellationToken);

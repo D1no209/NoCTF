@@ -15,7 +15,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
     {
         var challengeId = command.ChallengeId ?? Guid.CreateVersion7(command.CreatedAt);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
             db,
             [command.OwnerId],
@@ -102,7 +101,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, command.ChallengeId, ct);
         var entity = await WriteAuthorized(db.Challenges, command.ActorId, command.IsAdministrator)
             .SingleOrDefaultAsync(challenge => challenge.Id == command.ChallengeId, ct);
         if (entity is null)
@@ -149,7 +147,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(
                 item => item.ChallengeId == challengeId && item.DeletedAt == null,
                 ct))
@@ -173,7 +170,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var entity = await WriteAuthorized(
                 db.Challenges.IgnoreQueryFilters(),
                 actorId,
@@ -220,7 +216,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
     {
         var normalized = managerIds.Distinct().Order().ToArray();
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var entity = await db.Challenges.SingleOrDefaultAsync(challenge =>
             challenge.Id == challengeId &&
             (isAdministrator || challenge.OwnerId == actorId), ct);
@@ -271,7 +266,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var entity = await db.Challenges.SingleOrDefaultAsync(challenge =>
             challenge.Id == challengeId &&
             (isAdministrator || challenge.OwnerId == actorId), ct);

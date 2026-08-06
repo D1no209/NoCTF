@@ -26,7 +26,7 @@ public sealed class TeamModerationStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var status = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, cancellationToken);
+        var status = await CompetitionStateReader.ReadAsync(db, command.CompetitionId, cancellationToken);
         if (status is null)
             return new(TeamModerationFailure.CompetitionNotFound);
         if (status == CompetitionStatus.Finished)

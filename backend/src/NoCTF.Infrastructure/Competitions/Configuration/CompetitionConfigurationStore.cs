@@ -43,7 +43,7 @@ public sealed class CompetitionConfigurationStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
         var mode = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)

@@ -7,8 +7,6 @@ namespace NoCTF.Domain.Challenges;
 public sealed class Challenge
 {
     public Guid Id { get; set; }
-    [ConcurrencyCheck]
-    public long ConcurrencyVersion { get; set; }
     public Guid OwnerId { get; set; }
     public Guid[] ManagerIds { get; set; } = [];
     public GameMode Mode { get; set; }
@@ -18,6 +16,7 @@ public sealed class Challenge
     public string? Description { get; set; }
     public string Direction { get; set; } = "Uncategorized";
     public string DefinitionJson { get; set; } = """{"schemaVersion":1}""";
+    [ConcurrencyCheck]
     public int Revision { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

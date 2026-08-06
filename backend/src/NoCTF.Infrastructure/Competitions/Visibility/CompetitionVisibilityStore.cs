@@ -43,7 +43,7 @@ public sealed class CompetitionVisibilityStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(CompetitionVisibilityMutationState.NotFound);
 
         var competition = await db.Competitions
@@ -162,7 +162,7 @@ public sealed class CompetitionVisibilityStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return;
         var competition = await db.Competitions
             .SingleAsync(candidate => candidate.Id == competitionId, ct);

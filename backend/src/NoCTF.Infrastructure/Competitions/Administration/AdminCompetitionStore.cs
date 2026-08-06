@@ -55,7 +55,6 @@ public sealed class AdminCompetitionStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await CompetitionWriteLock.AcquireTransactionLockAsync(db, competitionId, ct);
         var entity = await db.Competitions.IgnoreQueryFilters()
             .SingleOrDefaultAsync(competition =>
                 competition.Id == competitionId &&
@@ -87,7 +86,7 @@ public sealed class AdminCompetitionStore(
         }
         catch (DbUpdateConcurrencyException)
         {
-            return new(CompetitionRestoreState.RevisionConflict);
+            return new(CompetitionRestoreState.NotFound);
         }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
@@ -102,7 +101,6 @@ public sealed class AdminCompetitionStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await CompetitionWriteLock.AcquireTransactionLockAsync(db, competitionId, ct);
         var entity = await db.Competitions.IgnoreQueryFilters()
             .SingleOrDefaultAsync(competition =>
                 competition.Id == competitionId &&
@@ -144,7 +142,7 @@ public sealed class AdminCompetitionStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return new(CompetitionOwnerTransferState.NotFound);
         var entity = await db.Competitions.SingleOrDefaultAsync(competition =>
             competition.Id == competitionId &&
