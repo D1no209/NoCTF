@@ -3092,6 +3092,31 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   运行镜像仍精确对应功能提交 `d837227`，无需再次迁移、重建服务或重复删除生产数据。本轮
   push/deploy/物理删除授权至此消费完毕。
 
+### 6.69 管理题库“包含已删除”卡死与过滤语义修复（2026-08-06）
+
+- 用户报告管理后台题库页点击“包含已删除”后页面卡死。实际浏览器逐项排查确认，根因是
+  TanStack Table 在 Vue Query 返回新数组时自动重置页码，同时页面 watcher 再次写入页码，形成
+  响应式更新循环；`vAutoAnimate` 不是根因，已保留原有表格动画。功能提交为
+  `4d771cb fix(challenges): prevent deleted filter freeze`。
+- 前端表格现关闭 `autoResetPageIndex`，仅由搜索 watcher 和显式生命周期切换函数控制页码；切换
+  已删除题目时只在当前页不是第一页时写入一次页码，然后更新筛选状态。实际浏览器通过生产 API
+  代理验收“包含已删除”→“隐藏已删除”→“包含已删除”双向连续切换，页面保持响应、4 行题目稳定、
+  Console error 为 0。
+- 排查同时发现后端默认列表和 `includeDeleted=false` 都会返回软删除题目。原因是投影中的关联比赛
+  题目计数使用 `IgnoreQueryFilters()`，EF Core 将其作用扩散到组合查询的外层 Challenge。题库 Store
+  现在统一从无全局过滤源开始，并在 `includeDeleted=false` 时显式追加 `DeletedAt == null`；列表和
+  详情行为一致，显式 `includeDeleted=true` 仍可取回软删除记录。
+- 新增真实 PostgreSQL 集成断言，覆盖软删除模板后默认 List/Find 不可见、显式包含时可见；兼容
+  `global.json` 的 .NET SDK 10.0.302 容器中完整 solution build 为 0 warning/0 error，non-Integration
+  601/601 passed，定向 `GitOpsPersistenceContractTests` 1/1 passed。前端题库定向测试 6/6 passed、
+  scoped ESLint passed、`vue-tsc`/Vite production build passed，仅有既有 Rollup PURE annotation 与
+  大 chunk 警告。更早同一轮的全量前端测试为 187 passed/1 failed；唯一失败仍是既有
+  `competitionContract.test.ts` 对已拆分的 `competitionAdminApi.delete` 旧断言，与本修复无关。
+- 本次没有 API 契约、OpenAPI、SDK、数据库模型或 migration 变化，也不需要递增平台运行版本。
+  仍保护协作者的 `TODO.md`、Runner `Properties/`、本地端口 overlay、实例状态 composable、Query
+  client、对应测试和 `scripts/`。本节完成时仅创建本地功能提交；6.68 已明确消费上一轮 push/deploy
+  授权，因此本修复尚未推送或部署，生产仍运行旧版本，必须等待新的明确授权。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
