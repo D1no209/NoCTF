@@ -115,9 +115,7 @@ public sealed class PasswordResetStore(
             ct);
         await AcquireUserLockAsync(descriptor.UserId, ct);
         var resetToken = await db.PasswordResetTokens
-            .FromSqlInterpolated(
-                $"SELECT * FROM password_reset_tokens WHERE id = {descriptor.Id} FOR UPDATE")
-            .SingleOrDefaultAsync(ct);
+            .SingleOrDefaultAsync(token => token.Id == descriptor.Id, ct);
         if (resetToken is null
             || !CryptographicOperations.FixedTimeEquals(resetToken.TokenSha256, tokenHash)
             || resetToken.ConsumedAt is not null
@@ -166,10 +164,14 @@ public sealed class PasswordResetStore(
         return PasswordResetCompletionState.Reset;
     }
 
-    private Task AcquireUserLockAsync(Guid userId, CancellationToken ct) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({'p' + userId.ToString("N")}, 0))",
+    private async Task AcquireUserLockAsync(Guid userId, CancellationToken ct)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(
+            candidate => candidate.Id == userId,
             ct);
+        if (user is not null)
+            user.ConcurrencyVersion = checked(user.ConcurrencyVersion + 1);
+    }
 
     private static byte[] HashToken(string token) =>
         SHA256.HashData(Encoding.UTF8.GetBytes(token));

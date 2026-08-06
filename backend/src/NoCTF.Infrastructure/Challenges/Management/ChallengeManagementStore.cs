@@ -5,7 +5,6 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Challenges;
 using NoCTF.Application.Messaging;
-using Npgsql;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 
@@ -77,9 +76,26 @@ public sealed class ChallengeManagementStore(
             await outbox.FlushOutgoingMessagesAsync();
             return new(Map(entity, template));
         }
-        catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
+        catch (DbUpdateConcurrencyException)
         {
-            return new(null, MapCompetitionChallengeConflict(exception));
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return new(null, ChallengeMutationFailure.RevisionConflict);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            var failure = await FindCompetitionChallengeConflictAsync(
+                entity.Id,
+                entity.CompetitionId,
+                entity.ChallengeId,
+                entity.Order,
+                includeIdConflict: true,
+                ct);
+            if (failure is null)
+                throw;
+            return new(null, failure.Value);
         }
     }
 
@@ -166,9 +182,26 @@ public sealed class ChallengeManagementStore(
                 .SingleAsync(challenge => challenge.Id == entity.ChallengeId, ct);
             return new(Map(entity, template));
         }
-        catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
+        catch (DbUpdateConcurrencyException)
         {
-            return new(null, MapCompetitionChallengeConflict(exception));
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return new(null, ChallengeMutationFailure.RevisionConflict);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            var failure = await FindCompetitionChallengeConflictAsync(
+                entity.Id,
+                entity.CompetitionId,
+                entity.ChallengeId,
+                entity.Order,
+                includeIdConflict: false,
+                ct);
+            if (failure is null)
+                throw;
+            return new(null, failure.Value);
         }
     }
 
@@ -262,10 +295,26 @@ public sealed class ChallengeManagementStore(
             await outbox.FlushOutgoingMessagesAsync();
             return null;
         }
-        catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
+        catch (DbUpdateConcurrencyException)
         {
-            db.Entry(entity).State = EntityState.Detached;
-            return MapCompetitionChallengeConflict(exception);
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return ChallengeMutationFailure.RevisionConflict;
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            var failure = await FindCompetitionChallengeConflictAsync(
+                entity.Id,
+                entity.CompetitionId,
+                entity.ChallengeId,
+                entity.Order,
+                includeIdConflict: false,
+                ct);
+            if (failure is null)
+                throw;
+            return failure.Value;
         }
     }
 
@@ -326,27 +375,27 @@ public sealed class ChallengeManagementStore(
             template.CreatedAt,
             instance.UpdatedAt);
 
-    private static bool IsCompetitionChallengeConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException
-        {
-            SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: "pk_competition_challenges"
-                or "ix_competition_challenges_competition_id_challenge_id"
-                or "ix_competition_challenges_competition_id_order"
-        };
-
-    private static ChallengeMutationFailure MapCompetitionChallengeConflict(
-        DbUpdateException exception) =>
-        ((PostgresException)exception.InnerException!).ConstraintName switch
-        {
-            "pk_competition_challenges" =>
-                ChallengeMutationFailure.ResourceIdConflict,
-            "ix_competition_challenges_competition_id_challenge_id" =>
-                ChallengeMutationFailure.ChallengeTemplateConflict,
-            "ix_competition_challenges_competition_id_order" =>
-                ChallengeMutationFailure.ChallengeOrderConflict,
-            _ => throw new InvalidOperationException(
-                "The competition challenge conflict constraint was not recognized.",
-                exception)
-        };
+    private async Task<ChallengeMutationFailure?> FindCompetitionChallengeConflictAsync(
+        Guid id,
+        Guid competitionId,
+        Guid challengeId,
+        int order,
+        bool includeIdConflict,
+        CancellationToken ct)
+    {
+        if (includeIdConflict && await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(item => item.Id == id, ct))
+            return ChallengeMutationFailure.ResourceIdConflict;
+        if (await db.CompetitionChallenges.AsNoTracking().AnyAsync(item =>
+                item.Id != id
+                && item.CompetitionId == competitionId
+                && item.ChallengeId == challengeId, ct))
+            return ChallengeMutationFailure.ChallengeTemplateConflict;
+        if (await db.CompetitionChallenges.AsNoTracking().AnyAsync(item =>
+                item.Id != id
+                && item.CompetitionId == competitionId
+                && item.Order == order, ct))
+            return ChallengeMutationFailure.ChallengeOrderConflict;
+        return null;
+    }
 }

@@ -39,14 +39,13 @@ internal static class ResourceManagerRoleGuard
         IEnumerable<Guid> userIds,
         CancellationToken cancellationToken)
     {
-        if (!db.Database.IsRelational())
-            return;
-
         foreach (var userId in userIds.Distinct().Order())
         {
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({'u' + userId.ToString("N")}, 0))",
+            var user = await db.Users.SingleOrDefaultAsync(
+                candidate => candidate.Id == userId,
                 cancellationToken);
+            if (user is not null)
+                user.ConcurrencyVersion = checked(user.ConcurrencyVersion + 1);
         }
     }
 }

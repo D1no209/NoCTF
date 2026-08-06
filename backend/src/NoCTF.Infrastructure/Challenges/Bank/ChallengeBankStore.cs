@@ -4,7 +4,6 @@ using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Challenges;
-using Npgsql;
 
 namespace NoCTF.Infrastructure.Challenges.Bank;
 
@@ -57,13 +56,14 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             await transaction.CommitAsync(ct);
             return new(ChallengeTemplateWriteState.Succeeded, result);
         }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+        catch (DbUpdateException)
         {
-            SqlState: PostgresErrorCodes.UniqueViolation
-        })
-        {
-            db.Entry(entity).State = EntityState.Detached;
-            return new(ChallengeTemplateWriteState.ResourceIdConflict);
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            if (await db.Challenges.IgnoreQueryFilters().AsNoTracking()
+                    .AnyAsync(challenge => challenge.Id == challengeId, ct))
+                return new(ChallengeTemplateWriteState.ResourceIdConflict);
+            throw;
         }
     }
 

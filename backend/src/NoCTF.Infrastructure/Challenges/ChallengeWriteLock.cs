@@ -5,13 +5,14 @@ namespace NoCTF.Infrastructure.Challenges;
 
 internal static class ChallengeWriteLock
 {
-    public static Task AcquireAsync(
+    public static async Task AcquireAsync(
         NoCtfDbContext db,
         Guid challengeId,
-        CancellationToken cancellationToken) =>
-        !db.Database.IsRelational()
-            ? Task.CompletedTask
-            : db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({'h' + challengeId.ToString("N")}, 0))",
-            cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var challenge = await db.Challenges.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(candidate => candidate.Id == challengeId, cancellationToken);
+        if (challenge is not null)
+            challenge.ConcurrencyVersion = checked(challenge.ConcurrencyVersion + 1);
+    }
 }

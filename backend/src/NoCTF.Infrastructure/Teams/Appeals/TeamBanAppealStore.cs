@@ -134,16 +134,12 @@ public sealed class TeamBanAppealStore(
         if (competitionStatus is null)
             return new(Failure: TeamBanAppealFailure.CompetitionNotFound);
 
-        var team = await db.Teams
-            .FromSqlInterpolated($"""
-                SELECT * FROM teams
-                WHERE competition_id = {command.CompetitionId}
-                  AND {command.ActorUserId} = ANY(member_ids)
-                  AND deleted_at IS NULL
-                FOR UPDATE
-                """)
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(cancellationToken);
+        var team = await db.Teams.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item =>
+                item.CompetitionId == command.CompetitionId
+                && item.MemberIds.Contains(command.ActorUserId)
+                && item.DeletedAt == null,
+                cancellationToken);
         if (team is null)
             return new(Failure: TeamBanAppealFailure.TeamNotFound);
         if (team.CaptainId != command.ActorUserId)
@@ -192,14 +188,10 @@ public sealed class TeamBanAppealStore(
         if (competitionStatus is null)
             return new(Failure: TeamBanAppealFailure.CompetitionNotFound);
 
-        var appeal = await db.CompetitionEvents
-            .FromSqlInterpolated($"""
-                SELECT * FROM competition_events
-                WHERE id = {command.AppealId}
-                FOR UPDATE
-                """)
-            .AsNoTracking()
-            .SingleOrDefaultAsync(cancellationToken);
+        var appeal = await db.CompetitionEvents.AsNoTracking()
+            .SingleOrDefaultAsync(
+                item => item.Id == command.AppealId,
+                cancellationToken);
         if (appeal is null
             || appeal.CompetitionId != command.CompetitionId
             || appeal.Kind != CompetitionEventKind.TeamBanAppealSubmitted
@@ -228,16 +220,12 @@ public sealed class TeamBanAppealStore(
         if (ban is null)
             return new(Failure: TeamBanAppealFailure.BanNotFound);
 
-        var team = await db.Teams
-            .FromSqlInterpolated($"""
-                SELECT * FROM teams
-                WHERE id = {appeal.TeamId.Value}
-                  AND competition_id = {command.CompetitionId}
-                  AND deleted_at IS NULL
-                FOR UPDATE
-                """)
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(cancellationToken);
+        var team = await db.Teams.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item =>
+                item.Id == appeal.TeamId.Value
+                && item.CompetitionId == command.CompetitionId
+                && item.DeletedAt == null,
+                cancellationToken);
         if (team is null)
             return new(Failure: TeamBanAppealFailure.TeamNotFound);
         if (!await IsCurrentBanAsync(team, ban.Id, cancellationToken))
@@ -296,16 +284,12 @@ public sealed class TeamBanAppealStore(
         if (competitionStatus is null)
             return new(Failure: TeamBanAppealFailure.CompetitionNotFound);
 
-        var team = await db.Teams
-            .FromSqlInterpolated($"""
-                SELECT * FROM teams
-                WHERE id = {command.TeamId}
-                  AND competition_id = {command.CompetitionId}
-                  AND deleted_at IS NULL
-                FOR UPDATE
-                """)
-            .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(cancellationToken);
+        var team = await db.Teams.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item =>
+                item.Id == command.TeamId
+                && item.CompetitionId == command.CompetitionId
+                && item.DeletedAt == null,
+                cancellationToken);
         if (team is null)
             return new(Failure: TeamBanAppealFailure.TeamNotFound);
         if (!team.IsBanned)
