@@ -19,6 +19,7 @@ using NoCTF.Runtime.Kubernetes.Networking;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using NoCTF.Domain.Runtime;
+using NoCTF.Infrastructure.Caching;
 
 namespace NoCTF.Runner.Composition;
 
@@ -26,9 +27,13 @@ public sealed class RunnerProgramMarker;
 
 public static class ServiceRegistration
 {
-    public static IServiceCollection AddNoCtfRunner(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddNoCtfRunner(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool development = false)
     {
         ValidateRunnerScoringCallbackBaseUrl(configuration);
+        services.AddNoCtfLocalComputationCaching(configuration);
         services.AddHttpClient();
         var configuredProvider = configuration["Runner:Provider"];
         var provider = Enum.TryParse<RuntimeProvider>(
@@ -74,18 +79,22 @@ public static class ServiceRegistration
                     && options.HeartbeatTtlSeconds > options.HeartbeatIntervalSeconds,
                 "Runner heartbeat TTL must be greater than its positive interval.")
             .ValidateOnStart();
-        var redis = configuration.GetConnectionString("Redis");
-        if (string.IsNullOrWhiteSpace(redis))
-            throw new InvalidOperationException("ConnectionStrings:Redis is required for the Runner host.");
-        services.AddSingleton<IConnectionMultiplexer>(_ =>
+        if (!development)
         {
-            var redisOptions = ConfigurationOptions.Parse(redis);
-            redisOptions.AbortOnConnectFail = false;
-            return ConnectionMultiplexer.Connect(redisOptions);
-        });
-        services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
-        services.AddSingleton<RedisRunnerAvailabilityRegistry>();
-        services.AddHostedService<RunnerAvailabilityPublisher>();
+            var redis = configuration.GetConnectionString("Redis");
+            if (string.IsNullOrWhiteSpace(redis))
+                throw new InvalidOperationException(
+                    "ConnectionStrings:Redis is required for the Runner host.");
+            services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                var redisOptions = ConfigurationOptions.Parse(redis);
+                redisOptions.AbortOnConnectFail = false;
+                return ConnectionMultiplexer.Connect(redisOptions);
+            });
+            services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
+            services.AddSingleton<RedisRunnerAvailabilityRegistry>();
+            services.AddHostedService<RunnerAvailabilityPublisher>();
+        }
         var isKubernetesPool = string.Equals(
             configuredProvider,
             nameof(NoCTF.Domain.Runtime.RuntimeProvider.Kubernetes),
@@ -174,6 +183,8 @@ public static class ServiceRegistration
             provider.GetRequiredService<RuntimeProviderCatalog>());
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AwdFlagInjectionConfigurationCatalog>();
+        services.AddSingleton<IAwdFlagInjectionConfigurationCatalog,
+            FusionAwdFlagInjectionConfigurationCatalog>();
         services.AddSingleton<AwdCheckerConfigurationCatalog>();
         services.AddSingleton<IRunnerScoringTokenIssuer, RunnerScoringTokenIssuer>();
         services.AddSingleton<IAwdFlagInjectionExecutor, AwdFlagInjectionExecutor>();

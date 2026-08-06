@@ -15,10 +15,13 @@ public sealed class PostgresPerTeamRuntimeFlagStore(NoCtfDbContext db)
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var lockKey = $"runtime-flag:{competitionChallengeId:D}:{teamId:D}";
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
-            cancellationToken);
+        if (db.Database.IsRelational())
+        {
+            var lockKey = $"runtime-flag:{competitionChallengeId:D}:{teamId:D}";
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
+                cancellationToken);
+        }
 
         var existing = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.CompetitionChallengeId == competitionChallengeId

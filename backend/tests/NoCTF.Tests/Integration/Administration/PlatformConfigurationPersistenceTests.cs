@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Infrastructure.Administration;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
+using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Administration;
 
@@ -26,13 +29,18 @@ public sealed class PlatformConfigurationPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             var now = DateTimeOffset.UtcNow;
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.ReadModels)
+                .Services
+                .BuildServiceProvider();
+            var caches = cacheServices.GetRequiredService<IFusionCacheProvider>();
 
             await using (var db = new NoCtfDbContext(options))
                 await db.Database.MigrateAsync(cancellationToken);
 
             await using (var db = new NoCtfDbContext(options))
             {
-                var store = new PlatformConfigurationStore(db);
+                var store = new PlatformConfigurationStore(db, caches);
                 var seeded = await store.GetAsync(cancellationToken);
                 var updated = await store.UpdateAsync(
                     "NoCTF Arena",
@@ -48,7 +56,7 @@ public sealed class PlatformConfigurationPersistenceTests
 
             await using (var db = new NoCtfDbContext(options))
             {
-                var store = new PlatformConfigurationStore(db);
+                var store = new PlatformConfigurationStore(db, caches);
                 var stale = await store.UpdateAsync(
                     "Stale name",
                     null,

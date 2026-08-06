@@ -16,18 +16,26 @@ internal static class RuntimeInfrastructure
 {
     internal static IServiceCollection AddNoCtfRuntime(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool development)
     {
-        var redis = configuration.GetConnectionString("Redis");
-        if (string.IsNullOrWhiteSpace(redis))
-            throw new InvalidOperationException("ConnectionStrings:Redis is required for the API host.");
-        services.AddSingleton<IConnectionMultiplexer>(_ =>
+        if (development)
         {
-            var redisOptions = ConfigurationOptions.Parse(redis);
-            redisOptions.AbortOnConnectFail = false;
-            return ConnectionMultiplexer.Connect(redisOptions);
-        });
-        services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
+            services.AddSingleton<IRunnerCapacityGate, DevelopmentRunnerCapacityGate>();
+        }
+        else
+        {
+            var redis = configuration.GetConnectionString("Redis");
+            if (string.IsNullOrWhiteSpace(redis))
+                throw new InvalidOperationException("ConnectionStrings:Redis is required for the API host.");
+            services.AddSingleton<IConnectionMultiplexer>(_ =>
+            {
+                var redisOptions = ConfigurationOptions.Parse(redis);
+                redisOptions.AbortOnConnectFail = false;
+                return ConnectionMultiplexer.Connect(redisOptions);
+            });
+            services.AddScoped<IRunnerCapacityGate, RedisRunnerCapacityGate>();
+        }
         services.AddSingleton<IRuntimePlacementPolicy, ConfiguredRuntimePlacementPolicy>();
         services.AddSingleton(new RuntimePublishedPortRange());
         services.AddScoped<IRuntimePublishedPortAllocator, PostgresRuntimePublishedPortAllocator>();

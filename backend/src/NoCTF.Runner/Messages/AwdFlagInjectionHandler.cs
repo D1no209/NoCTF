@@ -34,7 +34,7 @@ public interface IAwdFlagInjectionExecutor
 
 public sealed class AwdFlagInjectionWorkReader(
     IServiceScopeFactory scopes,
-    AwdFlagInjectionConfigurationCatalog configurations) : IAwdFlagInjectionWorkReader
+    IAwdFlagInjectionConfigurationCatalog configurations) : IAwdFlagInjectionWorkReader
 {
     public async Task<AwdFlagInjectionWork?> ReadAsync(
         InjectAwdFlag message,

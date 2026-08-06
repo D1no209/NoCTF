@@ -10,6 +10,8 @@ internal static class SharedRuntimeScopeLock
         Guid competitionChallengeId,
         CancellationToken cancellationToken)
     {
+        if (!db.Database.IsRelational())
+            return Task.CompletedTask;
         var key = LockKey(competitionChallengeId);
         return db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",

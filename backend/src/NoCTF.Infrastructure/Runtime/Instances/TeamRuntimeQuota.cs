@@ -12,6 +12,8 @@ internal static class TeamRuntimeQuota
         Guid teamId,
         CancellationToken cancellationToken)
     {
+        if (!db.Database.IsRelational())
+            return Task.CompletedTask;
         var key = LockKey(competitionId, teamId);
         return db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",

@@ -19,12 +19,15 @@ using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Infrastructure.Competitions.Visibility;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Events;
+using NoCTF.Infrastructure.Caching;
 
 namespace NoCTF.Infrastructure.Competitions;
 
 internal static class CompetitionInfrastructure
 {
-    internal static IServiceCollection AddNoCtfCompetitions(this IServiceCollection services)
+    internal static IServiceCollection AddNoCtfCompetitions(
+        this IServiceCollection services,
+        bool development)
     {
         services.AddScoped<ICompetitionLifecycleStore, CompetitionLifecycleStore>();
         services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
@@ -32,8 +35,12 @@ internal static class CompetitionInfrastructure
         services.AddScoped<IKohRuntimeProvisioner, PostgresKohRuntimeProvisioner>();
         services.AddScoped<IKohChallengeAccessReader, PostgresKohChallengeAccessReader>();
         services.AddSingleton<AwdRoundConfigurationCatalog>();
+        services.AddSingleton<IAwdRoundConfigurationCatalog,
+            FusionAwdRoundConfigurationCatalog>();
         services.AddSingleton<AwdCheckerConfigurationCatalog>();
         services.AddSingleton<KohProducerConfigurationCatalog>();
+        services.AddSingleton<IKohProducerConfigurationCatalog,
+            FusionKohProducerConfigurationCatalog>();
         services.AddHttpClient(HttpKohControlClient.ClientName)
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
@@ -44,6 +51,7 @@ internal static class CompetitionInfrastructure
         services.AddScoped<ICompetitionStartGateStore, CompetitionStartGateStore>();
         services.AddScoped<CompetitionStartGate>();
         services.AddScoped<ICompetitionManagementStore, CompetitionManagementStore>();
+        services.AddSingleton<CompetitionReadModelCache>();
         services.AddScoped<CreateCompetition>();
         services.AddScoped<GetCompetition>();
         services.AddScoped<ListCompetitions>();
@@ -70,15 +78,13 @@ internal static class CompetitionInfrastructure
         services.AddScoped<GetCompetitionVisibility>();
         services.AddScoped<UpdateCompetitionVisibility>();
         services.AddScoped<ApplyScheduledCompetitionVisibility>();
-        services.AddScoped<CompetitionEventStore>();
-        services.AddScoped<ICompetitionEventStore>(provider =>
-            provider.GetRequiredService<CompetitionEventStore>());
-        services.AddScoped<ICompetitionEventRecorder>(provider =>
-            provider.GetRequiredService<CompetitionEventStore>());
+        services.AddScoped<ICompetitionEventStore, CompetitionEventStore>();
+        services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
         services.AddScoped<ListCompetitionEvents>();
         services.AddScoped<ExportCompetitionEvents>();
         services.AddScoped<AccessSubmissionFlag>();
-        services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
+        if (!development)
+            services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
         return services;
     }
 }

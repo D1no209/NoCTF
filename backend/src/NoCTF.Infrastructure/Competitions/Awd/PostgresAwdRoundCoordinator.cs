@@ -15,7 +15,7 @@ namespace NoCTF.Infrastructure.Competitions.Awd;
 
 public sealed class PostgresAwdRoundCoordinator(
     NoCtfDbContext db,
-    AwdRoundConfigurationCatalog configurations,
+    IAwdRoundConfigurationCatalog configurations,
     ITransactionalMessageOutbox outbox,
     TimeProvider timeProvider) : IAwdRoundCoordinator
 {

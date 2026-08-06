@@ -26,12 +26,13 @@ namespace NoCTF.API.Composition;
 public static class ServiceRegistration
 {
     public static IServiceCollection AddNoCtfApi(this IServiceCollection services, IConfiguration configuration)
-        => AddNoCtfApi(services, configuration, true);
+        => AddNoCtfApi(services, configuration, true, development: false);
 
     public static IServiceCollection AddNoCtfApi(
         this IServiceCollection services,
         IConfiguration configuration,
-        bool includeInfrastructure)
+        bool includeInfrastructure,
+        bool development = false)
     {
         services.AddProblemDetails();
         services.AddFastEndpoints();
@@ -61,7 +62,7 @@ public static class ServiceRegistration
         });
         if (includeInfrastructure)
         {
-            services.AddNoCtfInfrastructure(configuration);
+            services.AddNoCtfInfrastructure(configuration, development);
             services.AddScoped<SubmitFlag>();
             services.AddScoped<SubmitFix>();
             services.AddScoped<LoginUser>();
@@ -113,9 +114,17 @@ public static class ServiceRegistration
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
         services.AddScoped<ISubmissionResultPublisher, SignalRSubmissionResultPublisher>();
+        if (includeInfrastructure && development)
+        {
+            services.AddSingleton<ILeaderboardRefreshPublisher,
+                LocalLeaderboardRefreshPublisher>();
+            services.AddSingleton<ISubmissionResultNotification,
+                LocalSubmissionResultPublisher>();
+        }
         services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
         services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
         if (includeInfrastructure
+            && !development
             && !configuration.GetValue<bool>("OpenApi:Exporting")
             && !string.IsNullOrWhiteSpace(redis))
         {

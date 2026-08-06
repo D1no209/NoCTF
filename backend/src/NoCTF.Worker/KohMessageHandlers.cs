@@ -16,7 +16,7 @@ namespace NoCTF.Worker;
 public sealed class KohPollingHandler(
     NoCtfDbContext db,
     IKohControlClient client,
-    KohProducerConfigurationCatalog configurations,
+    IKohProducerConfigurationCatalog configurations,
     TimeProvider timeProvider)
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
@@ -143,7 +143,7 @@ public sealed class KohPollingHandler(
 public sealed class KohObservationHandler(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
-    KohProducerConfigurationCatalog configurations,
+    IKohProducerConfigurationCatalog configurations,
     TimeProvider timeProvider)
 {
     public async Task Handle(

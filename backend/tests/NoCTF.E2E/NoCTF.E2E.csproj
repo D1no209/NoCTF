@@ -5,7 +5,11 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="TUnit" />
     <PackageReference Include="TUnit.Assertions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/NoCTF.API/NoCTF.API.csproj" />
   </ItemGroup>
 </Project>

@@ -6,7 +6,10 @@ using NoCTF.Infrastructure.Administration;
 
 namespace NoCTF.Infrastructure.Competitions.Administration;
 
-public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetitionStore
+public sealed class AdminCompetitionStore(
+    NoCtfDbContext db,
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
+    : IAdminCompetitionStore
 {
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(
         Guid actorId,
@@ -80,6 +83,8 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        if (readModels is not null)
+            await readModels.InvalidateAsync(entity.Id, ct);
         return new(CompetitionRestoreState.Restored);
     }
 
@@ -111,6 +116,8 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
         db.Competitions.Remove(entity);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        if (readModels is not null)
+            await readModels.InvalidateAsync(competitionId, ct);
         return true;
     }
 
@@ -169,6 +176,8 @@ public sealed class AdminCompetitionStore(NoCtfDbContext db) : IAdminCompetition
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
+        if (readModels is not null)
+            await readModels.InvalidateAsync(entity.Id, ct);
         return new(CompetitionOwnerTransferState.Transferred, Map(entity));
     }
 
