@@ -70,11 +70,8 @@ internal static class CompetitionInfrastructure
         services.AddScoped<GetCompetitionVisibility>();
         services.AddScoped<UpdateCompetitionVisibility>();
         services.AddScoped<ApplyScheduledCompetitionVisibility>();
-        services.AddScoped<CompetitionEventStore>();
-        services.AddScoped<ICompetitionEventStore>(provider =>
-            provider.GetRequiredService<CompetitionEventStore>());
-        services.AddScoped<ICompetitionEventRecorder>(provider =>
-            provider.GetRequiredService<CompetitionEventStore>());
+        services.AddScoped<ICompetitionEventStore, CompetitionEventStore>();
+        services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
         services.AddScoped<ListCompetitionEvents>();
         services.AddScoped<ExportCompetitionEvents>();
         services.AddScoped<AccessSubmissionFlag>();
