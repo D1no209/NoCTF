@@ -71,16 +71,17 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         Guid actorId,
         bool isAdministrator,
         bool includeDeleted,
-        CancellationToken ct) =>
-        await Project(Authorized(
-                    includeDeleted
-                        ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
-                        : db.Challenges.AsNoTracking(),
-                    actorId,
-                    isAdministrator)
+        CancellationToken ct)
+    {
+        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking();
+        if (!includeDeleted)
+            source = source.Where(challenge => challenge.DeletedAt == null);
+
+        return await Project(Authorized(source, actorId, isAdministrator)
                 .OrderByDescending(challenge => challenge.UpdatedAt)
                 .ThenBy(challenge => challenge.Id))
             .ToListAsync(ct);
+    }
 
     public Task<ChallengeTemplateView?> FindAsync(
         Guid challengeId,
@@ -89,9 +90,10 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         bool includeDeleted,
         CancellationToken ct)
     {
-        var source = includeDeleted
-            ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
-            : db.Challenges.AsNoTracking();
+        var source = db.Challenges.IgnoreQueryFilters().AsNoTracking();
+        if (!includeDeleted)
+            source = source.Where(challenge => challenge.DeletedAt == null);
+
         return Project(Authorized(source, actorId, isAdministrator)
                 .Where(challenge => challenge.Id == challengeId))
             .SingleOrDefaultAsync(ct);

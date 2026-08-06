@@ -276,6 +276,46 @@ public sealed class GitOpsPersistenceContractTests
                 4,
                 now,
                 cancellationToken)).IsNull();
+
+            var restoredCompetitionChallenge = (await competitionChallenges.ListAsync(
+                competitionId,
+                true,
+                true,
+                cancellationToken)).Single();
+            await Assert.That(await competitionChallenges.SoftDeleteAsync(
+                competitionId,
+                competitionChallengeId,
+                restoredCompetitionChallenge.Revision,
+                now,
+                cancellationToken)).IsNull();
+            await Assert.That(await challengeBank.SoftDeleteAsync(
+                challengeId,
+                botId,
+                false,
+                now,
+                cancellationToken)).IsNull();
+            await Assert.That(await challengeBank.ListAsync(
+                botId,
+                false,
+                false,
+                cancellationToken)).IsEmpty();
+            await Assert.That((await challengeBank.ListAsync(
+                botId,
+                false,
+                true,
+                cancellationToken)).Single().DeletedAt).IsNotNull();
+            await Assert.That(await challengeBank.FindAsync(
+                challengeId,
+                botId,
+                false,
+                false,
+                cancellationToken)).IsNull();
+            await Assert.That((await challengeBank.FindAsync(
+                challengeId,
+                botId,
+                false,
+                true,
+                cancellationToken))!.DeletedAt).IsNotNull();
         });
     }
 
