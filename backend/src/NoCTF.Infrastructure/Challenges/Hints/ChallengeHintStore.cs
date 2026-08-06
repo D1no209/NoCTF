@@ -16,8 +16,21 @@ public sealed class ChallengeHintStore(
     NoCtfDbContext db,
     ILeaderboardProjectionEngine projection,
     ITransactionalMessageOutbox outbox,
+    TeamChallengeCriticalSection criticalSection,
     ICompetitionEventRecorder? eventRecorder = null) : IChallengeHintStore
 {
+    public ChallengeHintStore(
+        NoCtfDbContext db,
+        ILeaderboardProjectionEngine projection,
+        ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder? eventRecorder = null)
+        : this(
+            db,
+            projection,
+            outbox,
+            new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry()),
+            eventRecorder) { }
+
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
@@ -213,13 +226,10 @@ public sealed class ChallengeHintStore(
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
-        await using var unlockLease = await CriticalSectionCoordinator.AcquireAsync(
+        await using var unlockLease = await criticalSection.AcquireAsync(
             db,
-            $"hint-unlock:{teamId.Value:N}:{competitionChallengeId:N}",
-            token => db.Teams.Where(team => team.Id == teamId.Value)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    team => team.CriticalSectionVersion,
-                    team => team.CriticalSectionVersion + 1), token),
+            teamId.Value,
+            competitionChallengeId,
             ct);
         var challenge = await db.CompetitionChallenges
             .Include(item => item.Hints)

@@ -18,8 +18,25 @@ public sealed class RuntimeInstanceStore(
     IRuntimePlacementPolicy placementPolicy,
     IPerTeamRuntimeFlagStore runtimeFlags,
     ITransactionalMessageOutbox outbox,
+    TeamRuntimeQuota runtimeQuota,
     ICompetitionEventRecorder? eventRecorder = null) : IRuntimeInstanceStore
 {
+    public RuntimeInstanceStore(
+        NoCtfDbContext db,
+        IChallengeRuntimeTemplateCatalog templates,
+        IRuntimePlacementPolicy placementPolicy,
+        IPerTeamRuntimeFlagStore runtimeFlags,
+        ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder? eventRecorder = null)
+        : this(
+            db,
+            templates,
+            placementPolicy,
+            runtimeFlags,
+            outbox,
+            new TeamRuntimeQuota(new LocalCriticalSectionRegistry()),
+            eventRecorder) { }
+
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
@@ -64,7 +81,7 @@ public sealed class RuntimeInstanceStore(
         if (scope.Mode == GameMode.Awd && command.Action is RuntimeAction.Start or RuntimeAction.Stop or RuntimeAction.Extend)
             return new(null, RuntimeMutationFailure.Unsupported);
 
-        await using var quotaLease = await TeamRuntimeQuota.AcquireLockAsync(
+        await using var quotaLease = await runtimeQuota.AcquireLockAsync(
             db,
             command.CompetitionId,
             scope.TeamId,
@@ -91,7 +108,7 @@ public sealed class RuntimeInstanceStore(
                         instance.State == RuntimeState.Stopping,
                         ct))
                     return new(null, RuntimeMutationFailure.InvalidState);
-                if (!await TeamRuntimeQuota.CanCreateSlotAsync(
+                if (!await runtimeQuota.CanCreateSlotAsync(
                         db,
                         command.CompetitionId,
                         scope.TeamId,
@@ -149,7 +166,7 @@ public sealed class RuntimeInstanceStore(
                 if (current is null
                     || !CanReset(current))
                     return new(null, RuntimeMutationFailure.InvalidState);
-                if (!await TeamRuntimeQuota.CanCreateSlotAsync(
+                if (!await runtimeQuota.CanCreateSlotAsync(
                         db,
                         command.CompetitionId,
                         scope.TeamId,

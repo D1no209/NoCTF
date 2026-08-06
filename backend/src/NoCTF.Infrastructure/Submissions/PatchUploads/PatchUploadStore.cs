@@ -14,8 +14,19 @@ namespace NoCTF.Infrastructure.Submissions.PatchUploads;
 public sealed class PatchUploadStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
+    SubmissionAttemptCriticalSection attemptCriticalSection,
     ILogger<PatchUploadStore> logger) : IPatchUploadStore
 {
+    public PatchUploadStore(
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        ILogger<PatchUploadStore> logger)
+        : this(
+            db,
+            outbox,
+            new SubmissionAttemptCriticalSection(new LocalCriticalSectionRegistry()),
+            logger) { }
+
     public async Task<PatchUploadScope?> ResolveScopeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -63,7 +74,7 @@ public sealed class PatchUploadStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
             ct);
-        await using var attemptLease = await SubmissionAttemptLock.AcquireAsync(
+        await using var attemptLease = await attemptCriticalSection.AcquireAsync(
             db,
             scope.TeamId,
             scope.CompetitionChallengeId,

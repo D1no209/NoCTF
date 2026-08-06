@@ -11,18 +11,11 @@ namespace NoCTF.Tests.Architecture;
 public sealed class PersistenceConcurrencyModelTests
 {
     [Test]
-    public async Task Aggregate_versions_are_provider_neutral_concurrency_tokens()
+    public async Task Only_user_and_team_use_dedicated_concurrency_versions()
     {
         await using var db = CreateDb();
 
-        foreach (var entityType in new[]
-                 {
-                     typeof(Competition),
-                     typeof(Challenge),
-                     typeof(Team),
-                     typeof(User),
-                     typeof(CompetitionChallenge)
-                 })
+        foreach (var entityType in new[] { typeof(Team), typeof(User) })
         {
             var property = db.Model.FindEntityType(entityType)!
                 .FindProperty("ConcurrencyVersion");
@@ -31,6 +24,17 @@ public sealed class PersistenceConcurrencyModelTests
             await Assert.That(property!.IsConcurrencyToken).IsTrue();
             await Assert.That(property.ValueGenerated)
                 .IsEqualTo(Microsoft.EntityFrameworkCore.Metadata.ValueGenerated.Never);
+        }
+
+        foreach (var entityType in new[]
+                 {
+                     typeof(Competition),
+                     typeof(Challenge),
+                     typeof(CompetitionChallenge)
+                 })
+        {
+            await Assert.That(db.Model.FindEntityType(entityType)!
+                .FindProperty("ConcurrencyVersion")).IsNull();
         }
     }
 
