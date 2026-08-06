@@ -497,7 +497,6 @@ public static class BackendMessageHandlers
         DispatchRuntime message,
         NoCtfDbContext db,
         IChallengeRuntimeTemplateCatalog templates,
-        IRuntimePublishedPortAllocator publishedPorts,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
@@ -600,6 +599,15 @@ public static class BackendMessageHandlers
                     template,
                     target.Instance.RuntimeProvider,
                     DateTimeOffset.UtcNow);
+                if (target.Instance.RuntimeProvider == RuntimeProvider.Docker)
+                {
+                    definition = definition with
+                    {
+                        PortMappings = definition.PortMappings.Keys.ToDictionary(
+                            port => port,
+                            _ => 0)
+                    };
+                }
                 claim = new ClaimContainerRuntime(
                     target.Instance.Id,
                     target.Instance.ProcessingVersion,
@@ -632,45 +640,6 @@ public static class BackendMessageHandlers
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
-        }
-        if (target.Instance.RuntimeProvider == RuntimeProvider.Docker)
-        {
-            var targets = RuntimePublishedPortClaims.Targets(claim);
-            await using var allocationTransaction = db.Database.CurrentTransaction is null
-                ? await db.Database.BeginTransactionAsync(cancellationToken)
-                : null;
-            var allocation = await publishedPorts.AllocateAsync(
-                target.Instance,
-                targets,
-                DateTimeOffset.UtcNow,
-                cancellationToken);
-            if (allocation.Failure is { } failure)
-            {
-                target.Instance.State = RuntimeState.Failed;
-                target.Instance.FailureCode = failure ==
-                    RuntimePublishedPortAllocationFailure.RangeExhausted
-                        ? RuntimeFailureCode.PublishedPortRangeExhausted
-                        : RuntimeFailureCode.InvalidConfiguration;
-                target.Instance.ProcessingVersion =
-                    checked(target.Instance.ProcessingVersion + 1);
-                await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
-                await RecordRuntimeStateAsync(
-                    events,
-                    target.Instance,
-                    CompetitionEventLevel.Error,
-                    DateTimeOffset.UtcNow,
-                    cancellationToken);
-                await db.SaveChangesAsync(cancellationToken);
-                if (allocationTransaction is not null)
-                    await allocationTransaction.CommitAsync(cancellationToken);
-                await outbox.FlushOutgoingMessagesAsync();
-                return;
-            }
-            claim = RuntimePublishedPortClaims.Apply(claim, allocation.Mappings);
-            if (targets.Count > 0)
-                await db.SaveChangesAsync(cancellationToken);
-            if (allocationTransaction is not null)
-                await allocationTransaction.CommitAsync(cancellationToken);
         }
         await PublishRuntimeClaimAsync(outbox, claim);
         await outbox.FlushOutgoingMessagesAsync();

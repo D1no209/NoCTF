@@ -77,7 +77,16 @@ public sealed class RuntimeProviderHandler(
                     expanded.ParticipantUrlIndexes,
                     message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
                     expanded.ControlCheckUrl,
-                    expanded.AwdCheckerTargetHost);
+                    expanded.AwdCheckerTargetHost,
+                    message.Definition.Provider == RuntimeProvider.Docker
+                        ? receipt.PortMappings
+                            .OrderBy(mapping => mapping.Key)
+                            .Select(mapping => new RuntimePublishedPortMapping(
+                                null,
+                                mapping.Key,
+                                mapping.Value))
+                            .ToArray()
+                        : null);
         }
         catch (TimeoutException)
         {
@@ -187,7 +196,10 @@ public sealed class RuntimeProviderHandler(
                             ? DateTimeOffset.UtcNow.Add(ttl)
                             : null,
                         expanded.ControlCheckUrl,
-                        expanded.AwdCheckerTargetHost);
+                        expanded.AwdCheckerTargetHost,
+                        message.Definition.Provider == RuntimeProvider.Docker
+                            ? ReadComposePublishedPorts(message.Definition, status)
+                            : null);
             }
         }
         catch (TimeoutException)
@@ -417,6 +429,40 @@ public sealed class RuntimeProviderHandler(
             throw new InvalidOperationException(
                 "Runtime capacity belongs to a different Runner assignment.");
     }
+
+    private static IReadOnlyList<RuntimePublishedPortMapping> ReadComposePublishedPorts(
+        ComposeRequest request,
+        ComposeStatus status)
+    {
+        var targets = (request.UrlBindings ?? [])
+            .Append(request.ControlCheckUrlBinding)
+            .Where(binding => binding?.ServiceName is not null
+                && binding.ContainerPort is not null)
+            .Select(binding => new
+            {
+                ServiceName = binding!.ServiceName!,
+                ContainerPort = binding.ContainerPort!.Value
+            })
+            .Distinct()
+            .OrderBy(target => target.ServiceName, StringComparer.Ordinal)
+            .ThenBy(target => target.ContainerPort)
+            .ToArray();
+        return targets.Select(target =>
+        {
+            var service = status.Services.Single(candidate => string.Equals(
+                candidate.Name,
+                target.ServiceName,
+                StringComparison.Ordinal));
+            if (!service.PublishedPorts.TryGetValue(target.ContainerPort, out var hostPort)
+                || hostPort is < 1 or > 65535)
+                throw new InvalidOperationException(
+                    $"Docker Compose did not publish {target.ServiceName}:{target.ContainerPort}.");
+            return new RuntimePublishedPortMapping(
+                target.ServiceName,
+                target.ContainerPort,
+                hostPort);
+        }).ToArray();
+    }
 }
 
 public static class RuntimeWriteBackHandler
@@ -429,7 +475,9 @@ public static class RuntimeWriteBackHandler
         ICompetitionEventRecorder? events = null)
     {
         events ??= NullCompetitionEventRecorder.Instance;
-        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
+        var instance = await db.RuntimeInstances
+            .Include(candidate => candidate.PublishedPorts)
+            .SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null)
@@ -437,6 +485,8 @@ public static class RuntimeWriteBackHandler
         if (IsLateProvisionSuccessAwaitingCleanup(instance, message))
         {
             instance.ProviderReceiptJson ??= message.ProviderReceiptJson;
+            await ReplacePublishedPortsAsync(
+                instance, message, events, DateTimeOffset.UtcNow, cancellationToken);
             instance.RunnerAssignmentReleaseToken = null;
             instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
@@ -451,6 +501,7 @@ public static class RuntimeWriteBackHandler
             || instance.RuntimeProvider != message.Provider)
             return;
 
+        var runningAt = DateTimeOffset.UtcNow;
         instance.RunnerId = message.RunnerId;
         instance.RunnerAssignmentReleaseToken = null;
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
@@ -459,9 +510,11 @@ public static class RuntimeWriteBackHandler
         instance.ControlCheckUrl = message.ControlCheckUrl;
         instance.AwdCheckerTargetHost = message.AwdCheckerTargetHost;
         instance.State = RuntimeState.Running;
-        instance.RunningAt = DateTimeOffset.UtcNow;
+        instance.RunningAt = runningAt;
         instance.ExpiresAt = message.ExpiresAt;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await ReplacePublishedPortsAsync(
+            instance, message, events, runningAt, cancellationToken);
         if (message.AwdCheckerTargetHost is not null)
             instance.NextCheckerDueAt = instance.RunningAt;
         if (instance.Purpose == RuntimePurpose.AwdpTarget
@@ -829,6 +882,60 @@ public static class RuntimeWriteBackHandler
         && instance.RunnerAssignmentReleaseToken is null
         && instance.RuntimeProvider == message.Provider
         && string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal);
+
+    private static async Task ReplacePublishedPortsAsync(
+        RuntimeInstance instance,
+        RuntimeProvisioned message,
+        ICompetitionEventRecorder events,
+        DateTimeOffset allocatedAt,
+        CancellationToken cancellationToken)
+    {
+        if (message.PublishedPorts is null)
+            return;
+        if (message.Provider != RuntimeProvider.Docker && message.PublishedPorts.Count > 0)
+            throw new InvalidOperationException(
+                "Only Docker runtime results may contain host published ports.");
+        var mappings = message.PublishedPorts
+            .OrderBy(mapping => mapping.ServiceName, StringComparer.Ordinal)
+            .ThenBy(mapping => mapping.ContainerPort)
+            .ToArray();
+        if (mappings.Any(mapping => mapping.ContainerPort is < 1 or > 65535
+                || mapping.HostPort is < 1 or > 65535)
+            || mappings.Select(mapping => (mapping.ServiceName, mapping.ContainerPort))
+                .Distinct()
+                .Count() != mappings.Length)
+            throw new InvalidOperationException("Runtime published port results are invalid.");
+
+        instance.PublishedPorts.Clear();
+        foreach (var mapping in mappings)
+        {
+            instance.PublishedPorts.Add(new RuntimePublishedPort
+            {
+                Id = Guid.CreateVersion7(allocatedAt),
+                RuntimeInstanceId = instance.Id,
+                CompetitionId = instance.CompetitionId,
+                ServiceName = mapping.ServiceName,
+                ContainerPort = mapping.ContainerPort,
+                HostPort = mapping.HostPort,
+                AllocatedAt = allocatedAt
+            });
+            await events.RecordAsync(new(
+                instance.CompetitionId,
+                CompetitionEventKind.RuntimePortAllocated,
+                CompetitionEventLevel.Information,
+                instance.TeamId is null
+                    ? CompetitionEventVisibility.Public
+                    : CompetitionEventVisibility.Team,
+                allocatedAt,
+                TeamId: instance.TeamId,
+                CompetitionChallengeId: instance.CompetitionChallengeId,
+                RuntimeInstanceId: instance.Id,
+                SubmissionId: instance.SubmissionId,
+                RuntimeState: instance.State,
+                RuntimeGeneration: instance.Generation,
+                HostPort: mapping.HostPort), cancellationToken);
+        }
+    }
 
     private static ValueTask PublishRuntimeStopAsync(
         ITransactionalMessageOutbox outbox,

@@ -41,7 +41,7 @@ public static class RuntimeClaimFactory
                         definition.Command ?? [],
                         ContainerEnvironment(definition, fixedFlag),
                         MergeLabels(definition.Labels, instance),
-                        definition.PortMappings ?? new Dictionary<int, int>(),
+                        ContainerPortMappings(instance.RuntimeProvider, definition.PortMappings),
                         limits,
                         definition.Security
                             ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
@@ -133,6 +133,17 @@ public static class RuntimeClaimFactory
             && template.ControlCheckUrlBinding?.ContainerPort is int controlPort)
             ports.Add(controlPort);
         return ports.Count == 0 ? null : ports.Distinct().Order().ToArray();
+    }
+
+    private static IReadOnlyDictionary<int, int> ContainerPortMappings(
+        RuntimeProvider provider,
+        IReadOnlyDictionary<int, int>? configured)
+    {
+        if (configured is null || configured.Count == 0)
+            return new Dictionary<int, int>();
+        return provider == RuntimeProvider.Docker
+            ? configured.Keys.ToDictionary(port => port, _ => 0)
+            : configured;
     }
 
     private static string? ResolvePerTeamFlag(
