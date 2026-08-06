@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useQuery } from '@tanstack/vue-query'
 import { Home, LayoutDashboard, Menu, Users } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRouter } from 'vue-router'
+import { apiUrl, authApi } from '@/api/noctf'
+import { queryKeys } from '@/api/queryKeys'
 import { canManagePlatformResources } from '@/api/userRole'
 import BrandLogo from '@/components/BrandLogo.vue'
 import LanguageSwitch from '@/components/LanguageSwitch.vue'
@@ -20,6 +23,19 @@ const router = useRouter()
 const displayName = computed(() => auth.user?.userName ?? '')
 const canManage = computed(() => canManagePlatformResources(auth.userRole))
 const menuOpen = ref(false)
+
+const { data: currentUser } = useQuery({
+  queryKey: queryKeys.currentUser,
+  queryFn: authApi.getMe,
+  enabled: computed(() => auth.isAuthenticated),
+})
+
+const avatarUrl = computed(() =>
+  currentUser.value?.avatarUrl ? apiUrl(currentUser.value.avatarUrl) : null,
+)
+const profileInitial = computed(() =>
+  (currentUser.value?.userName ?? displayName.value ?? 'N').charAt(0).toUpperCase(),
+)
 
 async function handleLogout() {
   menuOpen.value = false
@@ -80,8 +96,22 @@ async function handleLogout() {
         <NotificationCenter />
 
         <template v-if="auth.isAuthenticated">
-          <RouterLink v-if="displayName" :to="{ name: 'profile' }" class="flex min-w-0 items-center gap-2 border-2 border-border bg-card px-2 py-1.5 text-sm transition-colors hover:bg-accent">
-            <span class="text-muted-foreground hidden lg:inline">{{ displayName }}</span>
+          <RouterLink
+            v-if="displayName"
+            :to="{ name: 'profile' }"
+            class="grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-border bg-card transition-colors hover:border-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            :aria-label="t('nav.profile')"
+            :title="t('nav.profile')"
+          >
+            <img
+              v-if="avatarUrl"
+              :src="avatarUrl"
+              :alt="t('profile.avatarAlt', { name: currentUser?.userName ?? displayName })"
+              class="size-full object-cover"
+            >
+            <span v-else class="font-mono text-sm font-black" aria-hidden="true">
+              {{ profileInitial }}
+            </span>
           </RouterLink>
           <Button variant="ghost" size="sm" class="hidden sm:inline-flex" @click="handleLogout">
             {{ t('auth.logout') }}

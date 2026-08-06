@@ -125,9 +125,12 @@ describe('avatar crop geometry', () => {
 })
 
 describe('profile workspace', () => {
-  test('keeps editing on /profile and the home card summary-only', async () => {
+  test('keeps editing on /profile and exposes it through the navigation avatar', async () => {
     const home = await Bun.file(
       new URL('../src/components/home/HomeWorkspace.vue', import.meta.url),
+    ).text()
+    const navigation = await Bun.file(
+      new URL('../src/components/layout/NavBar.vue', import.meta.url),
     ).text()
     const workspace = await Bun.file(
       new URL('../src/components/profile/ProfileWorkspace.vue', import.meta.url),
@@ -138,11 +141,16 @@ describe('profile workspace', () => {
     const router = await Bun.file(new URL('../src/router/index.ts', import.meta.url)).text()
 
     expect(router).toContain(`path: '/profile'`)
-    expect(home).toContain(`name: 'profile'`)
+    expect(home).not.toContain(`name: 'profile'`)
+    expect(home).not.toContain('currentUser')
+    expect(navigation).toContain(`:to="{ name: 'profile' }"`)
+    expect(navigation).toContain('v-if="avatarUrl"')
     expect(home).not.toContain('type="file"')
     expect(home).not.toContain('<Textarea')
     expect(editor).toContain('@wheel.prevent="handleWheel"')
     expect(editor).toContain('setPointerCapture(event.pointerId)')
+    expect(editor).toContain('absolute inset-0 box-border rounded-full')
+    expect(editor).not.toContain('absolute inset-4 rounded-full')
     expect(editor).not.toContain('type="range"')
     expect(workspace).toContain('changePasswordMutation')
   })
