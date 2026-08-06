@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
-  <title>NoCTF dinosaur</title>
-  <path
-    fill="#242424"
-    fill-rule="evenodd"
-    d="M18 2h10v3h3v10H20v3h7v4h-7v3h-3v5h-5v-8H9v5H5v-4H2v-4H0V10h5v6h4V9h9V2Zm5 4h3v3h-3V6Zm5 6h3v3h-3v-3Z"
-  />
-</svg>
