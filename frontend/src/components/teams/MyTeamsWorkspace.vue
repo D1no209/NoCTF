@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import type { PublicTeam } from '@/api/teamPresentation'
-import type { MyTeamRegistration } from '@/components/teams/myTeamRegistrations'
+import type { GlobalTeam } from '@/api/globalTeamPresentation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   CalendarDays,
+  Copy,
   Inbox,
   KeyRound,
   Loader2,
-  LockKeyhole,
+  LogOut,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
-  ShieldAlert,
-  ShieldCheck,
   UsersRound,
   X,
 } from 'lucide-vue-next'
@@ -21,71 +20,48 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { authApi, teamApi } from '@/api/noctf'
 import { queryKeys } from '@/api/queryKeys'
-import {
-  teamBanAppealApi,
-  TeamBanAppealStatus,
-  TeamBanSource,
-} from '@/api/teamBanAppealApi'
-import { isPlatformAdministrator } from '@/api/userRole'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import PageHeader from '@/components/layout/PageHeader.vue'
 import ErrorState from '@/components/state/ErrorState.vue'
-import { loadMyTeamsWorkspace } from '@/components/teams/myTeamRegistrations'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Panel } from '@/components/ui/panel'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
 
 type TeamAction = 'create' | 'join' | null
 
 const { locale, t } = useI18n()
 const queryClient = useQueryClient()
 const action = ref<TeamAction>(null)
-const selectedCompetitionId = ref('')
 const newTeamName = ref('')
 const newAvatarUrl = ref('')
 const invitationToken = ref('')
 const editingTeamId = ref<string | null>(null)
 const editTeamName = ref('')
 const editAvatarUrl = ref('')
-const appealDrafts = ref<Record<string, string>>({})
 
 const {
-  data: workspace,
+  data: teams,
   isError,
   isLoading,
   refetch,
 } = useQuery({
   queryKey: queryKeys.myTeams,
-  queryFn: () => loadMyTeamsWorkspace(),
+  queryFn: teamApi.listMine,
 })
 
 const { data: currentUser } = useQuery({
   queryKey: queryKeys.currentUser,
-  queryFn: () => authApi.getMe(),
+  queryFn: authApi.getMe,
 })
 
-const registrations = computed(() => workspace.value?.registrations ?? [])
-const availableCompetitions = computed(() => workspace.value?.availableCompetitions ?? [])
+const teamList = computed(() => teams.value ?? [])
 
 function openAction(nextAction: Exclude<TeamAction, null>) {
   action.value = action.value === nextAction ? null : nextAction
-  if (action.value && !availableCompetitions.value.some(
-    competition => competition.id === selectedCompetitionId.value,
-  )) {
-    selectedCompetitionId.value = availableCompetitions.value[0]?.id ?? ''
-  }
 }
 
 function closeAction() {
@@ -95,31 +71,17 @@ function closeAction() {
   invitationToken.value = ''
 }
 
-function selectedCompetition() {
-  const competition = availableCompetitions.value.find(
-    candidate => candidate.id === selectedCompetitionId.value,
-  )
-  if (!competition)
-    throw new TypeError('A competition must be selected before changing team membership.')
-  return competition
-}
-
-function refreshTeams(competitionId: string) {
+function refreshTeams() {
   void queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
-  void queryClient.invalidateQueries({ queryKey: queryKeys.myCompetitionTeam(competitionId) })
-  void queryClient.invalidateQueries({ queryKey: queryKeys.teams(competitionId) })
 }
 
 const createTeamMutation = useMutation({
-  mutationFn: () => {
-    const competition = selectedCompetition()
-    return teamApi.create(competition.id, {
-      name: newTeamName.value.trim(),
-      avatarUrl: newAvatarUrl.value.trim() || null,
-    })
-  },
-  onSuccess: (team) => {
-    refreshTeams(team.competitionId)
+  mutationFn: () => teamApi.create({
+    name: newTeamName.value.trim(),
+    avatarUrl: newAvatarUrl.value.trim() || null,
+  }),
+  onSuccess: () => {
+    refreshTeams()
     closeAction()
     toast.success(t('teams.createSuccess'))
   },
@@ -127,31 +89,41 @@ const createTeamMutation = useMutation({
 })
 
 const joinTeamMutation = useMutation({
-  mutationFn: async () => {
-    const competition = selectedCompetition()
-    await teamApi.join(competition.id, invitationToken.value.trim())
-    return competition.id
-  },
-  onSuccess: (competitionId) => {
-    refreshTeams(competitionId)
+  mutationFn: () => teamApi.join(invitationToken.value.trim()),
+  onSuccess: () => {
+    refreshTeams()
     closeAction()
     toast.success(t('teams.joinSuccess'))
   },
   onError: () => toast.error(t('teams.actionError')),
 })
 
-function isCaptain(team: PublicTeam) {
+const leaveTeamMutation = useMutation({
+  mutationFn: (teamId: string) => teamApi.leave(teamId),
+  onSuccess: () => {
+    refreshTeams()
+    toast.success(t('teams.leaveSuccess'))
+  },
+  onError: () => toast.error(t('teams.leaveError')),
+})
+
+const rotateInvitationMutation = useMutation({
+  mutationFn: (teamId: string) => teamApi.rotateInvitation(teamId),
+  onSuccess: () => {
+    refreshTeams()
+    toast.success(t('teams.invitationRotated'))
+  },
+  onError: () => toast.error(t('teams.actionError')),
+})
+
+function isCaptain(team: GlobalTeam) {
   return currentUser.value?.userId === team.captainId
 }
 
-function canManageTeam(team: PublicTeam) {
-  return isCaptain(team) || isPlatformAdministrator(currentUser.value?.role)
-}
-
-function startEditing(registration: MyTeamRegistration) {
-  editingTeamId.value = registration.team.id
-  editTeamName.value = registration.team.name
-  editAvatarUrl.value = registration.team.avatarUrl ?? ''
+function startEditing(team: GlobalTeam) {
+  editingTeamId.value = team.id
+  editTeamName.value = team.name
+  editAvatarUrl.value = team.avatarUrl ?? ''
 }
 
 function cancelEditing() {
@@ -161,61 +133,28 @@ function cancelEditing() {
 }
 
 const updateTeamMutation = useMutation({
-  mutationFn: (registration: MyTeamRegistration) => teamApi.update(
-    registration.competition.id,
-    registration.team.id,
-    {
-      name: editTeamName.value.trim(),
-      avatarUrl: editAvatarUrl.value.trim() || null,
-    },
-  ),
-  onSuccess: (team) => {
-    refreshTeams(team.competitionId)
+  mutationFn: (team: GlobalTeam) => teamApi.update(team.id, {
+    name: editTeamName.value.trim(),
+    avatarUrl: editAvatarUrl.value.trim() || null,
+  }),
+  onSuccess: () => {
+    refreshTeams()
     cancelEditing()
     toast.success(t('teams.updateSuccess'))
   },
   onError: () => toast.error(t('errors.updateTeam')),
 })
 
-const submitAppealMutation = useMutation({
-  mutationFn: (registration: MyTeamRegistration) => teamBanAppealApi.submit(
-    registration.competition.id,
-    appealDrafts.value[registration.team.id]?.trim() ?? '',
-  ),
-  onSuccess: (_, registration) => {
-    appealDrafts.value[registration.team.id] = ''
-    void queryClient.invalidateQueries({ queryKey: queryKeys.myTeams })
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.myTeamBanCase(registration.competition.id),
-    })
-    toast.success(t('teams.banAppeal.submitSuccess'))
-  },
-  onError: () => toast.error(t('teams.banAppeal.submitError')),
-})
-
-function teamStatusVariant(status: 'pending' | 'approved' | 'rejected') {
-  if (status === 'approved')
-    return 'default'
-  if (status === 'rejected')
-    return 'destructive'
-  return 'secondary'
+async function copyInvitation(token: string) {
+  await navigator.clipboard.writeText(token)
+  toast.success(t('teams.invitationCopied'))
 }
 
 function formatDate(value: string) {
-  if (!value)
-    return '-'
   return new Intl.DateTimeFormat(locale.value, {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
-}
-
-function appealStatusKey(status?: number) {
-  if (status === TeamBanAppealStatus.Accepted)
-    return 'accepted'
-  if (status === TeamBanAppealStatus.Upheld)
-    return 'upheld'
-  return 'submitted'
 }
 </script>
 
@@ -229,7 +168,7 @@ function appealStatusKey(status?: number) {
         <template #actions>
           <div class="flex flex-wrap items-center justify-end gap-2">
             <Badge variant="outline">
-              {{ t('teams.teamCount', { count: registrations.length }) }}
+              {{ t('teams.teamCount', { count: teamList.length }) }}
             </Badge>
             <Button size="sm" @click="openAction('create')">
               <Plus class="size-4" />
@@ -244,7 +183,7 @@ function appealStatusKey(status?: number) {
       </PageHeader>
 
       <div v-if="isLoading" class="grid gap-4 lg:grid-cols-2">
-        <Skeleton v-for="index in 4" :key="index" class="h-48 border-2 border-border" />
+        <Skeleton v-for="index in 4" :key="index" class="h-64 border-2 border-border" />
       </div>
 
       <ErrorState
@@ -262,7 +201,7 @@ function appealStatusKey(status?: number) {
                 {{ action === 'create' ? t('teams.createPanelTitle') : t('teams.joinPanelTitle') }}
               </h2>
               <p class="mt-1 text-sm text-muted-foreground">
-                {{ action === 'create' ? t('teams.createPanelDescription') : t('teams.joinPanelDescription') }}
+                {{ action === 'create' ? t('teams.createGlobalDescription') : t('teams.joinGlobalDescription') }}
               </p>
             </div>
             <Button size="icon" variant="ghost" :aria-label="t('common.cancel')" @click="closeAction">
@@ -270,92 +209,68 @@ function appealStatusKey(status?: number) {
             </Button>
           </div>
 
-          <div v-if="availableCompetitions.length" class="mt-5 grid gap-4 lg:grid-cols-2">
+          <div v-if="action === 'create'" class="mt-5 grid gap-4 lg:grid-cols-2">
             <div class="space-y-2">
-              <Label for="team-competition">{{ t('teams.competition') }}</Label>
-              <Select v-model="selectedCompetitionId">
-                <SelectTrigger id="team-competition">
-                  <SelectValue :placeholder="t('teams.selectCompetition')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="competition in availableCompetitions"
-                    :key="competition.id"
-                    :value="competition.id"
-                  >
-                    {{ competition.title }} · {{ competition.mode.toUpperCase() }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <Label for="new-team-name">{{ t('teams.teamName') }}</Label>
+              <Input
+                id="new-team-name"
+                v-model="newTeamName"
+                :placeholder="t('teams.teamNamePlaceholder')"
+                maxlength="128"
+              />
             </div>
-
-            <template v-if="action === 'create'">
-              <div class="space-y-2">
-                <Label for="new-team-name">{{ t('teams.teamName') }}</Label>
-                <Input
-                  id="new-team-name"
-                  v-model="newTeamName"
-                  :placeholder="t('teams.teamNamePlaceholder')"
-                  maxlength="128"
-                />
-              </div>
-              <div class="space-y-2 lg:col-span-2">
-                <Label for="new-team-avatar">{{ t('teams.avatarUrl') }}</Label>
-                <Input
-                  id="new-team-avatar"
-                  v-model="newAvatarUrl"
-                  type="url"
-                  :placeholder="t('teams.avatarUrlPlaceholder')"
-                />
-              </div>
-              <div class="flex justify-end gap-2 lg:col-span-2">
-                <Button variant="outline" @click="closeAction">
-                  {{ t('common.cancel') }}
-                </Button>
-                <Button
-                  :disabled="!selectedCompetitionId || !newTeamName.trim() || createTeamMutation.isPending.value"
-                  @click="createTeamMutation.mutate()"
-                >
-                  <Loader2 v-if="createTeamMutation.isPending.value" class="size-4 animate-spin" />
-                  <Plus v-else class="size-4" />
-                  {{ t('teams.createTeam') }}
-                </Button>
-              </div>
-            </template>
-
-            <template v-else>
-              <div class="space-y-2">
-                <Label for="team-invitation-token">{{ t('teams.invitationToken') }}</Label>
-                <Input
-                  id="team-invitation-token"
-                  v-model="invitationToken"
-                  :placeholder="t('teams.tokenPlaceholder')"
-                  maxlength="32"
-                />
-              </div>
-              <div class="flex justify-end gap-2 lg:col-span-2">
-                <Button variant="outline" @click="closeAction">
-                  {{ t('common.cancel') }}
-                </Button>
-                <Button
-                  :disabled="!selectedCompetitionId || !invitationToken.trim() || joinTeamMutation.isPending.value"
-                  @click="joinTeamMutation.mutate()"
-                >
-                  <Loader2 v-if="joinTeamMutation.isPending.value" class="size-4 animate-spin" />
-                  <KeyRound v-else class="size-4" />
-                  {{ t('teams.joinByToken') }}
-                </Button>
-              </div>
-            </template>
+            <div class="space-y-2">
+              <Label for="new-team-avatar">{{ t('teams.avatarUrl') }}</Label>
+              <Input
+                id="new-team-avatar"
+                v-model="newAvatarUrl"
+                type="url"
+                :placeholder="t('teams.avatarUrlPlaceholder')"
+              />
+            </div>
+            <div class="flex justify-end gap-2 lg:col-span-2">
+              <Button variant="outline" @click="closeAction">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                :disabled="!newTeamName.trim() || createTeamMutation.isPending.value"
+                @click="createTeamMutation.mutate()"
+              >
+                <Loader2 v-if="createTeamMutation.isPending.value" class="size-4 animate-spin" />
+                <Plus v-else class="size-4" />
+                {{ t('teams.createTeam') }}
+              </Button>
+            </div>
           </div>
 
-          <Panel v-else class="mt-5 border-dashed p-4 text-sm text-muted-foreground">
-            {{ t('teams.noAvailableCompetitions') }}
-          </Panel>
+          <div v-else class="mt-5 space-y-4">
+            <div class="space-y-2">
+              <Label for="team-invitation-token">{{ t('teams.invitationToken') }}</Label>
+              <Input
+                id="team-invitation-token"
+                v-model="invitationToken"
+                :placeholder="t('teams.tokenPlaceholder')"
+                maxlength="32"
+              />
+            </div>
+            <div class="flex justify-end gap-2">
+              <Button variant="outline" @click="closeAction">
+                {{ t('common.cancel') }}
+              </Button>
+              <Button
+                :disabled="invitationToken.trim().length !== 32 || joinTeamMutation.isPending.value"
+                @click="joinTeamMutation.mutate()"
+              >
+                <Loader2 v-if="joinTeamMutation.isPending.value" class="size-4 animate-spin" />
+                <KeyRound v-else class="size-4" />
+                {{ t('teams.joinByToken') }}
+              </Button>
+            </div>
+          </div>
         </Card>
 
         <Card
-          v-if="!registrations.length"
+          v-if="!teamList.length"
           class="flex min-h-64 flex-col items-center justify-center border-dashed px-6 py-10 text-center"
         >
           <Inbox class="size-9 text-muted-foreground" />
@@ -363,183 +278,97 @@ function appealStatusKey(status?: number) {
             {{ t('teams.noTeams') }}
           </h2>
           <p class="mt-1 max-w-md text-sm text-muted-foreground">
-            {{ t('teams.noTeamsDescription') }}
+            {{ t('teams.noTeamsUseHeader') }}
           </p>
-          <Button class="mt-5" @click="openAction('create')">
-            <Plus class="size-4" />
-            {{ t('teams.createTeam') }}
-          </Button>
         </Card>
 
         <div v-else class="grid gap-4 lg:grid-cols-2">
           <Card
-            v-for="item in registrations"
-            :key="item.team.id"
+            v-for="team in teamList"
+            :key="team.id"
             class="flex h-full flex-col gap-5 p-5"
           >
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="flex min-w-0 items-center gap-3">
                 <img
-                  v-if="item.team.avatarUrl"
-                  :src="item.team.avatarUrl"
-                  :alt="item.team.name"
+                  v-if="team.avatarUrl"
+                  :src="team.avatarUrl"
+                  :alt="team.name"
                   class="size-12 border-2 border-border object-cover"
                 >
                 <div v-else class="grid size-12 shrink-0 place-items-center border-2 border-border bg-muted">
                   <UsersRound class="size-5 text-muted-foreground" />
                 </div>
                 <div class="min-w-0">
-                  <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  <p class="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">
                     {{ t('teams.teamLabel') }}
-                  </div>
+                  </p>
                   <h2 class="mt-1 truncate text-lg font-bold">
-                    {{ item.team.name }}
+                    {{ team.name }}
                   </h2>
                 </div>
               </div>
-              <div class="flex flex-wrap items-center justify-end gap-2">
-                <Badge v-if="isCaptain(item.team)" variant="outline">
-                  {{ t('teams.captain') }}
-                </Badge>
-                <Badge :variant="teamStatusVariant(item.team.registrationStatus)">
-                  {{ t(`teams.status.${item.team.registrationStatus}`) }}
-                </Badge>
-                <Badge v-if="item.team.isBanned" variant="destructive">
-                  {{ t('teams.banAppeal.banned') }}
-                </Badge>
-              </div>
+              <Badge v-if="isCaptain(team)" variant="outline">
+                {{ t('teams.captain') }}
+              </Badge>
             </div>
 
             <Panel class="grid flex-1 gap-4 p-4 sm:grid-cols-2">
               <div>
                 <p class="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                  {{ t('teams.competition') }}
-                </p>
-                <div class="mt-1 flex flex-wrap items-center gap-2">
-                  <p class="font-semibold">
-                    {{ item.competition.title }}
-                  </p>
-                  <Badge variant="outline">
-                    {{ item.competition.mode.toUpperCase() }}
-                  </Badge>
-                </div>
-              </div>
-              <div>
-                <p class="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   {{ t('teams.members') }}
                 </p>
                 <p class="mt-1 font-semibold">
-                  {{ t('teams.memberSummary', {
-                    current: item.team.memberCount,
-                    maximum: item.competition.maxTeamMembers,
-                  }) }}
+                  {{ t('teams.globalMemberCount', { count: team.memberCount }) }}
                 </p>
               </div>
               <div>
                 <p class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
                   <CalendarDays class="size-3.5" />
-                  {{ t('teams.registeredAt') }}
+                  {{ t('teams.createdAt') }}
                 </p>
                 <p class="mt-1 font-semibold">
-                  {{ formatDate(item.team.registeredAt) }}
+                  {{ formatDate(team.createdAt) }}
                 </p>
               </div>
+            </Panel>
+
+            <Panel v-if="isCaptain(team) && team.invitationToken" class="space-y-3 p-4">
               <div>
-                <p class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                  <LockKeyhole class="size-3.5" />
-                  {{ t('teams.rosterState') }}
+                <p class="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                  {{ t('teams.invitationToken') }}
                 </p>
-                <p class="mt-1 font-semibold">
-                  {{ item.team.isLocked ? t('teams.locked') : t('teams.unlocked') }}
+                <p class="mt-2 break-all font-mono text-sm">
+                  {{ team.invitationToken }}
                 </p>
+              </div>
+              <div class="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" size="sm" @click="copyInvitation(team.invitationToken)">
+                  <Copy class="size-4" />
+                  {{ t('common.copy') }}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  :disabled="rotateInvitationMutation.isPending.value"
+                  @click="rotateInvitationMutation.mutate(team.id)"
+                >
+                  <RefreshCw class="size-4" />
+                  {{ t('teams.rotateInvitation') }}
+                </Button>
               </div>
             </Panel>
 
-            <Panel
-              v-if="item.banCase"
-              class="space-y-4 border-l-4 p-4"
-              :class="item.banCase.isCurrentlyBanned ? 'border-l-destructive' : 'border-l-emerald-600'"
-            >
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p class="flex items-center gap-2 font-semibold">
-                    <ShieldAlert v-if="item.banCase.isCurrentlyBanned" class="size-4 text-destructive" />
-                    <ShieldCheck v-else class="size-4 text-emerald-700" />
-                    {{ item.banCase.isCurrentlyBanned
-                      ? t('teams.banAppeal.currentBanTitle')
-                      : t('teams.banAppeal.correctedTitle') }}
-                  </p>
-                  <p class="mt-1 text-xs text-muted-foreground">
-                    {{ t('teams.banAppeal.sourceLabel') }}:
-                    {{ item.banCase.source === TeamBanSource.CheatIncident
-                      ? t('teams.banAppeal.source.cheatIncident')
-                      : t('teams.banAppeal.source.manualModeration') }}
-                    · {{ formatDate(item.banCase.bannedAt ?? '') }}
-                  </p>
-                </div>
-                <Badge v-if="item.banCase.appeal" variant="outline">
-                  {{ t(`teams.banAppeal.status.${appealStatusKey(item.banCase.appeal.status)}`) }}
-                </Badge>
-              </div>
-
-              <template v-if="item.banCase.appeal">
-                <div class="border-l-2 border-border pl-3">
-                  <p class="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                    {{ t('teams.banAppeal.statement') }}
-                  </p>
-                  <p class="mt-1 whitespace-pre-wrap text-sm">
-                    {{ item.banCase.appeal.statement }}
-                  </p>
-                </div>
-                <div v-if="item.banCase.appeal.resolutionReason" class="border-l-2 border-primary/30 pl-3">
-                  <p class="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                    {{ t('teams.banAppeal.resolution') }}
-                  </p>
-                  <p class="mt-1 whitespace-pre-wrap text-sm">
-                    {{ item.banCase.appeal.resolutionReason }}
-                  </p>
-                </div>
-              </template>
-
-              <div v-else-if="item.banCase.canAppeal" class="space-y-3">
-                <p class="text-sm text-muted-foreground">
-                  {{ t('teams.banAppeal.privateDescription') }}
-                </p>
-                <Textarea
-                  v-model="appealDrafts[item.team.id]"
-                  rows="4"
-                  maxlength="512"
-                  :placeholder="t('teams.banAppeal.placeholder')"
-                />
-                <div class="flex justify-end">
-                  <Button
-                    :disabled="(appealDrafts[item.team.id]?.trim().length ?? 0) < 16 || submitAppealMutation.isPending.value"
-                    @click="submitAppealMutation.mutate(item)"
-                  >
-                    <Loader2 v-if="submitAppealMutation.isPending.value" class="size-4 animate-spin" />
-                    {{ t('teams.banAppeal.submit') }}
-                  </Button>
-                </div>
-              </div>
-              <p v-else-if="item.banCase.isCurrentlyBanned" class="text-sm text-muted-foreground">
-                {{ t('teams.banAppeal.captainOnly') }}
-              </p>
-            </Panel>
-
-            <Panel v-if="editingTeamId === item.team.id" class="space-y-4 p-4">
+            <Panel v-if="editingTeamId === team.id" class="space-y-4 p-4">
               <div class="grid gap-4 sm:grid-cols-2">
                 <div class="space-y-2">
-                  <Label :for="`edit-team-name-${item.team.id}`">{{ t('teams.teamName') }}</Label>
-                  <Input
-                    :id="`edit-team-name-${item.team.id}`"
-                    v-model="editTeamName"
-                    maxlength="128"
-                  />
+                  <Label :for="`edit-team-name-${team.id}`">{{ t('teams.teamName') }}</Label>
+                  <Input :id="`edit-team-name-${team.id}`" v-model="editTeamName" maxlength="128" />
                 </div>
                 <div class="space-y-2">
-                  <Label :for="`edit-team-avatar-${item.team.id}`">{{ t('teams.avatarUrl') }}</Label>
+                  <Label :for="`edit-team-avatar-${team.id}`">{{ t('teams.avatarUrl') }}</Label>
                   <Input
-                    :id="`edit-team-avatar-${item.team.id}`"
+                    :id="`edit-team-avatar-${team.id}`"
                     v-model="editAvatarUrl"
                     type="url"
                     :placeholder="t('teams.avatarUrlPlaceholder')"
@@ -552,7 +381,7 @@ function appealStatusKey(status?: number) {
                 </Button>
                 <Button
                   :disabled="!editTeamName.trim() || updateTeamMutation.isPending.value"
-                  @click="updateTeamMutation.mutate(item)"
+                  @click="updateTeamMutation.mutate(team)"
                 >
                   <Loader2 v-if="updateTeamMutation.isPending.value" class="size-4 animate-spin" />
                   <Save v-else class="size-4" />
@@ -561,14 +390,26 @@ function appealStatusKey(status?: number) {
               </div>
             </Panel>
 
-            <Button
-              v-if="canManageTeam(item.team) && editingTeamId !== item.team.id"
-              variant="outline"
-              @click="startEditing(item)"
-            >
-              <Pencil class="size-4" />
-              {{ t('teams.editTeam') }}
-            </Button>
+            <div class="flex flex-wrap justify-end gap-2">
+              <Button
+                v-if="isCaptain(team) && editingTeamId !== team.id"
+                variant="outline"
+                @click="startEditing(team)"
+              >
+                <Pencil class="size-4" />
+                {{ t('teams.editTeam') }}
+              </Button>
+              <Button
+                v-if="!isCaptain(team)"
+                variant="outline"
+                :disabled="leaveTeamMutation.isPending.value"
+                @click="leaveTeamMutation.mutate(team.id)"
+              >
+                <Loader2 v-if="leaveTeamMutation.isPending.value" class="size-4 animate-spin" />
+                <LogOut v-else class="size-4" />
+                {{ t('teams.leave') }}
+              </Button>
+            </div>
           </Card>
         </div>
       </template>

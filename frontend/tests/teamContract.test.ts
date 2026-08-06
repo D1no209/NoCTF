@@ -25,6 +25,16 @@ const team = {
   registeredAt: '2026-08-01T00:00:00Z',
 } as const
 
+const globalTeam = {
+  id: teamId,
+  name: team.name,
+  avatarUrl: null,
+  captainId: team.captainId,
+  memberIds: [...team.memberIds],
+  invitationToken: 'A'.repeat(32),
+  createdAt: '2026-07-31T00:00:00Z',
+} as const
+
 let myTeamExists = true
 
 const contractFetch: typeof fetch = async (input, init) => {
@@ -37,19 +47,21 @@ const contractFetch: typeof fetch = async (input, init) => {
   const pathname = new URL(request.url).pathname
   const teamsPath = `/api/v1/competitions/${competitionId}/teams`
 
-  if (pathname === `${teamsPath}/me/membership` && request.method === 'DELETE')
+  if (pathname === `/api/v1/teams/${teamId}/members/me` && request.method === 'DELETE')
     return new Response(null, { status: 204 })
   if (pathname === `${teamsPath}/me`) {
     return myTeamExists
       ? Response.json(team)
       : Response.json({}, { status: 404 })
   }
-  if (pathname === `${teamsPath}/join` && request.method === 'POST')
-    return new Response(null, { status: 204 })
-  if (pathname === `${teamsPath}/${teamId}` && request.method === 'PUT')
-    return Response.json({ ...team, name: 'Renamed Brigade', avatarUrl: 'https://cdn.noctf.test/team.png' })
-  if (pathname === teamsPath && request.method === 'POST')
-    return Response.json(team, { status: 201 })
+  if (pathname === '/api/v1/teams/join' && request.method === 'POST')
+    return Response.json(globalTeam)
+  if (pathname === `/api/v1/teams/${teamId}` && request.method === 'PUT')
+    return Response.json({ ...globalTeam, name: 'Renamed Brigade', avatarUrl: 'https://cdn.noctf.test/team.png' })
+  if (pathname === '/api/v1/teams' && request.method === 'POST')
+    return Response.json(globalTeam, { status: 201 })
+  if (pathname === `/api/v1/competitions/${competitionId}/team-registrations` && request.method === 'POST')
+    return Response.json({ ...team, teamProfileId: teamId }, { status: 201 })
   if (pathname === teamsPath)
     return Response.json({ items: [team] })
 
@@ -90,6 +102,7 @@ describe('generated public team contract', () => {
         memberIds: [...team.memberIds],
         memberCount: 2,
         registrationStatus: 'approved',
+        teamProfileId: null,
       },
     ])
 
@@ -112,8 +125,8 @@ describe('generated public team contract', () => {
       .toBe(`/api/v1/competitions/${competitionId}/teams/me`)
   })
 
-  test('creates a team with the generated nested request contract', async () => {
-    await expect(teamApi.create(competitionId, {
+  test('creates a global team through the generated contract', async () => {
+    await expect(teamApi.create({
       name: team.name,
       avatarUrl: null,
     })).resolves.toMatchObject({ id: team.id })
@@ -121,15 +134,15 @@ describe('generated public team contract', () => {
     expect(requests).toHaveLength(1)
     expect(requests[0]!.method).toBe('POST')
     expect(new URL(requests[0]!.url).pathname)
-      .toBe(`/api/v1/competitions/${competitionId}/teams`)
+      .toBe('/api/v1/teams')
     expect(await requests[0]!.json()).toEqual({
       name: team.name,
       avatarUrl: null,
     })
   })
 
-  test('updates a team with the generated competition-scoped contract', async () => {
-    await expect(teamApi.update(competitionId, teamId, {
+  test('updates a global team with the generated contract', async () => {
+    await expect(teamApi.update(teamId, {
       name: 'Renamed Brigade',
       avatarUrl: 'https://cdn.noctf.test/team.png',
     })).resolves.toMatchObject({
@@ -141,23 +154,37 @@ describe('generated public team contract', () => {
     expect(requests).toHaveLength(1)
     expect(requests[0]!.method).toBe('PUT')
     expect(new URL(requests[0]!.url).pathname)
-      .toBe(`/api/v1/competitions/${competitionId}/teams/${teamId}`)
+      .toBe(`/api/v1/teams/${teamId}`)
     expect(await requests[0]!.json()).toEqual({
       name: 'Renamed Brigade',
       avatarUrl: 'https://cdn.noctf.test/team.png',
     })
   })
 
-  test('joins by invitation and leaves with generated void operations', async () => {
-    await expect(teamApi.join(competitionId, 'A'.repeat(32))).resolves.toBeUndefined()
-    await expect(teamApi.leave(competitionId)).resolves.toBeUndefined()
+  test('joins and leaves a global team through generated operations', async () => {
+    await expect(teamApi.join('A'.repeat(32))).resolves.toMatchObject({ id: teamId })
+    await expect(teamApi.leave(teamId)).resolves.toBeUndefined()
 
     expect(requests).toHaveLength(2)
     expect(new URL(requests[0]!.url).pathname)
-      .toBe(`/api/v1/competitions/${competitionId}/teams/join`)
+      .toBe('/api/v1/teams/join')
     expect(await requests[0]!.json()).toEqual({ invitationToken: 'A'.repeat(32) })
     expect(requests[1]!.method).toBe('DELETE')
     expect(new URL(requests[1]!.url).pathname)
-      .toBe(`/api/v1/competitions/${competitionId}/teams/me/membership`)
+      .toBe(`/api/v1/teams/${teamId}/members/me`)
+  })
+
+  test('registers a global team for a competition as a roster snapshot', async () => {
+    await expect(teamApi.register(competitionId, teamId)).resolves.toMatchObject({
+      competitionId,
+      teamProfileId: teamId,
+      memberIds: [...team.memberIds],
+    })
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]!.method).toBe('POST')
+    expect(new URL(requests[0]!.url).pathname)
+      .toBe(`/api/v1/competitions/${competitionId}/team-registrations`)
+    expect(await requests[0]!.json()).toEqual({ teamId })
   })
 })
