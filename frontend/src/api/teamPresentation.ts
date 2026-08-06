@@ -17,6 +17,7 @@ export interface PublicTeam {
   isLocked: boolean
   isBanned: boolean
   registeredAt: string
+  teamProfileId: string | null
 }
 
 const registrationStatuses: Record<
@@ -62,5 +63,6 @@ export function toPublicTeam(value: NoCtfapiEndpointsTeamsTeamResponse): PublicT
     isLocked: value.isLocked,
     isBanned: value.isBanned,
     registeredAt: requireString(value.registeredAt, 'registeredAt'),
+    teamProfileId: value.teamProfileId ?? null,
   }
 }

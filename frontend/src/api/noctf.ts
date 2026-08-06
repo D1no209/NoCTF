@@ -54,6 +54,7 @@ import {
 import { toPublicCompetition } from './competitionPresentation'
 import { client } from './generated/client.gen'
 import * as generatedSdk from './generated/sdk.gen'
+import { toGlobalTeam } from './globalTeamPresentation'
 import { toPublicNotificationPage } from './notificationPresentation'
 import {
   toAcceptedFlagSubmission,
@@ -709,6 +710,15 @@ export const challengeApi = {
 }
 
 export const teamApi = {
+  async listMine() {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsTeamsListMyTeamsEndpoint(),
+      tt('errors.loadMyTeams'),
+    )
+    if (!response.items)
+      throw new ApiError(tt('errors.loadMyTeams'))
+    return response.items.map(toGlobalTeam)
+  },
   async list(competitionId: string) {
     const response = unwrap(
       await generatedSdk.noCtfapiEndpointsTeamsListCompetitionTeamsEndpoint({
@@ -728,46 +738,60 @@ export const teamApi = {
       return null
     return toPublicTeam(unwrap(result, tt('errors.loadMyTeams')))
   },
-  async create(
-    competitionId: string,
-    body: NoCtfapiEndpointsTeamsCreateTeamRequest & { name: string },
-  ) {
+  async create(body: NoCtfapiEndpointsTeamsCreateTeamRequest & { name: string }) {
     const response = unwrap(
       await generatedSdk.noCtfapiEndpointsTeamsCreateTeamEndpoint({
-        path: { competitionId },
         body,
       }),
       tt('errors.createTeam'),
     )
-    return toPublicTeam(response)
+    return toGlobalTeam(response)
   },
   async update(
-    competitionId: string,
     teamId: string,
     body: NoCtfapiEndpointsTeamsUpdateTeamRequest & { name: string },
   ) {
     const response = unwrap(
       await generatedSdk.noCtfapiEndpointsTeamsUpdateTeamEndpoint({
-        path: { competitionId, teamId },
+        path: { teamId },
         body,
       }),
       tt('errors.updateTeam'),
     )
-    return toPublicTeam(response)
+    return toGlobalTeam(response)
   },
-  async join(competitionId: string, invitationToken: string) {
-    await requireSuccess(
-      generatedSdk.noCtfapiEndpointsTeamsJoinTeamByInvitationEndpoint({
-        path: { competitionId },
+  async join(invitationToken: string) {
+    return toGlobalTeam(unwrap(
+      await generatedSdk.noCtfapiEndpointsTeamsJoinTeamByInvitationEndpoint({
         body: { invitationToken },
       }),
       tt('errors.joinTeam'),
-    )
+    ))
   },
-  async leave(competitionId: string) {
+  async register(competitionId: string, teamId: string) {
+    return toPublicTeam(unwrap(
+      await generatedSdk.noCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpoint({
+        path: { competitionId },
+        body: { teamId },
+      }),
+      tt('errors.createTeam'),
+    ))
+  },
+  async rotateInvitation(teamId: string) {
+    const response = unwrap(
+      await generatedSdk.noCtfapiEndpointsTeamsRotateTeamInvitationEndpoint({
+        path: { teamId },
+      }),
+      tt('errors.requestFailed'),
+    )
+    if (!response.invitationToken)
+      throw new ApiError(tt('errors.requestFailed'))
+    return response.invitationToken
+  },
+  async leave(teamId: string) {
     await requireSuccess(
       generatedSdk.noCtfapiEndpointsTeamsLeaveTeamEndpoint({
-        path: { competitionId },
+        path: { teamId },
       }),
       tt('errors.requestFailed'),
     )

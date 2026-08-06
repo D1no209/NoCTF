@@ -8,23 +8,41 @@ export type NoCtfapiEndpointsHealthResponse = {
     status?: string;
 };
 
-export type NoCtfapiEndpointsTeamsTeamResponse = {
+export type NoCtfapiEndpointsTeamsGlobalTeamResponse = {
     id?: string;
-    competitionId?: string;
     name?: string;
     avatarUrl?: string | null;
     captainId?: string;
     memberIds?: Array<string>;
-    registrationStatus?: NoCtfDomainTeamsTeamRegistrationStatus;
-    isLocked?: boolean;
-    isBanned?: boolean;
-    registeredAt?: string;
+    invitationToken?: string | null;
+    createdAt?: string;
 };
 
-export type NoCtfDomainTeamsTeamRegistrationStatus = 0 | 1 | 2;
+export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+};
+
+export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
+    errors?: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown;
+};
+
+export type MicrosoftAspNetCoreMvcProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    [key: string]: unknown;
+};
 
 export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
-    name?: string;
+    name: string;
     avatarUrl?: string | null;
 };
 
@@ -61,6 +79,22 @@ export type NoCtfapiEndpointsTeamsGetMyTeamBanCaseRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsTeamsTeamResponse = {
+    id?: string;
+    competitionId?: string;
+    name?: string;
+    avatarUrl?: string | null;
+    captainId?: string;
+    memberIds?: Array<string>;
+    registrationStatus?: NoCtfDomainTeamsTeamRegistrationStatus;
+    isLocked?: boolean;
+    isBanned?: boolean;
+    registeredAt?: string;
+    teamProfileId?: string | null;
+};
+
+export type NoCtfDomainTeamsTeamRegistrationStatus = 0 | 1 | 2;
+
 export type NoCtfapiEndpointsTeamsGetMyTeamRequest = {
     [key: string]: never;
 };
@@ -81,31 +115,16 @@ export type NoCtfapiEndpointsTeamsListCompetitionTeamsRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsTeamsGlobalTeamListResponse = {
+    items?: Array<NoCtfapiEndpointsTeamsGlobalTeamResponse>;
+};
+
+export type NoCtfapiEndpointsTeamsRegisterTeamForCompetitionRequest = {
+    teamId: string;
+};
+
 export type NoCtfapiEndpointsTeamsRotateTeamInvitationResponse = {
     invitationToken?: string;
-};
-
-export type MicrosoftAspNetCoreMvcValidationProblemDetails = MicrosoftAspNetCoreHttpHttpValidationProblemDetails & {
-    errors?: {
-        [key: string]: Array<string>;
-    };
-    [key: string]: unknown;
-};
-
-export type MicrosoftAspNetCoreHttpHttpValidationProblemDetails = MicrosoftAspNetCoreMvcProblemDetails & {
-    errors?: {
-        [key: string]: Array<string>;
-    };
-    [key: string]: unknown;
-};
-
-export type MicrosoftAspNetCoreMvcProblemDetails = {
-    type?: string | null;
-    title?: string | null;
-    status?: number | null;
-    detail?: string | null;
-    instance?: string | null;
-    [key: string]: unknown;
 };
 
 export type NoCtfapiEndpointsTeamsSubmitTeamBanAppealRequest = {
@@ -121,11 +140,11 @@ export type FastEndpointsErrorResponse = {
 };
 
 export type NoCtfapiEndpointsTeamsTransferTeamCaptainRequest = {
-    newCaptainId?: string;
+    newCaptainId: string;
 };
 
 export type NoCtfapiEndpointsTeamsUpdateTeamRequest = {
-    name?: string;
+    name: string;
     avatarUrl?: string | null;
 };
 
@@ -1598,34 +1617,14 @@ export type NoCtfapiEndpointsHealthEndpointResponses = {
 
 export type NoCtfapiEndpointsHealthEndpointResponse = NoCtfapiEndpointsHealthEndpointResponses[keyof NoCtfapiEndpointsHealthEndpointResponses];
 
-export type NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointData = {
+export type NoCtfapiEndpointsTeamsListMyTeamsEndpointData = {
     body?: never;
-    path: {
-        competitionId: string;
-    };
+    path?: never;
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams';
+    url: '/api/v1/teams';
 };
 
-export type NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsTeamsTeamListResponse;
-};
-
-export type NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointResponse = NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointResponses[keyof NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointResponses];
-
-export type NoCtfapiEndpointsTeamsCreateTeamEndpointData = {
-    body: NoCtfapiEndpointsTeamsCreateTeamRequest;
-    path: {
-        competitionId: string;
-    };
-    query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams';
-};
-
-export type NoCtfapiEndpointsTeamsCreateTeamEndpointErrors = {
+export type NoCtfapiEndpointsTeamsListMyTeamsEndpointErrors = {
     /**
      * Unauthorized
      */
@@ -1634,17 +1633,46 @@ export type NoCtfapiEndpointsTeamsCreateTeamEndpointErrors = {
      * Forbidden
      */
     403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
 };
+
+export type NoCtfapiEndpointsTeamsListMyTeamsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsGlobalTeamListResponse;
+};
+
+export type NoCtfapiEndpointsTeamsListMyTeamsEndpointResponse = NoCtfapiEndpointsTeamsListMyTeamsEndpointResponses[keyof NoCtfapiEndpointsTeamsListMyTeamsEndpointResponses];
+
+export type NoCtfapiEndpointsTeamsCreateTeamEndpointData = {
+    body: NoCtfapiEndpointsTeamsCreateTeamRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/teams';
+};
+
+export type NoCtfapiEndpointsTeamsCreateTeamEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type NoCtfapiEndpointsTeamsCreateTeamEndpointError = NoCtfapiEndpointsTeamsCreateTeamEndpointErrors[keyof NoCtfapiEndpointsTeamsCreateTeamEndpointErrors];
 
 export type NoCtfapiEndpointsTeamsCreateTeamEndpointResponses = {
     /**
      * Created
      */
-    201: NoCtfapiEndpointsTeamsTeamResponse;
+    201: NoCtfapiEndpointsTeamsGlobalTeamResponse;
 };
 
 export type NoCtfapiEndpointsTeamsCreateTeamEndpointResponse = NoCtfapiEndpointsTeamsCreateTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsCreateTeamEndpointResponses];
@@ -1652,11 +1680,10 @@ export type NoCtfapiEndpointsTeamsCreateTeamEndpointResponse = NoCtfapiEndpoints
 export type NoCtfapiEndpointsTeamsDeleteTeamEndpointData = {
     body?: never;
     path: {
-        competitionId: string;
         teamId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams/{teamId}';
+    url: '/api/v1/teams/{teamId}';
 };
 
 export type NoCtfapiEndpointsTeamsDeleteTeamEndpointErrors = {
@@ -1683,43 +1710,20 @@ export type NoCtfapiEndpointsTeamsDeleteTeamEndpointResponses = {
 
 export type NoCtfapiEndpointsTeamsDeleteTeamEndpointResponse = NoCtfapiEndpointsTeamsDeleteTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsDeleteTeamEndpointResponses];
 
-export type NoCtfapiEndpointsTeamsGetTeamEndpointData = {
-    body?: never;
-    path: {
-        competitionId: string;
-        teamId: string;
-    };
-    query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams/{teamId}';
-};
-
-export type NoCtfapiEndpointsTeamsGetTeamEndpointErrors = {
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type NoCtfapiEndpointsTeamsGetTeamEndpointResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsTeamsTeamResponse;
-};
-
-export type NoCtfapiEndpointsTeamsGetTeamEndpointResponse = NoCtfapiEndpointsTeamsGetTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsGetTeamEndpointResponses];
-
 export type NoCtfapiEndpointsTeamsUpdateTeamEndpointData = {
     body: NoCtfapiEndpointsTeamsUpdateTeamRequest;
     path: {
-        competitionId: string;
         teamId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams/{teamId}';
+    url: '/api/v1/teams/{teamId}';
 };
 
 export type NoCtfapiEndpointsTeamsUpdateTeamEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1734,11 +1738,13 @@ export type NoCtfapiEndpointsTeamsUpdateTeamEndpointErrors = {
     404: unknown;
 };
 
+export type NoCtfapiEndpointsTeamsUpdateTeamEndpointError = NoCtfapiEndpointsTeamsUpdateTeamEndpointErrors[keyof NoCtfapiEndpointsTeamsUpdateTeamEndpointErrors];
+
 export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsTeamsTeamResponse;
+    200: NoCtfapiEndpointsTeamsGlobalTeamResponse;
 };
 
 export type NoCtfapiEndpointsTeamsUpdateTeamEndpointResponse = NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsUpdateTeamEndpointResponses];
@@ -1809,16 +1815,44 @@ export type NoCtfapiEndpointsTeamsGetMyTeamEndpointResponses = {
 
 export type NoCtfapiEndpointsTeamsGetMyTeamEndpointResponse = NoCtfapiEndpointsTeamsGetMyTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsGetMyTeamEndpointResponses];
 
-export type NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointData = {
-    body: NoCtfapiEndpointsTeamsJoinTeamByInvitationRequest;
+export type NoCtfapiEndpointsTeamsGetTeamEndpointData = {
+    body?: never;
     path: {
         competitionId: string;
+        teamId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams/join';
+    url: '/api/v1/competitions/{competitionId}/teams/{teamId}';
+};
+
+export type NoCtfapiEndpointsTeamsGetTeamEndpointErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type NoCtfapiEndpointsTeamsGetTeamEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsTeamResponse;
+};
+
+export type NoCtfapiEndpointsTeamsGetTeamEndpointResponse = NoCtfapiEndpointsTeamsGetTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsGetTeamEndpointResponses];
+
+export type NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointData = {
+    body: NoCtfapiEndpointsTeamsJoinTeamByInvitationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/teams/join';
 };
 
 export type NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -1829,11 +1863,13 @@ export type NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointErrors = {
     403: unknown;
 };
 
+export type NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointError = NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointErrors[keyof NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointErrors];
+
 export type NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointResponses = {
     /**
-     * No Content
+     * Success
      */
-    204: void;
+    200: NoCtfapiEndpointsTeamsGlobalTeamResponse;
 };
 
 export type NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointResponse = NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointResponses[keyof NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointResponses];
@@ -1841,10 +1877,10 @@ export type NoCtfapiEndpointsTeamsJoinTeamByInvitationEndpointResponse = NoCtfap
 export type NoCtfapiEndpointsTeamsLeaveTeamEndpointData = {
     body?: never;
     path: {
-        competitionId: string;
+        teamId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams/me/membership';
+    url: '/api/v1/teams/{teamId}/members/me';
 };
 
 export type NoCtfapiEndpointsTeamsLeaveTeamEndpointErrors = {
@@ -1871,15 +1907,71 @@ export type NoCtfapiEndpointsTeamsLeaveTeamEndpointResponses = {
 
 export type NoCtfapiEndpointsTeamsLeaveTeamEndpointResponse = NoCtfapiEndpointsTeamsLeaveTeamEndpointResponses[keyof NoCtfapiEndpointsTeamsLeaveTeamEndpointResponses];
 
-export type NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointData = {
+export type NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointData = {
     body?: never;
     path: {
         competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/teams';
+};
+
+export type NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsTeamsTeamListResponse;
+};
+
+export type NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointResponse = NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointResponses[keyof NoCtfapiEndpointsTeamsListCompetitionTeamsEndpointResponses];
+
+export type NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointData = {
+    body: NoCtfapiEndpointsTeamsRegisterTeamForCompetitionRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/team-registrations';
+};
+
+export type NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointError = NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointErrors[keyof NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointErrors];
+
+export type NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointResponses = {
+    /**
+     * Created
+     */
+    201: NoCtfapiEndpointsTeamsTeamResponse;
+};
+
+export type NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointResponse = NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointResponses[keyof NoCtfapiEndpointsTeamsRegisterTeamForCompetitionEndpointResponses];
+
+export type NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointData = {
+    body?: never;
+    path: {
         teamId: string;
         userId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams/{teamId}/members/{userId}';
+    url: '/api/v1/teams/{teamId}/members/{userId}';
 };
 
 export type NoCtfapiEndpointsTeamsRemoveTeamMemberEndpointErrors = {
@@ -1944,11 +2036,10 @@ export type NoCtfapiEndpointsTeamsResubmitTeamRegistrationEndpointResponse = NoC
 export type NoCtfapiEndpointsTeamsRotateTeamInvitationEndpointData = {
     body?: never;
     path: {
-        competitionId: string;
         teamId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate';
+    url: '/api/v1/teams/{teamId}/invitation-token/rotate';
 };
 
 export type NoCtfapiEndpointsTeamsRotateTeamInvitationEndpointErrors = {
@@ -2018,14 +2109,17 @@ export type SubmitTeamBanAppealResponse = SubmitTeamBanAppealResponses[keyof Sub
 export type NoCtfapiEndpointsTeamsTransferTeamCaptainEndpointData = {
     body: NoCtfapiEndpointsTeamsTransferTeamCaptainRequest;
     path: {
-        competitionId: string;
         teamId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/teams/{teamId}/captain/transfer';
+    url: '/api/v1/teams/{teamId}/captain/transfer';
 };
 
 export type NoCtfapiEndpointsTeamsTransferTeamCaptainEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -2039,6 +2133,8 @@ export type NoCtfapiEndpointsTeamsTransferTeamCaptainEndpointErrors = {
      */
     404: unknown;
 };
+
+export type NoCtfapiEndpointsTeamsTransferTeamCaptainEndpointError = NoCtfapiEndpointsTeamsTransferTeamCaptainEndpointErrors[keyof NoCtfapiEndpointsTeamsTransferTeamCaptainEndpointErrors];
 
 export type NoCtfapiEndpointsTeamsTransferTeamCaptainEndpointResponses = {
     /**

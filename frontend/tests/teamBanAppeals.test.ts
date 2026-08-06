@@ -12,8 +12,8 @@ const adminWorkspaceSource = await Bun.file(
     import.meta.url,
   ),
 ).text()
-const teamWorkspaceSource = await Bun.file(
-  new URL('../src/components/teams/MyTeamsWorkspace.vue', import.meta.url),
+const registrationWorkspaceSource = await Bun.file(
+  new URL('../src/components/competition-registration/CompetitionRegistrationWorkspace.vue', import.meta.url),
 ).text()
 
 describe('private team ban appeals', () => {
@@ -34,9 +34,9 @@ describe('private team ban appeals', () => {
   })
 
   test('keeps participant appeals private and staff decisions explicit', () => {
-    expect(teamWorkspaceSource).toContain('item.banCase.canAppeal')
-    expect(teamWorkspaceSource).toContain('teamBanAppealApi.submit(')
-    expect(teamWorkspaceSource).toContain('teams.banAppeal.privateDescription')
+    expect(registrationWorkspaceSource).toContain('banCase.canAppeal')
+    expect(registrationWorkspaceSource).toContain('teamBanAppealApi.submit(')
+    expect(registrationWorkspaceSource).toContain('teams.banAppeal.privateDescription')
     expect(adminWorkspaceSource).toContain('openResolution(banCase, \'accept\')')
     expect(adminWorkspaceSource).toContain('openResolution(banCase, \'uphold\')')
     expect(adminWorkspaceSource).toContain('banCase.canResolve')
