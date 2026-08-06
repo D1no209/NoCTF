@@ -331,8 +331,6 @@ public sealed class SubmissionProcessor(
         if (submission.CurrentScoringEventId is { } currentEventId)
         {
             var current = await db.ScoringEvents
-                .FromSqlInterpolated(
-                    $"SELECT * FROM scoring_events WHERE id = {currentEventId} FOR UPDATE")
                 .IgnoreQueryFilters()
                 .SingleAsync(item => item.Id == currentEventId, cancellationToken);
             if (current.FailureCode == ScoringFailureCode.ForeignTeamFlagDetected)
@@ -508,8 +506,14 @@ public sealed class SubmissionProcessor(
         if (competitionMode != GameMode.Ctf)
             return null;
 
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({"blood:" + submission.CompetitionChallengeId.ToString("N")}, 0))",
+        await using var bloodLease = await EfCriticalSection.AcquireAsync(
+            db,
+            $"blood-rank:{submission.CompetitionChallengeId:N}",
+            token => db.CompetitionChallenges.IgnoreQueryFilters()
+                .Where(challenge => challenge.Id == submission.CompetitionChallengeId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    challenge => challenge.CriticalSectionVersion,
+                    challenge => challenge.CriticalSectionVersion + 1), token),
             ct);
         var solvedTeamIds = await db.Submissions.AsNoTracking()
             .Where(candidate =>

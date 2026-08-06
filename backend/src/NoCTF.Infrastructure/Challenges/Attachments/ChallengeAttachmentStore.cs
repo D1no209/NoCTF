@@ -196,8 +196,13 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         }
         else
         {
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({scope.TeamId.ToString() + ":" + competitionChallengeId.ToString()}, 0))",
+            await using var assignmentLease = await EfCriticalSection.AcquireAsync(
+                db,
+                $"attachment-assignment:{scope.TeamId:N}:{competitionChallengeId:N}",
+                token => db.Teams.Where(team => team.Id == scope.TeamId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(
+                        team => team.CriticalSectionVersion,
+                        team => team.CriticalSectionVersion + 1), token),
                 ct);
             var existing = await db.ChallengeFlags.SingleOrDefaultAsync(flag =>
                 flag.CompetitionChallengeId == competitionChallengeId &&

@@ -140,21 +140,16 @@ public sealed class AdminRuntimeStore(
         if (teamId is not null && scope.Competition.Mode is not (GameMode.Ctf or GameMode.Awd))
             return new(null, RuntimeMutationFailure.Unsupported);
 
-        if (teamId is Guid lockedTeamId)
-        {
-            await TeamRuntimeQuota.AcquireLockAsync(
+        await using var criticalSection = teamId is Guid lockedTeamId
+            ? await TeamRuntimeQuota.AcquireLockAsync(
                 db,
                 competitionId,
                 lockedTeamId,
-                ct);
-        }
-        else
-        {
-            await SharedRuntimeScopeLock.AcquireAsync(
+                ct)
+            : await SharedRuntimeScopeLock.AcquireAsync(
                 db,
                 competitionChallengeId,
                 ct);
-        }
         var current = await db.RuntimeInstances
             .Where(item =>
                 item.CompetitionChallengeId == competitionChallengeId &&

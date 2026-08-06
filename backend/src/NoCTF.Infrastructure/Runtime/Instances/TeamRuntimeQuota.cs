@@ -6,19 +6,20 @@ namespace NoCTF.Infrastructure.Runtime.Instances;
 
 internal static class TeamRuntimeQuota
 {
-    public static Task AcquireLockAsync(
+    public static ValueTask<IAsyncDisposable> AcquireLockAsync(
         NoCtfDbContext db,
         Guid competitionId,
         Guid teamId,
         CancellationToken cancellationToken)
-    {
-        if (!db.Database.IsRelational())
-            return Task.CompletedTask;
-        var key = LockKey(competitionId, teamId);
-        return db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))",
+        => EfCriticalSection.AcquireAsync(
+            db,
+            $"team-runtime:{competitionId:N}:{teamId:N}",
+            token => db.Teams
+                .Where(team => team.Id == teamId && team.CompetitionId == competitionId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    team => team.CriticalSectionVersion,
+                    team => team.CriticalSectionVersion + 1), token),
             cancellationToken);
-    }
 
     public static async Task<bool> CanCreateSlotAsync(
         NoCtfDbContext db,

@@ -64,7 +64,7 @@ public sealed class RuntimeInstanceStore(
         if (scope.Mode == GameMode.Awd && command.Action is RuntimeAction.Start or RuntimeAction.Stop or RuntimeAction.Extend)
             return new(null, RuntimeMutationFailure.Unsupported);
 
-        await TeamRuntimeQuota.AcquireLockAsync(
+        await using var quotaLease = await TeamRuntimeQuota.AcquireLockAsync(
             db,
             command.CompetitionId,
             scope.TeamId,

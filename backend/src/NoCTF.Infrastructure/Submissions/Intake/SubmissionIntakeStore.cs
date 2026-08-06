@@ -47,7 +47,7 @@ public sealed class SubmissionIntakeStore(
             return [];
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
-        await SubmissionAttemptLock.AcquireAsync(
+        await using var attemptLease = await SubmissionAttemptLock.AcquireAsync(
             db,
             received[0].TeamId,
             received[0].CompetitionChallengeId,
@@ -116,7 +116,7 @@ public sealed class SubmissionIntakeStore(
     {
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
-        await SubmissionAttemptLock.AcquireAsync(
+        await using var attemptLease = await SubmissionAttemptLock.AcquireAsync(
             db,
             received.TeamId, received.CompetitionChallengeId, SubmissionKind.Fix, cancellationToken);
         var current = await LoadAdmissionAsync(

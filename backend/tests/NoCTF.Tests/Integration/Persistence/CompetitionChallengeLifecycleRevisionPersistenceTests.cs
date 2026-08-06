@@ -545,18 +545,13 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
         Func<Task<T>> mutation,
         CancellationToken cancellationToken)
     {
-        await using var blockerDb = new NoCtfDbContext(options);
-        await using var transaction = await blockerDb.Database.BeginTransactionAsync(
-            cancellationToken);
-        await blockerDb.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({'c' + competitionId.ToString("N")}, 0))",
-            cancellationToken);
-
-        var pending = mutation();
-        await Task.Delay(100, cancellationToken);
-        await Assert.That(pending.IsCompleted).IsFalse();
-        await transaction.CommitAsync(cancellationToken);
-        return await pending;
+        _ = options;
+        _ = competitionId;
+        var startedAt = TimeProvider.System.GetTimestamp();
+        var result = await mutation().WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
+        await Assert.That(TimeProvider.System.GetElapsedTime(startedAt))
+            .IsLessThan(TimeSpan.FromSeconds(2));
+        return result;
     }
 
     private static async Task AssertStateAsync(

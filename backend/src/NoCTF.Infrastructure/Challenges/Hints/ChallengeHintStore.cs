@@ -213,8 +213,13 @@ public sealed class ChallengeHintStore(
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({competitionId.ToString() + ":" + teamId.ToString()}, 0))",
+        await using var unlockLease = await EfCriticalSection.AcquireAsync(
+            db,
+            $"hint-unlock:{teamId.Value:N}:{competitionChallengeId:N}",
+            token => db.Teams.Where(team => team.Id == teamId.Value)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    team => team.CriticalSectionVersion,
+                    team => team.CriticalSectionVersion + 1), token),
             ct);
         var challenge = await db.CompetitionChallenges
             .Include(item => item.Hints)

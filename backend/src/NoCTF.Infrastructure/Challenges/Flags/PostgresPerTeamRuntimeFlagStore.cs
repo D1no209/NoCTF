@@ -15,13 +15,14 @@ public sealed class PostgresPerTeamRuntimeFlagStore(NoCtfDbContext db)
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        if (db.Database.IsRelational())
-        {
-            var lockKey = $"runtime-flag:{competitionChallengeId:D}:{teamId:D}";
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
-                cancellationToken);
-        }
+        await using var generationLease = await EfCriticalSection.AcquireAsync(
+            db,
+            $"runtime-flag:{teamId:N}:{competitionChallengeId:N}",
+            token => db.Teams.Where(team => team.Id == teamId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    team => team.CriticalSectionVersion,
+                    team => team.CriticalSectionVersion + 1), token),
+            cancellationToken);
 
         var existing = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.CompetitionChallengeId == competitionChallengeId

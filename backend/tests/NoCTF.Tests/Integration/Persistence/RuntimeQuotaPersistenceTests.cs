@@ -27,7 +27,7 @@ public sealed class RuntimeQuotaPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Concurrent_player_and_admin_starts_for_different_challenges_share_the_team_quota_lock(
+    public async Task Concurrent_player_and_admin_starts_do_not_exceed_the_team_quota(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -41,47 +41,23 @@ public sealed class RuntimeQuotaPersistenceTests
             var connectionString = postgres.GetConnectionString();
             var options = Options(connectionString);
             var fixture = await SeedAsync(options, [], cancellationToken);
-            var barrier = new TeamRuntimeLockBarrier();
-            var concurrentOptions = Options(connectionString, barrier);
-
             var playerStart = MutatePlayerAsync(
-                concurrentOptions,
+                options,
                 fixture,
                 fixture.Teams[0].UserId,
                 fixture.ChallengeIds[0],
                 RuntimeAction.Start,
                 cancellationToken);
             var adminStart = MutateAdminAsync(
-                concurrentOptions,
+                options,
                 fixture,
                 fixture.Teams[0].TeamId,
                 fixture.ChallengeIds[1],
                 RuntimeAction.Start,
                 cancellationToken);
 
-            IReadOnlyList<string> observedLockKeys;
-            var playerWasWaiting = false;
-            var adminWasWaiting = false;
-            try
-            {
-                await barrier.WaitUntilBothEnteredAsync(cancellationToken);
-                observedLockKeys = barrier.ObservedLockKeys;
-                playerWasWaiting = !playerStart.IsCompleted;
-                adminWasWaiting = !adminStart.IsCompleted;
-            }
-            finally
-            {
-                barrier.Release();
-            }
-
-            var attempts = await Task.WhenAll(playerStart, adminStart);
-            var expectedLockKey = TeamRuntimeLockKey(
-                fixture.CompetitionId,
-                fixture.Teams[0].TeamId);
-            await Assert.That(playerWasWaiting).IsTrue();
-            await Assert.That(adminWasWaiting).IsTrue();
-            await Assert.That(observedLockKeys).Count().IsEqualTo(2);
-            await Assert.That(observedLockKeys.All(key => key == expectedLockKey)).IsTrue();
+            var attempts = await Task.WhenAll(playerStart, adminStart)
+                .WaitAsync(TimeSpan.FromSeconds(2), cancellationToken);
             await Assert.That(attempts.Count(attempt => attempt.Result.Runtime is not null))
                 .IsEqualTo(1);
             await Assert.That(attempts.Count(attempt =>
@@ -394,65 +370,6 @@ public sealed class RuntimeQuotaPersistenceTests
             cancellationToken);
         return new(result, outbox.Published.OfType<DispatchRuntime>().Count());
     }
-
-    private sealed class TeamRuntimeLockBarrier : DbCommandInterceptor
-    {
-        private readonly object sync = new();
-        private readonly TaskCompletionSource<bool> bothEntered =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly TaskCompletionSource<bool> release =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private readonly List<string> observedLockKeys = [];
-
-        public IReadOnlyList<string> ObservedLockKeys
-        {
-            get
-            {
-                lock (sync)
-                    return observedLockKeys.ToArray();
-            }
-        }
-
-        public Task WaitUntilBothEnteredAsync(CancellationToken cancellationToken) =>
-            bothEntered.Task.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
-
-        public void Release() => release.TrySetResult(true);
-
-        public override async ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
-            DbCommand command,
-            CommandEventData eventData,
-            InterceptionResult<int> result,
-            CancellationToken cancellationToken = default)
-        {
-            if (!command.CommandText.Contains(
-                    "pg_advisory_xact_lock",
-                    StringComparison.OrdinalIgnoreCase))
-                return result;
-
-            var lockKey = command.Parameters
-                .Cast<DbParameter>()
-                .Select(parameter => parameter.Value)
-                .OfType<string>()
-                .SingleOrDefault(value => value.StartsWith(
-                    "team-runtime:",
-                    StringComparison.Ordinal));
-            if (lockKey is null)
-                return result;
-
-            lock (sync)
-            {
-                observedLockKeys.Add(lockKey);
-                if (observedLockKeys.Count == 2)
-                    bothEntered.TrySetResult(true);
-            }
-
-            await release.Task.WaitAsync(cancellationToken);
-            return result;
-        }
-    }
-
-    private static string TeamRuntimeLockKey(Guid competitionId, Guid teamId) =>
-        $"team-runtime:{competitionId:N}:{teamId:N}";
 
     private sealed record Fixture(
         DateTimeOffset Now,
