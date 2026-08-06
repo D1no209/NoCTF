@@ -23,13 +23,7 @@ import AvatarEditorDialog from '@/components/home/AvatarEditorDialog.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -198,8 +192,9 @@ function onAvatarEditorChange(open: boolean) {
         </p>
       </header>
 
-      <div v-if="isLoading" class="grid gap-4 lg:grid-cols-2">
-        <Skeleton v-for="section in 4" :key="section" class="h-72 w-full" />
+      <div v-if="isLoading" class="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <Skeleton class="h-80 w-full" />
+        <Skeleton class="h-[920px] w-full" />
       </div>
       <div v-else-if="isError" class="border-2 border-destructive bg-destructive/10 p-6 text-center">
         <p class="text-sm text-destructive">
@@ -209,228 +204,252 @@ function onAvatarEditorChange(open: boolean) {
           {{ t('common.retry') }}
         </Button>
       </div>
-      <div v-else class="grid items-start gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader class="border-b-2 border-border">
-            <CardTitle class="flex items-center gap-2">
-              <UserRound class="size-5" />
-              {{ t('profile.basicTitle') }}
-            </CardTitle>
-            <CardDescription>{{ t('profile.basicDescription') }}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-5 pt-6">
-            <div class="grid gap-4 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center">
-              <img
-                v-if="avatarUrl"
-                :src="avatarUrl"
-                :alt="t('profile.avatarAlt', { name: currentUser?.userName ?? '' })"
-                class="size-24 rounded-full border-2 border-border object-cover"
-              >
-              <div
-                v-else
-                class="grid size-24 place-items-center rounded-full border-2 border-border bg-muted text-3xl font-black"
-              >
-                {{ profileInitial }}
-              </div>
-              <div class="min-w-0">
-                <p class="truncate text-lg font-black">
-                  {{ currentUser?.userName }}
-                </p>
-                <p class="mt-1 flex items-center gap-2 truncate text-xs text-muted-foreground">
-                  <Mail class="size-3.5 shrink-0" />
-                  {{ currentUser?.email }}
-                </p>
-              </div>
-            </div>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between gap-3">
-                <Label for="profile-description">{{ t('profile.descriptionLabel') }}</Label>
-                <span class="font-mono text-[11px] tabular-nums text-muted-foreground">{{ description.length }}/500</span>
-              </div>
-              <Textarea
-                id="profile-description"
-                v-model="description"
-                :disabled="profileSavePending"
-                maxlength="500"
-                rows="5"
-                :placeholder="t('profile.descriptionPlaceholder')"
-                class="resize-none"
-              />
-            </div>
-            <Button
-              class="w-full"
-              :disabled="!descriptionDirty || profileSavePending"
-              @click="saveDescriptionMutation.mutate()"
+      <div v-else class="grid items-start gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <Card class="gap-0 p-5 lg:sticky lg:top-24">
+          <div class="flex flex-col items-center text-center">
+            <img
+              v-if="avatarUrl"
+              :src="avatarUrl"
+              :alt="t('profile.avatarAlt', { name: currentUser?.userName ?? '' })"
+              class="size-28 rounded-full border-2 border-border object-cover"
             >
-              <Loader2 v-if="saveDescriptionMutation.isPending.value" class="size-4 animate-spin" />
-              <Save v-else class="size-4" />
-              {{ t('profile.saveDescription') }}
-            </Button>
-          </CardContent>
+            <div
+              v-else
+              class="grid size-28 place-items-center rounded-full border-2 border-border bg-muted text-4xl font-black"
+            >
+              {{ profileInitial }}
+            </div>
+            <p class="mt-4 max-w-full truncate text-xl font-black">
+              {{ currentUser?.userName }}
+            </p>
+            <p class="mt-1 flex max-w-full items-center gap-2 truncate text-xs text-muted-foreground">
+              <Mail class="size-3.5 shrink-0" />
+              {{ currentUser?.email }}
+            </p>
+          </div>
+          <div class="mt-5 border-t-2 border-border pt-4">
+            <Badge variant="outline" class="w-full justify-center gap-2 py-2">
+              <Mail v-if="isEmailPublic" class="size-3.5" />
+              <LockKeyhole v-else class="size-3.5" />
+              {{ t(isEmailPublic ? 'profile.emailPublic' : 'profile.emailPrivate') }}
+            </Badge>
+            <p class="mt-3 text-center text-xs leading-5 text-muted-foreground">
+              {{ currentUser?.description || t('profile.descriptionEmpty') }}
+            </p>
+          </div>
         </Card>
 
-        <Card>
-          <CardHeader class="border-b-2 border-border">
-            <CardTitle class="flex items-center gap-2">
-              <Camera class="size-5" />
-              {{ t('profile.avatarTitle') }}
-            </CardTitle>
-            <CardDescription>{{ t('profile.avatarSectionDescription') }}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-5 pt-6">
-            <div class="border-2 border-dashed border-border bg-muted/40 p-6 text-center">
-              <Camera class="mx-auto size-7 text-muted-foreground" />
-              <p class="mt-3 text-sm leading-6 text-muted-foreground">
-                {{ t('profile.avatarSourceHelp') }}
+        <Card :decorated="false" class="gap-0 overflow-hidden py-0">
+          <section class="grid gap-5 p-5 md:grid-cols-[220px_minmax(0,1fr)] md:p-6">
+            <div>
+              <h2 class="flex items-center gap-2 font-black">
+                <UserRound class="size-5" />
+                {{ t('profile.basicTitle') }}
+              </h2>
+              <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                {{ t('profile.basicDescription') }}
               </p>
             </div>
-            <label class="block">
-              <Button as="span" class="w-full cursor-pointer">
-                <Camera class="size-4" />
-                {{ t('profile.chooseAvatar') }}
-              </Button>
-              <input
-                class="sr-only"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                @change="selectAvatar"
-              >
-            </label>
-          </CardContent>
-        </Card>
+            <div class="min-w-0 space-y-4">
+              <div class="space-y-2">
+                <div class="flex items-center justify-between gap-3">
+                  <Label for="profile-description">{{ t('profile.descriptionLabel') }}</Label>
+                  <span class="font-mono text-[11px] tabular-nums text-muted-foreground">{{ description.length }}/500</span>
+                </div>
+                <Textarea
+                  id="profile-description"
+                  v-model="description"
+                  :disabled="profileSavePending"
+                  maxlength="500"
+                  rows="5"
+                  :placeholder="t('profile.descriptionPlaceholder')"
+                  class="resize-none"
+                />
+              </div>
+              <div class="flex justify-end">
+                <Button
+                  :disabled="!descriptionDirty || profileSavePending"
+                  @click="saveDescriptionMutation.mutate()"
+                >
+                  <Loader2 v-if="saveDescriptionMutation.isPending.value" class="size-4 animate-spin" />
+                  <Save v-else class="size-4" />
+                  {{ t('profile.saveDescription') }}
+                </Button>
+              </div>
+            </div>
+          </section>
 
-        <Card>
-          <CardHeader class="border-b-2 border-border">
-            <CardTitle class="flex items-center gap-2">
-              <ShieldCheck class="size-5" />
-              {{ t('profile.privacyTitle') }}
-            </CardTitle>
-            <CardDescription>{{ t('profile.privacyDescription') }}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-5 pt-6">
-            <label class="flex cursor-pointer items-start gap-4 border-2 border-border bg-muted/40 p-4">
-              <input
-                v-model="isEmailPublic"
-                type="checkbox"
-                :disabled="profileSavePending"
-                class="mt-0.5 size-5 shrink-0 accent-foreground"
-              >
-              <span>
-                <span class="block text-sm font-bold">{{ t('profile.publicEmailLabel') }}</span>
-                <span class="mt-1 block text-xs leading-5 text-muted-foreground">
-                  {{ t('profile.publicEmailHelp') }}
+          <section class="grid gap-5 border-t-2 border-border p-5 md:grid-cols-[220px_minmax(0,1fr)] md:p-6">
+            <div>
+              <h2 class="flex items-center gap-2 font-black">
+                <Camera class="size-5" />
+                {{ t('profile.avatarTitle') }}
+              </h2>
+              <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                {{ t('profile.avatarSectionDescription') }}
+              </p>
+            </div>
+            <div class="min-w-0 space-y-4">
+              <div class="flex items-center gap-4 border-2 border-dashed border-border bg-muted/40 p-4">
+                <Camera class="size-7 shrink-0 text-muted-foreground" />
+                <p class="text-sm leading-6 text-muted-foreground">
+                  {{ t('profile.avatarSourceHelp') }}
+                </p>
+              </div>
+              <label class="flex justify-end">
+                <Button as="span" class="cursor-pointer">
+                  <Camera class="size-4" />
+                  {{ t('profile.chooseAvatar') }}
+                </Button>
+                <input
+                  class="sr-only"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  @change="selectAvatar"
+                >
+              </label>
+            </div>
+          </section>
+
+          <section class="grid gap-5 border-t-2 border-border p-5 md:grid-cols-[220px_minmax(0,1fr)] md:p-6">
+            <div>
+              <h2 class="flex items-center gap-2 font-black">
+                <ShieldCheck class="size-5" />
+                {{ t('profile.privacyTitle') }}
+              </h2>
+              <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                {{ t('profile.privacyDescription') }}
+              </p>
+            </div>
+            <div class="min-w-0 space-y-4">
+              <label class="flex cursor-pointer items-start gap-4 border-2 border-border bg-muted/40 p-4">
+                <input
+                  v-model="isEmailPublic"
+                  type="checkbox"
+                  :disabled="profileSavePending"
+                  class="mt-0.5 size-5 shrink-0 accent-foreground"
+                >
+                <span>
+                  <span class="block text-sm font-bold">{{ t('profile.publicEmailLabel') }}</span>
+                  <span class="mt-1 block text-xs leading-5 text-muted-foreground">
+                    {{ t('profile.publicEmailHelp') }}
+                  </span>
                 </span>
-              </span>
-            </label>
-            <div class="flex items-center gap-2 border-l-4 border-primary bg-muted px-3 py-2 text-xs text-muted-foreground">
-              <LockKeyhole class="size-4 shrink-0" />
-              {{ t('profile.ownerAdminEmailHelp') }}
+              </label>
+              <div class="flex items-center gap-2 border-2 border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+                <LockKeyhole class="size-4 shrink-0" />
+                {{ t('profile.ownerAdminEmailHelp') }}
+              </div>
+              <div class="flex justify-end">
+                <Button
+                  :disabled="!privacyDirty || profileSavePending"
+                  @click="savePrivacyMutation.mutate()"
+                >
+                  <Loader2 v-if="savePrivacyMutation.isPending.value" class="size-4 animate-spin" />
+                  <Save v-else class="size-4" />
+                  {{ t('profile.savePrivacy') }}
+                </Button>
+              </div>
             </div>
-            <Button
-              class="w-full"
-              :disabled="!privacyDirty || profileSavePending"
-              @click="savePrivacyMutation.mutate()"
-            >
-              <Loader2 v-if="savePrivacyMutation.isPending.value" class="size-4 animate-spin" />
-              <Save v-else class="size-4" />
-              {{ t('profile.savePrivacy') }}
-            </Button>
-          </CardContent>
-        </Card>
+          </section>
 
-        <Card>
-          <CardHeader class="border-b-2 border-border">
-            <CardTitle class="flex items-center gap-2">
-              <KeyRound class="size-5" />
-              {{ t('profile.passwordTitle') }}
-            </CardTitle>
-            <CardDescription>{{ t('profile.passwordDescription') }}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-4 pt-6">
-            <div class="space-y-2">
-              <Label for="current-password">{{ t('profile.currentPassword') }}</Label>
-              <div class="relative">
-                <Input
-                  id="current-password"
-                  v-model="currentPassword"
-                  :type="currentPasswordVisible ? 'text' : 'password'"
-                  autocomplete="current-password"
-                  class="pr-11"
-                />
-                <button
-                  type="button"
-                  class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
-                  :aria-label="t(currentPasswordVisible ? 'auth.hidePassword' : 'auth.showPassword')"
-                  :aria-pressed="currentPasswordVisible"
-                  @click="currentPasswordVisible = !currentPasswordVisible"
+          <section class="grid gap-5 border-t-2 border-border p-5 md:grid-cols-[220px_minmax(0,1fr)] md:p-6">
+            <div>
+              <h2 class="flex items-center gap-2 font-black">
+                <KeyRound class="size-5" />
+                {{ t('profile.passwordTitle') }}
+              </h2>
+              <p class="mt-2 text-xs leading-5 text-muted-foreground">
+                {{ t('profile.passwordDescription') }}
+              </p>
+            </div>
+            <div class="min-w-0 space-y-4">
+              <div class="space-y-2">
+                <Label for="current-password">{{ t('profile.currentPassword') }}</Label>
+                <div class="relative">
+                  <Input
+                    id="current-password"
+                    v-model="currentPassword"
+                    :type="currentPasswordVisible ? 'text' : 'password'"
+                    autocomplete="current-password"
+                    class="pr-11"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
+                    :aria-label="t(currentPasswordVisible ? 'auth.hidePassword' : 'auth.showPassword')"
+                    :aria-pressed="currentPasswordVisible"
+                    @click="currentPasswordVisible = !currentPasswordVisible"
+                  >
+                    <EyeOff v-if="currentPasswordVisible" class="size-4" />
+                    <Eye v-else class="size-4" />
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <Label for="new-password">{{ t('profile.newPassword') }}</Label>
+                <div class="relative">
+                  <Input
+                    id="new-password"
+                    v-model="newPassword"
+                    :type="newPasswordVisible ? 'text' : 'password'"
+                    autocomplete="new-password"
+                    minlength="8"
+                    class="pr-11"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
+                    :aria-label="t(newPasswordVisible ? 'auth.hidePassword' : 'auth.showPassword')"
+                    :aria-pressed="newPasswordVisible"
+                    @click="newPasswordVisible = !newPasswordVisible"
+                  >
+                    <EyeOff v-if="newPasswordVisible" class="size-4" />
+                    <Eye v-else class="size-4" />
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <Label for="confirm-password">{{ t('profile.confirmPassword') }}</Label>
+                <div class="relative">
+                  <Input
+                    id="confirm-password"
+                    v-model="confirmPassword"
+                    :type="confirmPasswordVisible ? 'text' : 'password'"
+                    autocomplete="new-password"
+                    minlength="8"
+                    class="pr-11"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
+                    :aria-label="t(confirmPasswordVisible ? 'auth.hidePassword' : 'auth.showPassword')"
+                    :aria-pressed="confirmPasswordVisible"
+                    @click="confirmPasswordVisible = !confirmPasswordVisible"
+                  >
+                    <EyeOff v-if="confirmPasswordVisible" class="size-4" />
+                    <Eye v-else class="size-4" />
+                  </button>
+                </div>
+              </div>
+              <p v-if="newPassword && newPassword.length < 8" class="text-xs text-destructive">
+                {{ t('profile.passwordMinimum') }}
+              </p>
+              <p v-else-if="confirmPassword && confirmPassword !== newPassword" class="text-xs text-destructive">
+                {{ t('profile.passwordMismatch') }}
+              </p>
+              <div class="flex justify-end">
+                <Button
+                  :disabled="!passwordValid || changePasswordMutation.isPending.value"
+                  @click="changePasswordMutation.mutate()"
                 >
-                  <EyeOff v-if="currentPasswordVisible" class="size-4" />
-                  <Eye v-else class="size-4" />
-                </button>
+                  <Loader2 v-if="changePasswordMutation.isPending.value" class="size-4 animate-spin" />
+                  <KeyRound v-else class="size-4" />
+                  {{ t('profile.changePassword') }}
+                </Button>
               </div>
             </div>
-            <div class="space-y-2">
-              <Label for="new-password">{{ t('profile.newPassword') }}</Label>
-              <div class="relative">
-                <Input
-                  id="new-password"
-                  v-model="newPassword"
-                  :type="newPasswordVisible ? 'text' : 'password'"
-                  autocomplete="new-password"
-                  minlength="8"
-                  class="pr-11"
-                />
-                <button
-                  type="button"
-                  class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
-                  :aria-label="t(newPasswordVisible ? 'auth.hidePassword' : 'auth.showPassword')"
-                  :aria-pressed="newPasswordVisible"
-                  @click="newPasswordVisible = !newPasswordVisible"
-                >
-                  <EyeOff v-if="newPasswordVisible" class="size-4" />
-                  <Eye v-else class="size-4" />
-                </button>
-              </div>
-            </div>
-            <div class="space-y-2">
-              <Label for="confirm-password">{{ t('profile.confirmPassword') }}</Label>
-              <div class="relative">
-                <Input
-                  id="confirm-password"
-                  v-model="confirmPassword"
-                  :type="confirmPasswordVisible ? 'text' : 'password'"
-                  autocomplete="new-password"
-                  minlength="8"
-                  class="pr-11"
-                />
-                <button
-                  type="button"
-                  class="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground"
-                  :aria-label="t(confirmPasswordVisible ? 'auth.hidePassword' : 'auth.showPassword')"
-                  :aria-pressed="confirmPasswordVisible"
-                  @click="confirmPasswordVisible = !confirmPasswordVisible"
-                >
-                  <EyeOff v-if="confirmPasswordVisible" class="size-4" />
-                  <Eye v-else class="size-4" />
-                </button>
-              </div>
-            </div>
-            <p v-if="newPassword && newPassword.length < 8" class="text-xs text-destructive">
-              {{ t('profile.passwordMinimum') }}
-            </p>
-            <p v-else-if="confirmPassword && confirmPassword !== newPassword" class="text-xs text-destructive">
-              {{ t('profile.passwordMismatch') }}
-            </p>
-            <Button
-              class="w-full"
-              :disabled="!passwordValid || changePasswordMutation.isPending.value"
-              @click="changePasswordMutation.mutate()"
-            >
-              <Loader2 v-if="changePasswordMutation.isPending.value" class="size-4 animate-spin" />
-              <KeyRound v-else class="size-4" />
-              {{ t('profile.changePassword') }}
-            </Button>
-          </CardContent>
+          </section>
         </Card>
       </div>
     </div>

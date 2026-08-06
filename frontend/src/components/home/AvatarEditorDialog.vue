@@ -234,7 +234,7 @@ onBeforeUnmount(releaseSource)
             :aria-label="t('profile.avatarCropPreview')"
           />
           <div
-            class="pointer-events-none absolute inset-4 rounded-full border-2 border-dashed border-white/90 shadow-[0_0_0_999px_rgba(0,0,0,0.28)]"
+            class="pointer-events-none absolute inset-0 box-border rounded-full border-2 border-dashed border-white/90 shadow-[0_0_0_999px_rgba(0,0,0,0.28)]"
           />
           <div
             v-if="loadError"
