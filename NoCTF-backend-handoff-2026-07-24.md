@@ -3056,6 +3056,42 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   明确授权推送功能与 HANDOFF，重新部署 API/前端，再只对生产中精确核对的 `deploy-smoke-*`
   Finished 测试比赛执行永久删除并做数据库、HTTPS 和浏览器验收。
 
+### 6.68 已结束比赛永久删除生产部署与测试数据清理（2026-08-06）
+
+- `d837227 fix(competitions): separate archive and permanent deletion` 与首轮文档提交
+  `84406cc docs(handoff): record competition deletion split` 已推送到
+  `origin/codex/backend-gitops-completion`。从干净 worktree 构建的生产 API/前端镜像为
+  `sha256:8bdc9bf2050f8203cc2e6655dcbd70e0dfc0ba231987fe62b37d254a9ee7ac3f`；离线镜像和增量
+  Git bundle 均经 SHA-256 校验后导入生产，生产 checkout 从 `750a1543` fast-forward 到
+  `84406cc8`。Compose 静态配置通过，migration 容器报告数据库已是最新、没有应用 migration。
+- 生产仅重建 `deploy-backend-1`，Worker、Runner、PostgreSQL、Redis、数据卷、上传卷和 HTTPS
+  证书均未替换。新 API 容器 `running/healthy`、RestartCount 0，公开
+  `https://noctf.fa1lsnow.com/health` 为 200，PostgreSQL accepting connections，Redis PONG；
+  从新容器 StartedAt 起以及永久删除完成后的 API 日志中，Error/Fatal/Critical/Unhandled/Failure
+  关键字计数均为 0。
+- 破坏性操作前按精确白名单重新核对了 8 个生产测试比赛：
+  `deploy-smoke-20260731T182509Z-{1,2}`、`deploy-smoke-20260731T190254Z-{1,2}`、
+  `deploy-smoke-20260731T190449Z-{1,2}`、`deploy-smoke-20260731T190631Z-{1,2}`。8 个记录均为
+  `Finished`、均未归档；其 Runtime 全部为 `Stopped` 或 `Failed`，没有 Queued、Provisioning、
+  Running 或 Stopping 实例。随后只对这 8 个已核对 UUID 逐个调用新强类型 hard-delete API，
+  8/8 均返回 204，未对任何非白名单 Competition 执行删除。
+- 删除后 PostgreSQL 只读验收确认：目标 Competition 0、`deploy-smoke-*` 0、当前全部 Competition 0；
+  对 schema 中 13 张含 `competition_id` 的表动态逐表查询，CompetitionChallenge、Event、榜单可见性/
+  生命周期审计、咨询、导出、通知、Patch、Runtime、历史端口、计分、Submission 和报名 Team 的目标
+  引用全部为 0。全局 `users` 仍有 3 条、可复用 `challenges` 仍有 4 条、全局 `team_profiles` 仍有
+  1 条，符合“只删除比赛作用域、保留账号/全局题库/全局队伍资料”的契约。
+- 内置浏览器实际登录生产管理后台验收 `/admin/competitions`：页面正常加载并显示“没有找到比赛”，
+  左侧完整管理导航仍可见，浏览器 Console error 为 0。由于生产比赛已经按明确白名单全部清空，
+  本轮没有再创建一次性比赛来重复点击确认框；确认框的 Archive/Permanent 分流由本地前端 3/3 测试、
+  production build 与部署前源契约覆盖。
+- 部署验收后精确删除本次 `/root/noctf-deploy-84406cc8` 两份离线传输文件及无任何容器引用的旧 API
+  镜像 `sha256:5f4d83ae...`；这些均可由 Git/镜像重建。没有执行全局 image/container/volume prune，
+  没有删除数据库、Redis、上传文件、证书、当前镜像或任何数据卷。根盘从镜像装载峰值 89% 使用、
+  4.5 GB 可用恢复到 87% 使用、5.4 GB 可用。
+- 本节作为独立 `docs(handoff)` 提交推送后，只需将生产 checkout 再 fast-forward 到该文档提交；
+  运行镜像仍精确对应功能提交 `d837227`，无需再次迁移、重建服务或重复删除生产数据。本轮
+  push/deploy/物理删除授权至此消费完毕。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -3096,13 +3132,14 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 当前尚未执行的交付边界：
 
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；灾备工具的
-  隔离 Docker 演练已完成，生产 Compose 已按 6.63 部署并验收；监控、备份调度/异地保留和生产
+  隔离 Docker 演练已完成，生产 Compose 已按 6.68 部署并验收；监控、备份调度/异地保留和生产
   恢复验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
-- 工作分支已按用户指令推送并完成生产 Compose 部署；未创建 PR、未合入 `main`。
+- 工作分支已按用户指令推送并完成生产 Compose 部署；最新生产部署与测试比赛物理删除结果以
+  6.68 为准。未创建 PR、未合入 `main`。
 - `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e`、
   `03647e7f`、`7b479f4`、`5923e57`、`92a6205`、`f20193c`、`948b02f`、`499f5cb` 及各自
-  HANDOFF 提交已按对应明确授权推送；最新生产部署范围和结果以 6.63 为准。该授权不自动覆盖后续任务。
+  HANDOFF 提交已按对应明确授权推送；最新生产部署范围和结果以 6.68 为准。该授权不自动覆盖后续任务。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
   不属于剩余工作。
 
@@ -3122,10 +3159,11 @@ Administrator MFA 和分层限流均已由用户明确暂缓，封禁申诉/误�
    后续明确恢复范围，不实现或重新规划 Administrator MFA/分层限流。
 3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
-4. 本轮 push/deploy 授权已在 6.63 完成并消费；未经新任务明确授权，后续继续不 push、不部署。
+4. 本轮 push/deploy/生产测试比赛物理删除授权已在 6.68 完成并消费；未经新任务明确授权，后续
+   继续不 push、不部署。
    生产备份调度、异地保留和真实恢复仍等待单独运维授权。
 
-真实 Compose/HTTPS 环境已按 6.63 部署；对尚未提供的 Kubernetes、Libvirt 与灾备环境细则：
+真实 Compose/HTTPS 环境已按 6.68 部署；对尚未提供的 Kubernetes、Libvirt 与灾备环境细则：
 
 1. 不猜测 Kubernetes namespace、Service DNS、NetworkPolicy/CIDR、Ingress/TLS、镜像
    registry/tag、replica/resource、对象存储、备份、监控或密钥来源。
