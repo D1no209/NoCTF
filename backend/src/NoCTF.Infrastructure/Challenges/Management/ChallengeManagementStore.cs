@@ -47,6 +47,26 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.TemplateNotFound);
         if (template.Mode != competitionMode)
             return new(null, ChallengeMutationFailure.TemplateModeMismatch);
+        var templateFence = await db.Challenges
+            .Where(challenge =>
+                challenge.Id == command.ChallengeId
+                && challenge.Mode == competitionMode
+                && challenge.Revision == template.Revision)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                challenge => challenge.Revision,
+                challenge => challenge.Revision + 1), ct);
+        if (templateFence == 0)
+            return new(null, ChallengeMutationFailure.RevisionConflict);
+        template.Revision = checked(template.Revision + 1);
+        var trackedTemplate = db.ChangeTracker.Entries<Challenge>()
+            .SingleOrDefault(entry => entry.Entity.Id == template.Id);
+        if (trackedTemplate is not null)
+        {
+            var revision = trackedTemplate.Property(challenge => challenge.Revision);
+            revision.OriginalValue = template.Revision;
+            revision.CurrentValue = template.Revision;
+            revision.IsModified = false;
+        }
 
         var entity = new CompetitionChallenge
         {

@@ -118,15 +118,16 @@ public sealed class AdminCompetitionStore(
             await db.CompetitionEvents.AnyAsync(item => item.CompetitionId == competitionId, ct);
         if (hasDependents)
             return false;
-        db.Competitions.Remove(entity);
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
+        db.Entry(entity).State = EntityState.Detached;
+        var deleted = await db.Competitions
+            .IgnoreQueryFilters()
+            .Where(competition =>
+                competition.Id == competitionId
+                && competition.DeletedAt != null
+                && (isAdministrator || competition.OwnerId == actorId))
+            .ExecuteDeleteAsync(ct);
+        if (deleted == 0)
             return false;
-        }
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(competitionId, ct);

@@ -34,6 +34,7 @@ public sealed class RuntimeClaimFactoryTests
             .IsEqualTo(ContainerNetworkIsolation.Isolated);
         await Assert.That(container.Definition.EgressPolicy)
             .IsEqualTo(RuntimeEgressPolicy.DenyAll);
+        await Assert.That(container.Definition.PortMappings[8080]).IsEqualTo(0);
         await Assert.That(container.Definition.Labels["noctf.io/job-kind"])
             .IsEqualTo("persistent-runtime");
     }
