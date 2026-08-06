@@ -1,7 +1,7 @@
 # NoCTF
 
 NoCTF is a competition platform for CTF, AWD, AWDP, and KoH, built with .NET 10
-and Vue 3. The current product and architecture contract lives in
+and Nuxt 4. The current product and architecture contract lives in
 [the authoritative documentation index](docs/README.md).
 
 ## Capabilities
@@ -47,7 +47,7 @@ not add an HAProxy or ingress-proxy layer for Docker runtimes.
 ## Technology
 
 - Backend: .NET 10, FastEndpoints, EF Core 10, Npgsql/PostgreSQL, Wolverine, SignalR.
-- Frontend: Vue 3, TypeScript, Vite, Bun, Tailwind CSS, generated OpenAPI SDK.
+- Frontend: Nuxt 4, Vue 3, TypeScript, Vite, and Bun.
 - Infrastructure: PostgreSQL, Redis, local or S3-compatible object storage.
 - Runtime providers: Docker Container/Compose, Kubernetes Container/Compose, Libvirt/OVA.
 - Tests: TUnit, NSubstitute, and Testcontainers against real dependencies.
@@ -84,14 +84,13 @@ host Docker socket when it is not `0`.
 ```text
 backend/
   src/
-    NoCTF.API/             HTTP, auth, SignalR
+    NoCTF.API/             HTTP, auth, SignalR, and the ClientApp Nuxt SPA
     NoCTF.Worker/          durable application processing
     NoCTF.Runner/          runtime-provider execution
     NoCTF.Domain/          domain model and policies
     NoCTF.Application/     capability-oriented use cases
     NoCTF.Infrastructure/  persistence and infrastructure adapters
   tests/NoCTF.Tests/       unit, architecture, and integration tests
-frontend/                  Vue SPA and generated API client
 deploy/                    local Compose and Kubernetes manifests
 docs/                      authoritative product and engineering specifications
 ```

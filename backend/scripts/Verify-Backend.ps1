@@ -67,7 +67,10 @@ try {
 
     if (-not $SkipOpenApi) {
         Write-Host '[RUN] OpenAPI export'
-        dotnet run --project .\src\NoCTF.API\NoCTF.API.csproj -- --export-openapi
+        dotnet run --project .\src\NoCTF.API\NoCTF.API.csproj `
+            --no-launch-profile `
+            -- `
+            --export-openapi
         Complete-NativeStep 'OpenAPI export'
 
         Write-Host '[RUN] OpenAPI artifact drift check'
