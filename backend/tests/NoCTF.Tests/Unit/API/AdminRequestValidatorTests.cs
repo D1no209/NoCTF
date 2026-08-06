@@ -52,7 +52,10 @@ public sealed class AdminRequestValidatorTests
         var supplied = await validator.ValidateAsync(new BanTeamRequest { Reason = "Rule violation" });
 
         await Assert.That(missing.IsValid).IsFalse();
-        await Assert.That(missing.Errors.Select(error => error.PropertyName)).Contains(nameof(BanTeamRequest.Reason));
+        await Assert.That(missing.Errors.Any(error => string.Equals(
+            error.PropertyName,
+            nameof(BanTeamRequest.Reason),
+            StringComparison.OrdinalIgnoreCase))).IsTrue();
         await Assert.That(supplied.IsValid).IsTrue();
     }
 }

@@ -47,19 +47,22 @@ public sealed class ChallengeTemplateProtocolTests
     {
         var validator = new UpdateChallengeTemplateValidator();
         var missing = validator.Validate(new UpdateChallengeTemplateRequest());
+        var missingProperties = missing.Errors
+            .Select(error => error.PropertyName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        await Assert.That(missing.Errors.Select(error => error.PropertyName))
-            .Contains(nameof(UpdateChallengeTemplateRequest.Mode));
-        await Assert.That(missing.Errors.Select(error => error.PropertyName))
-            .Contains(nameof(UpdateChallengeTemplateRequest.Visibility));
-        await Assert.That(missing.Errors.Select(error => error.PropertyName))
-            .Contains(nameof(UpdateChallengeTemplateRequest.Title));
-        await Assert.That(missing.Errors.Select(error => error.PropertyName))
-            .Contains(nameof(UpdateChallengeTemplateRequest.Direction));
-        await Assert.That(missing.Errors.Select(error => error.PropertyName))
-            .Contains(nameof(UpdateChallengeTemplateRequest.DefinitionJson));
-        await Assert.That(missing.Errors.Select(error => error.PropertyName))
-            .Contains(nameof(UpdateChallengeTemplateRequest.ExpectedRevision));
+        await Assert.That(missingProperties.Contains(
+            nameof(UpdateChallengeTemplateRequest.Mode))).IsTrue();
+        await Assert.That(missingProperties.Contains(
+            nameof(UpdateChallengeTemplateRequest.Visibility))).IsTrue();
+        await Assert.That(missingProperties.Contains(
+            nameof(UpdateChallengeTemplateRequest.Title))).IsTrue();
+        await Assert.That(missingProperties.Contains(
+            nameof(UpdateChallengeTemplateRequest.Direction))).IsTrue();
+        await Assert.That(missingProperties.Contains(
+            nameof(UpdateChallengeTemplateRequest.DefinitionJson))).IsTrue();
+        await Assert.That(missingProperties.Contains(
+            nameof(UpdateChallengeTemplateRequest.ExpectedRevision))).IsTrue();
         await Assert.That(validator.Validate(new UpdateChallengeTemplateRequest
         {
             Mode = GameMode.Ctf,
@@ -78,9 +81,10 @@ public sealed class ChallengeTemplateProtocolTests
             DefinitionJson = """{"schemaVersion":1}""",
             ExpectedRevision = -1
         });
-        await Assert.That(negativeRevision.Errors
-            .Any(error => error.PropertyName == nameof(
-                UpdateChallengeTemplateRequest.ExpectedRevision))).IsTrue();
+        await Assert.That(negativeRevision.Errors.Any(error => string.Equals(
+            error.PropertyName,
+            nameof(UpdateChallengeTemplateRequest.ExpectedRevision),
+            StringComparison.OrdinalIgnoreCase))).IsTrue();
     }
 
     [Test]

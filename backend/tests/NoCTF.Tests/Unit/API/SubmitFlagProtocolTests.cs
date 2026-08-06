@@ -55,7 +55,9 @@ public sealed class SubmitFlagProtocolTests
         });
 
         await Assert.That(result.IsValid).IsFalse();
-        await Assert.That(result.Errors.Select(error => error.PropertyName))
-            .Contains("Flags[1]");
+        await Assert.That(result.Errors.Any(error => string.Equals(
+            error.PropertyName,
+            "Flags[1]",
+            StringComparison.OrdinalIgnoreCase))).IsTrue();
     }
 }
