@@ -2979,6 +2979,44 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   本地端口 overlay、实例状态 composable、Query client、对应测试和 `scripts/`。下一步需用户重新
   明确授权才可 push 或生产部署；部署前必须包含 `e50c4c0`、`169ee05` 及本 HANDOFF 提交。
 
+### 6.66 全局队伍生产部署与验收（2026-08-06）
+
+- 用户明确授权“推送部署”。工作分支 `codex/backend-gitops-completion` 已从 `a8110cd` 推送到
+  `3bdff5738762436d120560a46ef1888affe181fd`，包含 6.64/6.65 的五个本地提交；GitHub
+  `refs/heads/codex/backend-gitops-completion` 已通过 `ls-remote` 核对为同一提交。未创建 PR、未合入
+  `main`，也未把 `TODO.md` 或协作者的 Runner `Properties/`、本地端口 overlay、实例状态 composable、
+  Query client、对应测试和 `scripts/` 未提交工作带入发布。
+- 生产主机继续使用 `/root/NoCTF` Compose checkout、既有 `/root/NoCTF/.env` 和未跟踪的
+  `deploy/docker-compose.prod.yml` HTTPS overlay；没有修改证书、环境密钥、PostgreSQL/Redis 数据卷、
+  上传目录或 Docker Runtime 直连随机宿主端口方案。因生产外网不稳定，本次从固定到 `3bdff57` 的本地
+  干净 worktree 构建 API/Worker/Runner，增量 Git bundle 与共享镜像包分别以 SHA-256
+  `A0030F359947C75297EED80D96FDD551EA92D12E8C92E61CD400ECE2714AA50F`、
+  `EA48B10DFABFB9F31FB9ED197B7518476259C08DB18FF93B94E9CD3A5F35D6BE` 校验后离线传输。
+- 生产 checkout 通过 bundle prerequisite 验证从 `8b0bf55` 无冲突 fast-forward 到 `3bdff57`。Compose
+  静态解析通过；独立 migration 容器以 0 退出并应用
+  `20260806103231_AddGlobalTeamProfiles`，数据库确认 migration history 和 `team_profiles` 均存在。
+  迁移成功后才重建 Backend、Worker、Runner；最终镜像分别为
+  `5f4d83ae1451c44c7767b22afb621a6cd426d4e8fe2c1d07f9f5d66f9323f0ed`、
+  `4746c10c1ef30b5ddb38cd8b54c721b27178aca47fe9d7692fca840497a9c0ed`、
+  `432cd4e7664ea0fdca1674463ac56912bcd2f802964ffc66933f373855e2f632`。
+- Backend/Runner 最终 healthy，Worker running，三者 restart count 均为 0；公网 HTTPS `/health` 返回
+  `{"status":"ok"}`，PostgreSQL `pg_isready` accepting connections、Redis `PONG`。从新容器各自
+  `StartedAt` 起，精确匹配 .NET/Serilog `fail:`、`crit:`、`ERR`、`FTL`、unhandled exception、
+  `InvalidServiceLocationException` 和 libgssapi 签名均为 0。先前宽匹配的 Worker/Runner 命中全部是
+  EF SQL 列名 `failure_code`，没有误记为生产错误。公开 OpenAPI 已包含 `/api/v1/teams`，带浏览器
+  `Accept: text/html` 的 `/teams` SPA fallback 正常。
+- 内置浏览器刷新生产 SPA 后确认首页重复资料卡已经移除，导航使用 FFS 头像并链接 `/profile`；首页
+  文案明确“选择已有队伍报名比赛”和“在队伍管理中创建可跨比赛复用的队伍”。`/teams` 在当前 0 支
+  全局队伍时正常加载，右上角同时显示创建与邀请 Token 加入入口，空态没有重复按钮，也没有比赛
+  选择器。尝试展开创建面板时浏览器控制会话超时，因此不把该点击记为通过；没有提交表单、创建
+  测试队伍或修改任何生产业务数据。
+- 发布后精确删除本次两份离线传输文件、一个两小时前成功退出的旧 `migration` 一次性容器和三张已
+  无任何容器引用的旧应用镜像；均为可由 Git/镜像重建的部署产物。没有删除数据卷、数据库、Redis、
+  上传文件、证书或当前镜像。根盘从镜像装载峰值 94% 使用、2.6 GB 可用恢复到 87% 使用、5.4 GB
+  可用。生产 Git remote-tracking ref 已在 GitHub 提交核对后同步，工作树只保留原有 HTTPS overlay。
+- 本节 HANDOFF 作为独立文档提交推送后，只需将生产 checkout 再 fast-forward 到该文档提交；运行
+  镜像仍精确对应功能提交 `3bdff57`，无需再次迁移或重建服务。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
