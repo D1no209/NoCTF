@@ -3017,6 +3017,45 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 - 本节 HANDOFF 作为独立文档提交推送后，只需将生产 checkout 再 fast-forward 到该文档提交；运行
   镜像仍精确对应功能提交 `3bdff57`，无需再次迁移或重建服务。
 
+### 6.67 已结束比赛归档与永久删除分流（2026-08-06）
+
+- 用户最新明确纠正：管理端“删除”是物理删除，和可恢复的“归档”不是同一操作；已结束比赛应在
+  二次确认后允许物理删除。该决策覆盖此前把管理列表“删除”误接到软删除的交互，也构成
+  `competition_events` 永久保留规则的显式管理员删除例外。功能提交为
+  `d837227 fix(competitions): separate archive and permanent deletion`。
+- 原 `DELETE /api/v1/admin/competitions/{competitionId}` 仍保留为强类型归档端点，现允许归档
+  `Finished` 比赛并在 OpenAPI 中明确可恢复语义；原
+  `DELETE /api/v1/admin/competitions/{competitionId}/hard-delete` 现在可直接永久删除调用者拥有或
+  Administrator 管理的 `Finished` 比赛。若仍存在 Queued、Provisioning、Running 或 Stopping
+  Runtime 则 fail closed 返回冲突，避免容器资源失去追踪。
+- 永久删除在同一个 PostgreSQL 事务中按外键依赖顺序移除比赛事件及父子事件链、通知、导出元数据、
+  私密咨询及条目、Runtime 与历史端口、提交、计分事实、补丁上传、比赛 Flag、Hint、比赛题目实例、
+  比赛报名快照、生命周期/榜单可见性审计和 Competition 本身；任一步失败会整体回滚。用户账号、
+  全局 `team_profiles` 和可复用 Challenge 模板不删除。补丁上传及数据导出的对象 Key 会先写入同事务
+  Wolverine `CleanupObject`，提交后刷新；即时刷新失败只记录告警，由 durable outbox 后续投递。
+- 前端操作菜单现在明确分为“归档比赛”和“永久删除”：归档说明数据保留且可恢复；永久删除仅在
+  `Finished` 行显示，继续使用 Pixel Industrial Dialog 做二次确认，并逐项说明比赛作用域数据会被
+  物理删除、用户和全局题库模板保留。薄封装分别调用生成 SDK 的 `adminDeleteCompetition` 与
+  `adminHardDeleteCompetition`，没有拼接 URL、路径、DTO 或失败码。OpenAPI 两份制品和 TypeScript
+  SDK 已重新导出生成；路由和响应 schema 未改变，仅 operation 描述与生成注释更新，无 migration。
+- 本地门禁：兼容 `global.json` 的 .NET SDK 10.0.302 Docker 环境中，完整 solution/test project build 均为 0 warning/
+  0 error；non-Integration 601/601 passed；真实 PostgreSQL 定向
+  `CompetitionManagementPersistenceTests` 2/2 passed，新增用例覆盖 Finished 比赛、队伍报名、比赛
+  Challenge、Stopped Runtime、历史端口、CompetitionEvent 和 lifecycle audit 全部物理删除，同时
+  User 与全局 Challenge 保留；EF pending model check 显示无漂移。前端删除交互测试 3/3 passed，
+  scoped ESLint passed，`bun run build` 的 vue-tsc/Vite production build passed，只有既有 Rollup
+  PURE annotation 与大 chunk 警告；`git diff --check` passed。
+- 完整 Integration 在“SDK Linux 容器挂宿主 Windows Docker socket”的非标准环境运行 156 项，
+  146 passed、2 个真实 Kubernetes/Libvirt 环境项按配置 skipped、8 failed。失败均与本次代码无关：
+  3 个 GreenMail/密码通知用例因宿主临时目录不能作为嵌套容器 bind mount 或 SMTP 容器连接失败，
+  3 个真实 Docker Runtime 用例因测试进程访问容器返回的 `localhost` 宿主端口被拒绝，2 个既有
+  advisory-lock 并发观测在全量高并发资源争抢下超时；新增永久删除用例在定向和全量运行中均通过。
+  不把该受限环境结果误记为完整 Integration 通过。
+- 当前仍保护协作者的 `TODO.md`、Runner `Properties/`、本地端口 overlay、实例状态 composable、
+  Query client、对应测试和 `scripts/`。本节完成时尚未 push、部署或删除生产数据；下一步按本轮用户
+  明确授权推送功能与 HANDOFF，重新部署 API/前端，再只对生产中精确核对的 `deploy-smoke-*`
+  Finished 测试比赛执行永久删除并做数据库、HTTPS 和浏览器验收。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
