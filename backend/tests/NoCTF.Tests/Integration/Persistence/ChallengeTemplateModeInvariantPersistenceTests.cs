@@ -288,7 +288,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             "Original description",
             "Web",
             """{"schemaVersion":1}""",
-            0,
+            1,
             fixture.Now,
             cancellationToken);
         await using var verifyDb = new NoCtfDbContext(options);

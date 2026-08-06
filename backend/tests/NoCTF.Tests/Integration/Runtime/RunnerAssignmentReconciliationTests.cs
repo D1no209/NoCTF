@@ -156,16 +156,20 @@ public sealed class RunnerAssignmentReconciliationTests
                         "{\"id\":\"late-provider-resource\"}",
                         [],
                         [],
-                        null),
+                        null,
+                        PublishedPorts: [new(null, 8080, 32771)]),
                     provisionWriteBackDb,
                     outbox,
                     cancellationToken);
             }
             await using (var verifyLegacyMessage = new NoCtfDbContext(options))
             {
-                var retained = await verifyLegacyMessage.RuntimeInstances.AsNoTracking().SingleAsync(
-                    instance => instance.Id == fixture.RedispatchId,
-                    cancellationToken);
+                var retained = await verifyLegacyMessage.RuntimeInstances
+                    .AsNoTracking()
+                    .Include(instance => instance.PublishedPorts)
+                    .SingleAsync(
+                        instance => instance.Id == fixture.RedispatchId,
+                        cancellationToken);
                 await Assert.That(retained.State).IsEqualTo(RuntimeState.Running);
                 await Assert.That(retained.RunnerId).IsEqualTo(runner);
                 await Assert.That(retained.RunnerAssignmentReleaseToken).IsNull();
@@ -173,6 +177,9 @@ public sealed class RunnerAssignmentReconciliationTests
                     JsonNode.Parse(retained.ProviderReceiptJson!),
                     JsonNode.Parse("{\"id\":\"late-provider-resource\"}"))).IsTrue();
                 await Assert.That(retained.ProcessingVersion).IsEqualTo(9);
+                await Assert.That(retained.PublishedPorts).HasSingleItem();
+                await Assert.That(retained.PublishedPorts.Single().ContainerPort).IsEqualTo(8080);
+                await Assert.That(retained.PublishedPorts.Single().HostPort).IsEqualTo(32771);
             }
             await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
             await Assert.That(await redisDatabase.KeyExistsAsync(
