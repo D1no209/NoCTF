@@ -7,7 +7,7 @@
 2026-07-31 本轮 outcome、上传补偿、Runtime scope、Patch draft、Runtime cleanup/
 replacement、团队并发额度与 CTF 排行榜前三血纵切已在本机闭合；Frontend 正继续按生成 OpenAPI 契约逐项
 迁移。此前第 7 节列出的三个高置信 Backend 问题均已由 `a234ee6` 完成，最新状态以
-6.33 至 6.59 和第 7 节为准：
+6.33 至 6.63 和第 7 节为准：
 
 - Docker Container/Compose 公开服务最终采用题目容器直接映射 Docker 随机宿主端口；
 - 24 条 `LeaderboardRevision` 写路径均在同一事务发布 invalidation；
@@ -55,8 +55,9 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - 6.57 已完成完整比赛 ZIP 与平台审计导出；6.58 已完成 PostgreSQL、对象存储和 Wolverine
   持久状态的加密备份、隔离恢复与自动演练工具；6.59 已完成私密 Team 封禁申诉、Finished 后
   误判更正、排行榜重投影和最小公开更正通知。
-- 历史阶段曾明确授权 push；当前 6.49 至 6.59 任务明确禁止 push/deploy，新增本地提交均未推送。
-  6.56 明确包含前端恢复流程；协作者拥有的其他 Frontend 未提交文件继续受保护。
+- 6.49 至 6.60 的禁止 push/deploy 边界已由后续明确授权取代；6.61 和 6.63 已完成对应生产部署，
+  最新生产状态以 6.63 为准。6.56 明确包含前端恢复流程；协作者拥有的其他 Frontend 未提交文件
+  继续受保护。
 - 真实 Kubernetes/Libvirt/生产运维验收等待用户提供目标环境细则。不要把已废弃或已否决
   的旧条目重新列为待办。
 - “后端 100%”不表示已经生产部署，也不表示 Kubernetes/Libvirt 所有可选基础设施已在
@@ -74,12 +75,13 @@ PostgreSQL 集成测试固定该契约。`docs/challenge-repository-gitops.md` �
 - `5660dc3` 的首次推送已通过 GitHub API 核对远端 ref；6.42 至 6.44 的后续 bug fix 与
   handoff 已推送到同一工作分支。`a234ee6` 是 Runtime cleanup/quota 代码提交；
   `f9216b9` 是 CTF 排行榜前三血代码提交。
-- 当前远端工作分支 HEAD 为 `50d8aa9 docs(handoff): record production deployment`；当前本地功能
-  HEAD 为 `58f763f fix(email): restore verification delivery and toast styling`。6.62 的功能提交尚未
-  push、尚未部署，生产仍运行 6.61 记录的 `499f5cb8` 应用代码。
+- 当前已推送功能 HEAD 与生产 checkout 均为
+  `8b0bf555093368c540e3cd0a6a710811c5f72ce8 fix(deploy): install runtime GSS dependency`；
+  `58f763f` 的邮箱修复也已包含在该生产版本，部署与清理结果见 6.63。本 HANDOFF 变更在功能提交
+  之后单独提交并推送。
 - 下方关于旧 `codex/backend-target-architecture-handoff` 分支的 ahead/behind 和提交
   序列是历史记录，不再代表当前 Git 状态。
-- 本轮只更新工作分支；没有创建 PR、直接推送 `main` 或执行部署。
+- 本轮只更新并推送工作分支，按用户授权执行了 6.63 的生产部署；没有创建 PR 或直接推送 `main`。
 - 本交接分支已包含远端 `main`，随后增加 Runtime、GitOps、并发栅栏与排行榜闭环纵切。
 - 原目标架构远程分支：`origin/codex/backend-target-architecture`。
 - 2026-07-27 推送前通过 GitHub CLI 认证的 HTTPS fetch 复核：
@@ -2881,6 +2883,43 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   一封验证邮件，确认 Worker 不再出现 `InvalidServiceLocationException`、日志出现脱敏的成功投递且
   收件箱收到验证链接；不要尝试恢复已经丢失明文的旧验证 Token。
 
+### 6.63 生产 ERROR 修复、邮箱修复部署与远程空间清理（2026-08-06）
+
+- 用户明确要求检查并修复生产 ERROR，同时以远程主机为主要清理目标。本轮已将
+  `58f763f fix(email): restore verification delivery and toast styling`、其 HANDOFF 提交
+  `384325b` 以及新增的 `8b0bf55 fix(deploy): install runtime GSS dependency` 推送到
+  `origin/codex/backend-gitops-completion`；生产 checkout `/root/NoCTF` 已快进到完整提交
+  `8b0bf555093368c540e3cd0a6a710811c5f72ce8`。未创建 PR、未合入 `main`，没有修改 `.env`、
+  HTTPS 证书、PostgreSQL/Redis 卷、上传目录或 Docker Runtime 的直连随机宿主端口方案。
+- 只读日志确认两类生产 ERROR：验证邮件消息在旧 Worker 中因 opaque scoped factory 触发
+  Wolverine `InvalidServiceLocationException`；API、Worker、Runner 每次启动还会各记录一次
+  `libgssapi_krb5.so.2` 无法加载。前者由 6.62 的明确 `ImplementationType` 注册修复，后者根因是
+  Ubuntu 24.04 的 ASP.NET 10.0 基础镜像不含 GSS 运行库。本轮新增一个共享 `runtime` 阶段安装
+  发行版包 `libgssapi-krb5-2`，API/Worker/Runner 全部从该阶段派生；部署拓扑测试固定三进程共享
+  运行时和依赖包，避免单个最终阶段回退。
+- 本地临时容器证明安装后 `/usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2` 存在；
+  `DeploymentTopologyTests` 2/2 passed。宿主机缺少锁定的 SDK 10.0.300，WSL Debug 测试项目构建
+  0 warning/0 error；额外的 WSL Release solution build 被既有 `obj/Release` Windows/WSL 写权限
+  阻塞，未把它误记为代码失败。最终发布从 `8b0bf55` 的独立干净 worktree 构建，完整执行前端
+  `vue-tsc`/Vite production build，以及 API、Worker、Runner 三项 Release `dotnet publish`，全部
+  成功；发布镜像分别为 API `7331f6e316de`、Worker `6c128494403b`、Runner `1976b4a0d55f`。
+- 生产使用 SHA-256 校验的 Git bundle 与共享层镜像包离线传输。Migration 以 0 退出后才重建三个
+  长期进程；最终 Backend/Runner `healthy`、Worker `running`，三者 restart count 均为 0，容器内
+  GSS 库均存在，PostgreSQL `pg_isready` accepting connections、Redis `PONG`、公网 HTTPS
+  `/health` 返回 `{"status":"ok"}`。从本轮三个容器各自 `StartedAt` 起，精确匹配 .NET/Serilog
+  ERROR/FTL/fail/critical/unhandled、`InvalidServiceLocationException` 和 libgssapi 签名均为 0；宽
+  匹配曾命中 SQL 列名 `failure_code`，已作为检索噪声排除。
+- 远程清理只删除经身份和引用检查确认可重建/无引用的目标：一个 5 天前失败的孤立容器及其
+  432 MB 镜像、四个被新容器替换的旧 NoCTF 应用镜像、SDK/Bun/Docker CLI/Alpine 四个仅构建
+  基础镜像、两个部署传输临时文件，以及生产 checkout 中 277,391,743 bytes 的
+  `frontend/node_modules`。根盘由初始 92% 使用、3.6 GB 可用（镜像装载峰值 97%、1.6 GB 可用）
+  收敛到 86% 使用、5.8 GB 可用。没有删除当前五个生产镜像、任何数据卷、数据库/Redis 数据、
+  `.git`、其他应用目录、Lightclaw 模型或系统缓存；后续发布继续使用本地干净构建与离线镜像包。
+- 内置浏览器实际加载新生产首页和 `/admin/users`，Administrator 会话、导航和三条用户记录正常；
+  浏览器控制在展开 FFS 操作菜单时超时，因此没有替用户修改账号或发送外部邮件。旧 FFS 验证消息
+  的明文 Token 在修复前失败后不可恢复；本次部署不会伪造或重放它，FFS 必须在验证页主动点击
+  “重新发送”生成新 Token 和新邮件。SMTP/MailKit 与 Wolverine 注册的本地回归结果仍以 6.62 为准。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2920,13 +2959,13 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 当前尚未执行的交付边界：
 
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；灾备工具的
-  隔离 Docker 演练已完成，生产 Compose 已按 6.61 部署并验收；监控、备份调度/异地保留和生产
+  隔离 Docker 演练已完成，生产 Compose 已按 6.63 部署并验收；监控、备份调度/异地保留和生产
   恢复验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
 - 工作分支已按用户指令推送并完成生产 Compose 部署；未创建 PR、未合入 `main`。
 - `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e`、
   `03647e7f`、`7b479f4`、`5923e57`、`92a6205`、`f20193c`、`948b02f`、`499f5cb` 及各自
-  HANDOFF 提交已按本轮明确授权推送；生产部署范围和结果以 6.61 为准。该授权不自动覆盖后续任务。
+  HANDOFF 提交已按对应明确授权推送；最新生产部署范围和结果以 6.63 为准。该授权不自动覆盖后续任务。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
   不属于剩余工作。
 
@@ -2946,10 +2985,10 @@ Administrator MFA 和分层限流均已由用户明确暂缓，封禁申诉/误�
    后续明确恢复范围，不实现或重新规划 Administrator MFA/分层限流。
 3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
-4. 本轮 push/deploy 授权已在 6.61 完成并消费；未经新任务明确授权，后续继续不 push、不部署。
+4. 本轮 push/deploy 授权已在 6.63 完成并消费；未经新任务明确授权，后续继续不 push、不部署。
    生产备份调度、异地保留和真实恢复仍等待单独运维授权。
 
-真实 Compose/HTTPS 环境已按 6.61 部署；对尚未提供的 Kubernetes、Libvirt 与灾备环境细则：
+真实 Compose/HTTPS 环境已按 6.63 部署；对尚未提供的 Kubernetes、Libvirt 与灾备环境细则：
 
 1. 不猜测 Kubernetes namespace、Service DNS、NetworkPolicy/CIDR、Ingress/TLS、镜像
    registry/tag、replica/resource、对象存储、备份、监控或密钥来源。
