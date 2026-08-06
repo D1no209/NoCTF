@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { SortingState } from '@tanstack/vue-table'
 import type { ChallengeTemplate } from '@/api/noctf'
-import { vAutoAnimate } from '@formkit/auto-animate/vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   createColumnHelper,
@@ -486,7 +485,7 @@ watch(globalFilter, () => table.setPageIndex(0))
             </TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody v-auto-animate>
+        <TableBody>
           <template v-if="isLoading">
             <TableRow v-for="index in 4" :key="`challenge-skeleton-${index}`">
               <TableCell
