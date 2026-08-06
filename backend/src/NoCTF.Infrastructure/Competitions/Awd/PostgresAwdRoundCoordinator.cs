@@ -34,7 +34,7 @@ public sealed class PostgresAwdRoundCoordinator(
         await using var transaction = ownsTransaction
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
-        var status = await CompetitionWriteLock.AcquireAsync(
+        var status = await CompetitionStateReader.ReadAsync(
             db,
             message.CompetitionId,
             cancellationToken);
@@ -202,7 +202,7 @@ public sealed class PostgresAwdRoundCoordinator(
         await using var transaction = ownsTransaction
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
-        var status = await CompetitionWriteLock.AcquireAsync(
+        var status = await CompetitionStateReader.ReadAsync(
             db,
             message.CompetitionId,
             cancellationToken);

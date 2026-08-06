@@ -20,7 +20,7 @@ public sealed class PostgresMissingFlagGenerator(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return [new(Guid.Empty, Guid.Empty, "competition_not_found", "Competition was not found.")];
         var competition = await db.Competitions.SingleAsync(item => item.Id == competitionId, ct);
         if (competition.Mode is not (GameMode.Ctf or GameMode.Koh))

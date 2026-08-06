@@ -6,8 +6,6 @@ namespace NoCTF.Domain.Competitions;
 public sealed class Competition
 {
     public Guid Id { get; set; }
-    [ConcurrencyCheck]
-    public long ConcurrencyVersion { get; set; }
     [MaxLength(160)]
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
@@ -15,15 +13,18 @@ public sealed class Competition
     public Guid[] ManagerIds { get; set; } = [];
     public Guid[] JudgeIds { get; set; } = [];
     public Guid[] ObserverIds { get; set; } = [];
+    [ConcurrencyCheck]
     public int PermissionRevision { get; set; }
     public GameMode Mode { get; set; }
     public string ConfigurationJson { get; set; } = """{"schemaVersion":1}""";
+    [ConcurrencyCheck]
     public int ConfigurationRevision { get; set; }
     public DateTimeOffset ConfigurationUpdatedAt { get; set; }
     public long LeaderboardRevision { get; set; }
     public CompetitionLeaderboardVisibility LeaderboardVisibility { get; set; }
     public DateTimeOffset? LeaderboardVisibilityStartsAt { get; set; }
     public DateTimeOffset? LeaderboardVisibilityAppliedAt { get; set; }
+    [ConcurrencyCheck]
     public int LeaderboardVisibilityRevision { get; set; }
     public string? FrozenLeaderboardSnapshotJson { get; set; }
     [MaxLength(32)]
@@ -32,6 +33,7 @@ public sealed class Competition
     public DateTimeOffset EndAt { get; set; }
     public DateTimeOffset? RunningSince { get; set; }
     public long AccumulatedRunningSeconds { get; set; }
+    [ConcurrencyCheck]
     public CompetitionStatus Status { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
     public int MaxTeamMembers { get; set; } = 5;

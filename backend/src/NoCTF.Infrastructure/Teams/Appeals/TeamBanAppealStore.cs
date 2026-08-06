@@ -127,7 +127,7 @@ public sealed class TeamBanAppealStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             System.Data.IsolationLevel.Serializable,
             cancellationToken);
-        var competitionStatus = await CompetitionWriteLock.AcquireAsync(
+        var competitionStatus = await CompetitionStateReader.ReadAsync(
             db,
             command.CompetitionId,
             cancellationToken);
@@ -181,7 +181,7 @@ public sealed class TeamBanAppealStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var competitionStatus = await CompetitionWriteLock.AcquireAsync(
+        var competitionStatus = await CompetitionStateReader.ReadAsync(
             db,
             command.CompetitionId,
             cancellationToken);
@@ -277,7 +277,7 @@ public sealed class TeamBanAppealStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var competitionStatus = await CompetitionWriteLock.AcquireAsync(
+        var competitionStatus = await CompetitionStateReader.ReadAsync(
             db,
             command.CompetitionId,
             cancellationToken);

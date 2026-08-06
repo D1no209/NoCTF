@@ -29,7 +29,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var status = await CompetitionWriteLock.AcquireAsync(
+        var status = await CompetitionStateReader.ReadAsync(
             db,
             competitionId,
             cancellationToken);

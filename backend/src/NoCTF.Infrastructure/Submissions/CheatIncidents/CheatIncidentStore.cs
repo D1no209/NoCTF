@@ -139,7 +139,7 @@ public sealed class CheatIncidentStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var competitionStatus = await CompetitionWriteLock.AcquireAsync(
+        var competitionStatus = await CompetitionStateReader.ReadAsync(
             db,
             command.CompetitionId,
             cancellationToken);

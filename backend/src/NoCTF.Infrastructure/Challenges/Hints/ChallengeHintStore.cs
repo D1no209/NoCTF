@@ -59,7 +59,7 @@ public sealed class ChallengeHintStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeHintSaveFailure.ScopeNotFound);
 
         var challenge = await db.CompetitionChallenges
@@ -130,7 +130,7 @@ public sealed class ChallengeHintStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return false;
 
         var challenge = await db.CompetitionChallenges
@@ -162,7 +162,7 @@ public sealed class ChallengeHintStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return false;
 
         var challenge = await db.CompetitionChallenges

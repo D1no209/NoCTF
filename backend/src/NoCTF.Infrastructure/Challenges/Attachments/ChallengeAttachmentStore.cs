@@ -45,7 +45,6 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
         if (challenge is null)
@@ -88,7 +87,6 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator)
             .Include(item => item.Attachments)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
@@ -114,7 +112,6 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator)
             .Include(item => item.Attachments)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
@@ -139,7 +136,6 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator, includeDeleted: true)
             .Include(item => item.Attachments)
             .SingleOrDefaultAsync(item => item.Id == challengeId && item.DeletedAt == null, ct);

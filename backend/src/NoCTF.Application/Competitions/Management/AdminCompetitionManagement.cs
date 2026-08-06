@@ -6,7 +6,6 @@ public enum CompetitionRestoreState
 {
     Restored,
     NotFound,
-    RevisionConflict,
     UserNotFound,
     RoleNotEligible
 }
