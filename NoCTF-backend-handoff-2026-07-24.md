@@ -2805,6 +2805,46 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   10.0.201，提交前已恢复 10.0.300，SDK 临时改动未进入提交。本阶段没有契约变化，因此没有重生
   OpenAPI/TypeScript SDK，也不需要 EF pending-model 检查或平台运行版本递增。
 
+### 6.61 生产部署、Worker 生命周期恢复与浏览器验收（2026-08-06）
+
+- 用户明确授权 push 和生产部署。工作分支 `codex/backend-gitops-completion` 已推送到
+  `origin`；生产 Compose checkout `/root/NoCTF` 已快进到功能提交
+  `499f5cb fix(worker): keep lifecycle handler codegen-safe`。未创建 PR、未合入 `main`，也没有
+  修改生产 `.env`、HTTPS 证书、数据库卷、Redis 卷或既有直连 Docker 随机宿主端口方案；按用户
+  指令没有为本次覆盖部署另做备份。
+- 首次把 `a3831c3` 的 API、Migration、Worker、Runner 镜像切换上线后，迁移容器以 0 退出，
+  API/Runner 健康且公网 `/health` 返回 `{"status":"ok"}`。验收同时发现 Worker 对
+  `AdvanceCompetitionLifecycle` 的 Wolverine 6 动态代码生成失败：
+  `ICompetitionEventRecorder` 使用 scoped opaque lambda alias，违反默认
+  `ServiceLocationPolicy.NotAllowed`；其他维护链仍工作，但比赛生命周期链停在 processing version
+  15555，因此不能把初次切换视为完整成功。
+- 修复保持最小：`ICompetitionEventStore` 与 `ICompetitionEventRecorder` 改为直接绑定
+  `CompetitionEventStore`，不再通过 `GetRequiredService` 工厂别名；新增 descriptor 回归测试保证两项
+  注册有明确 `ImplementationType` 且没有 `ImplementationFactory`。没有新增表、迁移、接口、DTO、
+  OpenAPI、generated SDK、业务状态或配置项。
+- 本地验证使用仓库锁定的独立 SDK 10.0.300：目标回归 1/1 passed，完整 non-Integration
+  598/598 passed，`dotnet build backend/NoCTF.slnx --no-restore` 0 warning/0 error，
+  `git diff --check` passed。修复提交已独立推送。
+- 生产主机无法稳定访问 GitHub/Docker Hub；部署使用有 prerequisite 的 Git bundle，以及本地已存在
+  基础镜像/kompose 的 SHA-256 校验后离线传输。kompose v1.38.0 二进制与官方
+  `SHA256_SUM` 一致；没有修改仓库 Dockerfile，离线替换只存在于已清理的临时构建上下文。最终四个
+  应用镜像均从 `499f5cb8aac9a1902940f5269f63bcadd64fdf6e` 重建：Backend
+  `a4533dd0ba74`、Migration `c6ef977a6676`、Worker `8cd6aa3a90e5`、Runner
+  `cc5911729e23`。
+- 最终生产验收：Migration exit 0；Backend/Runner healthy，Worker running；四个应用容器
+  restart count 均为 0；PostgreSQL `pg_isready` accepting connections，Redis `PONG`；15 分钟窗口内
+  API/Worker/Runner 的 fail/fatal/unhandled/critical/exception 匹配均为 0。比赛生命周期 schedule
+  从 15555 恢复并持续推进至 15584，跨多个 30 秒轮询周期更新；Runner 内 Docker client/server
+  28.5.2/29.3.1、kompose 1.38.0 可用。TLS 证书 CN/SAN 为 `noctf.fa1lsnow.com`，有效期至
+  2026-10-15，公网 HTTPS health 正常。
+- 使用内置浏览器实际访问生产 HTTPS：首页完整渲染并显示已登录 Administrator、`/teams`、
+  `/profile` 与管理入口；`/competitions` 完整加载比赛卡片且没有失败提示；
+  `/admin/platform-logs` 显示实时连接正常、死信 0。页面 console 没有应用错误，仅有既有
+  `THREE.Clock` deprecation warning；浏览器临时标签已清理。
+- 部署没有触碰用户/协作者的 `TODO.md`、Runner `Properties/`、本地端口 overlay、前端实例状态/
+  Query 文件、测试和 `scripts/` 未提交工作。Administrator MFA 与分层限流仍按用户要求暂缓；
+  生产备份调度、异地保留、监控告警和正式恢复演练仍是独立运维事项。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2844,13 +2884,13 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 当前尚未执行的交付边界：
 
 - 本地 `deploy-*` 六服务重建及真实 Bot GitOps apply/reapply/delete/restore 已完成；灾备工具的
-  隔离 Docker 演练已完成，正式环境部署、监控、备份调度/异地保留和生产恢复验收尚未执行。
+  隔离 Docker 演练已完成，生产 Compose 已按 6.61 部署并验收；监控、备份调度/异地保留和生产
+  恢复验收尚未执行。
 - 生产 Kubernetes 安装、Runner Pool 运维参数落地与生产式 Libvirt 演练仍需目标环境。
-- 工作分支已按用户指令推送；未创建 PR、未合入 `main`、未生产部署。
+- 工作分支已按用户指令推送并完成生产 Compose 部署；未创建 PR、未合入 `main`。
 - `809f825`、`dbf534a`、`bf3d393`、`8dca6ef`、`dbccb72`、`c11328e`、`567ed02e`、
-  `03647e7f`、`7b479f4`、`5923e57`、`92a6205`、`f20193c`、`948b02f` 及各自 HANDOFF 提交是当前任务新增的
-  本地提交，明确未 push、未部署；历史 push 授权不覆盖本阶段“未经授权不得
-  push/deploy”的要求。
+  `03647e7f`、`7b479f4`、`5923e57`、`92a6205`、`f20193c`、`948b02f`、`499f5cb` 及各自
+  HANDOFF 提交已按本轮明确授权推送；生产部署范围和结果以 6.61 为准。该授权不自动覆盖后续任务。
 - Docker 公开访问只采用直接随机宿主端口映射；旧 firewall/gateway/ACL 条目已废弃，
   不属于剩余工作。
 
@@ -2870,9 +2910,10 @@ Administrator MFA 和分层限流均已由用户明确暂缓，封禁申诉/误�
    后续明确恢复范围，不实现或重新规划 Administrator MFA/分层限流。
 3. 接口继续使用强类型 FastEndpoints，前端继续只使用 OpenAPI generated SDK/薄封装；完成后
    运行后端、真实依赖、EF、OpenAPI、Frontend 和浏览器门禁，做独立功能提交与 HANDOFF 提交。
-4. 未经新任务明确授权，继续不 push、不部署；生产备份调度、异地保留和真实恢复仍等待目标环境。
+4. 本轮 push/deploy 授权已在 6.61 完成并消费；未经新任务明确授权，后续继续不 push、不部署。
+   生产备份调度、异地保留和真实恢复仍等待单独运维授权。
 
-用户稍后会提供真实环境部署细则。在此之前：
+真实 Compose/HTTPS 环境已按 6.61 部署；对尚未提供的 Kubernetes、Libvirt 与灾备环境细则：
 
 1. 不猜测 Kubernetes namespace、Service DNS、NetworkPolicy/CIDR、Ingress/TLS、镜像
    registry/tag、replica/resource、对象存储、备份、监控或密钥来源。
@@ -2880,9 +2921,8 @@ Administrator MFA 和分层限流均已由用户明确暂缓，封禁申诉/误�
    Runner→API 路径落地最小网络允许规则与 Runner Pool 运维验收。
 3. 有真实 Libvirt 环境与 fixture disk 后设置 `NOCTF_LIBVIRT_DISK_PATH`，执行 OVA
    import/public URL/exact cleanup 与生产式生命周期演练。
-4. 在目标生产环境执行部署、监控、备份恢复和运维验收；本地代码通过不等于生产部署。
-5. 当前任务明确禁止 push/deploy；任何历史授权均不自动续用。仍不得自行创建 PR、合入
-   `main` 或执行生产部署。
+4. Compose 生产部署不等于监控、备份恢复或 Kubernetes/Libvirt 生产验收；这些仍需分别执行。
+5. 本轮 push/deploy 授权不自动续用。仍不得自行创建 PR、合入 `main` 或再次执行生产部署。
 
 不要重新引入 HAProxy/ingress、firewall executor/sidecar、transparent gateway、
 TargetPort ACL 或 callback-only gateway。Docker Runtime 公开访问只使用题目服务自己的
