@@ -3117,6 +3117,40 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   client、对应测试和 `scripts/`。本节完成时仅创建本地功能提交；6.68 已明确消费上一轮 push/deploy
   授权，因此本修复尚未推送或部署，生产仍运行旧版本，必须等待新的明确授权。
 
+### 6.70 题库卡死修复生产部署与布局动画收口（2026-08-07）
+
+- 用户明确授权“推送部署”。`4d771cb` 与 `e18cc4d` 首先推送并从固定提交的干净 worktree 构建 API
+  镜像 `sha256:43cd88409a1ab7c4e8f125d9bedd44cf246e85f6ea8d05012596a51a5ef277d7`；SHA-256
+  校验的增量 Git bundle 和压缩镜像离线导入生产。生产 checkout 从 `8a942d97` 快进到 `e18cc4d1`，
+  Compose 静态配置通过，独立 migration 报告数据库已是最新，随后只重建 API。此版生产浏览器已
+  证明默认列表从错误的 4 条修正为仅 2 条生效题目，但点击“包含已删除”仍会使生产构建下的浏览器
+  控制失去响应，因此没有把首版部署误记为完全通过。
+- 继续排查确认第二个前端诱因是题库 `<tbody>` 上的 `v-auto-animate`：从 2 行扩展到 4 行时会观察并
+  动画布局变更，和异步表格重算叠加后阻塞主线程。依据产品界面“motion conveys state”与避免布局
+  抖动原则，最终提交 `db5a97d fix(challenges): remove blocking table animation` 只移除该题库表格的
+  AutoAnimate 指令和未使用 import；按钮、表格结构、Pixel Industrial 视觉、其他页面动画、分页与
+  API 契约均未改变。回归测试明确禁止在该 TableBody 重新挂载 AutoAnimate。
+- `db5a97d` 的题库定向测试 6/6 passed、scoped ESLint passed、`vue-tsc`/Vite production build
+  passed，只有既有 Rollup PURE annotation 和大 chunk 警告；无后端、OpenAPI、SDK、数据库模型、
+  migration 或平台运行版本变化。该提交已推送并由 `ls-remote` 精确核对到
+  `origin/codex/backend-gitops-completion`。
+- 最终生产 API 镜像为
+  `sha256:593d3facde4340d2de1dd6b931d0a047fafce1f3b3a4a8ea5494bb23496018f6`，revision 标签精确为
+  `db5a97dca7dd8578c034a41b42de729abfb52ef5`。第二份增量 bundle 与镜像包经 SHA-256 校验后导入，
+  生产 checkout 无冲突快进到 `db5a97d`，Compose 静态配置通过并仅重建 API；Worker 与 Runner 镜像、
+  StartedAt 和运行状态未改变。最终 API `running/healthy`、RestartCount 0，HTTPS `/health` 为 200，
+  PostgreSQL accepting connections、Redis PONG，从新 API StartedAt 起 ERROR/FTL/fail/critical/
+  unhandled 等签名计数为 0。
+- 内置浏览器以全新生产标签验收 `/admin/challenges`：默认按钮为“包含已删除”且只显示 2 条生效题目；
+  点击立即返回，按钮变为“隐藏已删除”，同一 DOM 中准确出现 4 行；再次点击也立即返回，不再复现
+  卡死。浏览器控制服务在随后把第二次行数读取与 Console 日志合并时自身超时重置，因此未把该附加
+  读取记为通过；关键双向点击、默认过滤和 2→4 行变化已经分别取得独立可观测结果。
+- 部署后精确删除两轮传输目录、首版 `43cd8840...` 镜像和已无容器引用的上一版 `8bdc9bf2...` API
+  镜像；均可由 Git 和发布构建重建。当前 API/Worker/Runner、PostgreSQL/Redis/MinIO、数据卷、上传、
+  HTTPS 证书和未跟踪的生产 overlay 均保留。远程根盘从镜像导入时 89% 使用、4.5 GB 可用恢复到
+  87% 使用、5.4 GB 可用。本文档提交推送后只需将生产 checkout 再快进到文档提交，运行镜像仍应
+  精确对应功能提交 `db5a97d`，无需再次 migration 或重建服务。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
