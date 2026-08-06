@@ -150,10 +150,10 @@ public sealed class CheatIncidentStore(
             return new(CheatIncidentResolutionFailure.CompetitionFinished);
 
         var scoringEvent = await db.ScoringEvents
-            .FromSqlInterpolated(
-                $"SELECT * FROM scoring_events WHERE id = {command.ScoringEventId} FOR UPDATE")
             .IgnoreQueryFilters()
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(
+                item => item.Id == command.ScoringEventId,
+                cancellationToken);
         if (scoringEvent is null
             || scoringEvent.CompetitionId != command.CompetitionId
             || scoringEvent.FailureCode != ScoringFailureCode.ForeignTeamFlagDetected

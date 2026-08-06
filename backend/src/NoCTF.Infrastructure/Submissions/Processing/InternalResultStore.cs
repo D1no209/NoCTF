@@ -26,9 +26,9 @@ public sealed class InternalResultStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var runtime = await db.RuntimeInstances.FromSqlInterpolated(
-                $"SELECT * FROM runtime_instances WHERE id = {result.RuntimeInstanceId} FOR UPDATE")
-            .SingleOrDefaultAsync(ct);
+        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
+            item => item.Id == result.RuntimeInstanceId,
+            ct);
         if (runtime is null)
             return InternalResultDisposition.NotFound;
         if (runtime.Generation != result.Generation)
@@ -137,9 +137,9 @@ public sealed class InternalResultStore(
                 result.BodySha256)
                 ? InternalResultDisposition.Duplicate
                 : InternalResultDisposition.Conflict;
-        var runtime = await db.RuntimeInstances.FromSqlInterpolated(
-                $"SELECT * FROM runtime_instances WHERE id = {result.RuntimeInstanceId} FOR UPDATE")
-            .SingleOrDefaultAsync(ct);
+        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
+            item => item.Id == result.RuntimeInstanceId,
+            ct);
         if (runtime is null
             || runtime.Purpose != RuntimePurpose.AwdpTarget
             || runtime.SubmissionId != submission.Id)

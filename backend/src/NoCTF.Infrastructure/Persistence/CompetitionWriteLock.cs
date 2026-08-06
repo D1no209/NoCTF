@@ -10,28 +10,23 @@ internal static class CompetitionWriteLock
         Guid competitionId,
         CancellationToken cancellationToken)
     {
-        if (!db.Database.IsRelational())
-        {
-            return await db.Competitions.AsNoTracking()
-                .Where(competition => competition.Id == competitionId
-                    && competition.DeletedAt == null)
-                .Select(competition => (CompetitionStatus?)competition.Status)
-                .SingleOrDefaultAsync(cancellationToken);
-        }
-        await AcquireTransactionLockAsync(db, competitionId, cancellationToken);
-        var statuses = await db.Database.SqlQuery<short>(
-                $"""SELECT status AS "Value" FROM competitions WHERE id = {competitionId} AND deleted_at IS NULL""")
-            .ToListAsync(cancellationToken);
-        return statuses.Count == 1 ? (CompetitionStatus)statuses[0] : null;
+        var competition = await db.Competitions.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(candidate => candidate.Id == competitionId
+                && candidate.DeletedAt == null, cancellationToken);
+        if (competition is null)
+            return null;
+        competition.ConcurrencyVersion = checked(competition.ConcurrencyVersion + 1);
+        return competition.Status;
     }
 
-    public static Task AcquireTransactionLockAsync(
+    public static async Task AcquireTransactionLockAsync(
         NoCtfDbContext db,
         Guid competitionId,
-        CancellationToken cancellationToken) =>
-        !db.Database.IsRelational()
-            ? Task.CompletedTask
-            : db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({'c' + competitionId.ToString("N")}, 0))",
-            cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var competition = await db.Competitions.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(candidate => candidate.Id == competitionId, cancellationToken);
+        if (competition is not null)
+            competition.ConcurrencyVersion = checked(competition.ConcurrencyVersion + 1);
+    }
 }
