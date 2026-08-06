@@ -4,7 +4,15 @@ using NoCTF.Domain.Teams;
 
 namespace NoCTF.Application.Teams.Registration;
 
-public sealed record CreateTeamCommand(Guid CompetitionId, Guid UserId, string Name, string? AvatarUrl, DateTimeOffset RegisteredAt);
+public sealed record CreateTeamCommand(
+    Guid CompetitionId,
+    Guid UserId,
+    string Name,
+    string? AvatarUrl,
+    DateTimeOffset RegisteredAt,
+    Guid? TeamProfileId = null,
+    Guid? CaptainId = null,
+    IReadOnlyList<Guid>? MemberIds = null);
 public sealed record TeamView(
     Guid Id,
     Guid CompetitionId,
@@ -15,8 +23,13 @@ public sealed record TeamView(
     TeamRegistrationStatus RegistrationStatus,
     bool IsLocked,
     bool IsBanned,
-    DateTimeOffset RegisteredAt);
-public sealed record TeamRegistrationPolicy(CompetitionStatus Status, bool AutoApprove, bool CompetitionDeleted);
+    DateTimeOffset RegisteredAt,
+    Guid? TeamProfileId = null);
+public sealed record TeamRegistrationPolicy(
+    CompetitionStatus Status,
+    bool AutoApprove,
+    bool CompetitionDeleted,
+    int MaxTeamMembers = int.MaxValue);
 public enum TeamRegistrationFailure
 {
     CompetitionNotFound,
@@ -87,11 +100,66 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
             return OperationResult<TeamView>.Failure("competition_not_found", "Competition was not found.");
         if (policy.Status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
             return OperationResult<TeamView>.Failure("registration_closed", "Team registration is closed.");
-        var created = await store.TryCreateAsync(command with { Name = name },
+        var memberIds = (command.MemberIds ?? [command.UserId]).Distinct().ToArray();
+        var captainId = command.CaptainId ?? command.UserId;
+        if (memberIds.Length == 0 || !memberIds.Contains(captainId))
+        {
+            return OperationResult<TeamView>.Failure(
+                "invalid_team_roster",
+                "The team captain must be included in the registration roster.");
+        }
+        if (memberIds.Length > policy.MaxTeamMembers)
+        {
+            return OperationResult<TeamView>.Failure(
+                "team_full",
+                "The team has more members than this competition allows.");
+        }
+        var created = await store.TryCreateAsync(command with
+        {
+            Name = name,
+            CaptainId = captainId,
+            MemberIds = memberIds
+        },
             policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
         return created.Team is not null
             ? OperationResult<TeamView>.Success(created.Team)
             : OperationResult<TeamView>.Failure(TeamRegistrationFailureProtocol.Code(created.Failure ?? TeamRegistrationFailure.TeamConflict), "The team could not be created.");
+    }
+}
+
+public sealed class RegisterTeamProfile(
+    NoCTF.Application.Teams.Profiles.ITeamProfileStore profiles,
+    CreateTeam createTeam)
+{
+    public async Task<OperationResult<TeamView>> ExecuteAsync(
+        Guid competitionId,
+        Guid teamProfileId,
+        Guid actorId,
+        DateTimeOffset registeredAt,
+        CancellationToken cancellationToken = default)
+    {
+        var profile = await profiles.FindAsync(teamProfileId, cancellationToken);
+        if (profile is null)
+        {
+            return OperationResult<TeamView>.Failure(
+                "team_not_found",
+                "The team was not found.");
+        }
+        if (profile.CaptainId != actorId)
+        {
+            return OperationResult<TeamView>.Failure(
+                "team_forbidden",
+                "Only the team captain can register the team for a competition.");
+        }
+        return await createTeam.ExecuteAsync(new(
+            competitionId,
+            actorId,
+            profile.Name,
+            profile.AvatarUrl,
+            registeredAt,
+            profile.Id,
+            profile.CaptainId,
+            profile.MemberIds), cancellationToken);
     }
 }
 

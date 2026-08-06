@@ -22,7 +22,11 @@ public sealed class TeamRegistrationStore(
 
     public Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
-            .Select(x => new TeamRegistrationPolicy(x.Status, x.TeamRegistrationAutoApprove, x.DeletedAt != null))
+            .Select(x => new TeamRegistrationPolicy(
+                x.Status,
+                x.TeamRegistrationAutoApprove,
+                x.DeletedAt != null,
+                x.MaxTeamMembers))
             .SingleOrDefaultAsync(ct);
 
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
@@ -33,20 +37,22 @@ public sealed class TeamRegistrationStore(
         if (competitionStatus is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
         if (competitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
             return new(null, TeamRegistrationFailure.RegistrationClosed);
+        var memberIds = (command.MemberIds ?? [command.UserId]).ToArray();
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
-            && x.MemberIds.Contains(command.UserId), ct))
+            && x.MemberIds.Any(memberId => memberIds.Contains(memberId)), ct))
             return new(null, TeamRegistrationFailure.UserAlreadyRegistered);
         var id = Guid.CreateVersion7(command.RegisteredAt);
         var team = new Team
         {
             Id = id,
             CompetitionId = command.CompetitionId,
+            TeamProfileId = command.TeamProfileId,
             Name = name,
             NormalizedName = name.ToUpperInvariant(),
             AvatarUrl = command.AvatarUrl,
-            CaptainId = command.UserId,
-            MemberIds = [command.UserId],
+            CaptainId = command.CaptainId ?? command.UserId,
+            MemberIds = memberIds,
             InvitationToken = CreateInvitationToken(),
             RegistrationStatus = status,
             RegisteredAt = command.RegisteredAt
@@ -86,7 +92,7 @@ public sealed class TeamRegistrationStore(
                 && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
             .OrderBy(x => x.Name)
             .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
-                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt)).ToListAsync(ct);
+                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TeamProfileId)).ToListAsync(ct);
 
     public async Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
     {
@@ -173,7 +179,7 @@ public sealed class TeamRegistrationStore(
         db.Teams.AsNoTracking().Where(x => x.Id == teamId && x.CompetitionId == competitionId && x.DeletedAt == null
                 && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
             .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
-                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt)).SingleOrDefaultAsync(ct);
+                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TeamProfileId)).SingleOrDefaultAsync(ct);
 
     public Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct) =>
         db.Teams.AsNoTracking().Where(team => team.CompetitionId == competitionId
@@ -182,7 +188,7 @@ public sealed class TeamRegistrationStore(
                 && (includePending || team.RegistrationStatus == TeamRegistrationStatus.Approved))
             .Select(team => new TeamView(team.Id, team.CompetitionId, team.Name, team.AvatarUrl,
                 team.CaptainId, team.MemberIds, team.RegistrationStatus, team.IsLocked,
-                team.IsBanned, team.RegisteredAt))
+                team.IsBanned, team.RegisteredAt, team.TeamProfileId))
             .SingleOrDefaultAsync(ct);
 
     public async Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken ct) =>
@@ -258,7 +264,7 @@ public sealed class TeamRegistrationStore(
 
     private static TeamView Map(Team x) => new(
         x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
-        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt);
+        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TeamProfileId);
 
     private static string CreateInvitationToken()
     {

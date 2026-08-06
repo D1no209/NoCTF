@@ -21,6 +21,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
         Set<UserAccountLifecycleAudit>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
+    public DbSet<TeamProfile> TeamProfiles => Set<TeamProfile>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();

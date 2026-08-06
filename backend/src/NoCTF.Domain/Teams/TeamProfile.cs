@@ -2,12 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace NoCTF.Domain.Teams;
 
-/// <summary>Represents a competition-scoped team.</summary>
-public sealed class Team
+/// <summary>Stable team identity and current membership reused across competitions.</summary>
+public sealed class TeamProfile
 {
     public Guid Id { get; set; }
-    public Guid CompetitionId { get; set; }
-    public Guid? TeamProfileId { get; set; }
     [MaxLength(128)]
     public string Name { get; set; } = string.Empty;
     [MaxLength(128)]
@@ -17,12 +15,6 @@ public sealed class Team
     public Guid[] MemberIds { get; set; } = [];
     [StringLength(32, MinimumLength = 32)]
     public string InvitationToken { get; set; } = string.Empty;
-    public bool IsLocked { get; set; }
-    public TeamRegistrationStatus RegistrationStatus { get; set; }
-    public DateTimeOffset RegisteredAt { get; set; }
-    public bool IsBanned { get; set; }
-    public DateTimeOffset? BannedAt { get; set; }
-    public Guid? BannedById { get; set; }
-    public string? BanReason { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
 }
