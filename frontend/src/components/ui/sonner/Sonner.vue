@@ -1,11 +1,12 @@
 <script lang="ts" setup>
-import type { ToasterProps } from "vue-sonner"
-import { reactiveOmit } from "@vueuse/core"
-import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon, XIcon } from "lucide-vue-next"
-import { Toaster as Sonner } from "vue-sonner"
+import type { ToasterProps } from 'vue-sonner'
+import { reactiveOmit } from '@vueuse/core'
+import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon, XIcon } from 'lucide-vue-next'
+import { Toaster as Sonner } from 'vue-sonner'
+import 'vue-sonner/style.css'
 
 const props = defineProps<ToasterProps>()
-const delegatedProps = reactiveOmit(props, "toastOptions")
+const delegatedProps = reactiveOmit(props, 'toastOptions')
 </script>
 
 <template>
@@ -45,3 +46,24 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
     </template>
   </Sonner>
 </template>
+
+<style>
+[data-sonner-toaster].toaster {
+  --border-radius: 0;
+  font-family: var(--font-sans);
+}
+
+[data-sonner-toaster].toaster [data-sonner-toast][data-styled="true"] {
+  border-width: 2px;
+  border-color: var(--border);
+  box-shadow: var(--float-shadow);
+  font-size: 0.9rem;
+}
+
+[data-sonner-toaster].toaster [data-close-button] {
+  border: 2px solid var(--border);
+  border-radius: 0;
+  background: var(--card);
+  color: var(--foreground);
+}
+</style>

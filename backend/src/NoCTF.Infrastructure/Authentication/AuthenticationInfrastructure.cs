@@ -31,19 +31,21 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<LogoutAll>();
         services.AddScoped<IEmailVerificationStore, EmailVerificationStore>();
         services.AddSingleton<EmailVerificationSecretProtector>();
-        services.AddScoped<EmailVerificationConfigurationStore>();
-        services.AddScoped<IEmailVerificationConfigurationStore>(provider =>
-            provider.GetRequiredService<EmailVerificationConfigurationStore>());
-        services.AddScoped<IEmailVerificationDeliveryConfigurationReader>(provider =>
-            provider.GetRequiredService<EmailVerificationConfigurationStore>());
+        services.AddScoped<
+            IEmailVerificationConfigurationStore,
+            EmailVerificationConfigurationStore>();
+        services.AddScoped<
+            IEmailVerificationDeliveryConfigurationReader,
+            EmailVerificationConfigurationStore>();
         services.AddSingleton<
             IEmailVerificationSmtpClientFactory,
             EmailVerificationSmtpClientFactory>();
-        services.AddScoped<SmtpEmailVerificationDelivery>();
-        services.AddScoped<IEmailVerificationDelivery>(provider =>
-            provider.GetRequiredService<SmtpEmailVerificationDelivery>());
-        services.AddScoped<IPasswordResetEmailDelivery>(provider =>
-            provider.GetRequiredService<SmtpEmailVerificationDelivery>());
+        services.AddScoped<
+            IEmailVerificationDelivery,
+            SmtpEmailVerificationDelivery>();
+        services.AddScoped<
+            IPasswordResetEmailDelivery,
+            SmtpEmailVerificationDelivery>();
         services.AddScoped<IPasswordResetStore, PasswordResetStore>();
         services.AddScoped<RequestPasswordReset>();
         services.AddScoped<CompletePasswordReset>();
