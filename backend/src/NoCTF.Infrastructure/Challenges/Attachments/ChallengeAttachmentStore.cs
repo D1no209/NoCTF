@@ -11,8 +11,13 @@ using NoCTF.Infrastructure.Challenges;
 
 namespace NoCTF.Infrastructure.Challenges.Attachments;
 
-public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAttachmentStore
+public sealed class ChallengeAttachmentStore(
+    NoCtfDbContext db,
+    TeamChallengeCriticalSection criticalSection) : IChallengeAttachmentStore
 {
+    public ChallengeAttachmentStore(NoCtfDbContext db)
+        : this(db, new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry())) { }
+
     public Task<bool> AttachmentIdExistsAsync(
         Guid attachmentId,
         CancellationToken ct) =>
@@ -192,13 +197,10 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         }
         else
         {
-            await using var assignmentLease = await CriticalSectionCoordinator.AcquireAsync(
+            await using var assignmentLease = await criticalSection.AcquireAsync(
                 db,
-                $"attachment-assignment:{scope.TeamId:N}:{competitionChallengeId:N}",
-                token => db.Teams.Where(team => team.Id == scope.TeamId)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(
-                        team => team.CriticalSectionVersion,
-                        team => team.CriticalSectionVersion + 1), token),
+                scope.TeamId,
+                competitionChallengeId,
                 ct);
             var existing = await db.ChallengeFlags.SingleOrDefaultAsync(flag =>
                 flag.CompetitionChallengeId == competitionChallengeId &&

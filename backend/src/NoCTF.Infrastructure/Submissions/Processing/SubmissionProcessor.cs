@@ -24,9 +24,28 @@ public sealed class SubmissionProcessor(
     ISubmissionAdmissionModePolicy admissionModePolicy,
     IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
+    BloodRankCriticalSection bloodRankCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null,
     ILogger<SubmissionProcessor>? logger = null) : ISubmissionProcessor
 {
+    public SubmissionProcessor(
+        NoCtfDbContext db,
+        ISubmissionEvaluatorCatalog evaluatorCatalog,
+        ISubmissionAdmissionModePolicy admissionModePolicy,
+        IRuntimePlacementPolicy placementPolicy,
+        ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder? eventRecorder = null,
+        ILogger<SubmissionProcessor>? logger = null)
+        : this(
+            db,
+            evaluatorCatalog,
+            admissionModePolicy,
+            placementPolicy,
+            outbox,
+            new BloodRankCriticalSection(new LocalCriticalSectionRegistry()),
+            eventRecorder,
+            logger) { }
+
     private static readonly CompetitionEventKind[] CheatResolutionKinds =
     [
         CompetitionEventKind.CheatIncidentConfirmed,
@@ -506,14 +525,9 @@ public sealed class SubmissionProcessor(
         if (competitionMode != GameMode.Ctf)
             return null;
 
-        await using var bloodLease = await CriticalSectionCoordinator.AcquireAsync(
+        await using var bloodLease = await bloodRankCriticalSection.AcquireAsync(
             db,
-            $"blood-rank:{submission.CompetitionChallengeId:N}",
-            token => db.CompetitionChallenges.IgnoreQueryFilters()
-                .Where(challenge => challenge.Id == submission.CompetitionChallengeId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    challenge => challenge.CriticalSectionVersion,
-                    challenge => challenge.CriticalSectionVersion + 1), token),
+            submission.CompetitionChallengeId,
             ct);
         var solvedTeamIds = await db.Submissions.AsNoTracking()
             .Where(candidate =>

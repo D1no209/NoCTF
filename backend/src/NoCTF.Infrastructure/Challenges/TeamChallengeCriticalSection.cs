@@ -1,23 +1,21 @@
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Domain.Submissions;
 using NoCTF.Infrastructure.Persistence;
 
-namespace NoCTF.Infrastructure.Submissions.Intake;
+namespace NoCTF.Infrastructure.Challenges;
 
-public sealed class SubmissionAttemptCriticalSection(LocalCriticalSectionRegistry localLeases)
+public sealed class TeamChallengeCriticalSection(LocalCriticalSectionRegistry localLeases)
 {
     public async ValueTask<IAsyncDisposable> AcquireAsync(
         NoCtfDbContext db,
         Guid teamId,
         Guid competitionChallengeId,
-        SubmissionKind kind,
         CancellationToken cancellationToken)
     {
         if (!db.Database.IsRelational())
         {
             return await localLeases.AcquireAsync(
-                "submission-attempt",
-                $"{teamId:N}:{competitionChallengeId:N}:{(short)kind}",
+                "team-challenge",
+                $"{teamId:N}:{competitionChallengeId:N}",
                 cancellationToken);
         }
 
@@ -30,12 +28,12 @@ public sealed class SubmissionAttemptCriticalSection(LocalCriticalSectionRegistr
                     team => team.CriticalSectionVersion,
                     team => team.CriticalSectionVersion + 1), budget.Token);
             if (affected != 1)
-                throw new DbUpdateConcurrencyException("The submission team no longer exists.");
+                throw new DbUpdateConcurrencyException("The team challenge scope no longer exists.");
             return NoopCriticalSectionLease.Instance;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new FeatureCriticalSectionTimeoutException("submission-attempt");
+            throw new FeatureCriticalSectionTimeoutException("team-challenge");
         }
     }
 }

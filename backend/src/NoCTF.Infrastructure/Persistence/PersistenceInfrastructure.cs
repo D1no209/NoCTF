@@ -14,6 +14,7 @@ internal static class PersistenceInfrastructure
         bool exporting,
         bool development)
     {
+        services.AddSingleton<LocalCriticalSectionRegistry>();
         if (exporting || development)
         {
             var databaseName = exporting

@@ -18,8 +18,27 @@ public sealed class AdminRuntimeStore(
     IRuntimePlacementPolicy placementPolicy,
     IPerTeamRuntimeFlagStore runtimeFlags,
     ITransactionalMessageOutbox outbox,
+    TeamRuntimeQuota runtimeQuota,
+    SharedRuntimeCriticalSection sharedRuntimeCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null) : IAdminRuntimeStore
 {
+    public AdminRuntimeStore(
+        NoCtfDbContext db,
+        IChallengeRuntimeTemplateCatalog templates,
+        IRuntimePlacementPolicy placementPolicy,
+        IPerTeamRuntimeFlagStore runtimeFlags,
+        ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder? eventRecorder = null)
+        : this(
+            db,
+            templates,
+            placementPolicy,
+            runtimeFlags,
+            outbox,
+            new TeamRuntimeQuota(new LocalCriticalSectionRegistry()),
+            new SharedRuntimeCriticalSection(new LocalCriticalSectionRegistry()),
+            eventRecorder) { }
+
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
@@ -141,12 +160,12 @@ public sealed class AdminRuntimeStore(
             return new(null, RuntimeMutationFailure.Unsupported);
 
         await using var criticalSection = teamId is Guid lockedTeamId
-            ? await TeamRuntimeQuota.AcquireLockAsync(
+            ? await runtimeQuota.AcquireLockAsync(
                 db,
                 competitionId,
                 lockedTeamId,
                 ct)
-            : await SharedRuntimeScopeLock.AcquireAsync(
+            : await sharedRuntimeCriticalSection.AcquireAsync(
                 db,
                 competitionChallengeId,
                 ct);
@@ -175,7 +194,7 @@ public sealed class AdminRuntimeStore(
                     || !CanReset(current)))
                 return new(null, RuntimeMutationFailure.InvalidState);
             if (teamId is Guid quotaTeamId
-                && !await TeamRuntimeQuota.CanCreateSlotAsync(
+                && !await runtimeQuota.CanCreateSlotAsync(
                     db,
                     competitionId,
                     quotaTeamId,

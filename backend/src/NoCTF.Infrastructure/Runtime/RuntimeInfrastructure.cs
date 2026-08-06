@@ -39,6 +39,8 @@ internal static class RuntimeInfrastructure
         services.AddSingleton<IRuntimePlacementPolicy, ConfiguredRuntimePlacementPolicy>();
         services.AddSingleton(new RuntimePublishedPortRange());
         services.AddScoped<IRuntimePublishedPortAllocator, PostgresRuntimePublishedPortAllocator>();
+        services.AddScoped<TeamRuntimeQuota>();
+        services.AddScoped<SharedRuntimeCriticalSection>();
 
         services.AddScoped<IRuntimeInstanceStore, RuntimeInstanceStore>();
         services.AddScoped<GetPlayerRuntime>();

@@ -23,6 +23,7 @@ internal static class ChallengeInfrastructure
 {
     internal static IServiceCollection AddNoCtfChallenges(this IServiceCollection services)
     {
+        services.AddScoped<TeamChallengeCriticalSection>();
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
         services.AddSingleton<ChallengeRuntimeTemplateCatalog>();
         services.AddSingleton<IChallengeRuntimeTemplateCatalog,

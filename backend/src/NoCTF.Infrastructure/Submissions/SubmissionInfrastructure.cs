@@ -21,6 +21,7 @@ internal static class SubmissionInfrastructure
 {
     internal static IServiceCollection AddNoCtfSubmissions(this IServiceCollection services)
     {
+        services.AddScoped<SubmissionAttemptCriticalSection>();
         services.AddScoped<ISubmissionIntakeStore, SubmissionIntakeStore>();
         services.AddScoped<IPatchUploadStore, PatchUploadStore>();
         services.AddScoped<CreatePatchUpload>();
@@ -35,6 +36,7 @@ internal static class SubmissionInfrastructure
         services.AddScoped<AccessCheatIncident>();
         services.AddScoped<ResolveCheatIncident>();
         services.AddScoped<ISubmissionProcessor, SubmissionProcessor>();
+        services.AddScoped<BloodRankCriticalSection>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();
         services.AddScoped<RecordInternalResult>();
         services.AddSingleton<ISubmissionEvaluatorCatalog, GameModeSubmissionEvaluatorCatalog>();

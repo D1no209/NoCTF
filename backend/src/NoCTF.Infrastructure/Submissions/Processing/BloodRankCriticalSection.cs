@@ -1,41 +1,35 @@
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Domain.Submissions;
 using NoCTF.Infrastructure.Persistence;
 
-namespace NoCTF.Infrastructure.Submissions.Intake;
+namespace NoCTF.Infrastructure.Submissions.Processing;
 
-public sealed class SubmissionAttemptCriticalSection(LocalCriticalSectionRegistry localLeases)
+public sealed class BloodRankCriticalSection(LocalCriticalSectionRegistry localLeases)
 {
     public async ValueTask<IAsyncDisposable> AcquireAsync(
         NoCtfDbContext db,
-        Guid teamId,
         Guid competitionChallengeId,
-        SubmissionKind kind,
         CancellationToken cancellationToken)
     {
         if (!db.Database.IsRelational())
-        {
             return await localLeases.AcquireAsync(
-                "submission-attempt",
-                $"{teamId:N}:{competitionChallengeId:N}:{(short)kind}",
-                cancellationToken);
-        }
+                "blood-rank", competitionChallengeId.ToString("N"), cancellationToken);
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         budget.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            var affected = await db.Teams.Where(team => team.Id == teamId)
+            var affected = await db.CompetitionChallenges.IgnoreQueryFilters()
+                .Where(challenge => challenge.Id == competitionChallengeId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    team => team.CriticalSectionVersion,
-                    team => team.CriticalSectionVersion + 1), budget.Token);
+                    challenge => challenge.CriticalSectionVersion,
+                    challenge => challenge.CriticalSectionVersion + 1), budget.Token);
             if (affected != 1)
-                throw new DbUpdateConcurrencyException("The submission team no longer exists.");
+                throw new DbUpdateConcurrencyException("The blood rank scope no longer exists.");
             return NoopCriticalSectionLease.Instance;
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new FeatureCriticalSectionTimeoutException("submission-attempt");
+            throw new FeatureCriticalSectionTimeoutException("blood-rank");
         }
     }
 }
