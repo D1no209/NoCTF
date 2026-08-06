@@ -196,7 +196,7 @@ public sealed class ChallengeAttachmentStore(NoCtfDbContext db) : IChallengeAtta
         }
         else
         {
-            await using var assignmentLease = await EfCriticalSection.AcquireAsync(
+            await using var assignmentLease = await CriticalSectionCoordinator.AcquireAsync(
                 db,
                 $"attachment-assignment:{scope.TeamId:N}:{competitionChallengeId:N}",
                 token => db.Teams.Where(team => team.Id == scope.TeamId)

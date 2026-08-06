@@ -12,7 +12,7 @@ internal static class SubmissionAttemptLock
         Guid competitionChallengeId,
         SubmissionKind kind,
         CancellationToken cancellationToken) =>
-        EfCriticalSection.AcquireAsync(
+        CriticalSectionCoordinator.AcquireAsync(
             db,
             $"submission-attempt:{teamId:N}:{competitionChallengeId:N}:{(short)kind}",
             token => db.Teams.Where(team => team.Id == teamId)

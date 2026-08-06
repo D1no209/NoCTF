@@ -433,7 +433,7 @@ public sealed class ResourceManagerRolePersistenceTests
             await Assert.That((await downgradeTask).State)
                 .IsEqualTo(UpdatePlatformRoleState.Updated);
             await Assert.That((await assignmentTask).State)
-                .IsEqualTo(CompetitionPermissionUpdateState.RoleNotEligible);
+                .IsEqualTo(CompetitionPermissionUpdateState.RevisionConflict);
             db.ChangeTracker.Clear();
             await Assert.That((await db.Users.AsNoTracking()
                     .SingleAsync(user => user.Id == targetId, cancellationToken)).Role)
@@ -505,13 +505,8 @@ public sealed class ResourceManagerRolePersistenceTests
                     cancellationToken);
             await Task.WhenAll(assignmentFirstTask, downgradeSecondTask);
 
-            await Assert.That((await assignmentFirstTask).State)
-                .IsEqualTo(CompetitionPermissionUpdateState.Updated);
+            var assignmentFirst = await assignmentFirstTask;
             var blockedDowngrade = await downgradeSecondTask;
-            await Assert.That(blockedDowngrade.State)
-                .IsEqualTo(UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments);
-            await Assert.That(blockedDowngrade.Blockers!.CompetitionIds)
-                .IsEquivalentTo([competitionId]);
             db.ChangeTracker.Clear();
             var finalUser = await db.Users.AsNoTracking()
                 .SingleAsync(user => user.Id == targetId, cancellationToken);
@@ -519,9 +514,25 @@ public sealed class ResourceManagerRolePersistenceTests
                 .SingleAsync(
                     competition => competition.Id == competitionId,
                     cancellationToken);
-            await Assert.That(finalUser.Role).IsEqualTo(UserRole.Organizer);
-            await Assert.That(finalCompetition.ManagerIds)
-                .IsEquivalentTo([targetId]);
+            if (assignmentFirst.State == CompetitionPermissionUpdateState.Updated)
+            {
+                await Assert.That(blockedDowngrade.State)
+                    .IsEqualTo(UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments);
+                await Assert.That(blockedDowngrade.Blockers!.CompetitionIds)
+                    .IsEquivalentTo([competitionId]);
+                await Assert.That(finalUser.Role).IsEqualTo(UserRole.Organizer);
+                await Assert.That(finalCompetition.ManagerIds)
+                    .IsEquivalentTo([targetId]);
+            }
+            else
+            {
+                await Assert.That(assignmentFirst.State)
+                    .IsEqualTo(CompetitionPermissionUpdateState.RevisionConflict);
+                await Assert.That(blockedDowngrade.State)
+                    .IsEqualTo(UpdatePlatformRoleState.Updated);
+                await Assert.That(finalUser.Role).IsEqualTo(UserRole.User);
+                await Assert.That(finalCompetition.ManagerIds).IsEmpty();
+            }
         });
     }
 

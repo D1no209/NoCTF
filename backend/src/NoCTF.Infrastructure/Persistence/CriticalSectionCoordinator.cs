@@ -10,7 +10,7 @@ namespace NoCTF.Infrastructure.Persistence;
 internal sealed class CriticalSectionTimeoutException(string scope)
     : TimeoutException($"The {scope} critical section was busy for more than two seconds.");
 
-internal static class EfCriticalSection
+internal static class CriticalSectionCoordinator
 {
     private static readonly TimeSpan WaitBudget = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan SlowThreshold = TimeSpan.FromMilliseconds(100);

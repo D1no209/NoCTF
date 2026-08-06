@@ -506,7 +506,7 @@ public sealed class SubmissionProcessor(
         if (competitionMode != GameMode.Ctf)
             return null;
 
-        await using var bloodLease = await EfCriticalSection.AcquireAsync(
+        await using var bloodLease = await CriticalSectionCoordinator.AcquireAsync(
             db,
             $"blood-rank:{submission.CompetitionChallengeId:N}",
             token => db.CompetitionChallenges.IgnoreQueryFilters()

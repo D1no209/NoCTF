@@ -213,7 +213,7 @@ public sealed class ChallengeHintStore(
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
-        await using var unlockLease = await EfCriticalSection.AcquireAsync(
+        await using var unlockLease = await CriticalSectionCoordinator.AcquireAsync(
             db,
             $"hint-unlock:{teamId.Value:N}:{competitionChallengeId:N}",
             token => db.Teams.Where(team => team.Id == teamId.Value)

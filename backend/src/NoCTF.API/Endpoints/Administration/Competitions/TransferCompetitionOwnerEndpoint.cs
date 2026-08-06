@@ -63,6 +63,11 @@ public sealed class TransferCompetitionOwnerEndpoint(
             CompetitionOwnerTransferState.Transferred =>
                 TypedResults.Ok(CompetitionMapper.ToResponse(result.Competition!)),
             CompetitionOwnerTransferState.NotFound => TypedResults.NotFound(),
+            CompetitionOwnerTransferState.RevisionConflict =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.RevisionConflict,
+                        null)),
             CompetitionOwnerTransferState.UserNotFound =>
                 TypedResults.Conflict(
                     CompetitionResourceManagerConflictMapper.ToResponse(

@@ -126,7 +126,14 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.DefinitionJson = command.DefinitionJson;
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(ChallengeTemplateWriteState.RevisionConflict);
+        }
         var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
@@ -299,7 +306,14 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.ManagerIds = managerIds;
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(ChallengeTemplateWriteState.RevisionConflict);
+        }
         var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);

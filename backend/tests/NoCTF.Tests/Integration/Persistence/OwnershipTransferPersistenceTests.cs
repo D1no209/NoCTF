@@ -223,7 +223,7 @@ public sealed class OwnershipTransferPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Concurrent_competition_transfers_preserve_every_previous_owner(
+    public async Task Concurrent_competition_transfers_return_one_explicit_conflict(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -316,25 +316,29 @@ public sealed class OwnershipTransferPersistenceTests
                 cancellationToken);
             var transfers = await Task.WhenAll(firstTransferTask, secondTransferTask);
 
-            await Assert.That(transfers.All(
+            await Assert.That(transfers.Count(
                     result => result.State == CompetitionOwnerTransferState.Transferred))
-                .IsTrue();
+                .IsEqualTo(1);
+            await Assert.That(transfers.Count(
+                    result => result.State == CompetitionOwnerTransferState.RevisionConflict))
+                .IsEqualTo(1);
             db.ChangeTracker.Clear();
             var persisted = await db.Competitions
                 .AsNoTracking()
                 .SingleAsync(item => item.Id == competitionId, cancellationToken);
-            await Assert.That(persisted.ManagerIds.Append(persisted.OwnerId))
-                .IsEquivalentTo(
-                    [previousOwnerId, firstNewOwnerId, secondNewOwnerId, existingManagerId]);
+            await Assert.That(new[] { firstNewOwnerId, secondNewOwnerId })
+                .Contains(persisted.OwnerId);
+            await Assert.That(persisted.ManagerIds)
+                .IsEquivalentTo([previousOwnerId, existingManagerId]);
             await Assert.That(persisted.ManagerIds.Contains(persisted.OwnerId)).IsFalse();
-            await Assert.That(persisted.JudgeIds).IsEmpty();
-            await Assert.That(persisted.ObserverIds).IsEmpty();
+            await Assert.That(persisted.JudgeIds.Contains(persisted.OwnerId)).IsFalse();
+            await Assert.That(persisted.ObserverIds.Contains(persisted.OwnerId)).IsFalse();
         });
     }
 
     [Test]
     [Timeout(300_000)]
-    public async Task Template_delete_and_competition_reference_creation_are_serialized(
+    public async Task Template_delete_and_reference_creation_return_an_explicit_conflict(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -435,7 +439,7 @@ public sealed class OwnershipTransferPersistenceTests
 
             await Assert.That(await deleteTask).IsNull();
             await Assert.That((await createTask).Failure)
-                .IsEqualTo(ChallengeMutationFailure.TemplateNotFound);
+                .IsEqualTo(ChallengeMutationFailure.RevisionConflict);
 
             db.ChangeTracker.Clear();
             var templateDeletedAt = await db.Challenges
