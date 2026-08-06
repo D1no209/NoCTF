@@ -2941,6 +2941,44 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   持久化结构并改变 Team/OpenAPI/前端流程；6.64 没有提前修改该数据模型。当前任务未授权 push 或
   deploy，本提交和本 HANDOFF 只保留在本地。
 
+### 6.65 全局可复用队伍、比赛报名快照与前端验收（2026-08-06）
+
+- 用户通过 `$grill-me` 的三项 `AAA` 明确确认：Team 是不依赖比赛的全局可复用身份；比赛报名复制
+  当时成员形成快照，后续成员变更不回写历史；邀请 Token 只加入全局 Team，报名由队长在比赛页
+  单独执行。后端功能提交为 `e50c4c0 feat(teams): add reusable global team profiles`，前端适配提交为
+  `169ee05 feat(frontend): adapt reusable team workflow`；两项均仅为本地提交，未 push、未部署生产。
+- 数据模型只新增必要的 `team_profiles` 表，并在既有 `teams` 增加 nullable `team_profile_id`：前者保存
+  稳定名称、大小写不敏感规范名、当前 Captain/MemberIds、头像和全局 32 字符邀请 Token；后者继续
+  作为全部计分、提交、Runtime、封禁、申诉和审计关系使用的比赛快照。既有历史记录保持 null；新
+  报名保留外键追溯。没有新增 TeamMember、Invitation 或 CompetitionConfiguration 表。migration
+  `20260806103231_AddGlobalTeamProfiles` 由 `dotnet ef` 10.0.4 生成，未手改 migration/snapshot。
+- 强类型 FastEndpoints 新增 `GET/POST /api/v1/teams` 和
+  `POST /api/v1/competitions/{competitionId}/team-registrations`；修改、删除、加入、退出、移除成员、
+  轮换 Token 和转移队长全部迁到全局 `/api/v1/teams/...`。比赛队伍列表、本人队伍、详情和报名重提
+  仍是 competition-scoped。报名 use case 只允许当前全局队长，执行比赛状态、成员上限、同比赛成员
+  互斥和重复报名检查，并复制名称、头像、CaptainId、MemberIds；OpenAPI、路由清单、E2E 流程及
+  TypeScript SDK 已重新生成/同步，前端没有手写 URL、DTO、枚举或失败码。
+- `/teams` 现在始终显示右上角创建/邀请加入入口，不再查询或要求可报名比赛；空状态仅保留说明，
+  不再出现第二个无响应创建按钮。页面只管理全局名称、头像、当前成员、Token、编辑与退出；比赛页
+  从队长拥有且不超过人数上限的全局队伍中选择报名。私密封禁申诉完整迁回对应比赛报名工作区，
+  仍保留队长提交、成员查看状态和工作人员裁决结果。中英文补齐全部新流程文案及漏译的复制按钮，
+  Router 在新页面导航时回到顶部、浏览器后退时保留 saved position。
+- 后端验证：锁定 SDK 10.0.300 的 solution build 0 warning/0 error；non-Integration 601/601 passed；
+  主机 Docker/Testcontainers 真实 PostgreSQL 定向用例 1/1 passed，覆盖跨比赛复用、报名成员快照不
+  回写、投影追溯与名称大小写冲突；EF pending model check passed；`NoCTF.E2E.csproj` 独立编译
+  0 warning/0 error。嵌套 SDK 容器内的 Testcontainers Resource Reaper 因 Docker Desktop 容器网络
+  初始化超时，随后在主机 Docker 环境通过同一真实依赖用例；本阶段没有把完整 Integration 套件记为
+  通过。
+- 前端验证：scoped ESLint passed；全量 Bun 186/186 passed；`bun run build` 的 vue-tsc 与 Vite
+  production build passed，只有既有 PURE annotation/大 chunk 警告。内置浏览器连接本地迁移后的
+  API，确认首页资料摘要已移除、导航头像进入资料页、重排后的 `/profile` 正常；在数据库没有任何
+  比赛时从 `/teams` 成功创建 `Browser Acceptance Team`，创建/加入面板均无比赛选择器、空态无重复
+  按钮，Token、复制、轮换与编辑区正常显示。该记录只存在本地验收库，不涉及生产数据。
+- 本地验收为当前工作树临时重建 API/Migration 并应用 migration，公网 HTTPS/远程主机未变更；临时
+  Vite 监听和浏览器验收标签已清理。本轮继续保护用户/协作者的 `TODO.md`、Runner `Properties/`、
+  本地端口 overlay、实例状态 composable、Query client、对应测试和 `scripts/`。下一步需用户重新
+  明确授权才可 push 或生产部署；部署前必须包含 `e50c4c0`、`169ee05` 及本 HANDOFF 提交。
+
 上述旧目标迁移和 2026-07-30 GitOps 后端收尾均已完成代码与本地验证。本轮新增重点：
 
 - 方案 A 的 Platform Bot 创建/Access JWT 签发，稳定 UUID、`includeDeleted` 与精确恢复；
@@ -2976,6 +3014,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   无敏感内容的公开更正事实和 generated-SDK 前后端工作区。
 - FastEndpoints/FluentValidation 全局 JSON 属性命名下稳定的 Validator 协议测试，以及普通参赛者
   `/teams` 私密封禁申诉的实际浏览器验收和完整 current-user mock 契约。
+- 全局可复用 Team、当前成员/邀请 Token、比赛报名成员快照及不依赖比赛的创建/加入前端。
 
 当前尚未执行的交付边界：
 
@@ -2992,7 +3031,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 
 ## 7. 建议的下一交接顺序
 
-最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
+最新版 `TODO.md` 是后续优先级来源。P0 `/profile`、全局 Team/比赛报名快照、P0 MailKit SMTP、P1 排行榜冻结/黑灯、
 P1 选手与出题人交流、P1 单比赛独立日志和 P1 CTF/AWDP 跨队 Flag 反作弊已分别由 6.49 至
 6.54 完成；P2 管理员平台日志由 6.55 完成，安全忘记密码/邮箱重置由 6.56 完成，完整比赛与审计
 数据导出由 6.57 完成，PostgreSQL/对象存储/Wolverine 灾难恢复工具与演练由 6.58 完成。
