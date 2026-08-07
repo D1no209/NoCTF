@@ -44,3 +44,8 @@
 
 - The only game modes are CTF, AWD, AWDP, and KoH. Penetration is ordinary CTF content, not a game mode, and multi-stage or static-container-fleet challenge types are out of scope.
 - Production consists of three independent processes: `NoCTF.API`, horizontally scalable `NoCTF.Worker`, and one or more `NoCTF.Runner` nodes. Do not add a supported single-process hosting mode.
+
+## Frontend (ClientApp)
+
+- The SPA lives in `backend/src/NoCTF.API/ClientApp` (Nuxt 4, Bun, `ssr: false`). See `ClientApp/AGENTS.md` for the conventions.
+- It is currently a minimal skeleton without a UI framework, pages, or an API SDK; frontend features are rebuilt on top of this base as needed.

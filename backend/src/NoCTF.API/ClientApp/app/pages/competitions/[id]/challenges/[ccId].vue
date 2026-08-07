@@ -1,0 +1,181 @@
+<script setup lang="ts">
+import { toast } from 'vue-sonner'
+import { Dice5, Download, FileDown } from '@lucide/vue'
+import { getChallengeEndpoint, listChallengeAttachmentsEndpoint } from '~/api'
+import type {
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
+  NoCtfapiEndpointsChallengesChallengeResponse,
+} from '~/api'
+
+const route = useRoute()
+const competitionId = route.params.id as string
+const competitionChallengeId = route.params.ccId as string
+const ctx = inject(competitionContextKey)!
+const { isLoggedIn } = useAuth()
+
+const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
+const loading = ref(true)
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  const { data, error: err } = await getChallengeEndpoint({
+    path: { competitionId, competitionChallengeId },
+  })
+  loading.value = false
+  if (err || !data) {
+    error.value = parseApiError(err, '加载题目失败').message
+    return
+  }
+  challenge.value = data
+})
+
+// 附件(需要登录)
+const attachments = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
+const attachmentsLoaded = ref(false)
+
+async function loadAttachments() {
+  if (!isLoggedIn.value) return
+  const { data, error: err } = await listChallengeAttachmentsEndpoint({
+    path: { competitionId, competitionChallengeId },
+  })
+  attachmentsLoaded.value = true
+  if (err || !data) return
+  attachments.value = (data.items ?? []).filter((a) => !a.deletedAt)
+}
+
+onMounted(loadAttachments)
+watch(isLoggedIn, loadAttachments)
+
+const downloading = ref(false)
+
+async function downloadAttachment(attachmentId: string, fileName: string) {
+  downloading.value = true
+  try {
+    await downloadProtectedFile(
+      `/api/v1/competitions/${competitionId}/challenges/${competitionChallengeId}/attachments/${attachmentId}`,
+      fileName,
+    )
+  }
+  catch (e) {
+    toast.error(parseApiError(e, '附件下载失败').message)
+  }
+  finally {
+    downloading.value = false
+  }
+}
+
+async function downloadRandom() {
+  downloading.value = true
+  try {
+    await downloadProtectedFile(
+      `/api/v1/competitions/${competitionId}/challenges/${competitionChallengeId}/attachment`,
+      'attachment',
+    )
+  }
+  catch (e) {
+    toast.error(parseApiError(e, '附件下载失败').message)
+  }
+  finally {
+    downloading.value = false
+  }
+}
+
+const mode = computed(() => ctx.competition.value?.mode)
+</script>
+
+<template>
+  <div class="flex flex-col gap-6">
+    <Alert v-if="error" variant="destructive">
+      <AlertDescription>{{ error }}</AlertDescription>
+    </Alert>
+
+    <div v-else-if="loading" class="flex flex-col gap-4">
+      <Skeleton class="h-8 w-1/2" />
+      <Skeleton class="h-40 w-full" />
+    </div>
+
+    <template v-else-if="challenge">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="text-xl font-semibold">{{ challenge.title }}</h2>
+        <Badge variant="outline">{{ challenge.direction }}</Badge>
+        <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary">
+          分数隐藏
+        </Badge>
+        <span v-else class="font-semibold text-primary">{{ challenge.baseScore }} 分</span>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-base">题面</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p v-if="challenge.description" class="whitespace-pre-line text-sm leading-6">
+            {{ challenge.description }}
+          </p>
+          <p v-else class="text-sm text-muted-foreground">本题没有额外描述。</p>
+        </CardContent>
+      </Card>
+
+      <Card v-if="attachments.length || isLoggedIn">
+        <CardHeader>
+          <div class="flex items-center justify-between gap-2">
+            <CardTitle class="text-base">附件</CardTitle>
+            <Button variant="outline" size="sm" :disabled="downloading" @click="downloadRandom">
+              <Dice5 data-icon="inline-start" />
+              随机下载一个附件
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p v-if="!attachmentsLoaded" class="text-sm text-muted-foreground">加载中…</p>
+          <p v-else-if="!attachments.length" class="text-sm text-muted-foreground">本题没有附件。</p>
+          <ul v-else class="flex flex-col gap-2">
+            <li
+              v-for="attachment in attachments"
+              :key="attachment.id"
+              class="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
+            >
+              <span class="flex items-center gap-2 text-sm">
+                <FileDown class="size-4 text-muted-foreground" />
+                {{ attachment.fileName }}
+                <span class="text-muted-foreground">{{ formatBytes(attachment.byteLength) }}</span>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                :disabled="downloading"
+                @click="downloadAttachment(attachment.id!, attachment.fileName ?? 'attachment')"
+              >
+                <Download data-icon="inline-start" />
+                下载
+              </Button>
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <template v-if="ctx.competition.value">
+        <CtfPanel
+          v-if="mode === GameMode.Ctf"
+          :competition="ctx.competition.value"
+          :challenge="challenge"
+        />
+        <AwdPanel
+          v-else-if="mode === GameMode.Awd"
+          :competition="ctx.competition.value"
+          :challenge="challenge"
+        />
+        <AwdpPanel
+          v-else-if="mode === GameMode.Awdp"
+          :competition="ctx.competition.value"
+          :challenge="challenge"
+        />
+        <KohPanel
+          v-else-if="mode === GameMode.Koh"
+          :competition="ctx.competition.value"
+          :challenge="challenge"
+        />
+      </template>
+    </template>
+  </div>
+</template>
