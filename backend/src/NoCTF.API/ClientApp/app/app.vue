@@ -1,3 +1,10 @@
+<script setup lang="ts">
+usePlatform().ensureLoaded()
+</script>
+
 <template>
-  <NuxtPage />
+  <NuxtLayout>
+    <NuxtPage />
+  </NuxtLayout>
+  <Toaster rich-colors close-button position="top-right" />
 </template>

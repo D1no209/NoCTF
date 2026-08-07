@@ -11,7 +11,7 @@
         "tags": [
           "Health"
         ],
-        "operationId": "NoCTFAPIEndpointsHealthEndpoint",
+        "operationId": "HealthEndpoint",
         "responses": {
           "200": {
             "description": "Success",
@@ -31,7 +31,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsCreateTeamEndpoint",
+        "operationId": "CreateTeamEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -87,7 +87,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsListCompetitionTeamsEndpoint",
+        "operationId": "ListCompetitionTeamsEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -118,7 +118,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsDeleteTeamEndpoint",
+        "operationId": "DeleteTeamEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -161,7 +161,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsGetTeamEndpoint",
+        "operationId": "GetTeamEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -202,7 +202,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsUpdateTeamEndpoint",
+        "operationId": "UpdateTeamEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -316,7 +316,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsGetMyTeamEndpoint",
+        "operationId": "GetMyTeamEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -361,7 +361,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsJoinTeamByInvitationEndpoint",
+        "operationId": "JoinTeamByInvitationEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -409,7 +409,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsLeaveTeamEndpoint",
+        "operationId": "LeaveTeamEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -446,7 +446,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsRemoveTeamMemberEndpoint",
+        "operationId": "RemoveTeamMemberEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -500,7 +500,7 @@
           "Competitions"
         ],
         "summary": "Resubmits a rejected team registration.",
-        "operationId": "NoCTFAPIEndpointsTeamsResubmitTeamRegistrationEndpoint",
+        "operationId": "ResubmitTeamRegistrationEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -548,7 +548,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsRotateTeamInvitationEndpoint",
+        "operationId": "RotateTeamInvitationEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -673,7 +673,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsTeamsTransferTeamCaptainEndpoint",
+        "operationId": "TransferTeamCaptainEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -731,7 +731,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsSubmissionsGetSubmissionStatusEndpoint",
+        "operationId": "GetSubmissionStatusEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -786,7 +786,7 @@
           "Competitions"
         ],
         "summary": "Lists the current team's submissions.",
-        "operationId": "NoCTFAPIEndpointsSubmissionsListSubmissionsEndpoint",
+        "operationId": "ListSubmissionsEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -859,7 +859,7 @@
         ],
         "summary": "Consume a PatchUpload and create a Fix attempt.",
         "description": "PatchUpload consumption and durable evaluation dispatch are atomic.",
-        "operationId": "NoCTFAPIEndpointsSubmissionsSubmitFixEndpoint",
+        "operationId": "SubmitFixEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -955,7 +955,7 @@
         ],
         "summary": "Submit one Flag or an ordered AWD Flag collection.",
         "description": "Creates independent immutable attempts. The accepted response is not an evaluation result.",
-        "operationId": "NoCTFAPIEndpointsSubmissionsSubmitFlagEndpoint",
+        "operationId": "SubmitFlagEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1051,7 +1051,7 @@
         ],
         "summary": "Upload an AWDP patch archive",
         "description": "Validates and stores one gzip-compressed tar archive without creating a submission.",
-        "operationId": "NoCTFAPIEndpointsSubmissionsUploadPatchEndpoint",
+        "operationId": "UploadPatchEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1139,7 +1139,7 @@
           "Competitions"
         ],
         "summary": "Extends a running CTF runtime.",
-        "operationId": "NoCTFAPIEndpointsRuntimeExtendRuntimeEndpoint",
+        "operationId": "ExtendRuntimeEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1229,7 +1229,7 @@
         ],
         "summary": "Gets the current team runtime.",
         "description": "Only Running instances expose expanded public URLs.",
-        "operationId": "NoCTFAPIEndpointsRuntimeGetRuntimeEndpoint",
+        "operationId": "GetRuntimeEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1283,7 +1283,7 @@
         ],
         "summary": "Lists AWD participant targets.",
         "description": "During hardening only the caller's team is returned; afterwards every eligible team is retained even when it has no running URLs.",
-        "operationId": "NoCTFAPIEndpointsRuntimeListRuntimeTargetsEndpoint",
+        "operationId": "ListRuntimeTargetsEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1336,7 +1336,7 @@
           "Competitions"
         ],
         "summary": "Queues an atomic replacement runtime.",
-        "operationId": "NoCTFAPIEndpointsRuntimeResetRuntimeEndpoint",
+        "operationId": "ResetRuntimeEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1402,7 +1402,7 @@
           "Competitions"
         ],
         "summary": "Queues a team runtime start.",
-        "operationId": "NoCTFAPIEndpointsRuntimeStartRuntimeEndpoint",
+        "operationId": "StartRuntimeEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1468,7 +1468,7 @@
           "Competitions"
         ],
         "summary": "Queues a team runtime stop.",
-        "operationId": "NoCTFAPIEndpointsRuntimeStopRuntimeEndpoint",
+        "operationId": "StopRuntimeEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1572,7 +1572,7 @@
         ],
         "summary": "List permanent notifications",
         "description": "Returns the current user's immutable notification event stream.",
-        "operationId": "NoCTFAPIEndpointsNotificationsListNotificationsEndpoint",
+        "operationId": "ListNotificationsEndpoint",
         "parameters": [
           {
             "name": "cursor",
@@ -1696,7 +1696,7 @@
         ],
         "summary": "Download one AWDP fix archive",
         "description": "Returns only the archive bound to the internal JWT submission claim.",
-        "operationId": "NoCTFAPIEndpointsInternalDownloadFixArchiveEndpoint",
+        "operationId": "DownloadFixArchiveEndpoint",
         "parameters": [
           {
             "name": "submissionId",
@@ -1727,7 +1727,7 @@
         ],
         "summary": "Updates the status reported by an AWD checker.",
         "description": "Each accepted update replaces the runtime's previous checker status. Runtime identity and generation come from the internal JWT.",
-        "operationId": "NoCTFAPIEndpointsInternalRecordAwdCheckResultEndpoint",
+        "operationId": "RecordAwdCheckResultEndpoint",
         "requestBody": {
           "x-name": "RecordAwdCheckResultRequest",
           "description": "",
@@ -1794,7 +1794,7 @@
         ],
         "summary": "Records a claim-bound AWDP fix result.",
         "description": "SubmissionId and ProcessingVersion come exclusively from the internal JWT.",
-        "operationId": "NoCTFAPIEndpointsInternalRecordAwdpCheckResultEndpoint",
+        "operationId": "RecordAwdpCheckResultEndpoint",
         "requestBody": {
           "x-name": "RecordAwdpCheckResultRequest",
           "description": "",
@@ -1859,7 +1859,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsCompetitionsGetCompetitionEndpoint",
+        "operationId": "GetCompetitionEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1894,7 +1894,7 @@
           "Competitions"
         ],
         "summary": "Get the cached leaderboard or queue an asynchronous refresh.",
-        "operationId": "NoCTFAPIEndpointsCompetitionsGetLeaderboardEndpoint",
+        "operationId": "GetLeaderboardEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -1938,7 +1938,7 @@
         "tags": [
           "Competitions"
         ],
-        "operationId": "NoCTFAPIEndpointsCompetitionsListCompetitionsEndpoint",
+        "operationId": "ListCompetitionsEndpoint",
         "responses": {
           "200": {
             "description": "Success",
@@ -2311,7 +2311,7 @@
           "Competitions"
         ],
         "summary": "Downloads one All-policy challenge attachment.",
-        "operationId": "NoCTFAPIEndpointsChallengesDownloadChallengeAttachmentEndpoint",
+        "operationId": "DownloadChallengeAttachmentEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -2363,7 +2363,7 @@
         ],
         "summary": "Downloads the team's fixed RandomOnePerTeam attachment.",
         "description": "The first request atomically selects a candidate and persists the selection as a team ChallengeFlag fact.",
-        "operationId": "NoCTFAPIEndpointsChallengesDownloadRandomChallengeAttachmentEndpoint",
+        "operationId": "DownloadRandomChallengeAttachmentEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -2406,7 +2406,7 @@
           "Competitions"
         ],
         "summary": "Gets a published challenge.",
-        "operationId": "NoCTFAPIEndpointsChallengesGetChallengeEndpoint",
+        "operationId": "GetChallengeEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -2451,7 +2451,7 @@
         ],
         "summary": "Lists All-policy challenge attachments.",
         "description": "RandomOnePerTeam challenges deliberately return 404 from this route.",
-        "operationId": "NoCTFAPIEndpointsChallengesListChallengeAttachmentsEndpoint",
+        "operationId": "ListChallengeAttachmentsEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -2504,7 +2504,7 @@
           "Competitions"
         ],
         "summary": "Lists published challenges for a competition.",
-        "operationId": "NoCTFAPIEndpointsChallengesListChallengesEndpoint",
+        "operationId": "ListChallengesEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -2540,7 +2540,7 @@
         ],
         "summary": "Unlocks a published hint.",
         "description": "The first paid unlock creates a HintUnlock fact from an authoritative database projection.",
-        "operationId": "NoCTFAPIEndpointsChallengesUnlockChallengeHintEndpoint",
+        "operationId": "UnlockChallengeHintEndpoint",
         "parameters": [
           {
             "name": "competitionId",
@@ -3110,7 +3110,7 @@
         ],
         "summary": "Change the current password",
         "description": "Rehashes the password and invalidates all existing tokens.",
-        "operationId": "NoCTFAPIEndpointsAuthenticationChangePasswordEndpoint",
+        "operationId": "ChangePasswordEndpoint",
         "requestBody": {
           "x-name": "ChangePasswordRequest",
           "description": "",
@@ -3207,7 +3207,7 @@
         ],
         "summary": "Get the current user",
         "description": "Returns the authenticated account profile.",
-        "operationId": "NoCTFAPIEndpointsAuthenticationGetMeEndpoint",
+        "operationId": "GetMeEndpoint",
         "responses": {
           "200": {
             "description": "Success",
@@ -3300,7 +3300,7 @@
         "tags": [
           "Auth"
         ],
-        "operationId": "NoCTFAPIEndpointsAuthenticationLoginEndpoint",
+        "operationId": "LoginEndpoint",
         "requestBody": {
           "x-name": "LoginRequest",
           "description": "",
@@ -3345,7 +3345,7 @@
         ],
         "summary": "Invalidate every user token",
         "description": "Increments TokenVersion and clears the current refresh cookie.",
-        "operationId": "NoCTFAPIEndpointsAuthenticationLogoutAllEndpoint",
+        "operationId": "LogoutAllEndpoint",
         "responses": {
           "204": {
             "description": "No Content"
@@ -3372,7 +3372,7 @@
         "tags": [
           "Auth"
         ],
-        "operationId": "NoCTFAPIEndpointsAuthenticationLogoutEndpoint",
+        "operationId": "LogoutEndpoint",
         "responses": {
           "204": {
             "description": "No Content"
@@ -3385,7 +3385,7 @@
         "tags": [
           "Auth"
         ],
-        "operationId": "NoCTFAPIEndpointsAuthenticationRefreshTokenEndpoint",
+        "operationId": "RefreshTokenEndpoint",
         "responses": {
           "200": {
             "description": "Success",
@@ -3407,7 +3407,7 @@
         ],
         "summary": "Register a user account",
         "description": "Creates a local account with an Identity V3 password hash.",
-        "operationId": "NoCTFAPIEndpointsAuthenticationRegisterEndpoint",
+        "operationId": "RegisterEndpoint",
         "requestBody": {
           "x-name": "RegisterRequest",
           "description": "",
@@ -3510,7 +3510,7 @@
         ],
         "summary": "Resend email verification",
         "description": "Queues a new single-use email verification message.",
-        "operationId": "NoCTFAPIEndpointsAuthenticationResendEmailVerificationEndpoint",
+        "operationId": "ResendEmailVerificationEndpoint",
         "responses": {
           "204": {
             "description": "No Content"
@@ -3652,7 +3652,7 @@
         ],
         "summary": "Verify an email address",
         "description": "Consumes a single-use email verification token.",
-        "operationId": "NoCTFAPIEndpointsAuthenticationVerifyEmailEndpoint",
+        "operationId": "VerifyEmailEndpoint",
         "requestBody": {
           "x-name": "VerifyEmailRequest",
           "description": "",
