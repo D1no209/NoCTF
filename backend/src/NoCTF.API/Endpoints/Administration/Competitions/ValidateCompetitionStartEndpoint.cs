@@ -3,10 +3,39 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Teams.Moderation;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
-public sealed record StartValidationResponse(IReadOnlyList<StartGateError> Errors);
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<StartGateFailureCodeProtocol>))]
+public enum StartGateFailureCodeProtocol
+{
+    CompetitionNotPublished,
+    CompetitionConfigurationInvalid,
+    PublishedChallengeRequired,
+    ApprovedTeamRequired,
+    RuntimeQuotaInsufficient,
+    ChallengeModeMismatch,
+    ChallengeRulesInvalid,
+    RuntimeDefinitionInvalid
+}
+
+public sealed record StartGateErrorResponse(
+    StartGateFailureCodeProtocol Code,
+    Guid? CompetitionChallengeId,
+    string Message);
+
+public sealed record StartValidationResponse(IReadOnlyList<StartGateErrorResponse> Errors);
+
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
+internal static partial class ValidateCompetitionStartMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial StartGateFailureCodeProtocol ToProtocol(StartGateFailureCode value);
+
+    public static partial StartGateErrorResponse ToResponse(StartGateError value);
+}
 
 public sealed class ValidateCompetitionStartEndpoint(
     CompetitionStartGate gate,
@@ -37,6 +66,7 @@ public sealed class ValidateCompetitionStartEndpoint(
         var errors = await gate.ValidateAsync(competitionId, ct);
         return errors is null
             ? TypedResults.NotFound()
-            : TypedResults.Ok(new StartValidationResponse(errors));
+            : TypedResults.Ok(new StartValidationResponse(
+                errors.Select(ValidateCompetitionStartMapper.ToResponse).ToArray()));
     }
 }

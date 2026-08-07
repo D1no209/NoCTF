@@ -13,7 +13,7 @@ public sealed class CreateCompetitionRequest
 {
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public GameMode Mode { get; set; }
+    public GameModeProtocol Mode { get; set; }
     public DateTimeOffset StartTime { get; set; }
     public DateTimeOffset EndTime { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
@@ -65,7 +65,7 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
         var result = await create.ExecuteAsync(new CreateCompetitionCommand(
             request.Title,
             request.Description,
-            request.Mode,
+            CompetitionProtocolMapper.ToDomain(request.Mode),
             request.StartTime,
             request.EndTime,
             request.TeamRegistrationAutoApprove,

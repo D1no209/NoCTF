@@ -104,9 +104,12 @@ public sealed class FusionLeaderboardCache(
                 instance => instance.ChallengeId,
                 template => template.Id,
                 (instance, template) => new { Instance = instance, Template = template })
+            .OrderBy(item => item.Instance.Order)
+            .ThenBy(item => item.Instance.Id)
             .Select(item => new LeaderboardChallengeFact(
                 item.Instance.Id,
                 item.Template.Direction,
+                item.Template.Title,
                 false,
                 item.Instance.RulesJson))
             .ToListAsync(ct);
@@ -136,14 +139,20 @@ public sealed class FusionLeaderboardCache(
                     db.ScoringEvents.IgnoreQueryFilters().AsNoTracking(),
                     item => item.ScoringEventId,
                     scoringEvent => (Guid?)scoringEvent.Id,
-                    (item, scoringEvent) => new LeaderboardSubmissionFact(
+                    (item, scoringEvent) => new { item.Submission, ScoringEvent = scoringEvent })
+                .Join(
+                    db.Users.AsNoTracking(),
+                    item => item.Submission.SubmittedByUserId,
+                    user => user.Id,
+                    (item, user) => new LeaderboardSubmissionFact(
                         item.Submission.Id,
                         item.Submission.TeamId,
                         item.Submission.CompetitionChallengeId,
                         item.Submission.Kind,
                         item.Submission.ReceivedAt,
-                        scoringEvent,
-                        scoringEvent.VictimTeamId))
+                        item.ScoringEvent,
+                        item.ScoringEvent.VictimTeamId,
+                        user.UserName))
                 .ToListAsync(ct);
         }
         else
@@ -155,14 +164,20 @@ public sealed class FusionLeaderboardCache(
                     db.ScoringEvents.AsNoTracking(),
                     submission => submission.CurrentScoringEventId,
                     scoringEvent => (Guid?)scoringEvent.Id,
-                    (submission, scoringEvent) => new LeaderboardSubmissionFact(
-                        submission.Id,
-                        submission.TeamId,
-                        submission.CompetitionChallengeId,
-                        submission.Kind,
-                        submission.ReceivedAt,
-                        scoringEvent,
-                        scoringEvent.VictimTeamId))
+                    (submission, scoringEvent) => new { Submission = submission, ScoringEvent = scoringEvent })
+                .Join(
+                    db.Users.AsNoTracking(),
+                    item => item.Submission.SubmittedByUserId,
+                    user => user.Id,
+                    (item, user) => new LeaderboardSubmissionFact(
+                        item.Submission.Id,
+                        item.Submission.TeamId,
+                        item.Submission.CompetitionChallengeId,
+                        item.Submission.Kind,
+                        item.Submission.ReceivedAt,
+                        item.ScoringEvent,
+                        item.ScoringEvent.VictimTeamId,
+                        user.UserName))
                 .ToListAsync(ct);
         }
 
@@ -237,6 +252,8 @@ public sealed class FusionLeaderboardCache(
         {
             Subjects = projection.Subjects,
             Bloods = projection.Bloods,
+            Series = projection.Series,
+            Challenges = projection.Challenges,
             SnapshotRevision = competition.LeaderboardRevision,
             TargetRevision = competition.LeaderboardRevision,
             Stale = false,

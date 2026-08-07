@@ -190,8 +190,8 @@ watch(
   },
 )
 
-const appealStatusLabel = (status?: number) =>
-  ({ 0: '申诉中', 1: '已驳回', 2: '已通过' } as Record<number, string>)[status ?? -1] ?? '未知'
+const appealStatusLabel = (status?: string) =>
+  ({ Submitted: '申诉中', Upheld: '已驳回', Accepted: '已通过' } as Record<string, string>)[String(status)] ?? '未知'
 
 async function submitAppeal() {
   if (!appealStatement.value.trim()) return
@@ -272,7 +272,7 @@ async function submitAppeal() {
         <CardContent class="flex flex-col gap-3">
           <template v-if="banCase">
             <p class="text-sm">
-              封禁时间:{{ formatDateTime(banCase.bannedAt) }} · 来源:{{ banCase.source === 1 ? '作弊检测' : '人工处理' }}
+              封禁时间:{{ formatDateTime(banCase.bannedAt) }} · 来源:{{ banCase.source === 'CheatIncident' ? '作弊检测' : '人工处理' }}
             </p>
             <Alert v-if="banCase.appeal">
               <AlertDescription>

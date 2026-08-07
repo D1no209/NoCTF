@@ -11,9 +11,7 @@ export type CurrentUser = NoCtfapiEndpointsAuthenticationCurrentUserResponse
 
 /** Platform roles — mirrors NoCTF.Domain.Identity.UserRole. */
 export const UserRole = {
-  User: 0,
-  Organizer: 1,
-  Administrator: 2,
+  User: 'User', Organizer: 'Organizer', Administrator: 'Administrator',
 } as const
 
 export function useAuth() {

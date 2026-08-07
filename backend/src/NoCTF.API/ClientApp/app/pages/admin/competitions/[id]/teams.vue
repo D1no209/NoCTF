@@ -167,7 +167,7 @@ onMounted(() => {
             <TableCell class="font-medium">{{ t.name }}</TableCell>
             <TableCell>{{ t.memberIds?.length ?? 0 }}</TableCell>
             <TableCell>
-              <Badge :variant="t.registrationStatus === 1 ? 'default' : t.registrationStatus === 2 ? 'destructive' : 'secondary'">
+              <Badge :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
                 {{ enumLabel(TeamRegistrationStatusLabel, t.registrationStatus) }}
               </Badge>
             </TableCell>
@@ -178,7 +178,7 @@ onMounted(() => {
             <TableCell>{{ adminFormatDateTime(t.registeredAt) }}</TableCell>
             <TableCell v-if="canWrite" class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
-                <template v-if="t.registrationStatus === 0">
+                <template v-if="t.registrationStatus === 'Pending'">
                   <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">通过</Button>
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">拒绝</Button>
                 </template>
@@ -213,7 +213,7 @@ onMounted(() => {
               <CardTitle class="text-base">{{ a.teamName }}</CardTitle>
               <div class="flex items-center gap-1">
                 <Badge variant="outline">{{ enumLabel(TeamBanSourceLabel, a.source) }}</Badge>
-                <Badge v-if="a.appeal" :variant="a.appeal.status === 0 ? 'secondary' : a.appeal.status === 2 ? 'default' : 'destructive'">
+                <Badge v-if="a.appeal" :variant="a.appeal.status === 'Submitted' ? 'secondary' : a.appeal.status === 'Accepted' ? 'default' : 'destructive'">
                   申诉{{ enumLabel(TeamBanAppealStatusLabel, a.appeal.status) }}
                 </Badge>
                 <Badge v-if="a.isCurrentlyBanned" variant="destructive">封禁中</Badge>
@@ -228,7 +228,7 @@ onMounted(() => {
               裁决:{{ a.appeal.resolvedByUserName }} · {{ adminFormatDateTime(a.appeal.resolvedAt) }} — {{ a.appeal.resolutionReason }}
             </p>
           </CardContent>
-          <CardFooter v-if="canWrite && a.appeal?.status === 0 && a.canResolve" class="gap-2">
+          <CardFooter v-if="canWrite && a.appeal?.status === 'Submitted' && a.canResolve" class="gap-2">
             <Button size="sm" :disabled="appealPending" @click="openAppeal(a, 'accept')">接受申诉(解封)</Button>
             <Button variant="outline" size="sm" :disabled="appealPending" @click="openAppeal(a, 'uphold')">维持封禁</Button>
           </CardFooter>

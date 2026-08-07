@@ -10,7 +10,7 @@ const competitionId = route.params.id as string
 const items = ref<Challenge[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
-const dataScope = ref<number>(LeaderboardDataScope.Live)
+const dataScope = ref<string>(LeaderboardDataScope.Live)
 
 onMounted(async () => {
   const { data, error: err } = await listChallengesEndpoint({ path: { competitionId } })

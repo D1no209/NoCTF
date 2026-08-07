@@ -18,7 +18,7 @@ public sealed class FlagSubmissionBatchTests
             ["flag{valid}", "\0"],
             DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("flag_invalid");
+        await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.FlagInvalid);
         await Assert.That(store.BatchWrites).IsEqualTo(0);
     }
 

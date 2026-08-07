@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Permissions;
 using NoCTF.Domain.Identity;
@@ -9,8 +10,8 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 public sealed record CompetitionPermissionCandidateResponse(
     Guid Id,
     string UserName,
-    UserKind Kind,
-    UserRole Role,
+    UserKindProtocol Kind,
+    UserRoleProtocol Role,
     bool EmailVerified);
 
 public sealed record CompetitionPermissionCandidateListResponse(
@@ -23,8 +24,8 @@ internal static class CompetitionPermissionCandidateMapper
         new(
             candidate.Id,
             candidate.UserName,
-            candidate.Kind,
-            candidate.Role,
+            IdentityProtocolMapper.ToProtocol(candidate.Kind),
+            IdentityProtocolMapper.ToProtocol(candidate.Role),
             candidate.EmailVerified);
 }
 

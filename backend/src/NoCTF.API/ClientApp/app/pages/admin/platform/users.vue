@@ -28,8 +28,8 @@ const loadError = ref<string | null>(null)
 const search = ref('')
 const roleFilter = ref('all')
 
-const ROLE_LABELS: Record<number, string> = { 0: '用户', 1: '组织者', 2: '管理员' }
-const STATUS_LABELS: Record<number, string> = { 0: '正常', 1: '已封禁', 2: '已禁用', 3: '已匿名' }
+const ROLE_LABELS: Record<string, string> = { User: '用户', Organizer: '组织者', Administrator: '管理员' }
+const STATUS_LABELS: Record<string, string> = { Active: '正常', Banned: '已封禁', Disabled: '已禁用', Anonymized: '已匿名' }
 const REFERENCE_LABELS: Record<string, string> = {
   CompetitionOwner: '竞赛负责人',
   CompetitionCollaborator: '竞赛协作者',
@@ -51,7 +51,7 @@ const REFERENCE_LABELS: Record<string, string> = {
 const filteredUsers = computed(() => {
   const keyword = search.value.trim().toLowerCase()
   return users.value.filter((user) => {
-    if (roleFilter.value !== 'all' && user.role !== Number(roleFilter.value)) return false
+    if (roleFilter.value !== 'all' && user.role !== roleFilter.value) return false
     if (!keyword) return true
     return (user.userName ?? '').toLowerCase().includes(keyword)
       || (user.email ?? '').toLowerCase().includes(keyword)
@@ -74,7 +74,7 @@ async function load(): Promise<void> {
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref<PlatformUser | null>(null)
-const pendingRole = ref('0')
+const pendingRole = ref('User')
 const roleSaving = ref(false)
 const invalidating = ref(false)
 
@@ -91,7 +91,7 @@ async function openDetail(user: PlatformUser): Promise<void> {
     return
   }
   detail.value = data ?? null
-  pendingRole.value = String(data?.role ?? 0)
+  pendingRole.value = data?.role ?? 'User'
 }
 
 async function saveRole(): Promise<void> {
@@ -99,7 +99,7 @@ async function saveRole(): Promise<void> {
   roleSaving.value = true
   const { data, error, response } = await adminPlatformUpdateUserRole({
     path: { userId: detail.value.id },
-    body: { role: Number(pendingRole.value) as 0 | 1 | 2 },
+    body: { role: pendingRole.value as 'User' | 'Organizer' | 'Administrator' },
   })
   roleSaving.value = false
   if (error) {
@@ -203,9 +203,9 @@ onMounted(() => {
         <SelectContent>
           <SelectGroup>
             <SelectItem value="all">全部角色</SelectItem>
-            <SelectItem value="0">用户</SelectItem>
-            <SelectItem value="1">组织者</SelectItem>
-            <SelectItem value="2">管理员</SelectItem>
+            <SelectItem value="User">用户</SelectItem>
+            <SelectItem value="Organizer">组织者</SelectItem>
+            <SelectItem value="Administrator">管理员</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
@@ -253,18 +253,18 @@ onMounted(() => {
             </TableCell>
             <TableCell class="text-muted-foreground">{{ user.email }}</TableCell>
             <TableCell>
-              <Badge :variant="user.kind === 1 ? 'secondary' : 'outline'">
-                {{ user.kind === 1 ? 'Bot' : '用户' }}
+              <Badge :variant="user.kind === 'Bot' ? 'secondary' : 'outline'">
+                {{ user.kind === 'Bot' ? 'Bot' : '用户' }}
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge :variant="user.role === 2 ? 'default' : 'secondary'">
-                {{ ROLE_LABELS[user.role ?? 0] ?? user.role }}
+              <Badge :variant="user.role === 'Administrator' ? 'default' : 'secondary'">
+                {{ ROLE_LABELS[String(user.role)] ?? user.role }}
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge :variant="user.accountStatus === 0 ? 'outline' : 'destructive'">
-                {{ STATUS_LABELS[user.accountStatus ?? 0] ?? user.accountStatus }}
+              <Badge :variant="user.accountStatus === 'Active' ? 'outline' : 'destructive'">
+                {{ STATUS_LABELS[String(user.accountStatus)] ?? user.accountStatus }}
               </Badge>
             </TableCell>
             <TableCell>
@@ -297,9 +297,9 @@ onMounted(() => {
               <Badge v-else variant="outline" class="ml-1">未验证</Badge>
             </dd>
             <dt class="text-muted-foreground">类型</dt>
-            <dd>{{ detail.kind === 1 ? 'Bot' : '用户' }}</dd>
+            <dd>{{ detail.kind === 'Bot' ? 'Bot' : '用户' }}</dd>
             <dt class="text-muted-foreground">状态</dt>
-            <dd>{{ STATUS_LABELS[detail.accountStatus ?? 0] ?? detail.accountStatus }}</dd>
+            <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ?? detail.accountStatus }}</dd>
             <dt class="text-muted-foreground">令牌版本</dt>
             <dd>{{ detail.tokenVersion ?? 0 }}</dd>
             <dt class="text-muted-foreground">注册时间</dt>
@@ -320,14 +320,14 @@ onMounted(() => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="0">用户</SelectItem>
-                      <SelectItem value="1">组织者</SelectItem>
-                      <SelectItem value="2">管理员</SelectItem>
+                      <SelectItem value="User">用户</SelectItem>
+                      <SelectItem value="Organizer">组织者</SelectItem>
+                      <SelectItem value="Administrator">管理员</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
                 <Button
-                  :disabled="roleSaving || pendingRole === String(detail.role ?? 0) || detail.id === currentUser?.userId"
+                  :disabled="roleSaving || pendingRole === String(detail.role ?? 'User') || detail.id === currentUser?.userId"
                   @click="saveRole"
                 >
                   <Spinner v-if="roleSaving" data-icon="inline-start" />

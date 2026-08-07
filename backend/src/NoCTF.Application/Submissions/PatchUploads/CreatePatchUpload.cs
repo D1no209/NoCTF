@@ -13,6 +13,14 @@ public sealed record PatchUploadScope(
 
 public sealed record CreatedPatchUpload(Guid PatchUploadId);
 
+public enum PatchUploadFailureCode
+{
+    PatchUploadNotAvailable,
+    ArchiveStreamNotSeekable,
+    ArchiveInvalid,
+    PatchUploadConflict
+}
+
 public interface IPatchUploadStore
 {
     Task<PatchUploadScope?> ResolveScopeAsync(
@@ -40,7 +48,7 @@ public sealed class CreatePatchUpload(
     private const long MaxExpandedBytes = 1L << 30;
     private const long MaxSingleFileBytes = 256L << 20;
 
-    public async Task<OperationResult<CreatedPatchUpload>> ExecuteAsync(
+    public async Task<OperationResult<CreatedPatchUpload, PatchUploadFailureCode>> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid userId,
@@ -53,19 +61,19 @@ public sealed class CreatePatchUpload(
         var scope = await store.ResolveScopeAsync(
             competitionId, competitionChallengeId, userId, ct);
         if (scope is null)
-            return OperationResult<CreatedPatchUpload>.Failure(
-                "patch_upload_not_available",
+            return OperationResult<CreatedPatchUpload, PatchUploadFailureCode>.Failure(
+                PatchUploadFailureCode.PatchUploadNotAvailable,
                 "Patch upload is not available for this team and challenge.");
         if (!content.CanSeek)
-            return OperationResult<CreatedPatchUpload>.Failure(
-                "archive_stream_not_seekable",
+            return OperationResult<CreatedPatchUpload, PatchUploadFailureCode>.Failure(
+                PatchUploadFailureCode.ArchiveStreamNotSeekable,
                 "The archive stream must support validation before storage.");
 
         var validation = ValidateArchive(content);
         content.Position = 0;
         if (validation is not null)
-            return OperationResult<CreatedPatchUpload>.Failure(
-                "archive_invalid", validation);
+            return OperationResult<CreatedPatchUpload, PatchUploadFailureCode>.Failure(
+                PatchUploadFailureCode.ArchiveInvalid, validation);
 
         var id = Guid.CreateVersion7(now);
         var objectKey = $"fix-uploads/{id:N}";
@@ -106,9 +114,9 @@ public sealed class CreatePatchUpload(
             }
         }
         return saved
-            ? OperationResult<CreatedPatchUpload>.Success(new(id))
-            : OperationResult<CreatedPatchUpload>.Failure(
-                "patch_upload_conflict",
+            ? OperationResult<CreatedPatchUpload, PatchUploadFailureCode>.Success(new(id))
+            : OperationResult<CreatedPatchUpload, PatchUploadFailureCode>.Failure(
+                PatchUploadFailureCode.PatchUploadConflict,
                 "This team already has an unconsumed patch upload.");
     }
 

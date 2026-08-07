@@ -4,10 +4,11 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Identity;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
-[JsonConverter(typeof(JsonStringEnumConverter<PlatformUserDeletionReferenceCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<PlatformUserDeletionReferenceCode>))]
 public enum PlatformUserDeletionReferenceCode
 {
     CompetitionOwner,
@@ -34,64 +35,27 @@ public sealed record PlatformUserDeletionReferenceResponse(
 public sealed record PlatformUserDeletionPreviewResponse(
     Guid UserId,
     string UserName,
-    UserAccountStatus AccountStatus,
+    PlatformUserAccountStatusProtocol AccountStatus,
     bool CanHardDelete,
     bool CanAnonymize,
     bool SelfDeletionForbidden,
     bool LastAdministratorProtected,
     IReadOnlyList<PlatformUserDeletionReferenceResponse> References);
 
-internal static class PlatformUserDeletionMapping
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
+internal static partial class PlatformUserDeletionMapping
 {
-    public static PlatformUserDeletionPreviewResponse ToResponse(UserDeletionPreview preview) =>
-        new(
-            preview.UserId,
-            preview.UserName,
-            preview.AccountStatus,
-            preview.CanHardDelete,
-            preview.CanAnonymize,
-            preview.SelfDeletionForbidden,
-            preview.LastAdministratorProtected,
-            preview.References.Select(reference => new PlatformUserDeletionReferenceResponse(
-                ToCode(reference.Kind),
-                reference.Count)).ToArray());
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial PlatformUserAccountStatusProtocol ToProtocol(UserAccountStatus value);
 
-    private static PlatformUserDeletionReferenceCode ToCode(UserDeletionReferenceKind kind) =>
-        kind switch
-        {
-            UserDeletionReferenceKind.CompetitionOwner =>
-                PlatformUserDeletionReferenceCode.CompetitionOwner,
-            UserDeletionReferenceKind.CompetitionCollaborator =>
-                PlatformUserDeletionReferenceCode.CompetitionCollaborator,
-            UserDeletionReferenceKind.ChallengeOwner =>
-                PlatformUserDeletionReferenceCode.ChallengeOwner,
-            UserDeletionReferenceKind.ChallengeManager =>
-                PlatformUserDeletionReferenceCode.ChallengeManager,
-            UserDeletionReferenceKind.TeamCaptain =>
-                PlatformUserDeletionReferenceCode.TeamCaptain,
-            UserDeletionReferenceKind.TeamMember =>
-                PlatformUserDeletionReferenceCode.TeamMember,
-            UserDeletionReferenceKind.Submission =>
-                PlatformUserDeletionReferenceCode.Submission,
-            UserDeletionReferenceKind.PatchUpload =>
-                PlatformUserDeletionReferenceCode.PatchUpload,
-            UserDeletionReferenceKind.Notification =>
-                PlatformUserDeletionReferenceCode.Notification,
-            UserDeletionReferenceKind.ScoringEvent =>
-                PlatformUserDeletionReferenceCode.ScoringEvent,
-            UserDeletionReferenceKind.CompetitionLifecycleAudit =>
-                PlatformUserDeletionReferenceCode.CompetitionLifecycleAudit,
-            UserDeletionReferenceKind.CompetitionQuestion =>
-                PlatformUserDeletionReferenceCode.CompetitionQuestion,
-            UserDeletionReferenceKind.CompetitionQuestionEntry =>
-                PlatformUserDeletionReferenceCode.CompetitionQuestionEntry,
-            UserDeletionReferenceKind.CompetitionEvent =>
-                PlatformUserDeletionReferenceCode.CompetitionEvent,
-            UserDeletionReferenceKind.UserAccountLifecycleAudit =>
-                PlatformUserDeletionReferenceCode.UserAccountLifecycleAudit,
-            _ => throw new InvalidOperationException(
-                $"Unsupported user deletion reference kind: {kind}.")
-        };
+    public static partial PlatformUserDeletionPreviewResponse ToResponse(UserDeletionPreview preview);
+
+    [MapProperty(nameof(UserDeletionReference.Kind), nameof(PlatformUserDeletionReferenceResponse.Code))]
+    public static partial PlatformUserDeletionReferenceResponse ToResponse(UserDeletionReference reference);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial PlatformUserDeletionReferenceCode ToProtocol(UserDeletionReferenceKind value);
+
 }
 
 public sealed class PreviewPlatformUserDeletionEndpoint(
@@ -124,4 +88,12 @@ public sealed class PreviewPlatformUserDeletionEndpoint(
             ? TypedResults.NotFound()
             : TypedResults.Ok(PlatformUserDeletionMapping.ToResponse(preview));
     }
+}
+ [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<PlatformUserAccountStatusProtocol>))]
+public enum PlatformUserAccountStatusProtocol
+{
+    Active,
+    Banned,
+    Disabled,
+    Anonymized
 }

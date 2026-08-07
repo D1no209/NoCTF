@@ -30,16 +30,16 @@ public interface ITeamMembershipStore
 
 public sealed class JoinTeamByInvitation(ITeamMembershipStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(Guid competitionId, string invitationToken, Guid userId, DateTimeOffset now, CancellationToken ct = default)
+    public async Task<OperationResult<TeamMembershipFailure>> ExecuteAsync(Guid competitionId, string invitationToken, Guid userId, DateTimeOffset now, CancellationToken ct = default)
     {
         var failure = await store.JoinByInvitationAsync(competitionId, invitationToken, userId, now, ct);
-        return failure is null ? OperationResult.Success() : OperationResult.Failure(TeamMembershipFailureProtocol.Code(failure.Value), "Team could not be joined.");
+        return failure is null ? OperationResult<TeamMembershipFailure>.Success() : OperationResult<TeamMembershipFailure>.Failure(failure.Value, "Team could not be joined.");
     }
 }
 
 public sealed class RotateTeamInvitation(ITeamMembershipStore store)
 {
-    public async Task<OperationResult<string>> ExecuteAsync(
+    public async Task<OperationResult<string, TeamMembershipFailure>> ExecuteAsync(
         Guid competitionId,
         Guid teamId,
         Guid actorId,
@@ -47,28 +47,8 @@ public sealed class RotateTeamInvitation(ITeamMembershipStore store)
     {
         var token = InvitationTokenGenerator.Create();
         var result = await store.RotateInvitationAsync(competitionId, teamId, actorId, token, ct);
-        return result.Token is not null ? OperationResult<string>.Success(result.Token) : OperationResult<string>.Failure(TeamMembershipFailureProtocol.Code(result.Failure!.Value), "Invitation could not be rotated.");
+        return result.Token is not null ? OperationResult<string, TeamMembershipFailure>.Success(result.Token) : OperationResult<string, TeamMembershipFailure>.Failure(result.Failure!.Value, "Invitation could not be rotated.");
     }
-}
-
-internal static class TeamMembershipFailureProtocol
-{
-    public static string Code(TeamMembershipFailure failure) => failure switch
-    {
-        TeamMembershipFailure.CompetitionNotFound => "competition_not_found",
-        TeamMembershipFailure.TeamNotFound => "team_not_found",
-        TeamMembershipFailure.TeamForbidden => "team_forbidden",
-        TeamMembershipFailure.MembershipLocked => "membership_locked",
-        TeamMembershipFailure.UserAlreadyRegistered => "user_already_registered",
-        TeamMembershipFailure.TeamFull => "team_full",
-        TeamMembershipFailure.MembershipConflict => "membership_conflict",
-        TeamMembershipFailure.CaptainCannotBeRemoved => "captain_cannot_be_removed",
-        TeamMembershipFailure.MemberNotFound => "member_not_found",
-        TeamMembershipFailure.MembershipNotFound => "membership_not_found",
-        TeamMembershipFailure.CaptainMustTransfer => "captain_must_transfer",
-        TeamMembershipFailure.CaptainOnly => "captain_only",
-        _ => "membership_rejected"
-    };
 }
 
 public static class TeamMembershipPolicy
@@ -80,28 +60,28 @@ public static class TeamMembershipPolicy
 
 public sealed class RemoveTeamMember(ITeamMembershipStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid teamId, Guid targetUserId, Guid actorId, CancellationToken ct = default)
+    public async Task<OperationResult<TeamMembershipFailure>> ExecuteAsync(Guid competitionId, Guid teamId, Guid targetUserId, Guid actorId, CancellationToken ct = default)
     {
         var failure = await store.RemoveMemberAsync(competitionId, teamId, targetUserId, actorId, ct);
-        return failure is null ? OperationResult.Success() : OperationResult.Failure(TeamMembershipFailureProtocol.Code(failure.Value), "Team member was not removed.");
+        return failure is null ? OperationResult<TeamMembershipFailure>.Success() : OperationResult<TeamMembershipFailure>.Failure(failure.Value, "Team member was not removed.");
     }
 }
 
 public sealed class LeaveTeam(ITeamMembershipStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid userId, CancellationToken ct = default)
+    public async Task<OperationResult<TeamMembershipFailure>> ExecuteAsync(Guid competitionId, Guid userId, CancellationToken ct = default)
     {
         var failure = await store.LeaveAsync(competitionId, userId, ct);
-        return failure is null ? OperationResult.Success() : OperationResult.Failure(TeamMembershipFailureProtocol.Code(failure.Value), "User could not leave the team.");
+        return failure is null ? OperationResult<TeamMembershipFailure>.Success() : OperationResult<TeamMembershipFailure>.Failure(failure.Value, "User could not leave the team.");
     }
 }
 
 public sealed class TransferTeamCaptain(ITeamMembershipStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid teamId, Guid actorId, Guid newCaptainId, CancellationToken ct = default)
+    public async Task<OperationResult<TeamMembershipFailure>> ExecuteAsync(Guid competitionId, Guid teamId, Guid actorId, Guid newCaptainId, CancellationToken ct = default)
     {
         var failure = await store.TransferCaptainAsync(competitionId, teamId, actorId, newCaptainId, ct);
-        return failure is null ? OperationResult.Success() : OperationResult.Failure(TeamMembershipFailureProtocol.Code(failure.Value), "Captain was not transferred.");
+        return failure is null ? OperationResult<TeamMembershipFailure>.Success() : OperationResult<TeamMembershipFailure>.Failure(failure.Value, "Captain was not transferred.");
     }
 }
 

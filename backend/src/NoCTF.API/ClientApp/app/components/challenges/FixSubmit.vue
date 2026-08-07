@@ -19,7 +19,7 @@ const emit = defineEmits<{ evaluated: [] }>()
 const file = ref<File | null>(null)
 const pending = ref(false)
 const stage = ref<'idle' | 'uploading' | 'submitting' | 'evaluating'>('idle')
-const result = ref<{ state?: number, result?: number | null } | null>(null)
+const result = ref<{ state?: string, result?: string | null } | null>(null)
 
 function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement

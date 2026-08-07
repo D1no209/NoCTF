@@ -12,7 +12,7 @@ public sealed record ChallengeFlagResponse(
     Guid? CompetitionChallengeId,
     Guid? TeamId,
     string Flag,
-    SpecificationKind? SpecificationKind,
+    SpecificationKindProtocol? SpecificationKind,
     Guid? SpecificationId,
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidUntil,
@@ -26,7 +26,11 @@ internal static class ChallengeFlagMapping
     public static ChallengeFlagResponse ToResponse(ChallengeFlagView view) =>
         new(
             view.Id, view.ChallengeId, view.CompetitionChallengeId, view.TeamId,
-            view.Flag, view.SpecificationKind, view.SpecificationId,
+            view.Flag,
+            view.SpecificationKind is null
+                ? null
+                : ChallengeTemplateMapper.ToProtocol(view.SpecificationKind.Value),
+            view.SpecificationId,
             view.ValidStart, view.ValidUntil, view.DeletedAt, view.CreatedAt);
 }
 

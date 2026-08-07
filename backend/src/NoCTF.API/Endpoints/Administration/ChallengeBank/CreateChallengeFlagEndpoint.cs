@@ -13,7 +13,7 @@ public sealed class SaveChallengeFlagRequest
     public Guid? Id { get; set; }
     public Guid? TeamId { get; set; }
     public string Flag { get; set; } = string.Empty;
-    public SpecificationKind? SpecificationKind { get; set; }
+    public SpecificationKindProtocol? SpecificationKind { get; set; }
     public Guid? SpecificationId { get; set; }
     public DateTimeOffset? ValidStart { get; set; }
     public DateTimeOffset? ValidUntil { get; set; }
@@ -43,7 +43,10 @@ internal static class SaveChallengeFlagMapping
         DateTimeOffset now) =>
         new(
             scope, flagId, isCreate, request.TeamId, request.Flag,
-            request.SpecificationKind, request.SpecificationId,
+            request.SpecificationKind is null
+                ? null
+                : ChallengeTemplateMapper.ToDomain(request.SpecificationKind.Value),
+            request.SpecificationId,
             request.ValidStart, request.ValidUntil, now);
 }
 
@@ -79,16 +82,16 @@ public sealed class CreateChallengeFlagEndpoint(
             user.UserId,
             user.IsAdministrator,
             ct);
-        if (result.ErrorCode == "flag_not_found")
+        if (result.FailureCode == ChallengeFlagFailureCode.FlagNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: result.ErrorCode == "resource_id_conflict"
+                statusCode: result.FailureCode == ChallengeFlagFailureCode.ResourceIdConflict
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
                 title: "Flag was not created.",
                 detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
+                extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() });
         var response = ChallengeFlagMapping.ToResponse(result.Value!);
         return TypedResults.Created($"/api/v1/admin/challenges/{challengeId}/flags/{response.Id}", response);
     }

@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Net.Http.Headers;
+using NoCTF.API.Endpoints.Submissions;
 using NoCTF.API.Security;
 using NoCTF.Application.Submissions.CheatIncidents;
 using NoCTF.Application.Teams.Moderation;
@@ -26,10 +27,10 @@ public sealed record CheatIncidentDetailResponse(
     string SubmittedByUserName,
     Guid CompetitionChallengeId,
     string ChallengeTitle,
-    SubmissionKind SubmissionKind,
-    ScoringResult Result,
-    ScoringFailureCode FailureCode,
-    CheatIncidentStatus Status,
+    SubmissionKindProtocol SubmissionKind,
+    ScoringResultProtocol Result,
+    ScoringFailureCodeProtocol FailureCode,
+    CheatIncidentStatusProtocol Status,
     Guid? ResolvedByUserId,
     string? ResolvedByUserName,
     DateTimeOffset? ResolvedAt,
@@ -109,10 +110,10 @@ public sealed class GetCheatIncidentEndpoint(
             detail.SubmittedByUserName,
             detail.CompetitionChallengeId,
             detail.ChallengeTitle,
-            detail.SubmissionKind,
-            detail.Result,
-            detail.FailureCode,
-            detail.Status,
+            SubmissionMapper.ToProtocol(detail.SubmissionKind),
+            SubmissionMapper.ToProtocol(detail.Result),
+            SubmissionMapper.ToProtocol(detail.FailureCode),
+            CheatIncidentProtocolMapper.ToProtocol(detail.Status),
             detail.ResolvedByUserId,
             detail.ResolvedByUserName,
             detail.ResolvedAt,

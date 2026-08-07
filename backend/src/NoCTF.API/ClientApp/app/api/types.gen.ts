@@ -5,8 +5,10 @@ export type ClientOptions = {
 };
 
 export type NoCtfapiEndpointsHealthResponse = {
-    status?: string;
+    status?: NoCtfapiEndpointsHealthStatus;
 };
+
+export type NoCtfapiEndpointsHealthStatus = 'Ok';
 
 export type NoCtfapiEndpointsTeamsTeamResponse = {
     id?: string;
@@ -15,13 +17,13 @@ export type NoCtfapiEndpointsTeamsTeamResponse = {
     avatarUrl?: string | null;
     captainId?: string;
     memberIds?: Array<string>;
-    registrationStatus?: NoCtfDomainTeamsTeamRegistrationStatus;
+    registrationStatus?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol;
     isLocked?: boolean;
     isBanned?: boolean;
     registeredAt?: string;
 };
 
-export type NoCtfDomainTeamsTeamRegistrationStatus = 0 | 1 | 2;
+export type NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol = 'Pending' | 'Approved' | 'Rejected';
 
 export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
     name?: string;
@@ -33,14 +35,14 @@ export type NoCtfapiEndpointsTeamsMyTeamBanCaseResponse = {
     competitionId?: string;
     teamId?: string;
     teamName?: string;
-    source?: NoCtfDomainTeamsTeamBanSource;
+    source?: NoCtfapiEndpointsTeamsTeamBanSourceProtocol;
     bannedAt?: string;
     isCurrentlyBanned?: boolean;
     canAppeal?: boolean;
     appeal?: NoCtfapiEndpointsTeamsMyTeamBanAppealResponse | null;
 };
 
-export type NoCtfDomainTeamsTeamBanSource = 0 | 1;
+export type NoCtfapiEndpointsTeamsTeamBanSourceProtocol = 'ManualModeration' | 'CheatIncident';
 
 export type NoCtfapiEndpointsTeamsMyTeamBanAppealResponse = {
     id?: string;
@@ -48,14 +50,14 @@ export type NoCtfapiEndpointsTeamsMyTeamBanAppealResponse = {
     submittedByUserName?: string;
     statement?: string;
     submittedAt?: string;
-    status?: NoCtfDomainTeamsTeamBanAppealStatus;
+    status?: NoCtfapiEndpointsTeamsTeamBanAppealStatusProtocol;
     resolvedByUserId?: string | null;
     resolvedByUserName?: string | null;
     resolutionReason?: string | null;
     resolvedAt?: string | null;
 };
 
-export type NoCtfDomainTeamsTeamBanAppealStatus = 0 | 1 | 2;
+export type NoCtfapiEndpointsTeamsTeamBanAppealStatusProtocol = 'Submitted' | 'Upheld' | 'Accepted';
 
 export type NoCtfapiEndpointsTeamsGetMyTeamBanCaseRequest = {
     [key: string]: never;
@@ -134,22 +136,22 @@ export type NoCtfapiEndpointsSubmissionsSubmissionStatusResponse = {
     competitionId?: string;
     teamId?: string;
     competitionChallengeId?: string;
-    kind?: NoCtfDomainSubmissionsSubmissionKind;
-    evaluationState?: NoCtfDomainSubmissionsSubmissionEvaluationState;
-    result?: NoCtfDomainSubmissionsScoringResult | null;
-    failureCode?: NoCtfDomainSubmissionsScoringFailureCode | null;
+    kind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol;
+    evaluationState?: NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol;
+    result?: NoCtfapiEndpointsSubmissionsScoringResultProtocol | null;
+    failureCode?: NoCtfapiEndpointsSubmissionsScoringFailureCodeProtocol | null;
     receivedAt?: string;
     evaluationUpdatedAt?: string;
     processingVersion?: number;
 };
 
-export type NoCtfDomainSubmissionsSubmissionKind = 0 | 1 | 2;
+export type NoCtfapiEndpointsSubmissionsSubmissionKindProtocol = 'Flag' | 'Break' | 'Fix';
 
-export type NoCtfDomainSubmissionsSubmissionEvaluationState = 0 | 1 | 2 | 3 | 4;
+export type NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol = 'Pending' | 'Queued' | 'Processing' | 'Completed' | 'PlatformFailed';
 
-export type NoCtfDomainSubmissionsScoringResult = 0 | 1 | 2 | 3 | 4 | 5;
+export type NoCtfapiEndpointsSubmissionsScoringResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'PlatformFailed' | 'Rejected';
 
-export type NoCtfDomainSubmissionsScoringFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29;
+export type NoCtfapiEndpointsSubmissionsScoringFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpFixFailed' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceDown' | 'AwdpViolation' | 'ForeignTeamFlagDetected';
 
 export type NoCtfapiEndpointsSubmissionsGetSubmissionStatusRequest = {
     [key: string]: never;
@@ -166,10 +168,10 @@ export type NoCtfapiEndpointsSubmissionsSubmissionListItemResponse = {
     competitionChallengeId?: string;
     teamId?: string;
     submittedByUserId?: string;
-    kind?: NoCtfDomainSubmissionsSubmissionKind;
-    evaluationState?: NoCtfDomainSubmissionsSubmissionEvaluationState;
-    result?: NoCtfDomainSubmissionsScoringResult | null;
-    failureCode?: NoCtfDomainSubmissionsScoringFailureCode | null;
+    kind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol;
+    evaluationState?: NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol;
+    result?: NoCtfapiEndpointsSubmissionsScoringResultProtocol | null;
+    failureCode?: NoCtfapiEndpointsSubmissionsScoringFailureCodeProtocol | null;
     receivedAt?: string;
     processingVersion?: number;
 };
@@ -226,10 +228,10 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     competitionChallengeId?: string;
     teamId?: string | null;
     generation?: number;
-    runtimeKind?: NoCtfDomainRuntimeRuntimeKind;
-    provider?: NoCtfDomainRuntimeRuntimeProvider;
-    state?: NoCtfDomainRuntimeRuntimeState;
-    failureCode?: NoCtfDomainRuntimeRuntimeFailureCode | null;
+    runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol;
+    provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol;
+    state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
+    failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
     processingVersion?: number;
     urls?: Array<string>;
     createdAt?: string;
@@ -238,13 +240,13 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     stoppedAt?: string | null;
 };
 
-export type NoCtfDomainRuntimeRuntimeKind = 0 | 1 | 2;
+export type NoCtfapiEndpointsRuntimeRuntimeKindProtocol = 'Container' | 'Compose' | 'OvaVm';
 
-export type NoCtfDomainRuntimeRuntimeProvider = 0 | 1 | 2;
+export type NoCtfapiEndpointsRuntimeRuntimeProviderProtocol = 'Docker' | 'Kubernetes' | 'Libvirt';
 
-export type NoCtfDomainRuntimeRuntimeState = 0 | 1 | 2 | 3 | 4 | 5;
+export type NoCtfapiEndpointsRuntimeRuntimeStateProtocol = 'Queued' | 'Provisioning' | 'Running' | 'Stopping' | 'Stopped' | 'Failed';
 
-export type NoCtfDomainRuntimeRuntimeFailureCode = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol = 'InvalidConfiguration' | 'RunnerUnavailable' | 'ProviderUnavailable' | 'ProvisionTimeout' | 'ProviderRejected' | 'CleanupFailed' | 'UrlExpansionFailed' | 'PublishedPortRangeExhausted';
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
     items?: Array<NoCtfapiEndpointsRuntimeRuntimeTargetResponse>;
@@ -271,12 +273,12 @@ export type NoCtfapiEndpointsNotificationsNotificationResponse = {
     id?: string;
     competitionId?: string | null;
     entityId?: string | null;
-    kind?: NoCtfDomainNotificationsNotificationKind;
+    kind?: NoCtfapiEndpointsNotificationsNotificationKindProtocol;
     payload?: unknown;
     createdAt?: string;
 };
 
-export type NoCtfDomainNotificationsNotificationKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
+export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'SubmissionEvaluated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CompetitionQuestionOpened' | 'CompetitionQuestionReplied' | 'CompetitionQuestionStatusChanged' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'DataExportReady' | 'DataExportFailed';
 
 export type NoCtfapiEndpointsNotificationsListNotificationsRequest = {
     [key: string]: never;
@@ -292,14 +294,16 @@ export type NoCtfapiEndpointsNotificationsReadNotificationFeedRequest = {
 };
 
 export type NoCtfapiEndpointsInternalInternalResultResponse = {
-    disposition?: string;
+    disposition?: NoCtfapiEndpointsInternalInternalResultDispositionProtocol;
 };
+
+export type NoCtfapiEndpointsInternalInternalResultDispositionProtocol = 'Applied' | 'Duplicate' | 'Superseded';
 
 export type NoCtfapiEndpointsInternalRecordAwdCheckResultRequest = {
-    state?: NoCtfDomainRuntimeAwdServiceState;
+    state?: NoCtfapiEndpointsInternalAwdServiceStateProtocol;
 };
 
-export type NoCtfDomainRuntimeAwdServiceState = 'Unknown' | 'Up' | 'Down' | 'CheckerAbnormalExit' | 'CheckerTimedOut';
+export type NoCtfapiEndpointsInternalAwdServiceStateProtocol = 'Unknown' | 'Up' | 'Down' | 'CheckerAbnormalExit' | 'CheckerTimedOut';
 
 export type NoCtfapiEndpointsInternalRecordAwdpCheckResultRequest = {
     outcome?: NoCtfapiEndpointsInternalAwdpFixResultOutcome;
@@ -311,99 +315,136 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     id?: string;
     title?: string;
     description?: string | null;
-    mode?: NoCtfDomainCompetitionsGameMode;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     startTime?: string;
     endTime?: string;
-    status?: NoCtfDomainCompetitionsCompetitionStatus;
+    status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
     teamRegistrationAutoApprove?: boolean;
     maxTeamMembers?: number;
     maxConcurrentRuntimeInstancesPerTeam?: number;
     ownerId?: string;
-    leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
 };
 
-export type NoCtfDomainCompetitionsGameMode = 0 | 1 | 2 | 3;
+export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
 
-export type NoCtfDomainCompetitionsCompetitionStatus = 0 | 1 | 2 | 3 | 4 | 5;
+export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
 
-export type NoCtfDomainCompetitionsCompetitionLeaderboardVisibility = 0 | 1 | 2;
+export type NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol = 'Normal' | 'Frozen' | 'Blackout';
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
     [key: string]: never;
 };
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardResponse = {
+export type NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
     competitionId?: string;
     generatedAt?: string;
-    entries?: Array<NoCtfApplicationScoringLeaderboardLeaderboardEntry>;
-    subjects?: Array<NoCtfApplicationScoringLeaderboardLeaderboardSubjectSummary>;
-    bloods?: Array<NoCtfApplicationScoringLeaderboardLeaderboardBloodSummary>;
+    entries?: Array<NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse>;
+    subjects?: Array<NoCtfapiEndpointsCompetitionsLeaderboardSubjectSummaryResponse>;
+    bloods?: Array<NoCtfapiEndpointsCompetitionsLeaderboardBloodSummaryResponse>;
+    series?: Array<NoCtfapiEndpointsCompetitionsLeaderboardTeamSeriesResponse>;
+    challenges?: Array<NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse>;
     snapshotRevision?: number;
     targetRevision?: number;
     stale?: boolean;
     lastFailureAt?: string | null;
-    visibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
-    dataScope?: NoCtfApplicationScoringLeaderboardLeaderboardDataScope;
+    visibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
+    dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
     dataAsOf?: string | null;
 };
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardEntry = {
+export type NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse = {
     rank?: number;
     teamId?: string;
     teamName?: string;
     score?: number;
     solveCount?: number;
     lastScoreAt?: string | null;
-    challenges?: Array<NoCtfApplicationScoringLeaderboardLeaderboardChallengeSummary>;
+    challenges?: Array<NoCtfapiEndpointsCompetitionsLeaderboardChallengeSummaryResponse>;
 };
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardChallengeSummary = {
+export type NoCtfapiEndpointsCompetitionsLeaderboardChallengeSummaryResponse = {
     competitionChallengeId?: string;
     direction?: string;
     solveCount?: number;
 };
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardSubjectSummary = {
+export type NoCtfapiEndpointsCompetitionsLeaderboardSubjectSummaryResponse = {
     subjectId?: string;
     subjectName?: string;
     score?: number;
     successCount?: number;
-    slots?: Array<NoCtfApplicationScoringLeaderboardLeaderboardSlotSummary>;
+    slots?: Array<NoCtfapiEndpointsCompetitionsLeaderboardSlotSummaryResponse>;
 };
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardSlotSummary = {
+export type NoCtfapiEndpointsCompetitionsLeaderboardSlotSummaryResponse = {
     slotKey?: string;
-    kind?: NoCtfApplicationScoringLeaderboardLeaderboardSlotKind;
+    kind?: NoCtfapiEndpointsCompetitionsLeaderboardSlotKindProtocol;
     label?: string;
     successCount?: number;
     lastOccurredAt?: string | null;
-    bloodRank?: NoCtfApplicationScoringLeaderboardLeaderboardBloodRank | null;
+    bloodRank?: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol | null;
     bloodAt?: string | null;
 };
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardSlotKind = 0 | 1 | 2 | 3 | 4 | 5;
+export type NoCtfapiEndpointsCompetitionsLeaderboardSlotKindProtocol = 'Challenge' | 'Service' | 'Break' | 'Fix' | 'Control' | 'Stage';
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardBloodRank = 1 | 2 | 3;
+export type NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol = 'First' | 'Second' | 'Third';
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardBloodSummary = {
+export type NoCtfapiEndpointsCompetitionsLeaderboardBloodSummaryResponse = {
     slotKey?: string;
-    slotKind?: NoCtfApplicationScoringLeaderboardLeaderboardSlotKind;
-    bloodRank?: NoCtfApplicationScoringLeaderboardLeaderboardBloodRank;
+    slotKind?: NoCtfapiEndpointsCompetitionsLeaderboardSlotKindProtocol;
+    bloodRank?: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol;
     teamId?: string;
     teamName?: string;
     occurredAt?: string;
 };
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardDataScope = 0 | 1 | 2;
+export type NoCtfapiEndpointsCompetitionsLeaderboardTeamSeriesResponse = {
+    teamId?: string;
+    teamName?: string;
+    points?: Array<NoCtfapiEndpointsCompetitionsLeaderboardScorePointResponse>;
+    solves?: Array<NoCtfapiEndpointsCompetitionsLeaderboardSolveRecordResponse>;
+    penalties?: Array<NoCtfapiEndpointsCompetitionsLeaderboardPenaltyRecordResponse>;
+};
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardProcessingResponse = {
+export type NoCtfapiEndpointsCompetitionsLeaderboardScorePointResponse = {
+    at?: string;
+    score?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardSolveRecordResponse = {
+    competitionChallengeId?: string;
+    at?: string;
+    points?: number;
+    solveOrdinal?: number;
+    submitterName?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardPenaltyRecordResponse = {
+    at?: string;
+    points?: number;
+    kind?: NoCtfapiEndpointsCompetitionsLeaderboardPenaltyKindProtocol;
+};
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardPenaltyKindProtocol = 'WrongSubmission' | 'HintUnlock';
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse = {
+    competitionChallengeId?: string;
+    title?: string;
+    direction?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
+
+export type NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse = {
     competitionId?: string;
-    state?: NoCtfApplicationScoringLeaderboardLeaderboardProjectionState;
+    state?: NoCtfapiEndpointsCompetitionsLeaderboardProjectionStateProtocol;
     targetRevision?: number;
     statusUrl?: string;
 };
 
-export type NoCtfApplicationScoringLeaderboardLeaderboardProjectionState = 0;
+export type NoCtfapiEndpointsCompetitionsLeaderboardProjectionStateProtocol = 'Processing';
 
 export type NoCtfapiEndpointsCompetitionsGetLeaderboardRequest = {
     [key: string]: never;
@@ -415,7 +456,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionListResponse = {
 
 export type NoCtfapiEndpointsCompetitionsEventsAccessCompetitionSubmissionFlagResponse = {
     submissionId?: string;
-    submissionKind?: NoCtfDomainSubmissionsSubmissionKind;
+    submissionKind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol;
     submittedFlag?: string;
     accessedAt?: string;
 };
@@ -428,12 +469,12 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfDomainCompetitionsEventsCompetitionEventKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45 | 46 | 47;
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'SubmissionReceived' | 'SubmissionEvaluated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'QuestionPublished' | 'ProtectedSubmissionFlagAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'ProtectedCompetitionExportCreated' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished';
 
-export type NoCtfDomainCompetitionsEventsCompetitionEventLevel = 0 | 1 | 2;
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventListResponse = {
-    accessLevel?: NoCtfApplicationCompetitionsEventsCompetitionEventAccessLevel;
+    accessLevel?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventAccessLevelProtocol;
     viewerTeamId?: string | null;
     canExport?: boolean;
     canAccessSubmissionFlags?: boolean;
@@ -441,14 +482,14 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventListResponse = {
     nextCursor?: string | null;
 };
 
-export type NoCtfApplicationCompetitionsEventsCompetitionEventAccessLevel = 0 | 1 | 2;
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventAccessLevelProtocol = 'Participant' | 'Team' | 'Staff';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     id?: string;
     competitionId?: string;
-    kind?: NoCtfDomainCompetitionsEventsCompetitionEventKind;
-    level?: NoCtfDomainCompetitionsEventsCompetitionEventLevel;
-    visibility?: NoCtfDomainCompetitionsEventsCompetitionEventVisibility;
+    kind?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol;
+    level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol;
+    visibility?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol;
     actorUserId?: string | null;
     actorDisplayName?: string | null;
     relatedUserId?: string | null;
@@ -463,26 +504,26 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     scoringEventId?: string | null;
     questionId?: string | null;
     parentEventId?: string | null;
-    competitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
-    leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
-    teamRegistrationStatus?: NoCtfDomainTeamsTeamRegistrationStatus | null;
-    submissionKind?: NoCtfDomainSubmissionsSubmissionKind | null;
-    submissionState?: NoCtfDomainSubmissionsSubmissionEvaluationState | null;
-    scoringEventKind?: NoCtfDomainSubmissionsScoringEventKind | null;
-    scoringResult?: NoCtfDomainSubmissionsScoringResult | null;
-    runtimeState?: NoCtfDomainRuntimeRuntimeState | null;
-    questionStatus?: NoCtfDomainChallengesQuestionsCompetitionQuestionStatus | null;
+    competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null;
+    leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol | null;
+    teamRegistrationStatus?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol | null;
+    submissionKind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol | null;
+    submissionState?: NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol | null;
+    scoringEventKind?: NoCtfapiEndpointsCompetitionsEventsScoringEventKindProtocol | null;
+    scoringResult?: NoCtfapiEndpointsSubmissionsScoringResultProtocol | null;
+    runtimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
+    questionStatus?: NoCtfapiEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol | null;
     runtimeGeneration?: number | null;
     hostPort?: number | null;
     reason?: string | null;
     occurredAt?: string;
 };
 
-export type NoCtfDomainCompetitionsEventsCompetitionEventVisibility = 0 | 1 | 2;
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol = 'Public' | 'Team' | 'Staff';
 
-export type NoCtfDomainSubmissionsScoringEventKind = 0 | 1 | 2 | 3;
+export type NoCtfapiEndpointsCompetitionsEventsScoringEventKindProtocol = 'SubmissionEvaluation' | 'AwdServiceStatus' | 'HintUnlock' | 'KohObservation';
 
-export type NoCtfDomainChallengesQuestionsCompetitionQuestionStatus = 0 | 1 | 2 | 3;
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol = 'Pending' | 'Replied' | 'Resolved' | 'Closed';
 
 export type NoCtfapiEndpointsCompetitionsEventsListCompetitionEventsRequest = {
     [key: string]: never;
@@ -504,8 +545,8 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     updatedAt?: string;
     controlFlag?: string | null;
     urls?: Array<string> | null;
-    leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
-    dataScope?: NoCtfApplicationScoringLeaderboardLeaderboardDataScope;
+    leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
+    dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
 };
 
 export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
@@ -529,8 +570,8 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentRespo
 
 export type NoCtfapiEndpointsChallengesChallengeListResponse = {
     items?: Array<NoCtfapiEndpointsChallengesChallengeResponse>;
-    leaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
-    dataScope?: NoCtfApplicationScoringLeaderboardLeaderboardDataScope;
+    leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
+    dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
 };
 
 export type NoCtfapiEndpointsChallengesListChallengesRequest = {
@@ -662,17 +703,17 @@ export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     userId?: string;
     userName?: string;
     email?: string;
-    role?: NoCtfDomainIdentityUserRole;
-    kind?: NoCtfDomainIdentityUserKind;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
+    kind?: NoCtfapiEndpointsAuthenticationUserKindProtocol;
     emailVerified?: boolean;
     description?: string | null;
     avatarUrl?: string | null;
     isEmailPublic?: boolean;
 };
 
-export type NoCtfDomainIdentityUserRole = 0 | 1 | 2;
+export type NoCtfapiEndpointsAuthenticationUserRoleProtocol = 'User' | 'Organizer' | 'Administrator';
 
-export type NoCtfDomainIdentityUserKind = 0 | 1;
+export type NoCtfapiEndpointsAuthenticationUserKindProtocol = 'Human' | 'Bot';
 
 export type NoCtfapiEndpointsAuthenticationPublicUserProfileResponse = {
     userId?: string;
@@ -690,7 +731,7 @@ export type NoCtfapiEndpointsAuthenticationGetUserProfileRequest = {
 export type NoCtfapiEndpointsAuthenticationLoginResponse = {
     userId?: string;
     userName?: string;
-    role?: NoCtfDomainIdentityUserRole;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
     emailVerified?: boolean;
     accessToken?: string;
     expiresAt?: string;
@@ -704,7 +745,7 @@ export type NoCtfapiEndpointsAuthenticationLoginRequest = {
 export type NoCtfapiEndpointsAuthenticationRefreshTokenResponse = {
     userId?: string;
     userName?: string;
-    role?: NoCtfDomainIdentityUserRole;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
     emailVerified?: boolean;
     accessToken?: string;
     expiresAt?: string;
@@ -714,7 +755,7 @@ export type NoCtfapiEndpointsAuthenticationRegisterResponse = {
     userId?: string;
     userName?: string;
     email?: string;
-    role?: NoCtfDomainIdentityUserRole;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
     emailVerified?: boolean;
     requiresEmailVerification?: boolean;
     verificationEmailQueued?: boolean;
@@ -774,7 +815,7 @@ export type NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse = {
     competitionId?: string;
     teamId?: string;
     teamName?: string;
-    source?: NoCtfDomainTeamsTeamBanSource;
+    source?: NoCtfapiEndpointsTeamsTeamBanSourceProtocol;
     bannedAt?: string;
     isCurrentlyBanned?: boolean;
     canResolve?: boolean;
@@ -787,7 +828,7 @@ export type NoCtfapiEndpointsAdministrationTeamsAdminTeamBanAppealResponse = {
     submittedByUserName?: string;
     statement?: string;
     submittedAt?: string;
-    status?: NoCtfDomainTeamsTeamBanAppealStatus;
+    status?: NoCtfapiEndpointsTeamsTeamBanAppealStatusProtocol;
     resolvedByUserId?: string | null;
     resolvedByUserName?: string | null;
     resolutionReason?: string | null;
@@ -812,10 +853,10 @@ export type NoCtfapiEndpointsSubmissionsAdminSubmissionStatusResponse = {
     teamId?: string;
     competitionChallengeId?: string;
     submittedByUserId?: string;
-    kind?: NoCtfDomainSubmissionsSubmissionKind;
-    evaluationState?: NoCtfDomainSubmissionsSubmissionEvaluationState;
-    result?: NoCtfDomainSubmissionsScoringResult | null;
-    failureCode?: NoCtfDomainSubmissionsScoringFailureCode | null;
+    kind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol;
+    evaluationState?: NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol;
+    result?: NoCtfapiEndpointsSubmissionsScoringResultProtocol | null;
+    failureCode?: NoCtfapiEndpointsSubmissionsScoringFailureCodeProtocol | null;
     receivedAt?: string;
     evaluationUpdatedAt?: string;
     processingVersion?: number;
@@ -850,12 +891,12 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     competitionChallengeId?: string;
     teamId?: string | null;
     generation?: number;
-    runtimeKind?: NoCtfDomainRuntimeRuntimeKind;
-    provider?: NoCtfDomainRuntimeRuntimeProvider;
+    runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol;
+    provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol;
     runnerPool?: string;
     runnerId?: string | null;
-    state?: NoCtfDomainRuntimeRuntimeState;
-    failureCode?: NoCtfDomainRuntimeRuntimeFailureCode | null;
+    state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
+    failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
     processingVersion?: number;
     urls?: Array<string>;
     providerReceiptJson?: string | null;
@@ -887,23 +928,21 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     id?: string;
     userName?: string;
     email?: string;
-    kind?: NoCtfDomainIdentityUserKind;
-    role?: NoCtfDomainIdentityUserRole;
-    accountStatus?: NoCtfDomainIdentityUserAccountStatus;
+    kind?: NoCtfapiEndpointsAuthenticationUserKindProtocol;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
+    accountStatus?: NoCtfapiEndpointsAuthenticationUserAccountStatusProtocol;
     tokenVersion?: number;
     emailVerified?: boolean;
     createdAt?: string;
     updatedAt?: string;
 };
 
-export type NoCtfDomainIdentityUserAccountStatus = 0 | 1 | 2 | 3;
+export type NoCtfapiEndpointsAuthenticationUserAccountStatusProtocol = 'Active' | 'Banned' | 'Disabled' | 'Anonymized';
 
 export type NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest = {
     userName: string;
-    role?: NoCtfDomainIdentityUserRole2;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
 };
-
-export type NoCtfDomainIdentityUserRole2 = 'User' | 'Organizer' | 'Administrator';
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionResponse = {
     outcome?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionOutcomeCode;
@@ -921,13 +960,15 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionConflictC
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse = {
     userId?: string;
     userName?: string;
-    accountStatus?: NoCtfDomainIdentityUserAccountStatus;
+    accountStatus?: NoCtfapiEndpointsAdministrationPlatformPlatformUserAccountStatusProtocol;
     canHardDelete?: boolean;
     canAnonymize?: boolean;
     selfDeletionForbidden?: boolean;
     lastAdministratorProtected?: boolean;
     references?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceResponse>;
 };
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformUserAccountStatusProtocol = 'Active' | 'Banned' | 'Disabled' | 'Anonymized';
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceResponse = {
     code?: NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionReferenceCode;
@@ -947,9 +988,9 @@ export type NoCtfapiEndpointsAdministrationPlatformExportPlatformLogsRequest = {
     [key: string]: never;
 };
 
-export type NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel = 0 | 1 | 2 | 3 | 4 | 5;
+export type NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol = 'Trace' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical';
 
-export type NoCtfApplicationAdministrationPlatformLogsPlatformLogService = 0 | 1 | 2;
+export type NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol = 'Api' | 'Worker' | 'Runner';
 
 export type NoCtfapiEndpointsAdministrationPlatformDeadLetterResponse = {
     messageId?: string;
@@ -970,7 +1011,7 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
     passwordResetMaxRequestsPerHour?: number;
     smtpHost?: string;
     smtpPort?: number;
-    smtpSecurityMode?: NoCtfDomainIdentitySmtpSecurityMode;
+    smtpSecurityMode?: NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol;
     smtpUserName?: string;
     smtpPasswordConfigured?: boolean;
     smtpFromAddress?: string;
@@ -980,7 +1021,7 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
     updatedAt?: string;
 };
 
-export type NoCtfDomainIdentitySmtpSecurityMode = 'None' | 'SslOnConnect' | 'StartTls';
+export type NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol = 'None' | 'SslOnConnect' | 'StartTls';
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse = {
     name?: string;
@@ -1024,18 +1065,18 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogListResponse 
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     id?: string;
-    kind?: NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind;
+    kind?: NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol;
     subjectId?: string;
     competitionId?: string | null;
     actorId?: string | null;
-    fromCompetitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
-    toCompetitionStatus?: NoCtfDomainCompetitionsCompetitionStatus | null;
-    fromLeaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
-    toLeaderboardVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility | null;
-    userAccountAction?: NoCtfDomainIdentityUserAccountLifecycleAction | null;
-    competitionEventKind?: NoCtfDomainCompetitionsEventsCompetitionEventKind | null;
-    competitionEventLevel?: NoCtfDomainCompetitionsEventsCompetitionEventLevel | null;
-    competitionEventVisibility?: NoCtfDomainCompetitionsEventsCompetitionEventVisibility | null;
+    fromCompetitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null;
+    toCompetitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null;
+    fromLeaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol | null;
+    toLeaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol | null;
+    userAccountAction?: NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol | null;
+    competitionEventKind?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol | null;
+    competitionEventLevel?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol | null;
+    competitionEventVisibility?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol | null;
     relatedUserId?: string | null;
     teamId?: string | null;
     competitionChallengeId?: string | null;
@@ -1043,19 +1084,19 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     submissionId?: string | null;
     scoringEventId?: string | null;
     questionId?: string | null;
-    submissionKind?: NoCtfDomainSubmissionsSubmissionKind | null;
-    submissionState?: NoCtfDomainSubmissionsSubmissionEvaluationState | null;
-    scoringEventKind?: NoCtfDomainSubmissionsScoringEventKind | null;
-    scoringResult?: NoCtfDomainSubmissionsScoringResult | null;
+    submissionKind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol | null;
+    submissionState?: NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol | null;
+    scoringEventKind?: NoCtfapiEndpointsCompetitionsEventsScoringEventKindProtocol | null;
+    scoringResult?: NoCtfapiEndpointsSubmissionsScoringResultProtocol | null;
     subjectDisplayName?: string | null;
     reason?: string | null;
     automatic?: boolean;
     occurredAt?: string;
 };
 
-export type NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind = 0 | 1 | 2 | 3;
+export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = 'CompetitionLifecycle' | 'UserAccountLifecycle' | 'CompetitionLeaderboardVisibility' | 'CompetitionEvent';
 
-export type NoCtfDomainIdentityUserAccountLifecycleAction = 0 | 1 | 2 | 3;
+export type NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol = 'Banned' | 'Disabled' | 'Anonymized' | 'PhysicallyDeleted';
 
 export type NoCtfapiEndpointsAdministrationPlatformListPlatformAuditLogsRequest = {
     [key: string]: never;
@@ -1069,8 +1110,8 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformLogListResponse = {
 export type NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse = {
     cursor?: string;
     timestamp?: string;
-    service?: NoCtfApplicationAdministrationPlatformLogsPlatformLogService;
-    level?: NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel;
+    service?: NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol;
+    level?: NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol;
     category?: string;
     eventId?: number;
     eventName?: string | null;
@@ -1108,7 +1149,7 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfig
     passwordResetMaxRequestsPerHour: number;
     smtpHost: string;
     smtpPort: number;
-    smtpSecurityMode: NoCtfDomainIdentitySmtpSecurityMode;
+    smtpSecurityMode: NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol;
     smtpUserName: string;
     smtpFromAddress: string;
     smtpFromName: string;
@@ -1131,7 +1172,7 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflic
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode = 'ActiveOwnerOrManagerAssignments';
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest = {
-    role?: NoCtfDomainIdentityUserRole;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
@@ -1141,28 +1182,28 @@ export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
 
 export type NoCtfapiEndpointsAdministrationDataExportsDataExportResponse = {
     id?: string;
-    scope?: NoCtfDomainDataExportsDataExportScope;
+    scope?: NoCtfapiEndpointsAdministrationDataExportsDataExportScopeProtocol;
     competitionId?: string | null;
     requestedByUserId?: string;
     requestedAt?: string;
     includeProtectedFlags?: boolean;
     reason?: string | null;
-    status?: NoCtfDomainDataExportsDataExportStatus;
+    status?: NoCtfapiEndpointsAdministrationDataExportsDataExportStatusProtocol;
     startedAt?: string | null;
     completedAt?: string | null;
     expiresAt?: string | null;
     fileName?: string | null;
     length?: number | null;
     sha256?: string | null;
-    failureCode?: NoCtfDomainDataExportsDataExportFailureCode | null;
+    failureCode?: NoCtfapiEndpointsAdministrationDataExportsDataExportFailureCodeProtocol | null;
     failureDetail?: string | null;
 };
 
-export type NoCtfDomainDataExportsDataExportScope = 0 | 1;
+export type NoCtfapiEndpointsAdministrationDataExportsDataExportScopeProtocol = 'CompetitionArchive' | 'PlatformAudit';
 
-export type NoCtfDomainDataExportsDataExportStatus = 0 | 1 | 2 | 3 | 4;
+export type NoCtfapiEndpointsAdministrationDataExportsDataExportStatusProtocol = 'Queued' | 'Processing' | 'Available' | 'Failed' | 'Expired';
 
-export type NoCtfDomainDataExportsDataExportFailureCode = 0 | 1 | 2 | 3;
+export type NoCtfapiEndpointsAdministrationDataExportsDataExportFailureCodeProtocol = 'SubjectNotFound' | 'SizeLimitExceeded' | 'GenerationFailed' | 'ObjectStorageFailed';
 
 export type NoCtfapiEndpointsAdministrationDataExportsCreateCompetitionDataExportRequest = {
     includeProtectedFlags?: boolean;
@@ -1183,7 +1224,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManage
 export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest = {
     title: string;
     description?: string | null;
-    mode?: NoCtfDomainCompetitionsGameMode;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     startTime?: string;
     endTime?: string;
     teamRegistrationAutoApprove?: boolean;
@@ -1192,29 +1233,31 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest 
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsGenerateMissingFlagsResponse = {
-    failures?: Array<NoCtfApplicationChallengesFlagsMissingFlagGenerationFailure>;
+    failures?: Array<NoCtfapiEndpointsAdministrationCompetitionsMissingFlagGenerationFailureResponse>;
 };
 
-export type NoCtfApplicationChallengesFlagsMissingFlagGenerationFailure = {
+export type NoCtfapiEndpointsAdministrationCompetitionsMissingFlagGenerationFailureResponse = {
     competitionChallengeId?: string;
     teamId?: string;
-    code?: string;
+    code?: NoCtfapiEndpointsAdministrationCompetitionsMissingFlagFailureCodeProtocol;
     description?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsMissingFlagFailureCodeProtocol = 'CompetitionNotFound' | 'GameModeUnsupported' | 'FlagGenerationFailed';
+
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse = {
     competitionId?: string;
-    mode?: NoCtfDomainCompetitionsGameMode;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     json?: string;
     revision?: number;
-    competitionStatus?: NoCtfDomainCompetitionsCompetitionStatus;
+    competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
     updatedAt?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse = {
     competitionId?: string;
-    configuredVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
-    effectiveVisibility?: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    configuredVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
+    effectiveVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     startsAt?: string | null;
     appliedAt?: string | null;
     revision?: number;
@@ -1240,8 +1283,8 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCand
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateResponse = {
     id?: string;
     userName?: string;
-    kind?: NoCtfDomainIdentityUserKind;
-    role?: NoCtfDomainIdentityUserRole;
+    kind?: NoCtfapiEndpointsAuthenticationUserKindProtocol;
+    role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;
     emailVerified?: boolean;
 };
 
@@ -1265,14 +1308,14 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest 
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityFailureResponse = {
-    code?: NoCtfApplicationCompetitionsVisibilityCompetitionVisibilityMutationState;
+    code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionVisibilityMutationCodeProtocol;
     current?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse | null;
 };
 
-export type NoCtfApplicationCompetitionsVisibilityCompetitionVisibilityMutationState = 0 | 1 | 2 | 3 | 4;
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionVisibilityMutationCodeProtocol = 'Updated' | 'NotFound' | 'RevisionConflict' | 'InvalidSchedule' | 'CompetitionFinished';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest = {
-    visibility: NoCtfDomainCompetitionsCompetitionLeaderboardVisibility;
+    visibility: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     startsAt?: string | null;
     expectedRevision: number;
     reason?: string | null;
@@ -1286,14 +1329,16 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissi
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsStartValidationResponse = {
-    errors?: Array<NoCtfApplicationCompetitionsLifecycleStartGateError>;
+    errors?: Array<NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse>;
 };
 
-export type NoCtfApplicationCompetitionsLifecycleStartGateError = {
-    code?: string;
+export type NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse = {
+    code?: NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol;
     competitionChallengeId?: string | null;
     message?: string;
 };
+
+export type NoCtfapiEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol = 'CompetitionNotPublished' | 'CompetitionConfigurationInvalid' | 'PublishedChallengeRequired' | 'ApprovedTeamRequired' | 'RuntimeQuotaInsufficient' | 'ChallengeModeMismatch' | 'ChallengeRulesInvalid' | 'RuntimeDefinitionInvalid';
 
 export type NoCtfapiEndpointsAdministrationCheatIncidentsConfirmCheatIncidentRequest = {
     reason: string;
@@ -1319,10 +1364,10 @@ export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResp
     submittedByUserName?: string;
     competitionChallengeId?: string;
     challengeTitle?: string;
-    submissionKind?: NoCtfDomainSubmissionsSubmissionKind;
-    result?: NoCtfDomainSubmissionsScoringResult;
-    failureCode?: NoCtfDomainSubmissionsScoringFailureCode;
-    status?: NoCtfDomainSubmissionsCheatIncidentStatus;
+    submissionKind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol;
+    result?: NoCtfapiEndpointsSubmissionsScoringResultProtocol;
+    failureCode?: NoCtfapiEndpointsSubmissionsScoringFailureCodeProtocol;
+    status?: NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol;
     resolvedByUserId?: string | null;
     resolvedByUserName?: string | null;
     resolvedAt?: string | null;
@@ -1338,7 +1383,7 @@ export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResp
     canCorrect?: boolean;
 };
 
-export type NoCtfDomainSubmissionsCheatIncidentStatus = 0 | 1 | 2 | 3 | 4;
+export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol = 'Pending' | 'Confirmed' | 'Dismissed' | 'Superseded' | 'Corrected';
 
 export type NoCtfapiEndpointsAdministrationCheatIncidentsGetCheatIncidentRequest = {
     [key: string]: never;
@@ -1363,10 +1408,10 @@ export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemRe
     submittedByUserName?: string;
     competitionChallengeId?: string;
     challengeTitle?: string;
-    submissionKind?: NoCtfDomainSubmissionsSubmissionKind;
-    result?: NoCtfDomainSubmissionsScoringResult;
-    failureCode?: NoCtfDomainSubmissionsScoringFailureCode;
-    status?: NoCtfDomainSubmissionsCheatIncidentStatus;
+    submissionKind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol;
+    result?: NoCtfapiEndpointsSubmissionsScoringResultProtocol;
+    failureCode?: NoCtfapiEndpointsSubmissionsScoringFailureCodeProtocol;
+    status?: NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol;
     resolvedByUserId?: string | null;
     resolvedByUserName?: string | null;
     resolvedAt?: string | null;
@@ -1399,7 +1444,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = 
     competitionChallengeId?: string | null;
     teamId?: string | null;
     flag?: string;
-    specificationKind?: NoCtfDomainChallengesSpecificationKind | null;
+    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
     specificationId?: string | null;
     validStart?: string | null;
     validUntil?: string | null;
@@ -1407,13 +1452,13 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = 
     createdAt?: string;
 };
 
-export type NoCtfDomainChallengesSpecificationKind = 0 | 1 | 2 | 3;
+export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest = {
     id?: string | null;
     teamId?: string | null;
     flag: string;
-    specificationKind?: NoCtfDomainChallengesSpecificationKind | null;
+    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
     specificationId?: string | null;
     validStart?: string | null;
     validUntil?: string | null;
@@ -1433,10 +1478,10 @@ export type NoCtfapiEndpointsAdministrationChallengesDeleteChallengeRequest = {
 export type NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse = {
     competitionId?: string;
     competitionChallengeId?: string;
-    mode?: NoCtfDomainCompetitionsGameMode;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     json?: string;
     revision?: number;
-    competitionStatus?: NoCtfDomainCompetitionsCompetitionStatus;
+    competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
     updatedAt?: string;
 };
 
@@ -1492,8 +1537,8 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
     id?: string;
     ownerId?: string;
     managerIds?: Array<string>;
-    mode?: NoCtfDomainCompetitionsGameMode;
-    visibility?: NoCtfDomainChallengesChallengeVisibility;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    visibility?: NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol;
     title?: string;
     description?: string | null;
     direction?: string;
@@ -1505,7 +1550,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
     updatedAt?: string;
 };
 
-export type NoCtfDomainChallengesChallengeVisibility = 0 | 1;
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol = 'Private' | 'Shared';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse = {
     code: NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode;
@@ -1516,17 +1561,13 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflic
 
 export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest = {
     id?: string | null;
-    mode?: NoCtfDomainCompetitionsGameMode2;
-    visibility?: NoCtfDomainChallengesChallengeVisibility2;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    visibility?: NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol;
     title: string;
     description?: string | null;
     direction: string;
     definitionJson: string;
 };
-
-export type NoCtfDomainCompetitionsGameMode2 = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
-
-export type NoCtfDomainChallengesChallengeVisibility2 = 'Private' | 'Shared';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankGetChallengeFlagRequest = {
     [key: string]: never;
@@ -1563,8 +1604,8 @@ export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeAttachmen
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeTemplateRequest = {
-    mode: NoCtfDomainCompetitionsGameMode2;
-    visibility: NoCtfDomainChallengesChallengeVisibility2;
+    mode: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    visibility: NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol;
     title: string;
     description?: string | null;
     direction: string;
@@ -2727,11 +2768,11 @@ export type GetLeaderboardEndpointResponses = {
     /**
      * Success
      */
-    200: NoCtfApplicationScoringLeaderboardLeaderboardResponse;
+    200: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse;
     /**
      * Accepted
      */
-    202: NoCtfApplicationScoringLeaderboardLeaderboardProcessingResponse;
+    202: NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse;
 };
 
 export type GetLeaderboardEndpointResponse = GetLeaderboardEndpointResponses[keyof GetLeaderboardEndpointResponses];
@@ -2798,8 +2839,8 @@ export type AdminExportCompetitionEventsData = {
         competitionId: string;
     };
     query: {
-        kind?: NoCtfDomainCompetitionsEventsCompetitionEventKind | null;
-        minimumLevel?: NoCtfDomainCompetitionsEventsCompetitionEventLevel | null;
+        kind?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol | null;
+        minimumLevel?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol | null;
         teamId?: string | null;
         userId?: string | null;
         competitionChallengeId?: string | null;
@@ -2837,8 +2878,8 @@ export type ListCompetitionEventsData = {
         competitionId: string;
     };
     query: {
-        kind?: NoCtfDomainCompetitionsEventsCompetitionEventKind | null;
-        minimumLevel?: NoCtfDomainCompetitionsEventsCompetitionEventLevel | null;
+        kind?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol | null;
+        minimumLevel?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol | null;
         teamId?: string | null;
         userId?: string | null;
         competitionChallengeId?: string | null;
@@ -4079,10 +4120,10 @@ export type AdminListSubmissionsData = {
         competitionChallengeId?: string | null;
         teamId?: string | null;
         userId?: string | null;
-        submissionKind?: NoCtfDomainSubmissionsSubmissionKind | null;
-        evaluationState?: NoCtfDomainSubmissionsSubmissionEvaluationState | null;
-        scoringResult?: NoCtfDomainSubmissionsScoringResult | null;
-        failureCode?: NoCtfDomainSubmissionsScoringFailureCode | null;
+        submissionKind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol | null;
+        evaluationState?: NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol | null;
+        scoringResult?: NoCtfapiEndpointsSubmissionsScoringResultProtocol | null;
+        failureCode?: NoCtfapiEndpointsSubmissionsScoringFailureCodeProtocol | null;
         receivedFrom?: string | null;
         receivedTo?: string | null;
         submittedFlag?: string | null;
@@ -4307,11 +4348,11 @@ export type AdminListRuntimesData = {
     query: {
         competitionChallengeId?: string | null;
         teamId?: string | null;
-        runtimeKind?: NoCtfDomainRuntimeRuntimeKind | null;
-        provider?: NoCtfDomainRuntimeRuntimeProvider | null;
+        runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol | null;
+        provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol | null;
         runnerPool?: string | null;
         runnerId?: string | null;
-        state?: NoCtfDomainRuntimeRuntimeState | null;
+        state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
         expiresBefore?: string | null;
         hostPort?: number | null;
         cursor?: string | null;
@@ -4681,8 +4722,8 @@ export type AdminPlatformExportLogsData = {
     body?: never;
     path?: never;
     query: {
-        minimumLevel: NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel;
-        service?: NoCtfApplicationAdministrationPlatformLogsPlatformLogService | null;
+        minimumLevel: NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol;
+        service?: NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol | null;
         from: string;
         to: string;
         category?: string | null;
@@ -5006,7 +5047,7 @@ export type AdminPlatformListAuditLogsData = {
     body?: never;
     path?: never;
     query: {
-        kind?: NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind | null;
+        kind?: NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol | null;
         from?: string | null;
         to?: string | null;
         competitionId?: string | null;
@@ -5047,8 +5088,8 @@ export type AdminPlatformListLogsData = {
     body?: never;
     path?: never;
     query: {
-        minimumLevel: NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel;
-        service?: NoCtfApplicationAdministrationPlatformLogsPlatformLogService | null;
+        minimumLevel: NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol;
+        service?: NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol | null;
         from?: string | null;
         to?: string | null;
         category?: string | null;
@@ -6442,7 +6483,7 @@ export type AdminListCheatIncidentsData = {
         ownerTeamId?: string | null;
         userId?: string | null;
         competitionChallengeId?: string | null;
-        status?: NoCtfDomainSubmissionsCheatIncidentStatus | null;
+        status?: NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol | null;
         from: string;
         to: string;
         cursor?: string | null;

@@ -25,7 +25,7 @@ public sealed class CreatePatchUploadTests
             archive,
             DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("patch_upload_conflict");
+        await Assert.That(result.FailureCode).IsEqualTo(PatchUploadFailureCode.PatchUploadConflict);
         await Assert.That(objects.StoredObjectKey).IsNotNull();
         await Assert.That(objects.DeletedObjectKey)
             .IsEqualTo(objects.StoredObjectKey);
@@ -48,7 +48,7 @@ public sealed class CreatePatchUploadTests
             archive,
             DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("patch_upload_conflict");
+        await Assert.That(result.FailureCode).IsEqualTo(PatchUploadFailureCode.PatchUploadConflict);
         await Assert.That(objects.DeletedObjectKey)
             .IsEqualTo(objects.StoredObjectKey);
     }

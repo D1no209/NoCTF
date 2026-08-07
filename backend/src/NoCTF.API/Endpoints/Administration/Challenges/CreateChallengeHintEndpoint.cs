@@ -58,16 +58,16 @@ public sealed class CreateChallengeHintEndpoint(
         var result = await hints.SaveAsync(new(
             competitionId, challengeId, request.Id, true, request.Content, request.Cost,
             request.PublishedAt, DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode == "hint_not_found")
+        if (result.FailureCode == ChallengeHintFailureCode.HintNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: result.ErrorCode == "resource_id_conflict"
+                statusCode: result.FailureCode == ChallengeHintFailureCode.ResourceIdConflict
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
                 title: "Hint was not created.",
                 detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
+                extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() });
         var response = ChallengeHintMapping.ToResponse(result.Value!);
         return TypedResults.Created(
             $"/api/v1/admin/competitions/{competitionId}/challenges/{challengeId}/hints/{response.Id}",

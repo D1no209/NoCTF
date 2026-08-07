@@ -22,7 +22,12 @@ public sealed record LeaderboardTeamFact(
     bool IsBanned,
     bool IsDeleted,
     DateTimeOffset RegisteredAt = default);
-public sealed record LeaderboardChallengeFact(Guid Id, string Direction, bool IsDeleted, string? ConfigurationJson = null);
+public sealed record LeaderboardChallengeFact(
+    Guid Id,
+    string Direction,
+    string Title,
+    bool IsDeleted,
+    string? ConfigurationJson = null);
 
 public sealed record LeaderboardSubmissionFact(
     Guid SubmissionId,
@@ -31,7 +36,8 @@ public sealed record LeaderboardSubmissionFact(
     SubmissionKind Kind,
     DateTimeOffset ReceivedAt,
     ScoringEvent Event,
-    Guid? VictimTeamId = null);
+    Guid? VictimTeamId = null,
+    string? SubmitterName = null);
 
 public sealed record LeaderboardSystemFact(ScoringEvent Event, long CurrentValue = 0);
 
@@ -42,10 +48,14 @@ public sealed record LeaderboardAwdRoundFact(
     DateTimeOffset StartsAt,
     DateTimeOffset EndsAt);
 
+public sealed record GameModeLeaderboardProjection(
+    IReadOnlyList<LeaderboardEntry> Entries,
+    IReadOnlyList<LeaderboardTeamSeries> Series);
+
 public interface IGameModeLeaderboardProjector
 {
     GameMode Mode { get; }
-    IReadOnlyList<LeaderboardEntry> Project(LeaderboardProjectionInput input);
+    GameModeLeaderboardProjection Project(LeaderboardProjectionInput input);
 }
 
 public interface ILeaderboardProjectorCatalog
@@ -56,7 +66,11 @@ public interface ILeaderboardProjectorCatalog
 public sealed record LeaderboardProjectionResult(
     IReadOnlyList<LeaderboardEntry> Entries,
     IReadOnlyList<LeaderboardSubjectSummary> Subjects,
-    IReadOnlyList<LeaderboardBloodSummary> Bloods);
+    IReadOnlyList<LeaderboardBloodSummary> Bloods)
+{
+    public IReadOnlyList<LeaderboardTeamSeries> Series { get; init; } = [];
+    public IReadOnlyList<LeaderboardChallengeInfo> Challenges { get; init; } = [];
+}
 
 public interface ILeaderboardProjectionEngine
 {

@@ -45,9 +45,10 @@ public sealed class LeaderboardOpenApiTests
         var rank = ResolveSchema(
             root,
             blood.GetProperty("properties").GetProperty("bloodRank"));
+        await Assert.That(rank.GetProperty("type").GetString()).IsEqualTo("string");
         await Assert.That(rank.GetProperty("enum").EnumerateArray()
-                .Select(value => value.GetInt32()))
-            .IsEquivalentTo([1, 2, 3]);
+                .Select(value => value.GetString()!))
+            .IsEquivalentTo(["First", "Second", "Third"]);
         await Assert.That(rank.GetProperty("x-enumNames").EnumerateArray()
                 .Select(value => value.GetString()!))
             .IsEquivalentTo(["First", "Second", "Third"]);

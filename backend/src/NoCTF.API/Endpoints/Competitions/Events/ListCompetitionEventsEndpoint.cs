@@ -3,8 +3,13 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Competitions;
+using NoCTF.API.Endpoints.Runtime;
+using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.Teams;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions;
@@ -12,13 +17,60 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Competitions.Events;
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventKindProtocol>))]
+public enum CompetitionEventKindProtocol
+{
+    CompetitionCreated, CompetitionUpdated, CompetitionDeleted, CompetitionLifecycleChanged,
+    LeaderboardVisibilityChanged, ChallengeCreated, ChallengeUpdated, ChallengePublished,
+    ChallengeUnpublished, ChallengeDeleted, HintPublished, HintUnlocked, TeamRegistered,
+    TeamRegistrationChanged, TeamUpdated, TeamDeleted, TeamMemberJoined, TeamMemberRemoved,
+    TeamCaptainTransferred, TeamBanned, TeamUnbanned, SubmissionReceived, SubmissionEvaluated,
+    ScoringRecorded, FirstBloodAwarded, SecondBloodAwarded, ThirdBloodAwarded, RuntimeCreated,
+    RuntimeStateChanged, RuntimeExtended, RuntimeReset, RuntimePortAllocated,
+    AnnouncementPublished, QuestionOpened, QuestionReplied, QuestionStatusChanged,
+    QuestionPublished, ProtectedSubmissionFlagAccessed, CheatIncidentDetected,
+    CheatIncidentConfirmed, CheatIncidentDismissed, CheatIncidentSuperseded,
+    CheatIncidentCorrected, ProtectedCompetitionExportCreated, TeamBanAppealSubmitted,
+    TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]
+public enum CompetitionEventLevelProtocol { Information, Warning, Error }
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventVisibilityProtocol>))]
+public enum CompetitionEventVisibilityProtocol { Public, Team, Staff }
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventAccessLevelProtocol>))]
+public enum CompetitionEventAccessLevelProtocol { Participant, Team, Staff }
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoringEventKindProtocol>))]
+public enum ScoringEventKindProtocol { SubmissionEvaluation, AwdServiceStatus, HintUnlock, KohObservation }
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionQuestionStatusProtocol>))]
+public enum CompetitionQuestionStatusProtocol { Pending, Replied, Resolved, Closed }
+
+[Mapper]
+internal static partial class CompetitionEventProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventKindProtocol ToProtocol(CompetitionEventKind value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventLevelProtocol ToProtocol(CompetitionEventLevel value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventVisibilityProtocol ToProtocol(CompetitionEventVisibility value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventAccessLevelProtocol ToProtocol(CompetitionEventAccessLevel value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial ScoringEventKindProtocol ToProtocol(ScoringEventKind value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionQuestionStatusProtocol ToProtocol(CompetitionQuestionStatus value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventKind ToDomain(CompetitionEventKindProtocol value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventLevel ToDomain(CompetitionEventLevelProtocol value);
+}
+
 public sealed class ListCompetitionEventsRequest
 {
-    [QueryParam] public CompetitionEventKind? Kind { get; set; }
-    [QueryParam] public CompetitionEventLevel? MinimumLevel { get; set; }
+    [QueryParam] public CompetitionEventKindProtocol? Kind { get; set; }
+    [QueryParam] public CompetitionEventLevelProtocol? MinimumLevel { get; set; }
     [QueryParam] public Guid? TeamId { get; set; }
     [QueryParam] public Guid? UserId { get; set; }
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
@@ -47,9 +99,9 @@ public sealed class ListCompetitionEventsValidator
 public sealed record CompetitionEventResponse(
     Guid Id,
     Guid CompetitionId,
-    CompetitionEventKind Kind,
-    CompetitionEventLevel Level,
-    CompetitionEventVisibility Visibility,
+    CompetitionEventKindProtocol Kind,
+    CompetitionEventLevelProtocol Level,
+    CompetitionEventVisibilityProtocol Visibility,
     Guid? ActorUserId,
     string? ActorDisplayName,
     Guid? RelatedUserId,
@@ -64,22 +116,22 @@ public sealed record CompetitionEventResponse(
     Guid? ScoringEventId,
     Guid? QuestionId,
     Guid? ParentEventId,
-    CompetitionStatus? CompetitionStatus,
-    CompetitionLeaderboardVisibility? LeaderboardVisibility,
-    TeamRegistrationStatus? TeamRegistrationStatus,
-    SubmissionKind? SubmissionKind,
-    SubmissionEvaluationState? SubmissionState,
-    ScoringEventKind? ScoringEventKind,
-    ScoringResult? ScoringResult,
-    RuntimeState? RuntimeState,
-    CompetitionQuestionStatus? QuestionStatus,
+    CompetitionStatusProtocol? CompetitionStatus,
+    LeaderboardVisibilityProtocol? LeaderboardVisibility,
+    TeamRegistrationStatusProtocol? TeamRegistrationStatus,
+    SubmissionKindProtocol? SubmissionKind,
+    SubmissionEvaluationStateProtocol? SubmissionState,
+    ScoringEventKindProtocol? ScoringEventKind,
+    ScoringResultProtocol? ScoringResult,
+    RuntimeStateProtocol? RuntimeState,
+    CompetitionQuestionStatusProtocol? QuestionStatus,
     int? RuntimeGeneration,
     int? HostPort,
     string? Reason,
     DateTimeOffset OccurredAt);
 
 public sealed record CompetitionEventListResponse(
-    CompetitionEventAccessLevel AccessLevel,
+    CompetitionEventAccessLevelProtocol AccessLevel,
     Guid? ViewerTeamId,
     bool CanExport,
     bool CanAccessSubmissionFlags,
@@ -130,8 +182,8 @@ public sealed class ListCompetitionEventsEndpoint(
         var result = await list.ExecuteAsync(new CompetitionEventQuery(
             competitionId,
             user.UserId,
-            request.Kind,
-            request.MinimumLevel,
+            request.Kind is null ? null : CompetitionEventProtocolMapper.ToDomain(request.Kind.Value),
+            request.MinimumLevel is null ? null : CompetitionEventProtocolMapper.ToDomain(request.MinimumLevel.Value),
             request.TeamId,
             request.UserId,
             request.CompetitionChallengeId,
@@ -163,7 +215,7 @@ public sealed class ListCompetitionEventsEndpoint(
                     result.Items[^1].Id))
             : null;
         return TypedResults.Ok(new CompetitionEventListResponse(
-            result.AccessLevel.Value,
+            CompetitionEventProtocolMapper.ToProtocol(result.AccessLevel.Value),
             result.ViewerTeamId,
             result.CanExport,
             result.CanAccessSubmissionFlags,
@@ -190,9 +242,9 @@ public sealed class ListCompetitionEventsEndpoint(
         new(
             item.Id,
             item.CompetitionId,
-            item.Kind,
-            item.Level,
-            item.Visibility,
+            CompetitionEventProtocolMapper.ToProtocol(item.Kind),
+            CompetitionEventProtocolMapper.ToProtocol(item.Level),
+            CompetitionEventProtocolMapper.ToProtocol(item.Visibility),
             item.ActorUserId,
             item.ActorDisplayName,
             item.RelatedUserId,
@@ -207,15 +259,15 @@ public sealed class ListCompetitionEventsEndpoint(
             item.ScoringEventId,
             item.QuestionId,
             item.ParentEventId,
-            item.CompetitionStatus,
-            item.LeaderboardVisibility,
-            item.TeamRegistrationStatus,
-            item.SubmissionKind,
-            item.SubmissionState,
-            item.ScoringEventKind,
-            item.ScoringResult,
-            item.RuntimeState,
-            item.QuestionStatus,
+            item.CompetitionStatus is null ? null : CompetitionProtocolMapper.ToProtocol(item.CompetitionStatus.Value),
+            item.LeaderboardVisibility is null ? null : CompetitionProtocolMapper.ToProtocol(item.LeaderboardVisibility.Value),
+            item.TeamRegistrationStatus is null ? null : TeamMapper.ToProtocol(item.TeamRegistrationStatus.Value),
+            item.SubmissionKind is null ? null : SubmissionMapper.ToProtocol(item.SubmissionKind.Value),
+            item.SubmissionState is null ? null : SubmissionMapper.ToProtocol(item.SubmissionState.Value),
+            item.ScoringEventKind is null ? null : CompetitionEventProtocolMapper.ToProtocol(item.ScoringEventKind.Value),
+            item.ScoringResult is null ? null : SubmissionMapper.ToProtocol(item.ScoringResult.Value),
+            item.RuntimeState is null ? null : RuntimeProtocolMapper.ToProtocol(item.RuntimeState.Value),
+            item.QuestionStatus is null ? null : CompetitionEventProtocolMapper.ToProtocol(item.QuestionStatus.Value),
             item.RuntimeGeneration,
             item.HostPort,
             item.Reason,

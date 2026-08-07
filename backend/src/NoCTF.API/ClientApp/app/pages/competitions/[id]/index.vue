@@ -1,9 +1,23 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import {
+  ArrowRight,
+  Box,
+  CalendarRange,
+  Clock,
+  FileText,
+  KeyRound,
+  LogIn,
+  ShieldCheck,
+  Trophy,
+  UserPlus,
+  Users,
+} from '@lucide/vue'
+import {
   createTeamEndpoint,
   getMyTeamEndpoint,
   joinTeamByInvitationEndpoint,
+  listCompetitionTeamsEndpoint,
 } from '~/api'
 import type { NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
 
@@ -31,6 +45,44 @@ async function loadMyTeam() {
 
 onMounted(loadMyTeam)
 watch(isLoggedIn, loadMyTeam)
+
+// 已报名队伍数
+const approvedTeamCount = ref<number | null>(null)
+onMounted(async () => {
+  const { data, error } = await listCompetitionTeamsEndpoint({ path: { competitionId } })
+  if (error || !data) return
+  approvedTeamCount.value = (data.items ?? []).filter(
+    (team) => team.registrationStatus === TeamRegistrationStatus.Approved,
+  ).length
+})
+
+// 倒计时
+const now = ref(Date.now())
+let timer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  timer = setInterval(() => {
+    now.value = Date.now()
+  }, 30_000)
+})
+onUnmounted(() => clearInterval(timer))
+
+const countdown = computed(() => {
+  const c = competition.value
+  if (!c) return null
+  const start = new Date(c.startTime ?? '').getTime()
+  const end = new Date(c.endTime ?? '').getTime()
+  if (Number.isNaN(start) || Number.isNaN(end)) return null
+  if (now.value < start) return { label: '距开始', ms: start - now.value }
+  if (now.value < end) return { label: '距结束', ms: end - now.value }
+  return { label: '已结束', ms: 0 }
+})
+
+const canParticipate = computed(
+  () =>
+    myTeam.value?.registrationStatus === TeamRegistrationStatus.Approved
+    && !myTeam.value?.isBanned
+    && competition.value?.status === CompetitionStatus.Running,
+)
 
 // 创建队伍
 const createOpen = ref(false)
@@ -84,58 +136,71 @@ const isCaptain = computed(
 </script>
 
 <template>
-  <div v-if="competition" class="grid gap-6 lg:grid-cols-3">
-    <Card class="lg:col-span-2">
-      <CardHeader>
-        <CardTitle>竞赛介绍</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p v-if="competition.description" class="whitespace-pre-line text-sm leading-6">
-          {{ competition.description }}
-        </p>
-        <p v-else class="text-sm text-muted-foreground">主办方还没有填写竞赛介绍。</p>
-        <Separator class="my-4" />
-        <dl class="grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt class="text-muted-foreground">开始时间</dt>
-            <dd>{{ formatDateTime(competition.startTime) }}</dd>
-          </div>
-          <div>
-            <dt class="text-muted-foreground">结束时间</dt>
-            <dd>{{ formatDateTime(competition.endTime) }}</dd>
-          </div>
-          <div>
-            <dt class="text-muted-foreground">队伍人数上限</dt>
-            <dd>{{ competition.maxTeamMembers ?? '—' }} 人</dd>
-          </div>
-          <div>
-            <dt class="text-muted-foreground">报名审核</dt>
-            <dd>{{ competition.teamRegistrationAutoApprove ? '自动通过' : '需要主办方审核' }}</dd>
-          </div>
-        </dl>
-      </CardContent>
-    </Card>
+  <div v-if="competition" class="flex flex-col gap-6">
+    <!-- Banner -->
+    <div class="relative overflow-hidden rounded-xl border bg-gradient-to-br from-primary/90 via-primary/70 to-primary/40 text-primary-foreground">
+      <Trophy class="pointer-events-none absolute -right-8 -bottom-10 size-56 opacity-15" />
+      <div class="relative flex flex-col gap-6 p-6 sm:p-10">
+        <div class="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">{{ gameModeLabel(competition.mode) }}</Badge>
+          <Badge variant="outline" class="border-primary-foreground/40 text-primary-foreground">
+            {{ competitionStatusLabel(competition.status) }}
+          </Badge>
+        </div>
 
-    <Card>
-      <CardHeader>
-        <CardTitle>我的参赛状态</CardTitle>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-4">
-        <Skeleton v-if="!teamLoaded" class="h-20 w-full" />
+        <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">{{ competition.title }}</h1>
 
-        <template v-else-if="!isLoggedIn">
-          <p class="text-sm text-muted-foreground">登录后即可创建或加入队伍参赛。</p>
-          <Button as-child class="w-full">
-            <NuxtLink :to="`/auth/login?redirect=/competitions/${competitionId}`">登录 / 注册</NuxtLink>
-          </Button>
-        </template>
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          <span class="flex items-center gap-1.5">
+            <CalendarRange class="size-4" />
+            {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
+          </span>
+          <span v-if="countdown" class="flex items-center gap-1.5 font-medium">
+            <Clock class="size-4" />
+            {{ countdown.label }}{{ countdown.ms > 0 ? ` ${formatDuration(countdown.ms)}` : '' }}
+          </span>
+        </div>
 
-        <template v-else-if="!myTeam">
-          <p class="text-sm text-muted-foreground">你还没有加入本竞赛的队伍。</p>
-          <div class="flex flex-col gap-2">
+        <div class="flex flex-wrap gap-2">
+          <span class="flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs">
+            <Users class="size-3.5" />
+            队伍人数上限 {{ competition.maxTeamMembers ?? '—' }} 人
+          </span>
+          <span class="flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs">
+            <Box class="size-3.5" />
+            同时环境上限 {{ competition.maxConcurrentRuntimeInstancesPerTeam ?? '—' }} 个
+          </span>
+          <span class="flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs">
+            <ShieldCheck class="size-3.5" />
+            {{ competition.teamRegistrationAutoApprove ? '报名自动通过' : '报名需审核' }}
+          </span>
+          <span v-if="approvedTeamCount !== null" class="flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs">
+            <Trophy class="size-3.5" />
+            {{ approvedTeamCount }} 支队伍已报名
+          </span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+          <template v-if="!teamLoaded">
+            <Skeleton class="h-10 w-32" />
+          </template>
+
+          <template v-else-if="!isLoggedIn">
+            <Button as-child size="lg" variant="secondary">
+              <NuxtLink :to="`/auth/login?redirect=/competitions/${competitionId}`">
+                <LogIn data-icon="inline-start" />
+                登录 / 注册后报名
+              </NuxtLink>
+            </Button>
+          </template>
+
+          <template v-else-if="!myTeam">
             <Dialog v-model:open="createOpen">
               <DialogTrigger as-child>
-                <Button class="w-full">创建队伍</Button>
+                <Button size="lg" variant="secondary">
+                  <UserPlus data-icon="inline-start" />
+                  立即报名
+                </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -161,7 +226,10 @@ const isCaptain = computed(
 
             <Dialog v-model:open="joinOpen">
               <DialogTrigger as-child>
-                <Button variant="outline" class="w-full">凭邀请码加入</Button>
+                <Button size="lg" variant="outline" class="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+                  <KeyRound data-icon="inline-start" />
+                  凭邀请码加入
+                </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -184,34 +252,52 @@ const isCaptain = computed(
                 </form>
               </DialogContent>
             </Dialog>
-          </div>
-        </template>
+          </template>
 
-        <template v-else>
-          <div class="flex items-center gap-2">
-            <span class="font-medium">{{ myTeam.name }}</span>
-            <Badge
-              :variant="myTeam.registrationStatus === TeamRegistrationStatus.Approved ? 'default' : myTeam.registrationStatus === TeamRegistrationStatus.Rejected ? 'destructive' : 'secondary'"
-            >
-              {{ teamRegistrationStatusLabel(myTeam.registrationStatus) }}
-            </Badge>
-            <Badge v-if="myTeam.isBanned" variant="destructive">已封禁</Badge>
-          </div>
-          <Alert v-if="myTeam.registrationStatus === TeamRegistrationStatus.Pending">
-            <AlertDescription>报名已提交,等待主办方审核通过后即可参赛。</AlertDescription>
-          </Alert>
-          <Alert v-else-if="myTeam.registrationStatus === TeamRegistrationStatus.Rejected" variant="destructive">
-            <AlertDescription>
-              报名被拒绝{{ isCaptain ? ',可在「我的队伍」页修改信息后重新提交' : '' }}。
-            </AlertDescription>
-          </Alert>
-          <Alert v-else>
-            <AlertDescription>报名已通过,去题目区开始解题吧。</AlertDescription>
-          </Alert>
-          <Button variant="outline" as-child class="w-full">
-            <NuxtLink :to="`/competitions/${competitionId}/my/team`">进入我的队伍</NuxtLink>
-          </Button>
-        </template>
+          <template v-else>
+            <Button v-if="canParticipate" as-child size="lg" variant="secondary">
+              <NuxtLink :to="`/competitions/${competitionId}/challenges`">
+                进入比赛
+                <ArrowRight data-icon="inline-end" />
+              </NuxtLink>
+            </Button>
+            <Button as-child size="lg" variant="outline" class="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+              <NuxtLink :to="`/competitions/${competitionId}/my/team`">我的队伍</NuxtLink>
+            </Button>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- 我的队伍状态提示 -->
+    <Alert v-if="myTeam && myTeam.registrationStatus === TeamRegistrationStatus.Pending">
+      <ShieldCheck class="size-4" />
+      <AlertDescription>
+        队伍「{{ myTeam.name }}」报名已提交,等待主办方审核通过后即可参赛。
+      </AlertDescription>
+    </Alert>
+    <Alert v-else-if="myTeam && myTeam.registrationStatus === TeamRegistrationStatus.Rejected" variant="destructive">
+      <AlertDescription>
+        队伍「{{ myTeam.name }}」报名被拒绝{{ isCaptain ? ',可在「我的队伍」页修改信息后重新提交' : '' }}。
+      </AlertDescription>
+    </Alert>
+    <Alert v-else-if="myTeam?.isBanned" variant="destructive">
+      <AlertDescription>队伍「{{ myTeam.name }}」已被封禁,如有异议请联系主办方。</AlertDescription>
+    </Alert>
+
+    <!-- 竞赛介绍 -->
+    <Card>
+      <CardHeader>
+        <CardTitle class="flex items-center gap-2 text-base">
+          <FileText class="size-4" />
+          竞赛介绍
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p v-if="competition.description" class="whitespace-pre-line text-sm leading-7">
+          {{ competition.description }}
+        </p>
+        <p v-else class="text-sm text-muted-foreground">主办方还没有填写竞赛介绍。</p>
       </CardContent>
     </Card>
   </div>

@@ -68,6 +68,16 @@ public enum ChallengeConfigurationUpdateFailure
     ChallengeNotFound,
     RevisionConflict
 }
+
+public enum ChallengeConfigurationFailureCode
+{
+    InvalidRevision,
+    InvalidConfiguration,
+    CompetitionNotFound,
+    ConfigurationLocked,
+    ChallengeNotFound,
+    ConfigurationConflict
+}
 public sealed record ChallengeConfigurationUpdateResult(
     ChallengeConfigurationView? Configuration,
     ChallengeConfigurationUpdateFailure? Failure = null);
@@ -85,7 +95,7 @@ public sealed class UpdateChallengeConfiguration(
     IChallengeConfigurationStore store,
     IChallengeConfigurationCatalog catalog)
 {
-    public async Task<OperationResult<ChallengeConfigurationView>> ExecuteAsync(
+    public async Task<OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         int expectedRevision,
@@ -94,18 +104,18 @@ public sealed class UpdateChallengeConfiguration(
         CancellationToken ct = default)
     {
         if (expectedRevision < 0)
-            return OperationResult<ChallengeConfigurationView>.Failure(
-                "invalid_revision",
+            return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
+                ChallengeConfigurationFailureCode.InvalidRevision,
                 "Expected revision cannot be negative.");
         if (string.IsNullOrWhiteSpace(json))
-            return OperationResult<ChallengeConfigurationView>.Failure(
-                "invalid_configuration",
+            return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
+                ChallengeConfigurationFailureCode.InvalidConfiguration,
                 "Challenge configuration is required.");
 
         var current = await store.FindAsync(competitionId, competitionChallengeId, ct);
         if (current is null)
-            return OperationResult<ChallengeConfigurationView>.Failure(
-                "challenge_not_found",
+            return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
+                ChallengeConfigurationFailureCode.ChallengeNotFound,
                 "Challenge was not found.");
         var errors = catalog.ValidateRules(
             current.Mode,
@@ -113,8 +123,8 @@ public sealed class UpdateChallengeConfiguration(
             current.CompetitionConfigurationJson,
             current.EligibleTeamCount);
         if (errors.Count > 0)
-            return OperationResult<ChallengeConfigurationView>.Failure(
-                "invalid_configuration",
+            return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
+                ChallengeConfigurationFailureCode.InvalidConfiguration,
                 string.Join(" ", errors));
 
         var result = await store.TryUpdateAsync(
@@ -128,12 +138,12 @@ public sealed class UpdateChallengeConfiguration(
         if (result.Configuration is null)
         {
             var failure = result.Failure ?? ChallengeConfigurationUpdateFailure.RevisionConflict;
-            return OperationResult<ChallengeConfigurationView>.Failure(failure switch
+            return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(failure switch
             {
-                ChallengeConfigurationUpdateFailure.CompetitionNotFound => "competition_not_found",
-                ChallengeConfigurationUpdateFailure.ConfigurationLocked => "configuration_locked",
-                ChallengeConfigurationUpdateFailure.ChallengeNotFound => "challenge_not_found",
-                _ => "configuration_conflict"
+                ChallengeConfigurationUpdateFailure.CompetitionNotFound => ChallengeConfigurationFailureCode.CompetitionNotFound,
+                ChallengeConfigurationUpdateFailure.ConfigurationLocked => ChallengeConfigurationFailureCode.ConfigurationLocked,
+                ChallengeConfigurationUpdateFailure.ChallengeNotFound => ChallengeConfigurationFailureCode.ChallengeNotFound,
+                _ => ChallengeConfigurationFailureCode.ConfigurationConflict
             }, failure switch
             {
                 ChallengeConfigurationUpdateFailure.CompetitionNotFound => "Competition was not found.",
@@ -143,6 +153,6 @@ public sealed class UpdateChallengeConfiguration(
             });
         }
 
-        return OperationResult<ChallengeConfigurationView>.Success(result.Configuration);
+        return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Success(result.Configuration);
     }
 }

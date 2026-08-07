@@ -1,116 +1,70 @@
 import { toast } from 'vue-sonner'
 
-/** Numeric enum label maps — mirror the C# enum member order in NoCTF.Domain. */
+/** Protocol enum label maps. HTTP enums are PascalCase strings. */
 
-export const GameModeLabel: Record<number, string> = {
-  0: 'CTF',
-  1: 'AWD',
-  2: 'AWDP',
-  3: 'KoH',
+export const GameModeLabel: Record<string, string> = {
+  Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH',
 }
 
-export const CompetitionStatusLabel: Record<number, string> = {
-  0: '草稿',
-  1: '可见',
-  2: '已发布',
-  3: '进行中',
-  4: '已暂停',
-  5: '已结束',
+export const CompetitionStatusLabel: Record<string, string> = {
+  Draft: '草稿', Visible: '可见', Published: '已发布', Running: '进行中', Paused: '已暂停', Finished: '已结束',
 }
 
-export const TeamRegistrationStatusLabel: Record<number, string> = {
-  0: '待审批',
-  1: '已通过',
-  2: '已拒绝',
+export const TeamRegistrationStatusLabel: Record<string, string> = {
+  Pending: '待审批', Approved: '已通过', Rejected: '已拒绝',
 }
 
-export const TeamBanSourceLabel: Record<number, string> = {
-  0: '人工封禁',
-  1: '作弊事件',
+export const TeamBanSourceLabel: Record<string, string> = {
+  ManualModeration: '人工封禁', CheatIncident: '作弊事件',
 }
 
-export const TeamBanAppealStatusLabel: Record<number, string> = {
-  0: '待裁决',
-  1: '已维持',
-  2: '已接受',
+export const TeamBanAppealStatusLabel: Record<string, string> = {
+  Submitted: '待裁决', Upheld: '已维持', Accepted: '已接受',
 }
 
-export const SubmissionKindLabel: Record<number, string> = {
-  0: 'Flag',
-  1: 'Break',
-  2: 'Fix',
+export const SubmissionKindLabel: Record<string, string> = {
+  Flag: 'Flag', Break: 'Break', Fix: 'Fix',
 }
 
-export const SubmissionEvaluationStateLabel: Record<number, string> = {
-  0: '待处理',
-  1: '排队中',
-  2: '评测中',
-  3: '已完成',
-  4: '平台失败',
+export const SubmissionEvaluationStateLabel: Record<string, string> = {
+  Pending: '待处理', Queued: '排队中', Processing: '评测中', Completed: '已完成', PlatformFailed: '平台失败',
 }
 
-export const ScoringResultLabel: Record<number, string> = {
-  0: '正确',
-  1: '错误',
-  2: '重复',
-  3: '次数耗尽',
-  4: '平台失败',
-  5: '已拒绝',
+export const ScoringResultLabel: Record<string, string> = {
+  Correct: '正确', Wrong: '错误', Duplicate: '重复', AttemptsExhausted: '次数耗尽', PlatformFailed: '平台失败', Rejected: '已拒绝',
 }
 
-export const RuntimeKindLabel: Record<number, string> = {
-  0: '容器',
-  1: 'Compose',
-  2: '虚拟机',
+export const RuntimeKindLabel: Record<string, string> = {
+  Container: '容器', Compose: 'Compose', OvaVm: '虚拟机',
 }
 
-export const RuntimeProviderLabel: Record<number, string> = {
-  0: 'Docker',
-  1: 'Kubernetes',
-  2: 'Libvirt',
+export const RuntimeProviderLabel: Record<string, string> = {
+  Docker: 'Docker', Kubernetes: 'Kubernetes', Libvirt: 'Libvirt',
 }
 
-export const RuntimeStateLabel: Record<number, string> = {
-  0: '排队中',
-  1: '准备中',
-  2: '运行中',
-  3: '停止中',
-  4: '已停止',
-  5: '失败',
+export const RuntimeStateLabel: Record<string, string> = {
+  Queued: '排队中', Provisioning: '准备中', Running: '运行中', Stopping: '停止中', Stopped: '已停止', Failed: '失败',
 }
 
-export const CheatIncidentStatusLabel: Record<number, string> = {
-  0: '待处理',
-  1: '已确认',
-  2: '已驳回',
-  3: '已取代',
-  4: '已纠正',
+export const CheatIncidentStatusLabel: Record<string, string> = {
+  Pending: '待处理', Confirmed: '已确认', Dismissed: '已驳回', Superseded: '已取代', Corrected: '已纠正',
 }
 
-export const LeaderboardVisibilityLabel: Record<number, string> = {
-  0: '正常',
-  1: '冻结',
-  2: '遮蔽',
+export const LeaderboardVisibilityLabel: Record<string, string> = {
+  Normal: '正常', Frozen: '冻结', Blackout: '遮蔽',
 }
 
-export const DataExportStatusLabel: Record<number, string> = {
-  0: '排队中',
-  1: '处理中',
-  2: '可下载',
-  3: '失败',
-  4: '已过期',
+export const DataExportStatusLabel: Record<string, string> = {
+  Queued: '排队中', Processing: '处理中', Available: '可下载', Failed: '失败', Expired: '已过期',
 }
 
-export const SpecificationKindLabel: Record<number, string> = {
-  0: '附件',
-  1: 'AWD 轮次',
-  2: '运行时定义',
-  3: '提示',
+export const SpecificationKindLabel: Record<string, string> = {
+  Attachment: '附件', AwdRound: 'AWD 轮次', RuntimeDefinition: '运行时定义', Hint: '提示',
 }
 
-export function enumLabel(map: Record<number, string>, value: number | null | undefined): string {
+export function enumLabel(map: Record<string, string>, value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '—'
-  return map[value] ?? `#${value}`
+  return map[String(value)] ?? `#${value}`
 }
 
 export function adminFormatDateTime(value: string | null | undefined): string {

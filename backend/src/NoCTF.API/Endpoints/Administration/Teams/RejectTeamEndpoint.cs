@@ -27,7 +27,7 @@ public sealed class RejectTeamEndpoint(ReviewTeamRegistration review, ICompetiti
         var competitionId = Route<Guid>("competitionId"); var teamId = Route<Guid>("teamId");
         if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct)) return TypedResults.Forbid();
         var result = await review.ExecuteAsync(competitionId, teamId, false, ct);
-        if (result.ErrorCode == "team_not_found") return TypedResults.NotFound();
+        if (result.FailureCode == TeamRegistrationFailure.TeamNotFound) return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Team was not rejected.", detail: result.ErrorMessage);
         return TypedResults.NoContent();
     }

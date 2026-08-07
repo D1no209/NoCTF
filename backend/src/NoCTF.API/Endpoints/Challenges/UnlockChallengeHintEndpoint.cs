@@ -34,7 +34,7 @@ public sealed class UnlockChallengeHintEndpoint(
             user.UserId,
             DateTimeOffset.UtcNow,
             ct);
-        if (result.ErrorCode == "hint_not_found")
+        if (result.FailureCode == ChallengeHintFailureCode.HintNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Conflict();

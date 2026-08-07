@@ -21,10 +21,10 @@ public sealed class PostgresMissingFlagGenerator(
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
-            return [new(Guid.Empty, Guid.Empty, "competition_not_found", "Competition was not found.")];
+            return [new(Guid.Empty, Guid.Empty, MissingFlagFailureCode.CompetitionNotFound, "Competition was not found.")];
         var competition = await db.Competitions.SingleAsync(item => item.Id == competitionId, ct);
         if (competition.Mode is not (GameMode.Ctf or GameMode.Koh))
-            return [new(Guid.Empty, Guid.Empty, "game_mode_unsupported", "Only CTF and KoH use this generator.")];
+            return [new(Guid.Empty, Guid.Empty, MissingFlagFailureCode.GameModeUnsupported, "Only CTF and KoH use this generator.")];
         var challenges = await db.CompetitionChallenges.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId && item.IsPublished)
             .Join(
@@ -74,7 +74,7 @@ public sealed class PostgresMissingFlagGenerator(
                         failures.Add(new(
                             challenge.Id,
                             teamId,
-                            "flag_generation_failed",
+                            MissingFlagFailureCode.FlagGenerationFailed,
                             "The flag could not be derived."));
                     }
                     continue;
@@ -112,7 +112,7 @@ public sealed class PostgresMissingFlagGenerator(
                     failures.Add(new(
                         challenge.Id,
                         teamId,
-                        "flag_generation_failed",
+                        MissingFlagFailureCode.FlagGenerationFailed,
                         "The flag could not be derived."));
                 }
             }

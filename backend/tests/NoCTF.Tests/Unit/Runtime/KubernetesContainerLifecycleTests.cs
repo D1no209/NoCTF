@@ -64,10 +64,6 @@ public sealed class KubernetesContainerLifecycleTests
         _ = await lifecycle.CreateAsync(
             CheckerRequest() with
             {
-                Labels = new Dictionary<string, string>
-                {
-                    ["noctf.io/purpose"] = purpose
-                },
                 NetworkPurpose = networkPurpose
             },
             CancellationToken.None);
@@ -76,6 +72,8 @@ public sealed class KubernetesContainerLifecycleTests
         await Assert.That(createdPod!.Metadata.Labels.ContainsKey("noctf.io/expires-at")).IsFalse();
         await Assert.That(createdPod.Metadata.Labels["noctf.io/job-kind"])
             .IsEqualTo(jobKind);
+        await Assert.That(createdPod.Metadata.Labels["noctf.io/purpose"])
+            .IsEqualTo(purpose);
         await Assert.That(createdPolicy!.Spec.PodSelector.MatchLabels.All(label =>
             createdPod.Metadata.Labels.TryGetValue(label.Key, out var value)
             && string.Equals(value, label.Value, StringComparison.Ordinal))).IsTrue();
@@ -1241,7 +1239,7 @@ public sealed class KubernetesContainerLifecycleTests
         {
             ["NOCTF_CALLBACK_URL"] = "https://callback.noctf.svc:8443/api/internal/v1/awdp/fix-results"
         },
-        new Dictionary<string, string> { ["noctf.io/purpose"] = "awdp-checker" },
+        new Dictionary<string, string>(),
         new Dictionary<int, int>(),
         new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
         new ContainerSecurityPolicy(true, true, true, ["ALL"], []),

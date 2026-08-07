@@ -1912,7 +1912,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardProtocolResponse"
                 }
               }
             }
@@ -1922,7 +1922,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardProcessingResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardProcessingProtocolResponse"
                 }
               }
             }
@@ -2054,7 +2054,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventKind"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol"
                 }
               ]
             }
@@ -2066,7 +2066,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventLevel"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol"
                 }
               ]
             }
@@ -2178,7 +2178,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventKind"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol"
                 }
               ]
             }
@@ -2190,7 +2190,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventLevel"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol"
                 }
               ]
             }
@@ -4398,7 +4398,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
                 }
               ]
             }
@@ -4410,7 +4410,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionEvaluationState"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionEvaluationStateProtocol"
                 }
               ]
             }
@@ -4422,7 +4422,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringResultProtocol"
                 }
               ]
             }
@@ -4434,7 +4434,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringFailureCodeProtocol"
                 }
               ]
             }
@@ -4903,7 +4903,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeKind"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeKindProtocol"
                 }
               ]
             }
@@ -4915,7 +4915,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeProvider"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeProviderProtocol"
                 }
               ]
             }
@@ -4943,7 +4943,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeState"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
                 }
               ]
             }
@@ -5633,7 +5633,7 @@
             "schema": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformLogLevel"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol"
                 }
               ]
             }
@@ -5645,7 +5645,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformLogService"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol"
                 }
               ]
             }
@@ -6232,7 +6232,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformAuditKind"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol"
                 }
               ]
             }
@@ -6344,7 +6344,7 @@
             "schema": {
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformLogLevel"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol"
                 }
               ]
             }
@@ -6356,7 +6356,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformLogService"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol"
                 }
               ]
             }
@@ -8662,7 +8662,7 @@
               "nullable": true,
               "allOf": [
                 {
-                  "$ref": "#/components/schemas/NoCTFDomainSubmissionsCheatIncidentStatus"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol"
                 }
               ]
             }
@@ -11260,9 +11260,19 @@
         "additionalProperties": false,
         "properties": {
           "status": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsHealthStatus"
           }
         }
+      },
+      "NoCTFAPIEndpointsHealthStatus": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Ok"
+        ],
+        "enum": [
+          "Ok"
+        ]
       },
       "NoCTFAPIEndpointsTeamsTeamResponse": {
         "type": "object",
@@ -11295,7 +11305,7 @@
             }
           },
           "registrationStatus": {
-            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamRegistrationStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol"
           },
           "isLocked": {
             "type": "boolean"
@@ -11309,8 +11319,8 @@
           }
         }
       },
-      "NoCTFDomainTeamsTeamRegistrationStatus": {
-        "type": "integer",
+      "NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Pending",
@@ -11318,9 +11328,9 @@
           "Rejected"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Pending",
+          "Approved",
+          "Rejected"
         ]
       },
       "NoCTFAPIEndpointsTeamsCreateTeamRequest": {
@@ -11356,7 +11366,7 @@
             "type": "string"
           },
           "source": {
-            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanSource"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamBanSourceProtocol"
           },
           "bannedAt": {
             "type": "string",
@@ -11378,16 +11388,16 @@
           }
         }
       },
-      "NoCTFDomainTeamsTeamBanSource": {
-        "type": "integer",
+      "NoCTFAPIEndpointsTeamsTeamBanSourceProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "ManualModeration",
           "CheatIncident"
         ],
         "enum": [
-          0,
-          1
+          "ManualModeration",
+          "CheatIncident"
         ]
       },
       "NoCTFAPIEndpointsTeamsMyTeamBanAppealResponse": {
@@ -11413,7 +11423,7 @@
             "format": "date-time"
           },
           "status": {
-            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanAppealStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamBanAppealStatusProtocol"
           },
           "resolvedByUserId": {
             "type": "string",
@@ -11435,8 +11445,8 @@
           }
         }
       },
-      "NoCTFDomainTeamsTeamBanAppealStatus": {
-        "type": "integer",
+      "NoCTFAPIEndpointsTeamsTeamBanAppealStatusProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Submitted",
@@ -11444,9 +11454,9 @@
           "Accepted"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Submitted",
+          "Upheld",
+          "Accepted"
         ]
       },
       "NoCTFAPIEndpointsTeamsGetMyTeamBanCaseRequest": {
@@ -11651,16 +11661,16 @@
             "format": "guid"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
           },
           "evaluationState": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionEvaluationState"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionEvaluationStateProtocol"
           },
           "result": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringResultProtocol"
               }
             ]
           },
@@ -11668,7 +11678,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringFailureCodeProtocol"
               }
             ]
           },
@@ -11686,8 +11696,8 @@
           }
         }
       },
-      "NoCTFDomainSubmissionsSubmissionKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Flag",
@@ -11695,13 +11705,13 @@
           "Fix"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Flag",
+          "Break",
+          "Fix"
         ]
       },
-      "NoCTFDomainSubmissionsSubmissionEvaluationState": {
-        "type": "integer",
+      "NoCTFAPIEndpointsSubmissionsSubmissionEvaluationStateProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Pending",
@@ -11711,15 +11721,15 @@
           "PlatformFailed"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4
+          "Pending",
+          "Queued",
+          "Processing",
+          "Completed",
+          "PlatformFailed"
         ]
       },
-      "NoCTFDomainSubmissionsScoringResult": {
-        "type": "integer",
+      "NoCTFAPIEndpointsSubmissionsScoringResultProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Correct",
@@ -11730,16 +11740,16 @@
           "Rejected"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
+          "Correct",
+          "Wrong",
+          "Duplicate",
+          "AttemptsExhausted",
+          "PlatformFailed",
+          "Rejected"
         ]
       },
-      "NoCTFDomainSubmissionsScoringFailureCode": {
-        "type": "integer",
+      "NoCTFAPIEndpointsSubmissionsScoringFailureCodeProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "FlagNotSupported",
@@ -11774,36 +11784,36 @@
           "ForeignTeamFlagDetected"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29
+          "FlagNotSupported",
+          "FixNotSupported",
+          "BreakAttemptsExhausted",
+          "FixAttemptsExhausted",
+          "BreakRequired",
+          "ArchiveValidationUnavailable",
+          "FixArchiveMissing",
+          "FixArchiveLengthMismatch",
+          "FixArchiveContentTypeMismatch",
+          "FixArchiveHashMismatch",
+          "StorageTimeout",
+          "StorageUnavailable",
+          "CheckerPlatformError",
+          "SelfAttackRejected",
+          "DuplicateAttack",
+          "DuplicateAchievement",
+          "UnknownTeamIdentifier",
+          "InvalidObservation",
+          "ProducerTimeout",
+          "ProducerUnavailable",
+          "AmbiguousFlagMatch",
+          "FlagExpired",
+          "RoundOutOfRange",
+          "HardeningActive",
+          "AwdpFixFailed",
+          "AwdpPatchFailed",
+          "AwdpPatchTimeout",
+          "AwdpServiceDown",
+          "AwdpViolation",
+          "ForeignTeamFlagDetected"
         ]
       },
       "NoCTFAPIEndpointsSubmissionsGetSubmissionStatusRequest": {
@@ -11851,16 +11861,16 @@
             "format": "guid"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
           },
           "evaluationState": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionEvaluationState"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionEvaluationStateProtocol"
           },
           "result": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringResultProtocol"
               }
             ]
           },
@@ -11868,7 +11878,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringFailureCodeProtocol"
               }
             ]
           },
@@ -12042,19 +12052,19 @@
             "format": "int32"
           },
           "runtimeKind": {
-            "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeKindProtocol"
           },
           "provider": {
-            "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeProvider"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeProviderProtocol"
           },
           "state": {
-            "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeState"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
           },
           "failureCode": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeFailureCode"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol"
               }
             ]
           },
@@ -12089,8 +12099,8 @@
           }
         }
       },
-      "NoCTFDomainRuntimeRuntimeKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsRuntimeRuntimeKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Container",
@@ -12098,13 +12108,13 @@
           "OvaVm"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Container",
+          "Compose",
+          "OvaVm"
         ]
       },
-      "NoCTFDomainRuntimeRuntimeProvider": {
-        "type": "integer",
+      "NoCTFAPIEndpointsRuntimeRuntimeProviderProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Docker",
@@ -12112,13 +12122,13 @@
           "Libvirt"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Docker",
+          "Kubernetes",
+          "Libvirt"
         ]
       },
-      "NoCTFDomainRuntimeRuntimeState": {
-        "type": "integer",
+      "NoCTFAPIEndpointsRuntimeRuntimeStateProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Queued",
@@ -12129,16 +12139,16 @@
           "Failed"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
+          "Queued",
+          "Provisioning",
+          "Running",
+          "Stopping",
+          "Stopped",
+          "Failed"
         ]
       },
-      "NoCTFDomainRuntimeRuntimeFailureCode": {
-        "type": "integer",
+      "NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "InvalidConfiguration",
@@ -12151,14 +12161,14 @@
           "PublishedPortRangeExhausted"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7
+          "InvalidConfiguration",
+          "RunnerUnavailable",
+          "ProviderUnavailable",
+          "ProvisionTimeout",
+          "ProviderRejected",
+          "CleanupFailed",
+          "UrlExpansionFailed",
+          "PublishedPortRangeExhausted"
         ]
       },
       "NoCTFAPIEndpointsRuntimeRuntimeTargetListResponse": {
@@ -12244,7 +12254,7 @@
             "nullable": true
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFDomainNotificationsNotificationKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsNotificationsNotificationKindProtocol"
           },
           "payload": {},
           "createdAt": {
@@ -12253,8 +12263,8 @@
           }
         }
       },
-      "NoCTFDomainNotificationsNotificationKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsNotificationsNotificationKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "CompetitionLifecycleChanged",
@@ -12276,23 +12286,23 @@
           "DataExportFailed"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16
+          "CompetitionLifecycleChanged",
+          "TeamRegistrationChanged",
+          "SubmissionEvaluated",
+          "RuntimeStateChanged",
+          "StartGateFailed",
+          "ManagementFailure",
+          "BloodAwarded",
+          "ChallengePublished",
+          "HintPublished",
+          "TeamBanned",
+          "CompetitionQuestionOpened",
+          "CompetitionQuestionReplied",
+          "CompetitionQuestionStatusChanged",
+          "CheatIncidentDetected",
+          "TeamBanCorrected",
+          "DataExportReady",
+          "DataExportFailed"
         ]
       },
       "NoCTFAPIEndpointsNotificationsListNotificationsRequest": {
@@ -12323,20 +12333,34 @@
         "additionalProperties": false,
         "properties": {
           "disposition": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalInternalResultDispositionProtocol"
           }
         }
+      },
+      "NoCTFAPIEndpointsInternalInternalResultDispositionProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Applied",
+          "Duplicate",
+          "Superseded"
+        ],
+        "enum": [
+          "Applied",
+          "Duplicate",
+          "Superseded"
+        ]
       },
       "NoCTFAPIEndpointsInternalRecordAwdCheckResultRequest": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "state": {
-            "$ref": "#/components/schemas/NoCTFDomainRuntimeAwdServiceState"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsInternalAwdServiceStateProtocol"
           }
         }
       },
-      "NoCTFDomainRuntimeAwdServiceState": {
+      "NoCTFAPIEndpointsInternalAwdServiceStateProtocol": {
         "type": "string",
         "description": "",
         "x-enumNames": [
@@ -12395,7 +12419,7 @@
             "nullable": true
           },
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
           "startTime": {
             "type": "string",
@@ -12406,7 +12430,7 @@
             "format": "date-time"
           },
           "status": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
           },
           "teamRegistrationAutoApprove": {
             "type": "boolean"
@@ -12424,12 +12448,12 @@
             "format": "guid"
           },
           "leaderboardVisibility": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           }
         }
       },
-      "NoCTFDomainCompetitionsGameMode": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsGameModeProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Ctf",
@@ -12438,14 +12462,14 @@
           "Koh"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "Ctf",
+          "Awd",
+          "Awdp",
+          "Koh"
         ]
       },
-      "NoCTFDomainCompetitionsCompetitionStatus": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Draft",
@@ -12456,16 +12480,16 @@
           "Finished"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
+          "Draft",
+          "Visible",
+          "Published",
+          "Running",
+          "Paused",
+          "Finished"
         ]
       },
-      "NoCTFDomainCompetitionsCompetitionLeaderboardVisibility": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Normal",
@@ -12473,16 +12497,16 @@
           "Blackout"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Normal",
+          "Frozen",
+          "Blackout"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsGetCompetitionRequest": {
         "type": "object",
         "additionalProperties": false
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardResponse": {
+      "NoCTFAPIEndpointsCompetitionsLeaderboardProtocolResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -12497,19 +12521,31 @@
           "entries": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardEntry"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardEntryResponse"
             }
           },
           "subjects": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSubjectSummary"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSubjectSummaryResponse"
             }
           },
           "bloods": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodSummary"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardBloodSummaryResponse"
+            }
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardTeamSeriesResponse"
+            }
+          },
+          "challenges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardChallengeInfoResponse"
             }
           },
           "snapshotRevision": {
@@ -12529,10 +12565,10 @@
             "nullable": true
           },
           "visibility": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
           "dataScope": {
-            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardDataScope"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol"
           },
           "dataAsOf": {
             "type": "string",
@@ -12541,7 +12577,7 @@
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardEntry": {
+      "NoCTFAPIEndpointsCompetitionsLeaderboardEntryResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -12572,12 +12608,12 @@
           "challenges": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardChallengeSummary"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardChallengeSummaryResponse"
             }
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardChallengeSummary": {
+      "NoCTFAPIEndpointsCompetitionsLeaderboardChallengeSummaryResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -12594,7 +12630,7 @@
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardSubjectSummary": {
+      "NoCTFAPIEndpointsCompetitionsLeaderboardSubjectSummaryResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -12616,12 +12652,12 @@
           "slots": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSlotSummary"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSlotSummaryResponse"
             }
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardSlotSummary": {
+      "NoCTFAPIEndpointsCompetitionsLeaderboardSlotSummaryResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -12629,7 +12665,7 @@
             "type": "string"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSlotKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSlotKindProtocol"
           },
           "label": {
             "type": "string"
@@ -12647,7 +12683,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodRank"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardBloodRankProtocol"
               }
             ]
           },
@@ -12658,8 +12694,8 @@
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardSlotKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsLeaderboardSlotKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Challenge",
@@ -12670,16 +12706,16 @@
           "Stage"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
+          "Challenge",
+          "Service",
+          "Break",
+          "Fix",
+          "Control",
+          "Stage"
         ]
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardBloodRank": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsLeaderboardBloodRankProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "First",
@@ -12687,12 +12723,12 @@
           "Third"
         ],
         "enum": [
-          1,
-          2,
-          3
+          "First",
+          "Second",
+          "Third"
         ]
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardBloodSummary": {
+      "NoCTFAPIEndpointsCompetitionsLeaderboardBloodSummaryResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -12700,10 +12736,10 @@
             "type": "string"
           },
           "slotKind": {
-            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardSlotKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSlotKindProtocol"
           },
           "bloodRank": {
-            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardBloodRank"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardBloodRankProtocol"
           },
           "teamId": {
             "type": "string",
@@ -12718,8 +12754,124 @@
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardDataScope": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsLeaderboardTeamSeriesResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardScorePointResponse"
+            }
+          },
+          "solves": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSolveRecordResponse"
+            }
+          },
+          "penalties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardPenaltyRecordResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardScorePointResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardSolveRecordResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "solveOrdinal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "submitterName": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardPenaltyRecordResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "points": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardPenaltyKindProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardPenaltyKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "WrongSubmission",
+          "HintUnlock"
+        ],
+        "enum": [
+          "WrongSubmission",
+          "HintUnlock"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardChallengeInfoResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Live",
@@ -12727,12 +12879,12 @@
           "Hidden"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Live",
+          "Frozen",
+          "Hidden"
         ]
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardProcessingResponse": {
+      "NoCTFAPIEndpointsCompetitionsLeaderboardProcessingProtocolResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -12741,7 +12893,7 @@
             "format": "guid"
           },
           "state": {
-            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardProjectionState"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardProjectionStateProtocol"
           },
           "targetRevision": {
             "type": "integer",
@@ -12752,14 +12904,14 @@
           }
         }
       },
-      "NoCTFApplicationScoringLeaderboardLeaderboardProjectionState": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsLeaderboardProjectionStateProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Processing"
         ],
         "enum": [
-          0
+          "Processing"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsGetLeaderboardRequest": {
@@ -12787,7 +12939,7 @@
             "format": "guid"
           },
           "submissionKind": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
           },
           "submittedFlag": {
             "type": "string"
@@ -12817,8 +12969,8 @@
         "type": "object",
         "additionalProperties": false
       },
-      "NoCTFDomainCompetitionsEventsCompetitionEventKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "CompetitionCreated",
@@ -12871,58 +13023,58 @@
           "TeamBanCorrectionPublished"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          31,
-          32,
-          33,
-          34,
-          35,
-          36,
-          37,
-          38,
-          39,
-          40,
-          41,
-          42,
-          43,
-          44,
-          45,
-          46,
-          47
+          "CompetitionCreated",
+          "CompetitionUpdated",
+          "CompetitionDeleted",
+          "CompetitionLifecycleChanged",
+          "LeaderboardVisibilityChanged",
+          "ChallengeCreated",
+          "ChallengeUpdated",
+          "ChallengePublished",
+          "ChallengeUnpublished",
+          "ChallengeDeleted",
+          "HintPublished",
+          "HintUnlocked",
+          "TeamRegistered",
+          "TeamRegistrationChanged",
+          "TeamUpdated",
+          "TeamDeleted",
+          "TeamMemberJoined",
+          "TeamMemberRemoved",
+          "TeamCaptainTransferred",
+          "TeamBanned",
+          "TeamUnbanned",
+          "SubmissionReceived",
+          "SubmissionEvaluated",
+          "ScoringRecorded",
+          "FirstBloodAwarded",
+          "SecondBloodAwarded",
+          "ThirdBloodAwarded",
+          "RuntimeCreated",
+          "RuntimeStateChanged",
+          "RuntimeExtended",
+          "RuntimeReset",
+          "RuntimePortAllocated",
+          "AnnouncementPublished",
+          "QuestionOpened",
+          "QuestionReplied",
+          "QuestionStatusChanged",
+          "QuestionPublished",
+          "ProtectedSubmissionFlagAccessed",
+          "CheatIncidentDetected",
+          "CheatIncidentConfirmed",
+          "CheatIncidentDismissed",
+          "CheatIncidentSuperseded",
+          "CheatIncidentCorrected",
+          "ProtectedCompetitionExportCreated",
+          "TeamBanAppealSubmitted",
+          "TeamBanAppealUpheld",
+          "TeamBanAppealAccepted",
+          "TeamBanCorrectionPublished"
         ]
       },
-      "NoCTFDomainCompetitionsEventsCompetitionEventLevel": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Information",
@@ -12930,9 +13082,9 @@
           "Error"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Information",
+          "Warning",
+          "Error"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventListResponse": {
@@ -12940,7 +13092,7 @@
         "additionalProperties": false,
         "properties": {
           "accessLevel": {
-            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsEventsCompetitionEventAccessLevel"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventAccessLevelProtocol"
           },
           "viewerTeamId": {
             "type": "string",
@@ -12965,8 +13117,8 @@
           }
         }
       },
-      "NoCTFApplicationCompetitionsEventsCompetitionEventAccessLevel": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventAccessLevelProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Participant",
@@ -12974,9 +13126,9 @@
           "Staff"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Participant",
+          "Team",
+          "Staff"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventResponse": {
@@ -12992,13 +13144,13 @@
             "format": "guid"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol"
           },
           "level": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventLevel"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol"
           },
           "visibility": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventVisibility"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol"
           },
           "actorUserId": {
             "type": "string",
@@ -13070,7 +13222,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionStatus"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
               }
             ]
           },
@@ -13078,7 +13230,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
               }
             ]
           },
@@ -13086,7 +13238,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainTeamsTeamRegistrationStatus"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamRegistrationStatusProtocol"
               }
             ]
           },
@@ -13094,7 +13246,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
               }
             ]
           },
@@ -13102,7 +13254,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionEvaluationState"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionEvaluationStateProtocol"
               }
             ]
           },
@@ -13110,7 +13262,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringEventKind"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsScoringEventKindProtocol"
               }
             ]
           },
@@ -13118,7 +13270,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringResultProtocol"
               }
             ]
           },
@@ -13126,7 +13278,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeState"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
               }
             ]
           },
@@ -13134,7 +13286,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainChallengesQuestionsCompetitionQuestionStatus"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol"
               }
             ]
           },
@@ -13158,8 +13310,8 @@
           }
         }
       },
-      "NoCTFDomainCompetitionsEventsCompetitionEventVisibility": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Public",
@@ -13167,13 +13319,13 @@
           "Staff"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Public",
+          "Team",
+          "Staff"
         ]
       },
-      "NoCTFDomainSubmissionsScoringEventKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsEventsScoringEventKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "SubmissionEvaluation",
@@ -13182,14 +13334,14 @@
           "KohObservation"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "SubmissionEvaluation",
+          "AwdServiceStatus",
+          "HintUnlock",
+          "KohObservation"
         ]
       },
-      "NoCTFDomainChallengesQuestionsCompetitionQuestionStatus": {
-        "type": "integer",
+      "NoCTFAPIEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Pending",
@@ -13198,10 +13350,10 @@
           "Closed"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "Pending",
+          "Replied",
+          "Resolved",
+          "Closed"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsListCompetitionEventsRequest": {
@@ -13275,10 +13427,10 @@
             }
           },
           "leaderboardVisibility": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
           "dataScope": {
-            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardDataScope"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol"
           }
         }
       },
@@ -13345,10 +13497,10 @@
             }
           },
           "leaderboardVisibility": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
           "dataScope": {
-            "$ref": "#/components/schemas/NoCTFApplicationScoringLeaderboardLeaderboardDataScope"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardDataScopeProtocol"
           }
         }
       },
@@ -13879,10 +14031,10 @@
             "type": "string"
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserKindProtocol"
           },
           "emailVerified": {
             "type": "boolean"
@@ -13900,8 +14052,8 @@
           }
         }
       },
-      "NoCTFDomainIdentityUserRole": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAuthenticationUserRoleProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "User",
@@ -13909,21 +14061,21 @@
           "Administrator"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "User",
+          "Organizer",
+          "Administrator"
         ]
       },
-      "NoCTFDomainIdentityUserKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAuthenticationUserKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Human",
           "Bot"
         ],
         "enum": [
-          0,
-          1
+          "Human",
+          "Bot"
         ]
       },
       "NoCTFAPIEndpointsAuthenticationPublicUserProfileResponse": {
@@ -13970,7 +14122,7 @@
             "type": "string"
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
           },
           "emailVerified": {
             "type": "boolean"
@@ -14018,7 +14170,7 @@
             "type": "string"
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
           },
           "emailVerified": {
             "type": "boolean"
@@ -14047,7 +14199,7 @@
             "type": "string"
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
           },
           "emailVerified": {
             "type": "boolean"
@@ -14262,7 +14414,7 @@
             "type": "string"
           },
           "source": {
-            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanSource"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamBanSourceProtocol"
           },
           "bannedAt": {
             "type": "string",
@@ -14302,7 +14454,7 @@
             "format": "date-time"
           },
           "status": {
-            "$ref": "#/components/schemas/NoCTFDomainTeamsTeamBanAppealStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamBanAppealStatusProtocol"
           },
           "resolvedByUserId": {
             "type": "string",
@@ -14368,16 +14520,16 @@
             "format": "guid"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
           },
           "evaluationState": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionEvaluationState"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionEvaluationStateProtocol"
           },
           "result": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringResultProtocol"
               }
             ]
           },
@@ -14385,7 +14537,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringFailureCodeProtocol"
               }
             ]
           },
@@ -14483,10 +14635,10 @@
             "format": "int32"
           },
           "runtimeKind": {
-            "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeKindProtocol"
           },
           "provider": {
-            "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeProvider"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeProviderProtocol"
           },
           "runnerPool": {
             "type": "string"
@@ -14496,13 +14648,13 @@
             "nullable": true
           },
           "state": {
-            "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeState"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
           },
           "failureCode": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainRuntimeRuntimeFailureCode"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol"
               }
             ]
           },
@@ -14608,13 +14760,13 @@
             "type": "string"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserKindProtocol"
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
           },
           "accountStatus": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserAccountStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserAccountStatusProtocol"
           },
           "tokenVersion": {
             "type": "integer",
@@ -14633,8 +14785,8 @@
           }
         }
       },
-      "NoCTFDomainIdentityUserAccountStatus": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAuthenticationUserAccountStatusProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Active",
@@ -14643,10 +14795,10 @@
           "Anonymized"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "Active",
+          "Banned",
+          "Disabled",
+          "Anonymized"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformCreatePlatformBotRequest": {
@@ -14664,23 +14816,9 @@
             "nullable": false
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole2"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
           }
         }
-      },
-      "NoCTFDomainIdentityUserRole2": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "User",
-          "Organizer",
-          "Administrator"
-        ],
-        "enum": [
-          "User",
-          "Organizer",
-          "Administrator"
-        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionResponse": {
         "type": "object",
@@ -14748,7 +14886,7 @@
             "type": "string"
           },
           "accountStatus": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserAccountStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserAccountStatusProtocol"
           },
           "canHardDelete": {
             "type": "boolean"
@@ -14769,6 +14907,22 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformUserAccountStatusProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Active",
+          "Banned",
+          "Disabled",
+          "Anonymized"
+        ],
+        "enum": [
+          "Active",
+          "Banned",
+          "Disabled",
+          "Anonymized"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserDeletionReferenceResponse": {
         "type": "object",
@@ -14861,8 +15015,8 @@
         "type": "object",
         "additionalProperties": false
       },
-      "NoCTFApplicationAdministrationPlatformLogsPlatformLogLevel": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Trace",
@@ -14873,16 +15027,16 @@
           "Critical"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5
+          "Trace",
+          "Debug",
+          "Information",
+          "Warning",
+          "Error",
+          "Critical"
         ]
       },
-      "NoCTFApplicationAdministrationPlatformLogsPlatformLogService": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Api",
@@ -14890,9 +15044,9 @@
           "Runner"
         ],
         "enum": [
-          0,
-          1,
-          2
+          "Api",
+          "Worker",
+          "Runner"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse": {
@@ -14959,7 +15113,7 @@
             "format": "int32"
           },
           "smtpSecurityMode": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentitySmtpSecurityMode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformSmtpSecurityModeProtocol"
           },
           "smtpUserName": {
             "type": "string"
@@ -14987,7 +15141,7 @@
           }
         }
       },
-      "NoCTFDomainIdentitySmtpSecurityMode": {
+      "NoCTFAPIEndpointsAdministrationPlatformSmtpSecurityModeProtocol": {
         "type": "string",
         "description": "",
         "x-enumNames": [
@@ -15119,7 +15273,7 @@
             "format": "guid"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformAuditKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol"
           },
           "subjectId": {
             "type": "string",
@@ -15139,7 +15293,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionStatus"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
               }
             ]
           },
@@ -15147,7 +15301,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionStatus"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
               }
             ]
           },
@@ -15155,7 +15309,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
               }
             ]
           },
@@ -15163,7 +15317,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
               }
             ]
           },
@@ -15171,7 +15325,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainIdentityUserAccountLifecycleAction"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol"
               }
             ]
           },
@@ -15179,7 +15333,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventKind"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol"
               }
             ]
           },
@@ -15187,7 +15341,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventLevel"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol"
               }
             ]
           },
@@ -15195,7 +15349,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsEventsCompetitionEventVisibility"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol"
               }
             ]
           },
@@ -15238,7 +15392,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
               }
             ]
           },
@@ -15246,7 +15400,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionEvaluationState"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionEvaluationStateProtocol"
               }
             ]
           },
@@ -15254,7 +15408,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringEventKind"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsScoringEventKindProtocol"
               }
             ]
           },
@@ -15262,7 +15416,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringResultProtocol"
               }
             ]
           },
@@ -15283,8 +15437,8 @@
           }
         }
       },
-      "NoCTFApplicationAdministrationPlatformLogsPlatformAuditKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationPlatformPlatformAuditKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "CompetitionLifecycle",
@@ -15293,14 +15447,14 @@
           "CompetitionEvent"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "CompetitionLifecycle",
+          "UserAccountLifecycle",
+          "CompetitionLeaderboardVisibility",
+          "CompetitionEvent"
         ]
       },
-      "NoCTFDomainIdentityUserAccountLifecycleAction": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Banned",
@@ -15309,10 +15463,10 @@
           "PhysicallyDeleted"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "Banned",
+          "Disabled",
+          "Anonymized",
+          "PhysicallyDeleted"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformListPlatformAuditLogsRequest": {
@@ -15347,10 +15501,10 @@
             "format": "date-time"
           },
           "service": {
-            "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformLogService"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformLogServiceProtocol"
           },
           "level": {
-            "$ref": "#/components/schemas/NoCTFApplicationAdministrationPlatformLogsPlatformLogLevel"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformLogLevelProtocol"
           },
           "category": {
             "type": "string"
@@ -15516,7 +15670,7 @@
             "minimum": 1.0
           },
           "smtpSecurityMode": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentitySmtpSecurityMode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformSmtpSecurityModeProtocol"
           },
           "smtpUserName": {
             "type": "string",
@@ -15613,7 +15767,7 @@
         "additionalProperties": false,
         "properties": {
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
           }
         }
       },
@@ -15648,7 +15802,7 @@
             "format": "guid"
           },
           "scope": {
-            "$ref": "#/components/schemas/NoCTFDomainDataExportsDataExportScope"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportScopeProtocol"
           },
           "competitionId": {
             "type": "string",
@@ -15671,7 +15825,7 @@
             "nullable": true
           },
           "status": {
-            "$ref": "#/components/schemas/NoCTFDomainDataExportsDataExportStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportStatusProtocol"
           },
           "startedAt": {
             "type": "string",
@@ -15705,7 +15859,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainDataExportsDataExportFailureCode"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationDataExportsDataExportFailureCodeProtocol"
               }
             ]
           },
@@ -15715,20 +15869,20 @@
           }
         }
       },
-      "NoCTFDomainDataExportsDataExportScope": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationDataExportsDataExportScopeProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "CompetitionArchive",
           "PlatformAudit"
         ],
         "enum": [
-          0,
-          1
+          "CompetitionArchive",
+          "PlatformAudit"
         ]
       },
-      "NoCTFDomainDataExportsDataExportStatus": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationDataExportsDataExportStatusProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Queued",
@@ -15738,15 +15892,15 @@
           "Expired"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4
+          "Queued",
+          "Processing",
+          "Available",
+          "Failed",
+          "Expired"
         ]
       },
-      "NoCTFDomainDataExportsDataExportFailureCode": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationDataExportsDataExportFailureCodeProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "SubjectNotFound",
@@ -15755,10 +15909,10 @@
           "ObjectStorageFailed"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "SubjectNotFound",
+          "SizeLimitExceeded",
+          "GenerationFailed",
+          "ObjectStorageFailed"
         ]
       },
       "NoCTFAPIEndpointsAdministrationDataExportsCreateCompetitionDataExportRequest": {
@@ -15843,7 +15997,7 @@
             "nullable": true
           },
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
           "startTime": {
             "type": "string",
@@ -15876,12 +16030,12 @@
           "failures": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationChallengesFlagsMissingFlagGenerationFailure"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsMissingFlagGenerationFailureResponse"
             }
           }
         }
       },
-      "NoCTFApplicationChallengesFlagsMissingFlagGenerationFailure": {
+      "NoCTFAPIEndpointsAdministrationCompetitionsMissingFlagGenerationFailureResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -15894,12 +16048,26 @@
             "format": "guid"
           },
           "code": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsMissingFlagFailureCodeProtocol"
           },
           "description": {
             "type": "string"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsMissingFlagFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionNotFound",
+          "GameModeUnsupported",
+          "FlagGenerationFailed"
+        ],
+        "enum": [
+          "CompetitionNotFound",
+          "GameModeUnsupported",
+          "FlagGenerationFailed"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionConfigurationResponse": {
         "type": "object",
@@ -15910,7 +16078,7 @@
             "format": "guid"
           },
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
           "json": {
             "type": "string"
@@ -15920,7 +16088,7 @@
             "format": "int32"
           },
           "competitionStatus": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
           },
           "updatedAt": {
             "type": "string",
@@ -15937,10 +16105,10 @@
             "format": "guid"
           },
           "configuredVisibility": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
           "effectiveVisibility": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
           "startsAt": {
             "type": "string",
@@ -16033,10 +16201,10 @@
             "type": "string"
           },
           "kind": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserKindProtocol"
           },
           "role": {
-            "$ref": "#/components/schemas/NoCTFDomainIdentityUserRole"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationUserRoleProtocol"
           },
           "emailVerified": {
             "type": "boolean"
@@ -16124,7 +16292,7 @@
         "additionalProperties": false,
         "properties": {
           "code": {
-            "$ref": "#/components/schemas/NoCTFApplicationCompetitionsVisibilityCompetitionVisibilityMutationState"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionVisibilityMutationCodeProtocol"
           },
           "current": {
             "nullable": true,
@@ -16136,8 +16304,8 @@
           }
         }
       },
-      "NoCTFApplicationCompetitionsVisibilityCompetitionVisibilityMutationState": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionVisibilityMutationCodeProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Updated",
@@ -16147,11 +16315,11 @@
           "CompetitionFinished"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4
+          "Updated",
+          "NotFound",
+          "RevisionConflict",
+          "InvalidSchedule",
+          "CompetitionFinished"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest": {
@@ -16166,7 +16334,7 @@
             "nullable": false,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionLeaderboardVisibility"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
               }
             ]
           },
@@ -16193,10 +16361,10 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "expectedPermissionRevision",
           "managerIds",
           "judgeIds",
-          "observerIds",
-          "expectedPermissionRevision"
+          "observerIds"
         ],
         "properties": {
           "managerIds": {
@@ -16229,8 +16397,7 @@
           "expectedPermissionRevision": {
             "type": "integer",
             "format": "int32",
-            "minimum": 0.0,
-            "nullable": false
+            "minimum": 0.0
           }
         }
       },
@@ -16241,17 +16408,17 @@
           "errors": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFApplicationCompetitionsLifecycleStartGateError"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsStartGateErrorResponse"
             }
           }
         }
       },
-      "NoCTFApplicationCompetitionsLifecycleStartGateError": {
+      "NoCTFAPIEndpointsAdministrationCompetitionsStartGateErrorResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "code": {
-            "type": "string"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol"
           },
           "competitionChallengeId": {
             "type": "string",
@@ -16262,6 +16429,30 @@
             "type": "string"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsStartGateFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CompetitionNotPublished",
+          "CompetitionConfigurationInvalid",
+          "PublishedChallengeRequired",
+          "ApprovedTeamRequired",
+          "RuntimeQuotaInsufficient",
+          "ChallengeModeMismatch",
+          "ChallengeRulesInvalid",
+          "RuntimeDefinitionInvalid"
+        ],
+        "enum": [
+          "CompetitionNotPublished",
+          "CompetitionConfigurationInvalid",
+          "PublishedChallengeRequired",
+          "ApprovedTeamRequired",
+          "RuntimeQuotaInsufficient",
+          "ChallengeModeMismatch",
+          "ChallengeRulesInvalid",
+          "RuntimeDefinitionInvalid"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationCheatIncidentsConfirmCheatIncidentRequest": {
         "type": "object",
@@ -16352,16 +16543,16 @@
             "type": "string"
           },
           "submissionKind": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
           },
           "result": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringResultProtocol"
           },
           "failureCode": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringFailureCodeProtocol"
           },
           "status": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsCheatIncidentStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol"
           },
           "resolvedByUserId": {
             "type": "string",
@@ -16417,8 +16608,8 @@
           }
         }
       },
-      "NoCTFDomainSubmissionsCheatIncidentStatus": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Pending",
@@ -16428,11 +16619,11 @@
           "Corrected"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3,
-          4
+          "Pending",
+          "Confirmed",
+          "Dismissed",
+          "Superseded",
+          "Corrected"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCheatIncidentsGetCheatIncidentRequest": {
@@ -16506,16 +16697,16 @@
             "type": "string"
           },
           "submissionKind": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsSubmissionKind"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsSubmissionKindProtocol"
           },
           "result": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringResult"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringResultProtocol"
           },
           "failureCode": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsScoringFailureCode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsScoringFailureCodeProtocol"
           },
           "status": {
-            "$ref": "#/components/schemas/NoCTFDomainSubmissionsCheatIncidentStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol"
           },
           "resolvedByUserId": {
             "type": "string",
@@ -16646,7 +16837,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainChallengesSpecificationKind"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
               }
             ]
           },
@@ -16676,8 +16867,8 @@
           }
         }
       },
-      "NoCTFDomainChallengesSpecificationKind": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Attachment",
@@ -16686,10 +16877,10 @@
           "Hint"
         ],
         "enum": [
-          0,
-          1,
-          2,
-          3
+          "Attachment",
+          "AwdRound",
+          "RuntimeDefinition",
+          "Hint"
         ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest": {
@@ -16719,7 +16910,7 @@
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainChallengesSpecificationKind"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
               }
             ]
           },
@@ -16786,7 +16977,7 @@
             "format": "guid"
           },
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
           "json": {
             "type": "string"
@@ -16796,7 +16987,7 @@
             "format": "int32"
           },
           "competitionStatus": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsCompetitionStatus"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
           },
           "updatedAt": {
             "type": "string",
@@ -16929,10 +17120,10 @@
             }
           },
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
           "visibility": {
-            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol"
           },
           "title": {
             "type": "string"
@@ -16970,16 +17161,16 @@
           }
         }
       },
-      "NoCTFDomainChallengesChallengeVisibility": {
-        "type": "integer",
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol": {
+        "type": "string",
         "description": "",
         "x-enumNames": [
           "Private",
           "Shared"
         ],
         "enum": [
-          0,
-          1
+          "Private",
+          "Shared"
         ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse": {
@@ -17037,10 +17228,10 @@
             "nullable": true
           },
           "mode": {
-            "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode2"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
           "visibility": {
-            "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility2"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol"
           },
           "title": {
             "type": "string",
@@ -17064,34 +17255,6 @@
             "nullable": false
           }
         }
-      },
-      "NoCTFDomainCompetitionsGameMode2": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Ctf",
-          "Awd",
-          "Awdp",
-          "Koh"
-        ],
-        "enum": [
-          "Ctf",
-          "Awd",
-          "Awdp",
-          "Koh"
-        ]
-      },
-      "NoCTFDomainChallengesChallengeVisibility2": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Private",
-          "Shared"
-        ],
-        "enum": [
-          "Private",
-          "Shared"
-        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankGetChallengeFlagRequest": {
         "type": "object",
@@ -17183,7 +17346,7 @@
             "nullable": false,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainCompetitionsGameMode2"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
               }
             ]
           },
@@ -17191,7 +17354,7 @@
             "nullable": false,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/NoCTFDomainChallengesChallengeVisibility2"
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeVisibilityProtocol"
               }
             ]
           },

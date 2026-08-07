@@ -41,7 +41,7 @@ public sealed class MakeCompetitionVisibleEndpoint(
             user.UserId,
             "manual_make_visible",
             ct);
-        if (result.ErrorCode == "competition_not_found")
+        if (result.FailureCode == CompetitionTransitionFailureCode.CompetitionNotFound)
             return TypedResults.NotFound();
         return result.Succeeded
             ? TypedResults.NoContent()

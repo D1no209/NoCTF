@@ -2,8 +2,8 @@
 import { toast } from 'vue-sonner'
 import { adminChallengeBankCreateTemplate } from '~/api'
 import type {
-  NoCtfDomainChallengesChallengeVisibility2,
-  NoCtfDomainCompetitionsGameMode2,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
+  NoCtfapiEndpointsCompetitionsGameModeProtocol,
 } from '~/api'
 
 definePageMeta({ middleware: 'auth' })
@@ -11,32 +11,18 @@ definePageMeta({ middleware: 'auth' })
 const { canOrganize } = useAuth()
 
 const title = ref('')
-const mode = ref<NoCtfDomainCompetitionsGameMode2>('Ctf')
-const visibility = ref<NoCtfDomainChallengesChallengeVisibility2>('Private')
+const mode = ref<NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
+const visibility = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol>('Private')
 const direction = ref('')
 const description = ref('')
 const definitionJson = ref('{}')
 const error = ref<string | null>(null)
 const pending = ref(false)
 
-const definitionJsonError = computed(() => {
-  try {
-    JSON.parse(definitionJson.value)
-    return null
-  }
-  catch {
-    return '定义 JSON 格式错误,请检查后再提交'
-  }
-})
-
 async function submit(): Promise<void> {
   error.value = null
   if (!title.value.trim() || !direction.value.trim()) {
     error.value = '请填写标题和方向'
-    return
-  }
-  if (definitionJsonError.value) {
-    error.value = definitionJsonError.value
     return
   }
   pending.value = true
@@ -122,18 +108,9 @@ async function submit(): Promise<void> {
               <FieldLabel for="description">题面</FieldLabel>
               <Textarea id="description" v-model="description" rows="6" placeholder="题目描述,支持 Markdown" />
             </Field>
-            <Field :data-invalid="!!definitionJsonError || undefined">
-              <FieldLabel for="definition-json">定义 JSON</FieldLabel>
-              <Textarea
-                id="definition-json"
-                v-model="definitionJson"
-                rows="8"
-                class="font-mono text-sm"
-                :aria-invalid="!!definitionJsonError || undefined"
-                placeholder="Runtime / Checker / Flag 注入定义"
-              />
-              <FieldDescription>Provider 中立的 Runtime/Checker/Flag 注入定义,必须是合法 JSON。</FieldDescription>
-              <FieldError v-if="definitionJsonError">{{ definitionJsonError }}</FieldError>
+            <Field>
+              <FieldLabel>题目定义</FieldLabel>
+              <DefinitionEditor v-model="definitionJson" :mode="mode" />
             </Field>
             <Field orientation="horizontal">
               <Button type="submit" :disabled="pending">

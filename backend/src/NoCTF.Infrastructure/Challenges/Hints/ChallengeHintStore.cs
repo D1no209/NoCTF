@@ -312,15 +312,18 @@ public sealed class ChallengeHintStore(
             .Where(item => item.CompetitionId == competitionId)
             .Join(db.Challenges.IgnoreQueryFilters().AsNoTracking(), item => item.ChallengeId, template => template.Id,
                 (item, template) => new LeaderboardChallengeFact(
-                    item.Id, template.Direction, item.DeletedAt != null || template.DeletedAt != null,
+                    item.Id, template.Direction, template.Title, item.DeletedAt != null || template.DeletedAt != null,
                     item.RulesJson))
             .ToListAsync(ct);
         var submissions = await db.Submissions.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId && item.CurrentScoringEventId != null)
             .Join(db.ScoringEvents.AsNoTracking(), item => item.CurrentScoringEventId, fact => (Guid?)fact.Id,
-                (item, fact) => new LeaderboardSubmissionFact(
-                    item.Id, item.TeamId, item.CompetitionChallengeId, item.Kind, item.ReceivedAt, fact,
-                    fact.VictimTeamId))
+                (item, fact) => new { Submission = item, ScoringEvent = fact })
+            .Join(db.Users.AsNoTracking(), item => item.Submission.SubmittedByUserId, user => user.Id,
+                (item, user) => new LeaderboardSubmissionFact(
+                    item.Submission.Id, item.Submission.TeamId, item.Submission.CompetitionChallengeId,
+                    item.Submission.Kind, item.Submission.ReceivedAt, item.ScoringEvent,
+                    item.ScoringEvent.VictimTeamId, user.UserName))
             .ToListAsync(ct);
         var system = await db.ScoringEvents.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId && item.SubmissionId == null)

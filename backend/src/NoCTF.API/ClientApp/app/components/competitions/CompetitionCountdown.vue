@@ -2,7 +2,7 @@
 const props = defineProps<{
   startTime?: string
   endTime?: string
-  status?: number
+  status?: string
 }>()
 
 const now = ref(Date.now())

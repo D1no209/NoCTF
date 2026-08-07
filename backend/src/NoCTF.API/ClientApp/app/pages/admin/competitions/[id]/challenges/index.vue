@@ -144,7 +144,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
   <div class="flex flex-col gap-4">
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <Checkbox id="show-deleted" v-model:checked="includeDeleted" />
+        <Checkbox id="show-deleted" v-model="includeDeleted" />
         <label for="show-deleted" class="text-sm text-muted-foreground">显示已删除</label>
       </div>
       <Button v-if="canWrite" size="sm" @click="openAdd">

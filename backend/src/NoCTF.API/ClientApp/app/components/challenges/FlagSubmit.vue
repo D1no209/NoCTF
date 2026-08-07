@@ -4,9 +4,9 @@ import { getSubmissionStatusEndpoint, submitFlagEndpoint } from '~/api'
 
 interface TrackedSubmission {
   id: string
-  state?: number
-  result?: number | null
-  failureCode?: number | null
+  state?: string
+  result?: string | null
+  failureCode?: string | null
 }
 
 const props = withDefaults(
@@ -115,7 +115,7 @@ onUnmounted(() => {
   stopPolling()
 })
 
-function resultVariant(result?: number | null) {
+function resultVariant(result?: string | null) {
   if (result === ScoringResult.Correct) return 'default' as const
   return 'destructive' as const
 }

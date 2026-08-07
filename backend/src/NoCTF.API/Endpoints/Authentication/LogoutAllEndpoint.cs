@@ -25,9 +25,17 @@ public sealed class LogoutAllEndpoint(LogoutAll logoutAll, IUserContext user)
         var result = await logoutAll.ExecuteAsync(user.UserId, DateTimeOffset.UtcNow, ct);
         if (!result.Succeeded)
             return TypedResults.NotFound();
+        // See LogoutEndpoint: the __Secure- prefixed cookie can only be cleared with
+        // the Secure attribute present.
         HttpContext.Response.Cookies.Delete(
             "__Secure-noctf_refresh",
-            new CookieOptions { Path = "/api/v1/auth" });
+            new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Path = "/api/v1/auth"
+            });
         return TypedResults.NoContent();
     }
 }

@@ -29,11 +29,11 @@ public sealed class AwdpLeaderboardProjectorTests
                 Submission(teamId, challengeId, SubmissionKind.Flag, now.AddSeconds(1))
             ],
             [],
-            [new(challengeId, "Web", false)],
+            [new(challengeId, "Web", "Web challenge", false)],
             configuration,
             now.AddMinutes(-1));
 
-        var row = new AwdpLeaderboardProjector().Project(input).Single();
+        var row = new AwdpLeaderboardProjector().Project(input).Entries.Single();
 
         await Assert.That(row.Score).IsEqualTo(75);
         await Assert.That(row.SolveCount).IsEqualTo(1);
@@ -162,11 +162,11 @@ public sealed class AwdpLeaderboardProjectorTests
                     ScoringResult.PlatformFailed, ScoringFailureCode.CheckerPlatformError)
             ],
             [],
-            [new(challengeId, "Web", false)],
+            [new(challengeId, "Web", "Web challenge", false)],
             competition,
             now);
 
-        var row = new AwdpLeaderboardProjector().Project(input).Single();
+        var row = new AwdpLeaderboardProjector().Project(input).Entries.Single();
 
         await Assert.That(row.Score).IsEqualTo(-36);
     }
@@ -201,13 +201,13 @@ public sealed class AwdpLeaderboardProjectorTests
             ],
             [],
             [
-                new(firstChallenge, "Web", false),
-                new(secondChallenge, "Pwn", false)
+                new(firstChallenge, "Web", "Web challenge", false),
+                new(secondChallenge, "Pwn", "Pwn challenge", false)
             ],
             competition,
             now);
 
-        var rows = new AwdpLeaderboardProjector().Project(input);
+        var rows = new AwdpLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(moreFixes);
         await Assert.That(rows[1].TeamId).IsEqualTo(moreBreaks);
@@ -231,7 +231,7 @@ public sealed class AwdpLeaderboardProjectorTests
             [],
             []);
 
-        var rows = new AwdpLeaderboardProjector().Project(input);
+        var rows = new AwdpLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(lowerId);
         await Assert.That(rows[1].TeamId).IsEqualTo(higherId);
@@ -273,11 +273,11 @@ public sealed class AwdpLeaderboardProjectorTests
                     occurredAt: at.AddSeconds(2))
             ],
             [],
-            [new(challengeId, "Web", false)],
+            [new(challengeId, "Web", "Web challenge", false)],
             competition,
             at);
 
-        var rows = new AwdpLeaderboardProjector().Project(input);
+        var rows = new AwdpLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(earlier);
         await Assert.That(rows[0].LastScoreAt).IsEqualTo(at);
@@ -306,7 +306,7 @@ public sealed class AwdpLeaderboardProjectorTests
                 Submission(teamId, challengeId, SubmissionKind.Break, start.AddMinutes(15.5))
             ],
             [],
-            [new(challengeId, "Web", false)],
+            [new(challengeId, "Web", "Web challenge", false)],
             competition,
             start,
             [
@@ -315,7 +315,7 @@ public sealed class AwdpLeaderboardProjectorTests
                 Lifecycle(CompetitionStatus.Paused, CompetitionStatus.Running, start.AddMinutes(10))
             ]);
 
-        var row = new AwdpLeaderboardProjector().Project(input).Single();
+        var row = new AwdpLeaderboardProjector().Project(input).Entries.Single();
 
         await Assert.That(row.Score).IsEqualTo(50);
         await Assert.That(row.SolveCount).IsEqualTo(1);
@@ -348,10 +348,10 @@ public sealed class AwdpLeaderboardProjectorTests
             [new(teamId, "red", false, false)],
             submissions,
             [],
-            [new(challengeId, "Web", false, challenge)],
+            [new(challengeId, "Web", "Web challenge", false, challenge)],
             competition,
             now.AddMinutes(-1));
-        return new AwdpLeaderboardProjector().Project(input).Single();
+        return new AwdpLeaderboardProjector().Project(input).Entries.Single();
     }
 
     private static LeaderboardSubmissionFact Submission(

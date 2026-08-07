@@ -10,6 +10,11 @@ namespace NoCTF.Runtime.Docker.Containers;
 public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobRunner,
     IAttachedOneShotJobRunner, IContainerSandboxLifecycle, IDisposable
 {
+    private const string NetworkPurposeAwdpCallback = "awdp-callback";
+    private const string NetworkPurposeAwdCheckerCallback = "awd-checker-callback";
+    private const string NetworkPurposeAwdChecker = "awd-checker";
+    private const string NetworkPurposeAwdpVerification = "awdp-verification";
+    private const string NetworkPurposePersistentRuntime = "persistent-runtime";
     private readonly DockerClient client;
     private readonly DockerRuntimeOptions options;
 
@@ -609,7 +614,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         CancellationToken cancellationToken)
     {
         if (network.Labels?.TryGetValue("noctf.io/network-purpose", out var purpose) == true
-            && purpose is "awdp-callback" or "awd-checker-callback")
+            && purpose is NetworkPurposeAwdpCallback or NetworkPurposeAwdCheckerCallback)
         {
             var current = await client.Networks.InspectNetworkAsync(network.ID, cancellationToken);
             foreach (var containerId in current.Containers?.Keys ?? [])
@@ -799,14 +804,14 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     private static string CallbackNetworkPurpose(ContainerRequest request) =>
         request.NetworkPurpose == ContainerNetworkPurpose.AwdChecker
-            ? "awd-checker-callback"
-            : "awdp-callback";
+            ? NetworkPurposeAwdCheckerCallback
+            : NetworkPurposeAwdpCallback;
 
     private static string JobKind(ContainerNetworkPurpose purpose) => purpose switch
     {
-        ContainerNetworkPurpose.AwdChecker => "awd-checker",
-        ContainerNetworkPurpose.AwdpVerification => "awdp-verification",
-        ContainerNetworkPurpose.PersistentRuntime => "persistent-runtime",
+        ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdChecker,
+        ContainerNetworkPurpose.AwdpVerification => NetworkPurposeAwdpVerification,
+        ContainerNetworkPurpose.PersistentRuntime => NetworkPurposePersistentRuntime,
         _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
     };
 

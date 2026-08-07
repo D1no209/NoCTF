@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { listCompetitionEvents } from '~/api'
-import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from '~/api'
+import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse, NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol } from '~/api'
 
 type CompetitionEvent = NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse
 
@@ -12,16 +12,9 @@ const kind = ref<string>('all')
 
 const kindOptions = [
   { value: 'all', label: '全部动态' },
-  { value: '32', label: '公告' },
-  { value: '7', label: '题目发布' },
-  { value: '10', label: '提示发布' },
-  { value: '24', label: '一血' },
-  { value: '25', label: '二血' },
-  { value: '26', label: '三血' },
-  { value: '22', label: '提交评测' },
-  { value: '12', label: '队伍报名' },
-  { value: '19', label: '队伍封禁' },
-  { value: '34', label: '咨询回复' },
+  { value: 'AnnouncementPublished', label: '公告' }, { value: 'ChallengePublished', label: '题目发布' }, { value: 'HintPublished', label: '提示发布' },
+  { value: 'FirstBloodAwarded', label: '一血' }, { value: 'SecondBloodAwarded', label: '二血' }, { value: 'ThirdBloodAwarded', label: '三血' },
+  { value: 'SubmissionEvaluated', label: '提交评测' }, { value: 'TeamRegistered', label: '队伍报名' }, { value: 'TeamBanned', label: '队伍封禁' }, { value: 'QuestionReplied', label: '咨询回复' },
 ]
 
 const { items, loading, error, hasMore, initialized, loadMore, reset } =
@@ -36,7 +29,7 @@ const { items, loading, error, hasMore, initialized, loadMore, reset } =
       query: {
         from,
         to: new Date(now).toISOString(),
-        kind: kind.value === 'all' ? null : (Number(kind.value) as CompetitionEvent['kind']),
+        kind: kind.value === 'all' ? null : kind.value as NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
         cursor,
         limit: 50,
       },
@@ -73,9 +66,9 @@ onMounted(() => {
 })
 onUnmounted(() => unwatch?.())
 
-const levelVariant = (level?: number) =>
-  level === 2 ? ('destructive' as const) : level === 1 ? ('secondary' as const) : ('outline' as const)
-const levelLabel = (level?: number) => (level === 2 ? '警告' : level === 1 ? '注意' : '信息')
+const levelVariant = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) =>
+  level === 'Error' ? ('destructive' as const) : level === 'Warning' ? ('secondary' as const) : ('outline' as const)
+const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) => (level === 'Error' ? '警告' : level === 'Warning' ? '注意' : '信息')
 </script>
 
 <template>

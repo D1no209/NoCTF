@@ -3,11 +3,36 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Teams.Moderation;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
+ [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<MissingFlagFailureCodeProtocol>))]
+public enum MissingFlagFailureCodeProtocol
+{
+    CompetitionNotFound,
+    GameModeUnsupported,
+    FlagGenerationFailed
+}
+
+public sealed record MissingFlagGenerationFailureResponse(
+    Guid CompetitionChallengeId,
+    Guid TeamId,
+    MissingFlagFailureCodeProtocol Code,
+    string Description);
+
 public sealed record GenerateMissingFlagsResponse(
-    IReadOnlyList<MissingFlagGenerationFailure> Failures);
+    IReadOnlyList<MissingFlagGenerationFailureResponse> Failures);
+
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
+internal static partial class GenerateMissingFlagsMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial MissingFlagFailureCodeProtocol ToProtocol(MissingFlagFailureCode value);
+
+    public static partial MissingFlagGenerationFailureResponse ToResponse(MissingFlagGenerationFailure value);
+}
 
 public sealed class GenerateMissingFlagsEndpoint(
     GenerateMissingFlags generate,
@@ -35,6 +60,7 @@ public sealed class GenerateMissingFlagsEndpoint(
             return TypedResults.Forbid();
         var failures = await generate.ExecuteAsync(
             competitionId, DateTimeOffset.UtcNow, ct);
-        return TypedResults.Ok(new GenerateMissingFlagsResponse(failures));
+        return TypedResults.Ok(new GenerateMissingFlagsResponse(
+            failures.Select(GenerateMissingFlagsMapper.ToResponse).ToArray()));
     }
 }

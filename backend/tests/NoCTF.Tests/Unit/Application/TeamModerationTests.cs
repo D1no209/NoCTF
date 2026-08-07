@@ -14,7 +14,7 @@ public class TeamModerationTests
         var result = await useCase.ExecuteAsync(new(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), true, "reason", DateTimeOffset.UtcNow));
 
-        await Assert.That(result.ErrorCode).IsEqualTo("competition_finished");
+        await Assert.That(result.FailureCode).IsEqualTo(TeamModerationFailure.CompetitionFinished);
         await Assert.That(store.ApplyCalls).IsEqualTo(0);
     }
 

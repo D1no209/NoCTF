@@ -24,7 +24,7 @@ public class TeamRegistrationTests
     {
         var store = new Store(new(CompetitionStatus.Running, true, false));
         var result = await new CreateTeam(store).ExecuteAsync(new(Guid.NewGuid(), Guid.NewGuid(), "alpha", null, DateTimeOffset.UtcNow));
-        await Assert.That(result.ErrorCode).IsEqualTo("registration_closed");
+        await Assert.That(result.FailureCode).IsEqualTo(TeamRegistrationFailure.RegistrationClosed);
     }
 
     [Test]
@@ -34,7 +34,7 @@ public class TeamRegistrationTests
 
         var result = await new ReviewTeamRegistration(store).ExecuteAsync(Guid.NewGuid(), Guid.NewGuid(), true);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("competition_finished");
+        await Assert.That(result.FailureCode).IsEqualTo(TeamRegistrationFailure.CompetitionFinished);
         await Assert.That(store.ReviewWriteCount).IsEqualTo(0);
     }
 

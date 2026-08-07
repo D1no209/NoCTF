@@ -9,7 +9,7 @@ namespace NoCTF.API.Endpoints.Authentication;
 public sealed record RefreshTokenResponse(
     Guid UserId,
     string UserName,
-    UserRole Role,
+    UserRoleProtocol Role,
     bool EmailVerified,
     string AccessToken,
     DateTimeOffset ExpiresAt);
@@ -37,7 +37,15 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
         var result = await refresh.ExecuteAsync(refreshToken, cancellationToken);
         if (!result.Succeeded)
         {
-            HttpContext.Response.Cookies.Delete("__Secure-noctf_refresh", new CookieOptions { Path = "/api/v1/auth" });
+            // Same __Secure- prefix rule as LogoutEndpoint: the deletion needs the Secure
+            // attribute or browsers ignore it.
+            HttpContext.Response.Cookies.Delete("__Secure-noctf_refresh", new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Path = "/api/v1/auth"
+            });
             return TypedResults.Unauthorized();
         }
 
@@ -52,7 +60,7 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
         return TypedResults.Ok(new RefreshTokenResponse(
             result.Value.UserId,
             result.Value.UserName,
-            result.Value.Role,
+            IdentityProtocolMapper.ToProtocol(result.Value.Role),
             result.Value.EmailVerified,
             result.Value.AccessToken,
             result.Value.AccessTokenExpiresAt));

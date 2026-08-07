@@ -19,7 +19,7 @@ public sealed class UploadMyAvatarValidator : Validator<UploadMyAvatarRequest>
     public UploadMyAvatarValidator() => RuleFor(request => request.File).NotNull();
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<AvatarUploadFailureCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<AvatarUploadFailureCode>))]
 public enum AvatarUploadFailureCode
 {
     SizeInvalid,

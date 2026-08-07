@@ -41,6 +41,15 @@ public enum HintUnlockFailure
     InsufficientScore
 }
 
+public enum ChallengeHintFailureCode
+{
+    InvalidHint,
+    InvalidHintCost,
+    ResourceIdConflict,
+    HintNotFound,
+    InsufficientScore
+}
+
 public sealed record HintUnlockAttempt(
     HintUnlockResult? Result,
     HintUnlockFailure? Failure)
@@ -108,40 +117,43 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
             includeDeleted,
             ct);
 
-    public async Task<OperationResult<ChallengeHintView>> SaveAsync(
+    public async Task<OperationResult<ChallengeHintView, ChallengeHintFailureCode>> SaveAsync(
         SaveChallengeHintCommand command,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(command.Content))
-            return OperationResult<ChallengeHintView>.Failure("invalid_hint", "Hint content is required.");
+            return OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Failure(
+                ChallengeHintFailureCode.InvalidHint, "Hint content is required.");
         if (command.Cost < 0)
-            return OperationResult<ChallengeHintView>.Failure("invalid_hint_cost", "Hint cost cannot be negative.");
+            return OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Failure(
+                ChallengeHintFailureCode.InvalidHintCost, "Hint cost cannot be negative.");
         var result = await store.SaveAsync(command with { Content = command.Content.Trim() }, ct);
         return result.Failure switch
         {
             ChallengeHintSaveFailure.ResourceIdConflict =>
-                OperationResult<ChallengeHintView>.Failure(
-                    "resource_id_conflict",
+                OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Failure(
+                    ChallengeHintFailureCode.ResourceIdConflict,
                     "The requested hint ID is already in use."),
             ChallengeHintSaveFailure.ScopeNotFound or ChallengeHintSaveFailure.HintNotFound =>
-                OperationResult<ChallengeHintView>.Failure(
-                    "hint_not_found",
+                OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Failure(
+                    ChallengeHintFailureCode.HintNotFound,
                     "Competition challenge or hint was not found."),
-            _ => OperationResult<ChallengeHintView>.Success(result.Hint!)
+            _ => OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Success(result.Hint!)
         };
     }
 
-    public async Task<OperationResult> DeleteAsync(
+    public async Task<OperationResult<ChallengeHintFailureCode>> DeleteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
         DateTimeOffset now,
         CancellationToken ct = default) =>
         await store.DeleteAsync(competitionId, competitionChallengeId, hintId, now, ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure("hint_not_found", "Hint was not found.");
+            ? OperationResult<ChallengeHintFailureCode>.Success()
+            : OperationResult<ChallengeHintFailureCode>.Failure(
+                ChallengeHintFailureCode.HintNotFound, "Hint was not found.");
 
-    public async Task<OperationResult> RestoreAsync(
+    public async Task<OperationResult<ChallengeHintFailureCode>> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
@@ -153,13 +165,14 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
             hintId,
             now,
             ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure("hint_not_found", "Deleted hint was not found.");
+            ? OperationResult<ChallengeHintFailureCode>.Success()
+            : OperationResult<ChallengeHintFailureCode>.Failure(
+                ChallengeHintFailureCode.HintNotFound, "Deleted hint was not found.");
 }
 
 public sealed class UnlockChallengeHint(IChallengeHintStore store)
 {
-    public async Task<OperationResult<HintUnlockResult>> ExecuteAsync(
+    public async Task<OperationResult<HintUnlockResult, ChallengeHintFailureCode>> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid hintId,
@@ -172,14 +185,14 @@ public sealed class UnlockChallengeHint(IChallengeHintStore store)
         return result.Failure switch
         {
             HintUnlockFailure.NotFound =>
-                OperationResult<HintUnlockResult>.Failure(
-                    "hint_not_found",
+                OperationResult<HintUnlockResult, ChallengeHintFailureCode>.Failure(
+                    ChallengeHintFailureCode.HintNotFound,
                     "The hint is unavailable."),
             HintUnlockFailure.InsufficientScore =>
-                OperationResult<HintUnlockResult>.Failure(
-                    "insufficient_score",
+                OperationResult<HintUnlockResult, ChallengeHintFailureCode>.Failure(
+                    ChallengeHintFailureCode.InsufficientScore,
                     "The team has insufficient authoritative score."),
-            _ => OperationResult<HintUnlockResult>.Success(result.Result!)
+            _ => OperationResult<HintUnlockResult, ChallengeHintFailureCode>.Success(result.Result!)
         };
     }
 }

@@ -38,11 +38,11 @@ public sealed class ChallengeAttachmentUploadTests
     }
 
     [Test]
-    [Arguments(AddChallengeAttachmentState.ChallengeNotFound, "challenge_not_found")]
-    [Arguments(AddChallengeAttachmentState.ResourceIdConflict, "resource_id_conflict")]
+    [Arguments(AddChallengeAttachmentState.ChallengeNotFound, ChallengeAttachmentFailureCode.ChallengeNotFound)]
+    [Arguments(AddChallengeAttachmentState.ResourceIdConflict, ChallengeAttachmentFailureCode.ResourceIdConflict)]
     public async Task Rejected_attachment_deletes_the_exact_stored_object_once(
         AddChallengeAttachmentState state,
-        string expectedCode)
+        ChallengeAttachmentFailureCode expectedCode)
     {
         var harness = CreateHarness();
         harness.Store.AddAsync(
@@ -60,7 +60,7 @@ public sealed class ChallengeAttachmentUploadTests
         var result = await UploadAsync(harness);
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.ErrorCode).IsEqualTo(expectedCode);
+        await Assert.That(result.FailureCode).IsEqualTo(expectedCode);
         await AssertCompensatedOnceAsync(harness.Objects);
     }
 
@@ -156,7 +156,7 @@ public sealed class ChallengeAttachmentUploadTests
         return new(store, objects, new ManageChallengeAttachments(store, objects));
     }
 
-    private static async Task<OperationResult<ChallengeAttachmentView>> UploadAsync(
+    private static async Task<OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>> UploadAsync(
         Harness harness,
         CancellationToken cancellationToken = default)
     {

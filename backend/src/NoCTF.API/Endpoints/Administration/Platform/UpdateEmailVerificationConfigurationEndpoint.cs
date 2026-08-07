@@ -3,15 +3,47 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Domain.Identity;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
-public sealed class SmtpSecurityModeJsonConverter()
-    : JsonStringEnumConverter<SmtpSecurityMode>(
-        namingPolicy: null,
-        allowIntegerValues: false);
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<SmtpSecurityModeProtocol>))]
+public enum SmtpSecurityModeProtocol
+{
+    None,
+    SslOnConnect,
+    StartTls
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<EmailVerificationConfigurationFailureCode>))]
+public enum EmailVerificationConfigurationFailureCode
+{
+    Invalid,
+    RevisionConflict
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformProblemCode>))]
+public enum PlatformProblemCode
+{
+    EmailVerificationConfigurationConflict,
+    SmtpPasswordInvalid,
+    EmailDeliveryNotConfigured,
+    SmtpDeliveryFailed,
+    PlatformConfigurationConflict
+}
+
+[Mapper]
+internal static partial class SmtpSecurityModeProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SmtpSecurityMode ToDomain(SmtpSecurityModeProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SmtpSecurityModeProtocol ToProtocol(SmtpSecurityMode value);
+}
 
 public sealed class UpdateEmailVerificationConfigurationRequest
 {
@@ -24,8 +56,7 @@ public sealed class UpdateEmailVerificationConfigurationRequest
     public required int PasswordResetMaxRequestsPerHour { get; set; }
     public required string SmtpHost { get; set; }
     public required int SmtpPort { get; set; }
-    [JsonConverter(typeof(SmtpSecurityModeJsonConverter))]
-    public required SmtpSecurityMode SmtpSecurityMode { get; set; }
+    public required SmtpSecurityModeProtocol SmtpSecurityMode { get; set; }
     public required string SmtpUserName { get; set; }
     public required string SmtpFromAddress { get; set; }
     public required string SmtpFromName { get; set; }
@@ -88,7 +119,7 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
             request.PasswordResetMaxRequestsPerHour,
             request.SmtpHost,
             request.SmtpPort,
-            request.SmtpSecurityMode,
+            SmtpSecurityModeProtocolMapper.ToDomain(request.SmtpSecurityMode),
             request.SmtpUserName,
             request.SmtpFromAddress,
             request.SmtpFromName,
@@ -102,7 +133,7 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
                 title: "Email verification configuration is invalid.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "email_verification_configuration_invalid",
+                    ["code"] = EmailVerificationConfigurationFailureCode.Invalid,
                     ["errors"] = result.Errors.Select(error => error.ToString()).ToArray()
                 });
         }
@@ -114,7 +145,7 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
                 detail: "Reload the configuration and apply the changes again.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "email_verification_configuration_conflict"
+                    ["code"] = EmailVerificationConfigurationFailureCode.RevisionConflict
                 });
         }
 

@@ -28,7 +28,7 @@ public sealed class PauseCompetitionEndpoint(TransitionCompetitionLifecycle tran
         var id = Route<Guid>("competitionId");
         if (!await authorizer.CanModerateAsync(user.UserId, id, ct)) return TypedResults.Forbid();
         var result = await transition.ExecuteAsync(id, CompetitionStatus.Paused, user.UserId, "manual_pause", ct);
-        if (result.ErrorCode == "competition_not_found") return TypedResults.NotFound();
+        if (result.FailureCode == CompetitionTransitionFailureCode.CompetitionNotFound) return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Competition cannot be paused.", detail: result.ErrorMessage);
         return TypedResults.NoContent();
     }

@@ -7,13 +7,13 @@ using NoCTF.Domain.Challenges.Questions;
 
 namespace NoCTF.API.Endpoints.Challenges.Questions;
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionSubjectCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionSubjectCode>))]
 public enum CompetitionQuestionSubjectCode
 {
     Challenge,
     Platform
 }
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionStatusCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionStatusCode>))]
 public enum CompetitionQuestionStatusCode
 {
     Pending,
@@ -22,7 +22,7 @@ public enum CompetitionQuestionStatusCode
     Closed
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionAccessCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionAccessCode>))]
 public enum CompetitionQuestionAccessCode
 {
     Public,
@@ -31,7 +31,7 @@ public enum CompetitionQuestionAccessCode
     Handler
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionEntryKindCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionEntryKindCode>))]
 public enum CompetitionQuestionEntryKindCode
 {
     Message,
@@ -39,7 +39,7 @@ public enum CompetitionQuestionEntryKindCode
     Publication
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionParticipantRoleCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionParticipantRoleCode>))]
 public enum CompetitionQuestionParticipantRoleCode
 {
     Asker,

@@ -5,10 +5,48 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Notifications;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Notifications;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<NotificationKindProtocol>))]
+public enum NotificationKindProtocol
+{
+    CompetitionLifecycleChanged,
+    TeamRegistrationChanged,
+    SubmissionEvaluated,
+    RuntimeStateChanged,
+    StartGateFailed,
+    ManagementFailure,
+    BloodAwarded,
+    ChallengePublished,
+    HintPublished,
+    TeamBanned,
+    CompetitionQuestionOpened,
+    CompetitionQuestionReplied,
+    CompetitionQuestionStatusChanged,
+    CheatIncidentDetected,
+    TeamBanCorrected,
+    DataExportReady,
+    DataExportFailed
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<NotificationFailureCode>))]
+public enum NotificationFailureCode
+{
+    CursorInvalid
+}
+
+[Mapper]
+internal static partial class NotificationProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial NotificationKindProtocol ToProtocol(NotificationKind value);
+}
 
 public sealed class ListNotificationsRequest
 {
@@ -28,7 +66,7 @@ public sealed record NotificationResponse(
     Guid Id,
     Guid? CompetitionId,
     Guid? EntityId,
-    NotificationKind Kind,
+    NotificationKindProtocol Kind,
     JsonElement Payload,
     DateTimeOffset CreatedAt);
 
@@ -71,7 +109,7 @@ public sealed class ListNotificationsEndpoint(
                 title: "Invalid cursor.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "cursor_invalid"
+                    ["code"] = NotificationFailureCode.CursorInvalid
                 });
 
         var items = await list.ExecuteAsync(
@@ -84,7 +122,7 @@ public sealed class ListNotificationsEndpoint(
             item.Id,
             item.CompetitionId,
             item.EntityId,
-            item.Kind,
+            NotificationProtocolMapper.ToProtocol(item.Kind),
             JsonSerializer.Deserialize<JsonElement>(item.PayloadJson),
             item.CreatedAt)).ToArray();
         var next = items.Count == request.Limit

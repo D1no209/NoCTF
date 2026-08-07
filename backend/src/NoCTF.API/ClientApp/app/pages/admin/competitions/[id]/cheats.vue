@@ -10,7 +10,7 @@ import {
 import type {
   NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResponse,
   NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse,
-  NoCtfDomainSubmissionsCheatIncidentStatus,
+  NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
@@ -30,7 +30,7 @@ const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagin
   const { data, error } = await adminListCheatIncidents({
     path: { competitionId },
     query: {
-      status: filterStatus.value === '' ? null : Number(filterStatus.value) as NoCtfDomainSubmissionsCheatIncidentStatus,
+      status: filterStatus.value === '' ? null : filterStatus.value as NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol,
       from: localInputToIso(filterFrom.value) ?? '1970-01-01T00:00:00Z',
       to: localInputToIso(filterTo.value) ?? '2999-12-31T23:59:59Z',
       cursor,
@@ -119,11 +119,11 @@ onMounted(() => void loadMore())
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem value="0">待处理</SelectItem>
-            <SelectItem value="1">已确认</SelectItem>
-            <SelectItem value="2">已驳回</SelectItem>
-            <SelectItem value="3">已取代</SelectItem>
-            <SelectItem value="4">已纠正</SelectItem>
+            <SelectItem value="Pending">待处理</SelectItem>
+            <SelectItem value="Confirmed">已确认</SelectItem>
+            <SelectItem value="Dismissed">已驳回</SelectItem>
+            <SelectItem value="Superseded">已取代</SelectItem>
+            <SelectItem value="Corrected">已纠正</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
@@ -165,7 +165,7 @@ onMounted(() => void loadMore())
             <TableCell>{{ i.challengeTitle }}</TableCell>
             <TableCell>{{ enumLabel(SubmissionKindLabel, i.submissionKind) }}</TableCell>
             <TableCell>
-              <Badge :variant="i.status === 0 ? 'secondary' : i.status === 1 ? 'destructive' : 'outline'">
+              <Badge :variant="i.status === 'Pending' ? 'secondary' : i.status === 'Confirmed' ? 'destructive' : 'outline'">
                 {{ enumLabel(CheatIncidentStatusLabel, i.status) }}
               </Badge>
             </TableCell>

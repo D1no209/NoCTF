@@ -32,7 +32,7 @@ public sealed class KohLeaderboardProjectorTests
             },
             defaultPoints: 10);
 
-        var row = new KohLeaderboardProjector().Project(input).Single();
+        var row = new KohLeaderboardProjector().Project(input).Entries.Single();
 
         await Assert.That(row.Score).IsEqualTo(35);
         await Assert.That(row.SolveCount).IsEqualTo(3);
@@ -62,7 +62,7 @@ public sealed class KohLeaderboardProjectorTests
                 [zeroChallengeId] = 0
             });
 
-        var rows = new KohLeaderboardProjector().Project(input);
+        var rows = new KohLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(twoControls);
         await Assert.That(rows[1].TeamId).IsEqualTo(oneControl);
@@ -97,7 +97,7 @@ public sealed class KohLeaderboardProjectorTests
                 [secondZeroChallengeId] = 0
             });
 
-        var rows = new KohLeaderboardProjector().Project(input);
+        var rows = new KohLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(threeChallenges);
         await Assert.That(rows[1].TeamId).IsEqualTo(twoChallenges);
@@ -123,7 +123,7 @@ public sealed class KohLeaderboardProjectorTests
             ],
             new Dictionary<Guid, long?> { [challengeId] = 10 });
 
-        var rows = new KohLeaderboardProjector().Project(input);
+        var rows = new KohLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(earlier);
         await Assert.That(rows[1].TeamId).IsEqualTo(later);
@@ -150,7 +150,7 @@ public sealed class KohLeaderboardProjectorTests
             ],
             new Dictionary<Guid, long?> { [challengeId] = 10 });
 
-        var rows = new KohLeaderboardProjector().Project(input);
+        var rows = new KohLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(earlyRegistration);
         await Assert.That(rows[1].TeamId).IsEqualTo(lowerId);
@@ -167,6 +167,7 @@ public sealed class KohLeaderboardProjectorTests
         var challenges = challengePoints.Select(item => new LeaderboardChallengeFact(
             item.Key,
             "Pwn",
+            "Pwn challenge",
             false,
             JsonSerializer.Serialize(new KohChallengeConfiguration(
                 KohChallengeConfiguration.CurrentSchemaVersion,

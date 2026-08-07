@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { adminCreateCompetition } from '~/api'
-import type { NoCtfDomainCompetitionsGameMode } from '~/api'
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '~/api'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -9,7 +9,7 @@ const { canOrganize } = useAuth()
 
 const title = ref('')
 const description = ref('')
-const mode = ref<string>('0')
+const mode = ref<NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
 const startTime = ref('')
 const endTime = ref('')
 const teamRegistrationAutoApprove = ref(false)
@@ -40,7 +40,7 @@ async function submit() {
       body: {
         title: title.value.trim(),
         description: description.value.trim() || null,
-        mode: Number(mode.value) as NoCtfDomainCompetitionsGameMode,
+        mode: mode.value,
         startTime: start,
         endTime: end,
         teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
@@ -93,10 +93,10 @@ async function submit() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="0">CTF</SelectItem>
-                    <SelectItem value="1">AWD</SelectItem>
-                    <SelectItem value="2">AWDP</SelectItem>
-                    <SelectItem value="3">KoH</SelectItem>
+                    <SelectItem value="Ctf">CTF</SelectItem>
+                    <SelectItem value="Awd">AWD</SelectItem>
+                    <SelectItem value="Awdp">AWDP</SelectItem>
+                    <SelectItem value="Koh">KoH</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -123,7 +123,7 @@ async function submit() {
               </Field>
             </div>
             <Field orientation="horizontal">
-              <Checkbox id="auto-approve" v-model:checked="teamRegistrationAutoApprove" />
+              <Checkbox id="auto-approve" v-model="teamRegistrationAutoApprove" />
               <FieldLabel for="auto-approve" class="font-normal">队伍注册自动通过(无需审批)</FieldLabel>
             </Field>
             <Field>
