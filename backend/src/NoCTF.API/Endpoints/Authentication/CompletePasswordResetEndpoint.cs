@@ -22,7 +22,7 @@ public sealed class CompletePasswordResetValidator : Validator<CompletePasswordR
     }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompletePasswordResetFailureCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompletePasswordResetFailureCode>))]
 public enum CompletePasswordResetFailureCode
 {
     InvalidOrExpired

@@ -43,6 +43,40 @@ public sealed record LeaderboardBloodSummary(
     string TeamName,
     DateTimeOffset OccurredAt);
 
+public sealed record LeaderboardScorePoint(DateTimeOffset At, long Score);
+
+public enum LeaderboardPenaltyKind
+{
+    WrongSubmission,
+    HintUnlock
+}
+
+public sealed record LeaderboardSolveRecord(
+    Guid CompetitionChallengeId,
+    DateTimeOffset At,
+    long Points,
+    int SolveOrdinal,
+    string? SubmitterName);
+
+public sealed record LeaderboardPenaltyRecord(
+    DateTimeOffset At,
+    long Points,
+    LeaderboardPenaltyKind Kind);
+
+public sealed record LeaderboardTeamSeries(
+    Guid TeamId,
+    string TeamName,
+    IReadOnlyList<LeaderboardScorePoint> Points)
+{
+    public IReadOnlyList<LeaderboardSolveRecord> Solves { get; init; } = [];
+    public IReadOnlyList<LeaderboardPenaltyRecord> Penalties { get; init; } = [];
+}
+
+public sealed record LeaderboardChallengeInfo(
+    Guid CompetitionChallengeId,
+    string Title,
+    string Direction);
+
 public sealed record LeaderboardEntry(
     int Rank,
     Guid TeamId,

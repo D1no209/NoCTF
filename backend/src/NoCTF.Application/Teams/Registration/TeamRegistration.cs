@@ -19,6 +19,7 @@ public sealed record TeamView(
 public sealed record TeamRegistrationPolicy(CompetitionStatus Status, bool AutoApprove, bool CompetitionDeleted);
 public enum TeamRegistrationFailure
 {
+    InvalidTeamName,
     CompetitionNotFound,
     RegistrationClosed,
     UserAlreadyRegistered,
@@ -57,41 +58,23 @@ public interface ITeamRegistrationStore
     Task<TeamRegistrationFailure?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken);
 }
 
-internal static class TeamRegistrationFailureProtocol
-{
-    public static string Code(TeamRegistrationFailure failure) => failure switch
-    {
-        TeamRegistrationFailure.CompetitionNotFound => "competition_not_found",
-        TeamRegistrationFailure.RegistrationClosed => "registration_closed",
-        TeamRegistrationFailure.UserAlreadyRegistered => "user_already_registered",
-        TeamRegistrationFailure.TeamNameOrMembershipConflict => "team_name_or_membership_conflict",
-        TeamRegistrationFailure.TeamNotFound => "team_not_found",
-        TeamRegistrationFailure.CompetitionFinished => "competition_finished",
-        TeamRegistrationFailure.TeamLocked => "team_locked",
-        TeamRegistrationFailure.TeamConflict => "team_conflict",
-        TeamRegistrationFailure.TeamReviewConflict => "team_review_conflict",
-        TeamRegistrationFailure.CompetitionActive => "competition_active",
-        _ => "team_rejected"
-    };
-}
-
 public sealed class CreateTeam(ITeamRegistrationStore store)
 {
-    public async Task<OperationResult<TeamView>> ExecuteAsync(CreateTeamCommand command, CancellationToken ct = default)
+    public async Task<OperationResult<TeamView, TeamRegistrationFailure>> ExecuteAsync(CreateTeamCommand command, CancellationToken ct = default)
     {
         var name = command.Name.Trim();
         if (name.Length is < 1 or > 128)
-            return OperationResult<TeamView>.Failure("invalid_team_name", "Team name is required and must be at most 128 characters.");
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.InvalidTeamName, "Team name is required and must be at most 128 characters.");
         var policy = await store.GetPolicyAsync(command.CompetitionId, ct);
         if (policy is null || policy.CompetitionDeleted)
-            return OperationResult<TeamView>.Failure("competition_not_found", "Competition was not found.");
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionNotFound, "Competition was not found.");
         if (policy.Status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
-            return OperationResult<TeamView>.Failure("registration_closed", "Team registration is closed.");
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.RegistrationClosed, "Team registration is closed.");
         var created = await store.TryCreateAsync(command with { Name = name },
             policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
         return created.Team is not null
-            ? OperationResult<TeamView>.Success(created.Team)
-            : OperationResult<TeamView>.Failure(TeamRegistrationFailureProtocol.Code(created.Failure ?? TeamRegistrationFailure.TeamConflict), "The team could not be created.");
+            ? OperationResult<TeamView, TeamRegistrationFailure>.Success(created.Team)
+            : OperationResult<TeamView, TeamRegistrationFailure>.Failure(created.Failure ?? TeamRegistrationFailure.TeamConflict, "The team could not be created.");
     }
 }
 
@@ -115,48 +98,48 @@ public sealed class GetMyTeam(ITeamRegistrationStore store)
 
 public sealed class UpdateTeam(ITeamRegistrationStore store)
 {
-    public async Task<OperationResult<TeamView>> ExecuteAsync(UpdateTeamCommand command, CancellationToken ct = default)
+    public async Task<OperationResult<TeamView, TeamRegistrationFailure>> ExecuteAsync(UpdateTeamCommand command, CancellationToken ct = default)
     {
         var name = command.Name.Trim();
         if (name.Length is < 1 or > 128)
-            return OperationResult<TeamView>.Failure("invalid_team_name", "Team name is required and must be at most 128 characters.");
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.InvalidTeamName, "Team name is required and must be at most 128 characters.");
         var result = await store.UpdateAsync(command with { Name = name }, ct);
         if (result.Team is null)
-            return OperationResult<TeamView>.Failure(TeamRegistrationFailureProtocol.Code(result.Failure ?? TeamRegistrationFailure.TeamConflict), "Team was not found or can no longer be changed.");
-        return OperationResult<TeamView>.Success(result.Team);
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(result.Failure ?? TeamRegistrationFailure.TeamConflict, "Team was not found or can no longer be changed.");
+        return OperationResult<TeamView, TeamRegistrationFailure>.Success(result.Team);
     }
 }
 
 public sealed class DeleteTeam(ITeamRegistrationStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset now, CancellationToken ct = default)
+    public async Task<OperationResult<TeamRegistrationFailure>> ExecuteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset now, CancellationToken ct = default)
     {
         var failure = await store.SoftDeleteAsync(competitionId, teamId, actorId, now, ct);
-        if (failure is not null) return OperationResult.Failure(TeamRegistrationFailureProtocol.Code(failure.Value), "Team was not deleted.");
-        return OperationResult.Success();
+        if (failure is not null) return OperationResult<TeamRegistrationFailure>.Failure(failure.Value, "Team was not deleted.");
+        return OperationResult<TeamRegistrationFailure>.Success();
     }
 }
 
 public sealed class ReviewTeamRegistration(ITeamRegistrationStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid teamId, bool approve, CancellationToken ct = default)
+    public async Task<OperationResult<TeamRegistrationFailure>> ExecuteAsync(Guid competitionId, Guid teamId, bool approve, CancellationToken ct = default)
     {
         var policy = await store.GetPolicyAsync(competitionId, ct);
         if (policy is null || policy.CompetitionDeleted)
-            return OperationResult.Failure("competition_not_found", "Competition was not found.");
+            return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionNotFound, "Competition was not found.");
         if (policy.Status == CompetitionStatus.Finished)
-            return OperationResult.Failure("competition_finished", "Finished competitions are read-only.");
+            return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionFinished, "Finished competitions are read-only.");
         var result = await store.SetStatusAsync(competitionId, teamId,
             approve ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Rejected, ct);
         return result.Changed
-            ? OperationResult.Success()
-            : OperationResult.Failure(TeamRegistrationFailureProtocol.Code(result.Failure ?? TeamRegistrationFailure.TeamReviewConflict), "Team registration was not reviewed.");
+            ? OperationResult<TeamRegistrationFailure>.Success()
+            : OperationResult<TeamRegistrationFailure>.Failure(result.Failure ?? TeamRegistrationFailure.TeamReviewConflict, "Team registration was not reviewed.");
     }
 }
 
 public sealed class ResubmitTeamRegistration(ITeamRegistrationStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<OperationResult<TeamRegistrationFailure>> ExecuteAsync(
         Guid competitionId,
         Guid teamId,
         Guid userId,
@@ -164,15 +147,14 @@ public sealed class ResubmitTeamRegistration(ITeamRegistrationStore store)
     {
         var policy = await store.GetPolicyAsync(competitionId, ct);
         if (policy is null || policy.CompetitionDeleted)
-            return OperationResult.Failure("competition_not_found", "Competition was not found.");
+            return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionNotFound, "Competition was not found.");
         if (policy.Status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
-            return OperationResult.Failure("registration_closed", "Team registration is closed.");
+            return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.RegistrationClosed, "Team registration is closed.");
         var result = await store.ResubmitAsync(competitionId, teamId, userId, ct);
         return result.Changed
-            ? OperationResult.Success()
-            : OperationResult.Failure(
-                TeamRegistrationFailureProtocol.Code(
-                    result.Failure ?? TeamRegistrationFailure.TeamReviewConflict),
+            ? OperationResult<TeamRegistrationFailure>.Success()
+            : OperationResult<TeamRegistrationFailure>.Failure(
+                result.Failure ?? TeamRegistrationFailure.TeamReviewConflict,
                 "Rejected registration was not resubmitted.");
     }
 }

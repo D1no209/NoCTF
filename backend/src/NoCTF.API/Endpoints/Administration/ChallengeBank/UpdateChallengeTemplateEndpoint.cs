@@ -4,7 +4,7 @@ using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Composition;
-using System.Text.Json.Serialization;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
@@ -14,10 +14,8 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
 public sealed class UpdateChallengeTemplateRequest
 {
-    [JsonConverter(typeof(JsonStringEnumConverter<GameMode>))]
-    public GameMode? Mode { get; set; }
-    [JsonConverter(typeof(JsonStringEnumConverter<ChallengeVisibility>))]
-    public ChallengeVisibility? Visibility { get; set; }
+    public GameModeProtocol? Mode { get; set; }
+    public ChallengeVisibilityProtocol? Visibility { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Direction { get; set; } = string.Empty;
@@ -73,8 +71,8 @@ public sealed class UpdateChallengeTemplateEndpoint(
             Route<Guid>("challengeId"),
             user.UserId,
             user.IsAdministrator,
-            request.Mode!.Value,
-            request.Visibility!.Value,
+            CompetitionProtocolMapper.ToDomain(request.Mode!.Value),
+            ChallengeTemplateMapper.ToDomain(request.Visibility!.Value),
             request.Title,
             request.Description,
             request.Direction,

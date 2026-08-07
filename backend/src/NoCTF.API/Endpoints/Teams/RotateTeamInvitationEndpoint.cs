@@ -18,8 +18,8 @@ public sealed class RotateTeamInvitationEndpoint(RotateTeamInvitation rotate, IU
             Route<Guid>("teamId"),
             user.UserId,
             ct);
-        if (result.ErrorCode == "team_not_found") return TypedResults.NotFound();
-        if (result.ErrorCode == "team_forbidden") return TypedResults.Forbid();
+        if (result.FailureCode == TeamMembershipFailure.TeamNotFound) return TypedResults.NotFound();
+        if (result.FailureCode == TeamMembershipFailure.TeamForbidden) return TypedResults.Forbid();
         return result.Succeeded ? TypedResults.Ok(new RotateTeamInvitationResponse(result.Value!)) : TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, detail: result.ErrorMessage);
     }
 }

@@ -13,9 +13,9 @@ import {
 import type {
   NoCtfapiEndpointsSubmissionsAdminSubmissionStatusResponse,
   NoCtfapiEndpointsSubmissionsSubmissionListItemResponse,
-  NoCtfDomainSubmissionsScoringResult,
-  NoCtfDomainSubmissionsSubmissionEvaluationState,
-  NoCtfDomainSubmissionsSubmissionKind,
+  NoCtfapiEndpointsSubmissionsScoringResultProtocol,
+  NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol,
+  NoCtfapiEndpointsSubmissionsSubmissionKindProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
@@ -55,9 +55,9 @@ const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagin
     query: {
       competitionChallengeId: filterChallenge.value || null,
       teamId: filterTeam.value || null,
-      submissionKind: filterKind.value === '' ? null : Number(filterKind.value) as NoCtfDomainSubmissionsSubmissionKind,
-      evaluationState: filterState.value === '' ? null : Number(filterState.value) as NoCtfDomainSubmissionsSubmissionEvaluationState,
-      scoringResult: filterResult.value === '' ? null : Number(filterResult.value) as NoCtfDomainSubmissionsScoringResult,
+      submissionKind: filterKind.value === '' ? null : filterKind.value as NoCtfapiEndpointsSubmissionsSubmissionKindProtocol,
+      evaluationState: filterState.value === '' ? null : filterState.value as NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol,
+      scoringResult: filterResult.value === '' ? null : filterResult.value as NoCtfapiEndpointsSubmissionsScoringResultProtocol,
       submittedFlag: filterFlag.value || null,
       cursor,
       limit: 30,
@@ -219,9 +219,9 @@ onMounted(() => {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="0">Flag</SelectItem>
-                <SelectItem value="1">Break</SelectItem>
-                <SelectItem value="2">Fix</SelectItem>
+                <SelectItem value="Flag">Flag</SelectItem>
+                <SelectItem value="Break">Break</SelectItem>
+                <SelectItem value="Fix">Fix</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -231,11 +231,11 @@ onMounted(() => {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="0">待处理</SelectItem>
-                <SelectItem value="1">排队中</SelectItem>
-                <SelectItem value="2">评测中</SelectItem>
-                <SelectItem value="3">已完成</SelectItem>
-                <SelectItem value="4">平台失败</SelectItem>
+                <SelectItem value="Pending">待处理</SelectItem>
+                <SelectItem value="Queued">排队中</SelectItem>
+                <SelectItem value="Processing">评测中</SelectItem>
+                <SelectItem value="Completed">已完成</SelectItem>
+                <SelectItem value="PlatformFailed">平台失败</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -245,12 +245,12 @@ onMounted(() => {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="0">正确</SelectItem>
-                <SelectItem value="1">错误</SelectItem>
-                <SelectItem value="2">重复</SelectItem>
-                <SelectItem value="3">次数耗尽</SelectItem>
-                <SelectItem value="4">平台失败</SelectItem>
-                <SelectItem value="5">已拒绝</SelectItem>
+                <SelectItem value="Correct">正确</SelectItem>
+                <SelectItem value="Wrong">错误</SelectItem>
+                <SelectItem value="Duplicate">重复</SelectItem>
+                <SelectItem value="AttemptsExhausted">次数耗尽</SelectItem>
+                <SelectItem value="PlatformFailed">平台失败</SelectItem>
+                <SelectItem value="Rejected">已拒绝</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -315,12 +315,12 @@ onMounted(() => {
             <TableCell>{{ challengeTitle(s.competitionChallengeId) }}</TableCell>
             <TableCell>{{ enumLabel(SubmissionKindLabel, s.kind) }}</TableCell>
             <TableCell>
-              <Badge :variant="s.evaluationState === 3 ? 'default' : s.evaluationState === 4 ? 'destructive' : 'secondary'">
+              <Badge :variant="s.evaluationState === 'Completed' ? 'default' : s.evaluationState === 'PlatformFailed' ? 'destructive' : 'secondary'">
                 {{ enumLabel(SubmissionEvaluationStateLabel, s.evaluationState) }}
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge v-if="s.result !== null && s.result !== undefined" :variant="s.result === 0 ? 'default' : 'outline'">
+              <Badge v-if="s.result !== null && s.result !== undefined" :variant="s.result === 'Correct' ? 'default' : 'outline'">
                 {{ enumLabel(ScoringResultLabel, s.result) }}
               </Badge>
               <span v-else class="text-muted-foreground">—</span>

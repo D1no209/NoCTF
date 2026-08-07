@@ -81,7 +81,7 @@ public sealed class UploadPlatformLogoEndpoint(
                 detail: "Reload the configuration before uploading the logo again.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "platform_configuration_conflict"
+                    ["code"] = PlatformProblemCode.PlatformConfigurationConflict
                 }),
             PlatformLogoUpdateState.InvalidSize => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,

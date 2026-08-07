@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CompetitionStatus, competitionStatusLabel } from '~/utils/labels'
 
-const props = defineProps<{ status?: number }>()
+const props = defineProps<{ status?: string }>()
 
 const label = computed(() => competitionStatusLabel(props.status))
 

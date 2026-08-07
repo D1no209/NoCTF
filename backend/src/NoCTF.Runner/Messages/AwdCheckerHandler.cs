@@ -195,15 +195,7 @@ public sealed class AwdCheckerExecutor(
             work.Image,
             work.Command,
             environment,
-            new Dictionary<string, string>
-            {
-                ["noctf.io/managed"] = "true",
-                ["noctf.io/runtime-instance-id"] = work.RuntimeInstanceId.ToString("D"),
-                ["noctf.io/generation"] = work.Generation.ToString(
-                    System.Globalization.CultureInfo.InvariantCulture),
-                ["noctf.io/job-kind"] = "awd-checker",
-                ["noctf.io/purpose"] = "awd-checker"
-            },
+            new Dictionary<string, string>(),
             new Dictionary<int, int>(),
             new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
             new ContainerSecurityPolicy(true, true, true, ["ALL"], []),

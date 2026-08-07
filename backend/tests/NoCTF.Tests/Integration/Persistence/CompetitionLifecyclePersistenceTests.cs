@@ -51,7 +51,7 @@ public sealed class CompetitionLifecyclePersistenceTests
 
             await Assert.That(errors).IsNotNull();
             var runtimeError = errors!.Single(error =>
-                error.Code == "RuntimeDefinitionInvalid" &&
+                error.Code == StartGateFailureCode.RuntimeDefinitionInvalid &&
                 error.CompetitionChallengeId == fixture.CompetitionChallengeId);
             await Assert.That(runtimeError.Message)
                 .IsEqualTo("Runtime is required before an AWD competition can start.");

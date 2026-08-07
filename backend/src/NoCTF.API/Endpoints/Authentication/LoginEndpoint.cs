@@ -10,7 +10,7 @@ namespace NoCTF.API.Endpoints.Authentication;
 public sealed record LoginResponse(
     Guid UserId,
     string UserName,
-    UserRole Role,
+    UserRoleProtocol Role,
     bool EmailVerified,
     string AccessToken,
     DateTimeOffset ExpiresAt);
@@ -59,7 +59,7 @@ public sealed class LoginEndpoint(LoginUser login)
         return TypedResults.Ok(new LoginResponse(
             result.Value!.UserId,
             result.Value.UserName,
-            result.Value.Role,
+            IdentityProtocolMapper.ToProtocol(result.Value.Role),
             result.Value.EmailVerified,
             result.Value.AccessToken,
             result.Value.AccessTokenExpiresAt));

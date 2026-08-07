@@ -15,7 +15,7 @@ public sealed class UpdateTeamEndpoint(UpdateTeam update, ITeamRegistrationStore
         request.CompetitionId = Route<Guid>("competitionId"); request.TeamId = Route<Guid>("teamId");
         if (!await store.CanManageAsync(user.UserId, request.CompetitionId, request.TeamId, ct)) return TypedResults.Forbid();
         var result = await update.ExecuteAsync(TeamMapper.ToCommand(request), ct);
-        if (result.ErrorCode == "team_not_found_or_locked") return TypedResults.NotFound();
+        if (result.FailureCode == TeamRegistrationFailure.TeamLocked) return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Team was not updated.", detail: result.ErrorMessage);
         return TypedResults.Ok(TeamMapper.ToResponse(result.Value!));
     }

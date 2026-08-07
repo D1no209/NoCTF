@@ -3,10 +3,52 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.DataExports;
 using NoCTF.Domain.DataExports;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.DataExports;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<DataExportScopeProtocol>))]
+public enum DataExportScopeProtocol
+{
+    CompetitionArchive,
+    PlatformAudit
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<DataExportStatusProtocol>))]
+public enum DataExportStatusProtocol
+{
+    Queued,
+    Processing,
+    Available,
+    Failed,
+    Expired
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<DataExportFailureCodeProtocol>))]
+public enum DataExportFailureCodeProtocol
+{
+    SubjectNotFound,
+    SizeLimitExceeded,
+    GenerationFailed,
+    ObjectStorageFailed
+}
+
+[Mapper]
+internal static partial class DataExportProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial DataExportScopeProtocol ToProtocol(DataExportScope value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial DataExportStatusProtocol ToProtocol(DataExportStatus value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial DataExportFailureCodeProtocol ToProtocol(DataExportFailureCode value);
+}
 
 public sealed class CreateCompetitionDataExportRequest
 {
@@ -25,20 +67,20 @@ public sealed class CreateCompetitionDataExportValidator
 
 public sealed record DataExportResponse(
     Guid Id,
-    DataExportScope Scope,
+    DataExportScopeProtocol Scope,
     Guid? CompetitionId,
     Guid RequestedByUserId,
     DateTimeOffset RequestedAt,
     bool IncludeProtectedFlags,
     string? Reason,
-    DataExportStatus Status,
+    DataExportStatusProtocol Status,
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     DateTimeOffset? ExpiresAt,
     string? FileName,
     long? Length,
     string? Sha256,
-    DataExportFailureCode? FailureCode,
+    DataExportFailureCodeProtocol? FailureCode,
     string? FailureDetail);
 
 public sealed record DataExportListResponse(IReadOnlyList<DataExportResponse> Items);
@@ -104,19 +146,19 @@ public sealed class CreateCompetitionDataExportEndpoint(
 
     internal static DataExportResponse Map(DataExportView item) => new(
         item.Id,
-        item.Scope,
+        DataExportProtocolMapper.ToProtocol(item.Scope),
         item.CompetitionId,
         item.RequestedByUserId,
         item.RequestedAt,
         item.IncludeProtectedFlags,
         item.Reason,
-        item.Status,
+        DataExportProtocolMapper.ToProtocol(item.Status),
         item.StartedAt,
         item.CompletedAt,
         item.ExpiresAt,
         item.FileName,
         item.Length,
         item.Sha256,
-        item.FailureCode,
+        item.FailureCode is null ? null : DataExportProtocolMapper.ToProtocol(item.FailureCode.Value),
         item.FailureDetail);
 }

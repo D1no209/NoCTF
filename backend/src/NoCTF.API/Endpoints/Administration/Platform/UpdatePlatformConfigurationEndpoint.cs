@@ -71,7 +71,7 @@ public sealed class UpdatePlatformConfigurationEndpoint(
                 detail: "Reload the configuration and apply the changes again.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "platform_configuration_conflict"
+                    ["code"] = PlatformProblemCode.PlatformConfigurationConflict
                 }),
             PlatformConfigurationUpdateState.InvalidInput => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,

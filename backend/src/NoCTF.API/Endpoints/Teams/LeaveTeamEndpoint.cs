@@ -13,7 +13,7 @@ public sealed class LeaveTeamEndpoint(LeaveTeam leave, IUserContext user)
     public override async Task<Results<NoContent, NotFound, ProblemHttpResult>> ExecuteAsync(CancellationToken ct)
     {
         var result = await leave.ExecuteAsync(Route<Guid>("competitionId"), user.UserId, ct);
-        if (result.ErrorCode == "membership_not_found") return TypedResults.NotFound();
+        if (result.FailureCode == TeamMembershipFailure.MembershipNotFound) return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "User could not leave the team.", detail: result.ErrorMessage);
         return TypedResults.NoContent();
     }

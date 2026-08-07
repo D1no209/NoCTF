@@ -109,7 +109,7 @@ public sealed class DevelopmentHostingTests
             {
                 title = "Development integration",
                 description = "EF Core InMemory HTTP integration",
-                mode = 0,
+                mode = "Ctf",
                 startTime = now.AddMinutes(10),
                 endTime = now.AddHours(2),
                 teamRegistrationAutoApprove = true,

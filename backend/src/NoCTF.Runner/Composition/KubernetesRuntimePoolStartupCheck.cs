@@ -9,6 +9,10 @@ public sealed class KubernetesRuntimePoolStartupCheck(
     IKubernetes client,
     KubernetesRuntimeOptions options) : IHostedService
 {
+    private enum CiliumPolicyEnforcementMode
+    {
+        Always
+    }
     public const string PolicyName = "noctf-runtime-baseline-deny";
     public const string PurposeLabel = "runtime-baseline";
     public const string CiliumConfigNamespace = "kube-system";
@@ -38,7 +42,11 @@ public sealed class KubernetesRuntimePoolStartupCheck(
         if (ciliumConfig.Data?.TryGetValue(
                 CiliumPolicyEnforcementKey,
                 out var enforcementMode) != true
-            || !string.Equals(enforcementMode, "always", StringComparison.OrdinalIgnoreCase))
+            || !Enum.TryParse<CiliumPolicyEnforcementMode>(
+                enforcementMode,
+                true,
+                out var parsedMode)
+            || parsedMode != CiliumPolicyEnforcementMode.Always)
         {
             throw new InvalidOperationException(
                 $"Cilium '{CiliumPolicyEnforcementKey}' must be configured as 'always'.");

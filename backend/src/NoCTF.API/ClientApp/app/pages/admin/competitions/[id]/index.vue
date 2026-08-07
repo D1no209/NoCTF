@@ -13,7 +13,7 @@ import {
   adminStartCompetition,
   adminValidateCompetitionStart,
 } from '~/api'
-import type { NoCtfApplicationCompetitionsLifecycleStartGateError } from '~/api'
+import type { NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
@@ -26,11 +26,11 @@ const actionError = ref<string | null>(null)
 const status = computed(() => competition.value?.status)
 
 const steps = [
-  { value: 0, label: '草稿' },
-  { value: 1, label: '可见' },
-  { value: 2, label: '已发布' },
-  { value: 3, label: '进行中' },
-  { value: 5, label: '已结束' },
+  { value: 'Draft', label: '草稿' },
+  { value: 'Visible', label: '可见' },
+  { value: 'Published', label: '已发布' },
+  { value: 'Running', label: '进行中' },
+  { value: 'Finished', label: '已结束' },
 ]
 
 interface LifecycleAction {
@@ -46,38 +46,38 @@ const actions = computed<LifecycleAction[]>(() => [
   {
     key: 'make-visible',
     label: '对外可见',
-    visible: status.value === 0,
+    visible: status.value === 'Draft',
     run: () => adminMakeCompetitionVisible({ path: { competitionId } }),
   },
   {
     key: 'publish',
     label: '发布竞赛',
-    visible: status.value === 1,
+    visible: status.value === 'Visible',
     run: () => adminPublishCompetition({ path: { competitionId } }),
   },
   {
     key: 'start',
     label: '开始比赛',
-    visible: status.value === 2,
+    visible: status.value === 'Published',
     confirm: { title: '开始比赛', description: '将立即开始比赛并为队伍预置运行时实例。确认继续?' },
     run: () => adminStartCompetition({ path: { competitionId } }),
   },
   {
     key: 'pause',
     label: '暂停比赛',
-    visible: status.value === 3,
+    visible: status.value === 'Running',
     run: () => adminPauseCompetition({ path: { competitionId } }),
   },
   {
     key: 'resume',
     label: '恢复比赛',
-    visible: status.value === 4,
+    visible: status.value === 'Paused',
     run: () => adminResumeCompetition({ path: { competitionId } }),
   },
   {
     key: 'finish',
     label: '结束比赛',
-    visible: status.value === 2 || status.value === 3 || status.value === 4,
+    visible: status.value === 'Published' || status.value === 'Running' || status.value === 'Paused',
     destructive: true,
     confirm: { title: '结束比赛', description: '结束比赛不可撤销,将清理全部运行时实例。确认结束?' },
     run: () => adminFinishCompetition({ path: { competitionId } }),
@@ -114,7 +114,7 @@ function trigger(action: LifecycleAction) {
 
 // ---- Start gate validation ----
 const validating = ref(false)
-const validationErrors = ref<NoCtfApplicationCompetitionsLifecycleStartGateError[] | null>(null)
+const validationErrors = ref<NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse[] | null>(null)
 
 async function validateStart() {
   validating.value = true
@@ -135,11 +135,11 @@ async function validateStart() {
 
 // ---- Generate missing flags ----
 const generating = ref(false)
-const generateFailures = ref<{ competitionChallengeId?: string; teamId?: string; code?: string; description?: string }[] | null>(null)
+const generateFailures = ref<{ competitionChallengeId?: string; teamId?: string; code?: string; description?: string }[]>([])
 
 async function generateMissingFlags() {
   generating.value = true
-  generateFailures.value = null
+    generateFailures.value = []
   try {
     const { data, error } = await adminGenerateMissingFlags({ path: { competitionId } })
     if (error) throw error
@@ -224,8 +224,8 @@ async function hardDelete() {
       <CardContent class="flex flex-col gap-6">
         <div class="flex flex-wrap items-center gap-2">
           <template v-for="(step, i) in steps" :key="step.value">
-            <Badge :variant="status === step.value || (step.value === 3 && status === 4) ? 'default' : 'outline'">
-              {{ step.value === 3 && status === 4 ? '已暂停' : step.label }}
+            <Badge :variant="status === step.value || (step.value === 'Running' && status === 'Paused') ? 'default' : 'outline'">
+              {{ step.value === 'Running' && status === 'Paused' ? '已暂停' : step.label }}
             </Badge>
             <span v-if="i < steps.length - 1" class="text-muted-foreground">→</span>
           </template>

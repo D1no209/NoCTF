@@ -39,14 +39,14 @@ public sealed class CtfLeaderboardProjectorTests
                     CreatedAt = at
                 })],
             [],
-            [new(challengeId, "Web", false,
+            [new(challengeId, "Web", "Web challenge", false,
                 JsonSerializer.Serialize(new CtfChallengeConfiguration(
                     CtfChallengeConfiguration.CurrentSchemaVersion,
                     new(500, 100, 10), [], null, null, "minimumPoints + 17m")))],
             json,
             at.AddMinutes(-1));
 
-        var row = new CtfLeaderboardProjector().Project(input).Single();
+        var row = new CtfLeaderboardProjector().Project(input).Entries.Single();
 
         await Assert.That(row.Score).IsEqualTo(117);
     }
@@ -66,12 +66,12 @@ public sealed class CtfLeaderboardProjectorTests
             [Fact(firstTeam, start, Guid.NewGuid()), Fact(firstTeam, start.AddSeconds(1), Guid.NewGuid()),
              Fact(secondTeam, start.AddSeconds(2), Guid.NewGuid())],
             [],
-            [new(challengeId, "Web", false, JsonSerializer.Serialize(new CtfChallengeConfiguration(
+            [new(challengeId, "Web", "Web challenge", false, JsonSerializer.Serialize(new CtfChallengeConfiguration(
                 1, new(100, 100, 10), [new(BloodRewardPolicy.FixedPoints, 10), new(BloodRewardPolicy.FixedPoints, 20)])))],
             JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 100, 10), [])),
             start);
 
-        var rows = new CtfLeaderboardProjector().Project(input);
+        var rows = new CtfLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows.Single(row => row.TeamId == firstTeam).Score).IsEqualTo(110);
         await Assert.That(rows.Single(row => row.TeamId == secondTeam).Score).IsEqualTo(120);
@@ -116,7 +116,7 @@ public sealed class CtfLeaderboardProjectorTests
                 Fact(teams[3], start.AddSeconds(3), Guid.Parse("40000000-0000-0000-0000-000000000001"))
             ],
             [],
-            [new(challengeId, "Web", false, JsonSerializer.Serialize(
+            [new(challengeId, "Web", "Web challenge", false, JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
                     CtfChallengeConfiguration.CurrentSchemaVersion,
                     new(100, 100, 10),
@@ -193,11 +193,11 @@ public sealed class CtfLeaderboardProjectorTests
                 Fact(ScoringResult.Correct, at),
                 Fact(ScoringResult.Wrong, at.AddSeconds(1))
             ], [],
-            [new(challengeId, "Web", false, JsonSerializer.Serialize(
+            [new(challengeId, "Web", "Web challenge", false, JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(1, new(100, 100, 10), [], null, null, null, 25)))],
             JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 100, 10), [], null, 10)), at);
 
-        var row = new CtfLeaderboardProjector().Project(input).Single();
+        var row = new CtfLeaderboardProjector().Project(input).Entries.Single();
 
         await Assert.That(row.Score).IsEqualTo(75);
 
@@ -233,11 +233,11 @@ public sealed class CtfLeaderboardProjectorTests
             [new(firstTeam, "first", false, false), new(secondTeam, "second", false, false)],
             [Fact(firstTeam, start), Fact(secondTeam, start.AddSeconds(1))],
             [],
-            [new(challengeId, "Web", false, JsonSerializer.Serialize(challengeConfiguration))],
+            [new(challengeId, "Web", "Web challenge", false, JsonSerializer.Serialize(challengeConfiguration))],
             JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 0, 10), [])),
             start);
 
-        var rows = new CtfLeaderboardProjector().Project(input);
+        var rows = new CtfLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows.Single(row => row.TeamId == firstTeam).Score).IsEqualTo(80);
         await Assert.That(rows.Single(row => row.TeamId == secondTeam).Score).IsEqualTo(120);
@@ -272,14 +272,14 @@ public sealed class CtfLeaderboardProjectorTests
                     Result = ScoringResult.Correct, OccurredAt = start.AddSeconds(index), CreatedAt = start
                 })).ToList(),
             [],
-            [new(challengeId, "Web", false, JsonSerializer.Serialize(new CtfChallengeConfiguration(
+            [new(challengeId, "Web", "Web challenge", false, JsonSerializer.Serialize(new CtfChallengeConfiguration(
                 1, new(100, 0, 10),
                 [new(BloodRewardPolicy.FixedPoints, 10), new(BloodRewardPolicy.FixedPoints, 20)],
                 ScoreExpression: "100m / (solveCount - 2)")))],
             JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 0, 10), [])),
             start);
 
-        var rows = new CtfLeaderboardProjector().Project(input);
+        var rows = new CtfLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows.Count).IsEqualTo(3);
     }
@@ -305,7 +305,7 @@ public sealed class CtfLeaderboardProjectorTests
             [],
             [challengeId]);
 
-        var rows = new CtfLeaderboardProjector().Project(input);
+        var rows = new CtfLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(earlier);
         await Assert.That(rows[0].LastScoreAt).IsEqualTo(at);
@@ -346,7 +346,7 @@ public sealed class CtfLeaderboardProjectorTests
             ],
             [firstChallengeId, secondChallengeId]);
 
-        var rows = new CtfLeaderboardProjector().Project(input);
+        var rows = new CtfLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(moreSolves);
         await Assert.That(rows[0].Score).IsEqualTo(100);
@@ -373,11 +373,130 @@ public sealed class CtfLeaderboardProjectorTests
             [],
             []);
 
-        var rows = new CtfLeaderboardProjector().Project(input);
+        var rows = new CtfLeaderboardProjector().Project(input).Entries;
 
         await Assert.That(rows[0].TeamId).IsEqualTo(earlyRegistration);
         await Assert.That(rows[1].TeamId).IsEqualTo(lowerId);
         await Assert.That(rows[2].TeamId).IsEqualTo(higherId);
+    }
+
+    [Test]
+    public async Task Series_replays_score_events_to_the_entry_score_in_time_order()
+    {
+        var teamA = Guid.NewGuid();
+        var teamB = Guid.NewGuid();
+        var teamC = Guid.NewGuid();
+        var firstChallengeId = Guid.NewGuid();
+        var secondChallengeId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
+        var start = DateTimeOffset.Parse("2026-07-25T00:00:00Z");
+        var input = new LeaderboardProjectionInput(
+            competitionId,
+            GameMode.Ctf,
+            [
+                new(teamA, "a", false, false, start),
+                new(teamB, "b", false, false, start),
+                new(teamC, "c", false, false, start)
+            ],
+            [
+                Submission(teamA, firstChallengeId, ScoringResult.Correct, start, "alice"),
+                Submission(teamA, secondChallengeId, ScoringResult.Wrong, start.AddSeconds(1)),
+                Submission(teamB, firstChallengeId, ScoringResult.Correct, start.AddSeconds(2), "bob"),
+                Submission(teamB, secondChallengeId, ScoringResult.Correct, start.AddSeconds(3), "carol")
+            ],
+            [
+                new LeaderboardSystemFact(
+                    new ScoringEvent
+                    {
+                        Id = Guid.NewGuid(),
+                        CompetitionId = competitionId,
+                        TeamId = teamA,
+                        Kind = ScoringEventKind.HintUnlock,
+                        Result = ScoringResult.Correct,
+                        OccurredAt = start.AddSeconds(4),
+                        CreatedAt = start.AddSeconds(4)
+                    },
+                    CurrentValue: 30)
+            ],
+            [
+                new LeaderboardChallengeFact(firstChallengeId, "Web", "First", false,
+                    JsonSerializer.Serialize(new CtfChallengeConfiguration(
+                        CtfChallengeConfiguration.CurrentSchemaVersion,
+                        new(100, 100, 10),
+                        [new(BloodRewardPolicy.FixedPoints, 10), new(BloodRewardPolicy.FixedPoints, 20)]))),
+                new LeaderboardChallengeFact(secondChallengeId, "Pwn", "Second", false,
+                    JsonSerializer.Serialize(new CtfChallengeConfiguration(
+                        CtfChallengeConfiguration.CurrentSchemaVersion,
+                        new(200, 200, 10), [], null, null, null, 5)))
+            ],
+            JsonSerializer.Serialize(new CtfConfiguration(
+                CtfConfiguration.CurrentSchemaVersion,
+                new(100, 100, 10),
+                [])),
+            start);
+
+        var projection = new CtfLeaderboardProjector().Project(input);
+
+        // teamC has no score events and therefore no series.
+        await Assert.That(projection.Series.Count).IsEqualTo(2);
+        var seriesA = projection.Series.Single(series => series.TeamId == teamA);
+        await Assert.That(seriesA.TeamName).IsEqualTo("a");
+        await Assert.That(seriesA.Points.Count).IsEqualTo(3);
+        await Assert.That(seriesA.Points[0].Score).IsEqualTo(110);
+        await Assert.That(seriesA.Points[0].At).IsEqualTo(start);
+        await Assert.That(seriesA.Points[1].Score).IsEqualTo(105);
+        await Assert.That(seriesA.Points[2].Score).IsEqualTo(75);
+        var seriesB = projection.Series.Single(series => series.TeamId == teamB);
+        await Assert.That(seriesB.Points.Count).IsEqualTo(2);
+        await Assert.That(seriesB.Points[0].Score).IsEqualTo(120);
+        await Assert.That(seriesB.Points[1].Score).IsEqualTo(320);
+        var solveA = seriesA.Solves.Single();
+        await Assert.That(solveA.CompetitionChallengeId).IsEqualTo(firstChallengeId);
+        await Assert.That(solveA.At).IsEqualTo(start);
+        await Assert.That(solveA.Points).IsEqualTo(110);
+        await Assert.That(solveA.SolveOrdinal).IsEqualTo(1);
+        await Assert.That(solveA.SubmitterName).IsEqualTo("alice");
+        await Assert.That(seriesA.Penalties.Count).IsEqualTo(2);
+        await Assert.That(seriesA.Penalties[0].Kind).IsEqualTo(LeaderboardPenaltyKind.WrongSubmission);
+        await Assert.That(seriesA.Penalties[0].Points).IsEqualTo(5);
+        await Assert.That(seriesA.Penalties[0].At).IsEqualTo(start.AddSeconds(1));
+        await Assert.That(seriesA.Penalties[1].Kind).IsEqualTo(LeaderboardPenaltyKind.HintUnlock);
+        await Assert.That(seriesA.Penalties[1].Points).IsEqualTo(30);
+        await Assert.That(seriesA.Penalties[1].At).IsEqualTo(start.AddSeconds(4));
+        await Assert.That(seriesB.Solves.Count).IsEqualTo(2);
+        await Assert.That(seriesB.Solves[0].CompetitionChallengeId).IsEqualTo(firstChallengeId);
+        await Assert.That(seriesB.Solves[0].Points).IsEqualTo(120);
+        await Assert.That(seriesB.Solves[0].SolveOrdinal).IsEqualTo(2);
+        await Assert.That(seriesB.Solves[0].SubmitterName).IsEqualTo("bob");
+        await Assert.That(seriesB.Solves[1].CompetitionChallengeId).IsEqualTo(secondChallengeId);
+        await Assert.That(seriesB.Solves[1].Points).IsEqualTo(200);
+        await Assert.That(seriesB.Solves[1].SolveOrdinal).IsEqualTo(1);
+        await Assert.That(seriesB.Solves[1].SubmitterName).IsEqualTo("carol");
+        await Assert.That(seriesB.Penalties.Count).IsEqualTo(0);
+        foreach (var series in projection.Series)
+        {
+            var entry = projection.Entries.Single(candidate => candidate.TeamId == series.TeamId);
+            await Assert.That(series.Points[^1].Score).IsEqualTo(entry.Score);
+            for (var index = 1; index < series.Points.Count; index++)
+                await Assert.That(series.Points[index].At)
+                    .IsGreaterThanOrEqualTo(series.Points[index - 1].At);
+        }
+
+        LeaderboardSubmissionFact Submission(
+            Guid teamId,
+            Guid challengeId,
+            ScoringResult result,
+            DateTimeOffset at,
+            string? submitterName = null) =>
+            new(
+                Guid.NewGuid(), teamId, challengeId, SubmissionKind.Flag, at,
+                new ScoringEvent
+                {
+                    Id = Guid.NewGuid(), CompetitionId = competitionId, TeamId = teamId,
+                    CompetitionChallengeId = challengeId, Kind = ScoringEventKind.SubmissionEvaluation,
+                    Result = result, OccurredAt = at, CreatedAt = at
+                },
+                SubmitterName: submitterName);
     }
 
     private static LeaderboardProjectionInput Input(
@@ -395,6 +514,7 @@ public sealed class CtfLeaderboardProjectorTests
             challengeIds.Select(challengeId => new LeaderboardChallengeFact(
                 challengeId,
                 "Web",
+                "Web challenge",
                 false,
                 JsonSerializer.Serialize(new CtfChallengeConfiguration(
                     CtfChallengeConfiguration.CurrentSchemaVersion,

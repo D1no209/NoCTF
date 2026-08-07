@@ -35,8 +35,8 @@ onMounted(() => {
   if (canOrganize.value) void load()
 })
 
-function visibilityLabel(visibility?: number): string {
-  return visibility === 1 ? '共享' : '私有'
+function visibilityLabel(visibility?: string): string {
+  return visibility === 'Shared' ? '共享' : '私有'
 }
 </script>
 
@@ -61,7 +61,7 @@ function visibilityLabel(visibility?: number): string {
 
     <template v-else>
       <div class="flex items-center gap-2">
-        <Switch id="include-deleted" v-model:checked="includeDeleted" />
+        <Switch id="include-deleted" v-model="includeDeleted" />
         <Label for="include-deleted">显示已删除的模板</Label>
       </div>
 

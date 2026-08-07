@@ -57,16 +57,16 @@ public sealed class UploadChallengeAttachmentEndpoint(
             content,
             DateTimeOffset.UtcNow,
             ct);
-        if (result.ErrorCode == "challenge_not_found")
+        if (result.FailureCode == ChallengeAttachmentFailureCode.ChallengeNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: result.ErrorCode == "resource_id_conflict"
+                statusCode: result.FailureCode == ChallengeAttachmentFailureCode.ResourceIdConflict
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
                 title: "Attachment was not uploaded.",
                 detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
+                extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() });
         var response = ChallengeAttachmentMapping.ToResponse(result.Value!);
         return TypedResults.Created(
             $"/api/v1/admin/challenges/{response.ChallengeId}/attachments/{response.Id}",

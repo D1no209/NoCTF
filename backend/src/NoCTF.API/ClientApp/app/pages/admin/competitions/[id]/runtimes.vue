@@ -15,8 +15,8 @@ import {
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
-  NoCtfDomainRuntimeRuntimeKind,
-  NoCtfDomainRuntimeRuntimeState,
+  NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
+  NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
@@ -53,8 +53,8 @@ const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagin
     query: {
       competitionChallengeId: filterChallenge.value || null,
       teamId: filterTeam.value || null,
-      state: filterState.value === '' ? null : Number(filterState.value) as NoCtfDomainRuntimeRuntimeState,
-      runtimeKind: filterKind.value === '' ? null : Number(filterKind.value) as NoCtfDomainRuntimeRuntimeKind,
+      state: filterState.value === '' ? null : filterState.value as NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
+      runtimeKind: filterKind.value === '' ? null : filterKind.value as NoCtfapiEndpointsRuntimeRuntimeKindProtocol,
       cursor,
       limit: 30,
     },
@@ -92,7 +92,7 @@ async function openDetail(id?: string) {
 const opPending = ref<string | null>(null)
 const opMessage = ref<string | null>(null)
 
-async function waitForRuntime(runtimeInstanceId: string | undefined, done: (state?: number | null) => boolean) {
+async function waitForRuntime(runtimeInstanceId: string | undefined, done: (state?: string | null) => boolean) {
   if (!runtimeInstanceId) return
   let attempts = 0
   while (attempts < 30) {
@@ -126,9 +126,9 @@ async function runRuntimeOp(
     if (error) throw error
     const label = op === 'start' ? '启动' : op === 'stop' ? '停止' : '重置'
     toast.success(`${label}操作已受理`)
-    const targetState = op === 'start' ? 2 : 4
+    const targetState = op === 'start' ? 'Running' : 'Stopped'
     await waitForRuntime(data?.runtimeInstanceId ?? rt.id, state =>
-      op === 'reset' ? state === 2 : state === targetState || state === 5)
+      op === 'reset' ? state === 'Stopped' : state === targetState || state === 'Failed')
     refreshList()
     if (detailOpen.value && detail.value?.id) await openDetail(detail.value.id)
   }
@@ -204,12 +204,12 @@ onMounted(() => {
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="0">排队中</SelectItem>
-              <SelectItem value="1">准备中</SelectItem>
-              <SelectItem value="2">运行中</SelectItem>
-              <SelectItem value="3">停止中</SelectItem>
-              <SelectItem value="4">已停止</SelectItem>
-              <SelectItem value="5">失败</SelectItem>
+              <SelectItem value="Queued">排队中</SelectItem>
+              <SelectItem value="Provisioning">准备中</SelectItem>
+              <SelectItem value="Running">运行中</SelectItem>
+              <SelectItem value="Stopping">停止中</SelectItem>
+              <SelectItem value="Stopped">已停止</SelectItem>
+              <SelectItem value="Failed">失败</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -219,9 +219,9 @@ onMounted(() => {
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="0">容器</SelectItem>
-              <SelectItem value="1">Compose</SelectItem>
-              <SelectItem value="2">虚拟机</SelectItem>
+              <SelectItem value="Container">容器</SelectItem>
+              <SelectItem value="Compose">Compose</SelectItem>
+              <SelectItem value="OvaVm">虚拟机</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -262,7 +262,7 @@ onMounted(() => {
             <TableCell>{{ rt.generation }}</TableCell>
             <TableCell>{{ enumLabel(RuntimeKindLabel, rt.runtimeKind) }}</TableCell>
             <TableCell>
-              <Badge :variant="rt.state === 2 ? 'default' : rt.state === 5 ? 'destructive' : 'secondary'">
+              <Badge :variant="rt.state === 'Running' ? 'default' : rt.state === 'Failed' ? 'destructive' : 'secondary'">
                 {{ enumLabel(RuntimeStateLabel, rt.state) }}
               </Badge>
             </TableCell>
@@ -272,12 +272,12 @@ onMounted(() => {
                 <Button variant="ghost" size="sm" @click="openDetail(rt.id)">详情</Button>
                 <template v-if="canWrite">
                   <Button
-                    v-if="rt.state === 4 || rt.state === 5"
+                    v-if="rt.state === 'Stopped' || rt.state === 'Failed'"
                     variant="ghost" size="sm" :disabled="opPending !== null"
                     @click="runRuntimeOp(rt, 'start')"
                   >启动</Button>
                   <Button
-                    v-if="rt.state === 2"
+                    v-if="rt.state === 'Running'"
                     variant="ghost" size="sm" :disabled="opPending !== null"
                     @click="runRuntimeOp(rt, 'stop')"
                   >停止</Button>
@@ -289,7 +289,7 @@ onMounted(() => {
                     重置
                   </Button>
                   <Button
-                    v-if="rt.teamId && rt.state === 2"
+                    v-if="rt.teamId && rt.state === 'Running'"
                     variant="ghost" size="sm" :disabled="opPending !== null"
                     @click="extendDialog = rt; extendSeconds = 1800"
                   >续期</Button>

@@ -20,6 +20,19 @@ public sealed class KubernetesContainerLifecycle(
     private const string InternalServiceRole = "dns";
     private const string PublicServiceRole = "public";
     private const string PublicServiceSuffix = "-public";
+    private const string PodPhaseRunning = "Running";
+    private const string PodPhaseSucceeded = "Succeeded";
+    private const string PodPhaseFailed = "Failed";
+    private const string ServiceTypeClusterIp = "ClusterIP";
+    private const string ServiceTypeNodePort = "NodePort";
+    private const string JobKindPersistentRuntime = "persistent-runtime";
+    private const string JobKindAwdpVerification = "awdp-verification";
+    private const string JobKindAwdChecker = "awd-checker";
+    private const string NetworkPurposeAwdChecker = "awd-checker";
+    private const string NetworkPurposeAwdpChecker = "awdp-checker";
+    private const string NetworkPurposeAwdpVerification = "awdp-verification";
+    private const string NetworkPurposePersistentRuntime = "persistent-runtime";
+    private const string ExternalReasonExitCode = "ExitCode";
     private const string ExecTimeoutScript = """
         duration=$1
         shift
@@ -60,6 +73,8 @@ public sealed class KubernetesContainerLifecycle(
             ?? request.OperationId).ToString("D");
         labels["noctf.io/generation"] = request.Generation.ToString(
             System.Globalization.CultureInfo.InvariantCulture);
+        if (request.AllowInternalCallback)
+            labels["noctf.io/purpose"] = CallbackPurpose(request.NetworkPurpose);
         if (request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
             && request.PortMappings.Count == 0)
             await EnsurePublicServiceAbsentAsync(name, request, cancellationToken);
@@ -307,7 +322,7 @@ public sealed class KubernetesContainerLifecycle(
             {
                 var pod = await client.CoreV1.ReadNamespacedPodAsync(
                     receipt.ResourceId, options.Namespace, cancellationToken: cancellationToken);
-                if (pod.Status?.Phase is "Succeeded" or "Failed")
+                if (pod.Status?.Phase is PodPhaseSucceeded or PodPhaseFailed)
                 {
                     var terminated = pod.Status.ContainerStatuses?.SingleOrDefault()?.State?.Terminated;
                     return new(receipt.ResourceId, checked((int)(terminated?.ExitCode ?? -1)), string.Empty, string.Empty,
@@ -350,8 +365,8 @@ public sealed class KubernetesContainerLifecycle(
             ["noctf.io/runtime-instance-id"] = target.Identity.RuntimeInstanceId.ToString("D"),
             ["noctf.io/generation"] = target.Identity.Generation.ToString(
                 System.Globalization.CultureInfo.InvariantCulture),
-            ["noctf.io/job-kind"] = "awd-checker",
-            ["noctf.io/purpose"] = "awd-checker"
+            ["noctf.io/job-kind"] = JobKindAwdChecker,
+            ["noctf.io/purpose"] = NetworkPurposeAwdChecker
         };
         return await RunAsync(
             request with
@@ -387,7 +402,7 @@ public sealed class KubernetesContainerLifecycle(
             options.Namespace,
             cancellationToken: cancellationToken);
         if (!HasResourceIdentity(policy.Metadata.Labels, target.Identity)
-            || !HasNetworkPurpose(policy.Metadata.Labels, "persistent-runtime")
+            || !HasNetworkPurpose(policy.Metadata.Labels, NetworkPurposePersistentRuntime)
             || !HasResourceIdentity(pod.Metadata.Labels, target.Identity)
             || !HasLabel(pod.Metadata.Labels, "noctf.io/sandbox", receipt.NetworkId))
             throw new InvalidOperationException(
@@ -443,8 +458,8 @@ public sealed class KubernetesContainerLifecycle(
             ? $"noctf-awdp-{identity.RuntimeInstanceId:N}"
             : $"noctf-rt-{identity.RuntimeInstanceId:N}-{identity.Generation}";
         var purpose = request.Purpose == ContainerNetworkPurpose.AwdpVerification
-            ? "awdp-verification"
-            : "persistent-runtime";
+            ? NetworkPurposeAwdpVerification
+            : NetworkPurposePersistentRuntime;
         try
         {
             var existing = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
@@ -801,7 +816,7 @@ public sealed class KubernetesContainerLifecycle(
             labels,
             identity,
             InternalServiceRole,
-            "ClusterIP",
+            ServiceTypeClusterIp,
             request.ContainerPorts,
             requireAssignedNodePorts: false,
             cancellationToken,
@@ -815,7 +830,7 @@ public sealed class KubernetesContainerLifecycle(
                 labels,
                 identity,
                 PublicServiceRole,
-                "NodePort",
+                ServiceTypeNodePort,
                 request.PortMappings.Keys.Order().ToArray(),
                 requireAssignedNodePorts: true,
                 cancellationToken,
@@ -972,12 +987,12 @@ public sealed class KubernetesContainerLifecycle(
                 || port.TargetPort?.Value
                     != port.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)
                 || !string.Equals(port.Protocol, "TCP", StringComparison.Ordinal)
-                || type == "ClusterIP" && port.NodePort is not null
+                || type == ServiceTypeClusterIp && port.NodePort is not null
                 || requireAssignedNodePorts && port.NodePort is not (>= 1 and <= 65535))
                 throw new InvalidOperationException(
                     $"Kubernetes Service '{name}' has a different port contract.");
         }
-        if (type == "ClusterIP"
+        if (type == ServiceTypeClusterIp
             && (string.IsNullOrWhiteSpace(spec.ClusterIP)
                 || string.Equals(spec.ClusterIP, "None", StringComparison.OrdinalIgnoreCase))
             || requireAssignedNodePorts
@@ -1092,7 +1107,7 @@ public sealed class KubernetesContainerLifecycle(
                 && !HasLabel(
                     pod.Metadata?.Labels,
                     "noctf.io/purpose",
-                    CallbackPurpose(request)))
+                    CallbackPurpose(request.NetworkPurpose)))
             throw new InvalidOperationException(
                 $"Kubernetes Pod '{name}' has a different ownership identity or network.");
     }
@@ -1127,7 +1142,7 @@ public sealed class KubernetesContainerLifecycle(
 
     private static string JobKindFromLabels(IReadOnlyDictionary<string, string> labels) =>
         labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-            && jobKind is "persistent-runtime" or "awdp-verification" or "awd-checker"
+            && jobKind is JobKindPersistentRuntime or JobKindAwdpVerification or JobKindAwdChecker
                 ? jobKind
                 : throw new InvalidOperationException(
                     "A Kubernetes Container service requires a supported job kind.");
@@ -1147,7 +1162,7 @@ public sealed class KubernetesContainerLifecycle(
         ICollection<V1NetworkPolicy>? createdPolicies = null)
     {
         var callbackPort = GetCallbackPort(request);
-        var purpose = CallbackPurpose(request);
+        var purpose = CallbackPurpose(request.NetworkPurpose);
         var policyName = $"{name}-callback";
         var desired = new V1NetworkPolicy
         {
@@ -1280,12 +1295,13 @@ public sealed class KubernetesContainerLifecycle(
         return new(policy, true);
     }
 
-    private static string CallbackPurpose(ContainerRequest request) =>
-        request.Labels.TryGetValue("noctf.io/purpose", out var purpose)
-            && purpose is "awd-checker" or "awdp-checker"
-                ? purpose
-                : throw new InvalidOperationException(
-                    "A scoring checker requires a supported purpose label.");
+    private static string CallbackPurpose(ContainerNetworkPurpose purpose) => purpose switch
+    {
+        ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdChecker,
+        ContainerNetworkPurpose.AwdpVerification => NetworkPurposeAwdpChecker,
+        _ => throw new InvalidOperationException(
+            "Only scoring checker containers can request an internal callback.")
+    };
 
     private void ValidateCallbackPolicy(
         V1NetworkPolicy policy,
@@ -1478,8 +1494,8 @@ public sealed class KubernetesContainerLifecycle(
         {
             var pod = await client.CoreV1.ReadNamespacedPodAsync(
                 podName, options.Namespace, cancellationToken: cancellationToken);
-            if (pod.Status?.Phase == "Running") return;
-            if (pod.Status?.Phase is "Failed" or "Succeeded")
+            if (pod.Status?.Phase == PodPhaseRunning) return;
+            if (pod.Status?.Phase is PodPhaseFailed or PodPhaseSucceeded)
                 throw new InvalidOperationException("Kubernetes sandbox target stopped before it became ready.");
             await Task.Delay(250, cancellationToken);
         }
@@ -1500,7 +1516,7 @@ public sealed class KubernetesContainerLifecycle(
             foreach (var cause in causes.EnumerateArray())
             {
                 if (cause.TryGetProperty("reason", out var reason)
-                    && reason.GetString() == "ExitCode"
+                    && reason.GetString() == ExternalReasonExitCode
                     && cause.TryGetProperty("message", out var message)
                     && int.TryParse(message.GetString(), out var exitCode))
                     return exitCode;
@@ -1540,9 +1556,9 @@ public sealed class KubernetesContainerLifecycle(
 
     private static string JobKind(ContainerNetworkPurpose purpose) => purpose switch
     {
-        ContainerNetworkPurpose.AwdChecker => "awd-checker",
-        ContainerNetworkPurpose.AwdpVerification => "awdp-verification",
-        ContainerNetworkPurpose.PersistentRuntime => "persistent-runtime",
+        ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdChecker,
+        ContainerNetworkPurpose.AwdpVerification => NetworkPurposeAwdpVerification,
+        ContainerNetworkPurpose.PersistentRuntime => NetworkPurposePersistentRuntime,
         _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
     };
 }

@@ -107,7 +107,7 @@ public class CompetitionManagementTests
         var delete = await new DeleteCompetition(store).ExecuteAsync(store.Last.Id, Guid.NewGuid(), now);
 
         await Assert.That(update.Succeeded).IsTrue();
-        await Assert.That(delete.ErrorCode).IsEqualTo("competition_finished");
+        await Assert.That(delete.FailureCode).IsEqualTo(CompetitionManagementFailureCode.CompetitionFinished);
     }
 
     [Test]
@@ -118,7 +118,7 @@ public class CompetitionManagementTests
 
         var result = await new DeleteCompetition(store).ExecuteAsync(store.Last.Id, Guid.NewGuid(), now);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("competition_active");
+        await Assert.That(result.FailureCode).IsEqualTo(CompetitionManagementFailureCode.CompetitionActive);
     }
 
     private sealed class Store : ICompetitionManagementStore

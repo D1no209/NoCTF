@@ -25,7 +25,7 @@ public sealed class ChangePasswordValidator : Validator<ChangePasswordRequest>
     }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<ChangePasswordFailureCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<ChangePasswordFailureCode>))]
 public enum ChangePasswordFailureCode
 {
     CurrentPasswordInvalid

@@ -137,7 +137,7 @@ public sealed class UserProfilePersistenceTests
                 new StaleRefreshIssuer(new(userId, before.TokenVersion)))
                 .ExecuteAsync("old-refresh", cancellationToken);
             await Assert.That(refresh.Succeeded).IsFalse();
-            await Assert.That(refresh.ErrorCode).IsEqualTo("refresh_invalid");
+            await Assert.That(refresh.FailureCode).IsEqualTo(RefreshAccessTokenFailureCode.RefreshInvalid);
         });
     }
 

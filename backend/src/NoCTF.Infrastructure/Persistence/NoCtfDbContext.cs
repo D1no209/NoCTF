@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Runtime;
@@ -42,6 +43,31 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NoCtfDbContext).Assembly);
+        ApplyUtcDateTimeOffsetConversions(modelBuilder);
+    }
+
+    /// <summary>
+    /// Npgsql only accepts offset-0 DateTimeOffset values for timestamptz columns. API payloads may carry
+    /// local offsets (for example +08:00), so normalize every DateTimeOffset to UTC at the mapping layer;
+    /// this also covers ExecuteUpdateAsync, which bypasses SaveChanges interception. Column types are
+    /// unchanged, so this conversion produces no migration diff.
+    /// </summary>
+    private static void ApplyUtcDateTimeOffsetConversions(ModelBuilder modelBuilder)
+    {
+        var utcConverter = new ValueConverter<DateTimeOffset, DateTimeOffset>(
+            value => value.ToUniversalTime(),
+            value => value.ToUniversalTime());
+        var utcNullableConverter = new ValueConverter<DateTimeOffset?, DateTimeOffset?>(
+            value => value.HasValue ? value.Value.ToUniversalTime() : value,
+            value => value.HasValue ? value.Value.ToUniversalTime() : value);
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        foreach (var property in entityType.GetProperties())
+        {
+            if (property.ClrType == typeof(DateTimeOffset))
+                property.SetValueConverter(utcConverter);
+            else if (property.ClrType == typeof(DateTimeOffset?))
+                property.SetValueConverter(utcNullableConverter);
+        }
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

@@ -2,11 +2,36 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
 using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Teams;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<TeamRegistrationStatusProtocol>))]
+public enum TeamRegistrationStatusProtocol
+{
+    Pending,
+    Approved,
+    Rejected
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<TeamBanAppealStatusProtocol>))]
+public enum TeamBanAppealStatusProtocol
+{
+    Submitted,
+    Upheld,
+    Accepted
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<TeamBanSourceProtocol>))]
+public enum TeamBanSourceProtocol
+{
+    ManualModeration,
+    CheatIncident
+}
 
 public sealed class CreateTeamRequest
 {
@@ -28,7 +53,7 @@ public sealed record TeamResponse(
     string? AvatarUrl,
     Guid CaptainId,
     IReadOnlyList<Guid> MemberIds,
-    TeamRegistrationStatus RegistrationStatus,
+    TeamRegistrationStatusProtocol RegistrationStatus,
     bool IsLocked,
     bool IsBanned,
     DateTimeOffset RegisteredAt);
@@ -58,6 +83,17 @@ internal static partial class TeamMapper
         DateTimeOffset registeredAt);
     public static partial TeamResponse ToResponse(TeamView view);
     public static partial UpdateTeamCommand ToCommand(UpdateTeamRequest request);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial TeamRegistrationStatusProtocol ToProtocol(
+        TeamRegistrationStatus value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial TeamBanAppealStatusProtocol ToProtocol(
+        TeamBanAppealStatus value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial TeamBanSourceProtocol ToProtocol(TeamBanSource value);
 }
 
 public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user)
@@ -68,7 +104,7 @@ public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var result = await create.ExecuteAsync(TeamMapper.ToCommand(request, user.UserId, DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode == "competition_not_found") return TypedResults.NotFound();
+        if (result.FailureCode == TeamRegistrationFailure.CompetitionNotFound) return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Team was not created.", detail: result.ErrorMessage);
         var response = TeamMapper.ToResponse(result.Value!);
         return TypedResults.Created($"/competitions/{request.CompetitionId}/teams/{response.Id}", response);

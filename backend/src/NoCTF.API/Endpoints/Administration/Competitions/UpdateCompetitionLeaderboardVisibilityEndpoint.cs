@@ -2,16 +2,19 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
 public sealed class UpdateCompetitionLeaderboardVisibilityRequest
 {
-    public CompetitionLeaderboardVisibility? Visibility { get; set; }
+    public LeaderboardVisibilityProtocol? Visibility { get; set; }
     public DateTimeOffset? StartsAt { get; set; }
     public int? ExpectedRevision { get; set; }
     public string? Reason { get; set; }
@@ -28,9 +31,27 @@ public sealed class UpdateCompetitionLeaderboardVisibilityValidator
     }
 }
 
+ [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionVisibilityMutationCodeProtocol>))]
+public enum CompetitionVisibilityMutationCodeProtocol
+{
+    Updated,
+    NotFound,
+    RevisionConflict,
+    InvalidSchedule,
+    CompetitionFinished
+}
+
 public sealed record CompetitionLeaderboardVisibilityFailureResponse(
-    CompetitionVisibilityMutationState Code,
+    CompetitionVisibilityMutationCodeProtocol Code,
     CompetitionLeaderboardVisibilityResponse? Current);
+
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
+internal static partial class CompetitionVisibilityMutationMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial CompetitionVisibilityMutationCodeProtocol ToProtocol(
+        CompetitionVisibilityMutationState value);
+}
 
 public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
     UpdateCompetitionVisibility update,
@@ -69,7 +90,7 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
             return TypedResults.Forbid();
         var result = await update.ExecuteAsync(new(
             competitionId,
-            request.Visibility!.Value,
+            CompetitionProtocolMapper.ToDomain(request.Visibility!.Value),
             request.StartsAt,
             request.ExpectedRevision!.Value,
             user.UserId,
@@ -87,11 +108,13 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
                 title: "Leaderboard visibility schedule is invalid.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = result.State
+                    ["code"] = CompetitionVisibilityMutationMapper.ToProtocol(result.State)
                 }),
             CompetitionVisibilityMutationState.RevisionConflict
                 or CompetitionVisibilityMutationState.CompetitionFinished => TypedResults.Conflict(
-                    new CompetitionLeaderboardVisibilityFailureResponse(result.State, current)),
+                    new CompetitionLeaderboardVisibilityFailureResponse(
+                        CompetitionVisibilityMutationMapper.ToProtocol(result.State),
+                        current)),
             _ => throw new ArgumentOutOfRangeException(nameof(result.State), result.State, null)
         };
     }

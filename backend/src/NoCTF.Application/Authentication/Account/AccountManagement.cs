@@ -15,11 +15,22 @@ public sealed record RegisterUserResult(
     bool RequiresEmailVerification,
     bool VerificationEmailQueued);
 
+public enum RegisterUserFailureCode
+{
+    UserNameConflict,
+    EmailConflict
+}
+
+public enum LogoutAllFailureCode
+{
+    UserNotFound
+}
+
 public sealed class RegisterUser(
     IUserAuthenticationStore store,
     IEmailVerificationStore? emailVerification = null)
 {
-    public async Task<OperationResult<RegisterUserResult>> ExecuteAsync(
+    public async Task<OperationResult<RegisterUserResult, RegisterUserFailureCode>> ExecuteAsync(
         RegisterUserCommand command,
         CancellationToken ct = default)
     {
@@ -37,10 +48,10 @@ public sealed class RegisterUser(
             command.Now,
             ct);
         if (state != CreateUserState.Created)
-            return OperationResult<RegisterUserResult>.Failure(
+            return OperationResult<RegisterUserResult, RegisterUserFailureCode>.Failure(
                 state == CreateUserState.EmailConflict
-                    ? "email_conflict"
-                    : "username_conflict",
+                    ? RegisterUserFailureCode.EmailConflict
+                    : RegisterUserFailureCode.UserNameConflict,
                 "The requested account identifier is already in use.");
 
         var profile = new UserProfile(
@@ -51,12 +62,12 @@ public sealed class RegisterUser(
             UserKind.Human,
             EmailVerified: !requiresEmailVerification);
         if (!requiresEmailVerification || emailVerification is null)
-            return OperationResult<RegisterUserResult>.Success(new(profile, false, false));
+            return OperationResult<RegisterUserResult, RegisterUserFailureCode>.Success(new(profile, false, false));
 
         var verificationState = await emailVerification.IssueAsync(id, command.Now, ct);
         if (verificationState == EmailVerificationState.Disabled)
             profile = profile with { EmailVerified = true };
-        return OperationResult<RegisterUserResult>.Success(new(
+        return OperationResult<RegisterUserResult, RegisterUserFailureCode>.Success(new(
             profile,
             verificationState is not EmailVerificationState.Disabled,
             verificationState == EmailVerificationState.Issued));
@@ -107,11 +118,13 @@ public sealed class ChangePassword(IUserAuthenticationStore store)
 
 public sealed class LogoutAll(IUserAuthenticationStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<OperationResult<LogoutAllFailureCode>> ExecuteAsync(
         Guid userId,
         DateTimeOffset now,
         CancellationToken ct = default) =>
         await store.IncrementTokenVersionAsync(userId, now, ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure("user_not_found", "User was not found.");
+            ? OperationResult<LogoutAllFailureCode>.Success()
+            : OperationResult<LogoutAllFailureCode>.Failure(
+                LogoutAllFailureCode.UserNotFound,
+                "User was not found.");
 }

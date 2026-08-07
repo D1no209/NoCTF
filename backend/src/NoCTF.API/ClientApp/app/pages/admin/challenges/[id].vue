@@ -22,8 +22,9 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
-  NoCtfDomainChallengesChallengeVisibility2,
-  NoCtfDomainCompetitionsGameMode2,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
+  NoCtfapiEndpointsCompetitionsGameModeProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
 } from '~/api'
 
 definePageMeta({ middleware: 'auth' })
@@ -40,13 +41,13 @@ const template = ref<Template | null>(null)
 const loading = ref(true)
 const loadError = ref<string | null>(null)
 
-const MODE_NAMES: NoCtfDomainCompetitionsGameMode2[] = ['Ctf', 'Awd', 'Awdp', 'Koh']
+const MODE_NAMES: NoCtfapiEndpointsCompetitionsGameModeProtocol[] = ['Ctf', 'Awd', 'Awdp', 'Koh']
 
 // ---------- 基本信息 ----------
 const form = reactive({
   title: '',
-  mode: 'Ctf' as NoCtfDomainCompetitionsGameMode2,
-  visibility: 'Private' as NoCtfDomainChallengesChallengeVisibility2,
+  mode: 'Ctf' as NoCtfapiEndpointsCompetitionsGameModeProtocol,
+  visibility: 'Private' as NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
   direction: '',
   description: '',
   definitionJson: '{}',
@@ -55,22 +56,12 @@ const saving = ref(false)
 const deleting = ref(false)
 const restoring = ref(false)
 
-const definitionJsonError = computed(() => {
-  try {
-    JSON.parse(form.definitionJson)
-    return null
-  }
-  catch {
-    return '定义 JSON 格式错误'
-  }
-})
-
 const isDeleted = computed(() => !!template.value?.deletedAt)
 
 function syncForm(value: Template): void {
   form.title = value.title ?? ''
-  form.mode = MODE_NAMES[value.mode ?? 0] ?? 'Ctf'
-  form.visibility = value.visibility === 1 ? 'Shared' : 'Private'
+  form.mode = value.mode ?? 'Ctf'
+  form.visibility = value.visibility ?? 'Private'
   form.direction = value.direction ?? ''
   form.description = value.description ?? ''
   form.definitionJson = value.definitionJson ?? '{}'
@@ -94,7 +85,7 @@ async function loadTemplate(): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!template.value || definitionJsonError.value) return
+  if (!template.value) return
   saving.value = true
   const { data, error, response } = await adminChallengeBankUpdateTemplate({
     path: { challengeId },
@@ -285,10 +276,10 @@ const deletingFlag = ref<Flag | null>(null)
 const flagActionPending = ref(false)
 
 const SPECIFICATION_KINDS = [
-  { value: '0', label: '附件' },
-  { value: '1', label: 'AWD 轮次' },
-  { value: '2', label: '运行时定义' },
-  { value: '3', label: '提示' },
+  { value: 'Attachment', label: '附件' },
+  { value: 'AwdRound', label: 'AWD 轮次' },
+  { value: 'RuntimeDefinition', label: '运行时定义' },
+  { value: 'Hint', label: '提示' },
 ] as const
 
 async function loadFlags(): Promise<void> {
@@ -338,7 +329,7 @@ async function createFlag(): Promise<void> {
       teamId: flagForm.teamId.trim() || null,
       specificationKind: flagForm.specificationKind === ''
         ? null
-        : (Number(flagForm.specificationKind) as 0 | 1 | 2 | 3),
+        : flagForm.specificationKind as NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
       specificationId: flagForm.specificationId.trim() || null,
       validStart: toIso(flagForm.validStart),
       validUntil: toIso(flagForm.validUntil),
@@ -386,9 +377,9 @@ async function restoreFlag(flag: Flag): Promise<void> {
   await loadFlags()
 }
 
-function specificationKindLabel(kind?: number | null): string {
+function specificationKindLabel(kind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null): string {
   if (kind === null || kind === undefined) return '—'
-  return SPECIFICATION_KINDS[kind]?.label ?? String(kind)
+  return SPECIFICATION_KINDS.find(item => item.value === kind)?.label ?? String(kind)
 }
 
 // ---------- 权限 ----------
@@ -603,18 +594,10 @@ onMounted(() => {
                       <FieldLabel for="edit-description">题面</FieldLabel>
                       <Textarea id="edit-description" v-model="form.description" rows="8" :disabled="isDeleted" />
                     </Field>
-                    <Field :data-invalid="!!definitionJsonError || undefined">
-                      <FieldLabel for="edit-definition-json">定义 JSON</FieldLabel>
-                      <Textarea
-                        id="edit-definition-json"
-                        v-model="form.definitionJson"
-                        rows="10"
-                        class="font-mono text-sm"
-                        :aria-invalid="!!definitionJsonError || undefined"
-                        :disabled="isDeleted"
-                      />
+                    <Field>
+                      <FieldLabel>题目定义</FieldLabel>
+                      <DefinitionEditor v-model="form.definitionJson" :mode="form.mode" :disabled="isDeleted" />
                       <FieldDescription>Runtime / Checker / Flag 注入定义;修改对未来启动的实例生效。</FieldDescription>
-                      <FieldError v-if="definitionJsonError">{{ definitionJsonError }}</FieldError>
                     </Field>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                       <span>修订版本 {{ template.revision ?? 0 }}</span>
@@ -623,7 +606,7 @@ onMounted(() => {
                       <span v-if="template.deletedAt">删除 <AdminDateTime :value="template.deletedAt" /></span>
                     </div>
                     <Field v-if="!isDeleted" orientation="horizontal">
-                      <Button type="submit" :disabled="saving || !!definitionJsonError">
+                      <Button type="submit" :disabled="saving">
                         <Spinner v-if="saving" data-icon="inline-start" />
                         保存修改
                       </Button>
@@ -638,7 +621,7 @@ onMounted(() => {
             <Card>
               <CardHeader class="flex flex-row items-center justify-between gap-4">
                 <div class="flex items-center gap-2">
-                  <Switch id="attachments-include-deleted" v-model:checked="attachmentsIncludeDeleted" />
+                  <Switch id="attachments-include-deleted" v-model="attachmentsIncludeDeleted" />
                   <Label for="attachments-include-deleted">显示已删除</Label>
                 </div>
                 <div>
@@ -726,7 +709,7 @@ onMounted(() => {
             <Card>
               <CardHeader class="flex flex-row items-center justify-between gap-4">
                 <div class="flex items-center gap-2">
-                  <Switch id="flags-include-deleted" v-model:checked="flagsIncludeDeleted" />
+                  <Switch id="flags-include-deleted" v-model="flagsIncludeDeleted" />
                   <Label for="flags-include-deleted">显示已删除</Label>
                 </div>
                 <Button :disabled="isDeleted" @click="openFlagCreate">

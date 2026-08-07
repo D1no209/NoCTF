@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Permissions;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
@@ -13,7 +14,8 @@ public sealed class UpdateCompetitionPermissionsRequest
     public IReadOnlyList<Guid> ManagerIds { get; set; } = [];
     public IReadOnlyList<Guid> JudgeIds { get; set; } = [];
     public IReadOnlyList<Guid> ObserverIds { get; set; } = [];
-    public int? ExpectedPermissionRevision { get; set; }
+    [Required]
+    public int ExpectedPermissionRevision { get; set; } = -1;
 }
 
 public sealed class UpdateCompetitionPermissionsValidator
@@ -25,15 +27,16 @@ public sealed class UpdateCompetitionPermissionsValidator
         RuleFor(request => request.JudgeIds).NotNull();
         RuleFor(request => request.ObserverIds).NotNull();
         RuleFor(request => request.ExpectedPermissionRevision)
-            .NotNull()
-            .GreaterThanOrEqualTo(0);
+            .GreaterThanOrEqualTo(0)
+            .OverridePropertyName(nameof(UpdateCompetitionPermissionsRequest.ExpectedPermissionRevision))
+            .WithMessage("Expected permission revision is required and must be non-negative.");
         RuleForEach(request => request.ManagerIds).NotEmpty();
         RuleForEach(request => request.JudgeIds).NotEmpty();
         RuleForEach(request => request.ObserverIds).NotEmpty();
     }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionResourceManagerConflictCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionResourceManagerConflictCode>))]
 public enum CompetitionResourceManagerConflictCode
 {
     RolesOverlap,
@@ -67,7 +70,7 @@ internal static class UpdateCompetitionPermissionsMapper
             request.ManagerIds,
             request.JudgeIds,
             request.ObserverIds,
-            request.ExpectedPermissionRevision!.Value);
+            request.ExpectedPermissionRevision);
 }
 
 public sealed class UpdateCompetitionPermissionsEndpoint(

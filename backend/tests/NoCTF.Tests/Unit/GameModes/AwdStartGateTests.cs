@@ -37,9 +37,9 @@ public sealed class AwdStartGateTests
         var errors = await gate.ValidateAsync(competitionId);
 
         await Assert.That(errors).IsNotNull();
-        await Assert.That(errors!.Count(error => error.Code == "RuntimeQuotaInsufficient"))
+        await Assert.That(errors!.Count(error => error.Code == StartGateFailureCode.RuntimeQuotaInsufficient))
             .IsEqualTo(1);
-        await Assert.That(errors.Any(error => error.Code == "RuntimeDefinitionInvalid"))
+        await Assert.That(errors.Any(error => error.Code == StartGateFailureCode.RuntimeDefinitionInvalid))
             .IsFalse();
     }
 

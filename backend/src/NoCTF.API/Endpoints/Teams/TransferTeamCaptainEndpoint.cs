@@ -15,8 +15,8 @@ public sealed class TransferTeamCaptainEndpoint(TransferTeamCaptain transfer, IU
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(TransferTeamCaptainRequest request, CancellationToken ct)
     {
         var result = await transfer.ExecuteAsync(Route<Guid>("competitionId"), Route<Guid>("teamId"), user.UserId, request.NewCaptainId, ct);
-        if (result.ErrorCode is "team_not_found" or "member_not_found") return TypedResults.NotFound();
-        if (result.ErrorCode == "captain_only") return TypedResults.Forbid();
+        if (result.FailureCode is TeamMembershipFailure.TeamNotFound or TeamMembershipFailure.MemberNotFound) return TypedResults.NotFound();
+        if (result.FailureCode == TeamMembershipFailure.CaptainOnly) return TypedResults.Forbid();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Captain was not transferred.", detail: result.ErrorMessage);
         return TypedResults.NoContent();
     }

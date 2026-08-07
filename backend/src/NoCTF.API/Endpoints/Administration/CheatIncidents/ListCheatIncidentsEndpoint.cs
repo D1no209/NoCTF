@@ -3,13 +3,37 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Submissions;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Submissions.CheatIncidents;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Submissions;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.CheatIncidents;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CheatIncidentStatusProtocol>))]
+public enum CheatIncidentStatusProtocol
+{
+    Pending,
+    Confirmed,
+    Dismissed,
+    Superseded,
+    Corrected
+}
+
+[Mapper]
+internal static partial class CheatIncidentProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial CheatIncidentStatusProtocol ToProtocol(CheatIncidentStatus value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial CheatIncidentStatus ToDomain(CheatIncidentStatusProtocol value);
+}
 
 public sealed class ListCheatIncidentsRequest
 {
@@ -17,7 +41,7 @@ public sealed class ListCheatIncidentsRequest
     [QueryParam] public Guid? OwnerTeamId { get; set; }
     [QueryParam] public Guid? UserId { get; set; }
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
-    [QueryParam] public CheatIncidentStatus? Status { get; set; }
+    [QueryParam] public CheatIncidentStatusProtocol? Status { get; set; }
     [QueryParam] public DateTimeOffset From { get; set; }
     [QueryParam] public DateTimeOffset To { get; set; }
     [QueryParam] public string? Cursor { get; set; }
@@ -49,10 +73,10 @@ public sealed record CheatIncidentListItemResponse(
     string SubmittedByUserName,
     Guid CompetitionChallengeId,
     string ChallengeTitle,
-    SubmissionKind SubmissionKind,
-    ScoringResult Result,
-    ScoringFailureCode FailureCode,
-    CheatIncidentStatus Status,
+    SubmissionKindProtocol SubmissionKind,
+    ScoringResultProtocol Result,
+    ScoringFailureCodeProtocol FailureCode,
+    CheatIncidentStatusProtocol Status,
     Guid? ResolvedByUserId,
     string? ResolvedByUserName,
     DateTimeOffset? ResolvedAt,
@@ -113,7 +137,7 @@ public sealed class ListCheatIncidentsEndpoint(
             request.OwnerTeamId,
             request.UserId,
             request.CompetitionChallengeId,
-            request.Status,
+            request.Status is null ? null : CheatIncidentProtocolMapper.ToDomain(request.Status.Value),
             request.From,
             request.To,
             position?.CreatedAt,
@@ -169,10 +193,10 @@ public sealed class ListCheatIncidentsEndpoint(
         item.SubmittedByUserName,
         item.CompetitionChallengeId,
         item.ChallengeTitle,
-        item.SubmissionKind,
-        item.Result,
-        item.FailureCode,
-        item.Status,
+        SubmissionMapper.ToProtocol(item.SubmissionKind),
+        SubmissionMapper.ToProtocol(item.Result),
+        SubmissionMapper.ToProtocol(item.FailureCode),
+        CheatIncidentProtocolMapper.ToProtocol(item.Status),
         item.ResolvedByUserId,
         item.ResolvedByUserName,
         item.ResolvedAt,

@@ -129,7 +129,7 @@ async function changePassword() {
                 <Textarea id="description" v-model="description" rows="4" placeholder="介绍一下自己(可选)" />
               </Field>
               <Field orientation="horizontal">
-                <Switch id="isEmailPublic" v-model:checked="isEmailPublic" />
+                <Switch id="isEmailPublic" v-model="isEmailPublic" />
                 <FieldLabel for="isEmailPublic">在个人资料页公开邮箱</FieldLabel>
               </Field>
             </FieldGroup>

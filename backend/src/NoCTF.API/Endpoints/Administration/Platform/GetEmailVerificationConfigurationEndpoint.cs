@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.EmailVerification;
@@ -16,8 +15,7 @@ public sealed record EmailVerificationConfigurationResponse(
     int PasswordResetMaxRequestsPerHour,
     string SmtpHost,
     int SmtpPort,
-    [property: JsonConverter(typeof(SmtpSecurityModeJsonConverter))]
-    SmtpSecurityMode SmtpSecurityMode,
+    SmtpSecurityModeProtocol SmtpSecurityMode,
     string SmtpUserName,
     bool SmtpPasswordConfigured,
     string SmtpFromAddress,
@@ -40,7 +38,7 @@ internal static class EmailVerificationConfigurationMapping
             configuration.PasswordResetMaxRequestsPerHour,
             configuration.SmtpHost,
             configuration.SmtpPort,
-            configuration.SmtpSecurityMode,
+            SmtpSecurityModeProtocolMapper.ToProtocol(configuration.SmtpSecurityMode),
             configuration.SmtpUserName,
             configuration.SmtpPasswordConfigured,
             configuration.SmtpFromAddress,

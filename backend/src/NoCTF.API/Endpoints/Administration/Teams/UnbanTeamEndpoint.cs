@@ -49,9 +49,9 @@ public sealed class UnbanTeamEndpoint(
             DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
         {
-            var statusCode = result.ErrorCode == "competition_finished"
+            var statusCode = result.FailureCode == TeamModerationFailure.CompetitionFinished
                 ? StatusCodes.Status409Conflict
-                : result.ErrorCode is "competition_not_found" or "team_not_found"
+                : result.FailureCode is TeamModerationFailure.CompetitionNotFound or TeamModerationFailure.TeamNotFound
                     ? StatusCodes.Status404NotFound
                     : StatusCodes.Status400BadRequest;
             return TypedResults.Problem(statusCode: statusCode,

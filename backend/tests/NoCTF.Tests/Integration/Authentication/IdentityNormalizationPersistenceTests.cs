@@ -85,7 +85,7 @@ public sealed class IdentityNormalizationPersistenceTests
                     cancellationToken);
                 var login = await store.FindByLoginAsync("  pLaYeR_oNe  ", cancellationToken);
 
-                await Assert.That(duplicate.ErrorCode).IsEqualTo("username_conflict");
+                await Assert.That(duplicate.FailureCode).IsEqualTo(RegisterUserFailureCode.UserNameConflict);
                 await Assert.That(login!.Id).IsEqualTo(firstUserId);
             }
 
@@ -110,8 +110,8 @@ public sealed class IdentityNormalizationPersistenceTests
                     new(competitionId, secondUserId, "alpha", null, now.AddTicks(1)),
                     cancellationToken);
 
-                await Assert.That(duplicate.ErrorCode)
-                    .IsEqualTo("team_name_or_membership_conflict");
+                await Assert.That(duplicate.FailureCode)
+                    .IsEqualTo(TeamRegistrationFailure.TeamNameOrMembershipConflict);
             }
         });
     }

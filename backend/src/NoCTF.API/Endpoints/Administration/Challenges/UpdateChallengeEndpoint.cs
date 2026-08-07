@@ -30,7 +30,7 @@ public sealed class UpdateChallengeValidator : Validator<UpdateChallengeRequest>
     }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionChallengeConflictCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionChallengeConflictCode>))]
 public enum CompetitionChallengeConflictCode
 {
     ResourceIdConflict,

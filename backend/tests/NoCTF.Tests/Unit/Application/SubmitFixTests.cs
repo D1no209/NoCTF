@@ -21,7 +21,7 @@ public sealed class SubmitFixTests
             Guid.NewGuid(),
             DateTimeOffset.UtcNow));
 
-        await Assert.That(result.ErrorCode).IsEqualTo("break_required");
+        await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.BreakRequired);
         await Assert.That(store.FixWrites).IsEqualTo(0);
     }
 

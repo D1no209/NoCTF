@@ -2,19 +2,52 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Competitions;
+using NoCTF.API.Endpoints.Competitions.Events;
+using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.Teams;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Submissions;
 using NoCTF.API.Pagination;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformAuditKindProtocol>))]
+public enum PlatformAuditKindProtocol
+{
+    CompetitionLifecycle,
+    UserAccountLifecycle,
+    CompetitionLeaderboardVisibility,
+    CompetitionEvent
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<UserAccountLifecycleActionProtocol>))]
+public enum UserAccountLifecycleActionProtocol
+{
+    Banned,
+    Disabled,
+    Anonymized,
+    PhysicallyDeleted
+}
+
+[Mapper]
+internal static partial class PlatformAuditProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial PlatformAuditKindProtocol ToProtocol(PlatformAuditKind value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial PlatformAuditKind ToDomain(PlatformAuditKindProtocol value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial UserAccountLifecycleActionProtocol ToProtocol(UserAccountLifecycleAction value);
+}
 
 public sealed class ListPlatformAuditLogsRequest
 {
     [QueryParam]
-    public PlatformAuditKind? Kind { get; set; }
+    public PlatformAuditKindProtocol? Kind { get; set; }
     [QueryParam]
     public DateTimeOffset? From { get; set; }
     [QueryParam]
@@ -46,18 +79,18 @@ public sealed class ListPlatformAuditLogsValidator : Validator<ListPlatformAudit
 
 public sealed record PlatformAuditLogResponse(
     Guid Id,
-    PlatformAuditKind Kind,
+    PlatformAuditKindProtocol Kind,
     Guid SubjectId,
     Guid? CompetitionId,
     Guid? ActorId,
-    CompetitionStatus? FromCompetitionStatus,
-    CompetitionStatus? ToCompetitionStatus,
-    CompetitionLeaderboardVisibility? FromLeaderboardVisibility,
-    CompetitionLeaderboardVisibility? ToLeaderboardVisibility,
-    UserAccountLifecycleAction? UserAccountAction,
-    CompetitionEventKind? CompetitionEventKind,
-    CompetitionEventLevel? CompetitionEventLevel,
-    CompetitionEventVisibility? CompetitionEventVisibility,
+    CompetitionStatusProtocol? FromCompetitionStatus,
+    CompetitionStatusProtocol? ToCompetitionStatus,
+    LeaderboardVisibilityProtocol? FromLeaderboardVisibility,
+    LeaderboardVisibilityProtocol? ToLeaderboardVisibility,
+    UserAccountLifecycleActionProtocol? UserAccountAction,
+    CompetitionEventKindProtocol? CompetitionEventKind,
+    CompetitionEventLevelProtocol? CompetitionEventLevel,
+    CompetitionEventVisibilityProtocol? CompetitionEventVisibility,
     Guid? RelatedUserId,
     Guid? TeamId,
     Guid? CompetitionChallengeId,
@@ -65,10 +98,10 @@ public sealed record PlatformAuditLogResponse(
     Guid? SubmissionId,
     Guid? ScoringEventId,
     Guid? QuestionId,
-    SubmissionKind? SubmissionKind,
-    SubmissionEvaluationState? SubmissionState,
-    ScoringEventKind? ScoringEventKind,
-    ScoringResult? ScoringResult,
+    SubmissionKindProtocol? SubmissionKind,
+    SubmissionEvaluationStateProtocol? SubmissionState,
+    ScoringEventKindProtocol? ScoringEventKind,
+    ScoringResultProtocol? ScoringResult,
     string? SubjectDisplayName,
     string? Reason,
     bool Automatic,
@@ -114,7 +147,7 @@ public sealed class ListPlatformAuditLogsEndpoint(
         }
         var items = await platform.QueryAuditsAsync(
                 new(
-                    request.Kind,
+                    request.Kind is null ? null : PlatformAuditProtocolMapper.ToDomain(request.Kind.Value),
                     request.From,
                     request.To,
                     request.CompetitionId,
@@ -126,18 +159,18 @@ public sealed class ListPlatformAuditLogsEndpoint(
         var responses = items
             .Select(view => new PlatformAuditLogResponse(
                 view.Id,
-                view.Kind,
+                PlatformAuditProtocolMapper.ToProtocol(view.Kind),
                 view.SubjectId,
                 view.CompetitionId,
                 view.ActorId,
-                view.FromCompetitionStatus,
-                view.ToCompetitionStatus,
-                view.FromLeaderboardVisibility,
-                view.ToLeaderboardVisibility,
-                view.UserAccountAction,
-                view.CompetitionEventKind,
-                view.CompetitionEventLevel,
-                view.CompetitionEventVisibility,
+                view.FromCompetitionStatus is null ? null : CompetitionProtocolMapper.ToProtocol(view.FromCompetitionStatus.Value),
+                view.ToCompetitionStatus is null ? null : CompetitionProtocolMapper.ToProtocol(view.ToCompetitionStatus.Value),
+                view.FromLeaderboardVisibility is null ? null : CompetitionProtocolMapper.ToProtocol(view.FromLeaderboardVisibility.Value),
+                view.ToLeaderboardVisibility is null ? null : CompetitionProtocolMapper.ToProtocol(view.ToLeaderboardVisibility.Value),
+                view.UserAccountAction is null ? null : PlatformAuditProtocolMapper.ToProtocol(view.UserAccountAction.Value),
+                view.CompetitionEventKind is null ? null : CompetitionEventProtocolMapper.ToProtocol(view.CompetitionEventKind.Value),
+                view.CompetitionEventLevel is null ? null : CompetitionEventProtocolMapper.ToProtocol(view.CompetitionEventLevel.Value),
+                view.CompetitionEventVisibility is null ? null : CompetitionEventProtocolMapper.ToProtocol(view.CompetitionEventVisibility.Value),
                 view.RelatedUserId,
                 view.TeamId,
                 view.CompetitionChallengeId,
@@ -145,10 +178,10 @@ public sealed class ListPlatformAuditLogsEndpoint(
                 view.SubmissionId,
                 view.ScoringEventId,
                 view.QuestionId,
-                view.SubmissionKind,
-                view.SubmissionState,
-                view.ScoringEventKind,
-                view.ScoringResult,
+                view.SubmissionKind is null ? null : SubmissionMapper.ToProtocol(view.SubmissionKind.Value),
+                view.SubmissionState is null ? null : SubmissionMapper.ToProtocol(view.SubmissionState.Value),
+                view.ScoringEventKind is null ? null : CompetitionEventProtocolMapper.ToProtocol(view.ScoringEventKind.Value),
+                view.ScoringResult is null ? null : SubmissionMapper.ToProtocol(view.ScoringResult.Value),
                 view.SubjectDisplayName,
                 view.Reason,
                 view.Automatic,

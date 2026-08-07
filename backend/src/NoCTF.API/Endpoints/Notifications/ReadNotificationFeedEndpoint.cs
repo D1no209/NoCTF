@@ -67,7 +67,7 @@ public sealed class ReadNotificationFeedEndpoint(
                 title: "Invalid cursor.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "cursor_invalid"
+                    ["code"] = NotificationFailureCode.CursorInvalid
                 });
         }
 
@@ -96,7 +96,7 @@ public sealed class ReadNotificationFeedEndpoint(
                 item.Id,
                 item.CompetitionId,
                 item.EntityId,
-                item.Kind,
+                NotificationProtocolMapper.ToProtocol(item.Kind),
                 JsonSerializer.Deserialize<JsonElement>(item.PayloadJson),
                 item.CreatedAt)).ToArray(),
             Encode(cursorScope, next)));

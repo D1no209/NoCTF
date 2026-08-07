@@ -120,7 +120,7 @@ async function downloadExport(item: NoCtfapiEndpointsAdministrationDataExportsDa
   }
 }
 
-const hasActive = computed(() => exports_.value.some(e => e.status === 0 || e.status === 1))
+const hasActive = computed(() => exports_.value.some(e => e.status === 'Queued' || e.status === 'Processing'))
 
 onMounted(loadExports)
 </script>
@@ -160,7 +160,7 @@ onMounted(loadExports)
             <Input id="ex-reason" v-model="exportReason" class="w-72" placeholder="记入审计" />
           </Field>
           <Field orientation="horizontal">
-            <Checkbox id="ex-flags" v-model:checked="includeProtectedFlags" />
+            <Checkbox id="ex-flags" v-model="includeProtectedFlags" />
             <FieldLabel for="ex-flags" class="font-normal">包含受保护的 Flag</FieldLabel>
           </Field>
           <Button :disabled="creating" @click="createExport">
@@ -201,7 +201,7 @@ onMounted(loadExports)
             <TableRow v-for="e in exports_" :key="e.id">
               <TableCell>{{ adminFormatDateTime(e.requestedAt) }}</TableCell>
               <TableCell>
-                <Badge :variant="e.status === 2 ? 'default' : e.status === 3 ? 'destructive' : 'secondary'">
+                  <Badge :variant="e.status === 'Available' ? 'default' : e.status === 'Failed' ? 'destructive' : 'secondary'">
                   {{ enumLabel(DataExportStatusLabel, e.status) }}
                 </Badge>
               </TableCell>
@@ -214,7 +214,7 @@ onMounted(loadExports)
               <TableCell>{{ adminFormatDateTime(e.expiresAt) }}</TableCell>
               <TableCell class="text-right">
                 <Button
-                  v-if="e.status === 2"
+                  v-if="e.status === 'Available'"
                   variant="outline"
                   size="sm"
                   :disabled="downloadingId === e.id"

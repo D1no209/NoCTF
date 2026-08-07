@@ -10,23 +10,33 @@ public sealed record CompetitionLifecycleTransition(
 
 public static class CompetitionLifecyclePolicy
 {
-    public static OperationResult ValidateSchedule(DateTimeOffset startTime, DateTimeOffset endTime)
+    public enum FailureCode
     {
-        return startTime < endTime
-            ? OperationResult.Success()
-            : OperationResult.Failure("invalid_schedule", "Competition start time must be before its end time.");
+        InvalidSchedule,
+        InvalidLifecycleTransition
     }
 
-    public static OperationResult ValidateTransition(CompetitionStatus from, CompetitionStatus to) =>
+    public static OperationResult<FailureCode> ValidateSchedule(DateTimeOffset startTime, DateTimeOffset endTime)
+    {
+        return startTime < endTime
+            ? OperationResult<FailureCode>.Success()
+            : OperationResult<FailureCode>.Failure(
+                FailureCode.InvalidSchedule,
+                "Competition start time must be before its end time.");
+    }
+
+    public static OperationResult<FailureCode> ValidateTransition(CompetitionStatus from, CompetitionStatus to) =>
         (from, to) switch
         {
-            (CompetitionStatus.Draft, CompetitionStatus.Visible) => OperationResult.Success(),
-            (CompetitionStatus.Visible, CompetitionStatus.Published) => OperationResult.Success(),
-            (CompetitionStatus.Published, CompetitionStatus.Visible) => OperationResult.Success(),
-            (CompetitionStatus.Published, CompetitionStatus.Running) => OperationResult.Success(),
-            (CompetitionStatus.Running, CompetitionStatus.Paused) => OperationResult.Success(),
-            (CompetitionStatus.Paused, CompetitionStatus.Running) => OperationResult.Success(),
-            (CompetitionStatus.Published or CompetitionStatus.Running or CompetitionStatus.Paused, CompetitionStatus.Finished) => OperationResult.Success(),
-            _ => OperationResult.Failure("invalid_lifecycle_transition", $"Cannot transition competition from {from} to {to}.")
+            (CompetitionStatus.Draft, CompetitionStatus.Visible) => OperationResult<FailureCode>.Success(),
+            (CompetitionStatus.Visible, CompetitionStatus.Published) => OperationResult<FailureCode>.Success(),
+            (CompetitionStatus.Published, CompetitionStatus.Visible) => OperationResult<FailureCode>.Success(),
+            (CompetitionStatus.Published, CompetitionStatus.Running) => OperationResult<FailureCode>.Success(),
+            (CompetitionStatus.Running, CompetitionStatus.Paused) => OperationResult<FailureCode>.Success(),
+            (CompetitionStatus.Paused, CompetitionStatus.Running) => OperationResult<FailureCode>.Success(),
+            (CompetitionStatus.Published or CompetitionStatus.Running or CompetitionStatus.Paused, CompetitionStatus.Finished) => OperationResult<FailureCode>.Success(),
+            _ => OperationResult<FailureCode>.Failure(
+                FailureCode.InvalidLifecycleTransition,
+                $"Cannot transition competition from {from} to {to}.")
         };
 }

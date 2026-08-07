@@ -13,28 +13,37 @@ public sealed record RefreshAccessTokenResult(
     DateTimeOffset AccessTokenExpiresAt,
     string RefreshToken);
 
+public enum RefreshAccessTokenFailureCode
+{
+    RefreshInvalid,
+    UserNotFound
+}
+
 public sealed class RefreshAccessToken(IUserAuthenticationStore store, IAccessTokenIssuer issuer)
 {
-    public async Task<OperationResult<RefreshAccessTokenResult>> ExecuteAsync(
+    public async Task<OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>> ExecuteAsync(
         string refreshToken,
         CancellationToken cancellationToken = default)
     {
         var principal = issuer.ValidateRefresh(refreshToken);
         if (principal is null)
-            return OperationResult<RefreshAccessTokenResult>.Failure("refresh_invalid", "Refresh token is invalid.");
+            return OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>.Failure(
+                RefreshAccessTokenFailureCode.RefreshInvalid, "Refresh token is invalid.");
 
         var user = await store.FindByIdAsync(principal.UserId, cancellationToken);
         if (user is null)
-            return OperationResult<RefreshAccessTokenResult>.Failure("user_not_found", "User no longer exists.");
+            return OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>.Failure(
+                RefreshAccessTokenFailureCode.UserNotFound, "User no longer exists.");
         if (user.Kind != UserKind.Human)
-            return OperationResult<RefreshAccessTokenResult>.Failure(
-                "refresh_invalid",
+            return OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>.Failure(
+                RefreshAccessTokenFailureCode.RefreshInvalid,
                 "Refresh token is no longer valid.");
         if (user.TokenVersion != principal.TokenVersion)
-            return OperationResult<RefreshAccessTokenResult>.Failure("refresh_invalid", "Refresh token is no longer valid.");
+            return OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>.Failure(
+                RefreshAccessTokenFailureCode.RefreshInvalid, "Refresh token is no longer valid.");
         var access = issuer.Issue(user, DateTimeOffset.UtcNow);
         var replacement = issuer.IssueRefresh(user);
-        return OperationResult<RefreshAccessTokenResult>.Success(
+        return OperationResult<RefreshAccessTokenResult, RefreshAccessTokenFailureCode>.Success(
             new(
                 user.Id,
                 user.UserName,

@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using NoCTF.API.Endpoints.Administration.Competitions;
 using NoCTF.API.Endpoints.Competitions;
-using NoCTF.Domain.Identity;
+using NoCTF.API.Endpoints.Authentication;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -62,8 +62,8 @@ public sealed class CompetitionPermissionProtocolTests
             .IsEquivalentTo(["Id", "UserName", "Kind", "Role", "EmailVerified"]);
         await Assert.That(properties["Id"].PropertyType).IsEqualTo(typeof(Guid));
         await Assert.That(properties["UserName"].PropertyType).IsEqualTo(typeof(string));
-        await Assert.That(properties["Kind"].PropertyType).IsEqualTo(typeof(UserKind));
-        await Assert.That(properties["Role"].PropertyType).IsEqualTo(typeof(UserRole));
+        await Assert.That(properties["Kind"].PropertyType).IsEqualTo(typeof(UserKindProtocol));
+        await Assert.That(properties["Role"].PropertyType).IsEqualTo(typeof(UserRoleProtocol));
         await Assert.That(properties["EmailVerified"].PropertyType).IsEqualTo(typeof(bool));
 
         var items = listType!.GetProperty("Items", BindingFlags.Public | BindingFlags.Instance);

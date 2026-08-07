@@ -9,7 +9,7 @@ import {
 import type {
   NoCtfapiEndpointsAdministrationDataExportsDataExportResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse,
-  NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind,
+  NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
 } from '~/api'
 import { downloadProtectedFile } from '~/utils/download'
 
@@ -18,29 +18,17 @@ definePageMeta({ middleware: 'platform-admin' })
 type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
 type DataExport = NoCtfapiEndpointsAdministrationDataExportsDataExportResponse
 
-const KIND_LABELS: Record<number, string> = {
-  0: '竞赛生命周期',
-  1: '账户生命周期',
-  2: '榜单可见性',
-  3: '竞赛事件',
+const KIND_LABELS: Record<string, string> = {
+  CompetitionLifecycle: '竞赛生命周期', UserAccountLifecycle: '账户生命周期', CompetitionLeaderboardVisibility: '榜单可见性', CompetitionEvent: '竞赛事件',
 }
-const EXPORT_STATUS: Record<number, { label: string; variant: 'secondary' | 'outline' | 'destructive' | 'default' }> = {
-  0: { label: '排队中', variant: 'outline' },
-  1: { label: '处理中', variant: 'secondary' },
-  2: { label: '可下载', variant: 'default' },
-  3: { label: '失败', variant: 'destructive' },
-  4: { label: '已过期', variant: 'outline' },
+const EXPORT_STATUS: Record<string, { label: string; variant: 'secondary' | 'outline' | 'destructive' | 'default' }> = {
+  Queued: { label: '排队中', variant: 'outline' }, Processing: { label: '处理中', variant: 'secondary' }, Available: { label: '可下载', variant: 'default' }, Failed: { label: '失败', variant: 'destructive' }, Expired: { label: '已过期', variant: 'outline' },
 }
-const COMPETITION_STATUS_LABELS: Record<number, string> = {
-  0: '草稿',
-  1: '可见',
-  2: '已发布',
-  3: '进行中',
-  4: '已暂停',
-  5: '已结束',
+const COMPETITION_STATUS_LABELS: Record<string, string> = {
+  Draft: '草稿', Visible: '可见', Published: '已发布', Running: '进行中', Paused: '已暂停', Finished: '已结束',
 }
-const VISIBILITY_LABELS: Record<number, string> = { 0: '正常', 1: '冻结', 2: '封榜' }
-const ACCOUNT_ACTION_LABELS: Record<number, string> = { 0: '封禁', 1: '禁用', 2: '匿名化', 3: '物理删除' }
+const VISIBILITY_LABELS: Record<string, string> = { Normal: '正常', Frozen: '冻结', Blackout: '封榜' }
+const ACCOUNT_ACTION_LABELS: Record<string, string> = { Banned: '封禁', Disabled: '禁用', Anonymized: '匿名化', PhysicallyDeleted: '物理删除' }
 
 const kind = ref('all')
 const actorId = ref('')
@@ -59,7 +47,7 @@ const { items, loading, hasMore, initialized, loadMore, reset } = useCursorPagin
     query: {
       kind: kind.value === 'all'
         ? null
-        : (Number(kind.value) as NoCtfApplicationAdministrationPlatformLogsPlatformAuditKind),
+        : kind.value as NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
       from: toIso(from.value),
       to: toIso(to.value),
       actorId: actorId.value.trim() || null,
@@ -78,17 +66,17 @@ function applyFilters(): void {
 }
 
 function detailText(log: AuditLog): string {
-  if (log.kind === 0 && log.fromCompetitionStatus !== null && log.fromCompetitionStatus !== undefined) {
-    const fromLabel = COMPETITION_STATUS_LABELS[log.fromCompetitionStatus] ?? log.fromCompetitionStatus
-    const toLabel = COMPETITION_STATUS_LABELS[log.toCompetitionStatus ?? -1] ?? log.toCompetitionStatus
+  if (log.kind === 'CompetitionLifecycle' && log.fromCompetitionStatus !== null && log.fromCompetitionStatus !== undefined) {
+    const fromLabel = COMPETITION_STATUS_LABELS[String(log.fromCompetitionStatus)] ?? log.fromCompetitionStatus
+    const toLabel = COMPETITION_STATUS_LABELS[String(log.toCompetitionStatus)] ?? log.toCompetitionStatus
     return `状态 ${fromLabel} → ${toLabel}`
   }
-  if (log.kind === 1 && log.userAccountAction !== null && log.userAccountAction !== undefined) {
-    return ACCOUNT_ACTION_LABELS[log.userAccountAction] ?? String(log.userAccountAction)
+  if (log.kind === 'UserAccountLifecycle' && log.userAccountAction !== null && log.userAccountAction !== undefined) {
+    return ACCOUNT_ACTION_LABELS[String(log.userAccountAction)] ?? String(log.userAccountAction)
   }
-  if (log.kind === 2 && log.fromLeaderboardVisibility !== null && log.fromLeaderboardVisibility !== undefined) {
-    const fromLabel = VISIBILITY_LABELS[log.fromLeaderboardVisibility] ?? log.fromLeaderboardVisibility
-    const toLabel = VISIBILITY_LABELS[log.toLeaderboardVisibility ?? -1] ?? log.toLeaderboardVisibility
+  if (log.kind === 'CompetitionLeaderboardVisibility' && log.fromLeaderboardVisibility !== null && log.fromLeaderboardVisibility !== undefined) {
+    const fromLabel = VISIBILITY_LABELS[String(log.fromLeaderboardVisibility)] ?? log.fromLeaderboardVisibility
+    const toLabel = VISIBILITY_LABELS[String(log.toLeaderboardVisibility)] ?? log.toLeaderboardVisibility
     return `可见性 ${fromLabel} → ${toLabel}`
   }
   return log.reason ?? '—'
@@ -158,10 +146,10 @@ onMounted(() => {
             <SelectContent>
               <SelectGroup>
                 <SelectItem value="all">全部类型</SelectItem>
-                <SelectItem value="0">竞赛生命周期</SelectItem>
-                <SelectItem value="1">账户生命周期</SelectItem>
-                <SelectItem value="2">榜单可见性</SelectItem>
-                <SelectItem value="3">竞赛事件</SelectItem>
+                <SelectItem value="CompetitionLifecycle">竞赛生命周期</SelectItem>
+                <SelectItem value="UserAccountLifecycle">账户生命周期</SelectItem>
+                <SelectItem value="CompetitionLeaderboardVisibility">榜单可见性</SelectItem>
+                <SelectItem value="CompetitionEvent">竞赛事件</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -215,7 +203,7 @@ onMounted(() => {
                 <AdminDateTime :value="log.occurredAt" />
               </TableCell>
               <TableCell>
-                <Badge variant="secondary">{{ KIND_LABELS[log.kind ?? 0] ?? log.kind }}</Badge>
+                <Badge variant="secondary">{{ KIND_LABELS[String(log.kind)] ?? log.kind }}</Badge>
                 <Badge v-if="log.automatic" variant="outline" class="ml-1">自动</Badge>
               </TableCell>
               <TableCell class="max-w-56">
@@ -281,8 +269,8 @@ onMounted(() => {
                 <AdminDateTime :value="item.requestedAt" />
               </TableCell>
               <TableCell>
-                <Badge :variant="EXPORT_STATUS[item.status ?? 0]?.variant ?? 'outline'">
-                  {{ EXPORT_STATUS[item.status ?? 0]?.label ?? item.status }}
+                <Badge :variant="EXPORT_STATUS[String(item.status)]?.variant ?? 'outline'">
+                  {{ EXPORT_STATUS[String(item.status)]?.label ?? item.status }}
                 </Badge>
                 <p v-if="item.failureDetail" class="mt-1 text-xs text-destructive" :title="item.failureDetail">
                   {{ item.failureDetail }}
@@ -296,7 +284,7 @@ onMounted(() => {
               </TableCell>
               <TableCell class="text-right">
                 <Button
-                  v-if="item.status === 2"
+                  v-if="item.status === 'Available'"
                   size="sm"
                   variant="outline"
                   :disabled="downloadingId === item.id"

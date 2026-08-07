@@ -5,26 +5,23 @@ import { adminPlatformListLogs } from '~/api'
 import { downloadProtectedFile } from '~/utils/download'
 import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse,
-  NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel,
-  NoCtfApplicationAdministrationPlatformLogsPlatformLogService,
+  NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol,
+  NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol,
 } from '~/api'
 
 definePageMeta({ middleware: 'platform-admin' })
 
 type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
 
-const LEVEL_LABELS: Record<number, string> = {
-  0: '跟踪',
-  1: '调试',
-  2: '信息',
-  3: '警告',
-  4: '错误',
-  5: '严重',
+const LEVEL_LABELS: Record<string, string> = {
+  Trace: '跟踪', Debug: '调试', Information: '信息', Warning: '警告', Error: '错误', Critical: '严重',
 }
-const SERVICE_LABELS: Record<number, string> = { 0: 'API', 1: 'Worker', 2: 'Runner' }
+const SERVICE_LABELS: Record<string, string> = { Api: 'API', Worker: 'Worker', Runner: 'Runner' }
+const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Critical'] as const
+const levelOrdinal = (level?: string | number) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
 const LIVE_LIMIT = 200
 
-const minimumLevel = ref('2')
+const minimumLevel = ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Information')
 const service = ref('all')
 const search = ref('')
 const from = ref('')
@@ -40,10 +37,10 @@ function toIso(local: string): string | null {
 const { items, loading, hasMore, initialized, loadMore, reset } = useCursorPagination<PlatformLog>(async (cursor) => {
   const { data, error } = await adminPlatformListLogs({
     query: {
-      minimumLevel: Number(minimumLevel.value) as NoCtfApplicationAdministrationPlatformLogsPlatformLogLevel,
+      minimumLevel: minimumLevel.value,
       service: service.value === 'all'
         ? null
-        : (Number(service.value) as NoCtfApplicationAdministrationPlatformLogsPlatformLogService),
+        : service.value as NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol,
       from: toIso(from.value),
       to: toIso(to.value),
       search: search.value.trim() || null,
@@ -71,8 +68,8 @@ const { state: hubState, start, stop } = usePlatformLogHub((log) => {
 })
 
 function matchesLiveFilters(log: PlatformLog): boolean {
-  if ((log.level ?? 0) < Number(minimumLevel.value)) return false
-  if (service.value !== 'all' && log.service !== Number(service.value)) return false
+  if (levelOrdinal(log.level) < levelOrdinal(minimumLevel.value)) return false
+  if (service.value !== 'all' && log.service !== service.value) return false
   const keyword = search.value.trim().toLowerCase()
   if (keyword) {
     const haystack = `${log.message ?? ''} ${log.category ?? ''}`.toLowerCase()
@@ -144,12 +141,12 @@ onMounted(() => {
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="0">跟踪</SelectItem>
-              <SelectItem value="1">调试</SelectItem>
-              <SelectItem value="2">信息</SelectItem>
-              <SelectItem value="3">警告</SelectItem>
-              <SelectItem value="4">错误</SelectItem>
-              <SelectItem value="5">严重</SelectItem>
+              <SelectItem value="Trace">跟踪</SelectItem>
+              <SelectItem value="Debug">调试</SelectItem>
+              <SelectItem value="Information">信息</SelectItem>
+              <SelectItem value="Warning">警告</SelectItem>
+              <SelectItem value="Error">错误</SelectItem>
+              <SelectItem value="Critical">严重</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -163,9 +160,9 @@ onMounted(() => {
           <SelectContent>
             <SelectGroup>
               <SelectItem value="all">全部</SelectItem>
-              <SelectItem value="0">API</SelectItem>
-              <SelectItem value="1">Worker</SelectItem>
-              <SelectItem value="2">Runner</SelectItem>
+              <SelectItem value="Api">API</SelectItem>
+              <SelectItem value="Worker">Worker</SelectItem>
+              <SelectItem value="Runner">Runner</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
@@ -193,7 +190,7 @@ onMounted(() => {
     </div>
 
     <div class="flex items-center gap-3">
-      <Switch id="live-stream" v-model:checked="live" />
+      <Switch id="live-stream" v-model="live" />
       <Label for="live-stream" class="inline-flex items-center gap-1">
         <Radio class="size-4" />
         实时接收新日志
@@ -231,11 +228,11 @@ onMounted(() => {
               <AdminDateTime :value="log.timestamp" />
             </TableCell>
             <TableCell>
-              <Badge :variant="(log.level ?? 0) >= 4 ? 'destructive' : (log.level ?? 0) === 3 ? 'secondary' : 'outline'">
-                {{ LEVEL_LABELS[log.level ?? 0] ?? log.level }}
+              <Badge :variant="levelOrdinal(log.level) >= 4 ? 'destructive' : log.level === 'Warning' ? 'secondary' : 'outline'">
+                {{ LEVEL_LABELS[String(log.level)] ?? log.level }}
               </Badge>
             </TableCell>
-            <TableCell class="text-muted-foreground">{{ SERVICE_LABELS[log.service ?? 0] ?? log.service }}</TableCell>
+            <TableCell class="text-muted-foreground">{{ SERVICE_LABELS[String(log.service)] ?? log.service }}</TableCell>
             <TableCell class="max-w-56 truncate text-sm text-muted-foreground" :title="log.category">
               {{ log.category }}
             </TableCell>

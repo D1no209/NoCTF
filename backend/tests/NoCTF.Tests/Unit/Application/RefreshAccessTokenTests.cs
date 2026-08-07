@@ -18,7 +18,7 @@ public sealed class RefreshAccessTokenTests
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.ErrorCode).IsEqualTo("refresh_invalid");
+        await Assert.That(result.FailureCode).IsEqualTo(RefreshAccessTokenFailureCode.RefreshInvalid);
     }
 
     [Test]
@@ -47,7 +47,7 @@ public sealed class RefreshAccessTokenTests
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.ErrorCode).IsEqualTo("refresh_invalid");
+        await Assert.That(result.FailureCode).IsEqualTo(RefreshAccessTokenFailureCode.RefreshInvalid);
     }
 
     private sealed class Store(AuthenticatedUser user) : IUserAuthenticationStore

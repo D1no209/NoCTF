@@ -9,14 +9,14 @@ import {
 import type {
   NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
-  NoCtfDomainIdentityUserRole2,
+  NoCtfapiEndpointsAuthenticationUserRoleProtocol,
 } from '~/api'
 
 definePageMeta({ middleware: 'platform-admin' })
 
 type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 
-const ROLE_LABELS: Record<number, string> = { 0: '用户', 1: '组织者', 2: '管理员' }
+const ROLE_LABELS: Record<string, string> = { User: '用户', Organizer: '组织者', Administrator: '管理员' }
 
 const bots = ref<PlatformUser[]>([])
 const loading = ref(true)
@@ -31,14 +31,14 @@ async function load(): Promise<void> {
     loadError.value = parseApiError(error).message
     return
   }
-  bots.value = (data?.items ?? []).filter(user => user.kind === 1)
+  bots.value = (data?.items ?? []).filter(user => user.kind === 'Bot')
 }
 
 // ---------- 创建 ----------
 const createOpen = ref(false)
 const creating = ref(false)
 const botName = ref('')
-const botRole = ref<NoCtfDomainIdentityUserRole2>('User')
+const botRole = ref<NoCtfapiEndpointsAuthenticationUserRoleProtocol>('User')
 
 function openCreate(): void {
   botName.value = ''
@@ -153,8 +153,8 @@ onMounted(() => {
               </span>
             </TableCell>
             <TableCell>
-              <Badge :variant="bot.role === 2 ? 'default' : 'secondary'">
-                {{ ROLE_LABELS[bot.role ?? 0] ?? bot.role }}
+              <Badge :variant="bot.role === 'Administrator' ? 'default' : 'secondary'">
+                {{ ROLE_LABELS[String(bot.role)] ?? bot.role }}
               </Badge>
             </TableCell>
             <TableCell>

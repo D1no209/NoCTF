@@ -22,15 +22,16 @@ import type {
   NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse,
   NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
-  NoCtfDomainChallengesSpecificationKind,
+  NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
+import type { GameModeValue } from '~/utils/game-config'
 
 definePageMeta({ middleware: 'auth' })
 
 const route = useRoute()
 const ccId = route.params.ccId as string
-const { competitionId, canWrite } = useCompetitionAdmin()
+const { competitionId, competition, canWrite } = useCompetitionAdmin()
 
 // ---- Challenge detail ----
 const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
@@ -168,7 +169,7 @@ async function saveFlag() {
     teamId: flagForm.value.teamId.trim() || null,
     specificationKind: flagForm.value.specificationKind === ''
       ? null
-      : Number(flagForm.value.specificationKind) as NoCtfDomainChallengesSpecificationKind,
+      : flagForm.value.specificationKind as NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
     specificationId: flagForm.value.specificationId.trim() || null,
     validStart: localInputToIso(flagForm.value.validStart) ?? null,
     validUntil: localInputToIso(flagForm.value.validUntil) ?? null,
@@ -386,7 +387,7 @@ onMounted(() => {
                     </Field>
                   </div>
                   <Field orientation="horizontal">
-                    <Switch id="cc-published" v-model:checked="editPublished" :disabled="!canWrite" />
+                    <Switch id="cc-published" v-model="editPublished" :disabled="!canWrite" />
                     <FieldLabel for="cc-published" class="font-normal">发布该题目(对选手可见)</FieldLabel>
                   </Field>
                   <Field v-if="canWrite">
@@ -404,11 +405,12 @@ onMounted(() => {
         <TabsContent value="config" class="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>题目配置(JSON)</CardTitle>
-              <CardDescription>该题目在本竞赛中的模式专属配置</CardDescription>
+              <CardTitle>题目规则</CardTitle>
+              <CardDescription>该题目在本竞赛中的模式专属规则;未覆盖的字段继承竞赛默认</CardDescription>
             </CardHeader>
             <CardContent>
-              <JsonConfigEditor
+              <ChallengeRulesEditor
+                :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
                 :json="config?.json"
                 :revision="config?.revision"
                 :readonly="!canWrite"
@@ -424,7 +426,7 @@ onMounted(() => {
           <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <Checkbox id="show-deleted-flags" v-model:checked="includeDeletedFlags" />
+                <Checkbox id="show-deleted-flags" v-model="includeDeletedFlags" />
                 <label for="show-deleted-flags" class="text-sm text-muted-foreground">显示已删除</label>
               </div>
               <Button v-if="canWrite" size="sm" @click="openFlagDialog()">
@@ -485,7 +487,7 @@ onMounted(() => {
           <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <Checkbox id="show-deleted-hints" v-model:checked="includeDeletedHints" />
+                <Checkbox id="show-deleted-hints" v-model="includeDeletedHints" />
                 <label for="show-deleted-hints" class="text-sm text-muted-foreground">显示已删除</label>
               </div>
               <Button v-if="canWrite" size="sm" @click="openHintDialog()">
@@ -563,10 +565,10 @@ onMounted(() => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="0">附件</SelectItem>
-                      <SelectItem value="1">AWD 轮次</SelectItem>
-                      <SelectItem value="2">运行时定义</SelectItem>
-                      <SelectItem value="3">提示</SelectItem>
+                      <SelectItem value="Attachment">附件</SelectItem>
+                      <SelectItem value="AwdRound">AWD 轮次</SelectItem>
+                      <SelectItem value="RuntimeDefinition">运行时定义</SelectItem>
+                      <SelectItem value="Hint">提示</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>

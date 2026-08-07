@@ -9,7 +9,7 @@ import {
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfigurationResponse,
-  NoCtfDomainIdentitySmtpSecurityMode,
+  NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol,
 } from '~/api'
 
 definePageMeta({ middleware: 'platform-admin' })
@@ -30,7 +30,7 @@ const form = reactive({
   passwordResetMaxRequestsPerHour: 5,
   smtpHost: '',
   smtpPort: 587,
-  smtpSecurityMode: 'StartTls' as NoCtfDomainIdentitySmtpSecurityMode,
+  smtpSecurityMode: 'StartTls' as NoCtfapiEndpointsAdministrationPlatformSmtpSecurityModeProtocol,
   smtpUserName: '',
   smtpFromAddress: '',
   smtpFromName: '',
@@ -154,7 +154,7 @@ onMounted(() => {
             </CardDescription>
           </div>
           <div class="flex items-center gap-2">
-            <Switch id="email-enabled" v-model:checked="form.enabled" />
+            <Switch id="email-enabled" v-model="form.enabled" />
             <Label for="email-enabled">启用邮件发送</Label>
           </div>
         </CardHeader>

@@ -229,7 +229,7 @@ public sealed class PatchUploadReplacementPersistenceTests
                 await Assert.That(replacementSaved).IsTrue();
                 await Assert.That(
                     submission.Succeeded
-                    || submission.ErrorCode == "patch_upload_not_found").IsTrue();
+                    || submission.FailureCode == SubmissionFailureCode.PatchUploadNotFound).IsTrue();
 
                 await using (var verifyScope = host.Services.CreateAsyncScope())
                 {
@@ -416,7 +416,7 @@ public sealed class PatchUploadReplacementPersistenceTests
         return patchUploadId;
     }
 
-    private static async Task<OperationResult<CreatedPatchUpload>> UploadAsync(
+    private static async Task<OperationResult<CreatedPatchUpload, PatchUploadFailureCode>> UploadAsync(
         IHost host,
         Fixture fixture,
         string script,
@@ -462,7 +462,7 @@ public sealed class PatchUploadReplacementPersistenceTests
         await Assert.That(result.Succeeded).IsTrue();
     }
 
-    private static async Task<OperationResult<SubmissionAccepted>> SubmitAsync(
+    private static async Task<OperationResult<SubmissionAccepted, SubmissionFailureCode>> SubmitAsync(
         IHost host,
         Fixture fixture,
         Guid patchUploadId,

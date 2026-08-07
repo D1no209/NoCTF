@@ -90,7 +90,7 @@ public sealed class NotificationFeedEndpointTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(problem.RootElement.GetProperty("code").GetString())
-            .IsEqualTo("cursor_invalid");
+            .IsEqualTo("CursorInvalid");
         await Assert.That(reader.ReadCalls).IsEqualTo(0);
     }
 

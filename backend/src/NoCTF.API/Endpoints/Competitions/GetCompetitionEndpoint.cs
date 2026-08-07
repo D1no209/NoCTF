@@ -1,23 +1,75 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Competitions;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Competitions;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<GameModeProtocol>))]
+public enum GameModeProtocol
+{
+    Ctf,
+    Awd,
+    Awdp,
+    Koh
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionStatusProtocol>))]
+public enum CompetitionStatusProtocol
+{
+    Draft,
+    Visible,
+    Published,
+    Running,
+    Paused,
+    Finished
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<LeaderboardVisibilityProtocol>))]
+public enum LeaderboardVisibilityProtocol
+{
+    Normal,
+    Frozen,
+    Blackout
+}
+
+[Mapper]
+public static partial class CompetitionProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial GameMode ToDomain(GameModeProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial GameModeProtocol ToProtocol(GameMode value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial CompetitionStatusProtocol ToProtocol(CompetitionStatus value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial LeaderboardVisibilityProtocol ToProtocol(
+        CompetitionLeaderboardVisibility value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial CompetitionLeaderboardVisibility ToDomain(
+        LeaderboardVisibilityProtocol value);
+}
 
 public sealed record CompetitionResponse(
     Guid Id,
     string Title,
     string? Description,
-    GameMode Mode,
+    GameModeProtocol Mode,
     DateTimeOffset StartTime,
     DateTimeOffset EndTime,
-    CompetitionStatus Status,
+    CompetitionStatusProtocol Status,
     bool TeamRegistrationAutoApprove,
     int MaxTeamMembers,
     int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId,
-    CompetitionLeaderboardVisibility LeaderboardVisibility);
+    LeaderboardVisibilityProtocol LeaderboardVisibility);
 
 internal static class CompetitionMapper
 {
@@ -26,19 +78,20 @@ internal static class CompetitionMapper
             view.Id,
             view.Title,
             view.Description,
-            view.Mode,
+            CompetitionProtocolMapper.ToProtocol(view.Mode),
             view.StartTime,
             view.EndTime,
-            view.Status,
+            CompetitionProtocolMapper.ToProtocol(view.Status),
             view.TeamRegistrationAutoApprove,
             view.MaxTeamMembers,
             view.MaxConcurrentRuntimeInstancesPerTeam,
             view.OwnerId,
-            CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-                view.Status,
-                view.LeaderboardVisibility,
-                view.LeaderboardVisibilityStartsAt,
-                DateTimeOffset.UtcNow));
+            CompetitionProtocolMapper.ToProtocol(
+                CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+                    view.Status,
+                    view.LeaderboardVisibility,
+                    view.LeaderboardVisibilityStartsAt,
+                    DateTimeOffset.UtcNow)));
 }
 
 public sealed class GetCompetitionRequest { public Guid CompetitionId { get; set; } }

@@ -26,7 +26,7 @@ const loading = ref(true)
 const acting = ref(false)
 const extendMinutes = ref(30)
 
-const TRANSITIONAL: number[] = [RuntimeState.Queued, RuntimeState.Provisioning, RuntimeState.Stopping]
+const TRANSITIONAL: string[] = [RuntimeState.Queued, RuntimeState.Provisioning, RuntimeState.Stopping]
 
 async function load(): Promise<void> {
   const { data, error } = await getRuntimeEndpoint({
@@ -39,13 +39,13 @@ onMounted(async () => {
   await load()
   loading.value = false
   // 初始加载时若处于过渡态,继续轮询直到稳定
-  if (runtime.value && TRANSITIONAL.includes(runtime.value.state ?? -1)) startPolling()
+  if (runtime.value && TRANSITIONAL.includes(runtime.value.state ?? '')) startPolling()
 })
 
 const { polling, timedOut, start: startPolling } = usePolling(
   async () => {
     await load()
-    return !runtime.value || !TRANSITIONAL.includes(runtime.value.state ?? -1)
+    return !runtime.value || !TRANSITIONAL.includes(runtime.value.state ?? '')
   },
   { interval: 2000, timeout: 120_000 },
 )

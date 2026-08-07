@@ -44,7 +44,7 @@ public sealed class CreateCompetitionQuestionValidator
     }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionFailureCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionFailureCode>))]
 public enum CompetitionQuestionFailureCode
 {
     InvalidRequest,

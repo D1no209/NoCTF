@@ -24,7 +24,7 @@ public sealed class ResubmitTeamRegistrationEndpoint(
             Route<Guid>("teamId"),
             user.UserId,
             ct);
-        if (result.ErrorCode == "competition_not_found")
+        if (result.FailureCode == TeamRegistrationFailure.CompetitionNotFound)
             return TypedResults.NotFound();
         return result.Succeeded ? TypedResults.NoContent() : TypedResults.Conflict();
     }

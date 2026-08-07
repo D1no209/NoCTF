@@ -6,7 +6,7 @@ import {
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse,
-  NoCtfDomainCompetitionsCompetitionLeaderboardVisibility,
+  NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
@@ -18,7 +18,7 @@ const current = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeader
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const visibility = ref('0')
+const visibility = ref<NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol>('Normal')
 const startsAt = ref('')
 const reason = ref('')
 const saving = ref(false)
@@ -30,7 +30,7 @@ async function load() {
   if (e) error.value = parseApiError(e).message
   else {
     current.value = data ?? null
-    visibility.value = String(data?.configuredVisibility ?? 0)
+    visibility.value = data?.configuredVisibility ?? 'Normal'
     startsAt.value = isoToLocalInput(data?.startsAt)
   }
   loading.value = false
@@ -43,7 +43,7 @@ async function save() {
     const { data, error } = await adminUpdateCompetitionLeaderboardVisibility({
       path: { competitionId },
       body: {
-        visibility: Number(visibility.value) as NoCtfDomainCompetitionsCompetitionLeaderboardVisibility,
+        visibility: visibility.value,
         startsAt: localInputToIso(startsAt.value) ?? null,
         expectedRevision: current.value.revision ?? 0,
         reason: reason.value.trim() || null,
@@ -112,9 +112,9 @@ onMounted(load)
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="0">正常</SelectItem>
-                      <SelectItem value="1">冻结</SelectItem>
-                      <SelectItem value="2">遮蔽</SelectItem>
+                      <SelectItem value="Normal">正常</SelectItem>
+                      <SelectItem value="Frozen">冻结</SelectItem>
+                      <SelectItem value="Blackout">遮蔽</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>

@@ -6,6 +6,7 @@ import {
   adminUpdateCompetition,
 } from '~/api'
 import type { NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationResponse } from '~/api'
+import type { GameModeValue } from '~/utils/game-config'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
@@ -145,7 +146,7 @@ onMounted(loadConfig)
               </Field>
             </div>
             <Field orientation="horizontal">
-              <Checkbox id="c-auto-approve" v-model:checked="teamRegistrationAutoApprove" :disabled="!canWrite" />
+              <Checkbox id="c-auto-approve" v-model="teamRegistrationAutoApprove" :disabled="!canWrite" />
               <FieldLabel for="c-auto-approve" class="font-normal">队伍注册自动通过</FieldLabel>
             </Field>
             <Field v-if="canWrite">
@@ -161,13 +162,14 @@ onMounted(loadConfig)
 
     <Card>
       <CardHeader>
-        <CardTitle>模式配置(JSON)</CardTitle>
+        <CardTitle>模式配置</CardTitle>
         <CardDescription>
           {{ enumLabel(GameModeLabel, config?.mode) }} 模式的专属配置;保存时携带修订版本进行乐观并发校验
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <JsonConfigEditor
+        <CompetitionModeConfigEditor
+          :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
           :json="config?.json"
           :revision="config?.revision"
           :readonly="!canWrite"

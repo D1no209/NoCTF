@@ -5,11 +5,11 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class ChallengeHintUnlockTests
 {
     [Test]
-    [Arguments(HintUnlockFailure.NotFound, "hint_not_found")]
-    [Arguments(HintUnlockFailure.InsufficientScore, "insufficient_score")]
+    [Arguments(HintUnlockFailure.NotFound, ChallengeHintFailureCode.HintNotFound)]
+    [Arguments(HintUnlockFailure.InsufficientScore, ChallengeHintFailureCode.InsufficientScore)]
     public async Task Unlock_maps_store_failures_to_stable_codes(
         HintUnlockFailure failure,
-        string expectedCode)
+        ChallengeHintFailureCode expectedCode)
     {
         var result = await new UnlockChallengeHint(new Store(
                 HintUnlockAttempt.Failed(failure)))
@@ -21,7 +21,7 @@ public sealed class ChallengeHintUnlockTests
                 DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.ErrorCode).IsEqualTo(expectedCode);
+        await Assert.That(result.FailureCode).IsEqualTo(expectedCode);
     }
 
     [Test]
