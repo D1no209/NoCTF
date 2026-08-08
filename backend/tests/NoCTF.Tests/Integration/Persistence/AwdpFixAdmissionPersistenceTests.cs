@@ -3,6 +3,7 @@ using NoCTF.Application.Submissions.Intake;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Storage;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Registration;
@@ -14,6 +15,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("AwdpFixAdmission")]
 public sealed class AwdpFixAdmissionPersistenceTests
 {
     [Test]
@@ -145,6 +147,7 @@ public sealed class AwdpFixAdmissionPersistenceTests
         var challengeId = Guid.CreateVersion7();
         var competitionChallengeId = Guid.CreateVersion7();
         var patchUploadId = Guid.CreateVersion7();
+        var patchFileId = Guid.CreateVersion7();
         db.Users.AddRange(
             NewUser(ownerId, "owner", now),
             NewUser(memberId, "member", now));
@@ -194,6 +197,16 @@ public sealed class AwdpFixAdmissionPersistenceTests
                 """{"schemaVersion":1,"break":{"settlement":0,"points":10},"fix":{"settlement":0,"points":20},"requireBreakBeforeFix":true,"maxBreakSubmissions":10,"maxFixSubmissions":10}""",
             UpdatedAt = now
         });
+        db.Files.Add(new StoredFile
+        {
+            Id = patchFileId,
+            ObjectKey = $"patches/{patchUploadId:N}",
+            FileName = "fix.tar.gz",
+            ContentType = "application/gzip",
+            ByteLength = 1,
+            Sha256 = new byte[32],
+            CreatedAt = now
+        });
         db.PatchUploads.Add(new PatchUpload
         {
             Id = patchUploadId,
@@ -201,11 +214,7 @@ public sealed class AwdpFixAdmissionPersistenceTests
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
             UploadedByUserId = memberId,
-            ObjectKey = $"patches/{patchUploadId:N}",
-            OriginalFileName = "fix.tar.gz",
-            ContentType = "application/gzip",
-            ByteLength = 1,
-            Sha256 = new byte[32],
+            FileId = patchFileId,
             UploadedAt = now
         });
         await db.SaveChangesAsync(cancellationToken);

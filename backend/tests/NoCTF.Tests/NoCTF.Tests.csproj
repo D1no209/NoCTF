@@ -30,9 +30,7 @@
          Each exclusion is removed when that scenario is rewritten against the consolidated model. -->
     <Compile Remove="Integration\Messaging\WolverineTransactionalOutboxTests.cs" />
     <Compile Remove="Integration\Persistence\AwdCheckerPersistenceTests.cs" />
-    <Compile Remove="Integration\Persistence\AwdpFixAdmissionPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\AwdpFixResultPersistenceTests.cs" />
-    <Compile Remove="Integration\Persistence\ChallengeHintUnlockPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\CompetitionChallengeLifecycleRevisionPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\CompetitionNotificationDeliveryPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\DataExportPersistenceTests.cs" />

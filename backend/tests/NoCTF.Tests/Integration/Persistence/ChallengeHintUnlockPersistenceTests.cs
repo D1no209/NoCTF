@@ -10,17 +10,17 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Challenges.Hints;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Tests.Fixtures;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("ChallengeHintUnlock")]
 public sealed class ChallengeHintUnlockPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Different_teams_unlocking_hints_increment_the_shared_revision_atomically(
+    public async Task Different_teams_queue_independent_hint_unlock_submissions_atomically(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -31,15 +31,12 @@ public sealed class ChallengeHintUnlockPersistenceTests
                 .WithPassword("postgres")
                 .Build();
             await postgres.StartAsync(cancellationToken);
-            var updateBarrier = new CompetitionLeaderboardUpdateBarrier();
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
-                .AddInterceptors(updateBarrier)
                 .Options;
             var fixture = await SeedAsync(options, cancellationToken);
             var outbox = new RecordingOutbox();
-            updateBarrier.Enable();
 
             var attempts = await Task.WhenAll(
                 UnlockAsync(
@@ -60,21 +57,26 @@ public sealed class ChallengeHintUnlockPersistenceTests
             await Assert.That(attempts.All(attempt =>
                     attempt.Failure is null && attempt.Result?.Created == true))
                 .IsTrue();
-            await Assert.That(updateBarrier.Arrivals).IsEqualTo(2);
             await using var verify = new NoCtfDbContext(options);
-            var unlocks = await verify.ScoringEvents.AsNoTracking()
-                .Where(scoringEvent => scoringEvent.Kind == NoCTF.Domain.Submissions.ScoringEventKind.HintUnlock)
+            var unlocks = await verify.Submissions.AsNoTracking()
+                .Where(submission => submission.Kind == NoCTF.Domain.Submissions.SubmissionKind.HintUnlock)
                 .ToListAsync(cancellationToken);
             await Assert.That(unlocks).Count().IsEqualTo(2);
-            await Assert.That(unlocks.Select(scoringEvent => scoringEvent.TeamId).Distinct())
+            await Assert.That(unlocks.Select(submission => submission.TeamId).Distinct())
                 .Count().IsEqualTo(2);
+            await Assert.That(unlocks.All(submission =>
+                submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued
+                && submission.CurrentScoringEventId is null
+                && submission.SubmittedFlag == fixture.HintId.ToString("D")))
+                .IsTrue();
             var leaderboardRevision = await verify.Competitions.AsNoTracking()
                 .Where(competition => competition.Id == fixture.CompetitionId)
                 .Select(competition => competition.LeaderboardRevision)
                 .SingleAsync(cancellationToken);
-            await Assert.That(leaderboardRevision).IsEqualTo(2);
-            await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count())
+            await Assert.That(leaderboardRevision).IsEqualTo(0);
+            await Assert.That(outbox.Published.OfType<EvaluateSubmission>().Count())
                 .IsEqualTo(2);
+            await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>()).IsEmpty();
         });
     }
 
@@ -151,17 +153,17 @@ public sealed class ChallengeHintUnlockPersistenceTests
             Order = 1,
             IsPublished = true,
             RulesJson = "{}",
-            UpdatedAt = now
-        });
-        db.Set<CompetitionChallengeHint>().Add(new CompetitionChallengeHint
-        {
-            Id = hintId,
-            CompetitionChallengeId = competitionChallengeId,
-            Content = "Concurrent hint",
-            Cost = 10,
-            PublishedAt = now.AddMinutes(-1),
-            CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            Hints =
+            [
+                new CompetitionChallengeHint
+                {
+                    Id = hintId,
+                    Content = "Concurrent hint",
+                    Cost = 10,
+                    PublishedAt = now.AddMinutes(-1)
+                }
+            ]
         });
         db.Teams.AddRange(
             NewTeam(
