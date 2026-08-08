@@ -41,15 +41,39 @@ async function saveProfile() {
 // Avatar
 const avatarInput = ref<HTMLInputElement | null>(null)
 const avatarPending = ref(false)
+const avatarEditorOpen = ref(false)
+const avatarSourceFile = ref<File | null>(null)
 
-async function uploadAvatar() {
-  const file = avatarInput.value?.files?.[0]
-  if (!file) return
+function selectAvatar(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
+  input.value = ''
+  if (!file)
+    return
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 12 * 1024 * 1024) {
+    toast.error('请选择不超过 12 MiB 的 JPEG、PNG 或 WebP 图片')
+    return
+  }
+  avatarSourceFile.value = file
+  avatarEditorOpen.value = true
+}
+
+function setAvatarEditorOpen(open: boolean) {
+  if (avatarPending.value)
+    return
+  avatarEditorOpen.value = open
+  if (!open)
+    avatarSourceFile.value = null
+}
+
+async function uploadAvatar(file: File) {
   avatarPending.value = true
   try {
     const { error } = await authenticationUploadMyAvatar({ body: { file } })
     if (error) throw parseApiError(error)
     await fetchMe()
+    avatarEditorOpen.value = false
+    avatarSourceFile.value = null
     toast.success('头像已更新')
   }
   catch (e) {
@@ -57,7 +81,6 @@ async function uploadAvatar() {
   }
   finally {
     avatarPending.value = false
-    if (avatarInput.value) avatarInput.value.value = ''
   }
 }
 
@@ -115,12 +138,19 @@ async function changePassword() {
                     <AvatarImage v-if="user?.avatarUrl" :src="user.avatarUrl" :alt="user?.userName ?? ''" />
                     <AvatarFallback>{{ user?.userName?.slice(0, 2) ?? '?' }}</AvatarFallback>
                   </Avatar>
-                  <div class="flex items-center gap-2">
-                    <Input ref="avatarInput" type="file" accept="image/*" class="w-auto" />
-                    <Button variant="outline" :disabled="avatarPending" @click="uploadAvatar">
+                  <div class="flex flex-col items-start gap-2">
+                    <input
+                      ref="avatarInput"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      class="sr-only"
+                      @change="selectAvatar"
+                    >
+                    <Button variant="outline" :disabled="avatarPending" @click="avatarInput?.click()">
                       <Spinner v-if="avatarPending" data-icon="inline-start" />
-                      上传
+                      选择并裁剪头像
                     </Button>
+                    <span class="text-xs text-muted-foreground">JPEG、PNG 或 WebP，原图不超过 12 MiB</span>
                   </div>
                 </div>
               </Field>
@@ -210,5 +240,13 @@ async function changePassword() {
         </Card>
       </TabsContent>
     </Tabs>
+    <AvatarCropDialog
+      :open="avatarEditorOpen"
+      :file="avatarSourceFile"
+      :saving="avatarPending"
+      @update:open="setAvatarEditorOpen"
+      @save="uploadAvatar"
+      @error="toast.error($event.message)"
+    />
   </div>
 </template>
