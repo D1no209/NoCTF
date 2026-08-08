@@ -109,7 +109,8 @@ public sealed class SmtpEmailVerificationDeliveryTests
             await Assert.That(messages.Count).IsEqualTo(1);
             await Assert.That(messages[0].TextBody).Contains("你好-admin");
             await Assert.That(messages[0].TextBody).Contains("token-two");
-            await Assert.That(messages[0].HtmlBody).Contains("verify-email?token=token-two");
+            await Assert.That(messages[0].HtmlBody).Contains(
+                "auth/verify-email?token=token-two");
         });
     }
 

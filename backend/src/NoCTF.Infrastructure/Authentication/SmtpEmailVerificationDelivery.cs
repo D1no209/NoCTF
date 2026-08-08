@@ -56,7 +56,7 @@ public sealed class SmtpEmailVerificationDelivery(
             UriKind.Absolute);
         var verificationUrl = new Uri(
             publicBaseUri,
-            $"verify-email?token={Uri.EscapeDataString(token)}").AbsoluteUri;
+            $"auth/verify-email?token={Uri.EscapeDataString(token)}").AbsoluteUri;
         using var message = CreateMessage(
             configuration,
             user.Email,
