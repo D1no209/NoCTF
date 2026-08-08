@@ -1,5 +1,6 @@
 using System.Formats.Tar;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Submissions.PatchUploads;
@@ -13,7 +14,10 @@ public sealed class CreatePatchUploadTests
     {
         var store = new RejectingPatchUploadStore();
         var objects = new RecordingObjectStorage();
-        var useCase = new CreatePatchUpload(store, objects);
+        var registry = new RecordingUploadRegistry();
+        var useCase = new CreatePatchUpload(
+            store,
+            new ManagedFileUploads(registry, objects));
         await using var archive = new MemoryStream(CreatePatchArchive());
 
         var result = await useCase.ExecuteAsync(
@@ -26,17 +30,20 @@ public sealed class CreatePatchUploadTests
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.FailureCode).IsEqualTo(PatchUploadFailureCode.PatchUploadConflict);
-        await Assert.That(objects.StoredObjectKey).IsNotNull();
-        await Assert.That(objects.DeletedObjectKey)
-            .IsEqualTo(objects.StoredObjectKey);
+        await Assert.That(registry.RegisteredFileId).IsNotNull();
+        await Assert.That(registry.AbandonedFileId)
+            .IsEqualTo(registry.RegisteredFileId);
     }
 
     [Test]
     public async Task Cleanup_failure_does_not_mask_the_database_rejection()
     {
         var store = new RejectingPatchUploadStore();
-        var objects = new RecordingObjectStorage(throwOnDelete: true);
-        var useCase = new CreatePatchUpload(store, objects);
+        var objects = new RecordingObjectStorage();
+        var registry = new RecordingUploadRegistry(throwOnAbandon: true);
+        var useCase = new CreatePatchUpload(
+            store,
+            new ManagedFileUploads(registry, objects));
         await using var archive = new MemoryStream(CreatePatchArchive());
 
         var result = await useCase.ExecuteAsync(
@@ -49,8 +56,8 @@ public sealed class CreatePatchUploadTests
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.FailureCode).IsEqualTo(PatchUploadFailureCode.PatchUploadConflict);
-        await Assert.That(objects.DeletedObjectKey)
-            .IsEqualTo(objects.StoredObjectKey);
+        await Assert.That(registry.AbandonedFileId)
+            .IsEqualTo(registry.RegisteredFileId);
     }
 
     private static byte[] CreatePatchArchive()
@@ -90,21 +97,15 @@ public sealed class CreatePatchUploadTests
         public Task<bool> SaveAsync(
             Guid patchUploadId,
             PatchUploadScope scope,
-            string objectKey,
-            string fileName,
-            string contentType,
-            long byteLength,
-            byte[] sha256,
+            Guid fileId,
             DateTimeOffset uploadedAt,
             CancellationToken cancellationToken) =>
             Task.FromResult(false);
     }
 
-    private sealed class RecordingObjectStorage(bool throwOnDelete = false)
-        : IObjectStorage
+    private sealed class RecordingObjectStorage : IObjectStorage
     {
         public string? StoredObjectKey { get; private set; }
-        public string? DeletedObjectKey { get; private set; }
 
         public Task<StoredObject?> InspectAsync(
             string objectKey,
@@ -119,12 +120,15 @@ public sealed class CreatePatchUploadTests
             CancellationToken cancellationToken)
         {
             StoredObjectKey = objectKey;
+            var position = content.Position;
+            var hash = Convert.ToHexString(SHA256.HashData(content));
+            var length = content.Position - position;
             return Task.FromResult(new StoredObject(
                 objectKey,
                 fileName,
                 contentType,
-                content.Length,
-                new string('0', 64)));
+                length,
+                hash));
         }
 
         public Task<Stream> OpenReadAsync(
@@ -135,9 +139,29 @@ public sealed class CreatePatchUploadTests
         public Task DeleteAsync(
             string objectKey,
             CancellationToken cancellationToken)
+            => Task.CompletedTask;
+    }
+
+    private sealed class RecordingUploadRegistry(bool throwOnAbandon = false)
+        : IManagedFileUploadRegistry
+    {
+        public Guid? RegisteredFileId { get; private set; }
+        public Guid? AbandonedFileId { get; private set; }
+
+        public Task RegisterAsync(
+            Guid fileId,
+            StoredObject metadata,
+            DateTimeOffset createdAt,
+            CancellationToken cancellationToken)
         {
-            DeletedObjectKey = objectKey;
-            return throwOnDelete
+            RegisteredFileId = fileId;
+            return Task.CompletedTask;
+        }
+
+        public Task AbandonAsync(Guid fileId, CancellationToken cancellationToken)
+        {
+            AbandonedFileId = fileId;
+            return throwOnAbandon
                 ? Task.FromException(new IOException("cleanup failed"))
                 : Task.CompletedTask;
         }

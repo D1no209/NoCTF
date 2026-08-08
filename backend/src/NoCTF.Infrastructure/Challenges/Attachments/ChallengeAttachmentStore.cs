@@ -6,18 +6,23 @@ using NoCTF.Application.Challenges.Attachments;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Storage;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Challenges;
-using NoCTF.Domain.Storage;
+using NoCTF.Infrastructure.Storage;
 
 namespace NoCTF.Infrastructure.Challenges.Attachments;
 
 public sealed class ChallengeAttachmentStore(
     NoCtfDbContext db,
-    TeamChallengeCriticalSection criticalSection) : IChallengeAttachmentStore
+    TeamChallengeCriticalSection criticalSection,
+    FileReferenceLock fileLock) : IChallengeAttachmentStore
 {
     public ChallengeAttachmentStore(NoCtfDbContext db)
-        : this(db, new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry())) { }
+        : this(
+            db,
+            new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry()),
+            new FileReferenceLock()) { }
 
     public Task<bool> AttachmentIdExistsAsync(
         Guid attachmentId,
@@ -47,7 +52,7 @@ public sealed class ChallengeAttachmentStore(
         Guid actorId,
         bool isAdministrator,
         Guid attachmentId,
-        StoredObject storedObject,
+        Guid fileId,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -59,23 +64,13 @@ public sealed class ChallengeAttachmentStore(
         if (await db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(item => item.Id == attachmentId, ct))
             return AddChallengeAttachmentState.ResourceIdConflict;
-        var file = new StoredFile
-        {
-            Id = Guid.CreateVersion7(now),
-            ObjectKey = storedObject.ObjectKey,
-            FileName = storedObject.FileName,
-            ContentType = storedObject.ContentType,
-            ByteLength = storedObject.Length,
-            Sha256 = Convert.FromHexString(storedObject.Sha256),
-            CreatedAt = now
-        };
-        db.Files.Add(file);
+        if (!await fileLock.AcquireAsync(db, fileId, ct))
+            return AddChallengeAttachmentState.ResourceIdConflict;
         db.Set<ChallengeAttachment>().Add(new ChallengeAttachment
         {
             Id = attachmentId,
             ChallengeId = challengeId,
-            FileId = file.Id,
-            File = file,
+            FileId = fileId,
             CreatedAt = now
         });
         challenge.Revision = checked(challenge.Revision + 1);

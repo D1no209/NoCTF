@@ -58,11 +58,7 @@ internal sealed class SwaggerPatchUploadStore : IPatchUploadStore
     public Task<bool> SaveAsync(
         Guid patchUploadId,
         PatchUploadScope scope,
-        string objectKey,
-        string fileName,
-        string contentType,
-        long byteLength,
-        byte[] sha256,
+        Guid fileId,
         DateTimeOffset uploadedAt,
         CancellationToken cancellationToken) =>
         Task.FromResult(false);

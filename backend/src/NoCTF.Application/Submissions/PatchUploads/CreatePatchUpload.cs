@@ -31,18 +31,14 @@ public interface IPatchUploadStore
     Task<bool> SaveAsync(
         Guid patchUploadId,
         PatchUploadScope scope,
-        string objectKey,
-        string fileName,
-        string contentType,
-        long byteLength,
-        byte[] sha256,
+        Guid fileId,
         DateTimeOffset uploadedAt,
         CancellationToken cancellationToken);
 }
 
 public sealed class CreatePatchUpload(
     IPatchUploadStore store,
-    IObjectStorage objects)
+    ManagedFileUploads uploads)
 {
     private const int MaxEntries = 10_000;
     private const long MaxExpandedBytes = 1L << 30;
@@ -76,14 +72,16 @@ public sealed class CreatePatchUpload(
                 PatchUploadFailureCode.ArchiveInvalid, validation);
 
         var id = Guid.CreateVersion7(now);
-        var objectKey = $"fix-uploads/{id:N}";
-        var stored = await objects.PutAsync(
-            objectKey,
+        var fileId = Guid.CreateVersion7(now);
+        var uploaded = await uploads.CreateAsync(
+            fileId,
+            $"fix-uploads/{id:N}",
             Path.GetFileName(fileName),
             string.IsNullOrWhiteSpace(contentType)
                 ? "application/gzip"
                 : contentType,
             content,
+            now,
             ct);
         var saved = false;
         try
@@ -91,27 +89,14 @@ public sealed class CreatePatchUpload(
             saved = await store.SaveAsync(
                 id,
                 scope,
-                stored.ObjectKey,
-                stored.FileName,
-                stored.ContentType,
-                stored.Length,
-                Convert.FromHexString(stored.Sha256),
+                uploaded.FileId,
                 now,
                 ct);
         }
         finally
         {
             if (!saved)
-            {
-                try
-                {
-                    await objects.DeleteAsync(stored.ObjectKey, CancellationToken.None);
-                }
-                catch
-                {
-                    // Object cleanup is best-effort here; storage lifecycle handles orphaned uploads.
-                }
-            }
+                await uploads.AbandonAsync(uploaded.FileId);
         }
         return saved
             ? OperationResult<CreatedPatchUpload, PatchUploadFailureCode>.Success(new(id))

@@ -506,6 +506,19 @@ public sealed class PatchUploadReplacementPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var scope = host.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        var fileId = Guid.CreateVersion7(uploadedAt);
+        db.Files.Add(new StoredFile
+        {
+            Id = fileId,
+            ObjectKey = stored.ObjectKey,
+            FileName = stored.FileName,
+            ContentType = stored.ContentType,
+            ByteLength = stored.Length,
+            Sha256 = Convert.FromHexString(stored.Sha256),
+            CreatedAt = uploadedAt
+        });
+        await db.SaveChangesAsync(cancellationToken);
         return await scope.ServiceProvider.GetRequiredService<IPatchUploadStore>()
             .SaveAsync(
                 patchUploadId,
@@ -514,11 +527,7 @@ public sealed class PatchUploadReplacementPersistenceTests
                     fixture.CompetitionChallengeId,
                     fixture.TeamId,
                     fixture.MemberId),
-                stored.ObjectKey,
-                stored.FileName,
-                stored.ContentType,
-                stored.Length,
-                Convert.FromHexString(stored.Sha256),
+                fileId,
                 uploadedAt,
                 cancellationToken);
     }

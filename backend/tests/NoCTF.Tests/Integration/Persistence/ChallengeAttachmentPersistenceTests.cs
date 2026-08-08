@@ -3,6 +3,7 @@ using NoCTF.Application.Challenges.Attachments;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Challenges.Attachments;
 using Testcontainers.PostgreSql;
@@ -56,6 +57,17 @@ public sealed class ChallengeAttachmentPersistenceTests
                 CreatedAt = now,
                 UpdatedAt = now
             });
+            var fileId = Guid.CreateVersion7();
+            db.Files.Add(new StoredFile
+            {
+                Id = fileId,
+                ObjectKey = $"attachments/{attachmentId:N}",
+                FileName = "attachment.txt",
+                ContentType = "text/plain",
+                ByteLength = 7,
+                Sha256 = new byte[32],
+                CreatedAt = now
+            });
             await db.SaveChangesAsync(cancellationToken);
             var store = new ChallengeAttachmentStore(db);
 
@@ -64,12 +76,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                 administratorId,
                 true,
                 attachmentId,
-                new StoredObject(
-                    $"challenges/{challengeId:N}/attachments/{attachmentId:N}",
-                    "attachment.txt",
-                    "text/plain",
-                    7,
-                    new string('0', 64)),
+                fileId,
                 now,
                 cancellationToken);
 

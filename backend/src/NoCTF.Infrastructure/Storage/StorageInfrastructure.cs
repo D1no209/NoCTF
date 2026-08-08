@@ -38,6 +38,9 @@ internal static class StorageInfrastructure
             services.AddSingleton<IObjectStorage, LocalObjectStorage>();
         }
 
+        services.AddScoped<IManagedFileUploadRegistry, ManagedFileUploadRegistry>();
+        services.AddScoped<ManagedFileUploads>();
+        services.AddScoped<FileReferenceLock>();
         services.AddScoped<IBusinessFileReferenceStore, BusinessFileReferenceStore>();
         services.AddScoped<ManageBusinessImages>();
 
