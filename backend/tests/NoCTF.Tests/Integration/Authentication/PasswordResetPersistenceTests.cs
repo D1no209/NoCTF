@@ -65,8 +65,9 @@ public sealed class PasswordResetPersistenceTests
 
             await using (var inspectionDb = new NoCtfDbContext(options))
             {
-                var persistedToken = await inspectionDb.PasswordResetTokens.AsNoTracking()
-                    .SingleAsync(cancellationToken);
+                var persistedToken = await inspectionDb.AccountTokens.AsNoTracking()
+                    .SingleAsync(token => token.Kind == AccountTokenKind.PasswordReset,
+                        cancellationToken);
                 var expectedHash = SHA256.HashData(Encoding.UTF8.GetBytes(resetMessage.Token));
                 await Assert.That(persistedToken.TokenSha256).IsEquivalentTo(expectedHash);
                 await Assert.That(Convert.ToHexString(persistedToken.TokenSha256))
@@ -105,8 +106,9 @@ public sealed class PasswordResetPersistenceTests
                 : "other-pass";
             await Assert.That(await users.VerifyPasswordAsync(
                 userId, winningPassword, cancellationToken)).IsTrue();
-            var consumed = await verificationDb.PasswordResetTokens.AsNoTracking()
-                .SingleAsync(cancellationToken);
+            var consumed = await verificationDb.AccountTokens.AsNoTracking()
+                .SingleAsync(token => token.Kind == AccountTokenKind.PasswordReset,
+                    cancellationToken);
             await Assert.That(consumed.ConsumedAt!.Value.ToUnixTimeMilliseconds())
                 .IsEqualTo(now.AddMinutes(2).ToUnixTimeMilliseconds());
 
@@ -122,7 +124,8 @@ public sealed class PasswordResetPersistenceTests
             await Assert.That(secondIssue).IsEqualTo(PasswordResetRequestState.Queued);
             await Assert.That(thirdIssue).IsEqualTo(PasswordResetRequestState.Queued);
             await Assert.That(fourthIssue).IsEqualTo(PasswordResetRequestState.RateLimited);
-            var laterTokens = await verificationDb.PasswordResetTokens.AsNoTracking()
+            var laterTokens = await verificationDb.AccountTokens.AsNoTracking()
+                .Where(token => token.Kind == AccountTokenKind.PasswordReset)
                 .OrderBy(candidate => candidate.CreatedAt)
                 .ToListAsync(cancellationToken);
             await Assert.That(laterTokens.Count).IsEqualTo(3);
@@ -172,7 +175,9 @@ public sealed class PasswordResetPersistenceTests
                 await Assert.That(result).IsEqualTo(PasswordResetRequestState.Ignored);
             }
 
-            await Assert.That(await db.PasswordResetTokens.CountAsync(cancellationToken))
+            await Assert.That(await db.AccountTokens.CountAsync(
+                    token => token.Kind == AccountTokenKind.PasswordReset,
+                    cancellationToken))
                 .IsEqualTo(0);
             await Assert.That(outbox.Messages).IsEmpty();
         });
