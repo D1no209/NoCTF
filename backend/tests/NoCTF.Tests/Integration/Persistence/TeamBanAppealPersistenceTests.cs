@@ -6,6 +6,7 @@ using NoCTF.Application.Teams.Appeals;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
@@ -15,6 +16,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("TeamBanAppeals")]
 public sealed class TeamBanAppealPersistenceTests
 {
     [Test]
@@ -189,8 +191,9 @@ public sealed class TeamBanAppealPersistenceTests
             Level = CompetitionEventLevel.Warning,
             Visibility = CompetitionEventVisibility.Staff,
             ActorUserId = ownerId,
-            TeamId = teamId,
-            Reason = "Private staff evidence",
+            SubjectType = EntityReferenceKind.Team,
+            SubjectId = teamId,
+            PayloadJson = """{"schemaVersion":1,"reason":"Private staff evidence"}""",
             OccurredAt = now
         });
         await db.SaveChangesAsync(cancellationToken);
