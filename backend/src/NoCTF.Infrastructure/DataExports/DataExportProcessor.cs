@@ -141,15 +141,17 @@ public sealed class DataExportProcessor(
             return;
         }
 
-        if (job.File is not null)
-            await objectStorage.DeleteAsync(job.File.ObjectKey, cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var fileId = job.FileId;
         job.Status = DataExportStatus.Expired;
         job.ActiveSlot = null;
-        if (job.File is not null)
-            db.Files.Remove(job.File);
         job.FileId = null;
         job.File = null;
+        if (fileId is { } cleanupFileId)
+            await outbox.PublishAsync(new CleanupFile(cleanupFileId));
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
     public async Task PurgeAsync(
@@ -169,12 +171,14 @@ public sealed class DataExportProcessor(
             return;
         }
 
-        if (job.File is not null)
-            await objectStorage.DeleteAsync(job.File.ObjectKey, cancellationToken);
-        if (job.File is not null)
-            db.Files.Remove(job.File);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var fileId = job.FileId;
         db.DataExports.Remove(job);
+        if (fileId is { } cleanupFileId)
+            await outbox.PublishAsync(new CleanupFile(cleanupFileId));
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
     }
 
     private async Task<GeneratedArtifact> GenerateArtifactAsync(
