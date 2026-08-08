@@ -5,7 +5,6 @@ using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
-using NoCTF.Domain.Platform;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Runtime;
@@ -33,6 +32,7 @@ using NoCTF.GameModes.Koh.Configuration;
 namespace NoCTF.Tests.Integration.Messaging;
 
 [Category("Integration")]
+[Category("WolverineTransactionalOutbox")]
 [NotInParallel]
 public sealed class WolverineTransactionalOutboxTests
 {
@@ -234,7 +234,7 @@ public sealed class WolverineTransactionalOutboxTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Lifecycle_chain_survives_restart_and_replayed_version_has_one_successor(
+    public async Task Lifecycle_ticks_remain_idempotent_across_worker_restart(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -249,7 +249,7 @@ public sealed class WolverineTransactionalOutboxTests
                     .Database.MigrateAsync(cancellationToken);
             }
 
-            var observation = LifecycleChainObservation.Expect();
+            var firstObservation = LifecycleTickObservation.Expect(2);
             using (var firstHost = BuildHost(connectionString))
             {
                 await firstHost.StartAsync(cancellationToken);
@@ -257,12 +257,14 @@ public sealed class WolverineTransactionalOutboxTests
                 {
                     var bus = firstHost.Services.GetRequiredService<IMessageBus>();
                     var now = DateTimeOffset.UtcNow;
-                    await bus.SendAsync(new LifecycleMessage(now, 1));
-                    await bus.SendAsync(new LifecycleMessage(now, 1));
-                    await observation.FirstCommitted.WaitAsync(
+                    await bus.SendAsync(new LifecycleMessage(now));
+                    await bus.SendAsync(new LifecycleMessage(now));
+                    await firstObservation.Completed.WaitAsync(
                         TimeSpan.FromSeconds(30),
                         cancellationToken);
-                    await WaitForLifecycleVersionAsync(firstHost, 2, cancellationToken);
+                    await Assert.That(firstObservation.Outcomes).Count().IsEqualTo(2);
+                    await Assert.That(firstObservation.Outcomes.All(outcome =>
+                        outcome == MessageExecutionOutcome.Idempotent)).IsTrue();
                 }
                 finally
                 {
@@ -272,25 +274,18 @@ public sealed class WolverineTransactionalOutboxTests
 
             using (var restartedHost = BuildHost(connectionString))
             {
+                var restartObservation = LifecycleTickObservation.Expect(1);
                 await restartedHost.StartAsync(cancellationToken);
                 try
                 {
-                    await observation.SuccessorCommitted.WaitAsync(
-                        TimeSpan.FromSeconds(45),
+                    await restartedHost.Services.GetRequiredService<IMessageBus>()
+                        .SendAsync(new LifecycleMessage(DateTimeOffset.UtcNow));
+                    await restartObservation.Completed.WaitAsync(
+                        TimeSpan.FromSeconds(30),
                         cancellationToken);
-                    await using var scope = restartedHost.Services.CreateAsyncScope();
-                    var schedule = await scope.ServiceProvider
-                        .GetRequiredService<NoCtfDbContext>()
-                        .DurableMaintenanceSchedules.AsNoTracking()
-                        .SingleAsync(
-                            candidate => candidate.Kind
-                                == MaintenanceChainKind.CompetitionLifecycle,
-                            cancellationToken);
-                    await Assert.That(schedule.ProcessingVersion).IsEqualTo(3);
-                    await Assert.That(observation.AppliedVersions.Count(version => version == 1))
-                        .IsEqualTo(1);
-                    await Assert.That(observation.AppliedVersions.Count(version => version == 2))
-                        .IsEqualTo(1);
+                    await Assert.That(restartObservation.Outcomes).Count().IsEqualTo(1);
+                    await Assert.That(restartObservation.Outcomes[0])
+                        .IsEqualTo(MessageExecutionOutcome.Idempotent);
                 }
                 finally
                 {
@@ -537,27 +532,6 @@ public sealed class WolverineTransactionalOutboxTests
             .WithUsername("postgres")
             .WithPassword("postgres")
             .Build();
-
-    private static async Task WaitForLifecycleVersionAsync(
-        IHost host,
-        long expectedVersion,
-        CancellationToken cancellationToken)
-    {
-        for (var attempt = 0; attempt < 100; attempt++)
-        {
-            await using var scope = host.Services.CreateAsyncScope();
-            var version = await scope.ServiceProvider.GetRequiredService<NoCtfDbContext>()
-                .DurableMaintenanceSchedules.AsNoTracking()
-                .Where(candidate => candidate.Kind == MaintenanceChainKind.CompetitionLifecycle)
-                .Select(candidate => candidate.ProcessingVersion)
-                .SingleAsync(cancellationToken);
-            if (version >= expectedVersion)
-                return;
-            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
-        }
-        throw new TimeoutException(
-            $"The lifecycle chain did not commit processing version {expectedVersion}.");
-    }
 
     private static async Task<DeadLetterEnvelope> WaitForDeadLetterAsync(
         IDeadLetters deadLetters,
@@ -816,7 +790,7 @@ public sealed class LifecycleMaintenanceProbeHandler
             db,
             outbox,
             cancellationToken);
-        LifecycleChainObservation.Record(message.ProcessingVersion, outcome);
+        LifecycleTickObservation.Record(outcome);
     }
 }
 
@@ -920,40 +894,35 @@ internal static class AwdInjectionObservation
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
-internal sealed record LifecycleChainTasks(
-    Task FirstCommitted,
-    Task SuccessorCommitted,
-    IReadOnlyList<long> AppliedVersions);
+internal sealed record LifecycleTickTasks(
+    Task Completed,
+    IReadOnlyList<MessageExecutionOutcome> Outcomes);
 
-internal static class LifecycleChainObservation
+internal static class LifecycleTickObservation
 {
     private static readonly object Sync = new();
-    private static TaskCompletionSource First = CreateSource();
-    private static TaskCompletionSource Successor = CreateSource();
-    private static readonly List<long> Versions = [];
+    private static TaskCompletionSource completion = CreateSource();
+    private static readonly List<MessageExecutionOutcome> Outcomes = [];
+    private static int expectedCount;
 
-    public static LifecycleChainTasks Expect()
+    public static LifecycleTickTasks Expect(int expected)
     {
         lock (Sync)
         {
-            First = CreateSource();
-            Successor = CreateSource();
-            Versions.Clear();
-            return new(First.Task, Successor.Task, Versions);
+            completion = CreateSource();
+            expectedCount = expected;
+            Outcomes.Clear();
+            return new(completion.Task, Outcomes);
         }
     }
 
-    public static void Record(long version, MessageExecutionOutcome outcome)
+    public static void Record(MessageExecutionOutcome outcome)
     {
-        if (outcome is not (MessageExecutionOutcome.Applied or MessageExecutionOutcome.Idempotent))
-            return;
         lock (Sync)
         {
-            Versions.Add(version);
-            if (version == 1)
-                First.TrySetResult();
-            else if (version == 2)
-                Successor.TrySetResult();
+            Outcomes.Add(outcome);
+            if (Outcomes.Count >= expectedCount)
+                completion.TrySetResult();
         }
     }
 

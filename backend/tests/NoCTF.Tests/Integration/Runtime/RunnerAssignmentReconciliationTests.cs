@@ -10,7 +10,6 @@ using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
-using NoCTF.Domain.Platform;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Ctf.Configuration;
@@ -29,6 +28,7 @@ using Testcontainers.Redis;
 namespace NoCTF.Tests.Integration.Runtime;
 
 [Category("Integration")]
+[Category("RunnerAssignmentReconciliation")]
 public sealed class RunnerAssignmentReconciliationTests
 {
     [Test]
@@ -77,7 +77,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var db = new NoCtfDbContext(options))
             {
                 await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    new ReconcileRunnerAssignments(fixture.Now),
                     db,
                     capacity,
                     outbox,
@@ -233,7 +233,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var db = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    new ReconcileRunnerAssignments(fixture.Now),
                     db,
                     capacity,
                     outbox,
@@ -299,12 +299,12 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var duplicateDb = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now.AddSeconds(1), 1),
+                    new ReconcileRunnerAssignments(fixture.Now.AddSeconds(1)),
                     duplicateDb,
                     capacity,
                     outbox,
                     cancellationToken);
-                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Superseded);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Idempotent);
             }
             await using var duplicateVerify = new NoCtfDbContext(options);
             var duplicateRetained = await duplicateVerify.RuntimeInstances.AsNoTracking()
@@ -330,7 +330,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var db = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    new ReconcileRunnerAssignments(fixture.Now),
                     db,
                     new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Unavailable),
                     outbox,
@@ -344,11 +344,6 @@ public sealed class RunnerAssignmentReconciliationTests
             await Assert.That(unchanged.State).IsEqualTo(RuntimeState.Provisioning);
             await Assert.That(unchanged.RunnerId).IsEqualTo("runner-a");
             await Assert.That(unchanged.ProcessingVersion).IsEqualTo(7);
-            var schedule = await verify.DurableMaintenanceSchedules.AsNoTracking()
-                .SingleAsync(
-                    item => item.Kind == MaintenanceChainKind.RunnerAssignmentReconciliation,
-                    cancellationToken);
-            await Assert.That(schedule.ProcessingVersion).IsEqualTo(2);
             await Assert.That(outbox.Published).IsEmpty();
             await Assert.That(outbox.RunnerNodeMessages).IsEmpty();
             var retry = outbox.Scheduled.Single();
@@ -379,7 +374,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var db = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    new ReconcileRunnerAssignments(fixture.Now),
                     db,
                     capacity,
                     outbox,
@@ -583,7 +578,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var reconcileDb = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    new ReconcileRunnerAssignments(fixture.Now),
                     reconcileDb,
                     capacity,
                     outbox,
@@ -1102,7 +1097,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var unavailableDb = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    new ReconcileRunnerAssignments(fixture.Now),
                     unavailableDb,
                     new ReconciliationCapacityGate(
                         runnerId => runnerId == "runner-c"
@@ -1119,7 +1114,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var offlineDb = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now.AddSeconds(1), 2),
+                    new ReconcileRunnerAssignments(fixture.Now.AddSeconds(1)),
                     offlineDb,
                     new ReconciliationCapacityGate(
                         runnerId => runnerId == "runner-c"
@@ -1169,7 +1164,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var db = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
-                    new ReconcileRunnerAssignments(fixture.Now, 1),
+                    new ReconcileRunnerAssignments(fixture.Now),
                     db,
                     capacity,
                     outbox,
