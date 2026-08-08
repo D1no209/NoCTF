@@ -13,7 +13,7 @@
 - `main@2056bdc1` 已在生产环境以全新 17 张业务表基线部署；Migration 退出码为 0，API、Runner、PostgreSQL、Redis 健康，Worker 正常运行，HTTPS 首页、`/health` 与 Nuxt 静态资源均返回 200。
 - `df4335f3`：修复验证邮件链接与 Nuxt 页面路由不一致。新邮件使用 `/auth/verify-email`；页面保留 `/verify-email` 路由别名，因此已投递的旧链接继续有效。
 - 验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；非集成测试 609/609 通过；`SmtpEmailVerificationDeliveryTests` 4/4 通过；`bun run typecheck` 与 `bun run generate` 通过，生成路由包含 `/auth/verify-email` 及 `/verify-email` alias；`git diff --check` 通过。
-- 本热修未修改 HTTP/OpenAPI 契约、数据模型、migration 或 SDK。待本 HANDOFF 提交后推送并重新部署生产镜像。
+- 本热修未修改 HTTP/OpenAPI 契约、数据模型、migration 或 SDK。`c744d155` 已推送并完成生产热更新；旧路径返回 HTML 200，线上入口脚本同时包含 `/auth/verify-email` 与 `/verify-email` alias，最近 5 分钟 API/Worker/Runner 无 `fail:`，EF Information 日志未再增长。
 
 ## 2026-08-08 续推记录
 
