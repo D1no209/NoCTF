@@ -229,7 +229,6 @@ public sealed class GitOpsPersistenceContractTests
             var hintId = Guid.CreateVersion7(now.AddMilliseconds(7));
             var hintStore = new ChallengeHintStore(
                 db,
-                Substitute.For<ILeaderboardProjectionEngine>(),
                 Substitute.For<ITransactionalMessageOutbox>());
             var hint = await hintStore.SaveAsync(
                 new(

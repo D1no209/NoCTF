@@ -2,32 +2,26 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Hints;
 using NoCTF.Application.Messaging;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Competitions.Events;
-using NoCTF.Domain.Competitions.Events;
-using System.Text.Json;
 
 namespace NoCTF.Infrastructure.Challenges.Hints;
 
 public sealed class ChallengeHintStore(
     NoCtfDbContext db,
-    ILeaderboardProjectionEngine projection,
     ITransactionalMessageOutbox outbox,
     TeamChallengeCriticalSection criticalSection,
     ICompetitionEventRecorder? eventRecorder = null) : IChallengeHintStore
 {
     public ChallengeHintStore(
         NoCtfDbContext db,
-        ILeaderboardProjectionEngine projection,
         ITransactionalMessageOutbox outbox,
         ICompetitionEventRecorder? eventRecorder = null)
         : this(
             db,
-            projection,
             outbox,
             new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry()),
             eventRecorder) { }
@@ -260,102 +254,6 @@ public sealed class ChallengeHintStore(
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return HintUnlockAttempt.Success(new(submissionId, true));
-    }
-
-    private async Task<long> AuthoritativeScoreAsync(
-        Guid competitionId,
-        Guid teamId,
-        DateTimeOffset projectedAt,
-        CancellationToken ct)
-    {
-        var competition = await db.Competitions.AsNoTracking().SingleAsync(item => item.Id == competitionId, ct);
-        var teams = await db.Teams.IgnoreQueryFilters().AsNoTracking()
-            .Where(item => item.CompetitionId == competitionId)
-            .Select(item => new LeaderboardTeamFact(
-                item.Id,
-                item.Name,
-                item.IsBanned,
-                item.DeletedAt != null,
-                item.RegisteredAt))
-            .ToListAsync(ct);
-        var challenges = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
-            .Where(item => item.CompetitionId == competitionId)
-            .Join(db.Challenges.IgnoreQueryFilters().AsNoTracking(), item => item.ChallengeId, template => template.Id,
-                (item, template) => new LeaderboardChallengeFact(
-                    item.Id, template.Direction, template.Title, item.DeletedAt != null || template.DeletedAt != null,
-                    item.RulesJson))
-            .ToListAsync(ct);
-        var submissions = await db.Submissions.AsNoTracking()
-            .Where(item => item.CompetitionId == competitionId && item.CurrentScoringEventId != null)
-            .Join(db.ScoringEvents.AsNoTracking(), item => item.CurrentScoringEventId, fact => (Guid?)fact.Id,
-                (item, fact) => new { Submission = item, ScoringEvent = fact })
-            .Join(db.Users.AsNoTracking(), item => item.Submission.SubmittedByUserId, user => user.Id,
-                (item, user) => new LeaderboardSubmissionFact(
-                    item.Submission.Id, item.Submission.TeamId, item.Submission.CompetitionChallengeId,
-                    item.Submission.Kind, item.Submission.ReceivedAt, item.ScoringEvent,
-                    item.ScoringEvent.VictimTeamId, user.UserName,
-                    item.Submission.SubmittedFlag))
-            .ToListAsync(ct);
-        var hintCosts = (await db.CompetitionChallenges.AsNoTracking()
-                .Where(item => item.CompetitionId == competitionId)
-                .ToListAsync(ct))
-            .SelectMany(item => item.Hints)
-            .ToDictionary(item => item.Id, item => item.Cost);
-        var systemEvents = await db.ScoringEvents.AsNoTracking()
-            .Where(item => item.CompetitionId == competitionId && item.SubmissionId == null)
-            .ToListAsync(ct);
-        var system = systemEvents.Select(item => new LeaderboardSystemFact(
-            item,
-            item.Kind == ScoringEventKind.HintUnlock && item.SpecificationId is { } hintId
-                ? hintCosts.GetValueOrDefault(hintId)
-                : 0)).ToList();
-        var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
-            .Where(item => item.CompetitionId == competitionId
-                && item.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
-            .OrderBy(item => item.OccurredAt)
-            .ToListAsync(ct);
-        var lifecycleAudits = lifecycleEvents.Select(item =>
-        {
-            using var payload = JsonDocument.Parse(item.PayloadJson);
-            return new CompetitionLifecycleTransition
-            {
-                Id = item.Id,
-                CompetitionId = item.CompetitionId,
-                From = Enum.Parse<CompetitionStatus>(payload.RootElement.GetProperty("from").GetString()!, true),
-                To = Enum.Parse<CompetitionStatus>(payload.RootElement.GetProperty("to").GetString()!, true),
-                ActorId = item.ActorUserId,
-                OccurredAt = item.OccurredAt
-            };
-        }).ToList();
-        IReadOnlyList<LeaderboardAwdRoundFact> awdRounds = [];
-        if (competition.Mode == GameMode.Awd)
-        {
-            awdRounds = await db.ChallengeFlags.AsNoTracking()
-                .Where(flag => flag.TeamId != null
-                    && flag.CompetitionChallengeId != null
-                    && flag.SpecificationKind == SpecificationKind.AwdRound
-                    && flag.SpecificationId != null
-                    && flag.ValidStart != null
-                    && flag.ValidUntil != null
-                    && flag.DeletedAt == null)
-                .Join(
-                    db.CompetitionChallenges.AsNoTracking()
-                        .Where(item => item.CompetitionId == competitionId),
-                    flag => flag.CompetitionChallengeId,
-                    item => (Guid?)item.Id,
-                    (flag, _) => new LeaderboardAwdRoundFact(
-                        flag.CompetitionChallengeId!.Value,
-                        flag.TeamId!.Value,
-                        flag.SpecificationId!.Value,
-                        flag.ValidStart!.Value,
-                        flag.ValidUntil!.Value))
-                .ToListAsync(ct);
-        }
-        var result = projection.Project(new(
-            competitionId, competition.Mode, teams, submissions, system, challenges,
-            competition.ConfigurationJson, competition.StartAt, lifecycleAudits,
-            awdRounds, projectedAt));
-        return result.Entries.SingleOrDefault(item => item.TeamId == teamId)?.Score ?? 0;
     }
 
     private async Task QueueHintPublicationAsync(

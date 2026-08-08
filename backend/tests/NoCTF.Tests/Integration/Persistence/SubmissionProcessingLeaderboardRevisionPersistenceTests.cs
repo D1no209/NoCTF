@@ -441,6 +441,7 @@ public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
             admissionPolicy,
             placementPolicy,
             outbox,
+            Substitute.For<ILeaderboardSnapshotFactory>(),
             events);
         await processor.ProcessAsync(submissionId, processingVersion, cancellationToken);
     }
