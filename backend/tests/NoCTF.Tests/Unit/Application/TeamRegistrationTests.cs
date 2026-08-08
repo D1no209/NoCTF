@@ -50,6 +50,7 @@ public class TeamRegistrationTests
                 Guid.NewGuid(),
                 command.CompetitionId,
                 command.Name,
+                null,
                 command.UserId,
                 [command.UserId],
                 status,

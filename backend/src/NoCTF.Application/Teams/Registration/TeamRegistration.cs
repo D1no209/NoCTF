@@ -9,6 +9,7 @@ public sealed record TeamView(
     Guid Id,
     Guid CompetitionId,
     string Name,
+    Guid? AvatarFileId,
     Guid CaptainId,
     IReadOnlyList<Guid> MemberIds,
     TeamRegistrationStatus RegistrationStatus,

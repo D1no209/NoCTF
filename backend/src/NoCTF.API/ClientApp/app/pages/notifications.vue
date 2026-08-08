@@ -43,11 +43,11 @@ onMounted(loadMore)
     <ul v-else class="flex flex-col gap-2">
       <li v-for="notification in items" :key="notification.id">
         <NuxtLink
-          :to="notification.competitionId ? `/competitions/${notification.competitionId}` : '/notifications'"
+          :to="notificationCompetitionId(notification) ? `/competitions/${notificationCompetitionId(notification)}` : '/notifications'"
           class="block rounded-md border px-4 py-3 transition-colors hover:border-primary/50"
         >
           <p class="text-sm">{{ notificationText(notification) }}</p>
-          <p class="mt-1 text-xs text-muted-foreground">{{ formatDateTime(notification.createdAt) }}</p>
+          <p class="mt-1 text-xs text-muted-foreground">{{ formatDateTime(notification.sentAt) }}</p>
         </NuxtLink>
       </li>
     </ul>
