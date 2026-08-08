@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
+using JasperFx;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Challenges;
@@ -36,6 +37,68 @@ namespace NoCTF.Tests.Integration.Messaging;
 [NotInParallel]
 public sealed class WolverineTransactionalOutboxTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Maintenance_ticks_are_single_active_and_fail_over_between_workers(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var connectionString = postgres.GetConnectionString();
+            using var first = BuildMaintenanceHost(connectionString);
+            using var second = BuildMaintenanceHost(connectionString);
+            var firstStopped = false;
+            var secondStopped = false;
+            MaintenanceTickObservation.Reset();
+
+            await first.StartAsync(cancellationToken);
+            await second.StartAsync(cancellationToken);
+            try
+            {
+                var firstAgent = first.Services.GetRequiredService<MaintenanceTickAgent>();
+                var secondAgent = second.Services.GetRequiredService<MaintenanceTickAgent>();
+                await WaitUntilAsync(
+                    () => RunningAgentCount(firstAgent, secondAgent) == 1
+                        && MaintenanceTickObservation.DispatchCount > 0,
+                    TimeSpan.FromSeconds(30),
+                    cancellationToken);
+                await Assert.That(RunningAgentCount(firstAgent, secondAgent)).IsEqualTo(1);
+
+                var active = firstAgent.Status == AgentStatus.Running ? first : second;
+                var standbyAgent = ReferenceEquals(active, first) ? secondAgent : firstAgent;
+                var countBeforeFailover = MaintenanceTickObservation.DispatchCount;
+                if (ReferenceEquals(active, first))
+                {
+                    await first.StopAsync(cancellationToken);
+                    firstStopped = true;
+                }
+                else
+                {
+                    await second.StopAsync(cancellationToken);
+                    secondStopped = true;
+                }
+
+                await WaitUntilAsync(
+                    () => standbyAgent.Status == AgentStatus.Running
+                        && MaintenanceTickObservation.DispatchCount > countBeforeFailover,
+                    TimeSpan.FromSeconds(30),
+                    cancellationToken);
+                await Assert.That(standbyAgent.Status).IsEqualTo(AgentStatus.Running);
+                await Assert.That(MaintenanceTickObservation.DispatchCount)
+                    .IsGreaterThan(countBeforeFailover);
+            }
+            finally
+            {
+                if (!firstStopped)
+                    await first.StopAsync(cancellationToken);
+                if (!secondStopped)
+                    await second.StopAsync(cancellationToken);
+            }
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Consumer_observes_business_fact_committed_with_outbox(
@@ -660,6 +723,41 @@ public sealed class WolverineTransactionalOutboxTests
         return builder.Build();
     }
 
+    private static IHost BuildMaintenanceHost(string connectionString)
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddSingularAgent<MaintenanceTickAgent>();
+        builder.UseWolverine(options =>
+        {
+            options.Discovery.IncludeType<MaintenanceTickProbeHandler>();
+            options.PersistMessagesWithPostgresql(connectionString, "wolverine_maintenance_test");
+            options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
+            options.Durability.CheckAssignmentPeriod = TimeSpan.FromMilliseconds(250);
+            options.Durability.FirstHealthCheckExecution = TimeSpan.FromMilliseconds(100);
+            options.Durability.HealthCheckPollingTime = TimeSpan.FromMilliseconds(250);
+            options.Durability.StaleNodeTimeout = TimeSpan.FromSeconds(1);
+        });
+        return builder.Build();
+    }
+
+    private static int RunningAgentCount(params MaintenanceTickAgent[] agents) =>
+        agents.Count(agent => agent.Status == AgentStatus.Running);
+
+    private static async Task WaitUntilAsync(
+        Func<bool> condition,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (condition())
+                return;
+            await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
+        }
+        throw new TimeoutException("The Wolverine maintenance agent did not reach the expected state.");
+    }
+
     public sealed class EmptyLifecycleStore : ICompetitionLifecycleStore
     {
         public Task<CompetitionStatus?> GetStatusAsync(
@@ -695,6 +793,26 @@ public sealed record ObserveScheduledOutboxProbe(Guid Id);
 public sealed record WriteRollbackOutboxProbe(Guid Id);
 public sealed record ObserveRollbackOutboxProbe(Guid Id);
 public sealed record FinishLifecycleProbe(Guid CompetitionId);
+
+public static class MaintenanceTickObservation
+{
+    private static int dispatchCount;
+
+    public static int DispatchCount => Volatile.Read(ref dispatchCount);
+
+    public static void Reset() => Interlocked.Exchange(ref dispatchCount, 0);
+
+    public static void RecordDispatch() => Interlocked.Increment(ref dispatchCount);
+}
+
+public sealed class MaintenanceTickProbeHandler
+{
+    public static void Handle(DispatchAwdCheckers _) => MaintenanceTickObservation.RecordDispatch();
+
+    public static void Handle(ReconcileRunnerAssignments _) { }
+
+    public static void Handle(LifecycleMessage _) { }
+}
 
 public sealed class OutboxBusinessProbeHandler
 {
