@@ -253,6 +253,50 @@ public sealed class CtfLeaderboardProjectorTests
     }
 
     [Test]
+    public async Task Projector_distinguishes_current_points_percentage_from_solve_time_percentage()
+    {
+        var teams = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        var challengeId = Guid.NewGuid();
+        var competitionId = Guid.NewGuid();
+        var start = DateTimeOffset.Parse("2026-08-09T00:00:00Z");
+        var challengeConfiguration = new CtfChallengeConfiguration(
+            CtfChallengeConfiguration.CurrentSchemaVersion,
+            new(100, 0, 10),
+            [
+                new(BloodRewardPolicy.CurrentPointsPercentage, 50),
+                new(BloodRewardPolicy.SolveTimePointsPercentage, 50),
+                new(BloodRewardPolicy.FixedPoints, 0)
+            ],
+            ScoreExpression: "initialPoints - solveCount * 10m");
+        var input = new LeaderboardProjectionInput(
+            competitionId,
+            GameMode.Ctf,
+            teams.Select((teamId, index) => new LeaderboardTeamFact(
+                teamId, $"team-{index + 1}", false, false)).ToList(),
+            teams.Select((teamId, index) => Fact(teamId, start.AddSeconds(index))).ToList(),
+            [],
+            [new(challengeId, "Web", "Web challenge", false,
+                JsonSerializer.Serialize(challengeConfiguration))],
+            JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 0, 10), [])),
+            start);
+
+        var rows = new CtfLeaderboardProjector().Project(input).Entries;
+
+        await Assert.That(rows.Single(row => row.TeamId == teams[0]).Score).IsEqualTo(105);
+        await Assert.That(rows.Single(row => row.TeamId == teams[1]).Score).IsEqualTo(110);
+        await Assert.That(rows.Single(row => row.TeamId == teams[2]).Score).IsEqualTo(70);
+
+        LeaderboardSubmissionFact Fact(Guid teamId, DateTimeOffset at) => new(
+            Guid.NewGuid(), teamId, challengeId, SubmissionKind.Flag, at,
+            new ScoringEvent
+            {
+                Id = Guid.NewGuid(), CompetitionId = competitionId, TeamId = teamId,
+                CompetitionChallengeId = challengeId, Kind = ScoringEventKind.SubmissionEvaluation,
+                Result = ScoringResult.Correct, OccurredAt = at, CreatedAt = at
+            });
+    }
+
+    [Test]
     public async Task Fixed_blood_reward_does_not_evaluate_irrelevant_slot_score()
     {
         var teams = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };

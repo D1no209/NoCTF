@@ -79,6 +79,7 @@ internal static class CtfLeaderboardProjection
             score = checked(score + BloodRewardAt(
                 configuration.BloodRewards ?? defaults.BloodRewards,
                 index,
+                score,
                 () => currentSolveCounts[challengeId] == solveOrdinal
                     ? score
                     : ScoreExpression.Evaluate(expression, new(
@@ -237,6 +238,7 @@ internal static class CtfLeaderboardProjection
     private static long BloodRewardAt(
         IReadOnlyList<BloodReward> rewards,
         int solveIndex,
+        long currentPoints,
         Func<long> solvePoints,
         CtfPointConfiguration points)
     {
@@ -249,6 +251,7 @@ internal static class CtfLeaderboardProjection
             BloodRewardPolicy.FixedPoints => reward.Value,
             BloodRewardPolicy.InitialPointsPercentage => points.InitialPoints * reward.Value / 100m,
             BloodRewardPolicy.SolveTimePointsPercentage => solvePoints() * reward.Value / 100m,
+            BloodRewardPolicy.CurrentPointsPercentage => currentPoints * reward.Value / 100m,
             _ => 0m
         };
         return checked((long)Math.Round(basis, MidpointRounding.AwayFromZero));
