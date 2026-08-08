@@ -118,6 +118,93 @@ public sealed class AdminRuntimeStore(
                     .ToArray()))
             .SingleOrDefaultAsync(ct);
 
+    public async Task<RuntimeMutationResult> TerminateAsync(
+        Guid competitionId,
+        Guid runtimeInstanceId,
+        long expectedProcessingVersion,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var scope = await db.RuntimeInstances.AsNoTracking()
+            .Where(instance =>
+                instance.Id == runtimeInstanceId &&
+                instance.CompetitionId == competitionId)
+            .Select(instance => new
+            {
+                instance.TeamId,
+                instance.CompetitionChallengeId
+            })
+            .SingleOrDefaultAsync(ct);
+        if (scope is null)
+            return new(null, RuntimeMutationFailure.NotFound);
+
+        await using var criticalSection = scope.TeamId is Guid teamId
+            ? await runtimeQuota.AcquireLockAsync(db, competitionId, teamId, ct)
+            : await sharedRuntimeCriticalSection.AcquireAsync(
+                db,
+                scope.CompetitionChallengeId,
+                ct);
+        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(candidate =>
+            candidate.Id == runtimeInstanceId &&
+            candidate.CompetitionId == competitionId,
+            ct);
+        if (instance is null)
+            return new(null, RuntimeMutationFailure.NotFound);
+        if (instance.ProcessingVersion != expectedProcessingVersion)
+            return new(null, RuntimeMutationFailure.Conflict);
+        if (instance.State == RuntimeState.Stopping)
+            return new(Map(instance));
+        if (instance.State == RuntimeState.Stopped ||
+            instance is { State: RuntimeState.Failed, ProviderReceiptJson: null })
+        {
+            return new(null, RuntimeMutationFailure.InvalidState);
+        }
+
+        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        instance.RunnerAssignmentReleaseToken = null;
+        if (instance.State == RuntimeState.Queued)
+        {
+            instance.State = RuntimeState.Stopped;
+            instance.StoppedAt = now;
+        }
+        else
+        {
+            instance.State = RuntimeState.Stopping;
+            instance.FailureCode = null;
+            await outbox.PublishAsync(new StopRuntime(
+                instance.Id,
+                instance.ProcessingVersion));
+        }
+
+        try
+        {
+            await events.RecordAsync(new(
+                instance.CompetitionId,
+                CompetitionEventKind.RuntimeStateChanged,
+                CompetitionEventLevel.Warning,
+                instance.TeamId is null
+                    ? CompetitionEventVisibility.Public
+                    : CompetitionEventVisibility.Team,
+                now,
+                ActorUserId: actorUserId,
+                TeamId: instance.TeamId,
+                CompetitionChallengeId: instance.CompetitionChallengeId,
+                RuntimeInstanceId: instance.Id,
+                RuntimeState: instance.State,
+                RuntimeGeneration: instance.Generation), ct);
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
+            return new(Map(instance));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(null, RuntimeMutationFailure.Conflict);
+        }
+    }
+
     public async Task<RuntimeMutationResult> MutateAsync(
         Guid competitionId,
         Guid competitionChallengeId,

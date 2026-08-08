@@ -10,8 +10,7 @@ import {
   adminResetTeamRuntime,
   adminStartSharedRuntime,
   adminStartTeamRuntime,
-  adminStopSharedRuntime,
-  adminStopTeamRuntime,
+  adminTerminateRuntime,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
@@ -109,7 +108,7 @@ async function waitForRuntime(runtimeInstanceId: string | undefined, done: (stat
 
 async function runRuntimeOp(
   rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
-  op: 'start' | 'stop' | 'reset',
+  op: 'start' | 'reset',
 ) {
   if (!rt.competitionChallengeId) return
   opPending.value = `${rt.id}:${op}`
@@ -120,15 +119,12 @@ async function runRuntimeOp(
     const { data, error } =
       op === 'start'
         ? (rt.teamId ? await adminStartTeamRuntime({ path: teamPath }) : await adminStartSharedRuntime({ path: ccPath }))
-        : op === 'stop'
-          ? (rt.teamId ? await adminStopTeamRuntime({ path: teamPath }) : await adminStopSharedRuntime({ path: ccPath }))
-          : (rt.teamId ? await adminResetTeamRuntime({ path: teamPath }) : await adminResetSharedRuntime({ path: ccPath }))
+        : (rt.teamId ? await adminResetTeamRuntime({ path: teamPath }) : await adminResetSharedRuntime({ path: ccPath }))
     if (error) throw error
-    const label = op === 'start' ? '启动' : op === 'stop' ? '停止' : '重置'
+    const label = op === 'start' ? '启动' : '重置'
     toast.success(`${label}操作已受理`)
-    const targetState = op === 'start' ? 'Running' : 'Stopped'
     await waitForRuntime(data?.runtimeInstanceId ?? rt.id, state =>
-      op === 'reset' ? state === 'Stopped' : state === targetState || state === 'Failed')
+      op === 'reset' ? state === 'Stopped' : state === 'Running' || state === 'Failed')
     refreshList()
     if (detailOpen.value && detail.value?.id) await openDetail(detail.value.id)
   }
@@ -137,6 +133,41 @@ async function runRuntimeOp(
   }
   finally {
     opPending.value = null
+  }
+}
+
+// ---- Exact termination ----
+const terminateDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+const terminatePending = ref(false)
+
+function canTerminate(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse) {
+  return rt.state === 'Queued'
+    || rt.state === 'Provisioning'
+    || rt.state === 'Running'
+    || (rt.state === 'Failed' && Boolean(rt.providerReceiptJson))
+}
+
+async function submitTermination() {
+  const rt = terminateDialog.value
+  if (!rt?.id || rt.processingVersion === undefined || rt.processingVersion === null) return
+  terminatePending.value = true
+  try {
+    const { data, error } = await adminTerminateRuntime({
+      path: { competitionId, runtimeInstanceId: rt.id },
+      body: { expectedProcessingVersion: rt.processingVersion },
+    })
+    if (error) throw error
+    toast.success('实例终止操作已受理')
+    terminateDialog.value = null
+    await waitForRuntime(data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped' || state === 'Failed')
+    refreshList()
+    if (detailOpen.value && detail.value?.id === rt.id) await openDetail(rt.id)
+  }
+  catch (e) {
+    toast.error(parseApiError(e).message)
+  }
+  finally {
+    terminatePending.value = false
   }
 }
 
@@ -277,10 +308,10 @@ onMounted(() => {
                     @click="runRuntimeOp(rt, 'start')"
                   >启动</Button>
                   <Button
-                    v-if="rt.state === 'Running'"
-                    variant="ghost" size="sm" :disabled="opPending !== null"
-                    @click="runRuntimeOp(rt, 'stop')"
-                  >停止</Button>
+                    v-if="canTerminate(rt)"
+                    variant="destructive" size="sm" :disabled="opPending !== null || terminatePending"
+                    @click="terminateDialog = rt"
+                  >终止</Button>
                   <Button
                     variant="ghost" size="sm" :disabled="opPending !== null"
                     @click="runRuntimeOp(rt, 'reset')"
@@ -369,5 +400,25 @@ onMounted(() => {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog :open="terminateDialog !== null" @update:open="(open) => { if (!open && !terminatePending) terminateDialog = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>终止此运行时实例？</AlertDialogTitle>
+          <AlertDialogDescription>
+            将立即停止并清理「{{ teamName(terminateDialog?.teamId) }}」在
+            「{{ challengeTitle(terminateDialog?.competitionChallengeId) }}」的第
+            {{ terminateDialog?.generation }} 代实例。该操作不会重建环境。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="terminatePending">取消</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" :disabled="terminatePending" @click="submitTermination">
+            <Spinner v-if="terminatePending" data-icon="inline-start" />
+            确认终止
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>

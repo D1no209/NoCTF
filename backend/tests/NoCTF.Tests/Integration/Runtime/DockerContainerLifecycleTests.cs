@@ -18,6 +18,72 @@ public sealed class DockerContainerLifecycleTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Missing_local_image_is_pulled_before_container_creation(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            var operationId = Guid.NewGuid();
+            const string image = "busybox:1.37.0-glibc";
+            await using (var sourceProbe = new ContainerBuilder(image)
+                .WithCommand("true")
+                .Build())
+            {
+                await sourceProbe.StartAsync(cancellationToken);
+            }
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            _ = await docker.Images.DeleteImageAsync(
+                image,
+                new ImageDeleteParameters { Force = true },
+                cancellationToken);
+            Func<Task> inspectMissing = async () =>
+                _ = await docker.Images.InspectImageAsync(image, cancellationToken);
+            await Assert.That(inspectMissing).Throws<DockerImageNotFoundException>();
+
+            using var lifecycle = CreateLifecycle();
+            ContainerReceipt? receipt = null;
+            try
+            {
+                receipt = await lifecycle.CreateAsync(new(
+                    operationId,
+                    RuntimeProvider.Docker,
+                    image,
+                    ["sleep", "300"],
+                    new Dictionary<string, string>(),
+                    new Dictionary<string, string>(),
+                    new Dictionary<int, int>(),
+                    new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                    new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                    TimeSpan.FromMinutes(5),
+                    NetworkName: "none",
+                    NetworkPurpose: ContainerNetworkPurpose.AwdpVerification), cancellationToken);
+
+                await Assert.That(receipt.Status).IsEqualTo(RuntimeStatus.Running);
+                _ = await docker.Images.InspectImageAsync(image, cancellationToken);
+            }
+            finally
+            {
+                if (receipt is not null)
+                    await lifecycle.DestroyAsync(receipt, CancellationToken.None);
+                try
+                {
+                    _ = await docker.Images.DeleteImageAsync(
+                        image,
+                        new ImageDeleteParameters { Force = true },
+                        CancellationToken.None);
+                }
+                catch (DockerImageNotFoundException)
+                {
+                    // A failed pull leaves no local image to remove.
+                }
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Isolated_network_replay_returns_the_original_network(
         CancellationToken cancellationToken)
     {
@@ -693,4 +759,5 @@ public sealed class DockerContainerLifecycleTests
     private static ContainerReceipt Receipt(string resourceId) => new(
         Guid.NewGuid(), RuntimeProvider.Docker, resourceId, RuntimeStatus.Running,
         new Dictionary<int, int>(), "localhost", null);
+
 }

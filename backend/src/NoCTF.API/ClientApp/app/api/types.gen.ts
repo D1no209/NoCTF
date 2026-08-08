@@ -928,6 +928,10 @@ export type NoCtfapiEndpointsAdministrationRuntimeListAdminRuntimesRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationRuntimeTerminateRuntimeRequest = {
+    expectedProcessingVersion: number;
+};
+
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
     id?: string;
     userName?: string;
@@ -4769,6 +4773,47 @@ export type AdminStopTeamRuntimeResponses = {
 };
 
 export type AdminStopTeamRuntimeResponse = AdminStopTeamRuntimeResponses[keyof AdminStopTeamRuntimeResponses];
+
+export type AdminTerminateRuntimeData = {
+    body: NoCtfapiEndpointsAdministrationRuntimeTerminateRuntimeRequest;
+    path: {
+        competitionId: string;
+        runtimeInstanceId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/terminate';
+};
+
+export type AdminTerminateRuntimeErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+};
+
+export type AdminTerminateRuntimeError = AdminTerminateRuntimeErrors[keyof AdminTerminateRuntimeErrors];
+
+export type AdminTerminateRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsRuntimeRuntimeAcceptedResponse;
+};
+
+export type AdminTerminateRuntimeResponse = AdminTerminateRuntimeResponses[keyof AdminTerminateRuntimeResponses];
 
 export type AdminPlatformCreateBotData = {
     body: NoCtfapiEndpointsAdministrationPlatformCreatePlatformBotRequest;

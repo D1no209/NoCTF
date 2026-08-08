@@ -44,6 +44,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         CreateContainerResponse? response = null;
         try
         {
+            await EnsureImageAvailableAsync(request.Image, cancellationToken);
             var labels = BuildLabels(request);
             response = await client.Containers.CreateContainerAsync(new CreateContainerParameters
             {
@@ -191,6 +192,34 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             resourceName,
             RuntimeInstanceId: request.RuntimeInstanceId,
             Generation: request.Generation);
+    }
+
+    private async Task EnsureImageAvailableAsync(
+        string image,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _ = await client.Images.InspectImageAsync(image, cancellationToken);
+            return;
+        }
+        catch (DockerImageNotFoundException)
+        {
+            // Pull below. Existing local images remain untouched.
+        }
+
+        var progress = new ImagePullProgress();
+        await client.Images.CreateImageAsync(
+            new ImagesCreateParameters { FromImage = image },
+            new AuthConfig(),
+            progress,
+            cancellationToken);
+        if (progress.Error is not null)
+        {
+            throw new InvalidOperationException(
+                $"Docker image pull failed: {progress.Error.Message}");
+        }
+        _ = await client.Images.InspectImageAsync(image, cancellationToken);
     }
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
@@ -873,6 +902,17 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 System.Globalization.CultureInfo.InvariantCulture)
         };
         return labels;
+    }
+
+    private sealed class ImagePullProgress : IProgress<JSONMessage>
+    {
+        public JSONError? Error { get; private set; }
+
+        public void Report(JSONMessage value)
+        {
+            if (value.Error is not null)
+                Error = value.Error;
+        }
     }
 
 }

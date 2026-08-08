@@ -5608,6 +5608,93 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/terminate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Terminates an exact runtime instance.",
+        "description": "Queues durable provider cleanup for the selected instance and rejects stale processing versions.",
+        "operationId": "AdminTerminateRuntime",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "TerminateRuntimeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeTerminateRuntimeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/bots": {
       "post": {
         "tags": [
@@ -15087,6 +15174,20 @@
       "NoCTFAPIEndpointsAdministrationRuntimeListAdminRuntimesRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationRuntimeTerminateRuntimeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedProcessingVersion"
+        ],
+        "properties": {
+          "expectedProcessingVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0.0
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse": {
         "type": "object",

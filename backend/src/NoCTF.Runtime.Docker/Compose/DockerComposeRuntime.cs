@@ -50,6 +50,8 @@ public sealed class DockerComposeRuntime(
                 "up",
                 cancellationToken,
                 "-d",
+                "--pull",
+                "missing",
                 "--wait",
                 "--wait-timeout",
                 Math.Max(1, (int)Math.Ceiling(request.OperationTimeout.TotalSeconds)).ToString(

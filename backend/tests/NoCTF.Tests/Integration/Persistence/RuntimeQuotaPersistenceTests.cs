@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Challenges.Flags;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -25,6 +26,75 @@ namespace NoCTF.Tests.Integration.Persistence;
 [NotInParallel]
 public sealed class RuntimeQuotaPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Admin_termination_targets_the_exact_instance_and_rejects_a_stale_version(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_runtime_exact_termination")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = Options(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, [RuntimeState.Running], cancellationToken);
+            var actorUserId = fixture.Teams[0].UserId;
+            Guid runtimeInstanceId;
+            await using (var lookup = new NoCtfDbContext(options))
+            {
+                runtimeInstanceId = await lookup.RuntimeInstances.AsNoTracking()
+                    .Where(runtime => runtime.CompetitionId == fixture.CompetitionId)
+                    .Select(runtime => runtime.Id)
+                    .SingleAsync(cancellationToken);
+            }
+
+            var outbox = new RecordingOutbox();
+            var events = new RecordingCompetitionEventRecorder();
+            await using (var db = new NoCtfDbContext(options))
+            {
+                var store = CreateAdminStore(db, outbox, events);
+                var result = await store.TerminateAsync(
+                    fixture.CompetitionId,
+                    runtimeInstanceId,
+                    expectedProcessingVersion: 0,
+                    actorUserId,
+                    fixture.Now,
+                    cancellationToken);
+
+                await Assert.That(result.Failure).IsNull();
+                await Assert.That(result.Runtime!.Id).IsEqualTo(runtimeInstanceId);
+                await Assert.That(result.Runtime.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(result.Runtime.ProcessingVersion).IsEqualTo(1);
+            }
+
+            await Assert.That(outbox.Published.OfType<StopRuntime>().Single())
+                .IsEqualTo(new StopRuntime(runtimeInstanceId, 1));
+            var recorded = events.Drafts.Single();
+            await Assert.That(recorded.ActorUserId).IsEqualTo(actorUserId);
+            await Assert.That(recorded.RuntimeInstanceId).IsEqualTo(runtimeInstanceId);
+            await Assert.That(recorded.RuntimeState).IsEqualTo(RuntimeState.Stopping);
+
+            await using (var staleDb = new NoCtfDbContext(options))
+            {
+                var staleOutbox = new RecordingOutbox();
+                var stale = await CreateAdminStore(staleDb, staleOutbox).TerminateAsync(
+                    fixture.CompetitionId,
+                    runtimeInstanceId,
+                    expectedProcessingVersion: 0,
+                    actorUserId,
+                    fixture.Now.AddSeconds(1),
+                    cancellationToken);
+
+                await Assert.That(stale.Runtime).IsNull();
+                await Assert.That(stale.Failure).IsEqualTo(RuntimeMutationFailure.Conflict);
+                await Assert.That(staleOutbox.Published).IsEmpty();
+            }
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Concurrent_player_and_admin_starts_do_not_exceed_the_team_quota(
@@ -371,6 +441,18 @@ public sealed class RuntimeQuotaPersistenceTests
         return new(result, outbox.Published.OfType<DispatchRuntime>().Count());
     }
 
+    private static AdminRuntimeStore CreateAdminStore(
+        NoCtfDbContext db,
+        RecordingOutbox outbox,
+        ICompetitionEventRecorder? events = null) =>
+        new(
+            db,
+            new ChallengeRuntimeTemplateCatalog(),
+            new FixedRuntimePlacementPolicy(runnerPool: "quota-tests"),
+            new PostgresPerTeamRuntimeFlagStore(db),
+            outbox,
+            events);
+
     private sealed record Fixture(
         DateTimeOffset Now,
         Guid CompetitionId,
@@ -407,5 +489,18 @@ public sealed class RuntimeQuotaPersistenceTests
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
 
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+    }
+
+    private sealed class RecordingCompetitionEventRecorder : ICompetitionEventRecorder
+    {
+        public List<CompetitionEventDraft> Drafts { get; } = [];
+
+        public ValueTask<Guid> RecordAsync(
+            CompetitionEventDraft draft,
+            CancellationToken cancellationToken = default)
+        {
+            Drafts.Add(draft);
+            return ValueTask.FromResult(Guid.CreateVersion7(draft.OccurredAt));
+        }
     }
 }
