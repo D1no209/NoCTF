@@ -6,7 +6,7 @@
 - API、测试项目当前均可编译；EF model snapshot 与当前模型无 pending changes（2026-08-08 再次验证）。
 - OpenAPI 已重新导出，Nuxt 生成客户端已更新。
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
-- Owner 明确本次提交不以完整测试通过为门槛；最后一次运行结果为 603 通过、140 跳过、6 失败，失败数与导入基线一致，包含旧 OpenAPI 路由计数/清单断言、Development Host DI、旧架构断言及本机 Docker 不可用。Build 与 EF drift 检查通过。
+- 当前完整测试基线已清零：最后一次运行结果为 608 通过、141 跳过、0 失败；跳过项来自本机 Docker 不可用及未启用的 Kubernetes/Libvirt 外部集成。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
 ## 2026-08-08 续推记录
 
@@ -21,8 +21,10 @@
 - `477c3b85`：恢复 AWD checker、AWDP fix result 与 KoH polling 共 11 个异步计分场景，排除文件由 7 个降至 4 个；AWD checker 测试改为当前无调度业务表的 `DispatchAwdCheckers(At, cursor)`，AWDP Patch 使用统一 File 引用，KoH 生命周期并发断言改读不可变 `competition_events` 及其 `from/to` payload。
 - `1e60c640`：恢复 CompetitionChallenge lifecycle revision 与 Competition notification delivery 共 4 个场景，排除文件由 4 个降至 2 个；Hint 断言改读所属 CompetitionChallenge 的 JSON 集合，通知测试改为动态受众。投递器将稳定 `sourceEventKey` 写入 Content JSON 并在写入前按目标、类型、比赛和内容查重，确保 Wolverine 重放不会重复投递。
 - `bd5e2cc3`：恢复 Wolverine transactional outbox 与 Runner assignment reconciliation 最后 2 个测试文件；维护测试改为当前无业务调度表的幂等 Tick 语义，Runner 对账改用当前时间/游标契约并验证显式重试消息。`NoCTF.Tests.csproj` 已无任何 `Compile Remove` 测试排除。
+- `6ee8ae02`：修复 `MaintenanceTickAgent` 单例直接依赖 scoped `IMessageBus` 导致 Development Host 无法构建的问题；每个 Tick 现在从短生命周期 scope 解析消息总线。17 表 schema 验收也统一接入 `DockerIntegrationTest`，本机缺少 Docker 时跳过、设置强制集成环境变量时仍会失败。
+- `361cb4f0`：将架构验证对齐 17 表收敛模型。参数化 PostgreSQL advisory lock、行锁与递归 CTE 仅允许在 4 个明确责任文件中出现，继续禁止 Raw SQL；JSON owned Hint 验证级联所有权，File FK 保持 Restrict；同步 189 条 API/122 条管理 API 清单、管理端 operationId/描述、OpenAPI 与 Nuxt SDK。
 - 新增协议枚举 `NotificationKind.UserAccountLifecycleChanged`；OpenAPI 与 Nuxt SDK 已同步。没有新增数据表或 migration。
-- 本轮验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；EF 无 pending model changes；OpenAPI 导出、Nuxt typecheck 与 production build 通过；全量测试 749 项，603 通过、140 跳过、6 个基线失败。所有导入的旧集成场景均已进入测试集，但本机 Docker 不可用时按测试设施策略跳过。
+- 本轮验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；EF 无 pending model changes；OpenAPI 导出、Nuxt typecheck 与 production build 通过；全量测试 749 项，608 通过、141 跳过、0 失败。所有导入的旧集成场景均已进入测试集，但本机 Docker 不可用时按测试设施策略跳过。
 - 未推送、未部署；原工作区 `TODO.md`、`PLAN.md` 及其他用户/协作者未提交内容保持不动。
 
 ## 已落地的主要能力
