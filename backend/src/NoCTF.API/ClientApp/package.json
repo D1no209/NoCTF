@@ -8,6 +8,7 @@
     "build": "nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "test": "bun test",
     "postinstall": "nuxt prepare",
     "api:gen": "openapi-ts",
     "typecheck": "nuxi typecheck"
