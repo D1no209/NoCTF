@@ -9,6 +9,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Shared;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Events;
@@ -19,6 +20,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("CheatIncidents")]
 public sealed class CheatIncidentPersistenceTests
 {
     [Test]
@@ -248,10 +250,10 @@ public sealed class CheatIncidentPersistenceTests
                 Level = CompetitionEventLevel.Warning,
                 Visibility = CompetitionEventVisibility.Staff,
                 ActorUserId = sourceUserId,
-                TeamId = sourceTeamId,
-                CompetitionChallengeId = competitionChallengeId,
-                SubmissionId = submissionIds[index],
-                ScoringEventId = scoringEventIds[index],
+                SubjectType = EntityReferenceKind.ScoringEvent,
+                SubjectId = scoringEventIds[index],
+                RelatedType = EntityReferenceKind.Team,
+                RelatedId = sourceTeamId,
                 OccurredAt = occurredAt
             });
         }

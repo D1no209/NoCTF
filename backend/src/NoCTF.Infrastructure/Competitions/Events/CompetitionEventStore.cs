@@ -30,6 +30,7 @@ public sealed class CompetitionEventStore(
         cancellationToken.ThrowIfCancellationRequested();
         var id = Guid.CreateVersion7(draft.OccurredAt);
         var subject = ResolveSubject(draft, id);
+        var related = ResolveRelated(draft, subject);
         db.CompetitionEvents.Add(new CompetitionEvent
         {
             Id = id,
@@ -40,9 +41,8 @@ public sealed class CompetitionEventStore(
             ActorUserId = draft.ActorUserId,
             SubjectType = subject.Type,
             SubjectId = subject.Id,
-            RelatedType = draft.RelatedType
-                ?? (draft.RelatedUserId is not null ? EntityReferenceKind.User : null),
-            RelatedId = draft.RelatedId ?? draft.RelatedUserId,
+            RelatedType = related?.Type,
+            RelatedId = related?.Id,
             ParentEventId = draft.ParentEventId,
             PayloadJson = draft.PayloadJson ?? JsonSerializer.Serialize(new
             {
@@ -452,6 +452,37 @@ public sealed class CompetitionEventStore(
             return (EntityReferenceKind.Notification, notificationId);
         return (EntityReferenceKind.Competition, draft.CompetitionId == Guid.Empty ? eventId : draft.CompetitionId);
     }
+
+    private static (EntityReferenceKind Type, Guid Id)? ResolveRelated(
+        CompetitionEventDraft draft,
+        (EntityReferenceKind Type, Guid Id) subject)
+    {
+        if ((draft.RelatedType is null) != (draft.RelatedId is null))
+            throw new InvalidOperationException(
+                "Competition event related type and id must be supplied together.");
+        if (draft.RelatedType is { } explicitType && draft.RelatedId is { } explicitId)
+            return (explicitType, explicitId);
+
+        return Candidate(EntityReferenceKind.User, draft.RelatedUserId, subject)
+            ?? Candidate(EntityReferenceKind.Team, draft.TeamId, subject)
+            ?? Candidate(
+                EntityReferenceKind.CompetitionChallenge,
+                draft.CompetitionChallengeId,
+                subject)
+            ?? Candidate(EntityReferenceKind.Submission, draft.SubmissionId, subject)
+            ?? Candidate(EntityReferenceKind.RuntimeInstance, draft.RuntimeInstanceId, subject)
+            ?? Candidate(EntityReferenceKind.ChallengeHint, draft.HintId, subject)
+            ?? Candidate(EntityReferenceKind.ScoringEvent, draft.ScoringEventId, subject)
+            ?? Candidate(EntityReferenceKind.Notification, draft.QuestionId, subject);
+    }
+
+    private static (EntityReferenceKind Type, Guid Id)? Candidate(
+        EntityReferenceKind type,
+        Guid? id,
+        (EntityReferenceKind Type, Guid Id) subject) =>
+        id is Guid value && (subject.Type != type || subject.Id != value)
+            ? (type, value)
+            : null;
 
     private static Guid? ReferenceId(CompetitionEvent item, EntityReferenceKind type) =>
         item.SubjectType == type ? item.SubjectId : item.RelatedType == type ? item.RelatedId : null;

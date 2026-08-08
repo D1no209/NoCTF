@@ -33,14 +33,11 @@
     <Compile Remove="Integration\Persistence\AwdpFixAdmissionPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\AwdpFixResultPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\ChallengeHintUnlockPersistenceTests.cs" />
-    <Compile Remove="Integration\Persistence\CheatIncidentPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\CompetitionChallengeLifecycleRevisionPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\CompetitionNotificationDeliveryPersistenceTests.cs" />
-    <Compile Remove="Integration\Persistence\CompetitionQuestionPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\DataExportPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\KohPollingPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\PatchUploadReplacementPersistenceTests.cs" />
-    <Compile Remove="Integration\Persistence\TeamBanAppealPersistenceTests.cs" />
     <Compile Remove="Integration\Runtime\RunnerAssignmentReconciliationTests.cs" />
   </ItemGroup>
 </Project>

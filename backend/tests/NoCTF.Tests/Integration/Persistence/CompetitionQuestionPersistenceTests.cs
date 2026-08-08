@@ -21,7 +21,7 @@ public sealed class CompetitionQuestionPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Private_dialogue_enforces_roles_audits_public_projection_and_outbox_idempotency(
+    public async Task Private_dialogue_enforces_roles_audits_and_private_notification_delivery(
         CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -196,35 +196,13 @@ public sealed class CompetitionQuestionPersistenceTests
                 "After reset, wait for the replacement instance to become Ready.",
                 reopened.Question.Revision,
                 now.AddSeconds(4)), ct);
-            var publishableReply = secondReply.Question!.Entries
-                .Where(entry => entry.Kind == CompetitionQuestionEntryKind.Message
-                    && entry.ActorRole == CompetitionQuestionParticipantRole.Handler)
-                .Last();
             db.ChangeTracker.Clear();
-            var published = await store.PublishAsync(new(
-                ids.CompetitionId,
-                created.Question.Id,
-                publishableReply.Id,
-                ids.ManagerId,
-                secondReply.Question.Revision,
-                now.AddSeconds(5)), ct);
-            await Assert.That(published.Failure).IsNull();
-
-            var publicView = await store.FindAsync(
+            var stillPrivate = await store.FindAsync(
                 ids.CompetitionId,
                 created.Question.Id,
                 ids.OtherParticipantId,
                 ct);
-            await Assert.That(publicView!.Access).IsEqualTo(CompetitionQuestionAccess.Public);
-            await Assert.That(publicView.AskedByUserId).IsNull();
-            await Assert.That(publicView.TeamId).IsNull();
-            await Assert.That(publicView.TeamDisplayName).IsNull();
-            await Assert.That(publicView.AskerDisplayName).IsEqualTo("Anonymous participant");
-            await Assert.That(publicView.Entries).Count().IsEqualTo(1);
-            await Assert.That(publicView.Entries[0].Body)
-                .IsEqualTo(publishableReply.Body);
-            await Assert.That(publicView.Entries[0].ActorDisplayName)
-                .IsEqualTo("competition-manager");
+            await Assert.That(stillPrivate).IsNull();
             db.ChangeTracker.Clear();
 
             var stale = await store.ChangeStatusAsync(new(
@@ -232,7 +210,7 @@ public sealed class CompetitionQuestionPersistenceTests
                 created.Question.Id,
                 ids.ManagerId,
                 CompetitionQuestionStatus.Closed,
-                secondReply.Question.Revision,
+                secondReply.Question!.Revision - 1,
                 now.AddSeconds(6)), ct);
             await Assert.That(stale.Failure)
                 .IsEqualTo(CompetitionQuestionFailure.RevisionConflict);
@@ -242,7 +220,7 @@ public sealed class CompetitionQuestionPersistenceTests
                 created.Question.Id,
                 ids.ManagerId,
                 CompetitionQuestionStatus.Closed,
-                published.Question!.Revision,
+                secondReply.Question.Revision,
                 now.AddSeconds(7)), ct);
             db.ChangeTracker.Clear();
             var terminal = await store.AddMessageAsync(new(
@@ -267,16 +245,15 @@ public sealed class CompetitionQuestionPersistenceTests
             await Assert.That(botQuestion.Failure)
                 .IsEqualTo(CompetitionQuestionFailure.Forbidden);
 
-            var delivery = new CompetitionNotificationDelivery(
-                db,
-                new CompetitionNotificationAudienceResolver(db));
-            await CompetitionNotificationMessageHandlers.Handle(opened, delivery, ct);
+            var delivery = new CompetitionNotificationDelivery(db);
             await CompetitionNotificationMessageHandlers.Handle(opened, delivery, ct);
             await Assert.That(await db.Notifications.CountAsync(notification =>
-                notification.Kind == NotificationKind.CompetitionQuestionOpened, ct))
+                notification.Kind == NotificationKind.QuestionOpened
+                    && notification.TargetType == NotificationTargetType.User, ct))
                 .IsEqualTo(opened.RecipientUserIds.Length);
             var notificationPayloads = await db.Notifications.AsNoTracking()
-                .Select(notification => notification.PayloadJson)
+                .Where(notification => notification.TargetType == NotificationTargetType.User)
+                .Select(notification => notification.ContentJson)
                 .ToArrayAsync(ct);
             await Assert.That(notificationPayloads.All(payload =>
                 !payload.Contains("health check", StringComparison.Ordinal))).IsTrue();
