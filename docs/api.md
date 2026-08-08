@@ -41,6 +41,7 @@ Login/Refresh 返回 AccessToken 与 ExpiresAt；Refresh Cookie 不出现在 bod
 ```text
 GET  /api/v1/competitions
 GET  /api/v1/competitions/{competitionId}
+GET  /api/v1/competitions/{competitionId}/poster
 GET  /api/v1/competitions/{competitionId}/leaderboard
 
 POST /api/v1/competitions/{competitionId}/teams
@@ -49,6 +50,9 @@ GET  /api/v1/competitions/{competitionId}/teams/me
 GET  /api/v1/competitions/{competitionId}/teams/{teamId}
 PUT  /api/v1/competitions/{competitionId}/teams/{teamId}
 DELETE /api/v1/competitions/{competitionId}/teams/{teamId}
+GET  /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
+POST /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
+DELETE /api/v1/competitions/{competitionId}/teams/{teamId}/avatar
 POST /api/v1/competitions/{competitionId}/teams/join
 POST /api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate
 POST /api/v1/competitions/{competitionId}/teams/{teamId}/captain/transfer
@@ -58,6 +62,7 @@ POST /api/v1/competitions/{competitionId}/teams/{teamId}/registration/resubmit
 ```
 
 Team response 使用 CaptainId 与 MemberIds 数组，不返回成员顺序。
+Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传/清除需要对应管理权限，读取路由不暴露通用 File 下载能力。
 
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
 
@@ -82,13 +87,13 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hi
 
 `attachments` 列表与带 Id 下载只用于 `All`；`attachment` 单数路由只用于 `RandomOnePerTeam`，抽取发生在该 GET 内且请求没有 AttachmentId。策略不匹配返回 404。KoH 详情在 Running 时对本队返回 Control Flag 与 shared Hill 的公开 urls，不返回 ControlCheckUrl；CTF PerTeamRuntime Flag 不单独返回，注入 Runtime 环境。
 
-Hint unlock 成功首次返回 201+HintUnlock 事实；已解锁或 Cost=0 直接可见时返回 200 且不创建新事件。未发布/不可见返回 404，权威当前分数不足返回 409 `InsufficientScoreForHint`。
+Hint unlock 始终返回 `202 Accepted`，响应只包含 `submissionId`、`evaluationState` 和状态 URL；客户端通过 Submission 状态与 Hint 查询获取最终结果。评估结果为 `Correct`、`Duplicate`、`Rejected + InsufficientScore` 或 `Rejected + HintUnavailable`。
 
 玩家 Challenge 列表/详情绝不返回 FlagId、正确答案、Flag 数量、RandomOne 候选附件数量/文件名、内部 Runtime 配置或 ObjectKey。All 的列表返回 AttachmentId、显示名、MIME、字节数；RandomOne 首次单数下载请求完成原子抽取后直接 302/stream 被选文件，客户端不能选择，之后固定返回同一附件。
 Blackout 不隐藏题面、附件、Runtime 或提交入口，但 Challenge 的 `baseScore` 返回 null，并随列表/
 详情返回同一 `leaderboardVisibility` 与 `dataScope`。
 
-## Competition Questions
+## Questions and announcements
 
 ```text
 GET  /api/v1/competitions/{competitionId}/questions
@@ -96,7 +101,8 @@ POST /api/v1/competitions/{competitionId}/questions
 GET  /api/v1/competitions/{competitionId}/questions/{questionId}
 POST /api/v1/competitions/{competitionId}/questions/{questionId}/messages
 PUT  /api/v1/competitions/{competitionId}/questions/{questionId}/status
-PUT  /api/v1/competitions/{competitionId}/questions/{questionId}/publication
+POST /api/v1/admin/competitions/{competitionId}/announcements
+GET  /api/v1/notifications/{notificationId}/thread
 GET  /api/v1/competitions/{competitionId}/events
 ```
 
@@ -105,9 +111,9 @@ Administrator/Owner/Manager/Judge 与关联模板 Owner/Manager 处理；Platfor
 Observer 只读。只有 Running/Paused 且已批准队伍内的 Human 用户可以发起咨询，Bot 不允许使用。
 Finished 后对话只读。Resolved 可由提问者通过追问重新打开，Closed 为终态。
 
-公开接口仅作为例外保留：处理者可显式匿名公开一条已审核回复，参与者投影不返回提问者、队伍或
-Submission 身份。面向全体参赛者的通用说明应优先发布为 Hint、比赛公告或平台公告。v1 不接受附件，
-可选 Submission 只保存引用。所有写操作使用 Revision 乐观并发控制，发起与回复共享每用户/IP
+Question 根就是 `notifications.id`，回复使用 `ReplyToId` 组成不可分叉线性链；读取权限在根发送者离队后仍保留。
+删除 Question publication；面向全体参赛者的通用说明创建 CompetitionAnnouncement。管理员公告 Source 是发送者 UserId，
+Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向选手必须显式选择 CompetitionParticipants。所有写操作使用 Revision 乐观并发控制，发起与回复共享每用户/IP
 每分钟 8 次的限流策略。
 
 ## Submission
@@ -173,6 +179,8 @@ GET  /api/v1/admin/competitions/{competitionId}/permissions
 PUT  /api/v1/admin/competitions/{competitionId}/permissions
 GET  /api/v1/admin/competitions/{competitionId}/permission-candidates
 POST /api/v1/admin/competitions/{competitionId}/owner/transfer
+POST /api/v1/admin/competitions/{competitionId}/poster
+DELETE /api/v1/admin/competitions/{competitionId}/poster
 GET  /api/v1/admin/competitions/{competitionId}/start-validation
 POST /api/v1/admin/competitions/{competitionId}/flags/generate-missing
 GET  /api/v1/admin/competitions/{competitionId}/events/export
@@ -320,20 +328,24 @@ POST /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/flag-
 POST /api/v1/admin/competitions/{competitionId}/submissions/queue-evaluation
 POST /api/v1/admin/competitions/{competitionId}/submissions/rejudge
 POST /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/rejudge
+POST /api/v1/admin/competitions/{competitionId}/submissions/manual-adjustments
 ```
 
 列表筛选：competitionChallengeId、teamId、userId、submissionKind、evaluationState、scoringResult、failureCode、receivedFrom/To、submittedFlag 精确匹配、hasCurrentScoringEvent。failureCode 对 Completed 匹配当前 ScoringEvent.FailureCode，对 PlatformFailed 匹配 Submission.EvaluationFailureCode。顺序 ReceivedAt desc/Id desc，limit 50..200，不算 total。
 
 queue-evaluation 用于 ManualBatch 的 Pending/无旧事件 PlatformFailed 集合；rejudge 集合只允许有当前事件的 Flag/Break 按题筛选。两者请求都必须指定 CompetitionChallengeId，接入事务只写带筛选 cutoff 的 durable drain message，Worker 再以 500 条 SKIP LOCKED 短事务更新实体状态/ProcessingVersion 与逐项 Outbox。单 Submission rejudge 用于任意管理员重判以及 AWDP Fix/Patch 精确重判。不建 Batch/Rejudge 实体。
 
+ManualAdjustment 请求为 `{ teamId, competitionChallengeId, delta: int }`，仅 Administrator/Owner/Manager 可用，零值返回 400。delta 以 canonical signed Int32 十进制写入 `Submission.SubmittedFlag`，不增加额外分数字段；评估始终创建 `ScoringEvent(ManualAdjust, Correct)`。
+
 ## Notifications
 
 ```text
 GET /api/v1/notifications
 GET /api/v1/notifications/feed
+GET /api/v1/notifications/{notificationId}/thread
 ```
 
-仅返回当前用户永久事件流，按 CreatedAt desc/Id desc keyset 分页。没有读取、标记已读、删除或计数 Endpoint。
+Feed 按动态受众读取：User、CompetitionCollaborators、CompetitionParticipants、TeamMembers、PlatformAdministrators；Question 根发送者及其后继线程拥有永久读取权。按 SentAt/Id keyset 分页，没有读取、标记已读、删除或计数 Endpoint。
 
 ## Platform Administration
 

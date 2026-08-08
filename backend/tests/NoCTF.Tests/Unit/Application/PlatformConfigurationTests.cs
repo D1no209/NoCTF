@@ -67,7 +67,7 @@ public sealed class PlatformConfigurationTests
     }
 
     [Test]
-    public async Task Successful_logo_replacement_cleans_the_previous_object()
+    public async Task Successful_logo_replacement_uses_the_new_file_reference()
     {
         var now = DateTimeOffset.UtcNow;
         var store = Substitute.For<IPlatformConfigurationStore>();
@@ -85,7 +85,7 @@ public sealed class PlatformConfigurationTests
                 8,
                 "sha256"));
         store.ReplaceLogoAsync(
-                Arg.Any<string>(),
+                Arg.Any<StoredObject>(),
                 2,
                 now,
                 Arg.Any<CancellationToken>())
@@ -93,10 +93,10 @@ public sealed class PlatformConfigurationTests
                 new PlatformConfigurationView(
                     "NoCTF",
                     null,
-                    call.ArgAt<string>(0),
+                    Guid.NewGuid(),
                     3,
                     now),
-                "platform/logo/previous.png"));
+                Guid.NewGuid()));
         var configuration = new ManagePlatformConfiguration(store, objects);
         var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
 
@@ -108,8 +108,8 @@ public sealed class PlatformConfigurationTests
             now);
 
         await Assert.That(result.State).IsEqualTo(PlatformLogoUpdateState.Updated);
-        await objects.Received(1).DeleteAsync(
-            "platform/logo/previous.png",
-            CancellationToken.None);
+        await objects.DidNotReceive().DeleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 }

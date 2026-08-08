@@ -15,6 +15,8 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.DataExports;
 using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Storage;
+using NoCTF.Domain.Shared;
 using NoCTF.Domain.Submissions;
 using NoCTF.Infrastructure.Persistence;
 
@@ -54,7 +56,7 @@ public sealed class DataExportProcessor(
         Guid dataExportId,
         CancellationToken cancellationToken)
     {
-        var job = await db.DataExports.SingleOrDefaultAsync(
+        var job = await db.DataExports.Include(item => item.File).SingleOrDefaultAsync(
             item => item.Id == dataExportId,
             cancellationToken);
         if (job is null
@@ -124,7 +126,7 @@ public sealed class DataExportProcessor(
         Guid dataExportId,
         CancellationToken cancellationToken)
     {
-        var job = await db.DataExports.SingleOrDefaultAsync(
+        var job = await db.DataExports.Include(item => item.File).SingleOrDefaultAsync(
             item => item.Id == dataExportId,
             cancellationToken);
         if (job is null || job.Status == DataExportStatus.Expired)
@@ -139,11 +141,14 @@ public sealed class DataExportProcessor(
             return;
         }
 
-        if (job.ObjectKey is not null)
-            await objectStorage.DeleteAsync(job.ObjectKey, cancellationToken);
+        if (job.File is not null)
+            await objectStorage.DeleteAsync(job.File.ObjectKey, cancellationToken);
         job.Status = DataExportStatus.Expired;
         job.ActiveSlot = null;
-        job.ObjectKey = null;
+        if (job.File is not null)
+            db.Files.Remove(job.File);
+        job.FileId = null;
+        job.File = null;
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -151,7 +156,7 @@ public sealed class DataExportProcessor(
         Guid dataExportId,
         CancellationToken cancellationToken)
     {
-        var job = await db.DataExports.SingleOrDefaultAsync(
+        var job = await db.DataExports.Include(item => item.File).SingleOrDefaultAsync(
             item => item.Id == dataExportId,
             cancellationToken);
         if (job is null)
@@ -164,8 +169,10 @@ public sealed class DataExportProcessor(
             return;
         }
 
-        if (job.ObjectKey is not null)
-            await objectStorage.DeleteAsync(job.ObjectKey, cancellationToken);
+        if (job.File is not null)
+            await objectStorage.DeleteAsync(job.File.ObjectKey, cancellationToken);
+        if (job.File is not null)
+            db.Files.Remove(job.File);
         db.DataExports.Remove(job);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -212,8 +219,6 @@ public sealed class DataExportProcessor(
         CancellationToken cancellationToken)
     {
         var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
-            .Include(item => item.LifecycleAudits)
-            .Include(item => item.LeaderboardVisibilityAudits)
             .SingleOrDefaultAsync(item => item.Id == competitionId, cancellationToken);
         if (competition is null)
         {
@@ -226,6 +231,13 @@ public sealed class DataExportProcessor(
         await using var limited = new LengthLimitedWriteStream(output, maximumArchiveBytes);
         using var archive = new ZipArchive(limited, ZipArchiveMode.Create, leaveOpen: true);
         var counts = new SortedDictionary<string, long>(StringComparer.Ordinal);
+        var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
+            .Where(item => item.CompetitionId == competitionId
+                && (item.Kind == CompetitionEventKind.CompetitionLifecycleChanged
+                    || item.Kind == CompetitionEventKind.LeaderboardVisibilityChanged))
+            .OrderBy(item => item.OccurredAt)
+            .ThenBy(item => item.Id)
+            .ToArrayAsync(cancellationToken);
 
         counts["competition.ndjson"] = await WriteRowsAsync(
             archive,
@@ -263,32 +275,10 @@ public sealed class DataExportProcessor(
                     competition.CreatedAt,
                     competition.UpdatedAt,
                     competition.DeletedAt,
-                    LifecycleAudits = competition.LifecycleAudits
-                        .OrderBy(item => item.OccurredAt)
-                        .ThenBy(item => item.Id)
-                        .Select(item => new
-                        {
-                            item.Id,
-                            item.From,
-                            item.To,
-                            item.ActorId,
-                            item.Reason,
-                            item.Automatic,
-                            item.OccurredAt
-                        }),
-                    LeaderboardVisibilityAudits = competition.LeaderboardVisibilityAudits
-                        .OrderBy(item => item.OccurredAt)
-                        .ThenBy(item => item.Id)
-                        .Select(item => new
-                        {
-                            item.Id,
-                            item.From,
-                            item.To,
-                            item.ActorId,
-                            item.Reason,
-                            item.Automatic,
-                            item.OccurredAt
-                        })
+                    LifecycleEvents = lifecycleEvents.Where(item =>
+                        item.Kind == CompetitionEventKind.CompetitionLifecycleChanged),
+                    LeaderboardVisibilityEvents = lifecycleEvents.Where(item =>
+                        item.Kind == CompetitionEventKind.LeaderboardVisibilityChanged)
                 }
             },
             cancellationToken);
@@ -310,7 +300,7 @@ public sealed class DataExportProcessor(
                     item.Id,
                     item.CompetitionId,
                     item.Name,
-                    item.AvatarUrl,
+                    item.AvatarFileId,
                     item.CaptainId,
                     item.MemberIds,
                     item.IsLocked,
@@ -422,12 +412,8 @@ public sealed class DataExportProcessor(
         var challenges = await db.Challenges.IgnoreQueryFilters().AsNoTracking()
             .Where(item => challengeIds.Contains(item.Id))
             .ToDictionaryAsync(item => item.Id, cancellationToken);
-        var hints = await db.Set<CompetitionChallengeHint>().AsNoTracking()
-            .Where(item => competitionChallengeIds.Contains(item.CompetitionChallengeId))
-            .OrderBy(item => item.CreatedAt)
-            .ThenBy(item => item.Id)
-            .ToArrayAsync(cancellationToken);
         var attachments = await db.Set<ChallengeAttachment>().AsNoTracking()
+            .Include(item => item.File)
             .Where(item => challengeIds.Contains(item.ChallengeId))
             .OrderBy(item => item.CreatedAt)
             .ThenBy(item => item.Id)
@@ -475,17 +461,13 @@ public sealed class DataExportProcessor(
                     template.UpdatedAt,
                     template.DeletedAt
                 },
-                Hints = hints.Where(item => item.CompetitionChallengeId == instance.Id)
-                    .Select(item => new
+                Hints = instance.Hints.Select(item => new
                     {
                         item.Id,
                         item.Content,
                         item.Cost,
                         item.PublishedAt,
-                        item.PublicationRevision,
-                        item.CreatedAt,
-                        item.UpdatedAt,
-                        item.DeletedAt
+                        item.HiddenAt
                     }),
                 Attachments = attachments.Where(item => item.ChallengeId == template.Id)
                     .Select(item => new
@@ -540,6 +522,14 @@ public sealed class DataExportProcessor(
             .SelectMany(
                 item => item.patches.DefaultIfEmpty(),
                 (item, patch) => new { item.submission, patch })
+            .GroupJoin(
+                db.Files.AsNoTracking(),
+                item => item.patch == null ? (Guid?)null : item.patch.FileId,
+                file => (Guid?)file.Id,
+                (item, files) => new { item.submission, item.patch, files })
+            .SelectMany(
+                item => item.files.DefaultIfEmpty(),
+                (item, file) => new { item.submission, item.patch, file })
             .OrderBy(item => item.submission.ReceivedAt)
             .ThenBy(item => item.submission.Id)
             .Select(item => new
@@ -559,10 +549,10 @@ public sealed class DataExportProcessor(
                     : new
                     {
                         item.patch.Id,
-                        item.patch.OriginalFileName,
-                        item.patch.ContentType,
-                        item.patch.ByteLength,
-                        item.patch.Sha256,
+                        OriginalFileName = item.file!.FileName,
+                        item.file.ContentType,
+                        ByteLength = item.file.ByteLength,
+                        item.file.Sha256,
                         item.patch.UploadedAt,
                         item.patch.ConsumedAt
                     },
@@ -690,11 +680,19 @@ public sealed class DataExportProcessor(
         job.ActiveSlot = null;
         job.CompletedAt = now;
         job.ExpiresAt = now.AddHours(24);
-        job.ObjectKey = storedObject.ObjectKey;
-        job.FileName = storedObject.FileName;
-        job.ContentType = storedObject.ContentType;
-        job.Length = storedObject.Length;
-        job.Sha256 = storedObject.Sha256;
+        var file = new StoredFile
+        {
+            Id = Guid.CreateVersion7(now),
+            ObjectKey = storedObject.ObjectKey,
+            FileName = storedObject.FileName,
+            ContentType = storedObject.ContentType,
+            ByteLength = storedObject.Length,
+            Sha256 = Convert.FromHexString(storedObject.Sha256),
+            CreatedAt = now
+        };
+        db.Files.Add(file);
+        job.FileId = file.Id;
+        job.File = file;
         await AddNotificationAsync(job, NotificationKind.DataExportReady, cancellationToken);
         if (job.IncludeProtectedFlags && job.CompetitionId is Guid competitionId)
         {
@@ -748,10 +746,12 @@ public sealed class DataExportProcessor(
         {
             return;
         }
-        var sourceKey = $"data-export:{job.Id:N}:{kind}";
         if (await db.Notifications.AsNoTracking().AnyAsync(
-                item => item.UserId == job.RequestedByUserId
-                    && item.SourceEventKey == sourceKey,
+                item => item.TargetType == NotificationTargetType.User
+                    && item.TargetId == job.RequestedByUserId
+                    && item.RelatedType == EntityReferenceKind.DataExport
+                    && item.RelatedId == job.Id
+                    && item.Kind == kind,
                 cancellationToken))
         {
             return;
@@ -759,21 +759,23 @@ public sealed class DataExportProcessor(
         db.Notifications.Add(new Notification
         {
             Id = Guid.CreateVersion7(timeProvider.GetUtcNow()),
-            UserId = job.RequestedByUserId,
-            CompetitionId = job.CompetitionId,
-            EntityId = job.Id,
+            SourceType = NotificationSourceType.System,
+            TargetType = NotificationTargetType.User,
+            TargetId = job.RequestedByUserId,
             Kind = kind,
-            SourceEventKey = sourceKey,
-            PayloadJson = JsonSerializer.Serialize(new
+            ContentJson = JsonSerializer.Serialize(new
             {
+                SchemaVersion = 1,
                 ExportId = job.Id,
                 job.Scope,
                 job.CompetitionId,
-                job.FileName,
+                FileName = job.File == null ? null : job.File.FileName,
                 job.ExpiresAt,
                 job.FailureCode
             }, JsonOptions),
-            CreatedAt = timeProvider.GetUtcNow()
+            RelatedType = EntityReferenceKind.DataExport,
+            RelatedId = job.Id,
+            SentAt = timeProvider.GetUtcNow()
         });
     }
 

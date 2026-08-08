@@ -57,14 +57,6 @@ public interface IChallengeAttachmentStore
     Task<bool> AttachmentIdExistsAsync(
         Guid attachmentId,
         CancellationToken cancellationToken);
-    Task<ChallengeAttachmentView?> UpdateAsync(
-        Guid challengeId,
-        Guid attachmentId,
-        Guid actorId,
-        bool isAdministrator,
-        string fileName,
-        string contentType,
-        CancellationToken cancellationToken);
     Task<bool> DeleteAsync(
         Guid challengeId,
         Guid attachmentId,
@@ -171,25 +163,6 @@ public sealed class ManageChallengeAttachments(
             stored.Sha256,
             null,
             now));
-    }
-
-    public async Task<OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>> UpdateAsync(
-        Guid challengeId,
-        Guid attachmentId,
-        Guid actorId,
-        bool isAdministrator,
-        string fileName,
-        string contentType,
-        CancellationToken ct = default)
-    {
-        var result = await store.UpdateAsync(
-            challengeId, attachmentId, actorId, isAdministrator,
-            fileName.Trim(), contentType.Trim(), ct);
-        return result is null
-            ? OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>.Failure(
-                ChallengeAttachmentFailureCode.AttachmentNotFound,
-                "Attachment was not found or access was denied.")
-            : OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>.Success(result);
     }
 
     public async Task<OperationResult<ChallengeAttachmentFailureCode>> DeleteAsync(

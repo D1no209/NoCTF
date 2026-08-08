@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Platform;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Authentication;
@@ -14,40 +15,37 @@ public sealed class EmailVerificationConfigurationStore(
     private const short SettingsId = 1;
 
     public async Task<EmailVerificationConfigurationView> GetAsync(CancellationToken ct) =>
-        ToView(await db.EmailVerificationSettings.AsNoTracking()
+        ToView(await db.PlatformSettings.AsNoTracking()
             .SingleAsync(settings => settings.Id == SettingsId, ct));
 
     public async Task<EmailVerificationConfigurationView?> UpdateAsync(
         UpdateEmailVerificationConfigurationCommand command,
         CancellationToken ct)
     {
-        var updated = await db.EmailVerificationSettings
+        var updated = await db.PlatformSettings
             .Where(settings => settings.Id == SettingsId
                 && settings.Revision == command.ExpectedRevision)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(settings => settings.Enabled, command.Enabled)
-                .SetProperty(settings => settings.PublicBaseUrl, command.PublicBaseUrl.TrimEnd('/'))
-                .SetProperty(settings => settings.TokenLifetimeMinutes, command.TokenLifetimeMinutes)
-                .SetProperty(settings => settings.ResendCooldownSeconds, command.ResendCooldownSeconds)
+                .SetProperty(settings => settings.EmailVerificationEnabled, command.Enabled)
+                .SetProperty(settings => settings.EmailPublicBaseUrl, command.PublicBaseUrl.TrimEnd('/'))
+                .SetProperty(settings => settings.EmailVerificationTokenLifetimeMinutes, command.TokenLifetimeMinutes)
+                .SetProperty(settings => settings.EmailVerificationResendCooldownSeconds, command.ResendCooldownSeconds)
                 .SetProperty(
-                    settings => settings.PasswordResetTokenLifetimeMinutes,
+                    settings => settings.EmailPasswordResetTokenLifetimeMinutes,
                     command.PasswordResetTokenLifetimeMinutes)
                 .SetProperty(
-                    settings => settings.PasswordResetCooldownSeconds,
+                    settings => settings.EmailPasswordResetCooldownSeconds,
                     command.PasswordResetCooldownSeconds)
                 .SetProperty(
-                    settings => settings.PasswordResetMaxRequestsPerHour,
+                    settings => settings.EmailPasswordResetMaxRequestsPerHour,
                     command.PasswordResetMaxRequestsPerHour)
-                .SetProperty(settings => settings.SmtpHost, command.SmtpHost.Trim())
-                .SetProperty(settings => settings.SmtpPort, command.SmtpPort)
-                .SetProperty(settings => settings.SmtpSecurityMode, command.SmtpSecurityMode)
-                .SetProperty(
-                    settings => settings.SmtpEnableSsl,
-                    command.SmtpSecurityMode != SmtpSecurityMode.None)
-                .SetProperty(settings => settings.SmtpUserName, command.SmtpUserName.Trim())
-                .SetProperty(settings => settings.SmtpFromAddress, command.SmtpFromAddress.Trim())
-                .SetProperty(settings => settings.SmtpFromName, command.SmtpFromName.Trim())
-                .SetProperty(settings => settings.SmtpTimeoutSeconds, command.SmtpTimeoutSeconds)
+                .SetProperty(settings => settings.EmailSmtpHost, command.SmtpHost.Trim())
+                .SetProperty(settings => settings.EmailSmtpPort, command.SmtpPort)
+                .SetProperty(settings => settings.EmailSmtpSecurityMode, command.SmtpSecurityMode)
+                .SetProperty(settings => settings.EmailSmtpUserName, command.SmtpUserName.Trim())
+                .SetProperty(settings => settings.EmailSmtpFromAddress, command.SmtpFromAddress.Trim())
+                .SetProperty(settings => settings.EmailSmtpFromName, command.SmtpFromName.Trim())
+                .SetProperty(settings => settings.EmailSmtpTimeoutSeconds, command.SmtpTimeoutSeconds)
                 .SetProperty(settings => settings.Revision, settings => settings.Revision + 1)
                 .SetProperty(settings => settings.UpdatedAt, command.Now),
                 ct);
@@ -61,11 +59,11 @@ public sealed class EmailVerificationConfigurationStore(
         CancellationToken ct)
     {
         var ciphertext = secrets.Protect(password);
-        var updated = await db.EmailVerificationSettings
+        var updated = await db.PlatformSettings
             .Where(settings => settings.Id == SettingsId
                 && settings.Revision == expectedRevision)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(settings => settings.SmtpPasswordCiphertext, ciphertext)
+                .SetProperty(settings => settings.EmailSmtpPasswordCiphertext, ciphertext)
                 .SetProperty(settings => settings.Revision, settings => settings.Revision + 1)
                 .SetProperty(settings => settings.UpdatedAt, now),
                 ct);
@@ -76,58 +74,53 @@ public sealed class EmailVerificationConfigurationStore(
         bool requireEnabled,
         CancellationToken ct)
     {
-        var settings = await db.EmailVerificationSettings.AsNoTracking()
+        var settings = await db.PlatformSettings.AsNoTracking()
             .SingleAsync(candidate => candidate.Id == SettingsId, ct);
-        var usesAuthentication = !string.IsNullOrWhiteSpace(settings.SmtpUserName);
-        if ((requireEnabled && !settings.Enabled)
-            || (usesAuthentication && settings.SmtpPasswordCiphertext is null)
-            || string.IsNullOrWhiteSpace(settings.SmtpHost)
-            || string.IsNullOrWhiteSpace(settings.SmtpFromAddress))
+        var usesAuthentication = !string.IsNullOrWhiteSpace(settings.EmailSmtpUserName);
+        if ((requireEnabled && !settings.EmailVerificationEnabled)
+            || (usesAuthentication && settings.EmailSmtpPasswordCiphertext is null)
+            || string.IsNullOrWhiteSpace(settings.EmailSmtpHost)
+            || string.IsNullOrWhiteSpace(settings.EmailSmtpFromAddress))
         {
             return null;
         }
 
         return new(
-            settings.Enabled,
-            settings.PublicBaseUrl,
-            settings.SmtpHost,
-            settings.SmtpPort,
+            settings.EmailVerificationEnabled,
+            settings.EmailPublicBaseUrl,
+            settings.EmailSmtpHost,
+            settings.EmailSmtpPort,
             ResolveSecurityMode(settings),
-            settings.SmtpUserName,
+            settings.EmailSmtpUserName,
             usesAuthentication
-                ? secrets.Unprotect(settings.SmtpPasswordCiphertext!)
+                ? secrets.Unprotect(settings.EmailSmtpPasswordCiphertext!)
                 : null,
-            settings.SmtpFromAddress,
-            settings.SmtpFromName,
-            settings.SmtpTimeoutSeconds);
+            settings.EmailSmtpFromAddress,
+            settings.EmailSmtpFromName,
+            settings.EmailSmtpTimeoutSeconds);
     }
 
     private static EmailVerificationConfigurationView ToView(
-        EmailVerificationSettings settings) =>
+        PlatformSettings settings) =>
         new(
-            settings.Enabled,
-            settings.PublicBaseUrl,
-            settings.TokenLifetimeMinutes,
-            settings.ResendCooldownSeconds,
-            settings.PasswordResetTokenLifetimeMinutes,
-            settings.PasswordResetCooldownSeconds,
-            settings.PasswordResetMaxRequestsPerHour,
-            settings.SmtpHost,
-            settings.SmtpPort,
+            settings.EmailVerificationEnabled,
+            settings.EmailPublicBaseUrl,
+            settings.EmailVerificationTokenLifetimeMinutes,
+            settings.EmailVerificationResendCooldownSeconds,
+            settings.EmailPasswordResetTokenLifetimeMinutes,
+            settings.EmailPasswordResetCooldownSeconds,
+            settings.EmailPasswordResetMaxRequestsPerHour,
+            settings.EmailSmtpHost,
+            settings.EmailSmtpPort,
             ResolveSecurityMode(settings),
-            settings.SmtpUserName,
-            settings.SmtpPasswordCiphertext is { Length: > 0 },
-            settings.SmtpFromAddress,
-            settings.SmtpFromName,
-            settings.SmtpTimeoutSeconds,
+            settings.EmailSmtpUserName,
+            settings.EmailSmtpPasswordCiphertext is { Length: > 0 },
+            settings.EmailSmtpFromAddress,
+            settings.EmailSmtpFromName,
+            settings.EmailSmtpTimeoutSeconds,
             settings.Revision,
             settings.UpdatedAt);
 
-    private static SmtpSecurityMode ResolveSecurityMode(EmailVerificationSettings settings) =>
-        settings.SmtpSecurityMode
-        ?? (settings.SmtpEnableSsl
-            ? settings.SmtpPort == 465
-                ? SmtpSecurityMode.SslOnConnect
-                : SmtpSecurityMode.StartTls
-            : SmtpSecurityMode.None);
+    private static SmtpSecurityMode ResolveSecurityMode(PlatformSettings settings) =>
+        settings.EmailSmtpSecurityMode ?? SmtpSecurityMode.None;
 }

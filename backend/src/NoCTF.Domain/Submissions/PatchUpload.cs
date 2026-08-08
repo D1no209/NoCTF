@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace NoCTF.Domain.Submissions;
 
@@ -9,15 +10,13 @@ public sealed class PatchUpload
     public Guid CompetitionChallengeId { get; set; }
     public Guid TeamId { get; set; }
     public Guid UploadedByUserId { get; set; }
-    [MaxLength(1024)]
-    public string ObjectKey { get; set; } = string.Empty;
-    [MaxLength(260)]
-    public string OriginalFileName { get; set; } = string.Empty;
-    [MaxLength(255)]
-    public string ContentType { get; set; } = string.Empty;
-    public long ByteLength { get; set; }
-    [Length(32, 32)]
-    public byte[] Sha256 { get; set; } = [];
+    public Guid FileId { get; set; }
+    public NoCTF.Domain.Storage.StoredFile File { get; set; } = null!;
+    [NotMapped] public string ObjectKey => File.ObjectKey;
+    [NotMapped] public string OriginalFileName => File.FileName;
+    [NotMapped] public string ContentType => File.ContentType;
+    [NotMapped] public long ByteLength => File.ByteLength;
+    [NotMapped] public byte[] Sha256 => File.Sha256;
     public DateTimeOffset UploadedAt { get; set; }
     public DateTimeOffset? ConsumedAt { get; set; }
     public Guid? SubmissionId { get; set; }

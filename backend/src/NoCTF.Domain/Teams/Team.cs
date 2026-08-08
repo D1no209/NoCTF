@@ -14,7 +14,8 @@ public sealed class Team
     public string Name { get; set; } = string.Empty;
     [MaxLength(128)]
     public string NormalizedName { get; set; } = string.Empty;
-    public string? AvatarUrl { get; set; }
+    public Guid? AvatarFileId { get; set; }
+    public NoCTF.Domain.Storage.StoredFile? AvatarFile { get; set; }
     public Guid CaptainId { get; set; }
     public Guid[] MemberIds { get; set; } = [];
     [StringLength(32, MinimumLength = 32)]

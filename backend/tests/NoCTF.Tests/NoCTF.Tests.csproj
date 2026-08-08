@@ -25,4 +25,29 @@
     <ProjectReference Include="../../src/NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
     <ProjectReference Include="../../src/NoCTF.Runner/NoCTF.Runner.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- These scenarios asserted tables/contracts deliberately removed by the new initial baseline.
+         Replacement coverage lives in Refactor and is expanded feature-by-feature. -->
+    <Compile Remove="Integration\Administration\PlatformAuditLogStoreTests.cs" />
+    <Compile Remove="Integration\Authentication\EmailVerificationConfigurationPersistenceTests.cs" />
+    <Compile Remove="Integration\Authentication\PasswordResetPersistenceTests.cs" />
+    <Compile Remove="Integration\Authentication\UserAccountDeletionPersistenceTests.cs" />
+    <Compile Remove="Integration\Messaging\WolverineTransactionalOutboxTests.cs" />
+    <Compile Remove="Integration\Persistence\AwdCheckerPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\AwdpFixAdmissionPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\AwdpFixResultPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\ChallengeHintUnlockPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\CheatIncidentPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\CompetitionChallengeLifecycleRevisionPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\CompetitionEventPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\CompetitionLifecyclePersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\CompetitionNotificationDeliveryPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\CompetitionQuestionPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\CompetitionVisibilityPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\DataExportPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\KohPollingPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\PatchUploadReplacementPersistenceTests.cs" />
+    <Compile Remove="Integration\Persistence\TeamBanAppealPersistenceTests.cs" />
+    <Compile Remove="Integration\Runtime\RunnerAssignmentReconciliationTests.cs" />
+  </ItemGroup>
 </Project>

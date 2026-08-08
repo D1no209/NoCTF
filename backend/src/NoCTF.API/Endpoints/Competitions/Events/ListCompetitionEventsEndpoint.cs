@@ -32,8 +32,7 @@ public enum CompetitionEventKindProtocol
     TeamCaptainTransferred, TeamBanned, TeamUnbanned, SubmissionReceived, SubmissionEvaluated,
     ScoringRecorded, FirstBloodAwarded, SecondBloodAwarded, ThirdBloodAwarded, RuntimeCreated,
     RuntimeStateChanged, RuntimeExtended, RuntimeReset, RuntimePortAllocated,
-    AnnouncementPublished, QuestionOpened, QuestionReplied, QuestionStatusChanged,
-    QuestionPublished, ProtectedSubmissionFlagAccessed, CheatIncidentDetected,
+    ProtectedSubmissionFlagAccessed, CheatIncidentDetected,
     CheatIncidentConfirmed, CheatIncidentDismissed, CheatIncidentSuperseded,
     CheatIncidentCorrected, ProtectedCompetitionExportCreated, TeamBanAppealSubmitted,
     TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished
@@ -49,7 +48,7 @@ public enum CompetitionEventVisibilityProtocol { Public, Team, Staff }
 public enum CompetitionEventAccessLevelProtocol { Participant, Team, Staff }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoringEventKindProtocol>))]
-public enum ScoringEventKindProtocol { SubmissionEvaluation, AwdServiceStatus, HintUnlock, KohObservation }
+public enum ScoringEventKindProtocol { SubmissionEvaluation, AwdServiceStatus, HintUnlock, KohObservation, ManualAdjust }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionQuestionStatusProtocol>))]
 public enum CompetitionQuestionStatusProtocol { Pending, Replied, Resolved, Closed }

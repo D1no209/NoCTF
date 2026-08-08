@@ -28,5 +28,7 @@ internal sealed class DataExportConfiguration : IEntityTypeConfiguration<DataExp
             item.Scope,
             item.ActiveSlot
         }).IsUnique();
+        builder.HasOne(item => item.File).WithMany()
+            .HasForeignKey(item => item.FileId).OnDelete(DeleteBehavior.Restrict);
     }
 }

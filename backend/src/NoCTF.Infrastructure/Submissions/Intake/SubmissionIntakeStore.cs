@@ -184,4 +184,75 @@ public sealed class SubmissionIntakeStore(
         await outbox.FlushOutgoingMessagesAsync();
         return new(SubmissionAcceptanceState.Created, entity.Id, entity.ReceivedAt);
     }
+
+    public async Task<SubmissionAcceptanceResult> TryAcceptHintUnlockAsync(
+        HintUnlockSubmissionReceived received,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var valid = await db.CompetitionChallenges.AnyAsync(item =>
+            item.Id == received.CompetitionChallengeId
+            && item.CompetitionId == received.CompetitionId, cancellationToken)
+            && await db.Teams.AnyAsync(item =>
+                item.Id == received.TeamId
+                && item.CompetitionId == received.CompetitionId
+                && item.MemberIds.Contains(received.UserId), cancellationToken);
+        if (!valid)
+            return new(SubmissionAcceptanceState.SnapshotChanged);
+        var entity = new Submission
+        {
+            Id = received.SubmissionId,
+            CompetitionId = received.CompetitionId,
+            CompetitionChallengeId = received.CompetitionChallengeId,
+            TeamId = received.TeamId,
+            SubmittedByUserId = received.UserId,
+            Kind = SubmissionKind.HintUnlock,
+            SubmittedFlag = received.HintId.ToString("D"),
+            ReceivedAt = received.ReceivedAt,
+            EvaluationState = SubmissionEvaluationState.Queued,
+            EvaluationUpdatedAt = received.ReceivedAt,
+            ProcessingVersion = 0
+        };
+        db.Submissions.Add(entity);
+        await outbox.PublishAsync(new EvaluateSubmission(entity.Id, entity.ProcessingVersion));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(SubmissionAcceptanceState.Created, entity.Id, entity.ReceivedAt);
+    }
+
+    public async Task<SubmissionAcceptanceResult> TryAcceptManualAdjustmentAsync(
+        ManualAdjustmentSubmissionReceived received,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var valid = await db.CompetitionChallenges.AnyAsync(item =>
+            item.Id == received.CompetitionChallengeId
+            && item.CompetitionId == received.CompetitionId, cancellationToken)
+            && await db.Teams.AnyAsync(item =>
+                item.Id == received.TeamId
+                && item.CompetitionId == received.CompetitionId, cancellationToken);
+        if (!valid)
+            return new(SubmissionAcceptanceState.SnapshotChanged);
+        var entity = new Submission
+        {
+            Id = received.SubmissionId,
+            CompetitionId = received.CompetitionId,
+            CompetitionChallengeId = received.CompetitionChallengeId,
+            TeamId = received.TeamId,
+            SubmittedByUserId = received.UserId,
+            Kind = SubmissionKind.ManualAdjust,
+            SubmittedFlag = received.Delta.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ReceivedAt = received.ReceivedAt,
+            EvaluationState = SubmissionEvaluationState.Queued,
+            EvaluationUpdatedAt = received.ReceivedAt,
+            ProcessingVersion = 0
+        };
+        db.Submissions.Add(entity);
+        await outbox.PublishAsync(new EvaluateSubmission(entity.Id, entity.ProcessingVersion));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(SubmissionAcceptanceState.Created, entity.Id, entity.ReceivedAt);
+    }
 }

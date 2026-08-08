@@ -20,7 +20,9 @@ API 多副本使用 Redis SignalR backplane。断线不补历史；客户端重�
 
 ## notifications
 
-站内通知是永久保留的个人事件流，不维护已读状态或未读数。Wolverine Worker 从已提交业务事件创建 Notification；通知失败不回滚原业务。
+通知是一行动态受众消息，而不是按 User 展开的收件箱，不维护已读状态或未读数。字段为 Source/Target type+id、Kind、Content、SentAt、Related 引用和 ReplyToId；Question 根、回复、状态变化、公告和自然通知共享此表。比赛管理员公告的 Source 是发送者 UserId，Target 是比赛且默认 TargetType=CompetitionCollaborators。
+
+读取时解析受众：协作者包含 Owner/Manager/Judge/Observer，参赛者包含当前有效 Approved 队伍成员，TeamMembers 解析队伍成员，平台管理员解析当前有效管理员。Question 根发送者永久继承线程访问权限。`GET /notifications/{id}/thread` 用 recursive CTE 返回线性链；SignalR 只发刷新提示，Feed 以 PostgreSQL 为准。
 
 Payload 由 NotificationKind 对应强类型 DTO 序列化，只含安全展示字段。按 CreatedAt desc/Id desc keyset 查询。没有 Read/MarkAllRead/Delete/Expiry API。
 

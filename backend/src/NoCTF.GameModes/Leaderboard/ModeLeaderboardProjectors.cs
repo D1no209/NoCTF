@@ -8,6 +8,7 @@ using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Ctf.Scoring;
+using System.Globalization;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -112,6 +113,7 @@ internal static class CtfLeaderboardProjection
                 group => group.Key,
                 group => group.Aggregate(0L, (total, fact) => checked(total + fact.Penalty)));
         var hintCosts = ProjectionPenalties.HintCosts(input, validTeams.Keys);
+        var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, validTeams.Keys);
 
         var rows = validTeams.Values.Select(team =>
         {
@@ -128,7 +130,8 @@ internal static class CtfLeaderboardProjection
                 .FirstOrDefault();
             var total = checked(own.Aggregate(0L, (sum, item) => checked(sum + item.Points))
                 - wrongPenalties.GetValueOrDefault(team.Id)
-                - hintCosts.GetValueOrDefault(team.Id));
+                - hintCosts.GetValueOrDefault(team.Id)
+                + manualAdjustments.GetValueOrDefault(team.Id));
             return new CtfRankedEntry(
                 new LeaderboardEntry(
                     0,
@@ -152,7 +155,8 @@ internal static class CtfLeaderboardProjection
             validTeams,
             awarded,
             wrongFacts,
-            ProjectionPenalties.HintCostEvents(input, validTeams.Keys));
+            ProjectionPenalties.HintCostEvents(input, validTeams.Keys),
+            ProjectionPenalties.ManualAdjustmentEvents(input, validTeams.Keys));
         return (entries, series);
     }
 
@@ -160,7 +164,8 @@ internal static class CtfLeaderboardProjection
         IReadOnlyDictionary<Guid, LeaderboardTeamFact> validTeams,
         IReadOnlyDictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points, int SolveOrdinal)>> awarded,
         IReadOnlyList<(Guid TeamId, DateTimeOffset ReceivedAt, Guid SubmissionId, long Penalty)> wrongFacts,
-        IReadOnlyList<(Guid TeamId, DateTimeOffset OccurredAt, Guid EventId, long Cost)> hintCostEvents)
+        IReadOnlyList<(Guid TeamId, DateTimeOffset OccurredAt, Guid EventId, long Cost)> hintCostEvents,
+        IReadOnlyList<(Guid TeamId, DateTimeOffset OccurredAt, Guid EventId, long Delta)> manualAdjustmentEvents)
     {
         var deltas = new Dictionary<Guid, List<(DateTimeOffset At, Guid StableId, long Delta)>>();
         var solveRecords = new Dictionary<Guid, List<LeaderboardSolveRecord>>();
@@ -203,6 +208,10 @@ internal static class CtfLeaderboardProjection
                 hint.OccurredAt,
                 hint.Cost,
                 LeaderboardPenaltyKind.HintUnlock));
+        }
+        foreach (var adjustment in manualAdjustmentEvents)
+        {
+            Add(adjustment.TeamId, adjustment.OccurredAt, adjustment.EventId, adjustment.Delta);
         }
         return deltas
             .Select(pair =>
@@ -384,6 +393,8 @@ internal static class AwdLeaderboardProjection
         }
         foreach (var hint in ProjectionPenalties.HintCosts(input, teams.Keys))
             values[hint.Key] = checked(values[hint.Key] - hint.Value);
+        foreach (var adjustment in ProjectionPenalties.ManualAdjustments(input, teams.Keys))
+            values[adjustment.Key] = checked(values[adjustment.Key] + adjustment.Value);
         var rows = teams.Values.Select(team =>
         {
             var attackCount = attacks.Count(attack => attack.TeamId == team.Id);
@@ -543,6 +554,7 @@ internal static class AwdpLeaderboardProjection
                                 ? challenges.GetValueOrDefault(challengeId)?.ConfigurationJson
                                 : null)))));
         var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
+        var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, teams.Keys);
         var rows = teams.Values.Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
@@ -561,7 +573,8 @@ internal static class AwdpLeaderboardProjection
                     0,
                     team.Id,
                     team.Name,
-                    checked(awardedScore - penalty - hintCosts.GetValueOrDefault(team.Id)),
+                    checked(awardedScore - penalty - hintCosts.GetValueOrDefault(team.Id)
+                        + manualAdjustments.GetValueOrDefault(team.Id)),
                     own.Count,
                     last == default ? null : last,
                     []),
@@ -584,7 +597,7 @@ internal static class AwdpLeaderboardProjection
 
     private static int Round(
         DateTimeOffset occurredAt,
-        IReadOnlyList<CompetitionLifecycleAudit>? lifecycleAudits,
+        IReadOnlyList<CompetitionLifecycleTransition>? lifecycleAudits,
         DateTimeOffset? start,
         int durationSeconds)
     {
@@ -685,6 +698,7 @@ internal static class KohLeaderboardProjection
             .ThenBy(fact => fact.Event.Id)
             .ToList();
         var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
+        var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, teams.Keys);
         var rows = teams.Values.Select(team =>
         {
             var own = observations.Where(fact => fact.Event.TeamId == team.Id).ToList();
@@ -701,7 +715,8 @@ internal static class KohLeaderboardProjection
                     0,
                     team.Id,
                     team.Name,
-                    checked(observationPoints - hintCosts.GetValueOrDefault(team.Id)),
+                    checked(observationPoints - hintCosts.GetValueOrDefault(team.Id)
+                        + manualAdjustments.GetValueOrDefault(team.Id)),
                     own.Count,
                     last == default ? null : last,
                     []),
@@ -774,6 +789,19 @@ internal static class ProjectionPenalties
         IEnumerable<Guid> teamIds)
     {
         var validTeams = teamIds.ToHashSet();
+        var submissionEvents = input.Submissions
+            .Where(fact => fact.Event is
+            {
+                DeletedAt: null,
+                Result: ScoringResult.Correct,
+                Kind: ScoringEventKind.HintUnlock,
+                TeamId: not null
+            } && validTeams.Contains(fact.TeamId))
+            .Select(fact => (fact.TeamId, fact.Event.OccurredAt, fact.Event.Id,
+                Cost: fact.HintCost ?? 0))
+            .ToList();
+        if (submissionEvents.Count > 0)
+            return submissionEvents;
         return input.SystemEvents
             .Where(fact => fact.Event is
             {
@@ -790,6 +818,20 @@ internal static class ProjectionPenalties
         IEnumerable<Guid> teamIds)
     {
         var validTeams = teamIds.ToHashSet();
+        var submissionHints = input.Submissions
+            .Where(fact => fact.Event is
+            {
+                DeletedAt: null,
+                Result: ScoringResult.Correct,
+                Kind: ScoringEventKind.HintUnlock,
+                TeamId: not null
+            } && validTeams.Contains(fact.TeamId))
+            .GroupBy(fact => fact.TeamId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Aggregate(0L, (total, fact) => checked(total + (fact.HintCost ?? 0))));
+        if (submissionHints.Count > 0)
+            return submissionHints;
         return input.SystemEvents
             .Where(fact => fact.Event is
             {
@@ -802,4 +844,46 @@ internal static class ProjectionPenalties
                 group => group.Key,
                 group => group.Aggregate(0L, (total, fact) => checked(total + fact.CurrentValue)));
     }
+
+    public static IReadOnlyDictionary<Guid, long> ManualAdjustments(
+        LeaderboardProjectionInput input,
+        IEnumerable<Guid> teamIds)
+    {
+        var validTeams = teamIds.ToHashSet();
+        return input.Submissions
+            .Where(fact => fact.Event is
+            {
+                DeletedAt: null,
+                Result: ScoringResult.Correct,
+                Kind: ScoringEventKind.ManualAdjust,
+                TeamId: not null
+            } && validTeams.Contains(fact.TeamId))
+            .GroupBy(fact => fact.TeamId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Aggregate(0L, (total, fact) => checked(total + ParseDelta(fact.SubmittedFlag))));
+    }
+
+    public static IReadOnlyList<(Guid TeamId, DateTimeOffset OccurredAt, Guid EventId, long Delta)> ManualAdjustmentEvents(
+        LeaderboardProjectionInput input,
+        IEnumerable<Guid> teamIds)
+    {
+        var validTeams = teamIds.ToHashSet();
+        return input.Submissions
+            .Where(fact => fact.Event is
+            {
+                DeletedAt: null,
+                Result: ScoringResult.Correct,
+                Kind: ScoringEventKind.ManualAdjust,
+                TeamId: not null
+            } && validTeams.Contains(fact.TeamId))
+            .Select(fact => (fact.TeamId, fact.Event.OccurredAt, fact.Event.Id,
+                Delta: ParseDelta(fact.SubmittedFlag)))
+            .ToList();
+    }
+
+    private static long ParseDelta(string? value) =>
+        long.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var delta)
+            ? delta
+            : 0;
 }

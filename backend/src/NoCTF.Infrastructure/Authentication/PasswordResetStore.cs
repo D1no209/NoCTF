@@ -58,22 +58,27 @@ public sealed class PasswordResetStore(
             return PasswordResetRequestState.Ignored;
 
         var hourlyBoundary = now.AddHours(-1);
-        var recentRequests = await db.PasswordResetTokens.CountAsync(token =>
-            token.UserId == userId.Value && token.CreatedAt > hourlyBoundary,
+        var recentRequests = await db.AccountTokens.CountAsync(token =>
+            token.UserId == userId.Value
+            && token.Kind == AccountTokenKind.PasswordReset
+            && token.CreatedAt > hourlyBoundary,
             ct);
         if (recentRequests >= settings.PasswordResetMaxRequestsPerHour)
             return PasswordResetRequestState.RateLimited;
 
         var cooldownBoundary = now.AddSeconds(-settings.PasswordResetCooldownSeconds);
-        if (await db.PasswordResetTokens.AsNoTracking().AnyAsync(token =>
-                token.UserId == userId.Value && token.CreatedAt > cooldownBoundary,
+        if (await db.AccountTokens.AsNoTracking().AnyAsync(token =>
+                token.UserId == userId.Value
+                && token.Kind == AccountTokenKind.PasswordReset
+                && token.CreatedAt > cooldownBoundary,
                 ct))
         {
             return PasswordResetRequestState.RateLimited;
         }
 
-        await db.PasswordResetTokens
+        await db.AccountTokens
             .Where(token => token.UserId == userId.Value
+                && token.Kind == AccountTokenKind.PasswordReset
                 && token.ConsumedAt == null
                 && token.InvalidatedAt == null)
             .ExecuteUpdateAsync(setters => setters
@@ -81,10 +86,11 @@ public sealed class PasswordResetStore(
 
         var rawToken = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(
             RandomNumberGenerator.GetBytes(32));
-        db.PasswordResetTokens.Add(new PasswordResetToken
+        db.AccountTokens.Add(new AccountToken
         {
             Id = Guid.CreateVersion7(now),
             UserId = userId.Value,
+            Kind = AccountTokenKind.PasswordReset,
             TokenSha256 = HashToken(rawToken),
             ExpiresAt = now.AddMinutes(settings.PasswordResetTokenLifetimeMinutes),
             CreatedAt = now
@@ -113,8 +119,9 @@ public sealed class PasswordResetStore(
         CancellationToken ct)
     {
         var tokenHash = HashToken(token);
-        var descriptor = await db.PasswordResetTokens.AsNoTracking()
-            .Where(candidate => candidate.TokenSha256 == tokenHash)
+        var descriptor = await db.AccountTokens.AsNoTracking()
+            .Where(candidate => candidate.Kind == AccountTokenKind.PasswordReset
+                && candidate.TokenSha256 == tokenHash)
             .Select(candidate => new { candidate.Id, candidate.UserId })
             .SingleOrDefaultAsync(ct);
         if (descriptor is null)
@@ -124,7 +131,7 @@ public sealed class PasswordResetStore(
             IsolationLevel.ReadCommitted,
             ct);
         await AcquireUserLockAsync(descriptor.UserId, ct);
-        var resetToken = await db.PasswordResetTokens
+        var resetToken = await db.AccountTokens
             .SingleOrDefaultAsync(token => token.Id == descriptor.Id, ct);
         if (resetToken is null
             || !CryptographicOperations.FixedTimeEquals(resetToken.TokenSha256, tokenHash)
@@ -160,8 +167,9 @@ public sealed class PasswordResetStore(
             return PasswordResetCompletionState.InvalidOrExpired;
 
         resetToken.ConsumedAt = now;
-        await db.PasswordResetTokens
+        await db.AccountTokens
             .Where(candidate => candidate.UserId == user.Id
+                && candidate.Kind == AccountTokenKind.PasswordReset
                 && candidate.Id != resetToken.Id
                 && candidate.ConsumedAt == null
                 && candidate.InvalidatedAt == null)

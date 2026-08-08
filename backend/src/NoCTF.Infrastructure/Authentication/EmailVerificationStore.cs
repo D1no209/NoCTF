@@ -44,8 +44,9 @@ public sealed class EmailVerificationStore(
         }
 
         var resendBoundary = now.AddSeconds(-settings.ResendCooldownSeconds);
-        var sentRecently = await db.EmailVerificationTokens.AsNoTracking().AnyAsync(
+        var sentRecently = await db.AccountTokens.AsNoTracking().AnyAsync(
             item => item.UserId == userId
+                && item.Kind == AccountTokenKind.EmailVerification
                 && item.ConsumedAt == null
                 && item.CreatedAt > resendBoundary,
             ct);
@@ -54,10 +55,11 @@ public sealed class EmailVerificationStore(
 
         var bytes = RandomNumberGenerator.GetBytes(32);
         var token = Microsoft.AspNetCore.WebUtilities.WebEncoders.Base64UrlEncode(bytes);
-        db.EmailVerificationTokens.Add(new EmailVerificationToken
+        db.AccountTokens.Add(new AccountToken
         {
             Id = Guid.CreateVersion7(now),
             UserId = userId,
+            Kind = AccountTokenKind.EmailVerification,
             TokenSha256 = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token)),
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(settings.TokenLifetimeMinutes)
@@ -74,8 +76,9 @@ public sealed class EmailVerificationStore(
         CancellationToken ct)
     {
         var hash = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(token));
-        var verification = await db.EmailVerificationTokens.SingleOrDefaultAsync(
+        var verification = await db.AccountTokens.SingleOrDefaultAsync(
             item => item.TokenSha256 == hash
+                && item.Kind == AccountTokenKind.EmailVerification
                 && item.ConsumedAt == null
                 && item.ExpiresAt > now,
             ct);

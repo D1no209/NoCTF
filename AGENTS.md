@@ -30,7 +30,7 @@
 - `refresh_sessions` is not a business table. Refresh tokens are stateless JWTs with a fixed 30-day lifetime, the shared authentication signing key, a distinct refresh audience, and `token_type=refresh` plus `sub`, `jti`, `iat`, `exp`, and `token_version` claims. Refresh rotation, replay detection, and per-device server-side revocation are intentionally not implemented. Logout only clears the HttpOnly cookie; `User.TokenVersion` remains the global administrative/password-change invalidation mechanism.
 - `competition_configurations` is not a separate entity/table. Competition mode, configuration JSON, revision, and update time are columns on `competitions`; common values use ordinary columns and mode-specific values use `jsonb`.
 - Competition collaborators are stored directly on `competitions` as the mutually exclusive PostgreSQL UUID arrays `ManagerIds`, `JudgeIds`, and `ObserverIds`. Do not create a collaborator entity or table. `OwnerId` is the sole owner source of truth.
-- Lifecycle audits remain owned by the `Competition` aggregate and may use a PostgreSQL child table; they are not independent application roots or `DbSet`s.
+- Lifecycle and leaderboard-visibility transitions are immutable `competition_events` with typed JSON payloads. There are no lifecycle-audit or leaderboard-visibility-audit tables, child collections, or `DbSet`s.
 - Team membership is stored directly on `teams` as a duplicate-free PostgreSQL UUID array `MemberIds`. `CaptainId` is the sole captain source of truth and must be present in `MemberIds`. Do not create a `TeamMember` entity/table or attach ordering semantics to the array.
 - `team_invitations` is not a separate entity/table. A team owns one unique, plaintext, cryptographically random 32-character `InvitationToken`. Possession of the token directly joins the team. Captains/administrators may rotate it, immediately invalidating the previous value; there are no invited-user, invitation-status, or invitation-expiry states.
 - `Challenge` is a reusable global question-bank template for exactly one `GameMode`. It owns the statement, attachments, plaintext template flags, and provider-neutral Runtime/Checker/Flag-injection definition JSON. It must not contain competition identity, ordering/publication, scoring, hints, `RuntimeProvider`, or `RunnerPool`.
@@ -39,6 +39,14 @@
 - There is no `runtime_operations` or `runtime_artifacts` business table. Asynchronous state belongs to the corresponding `RuntimeInstance`, `Submission`, or `ChallengeFlag`, while Wolverine owns durable message delivery.
 - Docker Container and Compose Runtime public access must use the challenge service's own Docker port mapping with host port `0` (Docker-assigned random port). Do not add or use an HAProxy/ingress proxy for Docker Runtime exposure.
 - A deployment selects exactly one active container Runtime provider (`Docker` or `Kubernetes`) and its runner pool in platform configuration. Challenge and Competition data never select either value.
+
+## Persistence baseline (2026 model)
+
+- The only business tables are `users`, `competitions`, `competition_events`, `teams`, `challenges`, `challenge_attachments`, `competition_challenges`, `challenge_flags`, `runtime_instances`, `patch_uploads`, `account_tokens`, `platform_settings`, `notifications`, `submissions`, `scoring_events`, `data_exports`, and `files`.
+- `email_verification_settings`, both legacy token tables, question/entry tables, hint tables, published-port tables, maintenance schedules, and user-account lifecycle-audit tables are deleted. Do not add compatibility `DbSet`s or migrations.
+- `files` owns immutable object metadata. Business records keep only a `FileId`; replacements upload a new File and enqueue `CleanupFile` for an unreferenced old File.
+- `notifications` is one append-only message with dynamic audience (`CompetitionCollaborators`, `CompetitionParticipants`, `TeamMembers`, `PlatformAdministrators`) and a linear `ReplyToId` chain. Question roots and announcements are notification kinds, not extra tables.
+- `SubmissionKind.ManualAdjust` stores the canonical signed Int32 delta (`-10` or `25`) in `SubmittedFlag`; no `additional_id`, score, or delta column is allowed. Every ManualAdjust and HintUnlock produces a ScoringEvent.
 
 ## Product scope
 

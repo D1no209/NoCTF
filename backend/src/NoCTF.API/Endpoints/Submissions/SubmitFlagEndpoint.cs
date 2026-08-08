@@ -18,7 +18,9 @@ public enum SubmissionKindProtocol
 {
     Flag,
     Break,
-    Fix
+    Fix,
+    HintUnlock,
+    ManualAdjust
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<SubmissionEvaluationStateProtocol>))]
@@ -74,7 +76,9 @@ public enum ScoringFailureCodeProtocol
     AwdpPatchTimeout,
     AwdpServiceDown,
     AwdpViolation,
-    ForeignTeamFlagDetected
+    ForeignTeamFlagDetected,
+    InsufficientScore,
+    HintUnavailable
 }
 
 public sealed record AcceptedSubmissionResponse(Guid SubmissionId, DateTimeOffset ReceivedAt);

@@ -11,6 +11,7 @@ using NoCTF.Domain.Platform;
 using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.DataExports;
+using NoCTF.Domain.Storage;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -18,28 +19,21 @@ namespace NoCTF.Infrastructure.Persistence;
 public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : DbContext(options)
 {
     public DbSet<User> Users => Set<User>();
-    public DbSet<UserAccountLifecycleAudit> UserAccountLifecycleAudits =>
-        Set<UserAccountLifecycleAudit>();
     public DbSet<Competition> Competitions => Set<Competition>();
     public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Challenge> Challenges => Set<Challenge>();
     public DbSet<CompetitionChallenge> CompetitionChallenges => Set<CompetitionChallenge>();
-    public DbSet<CompetitionQuestion> CompetitionQuestions => Set<CompetitionQuestion>();
     public DbSet<ChallengeFlag> ChallengeFlags => Set<ChallengeFlag>();
     public DbSet<RuntimeInstance> RuntimeInstances => Set<RuntimeInstance>();
     public DbSet<PatchUpload> PatchUploads => Set<PatchUpload>();
-    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
-    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
-    public DbSet<EmailVerificationSettings> EmailVerificationSettings =>
-        Set<EmailVerificationSettings>();
+    public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Submission> Submissions => Set<Submission>();
     public DbSet<ScoringEvent> ScoringEvents => Set<ScoringEvent>();
     public DbSet<DataExport> DataExports => Set<DataExport>();
-    public DbSet<DurableMaintenanceSchedule> DurableMaintenanceSchedules =>
-        Set<DurableMaintenanceSchedule>();
+    public DbSet<StoredFile> Files => Set<StoredFile>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(NoCtfDbContext).Assembly);
@@ -72,7 +66,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        EnsureCompetitionEventsAreAppendOnly();
+        EnsureAppendOnlyFacts();
         return base.SaveChanges(acceptAllChangesOnSuccess);
     }
 
@@ -80,11 +74,11 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        EnsureCompetitionEventsAreAppendOnly();
+        EnsureAppendOnlyFacts();
         return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
-    private void EnsureCompetitionEventsAreAppendOnly()
+    private void EnsureAppendOnlyFacts()
     {
         if (ChangeTracker.Entries<CompetitionEvent>().Any(entry =>
                 entry.State is EntityState.Modified or EntityState.Deleted))
@@ -92,5 +86,15 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
             throw new InvalidOperationException(
                 "Competition events are immutable and cannot be updated or deleted.");
         }
+
+        if (ChangeTracker.Entries<Notification>().Any(entry =>
+                entry.State is EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException(
+                "Notifications are immutable and cannot be updated or deleted.");
+        }
+
+        if (ChangeTracker.Entries<StoredFile>().Any(entry => entry.State == EntityState.Modified))
+            throw new InvalidOperationException("Stored file metadata is immutable.");
     }
 }

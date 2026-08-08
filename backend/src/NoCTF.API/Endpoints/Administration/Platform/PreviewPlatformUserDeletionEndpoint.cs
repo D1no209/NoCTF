@@ -21,11 +21,7 @@ public enum PlatformUserDeletionReferenceCode
     PatchUpload,
     Notification,
     ScoringEvent,
-    CompetitionLifecycleAudit,
-    CompetitionQuestion,
-    CompetitionQuestionEntry,
-    CompetitionEvent,
-    UserAccountLifecycleAudit
+    CompetitionEvent
 }
 
 public sealed record PlatformUserDeletionReferenceResponse(

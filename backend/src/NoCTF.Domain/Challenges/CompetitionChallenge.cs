@@ -27,12 +27,8 @@ public sealed class CompetitionChallenge
 public sealed class CompetitionChallengeHint
 {
     public Guid Id { get; set; }
-    public Guid CompetitionChallengeId { get; set; }
     public string Content { get; set; } = string.Empty;
     public long Cost { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
-    public int PublicationRevision { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
-    public DateTimeOffset? DeletedAt { get; set; }
+    public DateTimeOffset? HiddenAt { get; set; }
 }

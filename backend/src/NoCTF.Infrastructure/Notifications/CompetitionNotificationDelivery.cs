@@ -1,13 +1,14 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Notifications;
+using NoCTF.Application.Notifications;
+using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Notifications;
 
 public sealed class CompetitionNotificationDelivery(
-    NoCtfDbContext db,
-    CompetitionNotificationAudienceResolver audiences)
+    NoCtfDbContext db)
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
@@ -21,21 +22,22 @@ public sealed class CompetitionNotificationDelivery(
         Guid? requiredTeamId,
         CancellationToken ct)
     {
-        var recipients = await audiences.ResolveAsync(
-            competitionId,
-            requiredTeamId,
-            ct);
-        if (recipients.Count == 0)
-            return;
-
-        await PersistAsync(
-            competitionId,
-            entityId,
-            kind,
-            sourceEventKey,
-            JsonSerializer.Serialize(payload, JsonOptions),
-            recipients,
-            ct);
+        _ = sourceEventKey;
+        db.Notifications.Add(new Notification
+        {
+            Id = Guid.CreateVersion7(),
+            SourceType = NotificationSourceType.System,
+            TargetType = requiredTeamId is null
+                ? NotificationTargetType.CompetitionParticipants
+                : NotificationTargetType.TeamMembers,
+            TargetId = requiredTeamId ?? competitionId,
+            Kind = kind,
+            ContentJson = EnsureObjectPayload(payload),
+            RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition,
+            RelatedId = competitionId,
+            SentAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task DeliverToUsersAsync<TPayload>(
@@ -59,79 +61,80 @@ public sealed class CompetitionNotificationDelivery(
         if (recipients.Length == 0)
             return;
 
-        await PersistAsync(
-            competitionId,
-            entityId,
-            kind,
-            sourceEventKey,
-            JsonSerializer.Serialize(payload, JsonOptions),
-            recipients,
-            ct);
+        _ = sourceEventKey;
+        var sentAt = DateTimeOffset.UtcNow;
+        db.Notifications.AddRange(recipients.Select((userId, index) => new Notification
+        {
+            Id = Guid.CreateVersion7(sentAt.AddTicks(index)),
+            SourceType = NotificationSourceType.System,
+            TargetType = NotificationTargetType.User,
+            TargetId = userId,
+            Kind = kind,
+            ContentJson = EnsureObjectPayload(payload),
+            RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition,
+            RelatedId = competitionId,
+            SentAt = sentAt
+        }));
+        await db.SaveChangesAsync(ct);
     }
 
-    private async Task PersistAsync(
+    public async Task<NotificationView?> CreateAnnouncementAsync(
         Guid competitionId,
-        Guid entityId,
-        NotificationKind kind,
-        string sourceEventKey,
-        string payloadJson,
-        IReadOnlyCollection<Guid> recipients,
+        Guid sourceUserId,
+        string title,
+        string body,
+        bool participants,
+        DateTimeOffset sentAt,
         CancellationToken ct)
     {
-        var existing = await db.Notifications.AsNoTracking()
-            .Where(notification => recipients.Contains(notification.UserId)
-                && notification.SourceEventKey == sourceEventKey)
-            .Select(notification => notification.UserId)
-            .ToArrayAsync(ct);
-        var missing = recipients.Except(existing).Order().ToArray();
-        if (missing.Length == 0)
-            return;
-
-        var createdAt = DateTimeOffset.UtcNow;
-        Add(missing, createdAt);
-        try
+        var exists = await db.Competitions.AsNoTracking()
+            .AnyAsync(competition => competition.Id == competitionId, ct);
+        if (!exists)
+            return null;
+        var notification = new Notification
         {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException)
-        {
-            db.ChangeTracker.Clear();
-            var persisted = await db.Notifications.AsNoTracking()
-                .Where(notification => missing.Contains(notification.UserId)
-                    && notification.SourceEventKey == sourceEventKey)
-                .Select(notification => notification.UserId)
-                .ToArrayAsync(ct);
-            var retryMissing = missing.Except(persisted).Order().ToArray();
-            if (retryMissing.Length == 0)
-                return;
+            Id = Guid.CreateVersion7(sentAt),
+            SourceType = NotificationSourceType.User,
+            SourceId = sourceUserId,
+            TargetType = participants
+                ? NotificationTargetType.CompetitionParticipants
+                : NotificationTargetType.CompetitionCollaborators,
+            TargetId = competitionId,
+            Kind = NotificationKind.CompetitionAnnouncement,
+            ContentJson = JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                subject = title,
+                title,
+                body
+            }, JsonOptions),
+            RelatedType = EntityReferenceKind.Competition,
+            RelatedId = competitionId,
+            SentAt = sentAt
+        };
+        db.Notifications.Add(notification);
+        await db.SaveChangesAsync(ct);
+        return new(
+            notification.Id,
+            notification.SourceType,
+            notification.SourceId,
+            notification.TargetType,
+            notification.TargetId,
+            notification.Kind,
+            notification.ContentJson,
+            notification.RelatedType,
+            notification.RelatedId,
+            notification.ReplyToId,
+            notification.SentAt);
+    }
 
-            Add(retryMissing, DateTimeOffset.UtcNow);
-            try
-            {
-                await db.SaveChangesAsync(ct);
-            }
-            catch (DbUpdateException)
-            {
-                db.ChangeTracker.Clear();
-                var nowPersisted = await db.Notifications.AsNoTracking()
-                    .CountAsync(notification => retryMissing.Contains(notification.UserId)
-                        && notification.SourceEventKey == sourceEventKey, ct);
-                if (nowPersisted != retryMissing.Length)
-                    throw;
-            }
-        }
-
-        void Add(IEnumerable<Guid> userIds, DateTimeOffset timestamp) =>
-            db.Notifications.AddRange(userIds.Select(userId => new Notification
-            {
-                Id = Guid.CreateVersion7(timestamp),
-                UserId = userId,
-                CompetitionId = competitionId,
-                EntityId = entityId,
-                Kind = kind,
-                SourceEventKey = sourceEventKey,
-                PayloadJson = payloadJson,
-                CreatedAt = timestamp
-            }));
+    private static string EnsureObjectPayload<TPayload>(TPayload payload)
+    {
+        var element = JsonSerializer.SerializeToElement(payload, JsonOptions);
+        if (element.ValueKind != JsonValueKind.Object)
+            return JsonSerializer.Serialize(new { schemaVersion = 1, value = element }, JsonOptions);
+        var values = element.EnumerateObject().ToDictionary(property => property.Name, property => property.Value);
+        values.TryAdd("schemaVersion", JsonSerializer.SerializeToElement(1));
+        return JsonSerializer.Serialize(values, JsonOptions);
     }
 }

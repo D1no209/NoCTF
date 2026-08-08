@@ -3,12 +3,20 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
+using NoCTF.Application.Messaging;
+using NoCTF.Infrastructure.Messaging;
 
 namespace NoCTF.Infrastructure.Administration;
 
-public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
+public sealed class UserAccountAdministrationStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox? messageOutbox = null)
     : IUserAccountAdministrationStore
 {
+    private readonly ITransactionalMessageOutbox outbox =
+        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
     public async Task<UserDeletionPreview?> PreviewDeletionAsync(
         Guid userId,
         Guid actorUserId,
@@ -32,7 +40,8 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
             IsolationLevel.Serializable,
             ct);
         await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
-        var user = await db.Users.SingleOrDefaultAsync(candidate => candidate.Id == userId, ct);
+        var user = await db.Users.Include(candidate => candidate.AvatarFile)
+            .SingleOrDefaultAsync(candidate => candidate.Id == userId, ct);
         if (user is null)
             return new(UserDeletionState.UserNotFound);
 
@@ -49,28 +58,21 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
         if (mode == UserDeletionMode.Anonymize && !preview.CanAnonymize)
             return new(UserDeletionState.HardDeleteBlocked, preview);
 
-        var avatarObjectKey = user.AvatarObjectKey;
+        var previousAvatarFileId = user.AvatarFileId;
         var originalUserName = user.UserName;
-        await db.EmailVerificationTokens
-            .Where(token => token.UserId == userId)
-            .ExecuteDeleteAsync(ct);
-        await db.PasswordResetTokens
+        await db.AccountTokens
             .Where(token => token.UserId == userId)
             .ExecuteDeleteAsync(ct);
 
         if (mode == UserDeletionMode.HardDelete)
         {
             db.Users.Remove(user);
-            AddAudit(
-                userId,
-                originalUserName,
-                actorUserId,
-                UserAccountLifecycleAction.PhysicallyDeleted,
-                reason,
-                now);
+            if (previousAvatarFileId is { } previous)
+                await outbox.PublishAsync(new CleanupFile(previous));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-            return new(UserDeletionState.PhysicallyDeleted, preview, avatarObjectKey);
+            await outbox.FlushOutgoingMessagesAsync();
+            return new(UserDeletionState.PhysicallyDeleted, preview, previousAvatarFileId);
         }
 
         await RemoveResourcePermissionsAsync(userId, ct);
@@ -84,19 +86,16 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
         user.TokenVersion = checked(user.TokenVersion + 1);
         user.EmailVerifiedAt = null;
         user.Description = null;
-        user.AvatarObjectKey = null;
+        user.AvatarFileId = null;
+        user.AvatarFile = null;
         user.IsEmailPublic = false;
         user.UpdatedAt = now;
-        AddAudit(
-            userId,
-            originalUserName,
-            actorUserId,
-            UserAccountLifecycleAction.Anonymized,
-            reason,
-            now);
+        if (previousAvatarFileId is { } previousFileId)
+            await outbox.PublishAsync(new CleanupFile(previousFileId));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
-        return new(UserDeletionState.Anonymized, preview, avatarObjectKey);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(UserDeletionState.Anonymized, preview, previousAvatarFileId);
     }
 
     private async Task<UserDeletionPreview> BuildPreviewAsync(
@@ -143,7 +142,11 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
             db.PatchUploads.CountAsync(upload => upload.UploadedByUserId == user.Id, ct));
         await AddReferenceAsync(
             UserDeletionReferenceKind.Notification,
-            db.Notifications.CountAsync(notification => notification.UserId == user.Id, ct));
+            db.Notifications.CountAsync(notification =>
+                notification.SourceType == NotificationSourceType.User
+                    && notification.SourceId == user.Id
+                || notification.TargetType == NotificationTargetType.User
+                    && notification.TargetId == user.Id, ct));
         await AddReferenceAsync(
             UserDeletionReferenceKind.ScoringEvent,
             db.ScoringEvents.CountAsync(scoringEvent =>
@@ -152,33 +155,12 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
                 && teamIds.Contains(scoringEvent.VictimTeamId.Value),
                 ct));
         await AddReferenceAsync(
-            UserDeletionReferenceKind.CompetitionLifecycleAudit,
-            db.Set<NoCTF.Domain.Competitions.CompetitionLifecycleAudit>()
-                .CountAsync(audit => audit.ActorId == user.Id, ct));
-        await AddReferenceAsync(
-            UserDeletionReferenceKind.CompetitionQuestion,
-            db.CompetitionQuestions.CountAsync(question =>
-                question.AskedByUserId == user.Id
-                || question.PublishedByUserId == user.Id,
-                ct));
-        await AddReferenceAsync(
-            UserDeletionReferenceKind.CompetitionQuestionEntry,
-            db.Set<NoCTF.Domain.Challenges.Questions.CompetitionQuestionEntry>()
-                .CountAsync(entry => entry.ActorUserId == user.Id
-                    || entry.PublishedByUserId == user.Id,
-                    ct));
-        await AddReferenceAsync(
             UserDeletionReferenceKind.CompetitionEvent,
             db.CompetitionEvents.CountAsync(entry =>
                 entry.ActorUserId == user.Id
-                || entry.RelatedUserId == user.Id,
+                || entry.RelatedType == EntityReferenceKind.User
+                    && entry.RelatedId == user.Id,
                 ct));
-        await AddReferenceAsync(
-            UserDeletionReferenceKind.UserAccountLifecycleAudit,
-            db.UserAccountLifecycleAudits.CountAsync(
-                audit => audit.TargetUserId == user.Id || audit.ActorUserId == user.Id,
-                ct));
-
         var selfDeletionForbidden = user.Id == actorUserId;
         var lastAdministratorProtected = user.Role == UserRole.Administrator
             && user.AccountStatus == UserAccountStatus.Active
@@ -230,21 +212,4 @@ public sealed class UserAccountAdministrationStore(NoCtfDbContext db)
             challenge.ManagerIds = challenge.ManagerIds.Where(id => id != userId).ToArray();
     }
 
-    private void AddAudit(
-        Guid targetUserId,
-        string targetUserName,
-        Guid actorUserId,
-        UserAccountLifecycleAction action,
-        string reason,
-        DateTimeOffset now) =>
-        db.UserAccountLifecycleAudits.Add(new UserAccountLifecycleAudit
-        {
-            Id = Guid.CreateVersion7(now),
-            TargetUserId = targetUserId,
-            TargetUserName = targetUserName,
-            ActorUserId = actorUserId,
-            Action = action,
-            Reason = reason,
-            OccurredAt = now
-        });
 }

@@ -43,14 +43,12 @@ public sealed class CreateTeamRequest
         get => name;
         set => name = value?.Trim() ?? string.Empty;
     }
-    public string? AvatarUrl { get; set; }
 }
 
 public sealed record TeamResponse(
     Guid Id,
     Guid CompetitionId,
     string Name,
-    string? AvatarUrl,
     Guid CaptainId,
     IReadOnlyList<Guid> MemberIds,
     TeamRegistrationStatusProtocol RegistrationStatus,
@@ -71,7 +69,6 @@ public sealed class UpdateTeamRequest
         get => name;
         set => name = value?.Trim() ?? string.Empty;
     }
-    public string? AvatarUrl { get; set; }
 }
 
 [Mapper]

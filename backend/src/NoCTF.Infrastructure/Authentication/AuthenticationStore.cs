@@ -3,13 +3,20 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Application.Storage;
+using NoCTF.Domain.Storage;
+using NoCTF.Application.Messaging;
+using NoCTF.Infrastructure.Messaging;
 
 namespace NoCTF.Infrastructure.Authentication;
 
 public sealed class AuthenticationStore(
     NoCtfDbContext db,
-    IPasswordHasher<User> passwordHasher) : IUserAuthenticationStore
+    IPasswordHasher<User> passwordHasher,
+    ITransactionalMessageOutbox? messageOutbox = null) : IUserAuthenticationStore
 {
+    private readonly ITransactionalMessageOutbox outbox =
+        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
     public async Task<AuthenticatedUser?> FindByLoginAsync(
         string login,
         CancellationToken ct)
@@ -62,7 +69,7 @@ public sealed class AuthenticationStore(
                 user.Kind,
                 user.EmailVerifiedAt != null,
                 user.Description,
-                user.AvatarObjectKey,
+                user.AvatarFileId,
                 user.IsEmailPublic))
             .SingleOrDefaultAsync(ct);
 
@@ -88,27 +95,46 @@ public sealed class AuthenticationStore(
 
     public async Task<UserAvatarReplacement?> ReplaceAvatarAsync(
         Guid userId,
-        string objectKey,
+        StoredObject storedObject,
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item =>
+        var user = await db.Users.Include(item => item.AvatarFile).SingleOrDefaultAsync(item =>
             item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
             ct);
         if (user is null)
             return null;
 
-        var previousObjectKey = user.AvatarObjectKey;
-        user.AvatarObjectKey = objectKey;
+        var previousFileId = user.AvatarFileId;
+        var file = new StoredFile
+        {
+            Id = Guid.CreateVersion7(now),
+            ObjectKey = storedObject.ObjectKey,
+            FileName = storedObject.FileName,
+            ContentType = storedObject.ContentType,
+            ByteLength = storedObject.Length,
+            Sha256 = Convert.FromHexString(storedObject.Sha256),
+            CreatedAt = now
+        };
+        db.Files.Add(file);
+        user.AvatarFileId = file.Id;
+        user.AvatarFile = file;
         user.UpdatedAt = now;
+        if (previousFileId is { } previous && previous != file.Id)
+            await outbox.PublishAsync(new CleanupFile(previous));
         await db.SaveChangesAsync(ct);
-        return new UserAvatarReplacement(ToProfile(user), previousObjectKey);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new UserAvatarReplacement(ToProfile(user), previousFileId);
     }
 
-    public Task<string?> GetAvatarObjectKeyAsync(Guid userId, CancellationToken ct) =>
+    public Task<BusinessFileReference?> GetAvatarFileAsync(Guid userId, CancellationToken ct) =>
         db.Users.AsNoTracking()
-            .Where(user => user.Id == userId && user.AccountStatus == UserAccountStatus.Active)
-            .Select(user => user.AvatarObjectKey)
+            .Where(user => user.Id == userId
+                && user.AccountStatus == UserAccountStatus.Active
+                && user.AvatarFileId != null)
+            .Join(db.Files.AsNoTracking(), user => user.AvatarFileId, file => file.Id,
+                (_, file) => new BusinessFileReference(
+                    file.Id, file.ObjectKey, file.FileName, file.ContentType))
             .SingleOrDefaultAsync(ct);
 
     public async Task<CreateUserState> CreateAsync(
@@ -215,6 +241,6 @@ public sealed class AuthenticationStore(
             user.Kind,
             user.EmailVerifiedAt is not null,
             user.Description,
-            user.AvatarObjectKey,
+            user.AvatarFileId,
             user.IsEmailPublic);
 }

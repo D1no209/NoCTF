@@ -100,7 +100,7 @@ public sealed class GetPublicUserProfile(IUserAuthenticationStore store)
             profile.UserName,
             mayViewEmail ? profile.Email : null,
             profile.Description,
-            profile.AvatarObjectKey,
+            profile.AvatarFileId,
             profile.IsEmailPublic);
     }
 }

@@ -96,7 +96,7 @@ public sealed class IdentityNormalizationPersistenceTests
                     .SingleAsync(cancellationToken);
                 var store = new TeamRegistrationStore(db, new NoopOutbox());
                 var created = await new CreateTeam(store).ExecuteAsync(
-                    new(competitionId, firstUserId, "  Alpha  ", null, now),
+                    new(competitionId, firstUserId, "  Alpha  ", now),
                     cancellationToken);
 
                 await Assert.That(created.Succeeded).IsTrue();
@@ -107,7 +107,7 @@ public sealed class IdentityNormalizationPersistenceTests
             {
                 var store = new TeamRegistrationStore(db, new NoopOutbox());
                 var duplicate = await new CreateTeam(store).ExecuteAsync(
-                    new(competitionId, secondUserId, "alpha", null, now.AddTicks(1)),
+                    new(competitionId, secondUserId, "alpha", now.AddTicks(1)),
                     cancellationToken);
 
                 await Assert.That(duplicate.FailureCode)

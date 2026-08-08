@@ -23,6 +23,7 @@ internal static class SubmissionInfrastructure
     {
         services.AddScoped<SubmissionAttemptCriticalSection>();
         services.AddScoped<ISubmissionIntakeStore, SubmissionIntakeStore>();
+        services.AddScoped<CreateManualAdjustment>();
         services.AddScoped<IPatchUploadStore, PatchUploadStore>();
         services.AddScoped<CreatePatchUpload>();
         services.AddScoped<IFixArchiveReader, FixArchiveReader>();

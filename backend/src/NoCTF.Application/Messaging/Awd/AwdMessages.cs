@@ -53,7 +53,6 @@ public sealed record RunAwdChecker(
 
 public sealed record DispatchAwdCheckers(
     DateTimeOffset At,
-    long ProcessingVersion,
     Guid? AfterRuntimeInstanceId = null);
 
 public sealed record AwdCheckerCallbackMissing(

@@ -1,5 +1,6 @@
 using NoCTF.Application.Common;
 using NoCTF.Domain.Identity;
+using NoCTF.Application.Storage;
 
 namespace NoCTF.Application.Authentication.Account;
 
@@ -21,16 +22,16 @@ public sealed record UserProfile(
     UserKind Kind,
     bool EmailVerified,
     string? Description = null,
-    string? AvatarObjectKey = null,
+    Guid? AvatarFileId = null,
     bool IsEmailPublic = false);
 public sealed record PublicUserProfile(
     Guid Id,
     string UserName,
     string? Email,
     string? Description,
-    string? AvatarObjectKey,
+    Guid? AvatarFileId,
     bool IsEmailPublic);
-public sealed record UserAvatarReplacement(UserProfile Profile, string? PreviousObjectKey);
+public sealed record UserAvatarReplacement(UserProfile Profile, Guid? PreviousFileId);
 public enum CreateUserState { Created, UserNameConflict, EmailConflict }
 public enum ChangePasswordState { Changed, CurrentPasswordInvalid }
 
@@ -48,10 +49,13 @@ public interface IUserAuthenticationStore
         CancellationToken cancellationToken);
     Task<UserAvatarReplacement?> ReplaceAvatarAsync(
         Guid userId,
-        string objectKey,
+        StoredObject storedObject,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task<string?> GetAvatarObjectKeyAsync(Guid userId, CancellationToken cancellationToken);
+    Task<BusinessFileReference?> GetAvatarFileAsync(
+        Guid userId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<BusinessFileReference?>(null);
     Task<CreateUserState> CreateAsync(
         Guid userId,
         string userName,

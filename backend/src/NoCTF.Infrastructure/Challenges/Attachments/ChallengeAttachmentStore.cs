@@ -8,6 +8,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Challenges;
+using NoCTF.Domain.Storage;
 
 namespace NoCTF.Infrastructure.Challenges.Attachments;
 
@@ -33,6 +34,7 @@ public sealed class ChallengeAttachmentStore(
     {
         var challenge = await WriteAuthorized(actorId, isAdministrator, includeDeleted)
             .Include(item => item.Attachments)
+            .ThenInclude(item => item.File)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
         return challenge is null
             ? null
@@ -57,15 +59,23 @@ public sealed class ChallengeAttachmentStore(
         if (await db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(item => item.Id == attachmentId, ct))
             return AddChallengeAttachmentState.ResourceIdConflict;
+        var file = new StoredFile
+        {
+            Id = Guid.CreateVersion7(now),
+            ObjectKey = storedObject.ObjectKey,
+            FileName = storedObject.FileName,
+            ContentType = storedObject.ContentType,
+            ByteLength = storedObject.Length,
+            Sha256 = Convert.FromHexString(storedObject.Sha256),
+            CreatedAt = now
+        };
+        db.Files.Add(file);
         db.Set<ChallengeAttachment>().Add(new ChallengeAttachment
         {
             Id = attachmentId,
             ChallengeId = challengeId,
-            ObjectKey = storedObject.ObjectKey,
-            FileName = storedObject.FileName,
-            ContentType = storedObject.ContentType,
-            Length = storedObject.Length,
-            Sha256Bytes = Convert.FromHexString(storedObject.Sha256),
+            FileId = file.Id,
+            File = file,
             CreatedAt = now
         });
         challenge.Revision = checked(challenge.Revision + 1);
@@ -82,32 +92,6 @@ public sealed class ChallengeAttachmentStore(
         }
     }
 
-    public async Task<ChallengeAttachmentView?> UpdateAsync(
-        Guid challengeId,
-        Guid attachmentId,
-        Guid actorId,
-        bool isAdministrator,
-        string fileName,
-        string contentType,
-        CancellationToken ct)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var challenge = await WriteAuthorized(actorId, isAdministrator)
-            .Include(item => item.Attachments)
-            .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
-        var attachment = challenge?.Attachments.SingleOrDefault(item =>
-            item.Id == attachmentId && item.DeletedAt == null);
-        if (attachment is null)
-            return null;
-        attachment.FileName = fileName;
-        attachment.ContentType = contentType;
-        challenge!.Revision = checked(challenge.Revision + 1);
-        challenge.UpdatedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
-        return Map(attachment);
-    }
-
     public async Task<bool> DeleteAsync(
         Guid challengeId,
         Guid attachmentId,
@@ -119,6 +103,7 @@ public sealed class ChallengeAttachmentStore(
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator)
             .Include(item => item.Attachments)
+            .ThenInclude(item => item.File)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
         var attachment = challenge?.Attachments.SingleOrDefault(item =>
             item.Id == attachmentId && item.DeletedAt == null);
@@ -143,6 +128,7 @@ public sealed class ChallengeAttachmentStore(
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var challenge = await WriteAuthorized(actorId, isAdministrator, includeDeleted: true)
             .Include(item => item.Attachments)
+            .ThenInclude(item => item.File)
             .SingleOrDefaultAsync(item => item.Id == challengeId && item.DeletedAt == null, ct);
         var attachment = challenge?.Attachments.SingleOrDefault(item =>
             item.Id == attachmentId && item.DeletedAt != null);
@@ -172,7 +158,10 @@ public sealed class ChallengeAttachmentStore(
             .OrderBy(attachment => attachment.CreatedAt)
             .ThenBy(attachment => attachment.Id)
             .ToListAsync(ct);
-        return attachments.Select(Map).ToArray();
+        var fileIds = attachments.Select(item => item.FileId).ToArray();
+        var files = await db.Files.AsNoTracking().Where(file => fileIds.Contains(file.Id))
+            .ToDictionaryAsync(file => file.Id, ct);
+        return attachments.Select(item => Map(item, files[item.FileId])).ToArray();
     }
 
     public async Task<ChallengeAttachmentContent?> GetPlayerAsync(
@@ -238,14 +227,13 @@ public sealed class ChallengeAttachmentStore(
             }
         }
 
-        var attachment = await db.Challenges.AsNoTracking()
-            .Where(challenge => challenge.Id == scope.ChallengeId)
-            .SelectMany(challenge => challenge.Attachments)
+        var attachment = await db.Set<ChallengeAttachment>().AsNoTracking()
+            .Include(item => item.File)
             .SingleOrDefaultAsync(item => item.Id == selectedId && item.DeletedAt == null, ct);
         if (attachment is null)
             return null;
         await transaction.CommitAsync(ct);
-        return new(Map(attachment), attachment.ObjectKey);
+        return new(Map(attachment), attachment.File.ObjectKey);
     }
 
     private IQueryable<Challenge> WriteAuthorized(
@@ -303,11 +291,15 @@ public sealed class ChallengeAttachmentStore(
             : AttachmentDeliveryPolicy.All;
     }
 
-    private static ChallengeAttachmentView Map(ChallengeAttachment attachment) =>
+    private static ChallengeAttachmentView Map(ChallengeAttachment attachment) => Map(attachment, attachment.File);
+
+    private static ChallengeAttachmentView Map(
+        ChallengeAttachment attachment,
+        StoredFile file) =>
         new(
-            attachment.Id, attachment.ChallengeId, attachment.FileName,
-            attachment.ContentType, attachment.Length,
-            Convert.ToHexString(attachment.Sha256Bytes), attachment.DeletedAt, attachment.CreatedAt);
+            attachment.Id, attachment.ChallengeId, file.FileName,
+            file.ContentType, file.ByteLength,
+            Convert.ToHexString(file.Sha256), attachment.DeletedAt, attachment.CreatedAt);
 
     private sealed record PlayerScope(Guid TeamId, Guid ChallengeId, string ConfigurationJson);
 }

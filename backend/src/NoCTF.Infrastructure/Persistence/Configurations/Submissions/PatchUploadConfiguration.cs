@@ -12,7 +12,7 @@ internal sealed class PatchUploadConfiguration : IEntityTypeConfiguration<PatchU
             "ck_patch_uploads_consumption",
             "(consumed_at IS NULL) = (submission_id IS NULL)"));
         builder.HasKey(upload => upload.Id);
-        builder.HasIndex(upload => upload.ObjectKey).IsUnique();
+        builder.HasIndex(upload => upload.FileId).IsUnique();
         builder.HasIndex(upload => new { upload.TeamId, upload.CompetitionChallengeId }).IsUnique()
             .HasFilter("consumed_at IS NULL");
         builder.HasIndex(upload => upload.SubmissionId).IsUnique()
@@ -25,5 +25,7 @@ internal sealed class PatchUploadConfiguration : IEntityTypeConfiguration<PatchU
             .HasForeignKey(upload => upload.TeamId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
             .HasForeignKey(upload => upload.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(upload => upload.File).WithMany()
+            .HasForeignKey(upload => upload.FileId).OnDelete(DeleteBehavior.Restrict);
     }
 }
