@@ -142,11 +142,26 @@ export function competitionEventText(
   return templates[String(event.kind)] ?? '发生了一条竞赛动态'
 }
 
-/** 通知文案(NoCTF.Domain.Notifications.NotificationKind),payload 为松散 JSON。 */
+function notificationContent(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+): Record<string, unknown> {
+  return notification.content && typeof notification.content === 'object'
+    ? notification.content as Record<string, unknown>
+    : {}
+}
+
+export function notificationCompetitionId(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+): string | null {
+  const content = notificationContent(notification)
+  return typeof content.competitionId === 'string' ? content.competitionId : null
+}
+
+/** 通知文案(NoCTF.Domain.Notifications.NotificationKind),content 为松散 JSON。 */
 export function notificationText(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
-  const payload = (notification.payload ?? {}) as Record<string, unknown>
+  const payload = notificationContent(notification)
   const title = typeof payload.competitionTitle === 'string' ? `「${payload.competitionTitle}」` : ''
   const team = typeof payload.teamName === 'string' ? `「${payload.teamName}」` : ''
   const challenge = typeof payload.challengeTitle === 'string' ? `「${payload.challengeTitle}」` : ''

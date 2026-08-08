@@ -14,6 +14,7 @@ export type NoCtfapiEndpointsTeamsTeamResponse = {
     id?: string;
     competitionId?: string;
     name?: string;
+    avatarUrl?: string | null;
     captainId?: string;
     memberIds?: Array<string>;
     registrationStatus?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol;

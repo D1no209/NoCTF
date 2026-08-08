@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Security;
 using NoCTF.API.Serialization;
 using NoCTF.Application.Teams.Registration;
@@ -49,6 +50,7 @@ public sealed record TeamResponse(
     Guid Id,
     Guid CompetitionId,
     string Name,
+    string? AvatarUrl,
     Guid CaptainId,
     IReadOnlyList<Guid> MemberIds,
     TeamRegistrationStatusProtocol RegistrationStatus,
@@ -78,8 +80,36 @@ internal static partial class TeamMapper
         CreateTeamRequest request,
         Guid userId,
         DateTimeOffset registeredAt);
-    public static partial TeamResponse ToResponse(TeamView view);
     public static partial UpdateTeamCommand ToCommand(UpdateTeamRequest request);
+
+    public static TeamResponse ToResponse(
+        TeamView view,
+        LinkGenerator links,
+        HttpContext httpContext)
+    {
+        string? avatarUrl = null;
+        if (view.AvatarFileId is not null)
+        {
+            var path = links.GetPathByName(
+                httpContext,
+                "TeamAvatar_Get",
+                new { competitionId = view.CompetitionId, teamId = view.Id });
+            if (path is not null)
+                avatarUrl = $"{path}?revision={view.AvatarFileId.Value:N}";
+        }
+
+        return new(
+            view.Id,
+            view.CompetitionId,
+            view.Name,
+            avatarUrl,
+            view.CaptainId,
+            view.MemberIds,
+            ToProtocol(view.RegistrationStatus),
+            view.IsLocked,
+            view.IsBanned,
+            view.RegisteredAt);
+    }
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial TeamRegistrationStatusProtocol ToProtocol(
@@ -93,7 +123,7 @@ internal static partial class TeamMapper
     public static partial TeamBanSourceProtocol ToProtocol(TeamBanSource value);
 }
 
-public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user)
+public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user, LinkGenerator links)
     : Endpoint<CreateTeamRequest, Results<Created<TeamResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure() { Post("/competitions/{competitionId}/teams"); AuthSchemes("Bearer"); }
@@ -103,7 +133,7 @@ public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user)
         var result = await create.ExecuteAsync(TeamMapper.ToCommand(request, user.UserId, DateTimeOffset.UtcNow), ct);
         if (result.FailureCode == TeamRegistrationFailure.CompetitionNotFound) return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Team was not created.", detail: result.ErrorMessage);
-        var response = TeamMapper.ToResponse(result.Value!);
+        var response = TeamMapper.ToResponse(result.Value!, links, HttpContext);
         return TypedResults.Created($"/competitions/{request.CompetitionId}/teams/{response.Id}", response);
     }
 }

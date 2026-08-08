@@ -13,7 +13,6 @@ import {
   adminChallengeBankRestoreFlag,
   adminChallengeBankRestoreTemplate,
   adminChallengeBankTransferOwner,
-  adminChallengeBankUpdateAttachment,
   adminChallengeBankUpdatePermissions,
   adminChallengeBankUpdateTemplate,
   adminChallengeBankUploadAttachment,
@@ -147,10 +146,6 @@ const attachmentsLoading = ref(false)
 const attachmentsIncludeDeleted = ref(false)
 const uploading = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
-const editingAttachment = ref<Attachment | null>(null)
-const attachmentEditForm = reactive({ fileName: '', contentType: '' })
-const attachmentEditOpen = ref(false)
-const attachmentSaving = ref(false)
 const deletingAttachment = ref<Attachment | null>(null)
 const attachmentActionPending = ref(false)
 
@@ -188,34 +183,6 @@ async function uploadAttachment(event: Event): Promise<void> {
     return
   }
   toast.success(`已上传 ${file.name}`)
-  await loadAttachments()
-}
-
-function openAttachmentEdit(attachment: Attachment): void {
-  editingAttachment.value = attachment
-  attachmentEditForm.fileName = attachment.fileName ?? ''
-  attachmentEditForm.contentType = attachment.contentType ?? ''
-  attachmentEditOpen.value = true
-}
-
-async function saveAttachment(): Promise<void> {
-  const attachment = editingAttachment.value
-  if (!attachment?.id) return
-  attachmentSaving.value = true
-  const { error } = await adminChallengeBankUpdateAttachment({
-    path: { challengeId, attachmentId: attachment.id },
-    body: {
-      fileName: attachmentEditForm.fileName.trim(),
-      contentType: attachmentEditForm.contentType.trim(),
-    },
-  })
-  attachmentSaving.value = false
-  if (error) {
-    toast.error(parseApiError(error).message)
-    return
-  }
-  attachmentEditOpen.value = false
-  toast.success('附件已更新')
   await loadAttachments()
 }
 
@@ -689,9 +656,6 @@ onMounted(() => {
                             </Button>
                           </template>
                           <template v-else>
-                            <Button size="sm" variant="outline" @click="openAttachmentEdit(attachment)">
-                              编辑
-                            </Button>
                             <Button size="sm" variant="destructive" @click="deletingAttachment = attachment">
                               删除
                             </Button>
@@ -844,32 +808,6 @@ onMounted(() => {
         </Tabs>
       </template>
     </template>
-
-    <Dialog v-model:open="attachmentEditOpen">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>编辑附件</DialogTitle>
-          <DialogDescription>仅修改元数据,不替换文件内容。</DialogDescription>
-        </DialogHeader>
-        <FieldGroup>
-          <Field>
-            <FieldLabel for="attachment-name">文件名</FieldLabel>
-            <Input id="attachment-name" v-model="attachmentEditForm.fileName" required />
-          </Field>
-          <Field>
-            <FieldLabel for="attachment-type">Content-Type</FieldLabel>
-            <Input id="attachment-type" v-model="attachmentEditForm.contentType" required placeholder="application/octet-stream" />
-          </Field>
-        </FieldGroup>
-        <DialogFooter>
-          <Button variant="outline" @click="attachmentEditOpen = false">取消</Button>
-          <Button :disabled="attachmentSaving || !attachmentEditForm.fileName.trim()" @click="saveAttachment">
-            <Spinner v-if="attachmentSaving" data-icon="inline-start" />
-            保存
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
 
     <AlertDialog :open="!!deletingAttachment" @update:open="(open: boolean) => { if (!open) deletingAttachment = null }">
       <AlertDialogContent>

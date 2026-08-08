@@ -1,12 +1,17 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Security;
 using NoCTF.Application.Teams.Registration;
 
 namespace NoCTF.API.Endpoints.Teams;
 
-public sealed class UpdateTeamEndpoint(UpdateTeam update, ITeamRegistrationStore store, IUserContext user)
+public sealed class UpdateTeamEndpoint(
+    UpdateTeam update,
+    ITeamRegistrationStore store,
+    IUserContext user,
+    LinkGenerator links)
     : Endpoint<UpdateTeamRequest, Results<Ok<TeamResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure() { Put("/competitions/{competitionId}/teams/{teamId}"); AuthSchemes("Bearer"); }
@@ -17,6 +22,6 @@ public sealed class UpdateTeamEndpoint(UpdateTeam update, ITeamRegistrationStore
         var result = await update.ExecuteAsync(TeamMapper.ToCommand(request), ct);
         if (result.FailureCode == TeamRegistrationFailure.TeamLocked) return TypedResults.NotFound();
         if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Team was not updated.", detail: result.ErrorMessage);
-        return TypedResults.Ok(TeamMapper.ToResponse(result.Value!));
+        return TypedResults.Ok(TeamMapper.ToResponse(result.Value!, links, HttpContext));
     }
 }

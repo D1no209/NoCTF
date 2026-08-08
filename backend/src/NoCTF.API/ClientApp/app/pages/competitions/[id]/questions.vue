@@ -28,7 +28,7 @@ const listError = ref<string | null>(null)
 async function loadList() {
   const { data, error } = await listCompetitionQuestions({
     path: { competitionId },
-    query: { publishedOnly: false, limit: 100 },
+    query: { limit: 100 },
   })
   loading.value = false
   if (error || !data) {
@@ -236,7 +236,6 @@ const statusLabel = (status?: string) =>
             </div>
             <p class="mt-1 text-xs text-muted-foreground">
               {{ q.subject === 'Challenge' ? '题目' : '平台' }} · {{ formatDateTime(q.updatedAt) }}
-              <span v-if="q.publishedAt"> · 已公开</span>
             </p>
           </button>
         </li>

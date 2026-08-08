@@ -11568,6 +11568,10 @@
           "name": {
             "type": "string"
           },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "captainId": {
             "type": "string",
             "format": "guid"
