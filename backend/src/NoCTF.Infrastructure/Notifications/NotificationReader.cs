@@ -118,7 +118,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 
     private IQueryable<Notification> VisibleTo(Guid userId) =>
         db.Notifications.FromSqlInterpolated($$"""
-            WITH RECURSIVE visible AS (
+            WITH RECURSIVE directly_visible AS (
                 SELECT n.*
                 FROM notifications AS n
                 WHERE (n.target_type = 0 AND n.target_id = {{userId}})
@@ -144,9 +144,17 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                          AND u.kind = {{(short)UserKind.Human}}
                          AND u.role = {{(short)UserRole.Administrator}}
                          AND u.account_status = {{(short)UserAccountStatus.Active}}))
-                UNION
+            ), participated_path AS (
                 SELECT n.* FROM notifications AS n
-                WHERE n.kind = 2 AND n.source_type = 1 AND n.source_id = {{userId}}
+                WHERE n.source_type = {{(short)NotificationSourceType.User}}
+                  AND n.source_id = {{userId}}
+                UNION
+                SELECT parent.* FROM notifications AS parent
+                JOIN participated_path AS child ON child.reply_to_id = parent.id
+            ), visible AS (
+                SELECT * FROM directly_visible
+                UNION
+                SELECT * FROM participated_path
             ), thread AS (
                 SELECT * FROM visible
                 UNION
