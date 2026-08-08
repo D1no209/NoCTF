@@ -34,6 +34,13 @@ public interface IAdminRuntimeStore
         TimeSpan? extension,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+    Task<RuntimeMutationResult> TerminateAsync(
+        Guid competitionId,
+        Guid runtimeInstanceId,
+        long expectedProcessingVersion,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }
 
 public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
@@ -62,4 +69,19 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
         CancellationToken ct = default) =>
         store.MutateAsync(
             competitionId, competitionChallengeId, teamId, action, extension, now, ct);
+
+    public Task<RuntimeMutationResult> TerminateAsync(
+        Guid competitionId,
+        Guid runtimeInstanceId,
+        long expectedProcessingVersion,
+        Guid actorUserId,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        store.TerminateAsync(
+            competitionId,
+            runtimeInstanceId,
+            expectedProcessingVersion,
+            actorUserId,
+            now,
+            ct);
 }

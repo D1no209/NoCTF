@@ -270,6 +270,7 @@ POST /api/v1/admin/challenges/{challengeId}/flags/{flagId}/restore
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/runtimes
 GET  /api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}
+POST /api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/terminate
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/start
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/stop
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/challenges/{competitionChallengeId}/runtime/reset
@@ -279,7 +280,7 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset
 ```
 
-列表按 CreatedAt desc/Id desc keyset，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerPool、RunnerId、State、ExpiresBefore。Manager 可执行动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度、状态或 Generation 栅栏的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
+列表按 CreatedAt desc/Id desc keyset，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerPool、RunnerId、State、ExpiresBefore。Manager 可执行动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。精确终止使用 RuntimeInstanceId 与 ExpectedProcessingVersion，直接定位列表中的实例，但仍通过持久化 `Stopping -> Stopped` Provider 清理状态机；过期版本返回 409。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度、状态或 Generation 栅栏的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
 
 ## CompetitionChallenge Management
 
