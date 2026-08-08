@@ -359,9 +359,6 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
     competitionId?: string;
     generatedAt?: string;
     entries?: Array<NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse>;
-    subjects?: Array<NoCtfapiEndpointsCompetitionsLeaderboardSubjectSummaryResponse>;
-    bloods?: Array<NoCtfapiEndpointsCompetitionsLeaderboardBloodSummaryResponse>;
-    series?: Array<NoCtfapiEndpointsCompetitionsLeaderboardTeamSeriesResponse>;
     challenges?: Array<NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse>;
     snapshotRevision?: number;
     targetRevision?: number;
@@ -379,74 +376,18 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse = {
     score?: number;
     solveCount?: number;
     lastScoreAt?: string | null;
-    challenges?: Array<NoCtfapiEndpointsCompetitionsLeaderboardChallengeSummaryResponse>;
+    cells?: Array<NoCtfapiEndpointsCompetitionsLeaderboardCellResponse>;
 };
 
-export type NoCtfapiEndpointsCompetitionsLeaderboardChallengeSummaryResponse = {
+export type NoCtfapiEndpointsCompetitionsLeaderboardCellResponse = {
     competitionChallengeId?: string;
-    direction?: string;
-    solveCount?: number;
-};
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardSubjectSummaryResponse = {
-    subjectId?: string;
-    subjectName?: string;
     score?: number;
-    successCount?: number;
-    slots?: Array<NoCtfapiEndpointsCompetitionsLeaderboardSlotSummaryResponse>;
-};
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardSlotSummaryResponse = {
-    slotKey?: string;
-    kind?: NoCtfapiEndpointsCompetitionsLeaderboardSlotKindProtocol;
-    label?: string;
-    successCount?: number;
-    lastOccurredAt?: string | null;
+    solvedAt?: string | null;
+    solverName?: string | null;
     bloodRank?: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol | null;
-    bloodAt?: string | null;
 };
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardSlotKindProtocol = 'Challenge' | 'Service' | 'Break' | 'Fix' | 'Control' | 'Stage';
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol = 'First' | 'Second' | 'Third';
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardBloodSummaryResponse = {
-    slotKey?: string;
-    slotKind?: NoCtfapiEndpointsCompetitionsLeaderboardSlotKindProtocol;
-    bloodRank?: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol;
-    teamId?: string;
-    teamName?: string;
-    occurredAt?: string;
-};
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardTeamSeriesResponse = {
-    teamId?: string;
-    teamName?: string;
-    points?: Array<NoCtfapiEndpointsCompetitionsLeaderboardScorePointResponse>;
-    solves?: Array<NoCtfapiEndpointsCompetitionsLeaderboardSolveRecordResponse>;
-    penalties?: Array<NoCtfapiEndpointsCompetitionsLeaderboardPenaltyRecordResponse>;
-};
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardScorePointResponse = {
-    at?: string;
-    score?: number;
-};
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardSolveRecordResponse = {
-    competitionChallengeId?: string;
-    at?: string;
-    points?: number;
-    solveOrdinal?: number;
-    submitterName?: string | null;
-};
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardPenaltyRecordResponse = {
-    at?: string;
-    points?: number;
-    kind?: NoCtfapiEndpointsCompetitionsLeaderboardPenaltyKindProtocol;
-};
-
-export type NoCtfapiEndpointsCompetitionsLeaderboardPenaltyKindProtocol = 'WrongSubmission' | 'HintUnlock';
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse = {
     competitionChallengeId?: string;

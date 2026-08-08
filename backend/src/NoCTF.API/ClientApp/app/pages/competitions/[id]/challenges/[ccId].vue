@@ -97,7 +97,9 @@ const mode = computed(() => ctx.competition.value?.mode)
     <template v-else-if="challenge">
       <div class="flex flex-wrap items-center gap-3">
         <h2 class="text-xl font-semibold">{{ challenge.title }}</h2>
-        <Badge variant="outline">{{ challenge.direction }}</Badge>
+        <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
+          {{ challenge.direction }}
+        </Badge>
         <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary">
           分数隐藏
         </Badge>

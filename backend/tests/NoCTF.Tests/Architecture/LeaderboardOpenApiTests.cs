@@ -12,7 +12,7 @@ public sealed class LeaderboardOpenApiTests
         "/api/v1/competitions/{competitionId}/challenges";
 
     [Test]
-    public async Task Response_exposes_ranked_bloods_and_subject_slot_blood_details()
+    public async Task Response_exposes_a_sparse_team_by_challenge_matrix()
     {
         using var swagger = await ReadSwaggerAsync();
         var root = swagger.RootElement;
@@ -28,23 +28,34 @@ public sealed class LeaderboardOpenApiTests
                 .GetProperty("schema"));
         var responseProperties = response.GetProperty("properties");
 
-        await Assert.That(responseProperties.TryGetProperty("bloods", out var bloods))
-            .IsTrue();
-        await Assert.That(responseProperties.TryGetProperty("firstBloods", out _))
-            .IsFalse();
-
-        var blood = ResolveSchema(root, bloods.GetProperty("items"));
-        await Assert.That(PropertyNames(blood)).IsEquivalentTo([
-            "slotKey",
-            "slotKind",
-            "bloodRank",
+        await Assert.That(responseProperties.TryGetProperty("subjects", out _)).IsFalse();
+        await Assert.That(responseProperties.TryGetProperty("bloods", out _)).IsFalse();
+        await Assert.That(responseProperties.TryGetProperty("series", out _)).IsFalse();
+        var entry = ResolveSchema(
+            root,
+            responseProperties.GetProperty("entries").GetProperty("items"));
+        await Assert.That(PropertyNames(entry)).IsEquivalentTo([
+            "rank",
             "teamId",
             "teamName",
-            "occurredAt"
+            "score",
+            "solveCount",
+            "lastScoreAt",
+            "cells"
         ]);
-        var rank = ResolveSchema(
+        var cell = ResolveSchema(
             root,
-            blood.GetProperty("properties").GetProperty("bloodRank"));
+            entry.GetProperty("properties").GetProperty("cells").GetProperty("items"));
+        await Assert.That(PropertyNames(cell)).IsEquivalentTo([
+            "competitionChallengeId",
+            "score",
+            "solvedAt",
+            "solverName",
+            "bloodRank"
+        ]);
+        var rankProperty = cell.GetProperty("properties").GetProperty("bloodRank");
+        await Assert.That(rankProperty.GetProperty("nullable").GetBoolean()).IsTrue();
+        var rank = ResolveSchema(root, rankProperty.GetProperty("oneOf")[0]);
         await Assert.That(rank.GetProperty("type").GetString()).IsEqualTo("string");
         await Assert.That(rank.GetProperty("enum").EnumerateArray()
                 .Select(value => value.GetString()!))
@@ -52,24 +63,6 @@ public sealed class LeaderboardOpenApiTests
         await Assert.That(rank.GetProperty("x-enumNames").EnumerateArray()
                 .Select(value => value.GetString()!))
             .IsEquivalentTo(["First", "Second", "Third"]);
-
-        var subject = ResolveSchema(
-            root,
-            responseProperties.GetProperty("subjects").GetProperty("items"));
-        var slot = ResolveSchema(
-            root,
-            subject.GetProperty("properties")
-                .GetProperty("slots")
-                .GetProperty("items"));
-        var slotProperties = slot.GetProperty("properties");
-        await Assert.That(slotProperties.TryGetProperty("bloodRank", out var slotRank))
-            .IsTrue();
-        await Assert.That(slotRank.GetProperty("nullable").GetBoolean()).IsTrue();
-        await Assert.That(slotProperties.TryGetProperty("bloodAt", out var bloodAt))
-            .IsTrue();
-        await Assert.That(bloodAt.GetProperty("nullable").GetBoolean()).IsTrue();
-        await Assert.That(slotProperties.TryGetProperty("firstBloodAt", out _))
-            .IsFalse();
     }
 
     [Test]

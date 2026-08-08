@@ -52,7 +52,7 @@ public sealed record LeaderboardAwdRoundFact(
 
 public sealed record GameModeLeaderboardProjection(
     IReadOnlyList<LeaderboardEntry> Entries,
-    IReadOnlyList<LeaderboardTeamSeries> Series);
+    IReadOnlyList<LeaderboardCellFact> Cells);
 
 public interface IGameModeLeaderboardProjector
 {
@@ -67,12 +67,7 @@ public interface ILeaderboardProjectorCatalog
 
 public sealed record LeaderboardProjectionResult(
     IReadOnlyList<LeaderboardEntry> Entries,
-    IReadOnlyList<LeaderboardSubjectSummary> Subjects,
-    IReadOnlyList<LeaderboardBloodSummary> Bloods)
-{
-    public IReadOnlyList<LeaderboardTeamSeries> Series { get; init; } = [];
-    public IReadOnlyList<LeaderboardChallengeInfo> Challenges { get; init; } = [];
-}
+    IReadOnlyList<LeaderboardChallengeInfo> Challenges);
 
 public interface ILeaderboardProjectionEngine
 {

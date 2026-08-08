@@ -21,6 +21,10 @@ const { items, loading, error, hasMore, initialized, loadMore } =
       path: { competitionId },
       query: { cursor, limit: 50 },
     })
+    // 未加入队伍时后端返回 404:视为没有提交记录,展示空态而不是报错。
+    if ((err as { status?: number } | undefined)?.status === 404) {
+      return { items: [], nextCursor: null }
+    }
     if (err || !data) throw err ?? new Error('加载失败')
     return { items: data.items, nextCursor: data.nextCursor }
   })

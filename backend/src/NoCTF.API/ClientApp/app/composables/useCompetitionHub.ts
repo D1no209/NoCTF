@@ -55,7 +55,14 @@ function dispatch(event: keyof CompetitionHubHandlers, payload: unknown, direct 
 function ensureConnection(): signalR.HubConnection {
   if (connection) return connection
   const hub = new signalR.HubConnectionBuilder()
-    .withUrl('/hubs/v1/competitions', { accessTokenFactory: () => getAccessToken() ?? '' })
+    .withUrl('/hubs/v1/competitions', {
+      accessTokenFactory: () => getAccessToken() ?? '',
+      // 开发环境经 Vite ws 代理转发 SignalR WebSocket 会被重置并拖垮 Nuxt 进程,
+      // dev 下跳过 WebSockets 走 SSE/长轮询;生产直连后端,不受影响。
+      ...(import.meta.dev
+        ? { transport: signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling }
+        : {}),
+    })
     .withAutomaticReconnect()
     .configureLogging(signalR.LogLevel.Warning)
     .build()

@@ -26,7 +26,13 @@ const managerIds = ref<string[]>([])
 const judgeIds = ref<string[]>([])
 const observerIds = ref<string[]>([])
 
-const candidateName = (id: string) => candidates.value.find(c => c.id === id)?.userName ?? id
+const { user } = useAuth()
+
+// 候选人列表不含当前负责人本人时,回退到当前登录用户名,避免展示原始 UUID。
+const candidateName = (id: string) =>
+  candidates.value.find(c => c.id === id)?.userName
+  ?? (id && id === user.value?.userId ? user.value?.userName : undefined)
+  ?? id
 
 async function load() {
   loading.value = true

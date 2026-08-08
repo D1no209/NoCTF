@@ -287,9 +287,6 @@ public sealed class FusionLeaderboardCache(
             projectedAt));
         return new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
         {
-            Subjects = projection.Subjects,
-            Bloods = projection.Bloods,
-            Series = projection.Series,
             Challenges = projection.Challenges,
             SnapshotRevision = competition.LeaderboardRevision,
             TargetRevision = competition.LeaderboardRevision,
@@ -371,8 +368,8 @@ public sealed class FusionLeaderboardCache(
     }
 
     private static string SnapshotKey(Guid competitionId, long revision) =>
-        $"leaderboard:v3:{competitionId:N}:snapshot:{revision}";
+        $"leaderboard:v4:{competitionId:N}:snapshot:{revision}";
 
     private static string FailureKey(Guid competitionId, long revision) =>
-        $"leaderboard:v3:{competitionId:N}:failure:{revision}";
+        $"leaderboard:v4:{competitionId:N}:failure:{revision}";
 }

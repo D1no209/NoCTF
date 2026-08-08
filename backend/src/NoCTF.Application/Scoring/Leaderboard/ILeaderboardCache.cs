@@ -11,9 +11,6 @@ public enum LeaderboardDataScope
 
 public sealed record LeaderboardResponse(Guid CompetitionId, DateTimeOffset GeneratedAt, IReadOnlyList<LeaderboardEntry> Entries)
 {
-    public IReadOnlyList<LeaderboardSubjectSummary> Subjects { get; init; } = [];
-    public IReadOnlyList<LeaderboardBloodSummary> Bloods { get; init; } = [];
-    public IReadOnlyList<LeaderboardTeamSeries> Series { get; init; } = [];
     public IReadOnlyList<LeaderboardChallengeInfo> Challenges { get; init; } = [];
     public long SnapshotRevision { get; init; }
     public long TargetRevision { get; init; }

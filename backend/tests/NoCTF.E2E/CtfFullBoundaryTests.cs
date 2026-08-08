@@ -875,18 +875,15 @@ public sealed class CtfFullBoundaryTests
             .Single(item => item.GetProperty("teamId").GetGuid() == teamId);
         await Assert.That(entry.GetProperty("solveCount").GetInt32())
             .IsEqualTo(expectedSolveCount);
-        var challengeSolves = entry.GetProperty("challenges").EnumerateArray()
+        var challengeCells = entry.GetProperty("cells").EnumerateArray()
             .Where(item =>
                 item.GetProperty("competitionChallengeId").GetGuid()
                 == competitionChallengeId)
-            .Sum(item => item.GetProperty("solveCount").GetInt32());
-        await Assert.That(challengeSolves).IsEqualTo(expectedSolveCount);
-        var slotKey = $"challenge:{competitionChallengeId:N}";
-        var bloodCount = leaderboard.GetProperty("bloods").EnumerateArray()
-            .Count(item =>
-                item.GetProperty("teamId").GetGuid() == teamId
-                && item.GetProperty("slotKey").GetString() == slotKey
-                && item.GetProperty("bloodRank").GetInt32() == 1);
+            .ToArray();
+        await Assert.That(challengeCells).Count().IsEqualTo(expectedSolveCount);
+        var bloodCount = challengeCells.Count(item =>
+            item.GetProperty("bloodRank").ValueKind == JsonValueKind.String
+            && item.GetProperty("bloodRank").GetString() == "First");
         await Assert.That(bloodCount).IsEqualTo(expectedBloodCount);
     }
 

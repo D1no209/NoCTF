@@ -1,17 +1,5 @@
 namespace NoCTF.Application.Scoring.Leaderboard;
 
-public sealed record LeaderboardChallengeSummary(Guid CompetitionChallengeId, string Direction, int SolveCount);
-
-public enum LeaderboardSlotKind
-{
-    Challenge,
-    Service,
-    Break,
-    Fix,
-    Control,
-    Stage
-}
-
 public enum LeaderboardBloodRank
 {
     First = 1,
@@ -19,58 +7,24 @@ public enum LeaderboardBloodRank
     Third = 3
 }
 
-public sealed record LeaderboardSlotSummary(
-    string SlotKey,
-    LeaderboardSlotKind Kind,
-    string Label,
-    int SuccessCount,
-    DateTimeOffset? LastOccurredAt,
-    LeaderboardBloodRank? BloodRank,
-    DateTimeOffset? BloodAt);
-
-public sealed record LeaderboardSubjectSummary(
-    Guid SubjectId,
-    string SubjectName,
-    long Score,
-    int SuccessCount,
-    IReadOnlyList<LeaderboardSlotSummary> Slots);
-
-public sealed record LeaderboardBloodSummary(
-    string SlotKey,
-    LeaderboardSlotKind SlotKind,
-    LeaderboardBloodRank BloodRank,
-    Guid TeamId,
-    string TeamName,
-    DateTimeOffset OccurredAt);
-
-public sealed record LeaderboardScorePoint(DateTimeOffset At, long Score);
-
-public enum LeaderboardPenaltyKind
-{
-    WrongSubmission,
-    HintUnlock
-}
-
-public sealed record LeaderboardSolveRecord(
+/// <summary>
+/// The sparse value of one team × competition-challenge cell.
+/// An absent cell means that the team has no public result for that challenge.
+/// </summary>
+public sealed record LeaderboardCell(
     Guid CompetitionChallengeId,
-    DateTimeOffset At,
-    long Points,
-    int SolveOrdinal,
-    string? SubmitterName);
+    long Score,
+    DateTimeOffset? SolvedAt,
+    string? SolverName,
+    LeaderboardBloodRank? BloodRank);
 
-public sealed record LeaderboardPenaltyRecord(
-    DateTimeOffset At,
-    long Points,
-    LeaderboardPenaltyKind Kind);
-
-public sealed record LeaderboardTeamSeries(
+/// <summary>Projection-only cell before it is attached to a ranked team row.</summary>
+public sealed record LeaderboardCellFact(
     Guid TeamId,
-    string TeamName,
-    IReadOnlyList<LeaderboardScorePoint> Points)
-{
-    public IReadOnlyList<LeaderboardSolveRecord> Solves { get; init; } = [];
-    public IReadOnlyList<LeaderboardPenaltyRecord> Penalties { get; init; } = [];
-}
+    Guid CompetitionChallengeId,
+    long Score,
+    DateTimeOffset? SolvedAt,
+    string? SolverName);
 
 public sealed record LeaderboardChallengeInfo(
     Guid CompetitionChallengeId,
@@ -83,5 +37,8 @@ public sealed record LeaderboardEntry(
     string TeamName,
     long Score,
     int SolveCount,
-    DateTimeOffset? LastScoreAt,
-    IReadOnlyList<LeaderboardChallengeSummary> Challenges);
+    DateTimeOffset? LastScoreAt)
+{
+    /// <summary>Only solved/corrected cells are serialized; the matrix is sparse.</summary>
+    public IReadOnlyList<LeaderboardCell> Cells { get; init; } = [];
+}

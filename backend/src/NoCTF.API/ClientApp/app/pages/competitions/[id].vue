@@ -63,28 +63,29 @@ function isActive(to: string, exact: boolean) {
     <template v-else-if="competition">
       <div class="flex flex-col gap-3">
         <div class="flex flex-wrap items-center gap-3">
-          <h1 class="text-2xl font-semibold">{{ competition.title }}</h1>
+          <h1 class="text-3xl font-bold tracking-tight">{{ competition.title }}</h1>
           <ModeBadge :mode="competition.mode" />
           <LifecycleBadge :status="competition.status" />
           <CompetitionCountdown
             :start-time="competition.startTime"
             :end-time="competition.endTime"
             :status="competition.status"
+            class="font-mono font-medium text-primary"
           />
         </div>
-        <p class="text-sm text-muted-foreground">
+        <p class="font-mono text-xs text-muted-foreground tabular-nums">
           {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
         </p>
       </div>
 
-      <nav class="flex flex-wrap items-center gap-1 border-b pb-px">
+      <nav class="flex flex-wrap items-center gap-1 border-b">
         <Button
           v-for="tab in tabs"
           :key="tab.to"
           variant="ghost"
-          size="sm"
           as-child
-          :class="isActive(tab.to, tab.exact ?? false) ? 'border-b-2 border-primary rounded-none font-medium' : 'text-muted-foreground'"
+          class="rounded-b-none"
+          :class="isActive(tab.to, tab.exact ?? false) ? 'border-b-2 border-primary font-semibold text-foreground' : 'text-muted-foreground'"
         >
           <NuxtLink :to="tab.to">{{ tab.label }}</NuxtLink>
         </Button>

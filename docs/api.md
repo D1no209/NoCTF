@@ -67,8 +67,9 @@ Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
 
 Leaderboard GET 的 statusUrl 指回自身：无快照且投影中返回 202+targetRevision+Retry-After；有旧快照返回 200 并标 stale/revision；无快照且最后投影失败返回 503 ProblemDetails。它不创建独立 ProjectionOperation。
-CTF Leaderboard 的 `bloods[]` 同时返回每题一血、二血、三血，每项带强类型 `bloodRank`；
-`subjects[].slots[]` 以 nullable `bloodRank`/`bloodAt` 表示该队在该题是否获得前三血。
+Leaderboard 使用 `challenges[]` 列与 ranked `entries[]` 行；每行的稀疏 `cells[]` 直接携带
+`competitionChallengeId`、score、solvedAt、solverName 和 nullable `bloodRank`。CTF 每题前三个
+不同队伍的单元分别为 First、Second、Third；不再返回重复的 subjects/slots、bloods 或 series。
 排行榜响应同时返回 `visibility`、`dataScope` 与 nullable `dataAsOf`。Frozen 返回截止时刻的持久化
 快照；Blackout 对参赛者和 Bot 返回 `Hidden` 与空集合，但不关闭题目、Runtime、提交或本人
 提交结果。比赛结束时自动恢复最终实时榜单。人工 Administrator/Owner/Manager/Judge/Observer

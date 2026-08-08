@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Award, Medal, Target, TriangleAlert, Users } from '@lucide/vue'
+import { Award, Medal, Target, Users } from '@lucide/vue'
 import { getTeamEndpoint } from '~/api'
 import type { NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
 import type { echarts } from '~/utils/echarts'
-import { normalizeChallengeKey, penaltyKindLabel } from './types'
+import { normalizeChallengeKey } from './types'
 import type { ChallengeInfo, TrendSeries } from './types'
 
 const props = defineProps<{
@@ -39,10 +39,6 @@ const challengeTitle = computed(() => {
 const solves = computed(() =>
   [...(props.series?.solves ?? [])].sort((a, b) => String(b.at).localeCompare(String(a.at))),
 )
-const penalties = computed(() =>
-  [...(props.series?.penalties ?? [])].sort((a, b) => String(b.at).localeCompare(String(a.at))),
-)
-
 // 解题分布雷达:各方向解题数
 const radarOption = computed<echarts.EChartsCoreOption>(() => {
   const counts = new Map<string, number>()
@@ -241,10 +237,6 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
                   <Target class="size-4" />
                   解题记录 ({{ solves.length }})
                 </TabsTrigger>
-                <TabsTrigger value="penalties">
-                  <TriangleAlert class="size-4" />
-                  扣分记录 ({{ penalties.length }})
-                </TabsTrigger>
               </TabsList>
               <TabsContent value="solves">
                 <ScrollArea class="h-72">
@@ -270,24 +262,6 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
                       <Badge class="bg-emerald-600 text-white hover:bg-emerald-600">+{{ solve.points ?? 0 }} pts</Badge>
                     </li>
                     <li v-if="!solves.length" class="py-8 text-center text-sm text-muted-foreground">还没有解题记录</li>
-                  </ul>
-                </ScrollArea>
-              </TabsContent>
-              <TabsContent value="penalties">
-                <ScrollArea class="h-72">
-                  <ul class="flex flex-col gap-2 pr-4">
-                    <li
-                      v-for="(penalty, index) in penalties"
-                      :key="index"
-                      class="flex items-center justify-between gap-3 rounded-md border border-l-4 border-l-destructive px-3 py-2"
-                    >
-                      <div class="flex flex-col gap-1">
-                        <span class="font-medium">{{ penaltyKindLabel(penalty.kind) }}</span>
-                        <span class="text-xs text-muted-foreground">{{ formatDateTime(penalty.at) }}</span>
-                      </div>
-                      <Badge variant="destructive">-{{ penalty.points ?? 0 }} pts</Badge>
-                    </li>
-                    <li v-if="!penalties.length" class="py-8 text-center text-sm text-muted-foreground">没有扣分记录</li>
                   </ul>
                 </ScrollArea>
               </TabsContent>

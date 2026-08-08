@@ -50,6 +50,11 @@ public sealed class NoCtfDataModelTests
             [new(challengeId, "web", "Web", false)]));
 
         await Assert.That(projection.Entries.Single().Score).IsEqualTo(-25);
+        var cell = projection.Cells.Single();
+        await Assert.That(cell.TeamId).IsEqualTo(teamId);
+        await Assert.That(cell.CompetitionChallengeId).IsEqualTo(challengeId);
+        await Assert.That(cell.Score).IsEqualTo(-25);
+        await Assert.That(cell.SolvedAt).IsNull();
     }
 
     private sealed class RecordingIntakeStore : ISubmissionIntakeStore

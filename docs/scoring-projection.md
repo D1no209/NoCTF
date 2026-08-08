@@ -16,8 +16,9 @@ ScoringEvent 只保存事实，绝不保存分数。排行榜使用当前 Compet
 `SubmissionKind` 还包含 `HintUnlock` 与 `ManualAdjust`。ManualAdjust 的 signed Int32 delta 存在
 `Submission.SubmittedFlag`（例如 `-10`），没有 `additional_id` 或独立 delta 列；评估始终产生
 `ScoringEventKind.ManualAdjust / Correct`。HintUnlock 的 SubmittedFlag 是 canonical UUID，并产生
-`ScoringEventKind.HintUnlock`。四种模式在最终排序前扣除当前 Hint Cost 并加入当前 ManualAdjust delta，
-CTF 时间线也插入这两个事件。
+`ScoringEventKind.HintUnlock`。四种模式在最终排序前扣除当前 Hint Cost 并加入当前 ManualAdjust delta。
+ManualAdjust 必须同时指定 Team 与 CompetitionChallenge；它既计入队伍总分，也计入对应的排行榜
+矩阵单元，不存在无题目归属的队伍校分。
 
 封禁/软删除 Team 不进入榜单；其事实、针对它的攻防事实均从当前投影排除。Unban 恢复未删除事实。
 误判纠错在比赛结束后仍可递增 leaderboard revision 并触发同一投影链路，因此恢复的是原有不可变
@@ -82,11 +83,10 @@ new Interpreter(InterpreterOptions.Default)
 
 SolveValuePercentage 以该血位 solveCount 调当前表达式。百分比奖励=`decimal basis * percentage / 100` 后用 MidpointRounding.AwayFromZero 取整。血奖一旦按血位计算，不随以后 solveCount 衰减；配置/重判会重新确定血位和数额。
 
-排行榜响应使用 `bloods[]` 公开每题前三个不同队伍的血位。每项携带强类型
-`bloodRank`（`First/Second/Third`，OpenAPI 数值 1/2/3）、Team、slot 和发生时间；
-`subjects[].slots[]` 对获奖队伍同步携带 nullable `bloodRank` 与 `bloodAt`。同队多条 Correct
-只取最早一条，不得占多个血位；
-第四名及以后不进入 `bloods[]`。血位只属于 CTF Flag solve，不扩展到 AWD/AWDP/KoH。
+排行榜响应在 `entries[].cells[]` 的对应题目单元公开血位，携带强类型
+`bloodRank`（`First/Second/Third`）、分值、解出时间与解出者。同队同题多条 Correct
+只取最早一条，不得占多个血位；第四名及以后没有 `bloodRank`。血位只属于 CTF Flag solve，
+不扩展到 AWD/AWDP/KoH。
 
 ## 数值规则
 
@@ -128,5 +128,11 @@ status URL 就是同一个 leaderboard GET，不建立 ProjectionOperation 资�
 返回；旧 key 只按原 TTL 自然过期。
 
 ## 公共响应
+
+排行榜公共数据是一个稀疏矩阵：`challenges[]` 定义横轴，按排名排列的 `entries[]` 定义纵轴，
+每个 Entry 的 `cells[]` 只包含有得分贡献、解题事实或人工校分的题目单元。Cell 直接使用
+`competitionChallengeId`，不使用需要客户端解析的复合 `slotKey`。后端只投影权威计分、排名和
+单元事实；分页、题目分组、图表序列、CSV 等展示派生由前端完成。响应不再重复返回
+subjects/slots、独立 bloods 或逐队 score series。
 
 LeaderboardVisibility：Public、ParticipantsOnly、ManagersOnly。Draft 永远仅管理者。不存在冻结快照模式；Finished 后配置和事实仍可重判/重投影。
