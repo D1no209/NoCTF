@@ -70,6 +70,21 @@
 - 本轮只创建本地提交，未 push、未部署。生产仍运行 `7e5a1c07`；需要新的明确授权后才能推送和
   部署 `321ae19d`、`ff647827`、`e0076eea` 及本 HANDOFF 提交。
 
+## 2026-08-08 头像与导航修正生产部署
+
+- 用户明确授权后，`321ae19d`、`ff647827`、`e0076eea`、`2cd03663` 已快进推送至远程
+  `main`，并在生产服务器 `/root/NoCTF` 以相同提交构建部署。
+- 生产 Docker Hub 出口在构建期间超时；部署复用本机已校验的精确基础镜像
+  `oven/bun:1.3.14`、`docker:28-cli`、`alpine:3.22`，并从原生产 Runner 提取同版本 Kompose
+  二进制完成离线构建。临时 Dockerfile、Kompose 文件、镜像归档和部署日志均已删除，仓库与
+  `deploy/docker-compose.prod.yml` 未被改写。
+- Migration 容器退出码为 0；API、Runner、PostgreSQL、Redis 均为 healthy，Worker 正常运行。
+  生产 API 程序集版本确认为 `0.1.0-alpha.1`；HTTPS `/`、`/health` 返回 200，携带浏览器
+  `Accept: text/html` 的 `/account`、`/competitions`、`/admin/competitions`、`/verify-email`
+  直达请求均返回 200。
+- 新容器启动后的 API、Worker、Runner 日志中未发现 Error、Exception 或 `fail:`；数据库、
+  Redis、HTTPS 证书与上传卷均保持原有数据和配置。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
