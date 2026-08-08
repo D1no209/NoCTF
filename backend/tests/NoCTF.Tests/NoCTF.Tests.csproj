@@ -26,11 +26,9 @@
     <ProjectReference Include="../../src/NoCTF.Runner/NoCTF.Runner.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- These scenarios asserted tables/contracts deliberately removed by the new initial baseline.
-         Replacement coverage lives in Refactor and is expanded feature-by-feature. -->
+    <!-- These remaining scenarios assert tables/contracts removed by the new initial baseline.
+         Each exclusion is removed when that scenario is rewritten against the consolidated model. -->
     <Compile Remove="Integration\Administration\PlatformAuditLogStoreTests.cs" />
-    <Compile Remove="Integration\Authentication\EmailVerificationConfigurationPersistenceTests.cs" />
-    <Compile Remove="Integration\Authentication\PasswordResetPersistenceTests.cs" />
     <Compile Remove="Integration\Authentication\UserAccountDeletionPersistenceTests.cs" />
     <Compile Remove="Integration\Messaging\WolverineTransactionalOutboxTests.cs" />
     <Compile Remove="Integration\Persistence\AwdCheckerPersistenceTests.cs" />

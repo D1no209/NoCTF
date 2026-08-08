@@ -44,18 +44,12 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 new EmailVerificationSecretProtector(configuration));
             var initial = await store.GetAsync(cancellationToken);
             await Assert.That(initial.SmtpSecurityMode)
-                .IsEqualTo(SmtpSecurityMode.StartTls);
-            await db.EmailVerificationSettings.ExecuteUpdateAsync(setters => setters
-                .SetProperty(settings => settings.SmtpPort, 465)
-                .SetProperty(settings => settings.SmtpEnableSsl, true)
-                .SetProperty(settings => settings.SmtpSecurityMode, (SmtpSecurityMode?)null),
-                cancellationToken);
-            var legacy = await store.GetAsync(cancellationToken);
-            await Assert.That(legacy.SmtpSecurityMode)
-                .IsEqualTo(SmtpSecurityMode.SslOnConnect);
+                .IsEqualTo(SmtpSecurityMode.None);
+            await Assert.That(await db.PlatformSettings.CountAsync(cancellationToken))
+                .IsEqualTo(1);
 
             var passwordUpdated = await store.ReplacePasswordAsync(
-                legacy.Revision,
+                initial.Revision,
                 "smtp-secret",
                 DateTimeOffset.UtcNow,
                 cancellationToken);
@@ -63,6 +57,12 @@ public sealed class EmailVerificationConfigurationPersistenceTests
             await Assert.That(passwordUpdated!.SmtpPasswordConfigured).IsTrue();
             await Assert.That(typeof(EmailVerificationConfigurationView).GetProperty("SmtpPassword"))
                 .IsNull();
+            var persistedSettings = await db.PlatformSettings.AsNoTracking()
+                .SingleAsync(cancellationToken);
+            await Assert.That(persistedSettings.EmailSmtpPasswordCiphertext)
+                .IsNotNull();
+            await Assert.That(persistedSettings.EmailSmtpPasswordCiphertext!)
+                .IsNotEquivalentTo(Encoding.UTF8.GetBytes("smtp-secret"));
 
             var updated = await store.UpdateAsync(new(
                 Enabled: true,
