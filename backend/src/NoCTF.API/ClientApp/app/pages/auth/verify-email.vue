@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { resendEmailVerificationEndpoint, verifyEmailEndpoint } from '~/api'
 
+definePageMeta({ alias: ['/verify-email'] })
+
 const route = useRoute()
 const { isLoggedIn } = useAuth()
 
