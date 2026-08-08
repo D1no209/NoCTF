@@ -17,6 +17,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("CompetitionNotificationDelivery")]
 public sealed class CompetitionNotificationDeliveryPersistenceTests
 {
     [Test]
@@ -81,26 +82,25 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 participantId,
                 Guid.CreateVersion7(),
                 now);
-            var delivery = new CompetitionNotificationDelivery(
-                db,
-                new CompetitionNotificationAudienceResolver(db));
+            var delivery = new CompetitionNotificationDelivery(db);
             await CompetitionNotificationMessageHandlers.Handle(message, db, delivery, ct);
             await CompetitionNotificationMessageHandlers.Handle(message, db, delivery, ct);
 
             var notifications = await db.Notifications.AsNoTracking().ToArrayAsync(ct);
             await Assert.That(notifications).Count().IsEqualTo(4);
-            await Assert.That(notifications.Select(item => item.UserId)).IsEquivalentTo([
+            await Assert.That(notifications.Select(item => item.TargetId)).IsEquivalentTo([
                 administratorId,
                 ownerId,
                 managerId,
                 judgeId
             ]);
-            await Assert.That(notifications.Select(item => item.UserId)).DoesNotContain(observerId);
-            await Assert.That(notifications.Select(item => item.UserId)).DoesNotContain(participantId);
+            await Assert.That(notifications.Select(item => item.TargetId)).DoesNotContain(observerId);
+            await Assert.That(notifications.Select(item => item.TargetId)).DoesNotContain(participantId);
             await Assert.That(notifications.All(item =>
                 item.Kind == NotificationKind.CheatIncidentDetected
-                && item.SourceEventKey == $"cheat-incident:{message.SubmissionId:N}"
-                && !item.PayloadJson.Contains("flag", StringComparison.OrdinalIgnoreCase)))
+                && item.TargetType == NotificationTargetType.User
+                && item.ContentJson.Contains($"cheat-incident:{message.SubmissionId:N}")
+                && !item.ContentJson.Contains("flag", StringComparison.OrdinalIgnoreCase)))
                 .IsTrue();
         });
     }
@@ -215,7 +215,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 now,
                 ct)).IsNotNull();
 
-            var delivery = new CompetitionNotificationDelivery(db, resolver);
+            var delivery = new CompetitionNotificationDelivery(db);
             var payload = new TeamBannedPayload(
                 competitionId,
                 bannedTeamId,
@@ -239,13 +239,14 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 ct);
 
             var notifications = await db.Notifications.AsNoTracking()
-                .Where(notification => notification.CompetitionId == competitionId)
+                .Where(notification => notification.RelatedId == competitionId)
                 .ToArrayAsync(ct);
-            await Assert.That(notifications).Count().IsEqualTo(banAudience.Count);
-            await Assert.That(notifications.Select(notification => notification.UserId))
-                .IsEquivalentTo(banAudience);
-            await Assert.That(notifications.Select(notification => notification.SourceEventKey!).Distinct())
-                .IsEquivalentTo([$"team-banned:{bannedTeamId:N}:1"]);
+            await Assert.That(notifications).Count().IsEqualTo(1);
+            await Assert.That(notifications[0].TargetType)
+                .IsEqualTo(NotificationTargetType.TeamMembers);
+            await Assert.That(notifications[0].TargetId).IsEqualTo(bannedTeamId);
+            await Assert.That(notifications[0].ContentJson)
+                .Contains($"team-banned:{bannedTeamId:N}:1");
 
             await delivery.DeliverAsync(
                 competitionId,
@@ -263,19 +264,18 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             var reader = new NotificationReader(db);
             var start = new KeysetNotificationPosition(now.AddDays(-1), Guid.Empty);
             var ownerFeed = await reader.ReadFeedAsync(ownerId, start, 10, ct);
+            var approvedMemberFeed = await reader.ReadFeedAsync(
+                approvedMemberId,
+                start,
+                10,
+                ct);
             var unrelatedFeed = await reader.ReadFeedAsync(pendingMemberId, start, 10, ct);
             var bannedMemberFeed = await reader.ReadFeedAsync(bannedMemberId, start, 10, ct);
 
-            await Assert.That(ownerFeed).Count().IsEqualTo(2);
-            await Assert.That(ownerFeed.Select(item => item.Kind))
-                .IsEquivalentTo([
-                    NotificationKind.TeamBanned,
-                    NotificationKind.ChallengePublished
-                ]);
-            await Assert.That(ownerFeed.Zip(ownerFeed.Skip(1)).All(pair =>
-                pair.First.CreatedAt < pair.Second.CreatedAt
-                || pair.First.CreatedAt == pair.Second.CreatedAt
-                && pair.First.Id.CompareTo(pair.Second.Id) < 0)).IsTrue();
+            await Assert.That(ownerFeed).IsEmpty();
+            await Assert.That(approvedMemberFeed).Count().IsEqualTo(1);
+            await Assert.That(approvedMemberFeed[0].Kind)
+                .IsEqualTo(NotificationKind.ChallengePublished);
             await Assert.That(unrelatedFeed).IsEmpty();
             await Assert.That(bannedMemberFeed).Count().IsEqualTo(1);
         });
@@ -358,38 +358,32 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
-                    UpdatedAt = now
+                    Revision = 1,
+                    UpdatedAt = now,
+                    Hints =
+                    [
+                        new CompetitionChallengeHint
+                        {
+                            Id = hintId,
+                            Content = "paid secret content",
+                            Cost = 25,
+                            PublishedAt = futureAt
+                        },
+                        new CompetitionChallengeHint
+                        {
+                            Id = deletedHintId,
+                            Content = "deleted paid secret",
+                            Cost = 50,
+                            PublishedAt = publishedAt,
+                            HiddenAt = now
+                        }
+                    ]
                 });
-                setup.Set<CompetitionChallengeHint>().AddRange(
-                    new CompetitionChallengeHint
-                    {
-                        Id = hintId,
-                        CompetitionChallengeId = competitionChallengeId,
-                        Content = "paid secret content",
-                        Cost = 25,
-                        PublishedAt = futureAt,
-                        PublicationRevision = 1,
-                        CreatedAt = now,
-                        UpdatedAt = now
-                    },
-                    new CompetitionChallengeHint
-                    {
-                        Id = deletedHintId,
-                        CompetitionChallengeId = competitionChallengeId,
-                        Content = "deleted paid secret",
-                        Cost = 50,
-                        PublishedAt = publishedAt,
-                        PublicationRevision = 2,
-                        CreatedAt = now,
-                        UpdatedAt = now,
-                        DeletedAt = now
-                    });
                 await setup.SaveChangesAsync(ct);
             }
 
             await using var db = new NoCtfDbContext(options);
-            var resolver = new CompetitionNotificationAudienceResolver(db);
-            var delivery = new CompetitionNotificationDelivery(db, resolver);
+            var delivery = new CompetitionNotificationDelivery(db);
             var futureMessage = new PublishHintNotification(
                 competitionId,
                 competitionChallengeId,
@@ -404,11 +398,12 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 delivery,
                 ct);
 
-            var hint = await db.Set<CompetitionChallengeHint>()
-                .SingleAsync(candidate => candidate.Id == hintId, ct);
+            var challenge = await db.CompetitionChallenges
+                .SingleAsync(candidate => candidate.Id == competitionChallengeId, ct);
+            var hint = challenge.Hints.Single(candidate => candidate.Id == hintId);
             hint.PublishedAt = publishedAt;
-            hint.PublicationRevision = 2;
-            hint.UpdatedAt = now.AddSeconds(1);
+            challenge.Revision = 2;
+            challenge.UpdatedAt = now.AddSeconds(1);
             await db.SaveChangesAsync(ct);
 
             await CompetitionNotificationMessageHandlers.Handle(
@@ -447,16 +442,21 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 ct);
 
             var notifications = await db.Notifications.AsNoTracking()
-                .OrderBy(notification => notification.UserId)
                 .ToArrayAsync(ct);
-            await Assert.That(notifications).Count().IsEqualTo(2);
-            await Assert.That(notifications.Select(notification => notification.UserId))
-                .IsEquivalentTo([ownerId, memberId]);
+            await Assert.That(notifications).Count().IsEqualTo(1);
             await Assert.That(notifications.All(notification =>
                 notification.Kind == NotificationKind.HintPublished
-                && notification.SourceEventKey == $"hint-published:{hintId:N}:2"
-                && !notification.PayloadJson.Contains("paid secret", StringComparison.Ordinal)))
+                && notification.TargetType == NotificationTargetType.CompetitionParticipants
+                && notification.TargetId == competitionId
+                && notification.ContentJson.Contains($"hint-published:{hintId:N}:2")
+                && !notification.ContentJson.Contains("paid secret", StringComparison.Ordinal)))
                 .IsTrue();
+            var reader = new NotificationReader(db);
+            var start = new KeysetNotificationPosition(now.AddDays(-1), Guid.Empty);
+            await Assert.That(await reader.ReadFeedAsync(memberId, start, 10, ct))
+                .Count().IsEqualTo(1);
+            await Assert.That(await reader.ReadFeedAsync(ownerId, start, 10, ct))
+                .IsEmpty();
         });
     }
 

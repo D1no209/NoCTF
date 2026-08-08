@@ -15,6 +15,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("CompetitionChallengeLifecycleRevision")]
 public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
 {
     [Test]
@@ -513,13 +514,12 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
             cancellationToken);
 
         await using var assertionDb = new NoCtfDbContext(options);
-        var hintDeletedAt = await assertionDb.Set<CompetitionChallengeHint>()
+        var challenge = await assertionDb.CompetitionChallenges
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(hint => hint.Id == hintId)
-            .Select(hint => hint.DeletedAt)
-            .SingleAsync(cancellationToken);
-        await Assert.That(hintDeletedAt).IsNull();
+            .SingleAsync(item => item.Id == competitionChallengeId, cancellationToken);
+        await Assert.That(challenge.Hints.Single(hint => hint.Id == hintId).HiddenAt)
+            .IsNull();
         await hintOutbox.Received(3).PublishAsync(
             Arg.Is<InvalidateLeaderboard>(message =>
                 message!.CompetitionId == competitionId));
