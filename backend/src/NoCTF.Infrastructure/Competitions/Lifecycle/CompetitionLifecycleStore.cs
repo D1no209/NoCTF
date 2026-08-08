@@ -18,6 +18,9 @@ public sealed class CompetitionLifecycleStore(
     NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
     : ICompetitionLifecycleStore
 {
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
@@ -149,7 +152,7 @@ public sealed class CompetitionLifecycleStore(
                     .ThenByDescending(@event => @event.Id)
                     .FirstOrDefaultAsync(cancellationToken);
                 var pauseStartedAt = pauseEvent is not null
-                    && JsonSerializer.Deserialize<LifecyclePayload>(pauseEvent.PayloadJson)
+                    && JsonSerializer.Deserialize<LifecyclePayload>(pauseEvent.PayloadJson, JsonOptions)
                         is { From: CompetitionStatus.Running, To: CompetitionStatus.Paused }
                     ? pauseEvent.OccurredAt
                     : (DateTimeOffset?)null;

@@ -35,11 +35,8 @@
     <Compile Remove="Integration\Persistence\ChallengeHintUnlockPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\CheatIncidentPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\CompetitionChallengeLifecycleRevisionPersistenceTests.cs" />
-    <Compile Remove="Integration\Persistence\CompetitionEventPersistenceTests.cs" />
-    <Compile Remove="Integration\Persistence\CompetitionLifecyclePersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\CompetitionNotificationDeliveryPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\CompetitionQuestionPersistenceTests.cs" />
-    <Compile Remove="Integration\Persistence\CompetitionVisibilityPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\DataExportPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\KohPollingPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\PatchUploadReplacementPersistenceTests.cs" />
