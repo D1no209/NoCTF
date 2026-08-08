@@ -7,6 +7,7 @@ withDefaults(defineProps<{
   placeholder?: string
   disabled?: boolean
   id?: string
+  invalid?: boolean
 }>(), {
   min: undefined,
   max: undefined,
@@ -14,6 +15,7 @@ withDefaults(defineProps<{
   placeholder: undefined,
   disabled: false,
   id: undefined,
+  invalid: false,
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: number | null] }>()
@@ -39,6 +41,7 @@ function onInput(event: Event): void {
     :step="step"
     :placeholder="placeholder"
     :disabled="disabled"
+    :aria-invalid="invalid || undefined"
     @input="onInput"
   />
 </template>

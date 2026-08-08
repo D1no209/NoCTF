@@ -19,7 +19,12 @@ export const RuntimeAllocation = { Shared: 0, PerTeam: 1 } as const
 export const EgressPolicy = { DenyAll: 0, InternetOnly: 1 } as const
 export const FlagSource = { Static: 0, PerTeam: 1, AwdRotation: 2 } as const
 export const UrlExposure = { OwnerOnly: 0, Participants: 1 } as const
-export const BloodRewardPolicy = { FixedPoints: 0, InitialPointsPercentage: 1, SolveTimePointsPercentage: 2 } as const
+export const BloodRewardPolicy = {
+  FixedPoints: 0,
+  InitialPointsPercentage: 1,
+  SolveTimePointsPercentage: 2,
+  CurrentPointsPercentage: 3,
+} as const
 export const AwardSettlement = { Milestone: 0, PerRound: 1 } as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
 
@@ -31,7 +36,8 @@ export const ATTACK_REWARD_MODES = [
 export const BLOOD_REWARD_POLICIES = [
   { value: BloodRewardPolicy.FixedPoints, label: '固定分值' },
   { value: BloodRewardPolicy.InitialPointsPercentage, label: '初始分百分比' },
-  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: '解题耗时百分比' },
+  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: '解题时分值百分比' },
+  { value: BloodRewardPolicy.CurrentPointsPercentage, label: '当前分值百分比' },
 ] as const
 
 export const AWARD_SETTLEMENTS = [
@@ -74,10 +80,10 @@ export interface ContainerDefinitionModel {
   environment: Record<string, string>
   labels: Record<string, string>
   /** 容器端口列表(host 端口恒为 0,由 Docker 随机分配)。 */
-  containerPorts: number[]
+  containerPorts: Array<number | null>
   security: SecurityModel
   flagEnvironmentVariableName: string
-  internalPorts: number[]
+  internalPorts: Array<number | null>
 }
 
 export interface ComposeServiceResourceModel {
@@ -395,8 +401,9 @@ function putStringArray(obj: JsonObject, key: string, value: string[]): void {
   if (items.length > 0) obj[key] = items
 }
 
-function putNumberArray(obj: JsonObject, key: string, value: number[]): void {
-  if (value.length > 0) obj[key] = value
+function putNumberArray(obj: JsonObject, key: string, value: Array<number | null>): void {
+  const items = value.filter((item): item is number => item !== null)
+  if (items.length > 0) obj[key] = items
 }
 
 function putStringMap(obj: JsonObject, key: string, value: Record<string, string>): void {
@@ -445,8 +452,9 @@ function serializeRuntimeDefinition(definition: RuntimeDefinitionModel): JsonObj
   putStringArray(obj, 'command', definition.command)
   putStringMap(obj, 'environment', definition.environment)
   putStringMap(obj, 'labels', definition.labels)
-  if (definition.containerPorts.length > 0) {
-    obj.portMappings = Object.fromEntries(definition.containerPorts.map(port => [String(port), 0]))
+  const containerPorts = definition.containerPorts.filter((port): port is number => port !== null)
+  if (containerPorts.length > 0) {
+    obj.portMappings = Object.fromEntries(containerPorts.map(port => [String(port), 0]))
   }
   const security = serializeSecurity(definition.security)
   if (security) obj.security = security

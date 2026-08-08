@@ -6,7 +6,8 @@ public enum BloodRewardPolicy
 {
     FixedPoints,
     InitialPointsPercentage,
-    SolveTimePointsPercentage
+    SolveTimePointsPercentage,
+    CurrentPointsPercentage
 }
 
 public sealed record BloodReward(BloodRewardPolicy Policy, decimal Value);
