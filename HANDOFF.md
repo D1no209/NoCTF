@@ -140,6 +140,53 @@
 - 已清理本次部署的临时文件、14.46 GB BuildKit 缓存和 1.315 GB 无引用镜像；根分区占用由构建
   峰值 82% 降至 61%，剩余约 16 GB。数据库、Redis、上传卷和 HTTPS 证书保持原有数据与配置。
 
+## 2026-08-09 Running 队伍注册策略与卡住实例恢复
+
+- `1167cd0b`：比赛新增 `AllowTeamRegistrationWhileRunning` 配置，默认关闭。Visible/Published
+  阶段仍允许创建或重新报名；Running 阶段仅在该配置开启时允许；Paused/Finished 始终关闭。
+  持有邀请 Token 加入既有队伍不等同于创建队伍，因此不受该配置限制。Store 在 Serializable
+  写事务中重新读取状态和配置，避免比赛切换状态时的 TOCTOU 绕过。
+- 新增 EF CLI 生成的 migration `20260808173522_AllowTeamRegistrationWhileRunning`；没有手工编辑
+  migration 或 snapshot。Create/Update/Get Competition OpenAPI 契约、管理端创建/配置页和参赛者端
+  报名入口已同步，TypeScript SDK 由 OpenAPI 重新生成。
+- 新增 Administrator 专用强制终结接口
+  `POST /api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/force-terminate`。
+  仅对带 Runner 归属、在 `Provisioning`/`Stopping` 停留至少 5 分钟的实例开放；该阈值与运行时
+  最大操作超时 300 秒一致。请求必须携带当前 ProcessingVersion 和 8–512 字符原因，前端要求
+  原因与二次勾选确认。
+- 强制终结不直接改写终态：Worker 先持久化请求并把带 generation/provider/Runner fence 的消息
+  定向投递到原 Runner；Runner 按 RuntimeInstanceId + generation 标签执行幂等 Provider 清理，重新
+  枚举确认资源不存在后才释放容量；Worker 收到成功回执后才写回 `Stopped` 并派发等待的替代实例。
+  查询不到当前工作记录的幂等重试也必须执行身份清理和资源复查。资源残留、清理异常和容量归属冲突
+  均保持旧实例未完成状态，不允许数据库单边“强制成功”。Docker 端口随实际资源删除释放，历史
+  PublishedPorts 继续保留用于审计和端口追溯。
+- 新增工作人员可见的不可变比赛事件 `RuntimeForceTerminationRequested/Completed/Failed`，记录
+  Administrator、原因、时间、generation、状态与强类型清理结果；管理审计继续从比赛事件投影，
+  未新增独立审计表。
+- 修复两个根因：Runtime claim 将缺失的 `security.capAdd` 规范化为空数组，Docker/Kubernetes
+  adapter 同时防御 null；Runner assignment reconciliation 对“无 provider receipt、但仍保留
+  runner_id”的失联 Provisioning/Stopping 实例改为送回原 Runner 按身份清理，容量在清理确认前
+  保持占用，迟到的 provision receipt 会升级 processing fence 后再次精确清理。
+- Docker 单容器流程在既有“缺镜像才拉取”、确定性名称/标签、NotFound 幂等删除基础上，补充启动后
+  inspect 与有限等待；未真正进入 Running 的容器会清理并明确失败，不再生成虚假的 Running 回执。
+  设计参考了 GZCTF DockerManager 中值得保留的资源身份、缺镜像拉取和幂等清理思想，但未复制其
+  受限许可代码，并保留 NoCTF 更严格的 generation fence、资源复查和容量所有权约束。
+- 竞赛列表卡片整体成为可聚焦的命名路由链接，不再只有标题可点击。平台版本由
+  `0.1.0-alpha.3` 递增为 `0.1.0-alpha.4`。管理 API 清单由 123 增至 124，全部 API 路由清单由
+  190 增至 191；OpenAPI、API 文档与 Nuxt SDK 已同步。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；非集成/架构测试
+  617/617 通过；真实依赖 `RunnerAssignmentReconciliationTests` 14/14、
+  `RuntimeQuotaPersistenceTests` 3/3、`CompetitionManagementPersistenceTests` 1/1、
+  `RuntimeReplacementCleanupFailureTests` 18/18 通过。`dotnet ef migrations has-pending-model-changes`
+  无漂移；`bun run test` 9/9、`bun run typecheck`、`bun run generate` 通过；`git diff --check`
+  通过。Nuxt 构建仅保留既有 chunk/Nitro 第三方警告。
+- 本地浏览器以开发种子管理员验收：竞赛创建页显示 Running 队伍创建开关及说明，平台信息显示
+  `0.1.0-alpha.4`，页面无控制台 Error；本地开发库无竞赛数据，因此整卡跳转由组件 DOM 结构、
+  命名路由和生产构建验证。验收进程与临时日志已清理。后续浏览器验收按用户要求优先使用 Chrome
+  或电脑控制，避免继续依赖存在闪退问题的内置浏览器。
+- 本轮只创建本地功能提交与本 HANDOFF 提交，未 push、未部署；生产仍运行
+  `0.1.0-alpha.3`，等待新的明确授权。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
