@@ -6,7 +6,7 @@
 - API、测试项目当前均可编译；EF model snapshot 与当前模型无 pending changes（2026-08-08 再次验证）。
 - OpenAPI 已重新导出，Nuxt 生成客户端已更新。
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
-- Owner 明确本次提交不以完整测试通过为门槛；最后一次运行结果为 603 通过、90 跳过、6 失败，失败数与导入基线一致，包含旧 OpenAPI 路由计数/清单断言及本机 Docker 不可用。Build 与 EF drift 检查通过。
+- Owner 明确本次提交不以完整测试通过为门槛；最后一次运行结果为 603 通过、96 跳过、6 失败，失败数与导入基线一致，包含旧 OpenAPI 路由计数/清单断言及本机 Docker 不可用。Build 与 EF drift 检查通过。
 
 ## 2026-08-08 续推记录
 
@@ -14,8 +14,9 @@
 - `5e41b485`：修复 Nuxt 与合并后强类型契约漂移；Team API 增加生成式 `avatarUrl`，重新导出 OpenAPI 并生成 TypeScript SDK。
 - `6a33a6ac`：将邮件验证配置和密码重置持久化测试改写到 `platform_settings` 与统一 `account_tokens`，排除文件由 21 个降至 19 个。
 - `ea8c004d`：将用户物理删除/匿名化的操作人、原因、时间和动作写为管理员受众的不可变 Notification 原始事实，管理审计直接投影该事实；修复管理员通知角色判断，并将用户关联 Notification 纳入删除影响预览。对应两项集成测试已恢复，排除文件由 19 个降至 17 个。
+- `15d6fc50`：将 Competition Event、Lifecycle、Leaderboard Visibility 共 6 个持久化场景改写到不可变 `competition_events`，排除文件由 17 个降至 14 个；同时修复暂停生命周期 payload 使用默认大小写敏感 JSON 选项导致无法恢复暂停起点的问题。
 - 新增协议枚举 `NotificationKind.UserAccountLifecycleChanged`；OpenAPI 与 Nuxt SDK 已同步。没有新增数据表或 migration。
-- 本轮验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；EF 无 pending model changes；OpenAPI 导出、Nuxt typecheck 与 production build 通过；全量测试 699 项，603 通过、90 跳过、6 个基线失败。恢复的 PostgreSQL 集成场景已进入测试集，但本机 Docker 不可用时按测试设施策略跳过。
+- 本轮验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；EF 无 pending model changes；OpenAPI 导出、Nuxt typecheck 与 production build 通过；全量测试 705 项，603 通过、96 跳过、6 个基线失败。恢复的 PostgreSQL 集成场景已进入测试集，但本机 Docker 不可用时按测试设施策略跳过。
 - 未推送、未部署；原工作区 `TODO.md`、`PLAN.md` 及其他用户/协作者未提交内容保持不动。
 
 ## 已落地的主要能力
@@ -42,7 +43,7 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 
 ## 后续必须继续处理
 
-1. `NoCTF.Tests.csproj` 暂时排除了明确绑定旧表/旧协议的 17 个集成测试文件。已经恢复其余测试编译并新增 17 表 PostgreSQL Testcontainers 验收，但仍需把排除项逐项改写成新 Event/Notification/File/Token 模型测试后移除排除配置。
+1. `NoCTF.Tests.csproj` 暂时排除了明确绑定旧表/旧协议的 14 个集成测试文件。已经恢复其余测试编译并新增 17 表 PostgreSQL Testcontainers 验收，但仍需把排除项逐项改写成新 Event/Notification/File/Token 模型测试后移除排除配置。
 2. File 上传流程已有不可变 File 与 `CleanupFile(FileId)`，但 ChallengeAttachment、PatchUpload 等旧用例仍有“先上传对象、再创建 File 行”的路径；需统一到计划中的临时文件 → File 行 → 最终对象 → 建立引用补偿流程。
 3. HintUnlock 与 ManualAdjust 已共享 Team/Competition advisory lock，但 HintUnlock 的 authoritative score 仍应进一步统一复用四种模式的正式排行榜投影，并补并发/rejudge Testcontainers 测试。
 4. Maintenance `SingularAgent` 使用 Wolverine 6.21 的 `AddSingularAgent<T>()`（该版本没有计划文本中的 `EnableNodeAgentSupport()` 扩展）；仍需补多 Worker 故障转移与 500 条续页测试。
