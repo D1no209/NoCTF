@@ -6,6 +6,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
+using NoCTF.Domain.Storage;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
@@ -17,6 +18,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("AwdpFixResult")]
 public sealed class AwdpFixResultPersistenceTests
 {
     [Test]
@@ -299,22 +301,16 @@ public sealed class AwdpFixResultPersistenceTests
         var submissionId = Guid.CreateVersion7();
         var runtimeId = Guid.CreateVersion7();
         var patchUploadId = Guid.CreateVersion7();
-        db.PatchUploads.Add(new PatchUpload
-        {
-            Id = patchUploadId,
-            CompetitionId = original.CompetitionId,
-            CompetitionChallengeId = original.CompetitionChallengeId,
-            TeamId = original.TeamId,
-            UploadedByUserId = original.SubmittedByUserId,
-            ObjectKey = $"patches/{patchUploadId:N}",
-            OriginalFileName = "concurrent-fix.tar.gz",
-            ContentType = "application/gzip",
-            ByteLength = 1,
-            Sha256 = new byte[32],
-            UploadedAt = fixture.Now,
-            ConsumedAt = fixture.Now,
-            SubmissionId = submissionId
-        });
+        db.PatchUploads.Add(CreatePatchUpload(
+            db,
+            patchUploadId,
+            original.CompetitionId,
+            original.CompetitionChallengeId,
+            original.TeamId,
+            original.SubmittedByUserId,
+            submissionId,
+            "concurrent-fix.tar.gz",
+            fixture.Now));
         db.Submissions.Add(new Submission
         {
             Id = submissionId,
@@ -366,22 +362,16 @@ public sealed class AwdpFixResultPersistenceTests
         var submissionId = Guid.NewGuid();
         var runtimeId = Guid.NewGuid();
         var patchUploadId = Guid.NewGuid();
-        db.PatchUploads.Add(new PatchUpload
-        {
-            Id = patchUploadId,
-            CompetitionId = original.CompetitionId,
-            CompetitionChallengeId = original.CompetitionChallengeId,
-            TeamId = original.TeamId,
-            UploadedByUserId = original.SubmittedByUserId,
-            ObjectKey = $"patches/{patchUploadId:N}",
-            OriginalFileName = "fix.tar.gz",
-            ContentType = "application/gzip",
-            ByteLength = 1,
-            Sha256 = new byte[32],
-            UploadedAt = fixture.Now,
-            ConsumedAt = fixture.Now,
-            SubmissionId = submissionId
-        });
+        db.PatchUploads.Add(CreatePatchUpload(
+            db,
+            patchUploadId,
+            original.CompetitionId,
+            original.CompetitionChallengeId,
+            original.TeamId,
+            original.SubmittedByUserId,
+            submissionId,
+            "fix.tar.gz",
+            fixture.Now));
         db.Submissions.Add(new Submission
         {
             Id = submissionId,
@@ -484,22 +474,16 @@ public sealed class AwdpFixResultPersistenceTests
             RulesJson = "{}",
             UpdatedAt = now
         });
-        db.PatchUploads.Add(new PatchUpload
-        {
-            Id = patchUploadId,
-            CompetitionId = competitionId,
-            CompetitionChallengeId = competitionChallengeId,
-            TeamId = teamId,
-            UploadedByUserId = memberId,
-            ObjectKey = $"patches/{patchUploadId:N}",
-            OriginalFileName = "fix.tar.gz",
-            ContentType = "application/gzip",
-            ByteLength = 1,
-            Sha256 = new byte[32],
-            UploadedAt = now,
-            ConsumedAt = now,
-            SubmissionId = submissionId
-        });
+        db.PatchUploads.Add(CreatePatchUpload(
+            db,
+            patchUploadId,
+            competitionId,
+            competitionChallengeId,
+            teamId,
+            memberId,
+            submissionId,
+            "fix.tar.gz",
+            now));
         db.Submissions.Add(new Submission
         {
             Id = submissionId,
@@ -538,6 +522,43 @@ public sealed class AwdpFixResultPersistenceTests
         });
         await db.SaveChangesAsync(cancellationToken);
         return new(now, competitionId, competitionChallengeId, submissionId, runtimeId);
+    }
+
+    private static PatchUpload CreatePatchUpload(
+        NoCtfDbContext db,
+        Guid patchUploadId,
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid teamId,
+        Guid uploadedByUserId,
+        Guid submissionId,
+        string fileName,
+        DateTimeOffset now)
+    {
+        var file = new StoredFile
+        {
+            Id = Guid.CreateVersion7(),
+            ObjectKey = $"patches/{patchUploadId:N}",
+            FileName = fileName,
+            ContentType = "application/gzip",
+            ByteLength = 1,
+            Sha256 = new byte[32],
+            CreatedAt = now
+        };
+        db.Files.Add(file);
+        return new PatchUpload
+        {
+            Id = patchUploadId,
+            CompetitionId = competitionId,
+            CompetitionChallengeId = competitionChallengeId,
+            TeamId = teamId,
+            UploadedByUserId = uploadedByUserId,
+            FileId = file.Id,
+            File = file,
+            UploadedAt = now,
+            ConsumedAt = now,
+            SubmissionId = submissionId
+        };
     }
 
     private static User NewUser(Guid id, string name, DateTimeOffset now) => new()
