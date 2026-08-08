@@ -354,6 +354,82 @@ public sealed class RunnerAssignmentReconciliationTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Exactly_full_assignment_page_publishes_one_bounded_continuation(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var seedPage = new NoCtfDbContext(options))
+            {
+                var template = await seedPage.RuntimeInstances.AsNoTracking()
+                    .OrderBy(instance => instance.Id)
+                    .FirstAsync(cancellationToken);
+                for (var index = 0; index < 497; index++)
+                {
+                    seedPage.RuntimeInstances.Add(new RuntimeInstance
+                    {
+                        Id = Guid.CreateVersion7(),
+                        CompetitionId = template.CompetitionId,
+                        CompetitionChallengeId = template.CompetitionChallengeId,
+                        TeamId = null,
+                        Purpose = RuntimePurpose.Player,
+                        Generation = index + 2,
+                        RuntimeKind = RuntimeKind.Container,
+                        RuntimeProvider = RuntimeProvider.Docker,
+                        RunnerId = "runner-page",
+                        RunnerPool = "pool-a",
+                        State = RuntimeState.Running,
+                        ProcessingVersion = 1,
+                        ProviderReceiptJson = "{}",
+                        CreatedAt = fixture.Now.AddMinutes(index + 10)
+                    });
+                }
+                await seedPage.SaveChangesAsync(cancellationToken);
+            }
+
+            var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Online);
+            var firstPageOutbox = new RecordingTransactionalOutbox();
+            await using (var firstPageDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now),
+                    firstPageDb,
+                    capacity,
+                    firstPageOutbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Idempotent);
+            }
+
+            var continuation = firstPageOutbox.Published
+                .OfType<ReconcileRunnerAssignments>()
+                .Single();
+            await Assert.That(continuation.At).IsEqualTo(fixture.Now);
+            await Assert.That(continuation.AfterRuntimeInstanceId).IsNotNull();
+            await Assert.That(firstPageOutbox.Published).Count().IsEqualTo(1);
+            await Assert.That(firstPageOutbox.RunnerNodeMessages).IsEmpty();
+
+            var finalPageOutbox = new RecordingTransactionalOutbox();
+            await using (var finalPageDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    continuation,
+                    finalPageDb,
+                    capacity,
+                    finalPageOutbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Idempotent);
+            }
+            await Assert.That(finalPageOutbox.Published
+                .OfType<ReconcileRunnerAssignments>()).IsEmpty();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Later_unavailable_heartbeat_aborts_before_any_capacity_release(
         CancellationToken cancellationToken)
     {
