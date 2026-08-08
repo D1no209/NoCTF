@@ -1,12 +1,15 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Visibility;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using NoCTF.Infrastructure.Persistence;
@@ -15,6 +18,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("CompetitionVisibility")]
 public sealed class CompetitionVisibilityPersistenceTests
 {
     [Test]
@@ -29,7 +33,11 @@ public sealed class CompetitionVisibilityPersistenceTests
             var startsAt = fixture.Now.AddMinutes(10);
             await using (var configureDb = new NoCtfDbContext(fixture.Options))
             {
-                var store = new CompetitionVisibilityStore(configureDb, snapshots, outbox);
+                var store = new CompetitionVisibilityStore(
+                    configureDb,
+                    snapshots,
+                    outbox,
+                    new CompetitionEventStore(configureDb, outbox));
                 var result = await store.UpdateAsync(new(
                     fixture.CompetitionId,
                     CompetitionLeaderboardVisibility.Frozen,
@@ -50,7 +58,11 @@ public sealed class CompetitionVisibilityPersistenceTests
 
             await using (var applyDb = new NoCtfDbContext(fixture.Options))
             {
-                var store = new CompetitionVisibilityStore(applyDb, snapshots, outbox);
+                var store = new CompetitionVisibilityStore(
+                    applyDb,
+                    snapshots,
+                    outbox,
+                    new CompetitionEventStore(applyDb, outbox));
                 await store.ApplyScheduledAsync(
                     fixture.CompetitionId,
                     expectedRevision: 1,
@@ -76,8 +88,9 @@ public sealed class CompetitionVisibilityPersistenceTests
             await Assert.That(snapshot?.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
             await Assert.That(snapshots.Requests).HasSingleItem();
             await Assert.That(snapshots.Requests[0].ProjectedAt).IsEqualTo(startsAt);
-            await Assert.That(await verify.Set<CompetitionLeaderboardVisibilityAudit>()
-                .CountAsync(audit => audit.CompetitionId == fixture.CompetitionId, ct))
+            await Assert.That(await verify.CompetitionEvents.AsNoTracking()
+                .CountAsync(@event => @event.CompetitionId == fixture.CompetitionId
+                    && @event.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct))
                 .IsEqualTo(1);
             await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count())
                 .IsEqualTo(1);
@@ -128,7 +141,11 @@ public sealed class CompetitionVisibilityPersistenceTests
             var outbox = new RecordingOutbox();
             await using (var db = new NoCtfDbContext(fixture.Options))
             {
-                var applied = await new CompetitionLifecycleStore(db, null!, outbox)
+                var applied = await new CompetitionLifecycleStore(
+                        db,
+                        null!,
+                        outbox,
+                        new CompetitionEventStore(db, outbox))
                     .TryTransitionWithAuditAsync(
                         fixture.CompetitionId,
                         CompetitionStatus.Running,
@@ -144,18 +161,24 @@ public sealed class CompetitionVisibilityPersistenceTests
             await using var verify = new NoCtfDbContext(fixture.Options);
             var competition = await verify.Competitions.AsNoTracking()
                 .SingleAsync(candidate => candidate.Id == fixture.CompetitionId, ct);
-            var audit = await verify.Set<CompetitionLeaderboardVisibilityAudit>()
+            var audit = await verify.CompetitionEvents
                 .AsNoTracking()
-                .SingleAsync(candidate => candidate.CompetitionId == fixture.CompetitionId, ct);
+                .SingleAsync(candidate => candidate.CompetitionId == fixture.CompetitionId
+                    && candidate.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct);
+            var auditPayload = JsonSerializer.Deserialize<VisibilityEventPayload>(
+                audit.PayloadJson,
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
             await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Finished);
             await Assert.That(competition.LeaderboardVisibility)
                 .IsEqualTo(CompetitionLeaderboardVisibility.Normal);
             await Assert.That(competition.LeaderboardVisibilityStartsAt).IsNull();
             await Assert.That(competition.FrozenLeaderboardSnapshotJson).IsNull();
             await Assert.That(competition.LeaderboardVisibilityRevision).IsEqualTo(1);
-            await Assert.That(audit.From).IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
-            await Assert.That(audit.To).IsEqualTo(CompetitionLeaderboardVisibility.Normal);
-            await Assert.That(audit.Automatic).IsTrue();
+            await Assert.That(auditPayload?.From)
+                .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
+            await Assert.That(auditPayload?.To)
+                .IsEqualTo(CompetitionLeaderboardVisibility.Normal);
+            await Assert.That(auditPayload?.Automatic).IsTrue();
         }, CompetitionLeaderboardVisibility.Frozen);
     }
 
@@ -263,6 +286,14 @@ public sealed class CompetitionVisibilityPersistenceTests
         Guid HumanObserverId,
         Guid ObserverBotId,
         Guid ParticipantId);
+
+    private sealed record VisibilityEventPayload(
+        int SchemaVersion,
+        CompetitionLeaderboardVisibility From,
+        CompetitionLeaderboardVisibility To,
+        DateTimeOffset? DataCutoffAt,
+        bool Automatic,
+        string? Reason);
 
     private sealed class RecordingSnapshotFactory : ILeaderboardSnapshotFactory
     {

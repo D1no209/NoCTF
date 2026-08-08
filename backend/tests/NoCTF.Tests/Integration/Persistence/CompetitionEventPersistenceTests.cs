@@ -87,16 +87,16 @@ public sealed class CompetitionEventPersistenceTests
                     ChallengeId = ids.ChallengeId,
                     BaseScore = 500,
                     IsPublished = true,
-                    UpdatedAt = now
-                });
-                setup.Set<CompetitionChallengeHint>().Add(new CompetitionChallengeHint
-                {
-                    Id = ids.HintId,
-                    CompetitionChallengeId = ids.CompetitionChallengeId,
-                    Content = "Traceable hint",
-                    PublishedAt = now.AddMinutes(-5),
-                    CreatedAt = now.AddMinutes(-6),
-                    UpdatedAt = now.AddMinutes(-5)
+                    UpdatedAt = now,
+                    Hints =
+                    [
+                        new CompetitionChallengeHint
+                        {
+                            Id = ids.HintId,
+                            Content = "Traceable hint",
+                            PublishedAt = now.AddMinutes(-5)
+                        }
+                    ]
                 });
                 setup.Teams.AddRange(
                     ApprovedTeam(ids.TeamAId, ids.CompetitionId, "Team A", ids.TeamAUserId, now),
@@ -252,7 +252,7 @@ public sealed class CompetitionEventPersistenceTests
 
             var immutable = await db.CompetitionEvents.SingleAsync(
                 item => item.Id == eventIds[0], ct);
-            immutable.Reason = "attempted mutation";
+            immutable.PayloadJson = """{"schemaVersion":1,"reason":"attempted mutation"}""";
             await Assert.That(async () => await db.SaveChangesAsync(ct))
                 .Throws<InvalidOperationException>();
         });

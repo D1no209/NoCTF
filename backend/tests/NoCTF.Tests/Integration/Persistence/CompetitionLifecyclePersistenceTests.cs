@@ -1,22 +1,26 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("CompetitionLifecycle")]
 public sealed class CompetitionLifecyclePersistenceTests
 {
     [Test]
@@ -56,7 +60,11 @@ public sealed class CompetitionLifecyclePersistenceTests
             await Assert.That(runtimeError.Message)
                 .IsEqualTo("Runtime is required before an AWD competition can start.");
 
-            var store = new CompetitionLifecycleStore(db, gate, outbox);
+            var store = new CompetitionLifecycleStore(
+                db,
+                gate,
+                outbox,
+                new CompetitionEventStore(db, outbox));
             var transitioned = await store.TryTransitionWithAuditAsync(
                 fixture.CompetitionId,
                 CompetitionStatus.Published,
@@ -74,8 +82,10 @@ public sealed class CompetitionLifecyclePersistenceTests
                     .Select(competition => competition.Status)
                     .SingleAsync(cancellationToken))
                 .IsEqualTo(CompetitionStatus.Published);
-            await Assert.That(await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
-                    .AnyAsync(audit => audit.CompetitionId == fixture.CompetitionId, cancellationToken))
+            await Assert.That(await db.CompetitionEvents.AsNoTracking()
+                    .AnyAsync(@event => @event.CompetitionId == fixture.CompetitionId
+                        && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged,
+                        cancellationToken))
                 .IsFalse();
             await Assert.That(await db.RuntimeInstances.AsNoTracking()
                     .AnyAsync(runtime => runtime.CompetitionId == fixture.CompetitionId, cancellationToken))
@@ -103,10 +113,16 @@ public sealed class CompetitionLifecyclePersistenceTests
                 .Options;
             var fixture = await SeedAsync(options, cancellationToken);
             var outbox = new RecordingOutbox();
+            var pausedAt = fixture.Now.AddMinutes(-5);
 
             await using (var pauseDb = new NoCtfDbContext(options))
             {
-                var store = new CompetitionLifecycleStore(pauseDb, null!, outbox);
+                var eventStore = new CompetitionEventStore(pauseDb, outbox);
+                var store = new CompetitionLifecycleStore(
+                    pauseDb,
+                    null!,
+                    outbox,
+                    new PauseEventTimeRecorder(eventStore, pausedAt));
                 var applied = await store.TryTransitionWithAuditAsync(
                     fixture.CompetitionId,
                     CompetitionStatus.Running,
@@ -119,19 +135,13 @@ public sealed class CompetitionLifecyclePersistenceTests
                 await Assert.That(applied).IsTrue();
             }
 
-            var pausedAt = fixture.Now.AddMinutes(-5);
-            await using (var adjustDb = new NoCtfDbContext(options))
-            {
-                var pauseAudit = await adjustDb.Set<CompetitionLifecycleAudit>()
-                    .SingleAsync(audit => audit.CompetitionId == fixture.CompetitionId
-                        && audit.To == CompetitionStatus.Paused, cancellationToken);
-                pauseAudit.OccurredAt = pausedAt;
-                await adjustDb.SaveChangesAsync(cancellationToken);
-            }
-
             await using (var resumeDb = new NoCtfDbContext(options))
             {
-                var store = new CompetitionLifecycleStore(resumeDb, null!, outbox);
+                var store = new CompetitionLifecycleStore(
+                    resumeDb,
+                    null!,
+                    outbox,
+                    new CompetitionEventStore(resumeDb, outbox));
                 var applied = await store.TryTransitionWithAuditAsync(
                     fixture.CompetitionId,
                     CompetitionStatus.Paused,
@@ -164,6 +174,11 @@ public sealed class CompetitionLifecyclePersistenceTests
             await Assert.That(flag.ValidUntil).IsNotNull();
             await Assert.That(flag.ValidUntil!.Value)
                 .IsGreaterThan(fixture.OriginalValidUntil.AddMinutes(4));
+            await Assert.That(await verify.CompetitionEvents.AsNoTracking()
+                    .CountAsync(@event => @event.CompetitionId == fixture.CompetitionId
+                        && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged,
+                        cancellationToken))
+                .IsEqualTo(2);
             await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count()).IsEqualTo(2);
             await Assert.That(outbox.Published.OfType<ProvisionCompetitionRuntimes>().Count())
                 .IsEqualTo(1);
@@ -352,6 +367,21 @@ public sealed class CompetitionLifecyclePersistenceTests
         Guid OwnerId,
         Guid CompetitionId,
         Guid CompetitionChallengeId);
+
+    private sealed class PauseEventTimeRecorder(
+        ICompetitionEventRecorder inner,
+        DateTimeOffset pausedAt) : ICompetitionEventRecorder
+    {
+        public ValueTask<Guid> RecordAsync(
+            CompetitionEventDraft draft,
+            CancellationToken cancellationToken = default) =>
+            inner.RecordAsync(
+                draft.Kind == CompetitionEventKind.CompetitionLifecycleChanged
+                    && draft.CompetitionStatus == CompetitionStatus.Paused
+                    ? draft with { OccurredAt = pausedAt }
+                    : draft,
+                cancellationToken);
+    }
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {
