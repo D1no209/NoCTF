@@ -7,7 +7,7 @@ namespace NoCTF.Tests.Architecture;
 public sealed class CompetitionChallengePersistenceRulesTests
 {
     [Test]
-    public async Task Aggregate_children_have_restrict_foreign_keys_and_no_independent_dbsets()
+    public async Task Aggregate_children_use_json_ownership_and_restrict_file_foreign_keys()
     {
         await using var db = new NoCtfDbContext(new DbContextOptionsBuilder<NoCtfDbContext>()
             .UseNpgsql("Host=localhost;Database=noctf_model_tests;Username=noctf;Password=noctf")
@@ -24,14 +24,14 @@ public sealed class CompetitionChallengePersistenceRulesTests
         var hintType = db.Model.FindEntityType(typeof(CompetitionChallengeHint));
         await Assert.That(hintType).IsNotNull();
         await Assert.That(hintType!.GetForeignKeys().Single().DeleteBehavior)
-            .IsEqualTo(DeleteBehavior.Restrict);
+            .IsEqualTo(DeleteBehavior.Cascade);
         await Assert.That(typeof(NoCtfDbContext).GetProperties()
             .Any(property => property.PropertyType == typeof(DbSet<CompetitionChallengeHint>)))
             .IsFalse();
         var attachmentType = db.Model.FindEntityType(typeof(ChallengeAttachment));
         await Assert.That(attachmentType).IsNotNull();
-        await Assert.That(attachmentType!.GetForeignKeys().Single().DeleteBehavior)
-            .IsEqualTo(DeleteBehavior.Restrict);
+        await Assert.That(attachmentType!.GetForeignKeys()
+            .All(key => key.DeleteBehavior == DeleteBehavior.Restrict)).IsTrue();
         await Assert.That(typeof(NoCtfDbContext).GetProperties()
             .Any(property => property.PropertyType == typeof(DbSet<ChallengeAttachment>)))
             .IsFalse();

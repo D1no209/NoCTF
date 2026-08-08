@@ -41,7 +41,12 @@ public sealed class UploadCompetitionPosterEndpoint(
         AuthSchemes("Bearer");
         AllowFileUploads();
         Description(builder => builder.WithName("AdminCompetitionPoster_Replace"));
-        Summary(summary => summary.Summary = "Replaces a competition poster with an immutable File reference.");
+        Summary(summary =>
+        {
+            summary.Summary = "Replaces a competition poster.";
+            summary.Description =
+                "Stores a validated image as an immutable File and atomically replaces the competition poster reference.";
+        });
     }
 
     public override async Task<Results<Ok<CompetitionPosterResponse>, NotFound, ForbidHttpResult>>

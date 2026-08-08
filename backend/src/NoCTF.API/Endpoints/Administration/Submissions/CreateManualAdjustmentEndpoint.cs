@@ -36,6 +36,7 @@ public sealed class CreateManualAdjustmentEndpoint(
     {
         Post("/admin/competitions/{competitionId}/submissions/manual-adjustments");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminCreateManualAdjustment"));
         Summary(summary =>
         {
             summary.Summary = "Queues a signed manual score adjustment.";
