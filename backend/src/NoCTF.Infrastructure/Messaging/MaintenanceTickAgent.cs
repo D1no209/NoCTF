@@ -1,10 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Messaging;
 using Wolverine;
 using Wolverine.Runtime.Agents;
 
 namespace NoCTF.Infrastructure.Messaging;
 
-public sealed class MaintenanceTickAgent(IMessageBus bus) : SingularAgent("noctf-maintenance-ticks")
+public sealed class MaintenanceTickAgent(IServiceScopeFactory scopeFactory)
+    : SingularAgent("noctf-maintenance-ticks")
 {
     private CancellationTokenSource? stopping;
     private Task? loop;
@@ -41,6 +43,8 @@ public sealed class MaintenanceTickAgent(IMessageBus bus) : SingularAgent("noctf
         while (!cancellationToken.IsCancellationRequested)
         {
             var now = DateTimeOffset.UtcNow;
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
             await bus.PublishAsync(new DispatchAwdCheckers(now));
             if (now - lastSlowTick >= TimeSpan.FromSeconds(30))
             {
