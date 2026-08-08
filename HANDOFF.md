@@ -85,6 +85,23 @@
 - 新容器启动后的 API、Worker、Runner 日志中未发现 Error、Exception 或 `fail:`；数据库、
   Redis、HTTPS 证书与上传卷均保持原有数据和配置。
 
+## 2026-08-09 血榜当前分值奖励与端口输入修正
+
+- `b640f075`：CTF 血榜奖励新增 `BloodRewardPolicy.CurrentPointsPercentage = 3`。该策略按排行榜
+  本次投影得到的题目当前分值计算奖励；既有 `SolveTimePointsPercentage = 2` 仍按对应队伍解题时
+  的题目分值计算，现有枚举数值保持不变。前端配置项同步新增“当前分值百分比”，并将原有文案明确为
+  “解题时分值百分比”。
+- 修复题目运行环境的端口列表编辑：数字框被清空或浏览器因字母输入产生空值时，编辑行保留并显示
+  行内错误，不再被数组更新逻辑误当作删除；只有点击右侧删除按钮才会移除该行。序列化时过滤仍为空
+  的草稿行，仅提交有效数字端口。
+- 平台预发布版本由 `0.1.0-alpha.1` 递增为 `0.1.0-alpha.2`。本轮未修改 HTTP/OpenAPI 契约、
+  生成 SDK、数据模型或 migration。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；非集成测试
+  610/610 通过；`bun run test` 9/9 通过；`bun run typecheck`、`bun run generate` 通过；
+  MSBuild `Version` 为 `0.1.0-alpha.2`；`git diff --check` 通过。新增测试区分当前投影分值与解题时
+  分值，并覆盖端口空草稿保留、修正以及序列化过滤。
+- 本轮只创建本地提交，未 push、未部署；生产继续运行 `0.1.0-alpha.1`，等待新的明确授权。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
