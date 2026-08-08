@@ -9,6 +9,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
@@ -28,6 +29,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("KohPolling")]
 public sealed class KohPollingPersistenceTests
 {
     [Test]
@@ -650,13 +652,20 @@ public sealed class KohPollingPersistenceTests
                 var fact = await verify.ScoringEvents.AsNoTracking()
                     .SingleAsync(cancellationToken);
                 await Assert.That(fact.Kind).IsEqualTo(ScoringEventKind.KohObservation);
-                var transition = await verify.Set<CompetitionLifecycleAudit>()
-                    .AsNoTracking()
+                var transition = await verify.CompetitionEvents.AsNoTracking()
                     .SingleAsync(
-                        audit => audit.CompetitionId == fixture.CompetitionId,
+                        audit => audit.CompetitionId == fixture.CompetitionId
+                            && audit.Kind == CompetitionEventKind.CompetitionLifecycleChanged,
                         cancellationToken);
-                await Assert.That(transition.From).IsEqualTo(CompetitionStatus.Running);
-                await Assert.That(transition.To).IsEqualTo(CompetitionStatus.Paused);
+                await Assert.That(transition.CompetitionStatus)
+                    .IsEqualTo(CompetitionStatus.Paused);
+                using var payload = JsonDocument.Parse(transition.PayloadJson);
+                await Assert.That(payload.RootElement.GetProperty("from")
+                        .Deserialize<CompetitionStatus>())
+                    .IsEqualTo(CompetitionStatus.Running);
+                await Assert.That(payload.RootElement.GetProperty("to")
+                        .Deserialize<CompetitionStatus>())
+                    .IsEqualTo(CompetitionStatus.Paused);
             }
 
             var projections = observationOutbox.Published

@@ -24,6 +24,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("AwdChecker")]
 public sealed class AwdCheckerPersistenceTests
 {
     private static readonly JsonSerializerOptions JsonOptions =
@@ -53,7 +54,7 @@ public sealed class AwdCheckerPersistenceTests
             await using (var dispatchDb = new NoCtfDbContext(options))
             {
                 var outcome = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
-                    new(fixture.Now, 1), dispatchDb, catalog, outbox, cancellationToken);
+                    new(fixture.Now), dispatchDb, catalog, outbox, cancellationToken);
                 await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
             }
 
@@ -73,11 +74,8 @@ public sealed class AwdCheckerPersistenceTests
                 var runtime = await inflightDb.RuntimeInstances.SingleAsync(cancellationToken);
                 runtime.NextCheckerDueAt = fixture.Now.AddSeconds(1);
                 await inflightDb.SaveChangesAsync(cancellationToken);
-                var schedule = await inflightDb.DurableMaintenanceSchedules.SingleAsync(
-                    item => item.Kind == NoCTF.Domain.Platform.MaintenanceChainKind.AwdCheckerDispatch,
-                    cancellationToken);
                 var outcome = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
-                    new(fixture.Now.AddSeconds(1), schedule.ProcessingVersion),
+                    new(fixture.Now.AddSeconds(1)),
                     inflightDb, catalog, outbox, cancellationToken);
                 await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Idempotent);
                 await Assert.That(outbox.NodeMessages.OfType<RunAwdChecker>().Count()).IsEqualTo(1);
@@ -100,11 +98,8 @@ public sealed class AwdCheckerPersistenceTests
                 var runtime = await dueDb.RuntimeInstances.SingleAsync(cancellationToken);
                 runtime.NextCheckerDueAt = fixture.Now.AddSeconds(2);
                 await dueDb.SaveChangesAsync(cancellationToken);
-                var schedule = await dueDb.DurableMaintenanceSchedules.SingleAsync(
-                    item => item.Kind == NoCTF.Domain.Platform.MaintenanceChainKind.AwdCheckerDispatch,
-                    cancellationToken);
                 var outcome = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
-                    new(fixture.Now.AddSeconds(2), schedule.ProcessingVersion),
+                    new(fixture.Now.AddSeconds(2)),
                     dueDb, catalog, outbox, cancellationToken);
                 await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
             }
@@ -139,11 +134,8 @@ public sealed class AwdCheckerPersistenceTests
                 var runtime = await thirdDispatchDb.RuntimeInstances.SingleAsync(cancellationToken);
                 runtime.NextCheckerDueAt = fixture.Now.AddSeconds(4);
                 await thirdDispatchDb.SaveChangesAsync(cancellationToken);
-                var schedule = await thirdDispatchDb.DurableMaintenanceSchedules.SingleAsync(
-                    item => item.Kind == NoCTF.Domain.Platform.MaintenanceChainKind.AwdCheckerDispatch,
-                    cancellationToken);
                 await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
-                    new(fixture.Now.AddSeconds(4), schedule.ProcessingVersion),
+                    new(fixture.Now.AddSeconds(4)),
                     thirdDispatchDb, catalog, outbox, cancellationToken);
             }
             var third = outbox.NodeMessages.OfType<RunAwdChecker>()
@@ -216,11 +208,8 @@ public sealed class AwdCheckerPersistenceTests
             }
             await using (var deadlineDb = new NoCtfDbContext(options))
             {
-                var schedule = await deadlineDb.DurableMaintenanceSchedules.SingleAsync(
-                    item => item.Kind == NoCTF.Domain.Platform.MaintenanceChainKind.AwdCheckerDispatch,
-                    cancellationToken);
                 await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
-                    new(third.Deadline, schedule.ProcessingVersion),
+                    new(third.Deadline),
                     deadlineDb, catalog, outbox, cancellationToken);
             }
             await Assert.That(outbox.Published.OfType<AwdCheckerCallbackMissing>().Count()).IsEqualTo(1);
@@ -243,11 +232,8 @@ public sealed class AwdCheckerPersistenceTests
             }
             await using (var replacementDb = new NoCtfDbContext(options))
             {
-                var schedule = await replacementDb.DurableMaintenanceSchedules.SingleAsync(
-                    item => item.Kind == NoCTF.Domain.Platform.MaintenanceChainKind.AwdCheckerDispatch,
-                    cancellationToken);
                 await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
-                    new(configurationUpdatedAt, schedule.ProcessingVersion),
+                    new(configurationUpdatedAt),
                     replacementDb, catalog, outbox, cancellationToken);
             }
             var replacement = outbox.NodeMessages.OfType<RunAwdChecker>()
