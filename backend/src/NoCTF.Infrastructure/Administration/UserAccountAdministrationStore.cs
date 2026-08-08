@@ -129,7 +129,7 @@ public sealed class UserAccountAdministrationStore(
             SourceType = NotificationSourceType.User,
             SourceId = actorUserId,
             TargetType = NotificationTargetType.PlatformAdministrators,
-            TargetId = Guid.Empty,
+            TargetId = Notification.PlatformAdministratorsTargetId,
             Kind = NotificationKind.UserAccountLifecycleChanged,
             ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
                 1,

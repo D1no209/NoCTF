@@ -48,7 +48,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 $"noctf-compose-it-{operationId:N}");
             var runtimeOptions = new DockerRuntimeOptions(
                 Endpoint: DockerEndpoint(),
-                PublicHost: "localhost",
+                PublicHost: "127.0.0.1",
                 NetworkName: platformNetworkName,
                 CallbackContainerName: callback.Id);
             var runtime = new DockerComposeRuntime(
@@ -75,7 +75,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 using var http = new HttpClient();
                 var publicResponse = await GetEventuallyAsync(
                     http,
-                    $"http://localhost:{web.PublishedPorts[8080]}",
+                    $"http://127.0.0.1:{web.PublishedPorts[8080]}",
                     cancellationToken);
                 await Assert.That(publicResponse.Trim()).IsEqualTo("web");
                 var sameRuntime = await runtime.ExecAsync(

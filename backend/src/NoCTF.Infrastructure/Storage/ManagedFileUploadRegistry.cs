@@ -35,7 +35,6 @@ public sealed class ManagedFileUploadRegistry(
         await outbox.ScheduleAsync(new CleanupFile(fileId), createdAt.Add(CleanupLease));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await FlushAsync(fileId);
     }
 
     public async Task AbandonAsync(Guid fileId, CancellationToken cancellationToken)

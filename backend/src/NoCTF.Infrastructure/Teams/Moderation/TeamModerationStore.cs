@@ -5,6 +5,7 @@ using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Observability;
 
 namespace NoCTF.Infrastructure.Teams.Moderation;
@@ -44,7 +45,10 @@ public sealed class TeamModerationStore(
             : await db.CompetitionEvents.AsNoTracking()
                 .Where(@event =>
                     @event.CompetitionId == command.CompetitionId
-                    && @event.TeamId == team.Id
+                    && (@event.SubjectType == EntityReferenceKind.Team
+                        && @event.SubjectId == team.Id
+                        || @event.RelatedType == EntityReferenceKind.Team
+                        && @event.RelatedId == team.Id)
                     && @event.Kind == CompetitionEventKind.TeamBanned)
                 .OrderByDescending(@event => @event.OccurredAt)
                 .ThenByDescending(@event => @event.Id)

@@ -227,6 +227,7 @@ public sealed class CompetitionLifecycleStore(
             PayloadJson: JsonSerializer.Serialize(new
             {
                 schemaVersion = 1,
+                competitionStatus = to,
                 from,
                 to,
                 automatic,

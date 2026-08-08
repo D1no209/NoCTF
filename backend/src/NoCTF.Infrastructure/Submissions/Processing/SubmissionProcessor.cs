@@ -16,6 +16,7 @@ using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 using System.Globalization;
 using System.Text.Json;
 
@@ -518,7 +519,10 @@ public sealed class SubmissionProcessor(
             if (current.FailureCode == ScoringFailureCode.ForeignTeamFlagDetected)
             {
                 var resolved = await db.CompetitionEvents.AsNoTracking().AnyAsync(
-                    @event => @event.ScoringEventId == current.Id
+                    @event => (@event.SubjectType == EntityReferenceKind.ScoringEvent
+                            && @event.SubjectId == current.Id
+                            || @event.RelatedType == EntityReferenceKind.ScoringEvent
+                            && @event.RelatedId == current.Id)
                         && CheatResolutionKinds.Contains(@event.Kind),
                     cancellationToken);
                 if (!resolved)

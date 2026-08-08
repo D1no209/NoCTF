@@ -69,7 +69,7 @@ public sealed class DockerContainerLifecycleTests
             var options = new DockerRuntimeOptions(
                 DockerEndpoint(),
                 platformNetworkName,
-                "localhost");
+                "127.0.0.1");
             using var lifecycle = new DockerContainerLifecycle(options);
             var composeWorkRoot = Path.Combine(
                 Path.GetTempPath(),
@@ -123,7 +123,7 @@ public sealed class DockerContainerLifecycleTests
                 using var http = new HttpClient();
                 var response = await GetEventuallyAsync(
                     http,
-                    $"http://localhost:{receipt.PortMappings[8080]}",
+                    $"http://127.0.0.1:{receipt.PortMappings[8080]}",
                     cancellationToken);
                 await Assert.That(response.Trim()).IsEqualTo("target");
                 var target = await docker.Containers.InspectContainerAsync(
@@ -197,7 +197,7 @@ public sealed class DockerContainerLifecycleTests
             using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
                 DockerEndpoint(),
                 platformNetworkName,
-                "localhost"));
+                "127.0.0.1"));
             var receipts = new List<ContainerReceipt>();
             try
             {
@@ -233,7 +233,7 @@ public sealed class DockerContainerLifecycleTests
                             ContainerPort: 8080)],
                         null);
                     await Assert.That(expanded.Urls.Single())
-                        .IsEqualTo($"http://localhost:{receipt.PortMappings[8080]}/");
+                        .IsEqualTo($"http://127.0.0.1:{receipt.PortMappings[8080]}/");
                     var response = await GetEventuallyAsync(
                         http,
                         expanded.Urls.Single(),

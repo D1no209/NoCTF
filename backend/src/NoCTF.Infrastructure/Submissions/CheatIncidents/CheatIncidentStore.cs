@@ -4,6 +4,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Submissions.CheatIncidents;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 using NoCTF.Domain.Submissions;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Infrastructure.Persistence;
@@ -72,7 +73,10 @@ public sealed class CheatIncidentStore(
         var resolverNames = await LoadResolverNamesAsync(resolutions, cancellationToken);
         var pendingCount = await IncidentScoringEvents(query.CompetitionId)
             .CountAsync(item => !db.CompetitionEvents.Any(@event =>
-                    @event.ScoringEventId == item.Id
+                    (@event.SubjectType == EntityReferenceKind.ScoringEvent
+                        && @event.SubjectId == item.Id
+                        || @event.RelatedType == EntityReferenceKind.ScoringEvent
+                        && @event.RelatedId == item.Id)
                     && ResolutionKinds.Contains(@event.Kind)),
                 cancellationToken);
         return new(
@@ -166,7 +170,10 @@ public sealed class CheatIncidentStore(
 
         var resolution = await db.CompetitionEvents.AsNoTracking()
             .Where(@event =>
-                @event.ScoringEventId == scoringEvent.Id
+                (@event.SubjectType == EntityReferenceKind.ScoringEvent
+                    && @event.SubjectId == scoringEvent.Id
+                    || @event.RelatedType == EntityReferenceKind.ScoringEvent
+                    && @event.RelatedId == scoringEvent.Id)
                 && ResolutionKinds.Contains(@event.Kind))
             .OrderByDescending(@event => @event.OccurredAt)
             .ThenByDescending(@event => @event.Id)
@@ -198,7 +205,10 @@ public sealed class CheatIncidentStore(
             ban = await db.CompetitionEvents.AsNoTracking()
                 .Where(@event =>
                     @event.CompetitionId == command.CompetitionId
-                    && @event.TeamId == team.Id
+                    && (@event.SubjectType == EntityReferenceKind.Team
+                        && @event.SubjectId == team.Id
+                        || @event.RelatedType == EntityReferenceKind.Team
+                        && @event.RelatedId == team.Id)
                     && @event.Kind == CompetitionEventKind.TeamBanned)
                 .OrderByDescending(@event => @event.OccurredAt)
                 .ThenByDescending(@event => @event.Id)
@@ -419,13 +429,19 @@ public sealed class CheatIncidentStore(
         if (status == CheatIncidentStatus.Pending)
         {
             return incidents.Where(item => !db.CompetitionEvents.Any(@event =>
-                @event.ScoringEventId == item.Id
+                (@event.SubjectType == EntityReferenceKind.ScoringEvent
+                    && @event.SubjectId == item.Id
+                    || @event.RelatedType == EntityReferenceKind.ScoringEvent
+                    && @event.RelatedId == item.Id)
                 && ResolutionKinds.Contains(@event.Kind)));
         }
         var expectedKind = KindOf(status);
         return incidents.Where(item => db.CompetitionEvents
             .Where(@event =>
-                @event.ScoringEventId == item.Id
+                (@event.SubjectType == EntityReferenceKind.ScoringEvent
+                    && @event.SubjectId == item.Id
+                    || @event.RelatedType == EntityReferenceKind.ScoringEvent
+                    && @event.RelatedId == item.Id)
                 && ResolutionKinds.Contains(@event.Kind))
             .OrderByDescending(@event => @event.OccurredAt)
             .ThenByDescending(@event => @event.Id)
@@ -441,8 +457,11 @@ public sealed class CheatIncidentStore(
             return new Dictionary<Guid, CompetitionEvent>();
         var resolutions = await db.CompetitionEvents.AsNoTracking()
             .Where(@event =>
-                @event.ScoringEventId != null
-                && scoringEventIds.Contains(@event.ScoringEventId.Value)
+                (@event.SubjectType == EntityReferenceKind.ScoringEvent
+                    && scoringEventIds.Contains(@event.SubjectId)
+                    || @event.RelatedType == EntityReferenceKind.ScoringEvent
+                    && @event.RelatedId != null
+                    && scoringEventIds.Contains(@event.RelatedId.Value))
                 && ResolutionKinds.Contains(@event.Kind))
             .OrderByDescending(@event => @event.OccurredAt)
             .ThenByDescending(@event => @event.Id)

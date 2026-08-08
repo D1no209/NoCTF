@@ -18,6 +18,7 @@ using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Competitions.Koh;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Runtime.Administration;
 using NoCTF.Infrastructure.Runtime.Instances;
@@ -621,7 +622,9 @@ public sealed class KohPollingPersistenceTests
                 var applied = await new CompetitionLifecycleStore(
                     lifecycleDb,
                     null!,
-                    lifecycleOutbox).TryTransitionWithAuditAsync(
+                    lifecycleOutbox,
+                    new CompetitionEventStore(lifecycleDb, lifecycleOutbox))
+                    .TryTransitionWithAuditAsync(
                         fixture.CompetitionId,
                         CompetitionStatus.Running,
                         CompetitionStatus.Paused,

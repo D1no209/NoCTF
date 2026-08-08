@@ -5,6 +5,9 @@ using NoCTF.Domain.Shared;
 /// <summary>Represents a durable user notification.</summary>
 public sealed class Notification
 {
+    public static readonly Guid PlatformAdministratorsTargetId =
+        Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
     public Guid Id { get; set; }
     public NotificationSourceType SourceType { get; set; }
     public Guid? SourceId { get; set; }

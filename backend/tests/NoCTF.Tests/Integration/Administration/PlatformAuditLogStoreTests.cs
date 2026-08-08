@@ -65,7 +65,7 @@ public sealed class PlatformAuditLogStoreTests
                     SourceType = NotificationSourceType.User,
                     SourceId = actorId,
                     TargetType = NotificationTargetType.PlatformAdministrators,
-                    TargetId = Guid.Empty,
+                    TargetId = Notification.PlatformAdministratorsTargetId,
                     Kind = NotificationKind.UserAccountLifecycleChanged,
                     ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
                         1,

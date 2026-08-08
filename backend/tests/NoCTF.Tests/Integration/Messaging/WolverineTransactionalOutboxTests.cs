@@ -47,8 +47,10 @@ public sealed class WolverineTransactionalOutboxTests
             await using var postgres = CreatePostgres();
             await postgres.StartAsync(cancellationToken);
             var connectionString = postgres.GetConnectionString();
-            using var first = BuildMaintenanceHost(connectionString);
-            using var second = BuildMaintenanceHost(connectionString);
+            const string firstHostId = "first";
+            const string secondHostId = "second";
+            using var first = BuildMaintenanceHost(connectionString, firstHostId);
+            using var second = BuildMaintenanceHost(connectionString, secondHostId);
             var firstStopped = false;
             var secondStopped = false;
             MaintenanceTickObservation.Reset();
@@ -57,18 +59,17 @@ public sealed class WolverineTransactionalOutboxTests
             await second.StartAsync(cancellationToken);
             try
             {
-                var firstAgent = first.Services.GetRequiredService<MaintenanceTickAgent>();
-                var secondAgent = second.Services.GetRequiredService<MaintenanceTickAgent>();
                 await WaitUntilAsync(
-                    () => RunningAgentCount(firstAgent, secondAgent) == 1
-                        && MaintenanceTickObservation.DispatchCount > 0,
+                    () => MaintenanceTickObservation.ActiveHostCount == 1,
                     TimeSpan.FromSeconds(30),
                     cancellationToken);
-                await Assert.That(RunningAgentCount(firstAgent, secondAgent)).IsEqualTo(1);
+                await Assert.That(MaintenanceTickObservation.ActiveHostCount).IsEqualTo(1);
 
-                var active = firstAgent.Status == AgentStatus.Running ? first : second;
-                var standbyAgent = ReferenceEquals(active, first) ? secondAgent : firstAgent;
-                var countBeforeFailover = MaintenanceTickObservation.DispatchCount;
+                var activeHostId = MaintenanceTickObservation.ActiveHostIds.Single();
+                var active = activeHostId == firstHostId ? first : second;
+                var standbyHostId = activeHostId == firstHostId ? secondHostId : firstHostId;
+                var standbyCountBeforeFailover =
+                    MaintenanceTickObservation.DispatchCount(standbyHostId);
                 if (ReferenceEquals(active, first))
                 {
                     await first.StopAsync(cancellationToken);
@@ -81,13 +82,12 @@ public sealed class WolverineTransactionalOutboxTests
                 }
 
                 await WaitUntilAsync(
-                    () => standbyAgent.Status == AgentStatus.Running
-                        && MaintenanceTickObservation.DispatchCount > countBeforeFailover,
+                    () => MaintenanceTickObservation.DispatchCount(standbyHostId)
+                        > standbyCountBeforeFailover,
                     TimeSpan.FromSeconds(30),
                     cancellationToken);
-                await Assert.That(standbyAgent.Status).IsEqualTo(AgentStatus.Running);
-                await Assert.That(MaintenanceTickObservation.DispatchCount)
-                    .IsGreaterThan(countBeforeFailover);
+                await Assert.That(MaintenanceTickObservation.DispatchCount(standbyHostId))
+                    .IsGreaterThan(standbyCountBeforeFailover);
             }
             finally
             {
@@ -723,9 +723,10 @@ public sealed class WolverineTransactionalOutboxTests
         return builder.Build();
     }
 
-    private static IHost BuildMaintenanceHost(string connectionString)
+    private static IHost BuildMaintenanceHost(string connectionString, string hostId)
     {
         var builder = Host.CreateApplicationBuilder();
+        builder.Services.AddSingleton(new MaintenanceHostIdentity(hostId));
         builder.Services.AddSingularAgent<MaintenanceTickAgent>();
         builder.UseWolverine(options =>
         {
@@ -739,9 +740,6 @@ public sealed class WolverineTransactionalOutboxTests
         });
         return builder.Build();
     }
-
-    private static int RunningAgentCount(params MaintenanceTickAgent[] agents) =>
-        agents.Count(agent => agent.Status == AgentStatus.Running);
 
     private static async Task WaitUntilAsync(
         Func<bool> condition,
@@ -796,18 +794,31 @@ public sealed record FinishLifecycleProbe(Guid CompetitionId);
 
 public static class MaintenanceTickObservation
 {
-    private static int dispatchCount;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int>
+        DispatchCounts = new();
 
-    public static int DispatchCount => Volatile.Read(ref dispatchCount);
+    public static int ActiveHostCount => DispatchCounts.Count(item => item.Value > 0);
 
-    public static void Reset() => Interlocked.Exchange(ref dispatchCount, 0);
+    public static IReadOnlyList<string> ActiveHostIds => DispatchCounts
+        .Where(item => item.Value > 0)
+        .Select(item => item.Key)
+        .ToArray();
 
-    public static void RecordDispatch() => Interlocked.Increment(ref dispatchCount);
+    public static int DispatchCount(string hostId) =>
+        DispatchCounts.GetValueOrDefault(hostId);
+
+    public static void Reset() => DispatchCounts.Clear();
+
+    public static void RecordDispatch(string hostId) =>
+        DispatchCounts.AddOrUpdate(hostId, 1, (_, count) => count + 1);
 }
+
+public sealed record MaintenanceHostIdentity(string Value);
 
 public sealed class MaintenanceTickProbeHandler
 {
-    public static void Handle(DispatchAwdCheckers _) => MaintenanceTickObservation.RecordDispatch();
+    public static void Handle(DispatchAwdCheckers _, MaintenanceHostIdentity host) =>
+        MaintenanceTickObservation.RecordDispatch(host.Value);
 
     public static void Handle(ReconcileRunnerAssignments _) { }
 
