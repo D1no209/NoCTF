@@ -102,6 +102,30 @@
   分值，并覆盖端口空草稿保留、修正以及序列化过滤。
 - 本轮只创建本地提交，未 push、未部署；生产继续运行 `0.1.0-alpha.1`，等待新的明确授权。
 
+## 2026-08-09 管理员精确终止运行时与缺失镜像自动拉取
+
+- `17f2ca11`：管理端运行时列表新增破坏性“终止”操作与二次确认。新接口
+  `POST /api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/terminate`
+  以运行时实例 ID 和必填 `expectedProcessingVersion` 精确定位目标；过期页面返回 409，避免原有按
+  队伍/题目停止“最新一代”时误伤另一实例。终止沿用既有 `Stopping -> StopRuntime -> Runner ->
+  Stopped` 持久清理链路，排队中且尚未创建资源的实例直接进入 Stopped；操作写入带管理员 Actor 的
+  不可变比赛事件。
+- Docker 单容器创建前先检查本地镜像，仅在镜像不存在时从远程仓库拉取并再次校验；已有本地镜像
+  不会被强制更新。Compose 启动显式使用 `--pull missing`，同样只补齐本地缺失镜像。当前单容器拉取
+  使用 Docker daemon 的公开仓库访问能力，未新增或持久化私有仓库凭据。
+- OpenAPI 已重新导出，Nuxt TypeScript SDK 已重新生成；管理端只调用生成的
+  `adminTerminateRuntime`，没有手写 URL、端点路径、DTO 或状态枚举。管理 API 清单由 122 增至
+  123，全部 API 路由清单由 189 增至 190。平台版本由 `0.1.0-alpha.2` 递增为
+  `0.1.0-alpha.3`。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；非集成测试
+  610/610 通过；真实 PostgreSQL `RuntimeQuotaPersistenceTests` 3/3 通过，覆盖精确目标、停止消息、
+  操作人审计和过期版本冲突；真实 Docker 缺镜像拉取测试 1/1 通过；`bun run test` 9/9、
+  `bun run typecheck`、`bun run generate` 通过。OpenAPI 确认
+  `expectedProcessingVersion` 为必填 int64 且最小值为 0；EF pending-model-changes 检查无漂移，
+  `git diff --check` 通过。
+- 本轮未修改数据模型、数据表或 migration。只创建本地提交，未 push、未部署；生产仍运行
+  `0.1.0-alpha.1`，等待新的明确授权。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
