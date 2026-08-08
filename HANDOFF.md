@@ -6,7 +6,7 @@
 - API、测试项目当前均可编译；EF model snapshot 与当前模型无 pending changes（2026-08-08 再次验证）。
 - OpenAPI 已重新导出，Nuxt 生成客户端已更新。
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
-- Owner 明确本次提交不以完整测试通过为门槛；最后一次运行结果为 603 通过、120 跳过、6 失败，失败数与导入基线一致，包含旧 OpenAPI 路由计数/清单断言及本机 Docker 不可用。Build 与 EF drift 检查通过。
+- Owner 明确本次提交不以完整测试通过为门槛；最后一次运行结果为 603 通过、140 跳过、6 失败，失败数与导入基线一致，包含旧 OpenAPI 路由计数/清单断言、Development Host DI、旧架构断言及本机 Docker 不可用。Build 与 EF drift 检查通过。
 
 ## 2026-08-08 续推记录
 
@@ -20,8 +20,9 @@
 - `f840f7de`：恢复 DataExport 与 PatchUpload replacement 共 4 个文件生命周期场景，排除文件由 9 个降至 7 个；测试改用统一 `StoredFile/FileId`、不可变比赛事件与管理员生命周期 Notification。数据导出的作弊处置查询不再让 EF 翻译 `[NotMapped] ScoringEventId`，改为直接查询强类型 Subject/Related 引用。
 - `477c3b85`：恢复 AWD checker、AWDP fix result 与 KoH polling 共 11 个异步计分场景，排除文件由 7 个降至 4 个；AWD checker 测试改为当前无调度业务表的 `DispatchAwdCheckers(At, cursor)`，AWDP Patch 使用统一 File 引用，KoH 生命周期并发断言改读不可变 `competition_events` 及其 `from/to` payload。
 - `1e60c640`：恢复 CompetitionChallenge lifecycle revision 与 Competition notification delivery 共 4 个场景，排除文件由 4 个降至 2 个；Hint 断言改读所属 CompetitionChallenge 的 JSON 集合，通知测试改为动态受众。投递器将稳定 `sourceEventKey` 写入 Content JSON 并在写入前按目标、类型、比赛和内容查重，确保 Wolverine 重放不会重复投递。
+- `bd5e2cc3`：恢复 Wolverine transactional outbox 与 Runner assignment reconciliation 最后 2 个测试文件；维护测试改为当前无业务调度表的幂等 Tick 语义，Runner 对账改用当前时间/游标契约并验证显式重试消息。`NoCTF.Tests.csproj` 已无任何 `Compile Remove` 测试排除。
 - 新增协议枚举 `NotificationKind.UserAccountLifecycleChanged`；OpenAPI 与 Nuxt SDK 已同步。没有新增数据表或 migration。
-- 本轮验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；EF 无 pending model changes；OpenAPI 导出、Nuxt typecheck 与 production build 通过；全量测试 729 项，603 通过、120 跳过、6 个基线失败。恢复的 PostgreSQL 集成场景已进入测试集，但本机 Docker 不可用时按测试设施策略跳过。
+- 本轮验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；EF 无 pending model changes；OpenAPI 导出、Nuxt typecheck 与 production build 通过；全量测试 749 项，603 通过、140 跳过、6 个基线失败。所有导入的旧集成场景均已进入测试集，但本机 Docker 不可用时按测试设施策略跳过。
 - 未推送、未部署；原工作区 `TODO.md`、`PLAN.md` 及其他用户/协作者未提交内容保持不动。
 
 ## 已落地的主要能力
@@ -48,7 +49,7 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 
 ## 后续必须继续处理
 
-1. `NoCTF.Tests.csproj` 暂时排除了明确绑定旧表/旧协议的 2 个集成测试文件：Wolverine transactional outbox 与 Runner assignment reconciliation。已经恢复其余测试编译并新增 17 表 PostgreSQL Testcontainers 验收，但仍需把最后两项改写到 Wolverine 自有持久化与 RuntimeInstance/Runner Redis 资源模型后移除排除配置。
+1. 所有原先绑定旧表/旧协议的测试文件均已恢复，`NoCTF.Tests.csproj` 不再排除源码。当前机器 Docker 不可用，因此 140 个 Testcontainers 场景按设施策略跳过；生产 CI 仍需在真实 PostgreSQL、Redis 与 Docker 可用的环境完整执行。
 2. File 上传流程已有不可变 File 与 `CleanupFile(FileId)`，但 ChallengeAttachment、PatchUpload 等旧用例仍有“先上传对象、再创建 File 行”的路径；需统一到计划中的临时文件 → File 行 → 最终对象 → 建立引用补偿流程。
 3. HintUnlock 与 ManualAdjust 已共享 Team/Competition advisory lock，但 HintUnlock 的 authoritative score 仍应进一步统一复用四种模式的正式排行榜投影，并补并发/rejudge Testcontainers 测试。
 4. Maintenance `SingularAgent` 使用 Wolverine 6.21 的 `AddSingularAgent<T>()`（该版本没有计划文本中的 `EnableNodeAgentSupport()` 扩展）；仍需补多 Worker 故障转移与 500 条续页测试。
