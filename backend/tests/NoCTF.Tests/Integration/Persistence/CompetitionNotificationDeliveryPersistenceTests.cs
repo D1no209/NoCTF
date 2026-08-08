@@ -37,7 +37,8 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
                 .Options;
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.FromUnixTimeMilliseconds(
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             var competitionId = Guid.CreateVersion7();
             var administratorId = Guid.CreateVersion7();
             var ownerId = Guid.CreateVersion7();
@@ -122,7 +123,8 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
                 .Options;
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.FromUnixTimeMilliseconds(
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             var competitionId = Guid.CreateVersion7();
             var ownerId = Guid.CreateVersion7();
             var managerAndMemberId = Guid.CreateVersion7();
@@ -298,7 +300,8 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
                 .Options;
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.FromUnixTimeMilliseconds(
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             var competitionId = Guid.CreateVersion7();
             var ownerId = Guid.CreateVersion7();
             var memberId = Guid.CreateVersion7();

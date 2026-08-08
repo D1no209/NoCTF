@@ -45,6 +45,7 @@ public sealed class DataModelSchemaTests
 
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
                 .Options;
             await using (var db = new NoCtfDbContext(options))
                 await db.Database.MigrateAsync(ct);
@@ -52,7 +53,7 @@ public sealed class DataModelSchemaTests
             await using var connection = new NpgsqlConnection(postgres.GetConnectionString());
             await connection.OpenAsync(ct);
             await using var command = new NpgsqlCommand(
-                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT LIKE '__%' ORDER BY tablename",
+                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND left(tablename, 2) <> '__' ORDER BY tablename",
                 connection);
             var actual = new List<string>();
             await using (var reader = await command.ExecuteReaderAsync(ct))

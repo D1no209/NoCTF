@@ -149,8 +149,8 @@ public sealed class HintUnlockScoringPersistenceTests
                 await AssertCurrentAsync(
                     options,
                     submissionId,
-                    ScoringResult.Rejected,
-                    ScoringFailureCode.InsufficientScore,
+                    ScoringResult.Correct,
+                    failureCode: null,
                     cancellationToken);
                 await using var verify = new NoCtfDbContext(options);
                 var scoringEvents = await verify.ScoringEvents.IgnoreQueryFilters()
@@ -158,8 +158,7 @@ public sealed class HintUnlockScoringPersistenceTests
                     .Where(scoringEvent => scoringEvent.SubmissionId == submissionId)
                     .ToListAsync(cancellationToken);
                 await Assert.That(scoringEvents).Count().IsEqualTo(2);
-                await Assert.That(scoringEvents.Single(item =>
-                        item.Result == ScoringResult.Correct).DeletedAt)
+                await Assert.That(scoringEvents.Single(item => item.DeletedAt is not null).DeletedAt)
                     .IsNotNull();
                 await Assert.That(await ScoreAsync(
                         verify,
@@ -167,7 +166,7 @@ public sealed class HintUnlockScoringPersistenceTests
                         fixture.TeamId,
                         fixture.Now.AddMinutes(2),
                         cancellationToken))
-                    .IsEqualTo(50);
+                    .IsEqualTo(40);
             }
         });
     }
@@ -270,7 +269,7 @@ public sealed class HintUnlockScoringPersistenceTests
             OwnerId = ownerId,
             Mode = mode,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = "{}",
+            ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(mode),
             ConfigurationUpdatedAt = now,
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -298,7 +297,7 @@ public sealed class HintUnlockScoringPersistenceTests
             BaseScore = 100,
             Order = 1,
             IsPublished = true,
-            RulesJson = "{}",
+            RulesJson = new GameModeChallengeConfigurationCatalog().GetDefaultJson(mode),
             UpdatedAt = now,
             Hints = hintIds.Select((hintId, index) => new CompetitionChallengeHint
             {

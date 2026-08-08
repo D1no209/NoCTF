@@ -83,6 +83,7 @@ public sealed class ChallengeAttachmentPersistenceTests
             await Assert.That(added).IsEqualTo(AddChallengeAttachmentState.Added);
             db.ChangeTracker.Clear();
             var attachment = await db.Set<ChallengeAttachment>()
+                .Include(item => item.File)
                 .SingleAsync(item => item.Id == attachmentId, cancellationToken);
             await Assert.That(attachment.ChallengeId).IsEqualTo(challengeId);
             await Assert.That(attachment.Length).IsEqualTo(7);

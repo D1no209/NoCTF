@@ -76,7 +76,10 @@ public sealed class CheatIncidentPersistenceTests
             await Assert.That(detail!.SubmittedFlag).IsEqualTo(fixture.Flags[0]);
             var accessAudit = await db.CompetitionEvents.AsNoTracking()
                 .SingleAsync(item =>
-                    item.ScoringEventId == fixture.ScoringEventIds[0]
+                    (item.SubjectType == EntityReferenceKind.ScoringEvent
+                        && item.SubjectId == fixture.ScoringEventIds[0]
+                        || item.RelatedType == EntityReferenceKind.ScoringEvent
+                        && item.RelatedId == fixture.ScoringEventIds[0])
                     && item.Kind == CompetitionEventKind.ProtectedSubmissionFlagAccessed,
                     cancellationToken);
             await Assert.That(accessAudit.Reason).DoesNotContain(fixture.Flags[0]);
@@ -90,7 +93,10 @@ public sealed class CheatIncidentPersistenceTests
             await Assert.That(dismissed.Succeeded).IsTrue();
             var dismissal = await db.CompetitionEvents.AsNoTracking()
                 .SingleAsync(item =>
-                    item.ScoringEventId == fixture.ScoringEventIds[0]
+                    (item.SubjectType == EntityReferenceKind.ScoringEvent
+                        && item.SubjectId == fixture.ScoringEventIds[0]
+                        || item.RelatedType == EntityReferenceKind.ScoringEvent
+                        && item.RelatedId == fixture.ScoringEventIds[0])
                     && item.Kind == CompetitionEventKind.CheatIncidentDismissed,
                     cancellationToken);
             await Assert.That(dismissal.Reason).DoesNotContain(fixture.Flags[0]);

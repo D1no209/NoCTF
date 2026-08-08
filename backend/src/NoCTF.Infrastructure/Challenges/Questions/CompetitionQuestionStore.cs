@@ -120,6 +120,19 @@ public sealed class CompetitionQuestionStore(
             RelatedId = command.CompetitionId
         };
         db.Notifications.Add(notification);
+        await outbox.PublishAsync(new DeliverCompetitionQuestionNotification(
+            command.CompetitionId,
+            notification.Id,
+            null,
+            await ResolveHandlerRecipientIdsAsync(
+                command.CompetitionId,
+                command.CompetitionChallengeId,
+                ct),
+            NotificationKind.QuestionOpened,
+            CompetitionQuestionNotificationEvent.Opened,
+            root.Title,
+            command.Now,
+            0));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -224,6 +237,23 @@ public sealed class CompetitionQuestionStore(
             JsonSerializer.Serialize(payload, JsonOptions),
             command.Now);
         db.Notifications.Add(node);
+        await outbox.PublishAsync(new DeliverCompetitionQuestionNotification(
+            command.CompetitionId,
+            aggregate.RootNotification.Id,
+            node.Id,
+            actorRole == CompetitionQuestionParticipantRole.Asker
+                ? await ResolveHandlerRecipientIdsAsync(
+                    command.CompetitionId,
+                    aggregate.Root.CompetitionChallengeId,
+                    ct)
+                : [aggregate.RootNotification.SourceId!.Value],
+            NotificationKind.Message,
+            actorRole == CompetitionQuestionParticipantRole.Asker
+                ? CompetitionQuestionNotificationEvent.AskerFollowedUp
+                : CompetitionQuestionNotificationEvent.HandlerReplied,
+            aggregate.Root.Title,
+            command.Now,
+            aggregate.Revision + 1));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -266,6 +296,21 @@ public sealed class CompetitionQuestionStore(
             JsonSerializer.Serialize(payload, JsonOptions),
             command.Now);
         db.Notifications.Add(node);
+        await outbox.PublishAsync(new DeliverCompetitionQuestionNotification(
+            command.CompetitionId,
+            aggregate.RootNotification.Id,
+            node.Id,
+            role == CompetitionQuestionParticipantRole.Asker
+                ? await ResolveHandlerRecipientIdsAsync(
+                    command.CompetitionId,
+                    aggregate.Root.CompetitionChallengeId,
+                    ct)
+                : [aggregate.RootNotification.SourceId!.Value],
+            NotificationKind.QuestionStatusChanged,
+            CompetitionQuestionNotificationEvent.StatusChanged,
+            aggregate.Root.Title,
+            command.Now,
+            aggregate.Revision + 1));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -277,6 +322,63 @@ public sealed class CompetitionQuestionStore(
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({questionId.ToString()}, 0))",
             ct);
+
+    private async Task<Guid[]> ResolveHandlerRecipientIdsAsync(
+        Guid competitionId,
+        Guid? competitionChallengeId,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(candidate => candidate.Id == competitionId)
+            .Select(candidate => new
+            {
+                candidate.OwnerId,
+                candidate.ManagerIds,
+                candidate.JudgeIds
+            })
+            .SingleAsync(ct);
+        var candidateIds = competition.ManagerIds
+            .Concat(competition.JudgeIds)
+            .Append(competition.OwnerId)
+            .ToList();
+        if (competitionChallengeId is Guid bindingId)
+        {
+            var challenge = await db.CompetitionChallenges.AsNoTracking()
+                .Where(binding => binding.Id == bindingId
+                    && binding.CompetitionId == competitionId)
+                .Join(
+                    db.Challenges.AsNoTracking(),
+                    binding => binding.ChallengeId,
+                    challenge => challenge.Id,
+                    (_, challenge) => new
+                    {
+                        challenge.OwnerId,
+                        challenge.ManagerIds
+                    })
+                .SingleOrDefaultAsync(ct);
+            if (challenge is not null)
+            {
+                candidateIds.Add(challenge.OwnerId);
+                candidateIds.AddRange(challenge.ManagerIds);
+            }
+        }
+
+        var administratorIds = await db.Users.AsNoTracking()
+            .Where(user => user.Role == UserRole.Administrator
+                && user.Kind == UserKind.Human
+                && user.AccountStatus == UserAccountStatus.Active)
+            .Select(user => user.Id)
+            .ToArrayAsync(ct);
+        candidateIds.AddRange(administratorIds);
+        var distinctIds = candidateIds.Distinct().ToArray();
+        return await db.Users.AsNoTracking()
+            .Where(user => distinctIds.Contains(user.Id)
+                && user.Kind == UserKind.Human
+                && user.AccountStatus == UserAccountStatus.Active)
+            .OrderBy(user => user.Id)
+            .Select(user => user.Id)
+            .ToArrayAsync(ct);
+    }
 
     private static Notification AppendNode(
         QuestionAggregate aggregate,
@@ -418,7 +520,19 @@ public sealed class CompetitionQuestionStore(
             .Select(team => team.Name)
             .SingleOrDefaultAsync(ct);
         var entries = includeEntries
-            ? question.Nodes.Select(node => MapEntry(node, names)).ToArray()
+            ? question.Nodes.Select(node => MapEntry(node, names))
+                .Prepend(new CompetitionQuestionEntryView(
+                    question.RootNotification.Id,
+                    CompetitionQuestionEntryKind.StatusTransition,
+                    CompetitionQuestionParticipantRole.Asker,
+                    askerId,
+                    names.GetValueOrDefault(askerId, "已删除用户"),
+                    null,
+                    null,
+                    question.Root.Status,
+                    null,
+                    question.RootNotification.SentAt))
+                .ToArray()
             : [];
         return new(
             question.RootNotification.Id,

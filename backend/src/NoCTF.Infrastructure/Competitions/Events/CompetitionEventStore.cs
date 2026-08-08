@@ -58,6 +58,14 @@ public sealed class CompetitionEventStore(
                 questionStatus = draft.QuestionStatus,
                 runtimeGeneration = draft.RuntimeGeneration,
                 hostPort = draft.HostPort,
+                relatedUserId = draft.RelatedUserId,
+                teamId = draft.TeamId,
+                competitionChallengeId = draft.CompetitionChallengeId,
+                hintId = draft.HintId,
+                runtimeInstanceId = draft.RuntimeInstanceId,
+                submissionId = draft.SubmissionId,
+                scoringEventId = draft.ScoringEventId,
+                questionId = draft.QuestionId,
                 reason = SanitizeReason(draft.Reason)
             }, ExportJsonOptions),
             OccurredAt = draft.OccurredAt

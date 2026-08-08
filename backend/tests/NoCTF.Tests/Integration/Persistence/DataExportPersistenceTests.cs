@@ -660,7 +660,7 @@ public sealed class DataExportPersistenceTests
             SourceType = NotificationSourceType.User,
             SourceId = ids.AdministratorId,
             TargetType = NotificationTargetType.PlatformAdministrators,
-            TargetId = Guid.Empty,
+            TargetId = Notification.PlatformAdministratorsTargetId,
             Kind = NotificationKind.UserAccountLifecycleChanged,
             ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
                 1,

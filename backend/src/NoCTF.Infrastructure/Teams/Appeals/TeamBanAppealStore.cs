@@ -3,6 +3,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Appeals;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 
@@ -61,7 +62,8 @@ public sealed class TeamBanAppealStore(
                 @event.CompetitionId == competitionId
                 && @event.Kind == CompetitionEventKind.TeamBanAppealSubmitted
                 && @event.ParentEventId != null
-                && @event.TeamId != null)
+                && (@event.SubjectType == EntityReferenceKind.Team
+                    || @event.RelatedType == EntityReferenceKind.Team))
             .OrderByDescending(@event => @event.OccurredAt)
             .ThenByDescending(@event => @event.Id)
             .ToArrayAsync(cancellationToken);
@@ -215,7 +217,10 @@ public sealed class TeamBanAppealStore(
                 @event.Id == appeal.ParentEventId.Value
                 && @event.CompetitionId == command.CompetitionId
                 && @event.Kind == CompetitionEventKind.TeamBanned
-                && @event.TeamId == appeal.TeamId,
+                && (@event.SubjectType == EntityReferenceKind.Team
+                    && @event.SubjectId == appeal.TeamId
+                    || @event.RelatedType == EntityReferenceKind.Team
+                    && @event.RelatedId == appeal.TeamId),
             cancellationToken);
         if (ban is null)
             return new(Failure: TeamBanAppealFailure.BanNotFound);
@@ -385,7 +390,10 @@ public sealed class TeamBanAppealStore(
         db.CompetitionEvents.AsNoTracking()
             .Where(@event =>
                 @event.CompetitionId == competitionId
-                && @event.TeamId == teamId
+                && (@event.SubjectType == EntityReferenceKind.Team
+                    && @event.SubjectId == teamId
+                    || @event.RelatedType == EntityReferenceKind.Team
+                    && @event.RelatedId == teamId)
                 && @event.Kind == CompetitionEventKind.TeamBanned)
             .OrderByDescending(@event => @event.OccurredAt)
             .ThenByDescending(@event => @event.Id)
@@ -469,12 +477,21 @@ public sealed class TeamBanAppealStore(
         var bans = await db.CompetitionEvents.AsNoTracking()
             .Where(@event =>
                 @event.CompetitionId == competitionId
-                && @event.TeamId != null
-                && teamIds.Contains(@event.TeamId.Value)
+                && (@event.SubjectType == EntityReferenceKind.Team
+                    && teamIds.Contains(@event.SubjectId)
+                    || @event.RelatedType == EntityReferenceKind.Team
+                    && @event.RelatedId != null
+                    && teamIds.Contains(@event.RelatedId.Value))
                 && @event.Kind == CompetitionEventKind.TeamBanned)
             .OrderByDescending(@event => @event.OccurredAt)
             .ThenByDescending(@event => @event.Id)
-            .Select(@event => new { TeamId = @event.TeamId!.Value, @event.Id })
+            .Select(@event => new
+            {
+                TeamId = @event.SubjectType == EntityReferenceKind.Team
+                    ? @event.SubjectId
+                    : @event.RelatedId!.Value,
+                @event.Id
+            })
             .ToArrayAsync(cancellationToken);
         return bans
             .GroupBy(ban => ban.TeamId)

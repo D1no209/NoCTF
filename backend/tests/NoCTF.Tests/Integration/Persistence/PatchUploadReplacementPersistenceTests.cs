@@ -300,6 +300,8 @@ public sealed class PatchUploadReplacementPersistenceTests
                 .UseSnakeCaseNamingConvention());
         builder.Services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
         builder.Services.AddScoped<IPatchUploadStore, PatchUploadStore>();
+        builder.Services.AddScoped<IManagedFileUploadRegistry, ManagedFileUploadRegistry>();
+        builder.Services.AddScoped<ManagedFileUploads>();
         builder.Services.AddScoped<CreatePatchUpload>();
         builder.Services.AddSingleton<IObjectStorage, LocalObjectStorage>();
         builder.UseWolverine(options =>

@@ -18,6 +18,7 @@ using NoCTF.GameModes.Registration;
 using NoCTF.GameModes.Submission;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 using NoCTF.Worker;
 using NSubstitute;
 using Testcontainers.PostgreSql;
@@ -88,7 +89,10 @@ public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
 
             var detectionAudit = await verify.CompetitionEvents.AsNoTracking()
                 .SingleAsync(item =>
-                    item.ScoringEventId == scoringEvent.Id
+                    (item.SubjectType == EntityReferenceKind.ScoringEvent
+                        && item.SubjectId == scoringEvent.Id
+                        || item.RelatedType == EntityReferenceKind.ScoringEvent
+                        && item.RelatedId == scoringEvent.Id)
                     && item.Kind == CompetitionEventKind.CheatIncidentDetected,
                     cancellationToken);
             await Assert.That(detectionAudit.SubmissionId).IsEqualTo(fixture.SubmissionIds[0]);
@@ -130,7 +134,10 @@ public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
             await Assert.That(scoringEvents[1].Result).IsEqualTo(ScoringResult.Wrong);
             var superseded = await verify.CompetitionEvents.AsNoTracking()
                 .SingleAsync(item =>
-                    item.ScoringEventId == scoringEvent.Id
+                    (item.SubjectType == EntityReferenceKind.ScoringEvent
+                        && item.SubjectId == scoringEvent.Id
+                        || item.RelatedType == EntityReferenceKind.ScoringEvent
+                        && item.RelatedId == scoringEvent.Id)
                     && item.Kind == CompetitionEventKind.CheatIncidentSuperseded,
                     cancellationToken);
             await Assert.That(superseded.Reason)

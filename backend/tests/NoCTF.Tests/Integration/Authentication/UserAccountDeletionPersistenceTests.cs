@@ -53,7 +53,7 @@ public sealed class UserAccountDeletionPersistenceTests
                     SourceType = NotificationSourceType.System,
                     SourceId = null,
                     TargetType = NotificationTargetType.PlatformAdministrators,
-                    TargetId = Guid.Empty,
+                    TargetId = Notification.PlatformAdministratorsTargetId,
                     Kind = NotificationKind.Message,
                     ContentJson = "{\"schemaVersion\":1}",
                     RelatedType = EntityReferenceKind.User,

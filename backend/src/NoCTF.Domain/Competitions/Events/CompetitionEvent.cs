@@ -82,44 +82,61 @@ public sealed class CompetitionEvent
     public string PayloadJson { get; set; } = "{\"schemaVersion\":1}";
     public DateTimeOffset OccurredAt { get; set; }
 
-    [NotMapped] public Guid? RelatedUserId => Reference(EntityReferenceKind.User);
-    [NotMapped] public Guid? TeamId => Reference(EntityReferenceKind.Team);
-    [NotMapped] public Guid? CompetitionChallengeId => Reference(EntityReferenceKind.CompetitionChallenge);
-    [NotMapped] public Guid? HintId => Reference(EntityReferenceKind.ChallengeHint);
-    [NotMapped] public Guid? RuntimeInstanceId => Reference(EntityReferenceKind.RuntimeInstance);
-    [NotMapped] public Guid? SubmissionId => Reference(EntityReferenceKind.Submission);
-    [NotMapped] public Guid? ScoringEventId => Reference(EntityReferenceKind.ScoringEvent);
-    [NotMapped] public Guid? QuestionId => Reference(EntityReferenceKind.Notification);
-    [NotMapped] public CompetitionStatus? CompetitionStatus => Payload<CompetitionStatus>("competitionStatus");
-    [NotMapped] public CompetitionLeaderboardVisibility? LeaderboardVisibility => Payload<CompetitionLeaderboardVisibility>("leaderboardVisibility");
-    [NotMapped] public NoCTF.Domain.Teams.TeamRegistrationStatus? TeamRegistrationStatus => Payload<NoCTF.Domain.Teams.TeamRegistrationStatus>("teamRegistrationStatus");
-    [NotMapped] public NoCTF.Domain.Submissions.SubmissionKind? SubmissionKind => Payload<NoCTF.Domain.Submissions.SubmissionKind>("submissionKind");
-    [NotMapped] public NoCTF.Domain.Submissions.SubmissionEvaluationState? SubmissionState => Payload<NoCTF.Domain.Submissions.SubmissionEvaluationState>("submissionState");
-    [NotMapped] public NoCTF.Domain.Submissions.ScoringEventKind? ScoringEventKind => Payload<NoCTF.Domain.Submissions.ScoringEventKind>("scoringEventKind");
-    [NotMapped] public NoCTF.Domain.Submissions.ScoringResult? ScoringResult => Payload<NoCTF.Domain.Submissions.ScoringResult>("scoringResult");
-    [NotMapped] public NoCTF.Domain.Runtime.RuntimeState? RuntimeState => Payload<NoCTF.Domain.Runtime.RuntimeState>("runtimeState");
-    [NotMapped] public NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus? QuestionStatus => Payload<NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus>("questionStatus");
-    [NotMapped] public int? RuntimeGeneration => Payload<int>("runtimeGeneration");
-    [NotMapped] public int? HostPort => Payload<int>("hostPort");
-    [NotMapped] public string? Reason => Payload<string>("reason");
+    [NotMapped] public Guid? RelatedUserId => Reference(EntityReferenceKind.User) ?? PayloadValue<Guid>("relatedUserId");
+    [NotMapped] public Guid? TeamId => Reference(EntityReferenceKind.Team) ?? PayloadValue<Guid>("teamId");
+    [NotMapped] public Guid? CompetitionChallengeId => Reference(EntityReferenceKind.CompetitionChallenge) ?? PayloadValue<Guid>("competitionChallengeId");
+    [NotMapped] public Guid? HintId => Reference(EntityReferenceKind.ChallengeHint) ?? PayloadValue<Guid>("hintId");
+    [NotMapped] public Guid? RuntimeInstanceId => Reference(EntityReferenceKind.RuntimeInstance) ?? PayloadValue<Guid>("runtimeInstanceId");
+    [NotMapped] public Guid? SubmissionId => Reference(EntityReferenceKind.Submission) ?? PayloadValue<Guid>("submissionId");
+    [NotMapped] public Guid? ScoringEventId => Reference(EntityReferenceKind.ScoringEvent) ?? PayloadValue<Guid>("scoringEventId");
+    [NotMapped] public Guid? QuestionId => Reference(EntityReferenceKind.Notification) ?? PayloadValue<Guid>("questionId");
+    [NotMapped] public CompetitionStatus? CompetitionStatus => PayloadValue<CompetitionStatus>("competitionStatus");
+    [NotMapped] public CompetitionLeaderboardVisibility? LeaderboardVisibility => PayloadValue<CompetitionLeaderboardVisibility>("leaderboardVisibility");
+    [NotMapped] public NoCTF.Domain.Teams.TeamRegistrationStatus? TeamRegistrationStatus => PayloadValue<NoCTF.Domain.Teams.TeamRegistrationStatus>("teamRegistrationStatus");
+    [NotMapped] public NoCTF.Domain.Submissions.SubmissionKind? SubmissionKind => PayloadValue<NoCTF.Domain.Submissions.SubmissionKind>("submissionKind");
+    [NotMapped] public NoCTF.Domain.Submissions.SubmissionEvaluationState? SubmissionState => PayloadValue<NoCTF.Domain.Submissions.SubmissionEvaluationState>("submissionState");
+    [NotMapped] public NoCTF.Domain.Submissions.ScoringEventKind? ScoringEventKind => PayloadValue<NoCTF.Domain.Submissions.ScoringEventKind>("scoringEventKind");
+    [NotMapped] public NoCTF.Domain.Submissions.ScoringResult? ScoringResult => PayloadValue<NoCTF.Domain.Submissions.ScoringResult>("scoringResult");
+    [NotMapped] public NoCTF.Domain.Runtime.RuntimeState? RuntimeState => PayloadValue<NoCTF.Domain.Runtime.RuntimeState>("runtimeState");
+    [NotMapped] public NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus? QuestionStatus => PayloadValue<NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus>("questionStatus");
+    [NotMapped] public int? RuntimeGeneration => PayloadValue<int>("runtimeGeneration");
+    [NotMapped] public int? HostPort => PayloadValue<int>("hostPort");
+    [NotMapped] public string? Reason => PayloadText("reason");
 
     private Guid? Reference(EntityReferenceKind kind) =>
         SubjectType == kind ? SubjectId : RelatedType == kind ? RelatedId : null;
 
-    private T? Payload<T>(string propertyName)
+    private T? PayloadValue<T>(string propertyName) where T : struct
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(PayloadJson);
+            if (!document.RootElement.TryGetProperty(propertyName, out var value)
+                || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+                return null;
+
+            return value.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } });
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private string? PayloadText(string propertyName)
     {
         try
         {
             using var document = JsonDocument.Parse(PayloadJson);
             return document.RootElement.TryGetProperty(propertyName, out var value)
-                && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)
-                ? value.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)
-                    { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } })
-                : default;
+                && value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
         }
         catch (JsonException)
         {
-            return default;
+            return null;
         }
     }
 }
