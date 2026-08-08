@@ -6,7 +6,7 @@
 - API、测试项目当前均可编译；EF model snapshot 与当前模型无 pending changes（2026-08-08 再次验证）。
 - OpenAPI 已重新导出，Nuxt 生成客户端已更新。
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
-- 当前完整测试基线已清零：最后一次运行结果为 608 通过、141 跳过、0 失败；跳过项来自本机 Docker 不可用及未启用的 Kubernetes/Libvirt 外部集成。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
+- 当前完整测试基线已清零：最后一次运行结果为 608 通过、143 跳过、0 失败；跳过项来自本机 Docker 不可用及未启用的 Kubernetes/Libvirt 外部集成。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
 ## 2026-08-08 续推记录
 
@@ -25,8 +25,9 @@
 - `361cb4f0`：将架构验证对齐 17 表收敛模型。参数化 PostgreSQL advisory lock、行锁与递归 CTE 仅允许在 4 个明确责任文件中出现，继续禁止 Raw SQL；JSON owned Hint 验证级联所有权，File FK 保持 Restrict；同步 189 条 API/122 条管理 API 清单、管理端 operationId/描述、OpenAPI 与 Nuxt SDK。
 - `0a699031`：DataExport 过期和清除不再先行删除对象与 `files` 记录；处理器在同一数据库事务中解除 DataExport 引用并投递 `CleanupFile(FileId)`，提交后由统一文件生命周期处理器检查全局引用并完成对象/元数据清理。持久化测试覆盖 Expire/Purge 在消息处理前保留对象、消息处理后删除对象的边界。
 - `0d93b70a`：补充统一 File 清理的 PostgreSQL 验收测试；同一 File 同时被用户头像和平台 Logo 引用时，`CleanupFile` 在任一引用存在期间均保持对象与元数据，首次对象存储删除失败后保留 File 供 Wolverine 重试，解除全部引用后的重试完成对象与行删除，重复消息保持幂等。
+- `5aeddb4b`：修复 Notification 线程历史参与者权限；任意本人发送的节点会递归追溯到根，再向下展开后续回复，因此被移出比赛协作者的既有处理人仍可读取其参与过的完整私密线程。PostgreSQL 测试同时覆盖协作者/参赛队成员动态变化、分页途中追加回复、增量 feed 及不重不漏边界。
 - 新增协议枚举 `NotificationKind.UserAccountLifecycleChanged`；OpenAPI 与 Nuxt SDK 已同步。没有新增数据表或 migration。
-- 本轮验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；EF 无 pending model changes；OpenAPI 导出、Nuxt typecheck 与 production build 通过；全量测试 750 项，608 通过、142 跳过、0 失败。所有导入的旧集成场景均已进入测试集，但本机 Docker 不可用时按测试设施策略跳过。
+- 本轮验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；EF 无 pending model changes；OpenAPI 导出、Nuxt typecheck 与 production build 通过；全量测试 751 项，608 通过、143 跳过、0 失败。所有导入的旧集成场景均已进入测试集，但本机 Docker 不可用时按测试设施策略跳过。
 - 未推送、未部署；原工作区 `TODO.md`、`PLAN.md` 及其他用户/协作者未提交内容保持不动。
 
 ## 已落地的主要能力
@@ -53,11 +54,10 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 
 ## 后续必须继续处理
 
-1. 所有原先绑定旧表/旧协议的测试文件均已恢复，`NoCTF.Tests.csproj` 不再排除源码。当前机器 Docker 不可用，因此 140 个 Testcontainers 场景按设施策略跳过；生产 CI 仍需在真实 PostgreSQL、Redis 与 Docker 可用的环境完整执行。
+1. 所有原先绑定旧表/旧协议的测试文件均已恢复，`NoCTF.Tests.csproj` 不再排除源码。当前机器 Docker 不可用，相关 Testcontainers 场景按设施策略跳过；生产 CI 仍需在真实 PostgreSQL、Redis 与 Docker 可用的环境完整执行。
 2. File 上传流程已有不可变 File 与 `CleanupFile(FileId)`，但 ChallengeAttachment、PatchUpload 等旧用例仍有“先上传对象、再创建 File 行”的路径；需统一到计划中的临时文件 → File 行 → 最终对象 → 建立引用补偿流程。
 3. HintUnlock 与 ManualAdjust 已共享 Team/Competition advisory lock，但 HintUnlock 的 authoritative score 仍应进一步统一复用四种模式的正式排行榜投影，并补并发/rejudge Testcontainers 测试。
 4. Maintenance `SingularAgent` 使用 Wolverine 6.21 的 `AddSingularAgent<T>()`（该版本没有计划文本中的 `EnableNodeAgentSupport()` 扩展）；仍需补多 Worker 故障转移与 500 条续页测试。
-5. DataExport 过期/清除、File 共享引用和失败重试均已覆盖；仍需补 Notification 动态受众/递归分页的完整并发测试。
 
 ## 工作区保护
 
