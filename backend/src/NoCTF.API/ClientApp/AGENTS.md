@@ -24,9 +24,12 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - API 调用一律走 `app/api` SDK:`const { data, error } = await xxxEndpoint({ path, query, body })`;错误统一 `parseApiError(error)` 取 message,toast 用 vue-sonner 的 `toast()`。空响应体的错误(如登录 401)由 `plugins/api.client.ts` 的 error 拦截器按状态码合成文案,登录页 401 显示「用户名或密码错误」。
 - 模式专属配置 JSON(题目模板 definitionJson、竞赛模式配置、题目规则 rulesJson)一律用结构化编辑器组件,禁止暴露原始 JSON textarea:`DefinitionEditor`(题目定义,按模式分 CTF/AWD/AWDP/KoH 区块)、`CompetitionModeConfigEditor`(竞赛配置)、`ChallengeRulesEditor`(题目规则,字段可「覆盖/继承竞赛默认」)。解析/序列化与 schemaVersion、枚举整数编码全部走 `utils/game-config.ts`;字段或结构变化时先改该文件。
 - 分页一律签名 keyset cursor +「加载更多」(useCursorPagination),不要页码;改筛选必须 `reset()`。
-- 异步操作(提交/runtime/重判等)返回 202 时用 usePolling 轮询 statusUrl;SignalR 推送只做失效重取,REST 为事实源。
+- 异步操作(提交/runtime/重判等)返回 202 时用 usePolling 轮询 statusUrl;SignalR 推送只做失效重取,REST 为事实源。开发环境下两个 Hub 强制走 SSE/长轮询(`import.meta.dev` 分支):Vite ws 代理转发 SignalR WebSocket 会被重置并引发 Nuxt 崩溃重启循环,生产直连后端不受影响。
 - 管理端写操作带 expectedRevision 乐观锁,409 提示刷新后重取。
 - shadcn 规则:表单 FieldGroup+Field;Dialog/Sheet 必带 Title;语义色类(禁原始色值);gap-* 不用 space-*;size-*;条件类 `cn()`;空态 Empty、提示 Alert、骨架 Skeleton、状态 Badge;按钮加载态 Spinner+data-icon+disabled;图标用 `@lucide/vue`。
 - 开发环境会话恢复依赖后端 `appsettings.Development.json` 的 `Authentication:RefreshAllowedOrigins` 包含前端源(已配 127.0.0.1/localhost:3000-3001);新增端口要同步加。
+- 组件 style preset 为 `reka-vega`(components.json),正文 Inter;新增/更新组件统一 `bunx --bun shadcn-vue@latest add <name>`,apply/init preset 会重写 `main.css` 配色变量,之后需回合下方品牌色定制。
+- 主题默认深色,切换走 `useTheme()`(vueuse `vueuse-color-scheme` 持久化,nuxt.config head 脚本防首帧闪烁);品牌蓝(#2563eb)token 与浅/深两套配色在 `assets/css/main.css`,背景刻意带蓝色调、不做纯白。
+- 题目方向(Web/Pwn/Crypto 等)的图标与颜色一律走 `utils/directions.ts` 映射表(`directionIcon`/`directionTextClass`/`directionBadgeClass`),禁止局部硬编码方向色;分数、排名、时间等数据用 `font-mono`(JetBrains Mono)+ `tabular-nums`。
 - 发布构建由 `NoCTF.API.csproj` 驱动(`bun install --frozen-lockfile` + `bun run generate`),产物在 `.output/public`。
 - 改依赖后提交更新后的 `bun.lock`。

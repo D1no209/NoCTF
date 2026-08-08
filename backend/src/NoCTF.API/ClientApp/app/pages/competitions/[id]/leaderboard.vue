@@ -1,25 +1,17 @@
 <script setup lang="ts">
 import {
-  Binary,
-  Bug,
   ChevronLeft,
   ChevronRight,
   Download,
-  Flag,
-  Globe,
-  KeyRound,
   Medal,
-  Puzzle,
   Trophy,
 } from '@lucide/vue'
 import { getLeaderboardEndpoint } from '~/api'
 import type {
-  NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol,
   NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
-  NoCtfapiEndpointsCompetitionsLeaderboardSlotSummaryResponse,
 } from '~/api'
 import { bloodRankLabel, normalizeChallengeKey } from '~/components/leaderboard/types'
-import type { ChallengeInfo, TrendSeries } from '~/components/leaderboard/types'
+import type { ChallengeInfo, LeaderboardCell, MatrixEntry, TrendSeries } from '~/components/leaderboard/types'
 
 const route = useRoute()
 const competitionId = route.params.id as string
@@ -82,17 +74,18 @@ const directionGroups = computed<DirectionGroup[]>(() => {
 
 const showGroupLabels = ref(true)
 
-// ---- 队伍 × 题目 slot 查询 ----
+// ---- 队伍 × 题目稀疏矩阵 ----
 const slotsByTeam = computed(() => {
-  const map = new Map<string, Map<string, NoCtfapiEndpointsCompetitionsLeaderboardSlotSummaryResponse>>()
-  for (const subject of leaderboard.value?.subjects ?? []) {
-    if (!subject.subjectId) continue
-    const slots = new Map<string, NoCtfapiEndpointsCompetitionsLeaderboardSlotSummaryResponse>()
-    for (const slot of subject.slots ?? []) {
-      const id = slot.slotKey?.split(':')[1]
-      if (id) slots.set(normalizeChallengeKey(id), slot)
+  const map = new Map<string, Map<string, LeaderboardCell>>()
+  for (const entry of (leaderboard.value?.entries ?? []) as MatrixEntry[]) {
+    if (!entry.teamId) continue
+    const cells = new Map<string, LeaderboardCell>()
+    for (const cell of entry.cells ?? []) {
+      if (cell.competitionChallengeId) {
+        cells.set(normalizeChallengeKey(cell.competitionChallengeId), cell)
+      }
     }
-    map.set(subject.subjectId, slots)
+    map.set(entry.teamId, cells)
   }
   return map
 })
@@ -108,40 +101,45 @@ const bloodIconClass: Record<string, string> = {
   Third: 'text-orange-600',
 }
 
-function cellText(slot: NoCtfapiEndpointsCompetitionsLeaderboardSlotSummaryResponse, title: string): string {
+function cellText(slot: LeaderboardCell, title: string): string {
   const parts = [title]
+  if (slot.score !== undefined) parts.push(`${slot.score} 分`)
   if (slot.bloodRank) parts.push(bloodRankLabel[String(slot.bloodRank)] ?? '')
-  if (slot.lastOccurredAt) parts.push(formatDateTime(slot.lastOccurredAt))
+  if (slot.solvedAt) parts.push(formatDateTime(slot.solvedAt))
+  if (slot.solverName) parts.push(slot.solverName)
   return parts.filter(Boolean).join(' · ')
 }
 
-// ---- 分数趋势(TOP10) ----
-const topSeries = computed<TrendSeries[]>(() => {
-  const byTeam = new Map<string, TrendSeries>()
-  for (const series of (leaderboard.value?.series ?? []) as TrendSeries[]) {
-    if (series.teamId) byTeam.set(series.teamId, series)
+// ---- 分数趋势/详情均由矩阵单元在浏览器派生 ----
+function toSeries(entry: MatrixEntry): TrendSeries {
+  const solves = (entry.cells ?? [])
+    .filter(cell => cell.solvedAt)
+    .sort((a, b) => String(a.solvedAt).localeCompare(String(b.solvedAt)))
+    .map((cell) => ({
+      competitionChallengeId: cell.competitionChallengeId,
+      at: cell.solvedAt ?? undefined,
+      points: cell.score ?? 0,
+      solveOrdinal: cell.bloodRank ? ['First', 'Second', 'Third'].indexOf(String(cell.bloodRank)) + 1 : undefined,
+      submitterName: cell.solverName,
+    }))
+  let score = 0
+  const points = solves.map((solve) => ({ at: solve.at, score: score += solve.points ?? 0 }))
+  if (score !== (entry.score ?? 0)) {
+    points.push({ at: leaderboard.value?.generatedAt, score: entry.score ?? 0 })
   }
-  return (leaderboard.value?.entries ?? []).slice(0, 10).map((entry) => {
-    const series = entry.teamId ? byTeam.get(entry.teamId) : undefined
-    return {
-      teamId: entry.teamId,
-      teamName: entry.teamName,
-      points: series?.points ?? [],
-      solves: series?.solves ?? [],
-      penalties: series?.penalties ?? [],
-    }
-  })
-})
+  return { teamId: entry.teamId, teamName: entry.teamName, points, solves }
+}
 
-const hasAnySeries = computed(() =>
-  (leaderboard.value?.series ?? []).some((s) => (s.points?.length ?? 0) > 0),
-)
+const topSeries = computed<TrendSeries[]>(() => entries.value.slice(0, 10).map(toSeries))
+const hasAnySeries = computed(() => entries.value.some(entry =>
+  (entry.cells?.length ?? 0) > 0 || (entry.score ?? 0) !== 0,
+))
 
 // ---- 分页 ----
 const pageSize = ref(20)
 const page = ref(1)
 
-const entries = computed(() => leaderboard.value?.entries ?? [])
+const entries = computed<MatrixEntry[]>(() => (leaderboard.value?.entries ?? []) as MatrixEntry[])
 const totalPages = computed(() => Math.max(1, Math.ceil(entries.value.length / pageSize.value)))
 const pageItems = computed(() =>
   entries.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
@@ -156,15 +154,7 @@ const detailOpen = ref(false)
 const detailEntry = ref<(typeof entries.value)[number] | null>(null)
 
 const detailSeries = computed<TrendSeries | null>(() => {
-  const teamId = detailEntry.value?.teamId
-  if (!teamId) return null
-  return ((leaderboard.value?.series ?? []) as TrendSeries[]).find((s) => s.teamId === teamId) ?? {
-    teamId,
-    teamName: detailEntry.value?.teamName,
-    points: [],
-    solves: [],
-    penalties: [],
-  }
+  return detailEntry.value ? toSeries(detailEntry.value) : null
 })
 
 function openDetail(entry: (typeof entries.value)[number]) {
@@ -185,8 +175,8 @@ function exportCsv() {
     entry.lastScoreAt ? formatDateTime(entry.lastScoreAt) : '',
     ...challenges.value.map((challenge) => {
       const slot = slotFor(entry.teamId, challenge.competitionChallengeId)
-      if (!slot || !slot.successCount) return ''
-      return slot.bloodRank ? (bloodRankLabel[String(slot.bloodRank)] ?? '已解出') : '已解出'
+      if (!slot) return ''
+      return slot.score ?? 0
     }),
   ])
   const escape = (value: unknown) => `"${String(value).replaceAll('"', '""')}"`
@@ -200,19 +190,7 @@ function exportCsv() {
   URL.revokeObjectURL(url)
 }
 
-// ---- 方向图标 ----
-const directionIconMap: Record<string, typeof Globe> = {
-  web: Globe,
-  pwn: Bug,
-  reverse: Binary,
-  rev: Binary,
-  crypto: KeyRound,
-  misc: Puzzle,
-}
-
-function directionIcon(direction: string) {
-  return directionIconMap[direction.trim().toLowerCase()] ?? Flag
-}
+// ---- 方向图标/配色走共享映射(utils/directions.ts) ----
 
 const rankIconClass: Record<number, string> = {
   1: 'text-amber-500',
@@ -304,7 +282,11 @@ const rankIconClass: Record<number, string> = {
                         class="border-l text-center"
                       >
                         <span class="inline-flex items-center gap-1.5">
-                          <component :is="directionIcon(group.direction)" class="size-4" />
+                          <component
+                            :is="directionIcon(group.direction)"
+                            class="size-4"
+                            :class="directionTextClass(group.direction)"
+                          />
                           {{ group.direction }}
                         </span>
                       </TableHead>
@@ -332,7 +314,7 @@ const rankIconClass: Record<number, string> = {
                     >
                       <TableCell>
                         <Medal v-if="(entry.rank ?? 99) <= 3" :class="rankIconClass[entry.rank ?? 0]" class="size-5" />
-                        <span v-else class="pl-1 text-sm">{{ entry.rank }}</span>
+                        <span v-else class="pl-1 font-mono text-sm tabular-nums">{{ entry.rank }}</span>
                       </TableCell>
                       <TableCell>
                         <span class="flex items-center gap-2">
@@ -342,13 +324,13 @@ const rankIconClass: Record<number, string> = {
                           <span class="font-medium">{{ entry.teamName }}</span>
                         </span>
                       </TableCell>
-                      <TableCell class="text-right font-semibold">{{ entry.score }} pts</TableCell>
+                      <TableCell class="text-right font-mono font-semibold tabular-nums">{{ entry.score }} pts</TableCell>
                       <TableCell
                         v-for="challenge in challenges"
                         :key="challenge.competitionChallengeId"
                         class="border-l text-center"
                       >
-                        <template v-if="slotFor(entry.teamId, challenge.competitionChallengeId)?.successCount">
+                        <template v-if="slotFor(entry.teamId, challenge.competitionChallengeId)">
                           <Medal
                             class="mx-auto size-5"
                             :class="bloodIconClass[String(slotFor(entry.teamId, challenge.competitionChallengeId)?.bloodRank)] ?? 'text-muted-foreground/50'"

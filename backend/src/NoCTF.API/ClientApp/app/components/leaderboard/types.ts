@@ -13,18 +13,11 @@ export interface SolveRecordItem {
   submitterName?: string | null
 }
 
-export interface PenaltyRecordItem {
-  at?: string
-  points?: number
-  kind?: string
-}
-
 export interface TrendSeries {
   teamId?: string
   teamName?: string
   points?: TrendPoint[]
   solves?: SolveRecordItem[]
-  penalties?: PenaltyRecordItem[]
 }
 
 export interface ChallengeInfo {
@@ -33,13 +26,27 @@ export interface ChallengeInfo {
   direction?: string
 }
 
-/** slotKey 形如 `challenge:<guidN>`/`service:<guid>`,归一化成可比较的题目 id。 */
-export function normalizeChallengeKey(value?: string | null): string {
-  return (value ?? '').replace(/[^0-9a-f]/gi, '').toLowerCase()
+export interface LeaderboardCell {
+  competitionChallengeId?: string
+  score?: number
+  solvedAt?: string | null
+  solverName?: string | null
+  bloodRank?: string | null
 }
 
-export function penaltyKindLabel(kind?: string): string {
-  return ({ WrongSubmission: '错误提交扣分', HintUnlock: '解锁提示扣分' } as Record<string, string>)[String(kind)] ?? '扣分'
+export interface MatrixEntry {
+  rank?: number
+  teamId?: string
+  teamName?: string
+  score?: number
+  solveCount?: number
+  lastScoreAt?: string | null
+  cells?: LeaderboardCell[]
+}
+
+/** 归一化 GUID 文本，用于题目与稀疏 Cell 的 Map 比较。 */
+export function normalizeChallengeKey(value?: string | null): string {
+  return (value ?? '').replace(/[^0-9a-f]/gi, '').toLowerCase()
 }
 
 export const bloodRankLabel: Record<string, string> = { First: '一血', Second: '二血', Third: '三血' }

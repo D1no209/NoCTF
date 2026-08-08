@@ -130,31 +130,12 @@ public sealed class CtfLeaderboardProjectorTests
         var projection = new LeaderboardProjectionEngine(
             new LeaderboardProjectorCatalog()).Project(input);
 
-        await Assert.That(projection.Bloods).Count().IsEqualTo(3);
-        await Assert.That(projection.Bloods[0].TeamId).IsEqualTo(teams[0]);
-        await Assert.That(projection.Bloods[0].BloodRank)
-            .IsEqualTo(LeaderboardBloodRank.First);
-        await Assert.That(projection.Bloods[1].TeamId).IsEqualTo(teams[1]);
-        await Assert.That(projection.Bloods[1].BloodRank)
-            .IsEqualTo(LeaderboardBloodRank.Second);
-        await Assert.That(projection.Bloods[2].TeamId).IsEqualTo(teams[2]);
-        await Assert.That(projection.Bloods[2].BloodRank)
-            .IsEqualTo(LeaderboardBloodRank.Third);
-        foreach (var blood in projection.Bloods)
-        {
-            var slot = projection.Subjects
-                .Single(subject => subject.SubjectId == blood.TeamId)
-                .Slots
-                .Single(candidate => candidate.SlotKey == blood.SlotKey);
-            await Assert.That(slot.BloodRank).IsEqualTo(blood.BloodRank);
-            await Assert.That(slot.BloodAt).IsEqualTo(blood.OccurredAt);
-        }
-        var fourthSlot = projection.Subjects
-            .Single(subject => subject.SubjectId == teams[3])
-            .Slots
-            .Single();
-        await Assert.That(fourthSlot.BloodRank).IsNull();
-        await Assert.That(fourthSlot.BloodAt).IsNull();
+        var cells = projection.Entries.ToDictionary(entry => entry.TeamId, entry => entry.Cells.Single());
+        await Assert.That(cells[teams[0]].BloodRank).IsEqualTo(LeaderboardBloodRank.First);
+        await Assert.That(cells[teams[1]].BloodRank).IsEqualTo(LeaderboardBloodRank.Second);
+        await Assert.That(cells[teams[2]].BloodRank).IsEqualTo(LeaderboardBloodRank.Third);
+        await Assert.That(cells[teams[3]].BloodRank).IsNull();
+        await Assert.That(cells.Values.All(cell => cell.CompetitionChallengeId == challengeId)).IsTrue();
 
         LeaderboardSubmissionFact Fact(
             Guid teamId,
@@ -425,7 +406,7 @@ public sealed class CtfLeaderboardProjectorTests
     }
 
     [Test]
-    public async Task Series_replays_score_events_to_the_entry_score_in_time_order()
+    public async Task Matrix_cells_expose_challenge_score_solve_time_and_solver()
     {
         var teamA = Guid.NewGuid();
         var teamB = Guid.NewGuid();
@@ -479,52 +460,24 @@ public sealed class CtfLeaderboardProjectorTests
                 [])),
             start);
 
-        var projection = new CtfLeaderboardProjector().Project(input);
+        var projection = new LeaderboardProjectionEngine(
+            new LeaderboardProjectorCatalog()).Project(input);
 
-        // teamC has no score events and therefore no series.
-        await Assert.That(projection.Series.Count).IsEqualTo(2);
-        var seriesA = projection.Series.Single(series => series.TeamId == teamA);
-        await Assert.That(seriesA.TeamName).IsEqualTo("a");
-        await Assert.That(seriesA.Points.Count).IsEqualTo(3);
-        await Assert.That(seriesA.Points[0].Score).IsEqualTo(110);
-        await Assert.That(seriesA.Points[0].At).IsEqualTo(start);
-        await Assert.That(seriesA.Points[1].Score).IsEqualTo(105);
-        await Assert.That(seriesA.Points[2].Score).IsEqualTo(75);
-        var seriesB = projection.Series.Single(series => series.TeamId == teamB);
-        await Assert.That(seriesB.Points.Count).IsEqualTo(2);
-        await Assert.That(seriesB.Points[0].Score).IsEqualTo(120);
-        await Assert.That(seriesB.Points[1].Score).IsEqualTo(320);
-        var solveA = seriesA.Solves.Single();
-        await Assert.That(solveA.CompetitionChallengeId).IsEqualTo(firstChallengeId);
-        await Assert.That(solveA.At).IsEqualTo(start);
-        await Assert.That(solveA.Points).IsEqualTo(110);
-        await Assert.That(solveA.SolveOrdinal).IsEqualTo(1);
-        await Assert.That(solveA.SubmitterName).IsEqualTo("alice");
-        await Assert.That(seriesA.Penalties.Count).IsEqualTo(2);
-        await Assert.That(seriesA.Penalties[0].Kind).IsEqualTo(LeaderboardPenaltyKind.WrongSubmission);
-        await Assert.That(seriesA.Penalties[0].Points).IsEqualTo(5);
-        await Assert.That(seriesA.Penalties[0].At).IsEqualTo(start.AddSeconds(1));
-        await Assert.That(seriesA.Penalties[1].Kind).IsEqualTo(LeaderboardPenaltyKind.HintUnlock);
-        await Assert.That(seriesA.Penalties[1].Points).IsEqualTo(30);
-        await Assert.That(seriesA.Penalties[1].At).IsEqualTo(start.AddSeconds(4));
-        await Assert.That(seriesB.Solves.Count).IsEqualTo(2);
-        await Assert.That(seriesB.Solves[0].CompetitionChallengeId).IsEqualTo(firstChallengeId);
-        await Assert.That(seriesB.Solves[0].Points).IsEqualTo(120);
-        await Assert.That(seriesB.Solves[0].SolveOrdinal).IsEqualTo(2);
-        await Assert.That(seriesB.Solves[0].SubmitterName).IsEqualTo("bob");
-        await Assert.That(seriesB.Solves[1].CompetitionChallengeId).IsEqualTo(secondChallengeId);
-        await Assert.That(seriesB.Solves[1].Points).IsEqualTo(200);
-        await Assert.That(seriesB.Solves[1].SolveOrdinal).IsEqualTo(1);
-        await Assert.That(seriesB.Solves[1].SubmitterName).IsEqualTo("carol");
-        await Assert.That(seriesB.Penalties.Count).IsEqualTo(0);
-        foreach (var series in projection.Series)
-        {
-            var entry = projection.Entries.Single(candidate => candidate.TeamId == series.TeamId);
-            await Assert.That(series.Points[^1].Score).IsEqualTo(entry.Score);
-            for (var index = 1; index < series.Points.Count; index++)
-                await Assert.That(series.Points[index].At)
-                    .IsGreaterThanOrEqualTo(series.Points[index - 1].At);
-        }
+        var entryA = projection.Entries.Single(entry => entry.TeamId == teamA);
+        var cellA = entryA.Cells.Single();
+        await Assert.That(cellA.CompetitionChallengeId).IsEqualTo(firstChallengeId);
+        await Assert.That(cellA.Score).IsEqualTo(110);
+        await Assert.That(cellA.SolvedAt).IsEqualTo(start);
+        await Assert.That(cellA.SolverName).IsEqualTo("alice");
+        await Assert.That(entryA.Score).IsEqualTo(75);
+
+        var cellsB = projection.Entries.Single(entry => entry.TeamId == teamB).Cells
+            .ToDictionary(cell => cell.CompetitionChallengeId);
+        await Assert.That(cellsB[firstChallengeId].Score).IsEqualTo(120);
+        await Assert.That(cellsB[firstChallengeId].SolverName).IsEqualTo("bob");
+        await Assert.That(cellsB[secondChallengeId].Score).IsEqualTo(200);
+        await Assert.That(cellsB[secondChallengeId].SolverName).IsEqualTo("carol");
+        await Assert.That(projection.Entries.Single(entry => entry.TeamId == teamC).Cells).IsEmpty();
 
         LeaderboardSubmissionFact Submission(
             Guid teamId,

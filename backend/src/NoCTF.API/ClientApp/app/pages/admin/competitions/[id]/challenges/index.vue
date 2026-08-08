@@ -190,8 +190,12 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
             </NuxtLink>
             <span v-else class="font-medium">{{ c.title }}</span>
           </TableCell>
-          <TableCell>{{ c.direction }}</TableCell>
-          <TableCell>{{ c.baseScore ?? '—' }}</TableCell>
+          <TableCell>
+            <Badge variant="outline" :class="directionBadgeClass(c.direction)">
+              {{ c.direction }}
+            </Badge>
+          </TableCell>
+          <TableCell class="font-mono tabular-nums">{{ c.baseScore ?? '—' }}</TableCell>
           <TableCell>
             <Badge v-if="c.deletedAt" variant="destructive">已删除</Badge>
             <Badge v-else :variant="c.isPublished ? 'default' : 'outline'">

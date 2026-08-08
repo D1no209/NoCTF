@@ -30,5 +30,5 @@ const text = computed(() => {
 </script>
 
 <template>
-  <span v-if="text" class="text-sm text-muted-foreground">{{ text }}</span>
+  <span v-if="text" class="text-sm tabular-nums">{{ text }}</span>
 </template>

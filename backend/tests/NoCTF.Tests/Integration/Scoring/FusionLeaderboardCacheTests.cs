@@ -145,7 +145,7 @@ public sealed class FusionLeaderboardCacheTests
             Interlocked.Increment(ref invocationCount);
             if (delay is { } value)
                 Thread.Sleep(value);
-            return new([], [], []);
+            return new([], []);
         }
     }
 

@@ -1,4 +1,4 @@
-import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
+import { HubConnectionBuilder, HttpTransportType, LogLevel } from '@microsoft/signalr'
 import type { HubConnection } from '@microsoft/signalr'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse } from '~/api'
 import { getAccessToken } from '~/lib/session'
@@ -22,6 +22,10 @@ export function usePlatformLogHub(
     const hub = new HubConnectionBuilder()
       .withUrl('/hubs/v1/admin/platform-logs', {
         accessTokenFactory: () => getAccessToken() ?? '',
+        // 与 useCompetitionHub 相同:dev 下绕过 Vite ws 代理的 WebSocket 崩溃问题。
+        ...(import.meta.dev
+          ? { transport: HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling }
+          : {}),
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)

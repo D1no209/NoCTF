@@ -13110,24 +13110,6 @@
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardEntryResponse"
             }
           },
-          "subjects": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSubjectSummaryResponse"
-            }
-          },
-          "bloods": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardBloodSummaryResponse"
-            }
-          },
-          "series": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardTeamSeriesResponse"
-            }
-          },
           "challenges": {
             "type": "array",
             "items": {
@@ -13191,15 +13173,15 @@
             "format": "date-time",
             "nullable": true
           },
-          "challenges": {
+          "cells": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardChallengeSummaryResponse"
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardCellResponse"
             }
           }
         }
       },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardChallengeSummaryResponse": {
+      "NoCTFAPIEndpointsCompetitionsLeaderboardCellResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -13207,62 +13189,17 @@
             "type": "string",
             "format": "guid"
           },
-          "direction": {
-            "type": "string"
-          },
-          "solveCount": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardSubjectSummaryResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "subjectId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "subjectName": {
-            "type": "string"
-          },
           "score": {
             "type": "integer",
             "format": "int64"
           },
-          "successCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "slots": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSlotSummaryResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardSlotSummaryResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "slotKey": {
-            "type": "string"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSlotKindProtocol"
-          },
-          "label": {
-            "type": "string"
-          },
-          "successCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "lastOccurredAt": {
+          "solvedAt": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "solverName": {
+            "type": "string",
             "nullable": true
           },
           "bloodRank": {
@@ -13272,33 +13209,8 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardBloodRankProtocol"
               }
             ]
-          },
-          "bloodAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
           }
         }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardSlotKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Challenge",
-          "Service",
-          "Break",
-          "Fix",
-          "Control",
-          "Stage"
-        ],
-        "enum": [
-          "Challenge",
-          "Service",
-          "Break",
-          "Fix",
-          "Control",
-          "Stage"
-        ]
       },
       "NoCTFAPIEndpointsCompetitionsLeaderboardBloodRankProtocol": {
         "type": "string",
@@ -13312,132 +13224,6 @@
           "First",
           "Second",
           "Third"
-        ]
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardBloodSummaryResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "slotKey": {
-            "type": "string"
-          },
-          "slotKind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSlotKindProtocol"
-          },
-          "bloodRank": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardBloodRankProtocol"
-          },
-          "teamId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "teamName": {
-            "type": "string"
-          },
-          "occurredAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardTeamSeriesResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "teamId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "teamName": {
-            "type": "string"
-          },
-          "points": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardScorePointResponse"
-            }
-          },
-          "solves": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardSolveRecordResponse"
-            }
-          },
-          "penalties": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardPenaltyRecordResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardScorePointResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "score": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardSolveRecordResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "points": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "solveOrdinal": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "submitterName": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardPenaltyRecordResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "points": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardPenaltyKindProtocol"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsLeaderboardPenaltyKindProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "WrongSubmission",
-          "HintUnlock"
-        ],
-        "enum": [
-          "WrongSubmission",
-          "HintUnlock"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsLeaderboardChallengeInfoResponse": {

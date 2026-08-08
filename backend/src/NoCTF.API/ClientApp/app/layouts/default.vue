@@ -3,31 +3,43 @@ import { Bell, LogOut, Settings, ShieldCheck, Trophy, User } from '@lucide/vue'
 
 const { user, isLoggedIn, isAdministrator, canOrganize, logout } = useAuth()
 const { configuration } = usePlatform()
+const route = useRoute()
+
+const navItems = computed(() => [
+  { to: '/competitions', label: '竞赛', show: true },
+  { to: '/admin/competitions', label: '竞赛管理', show: isLoggedIn.value },
+  { to: '/admin/challenges', label: '题库管理', show: canOrganize.value },
+  { to: '/admin/platform', label: '平台管理', show: isAdministrator.value },
+])
+
+function isActive(to: string) {
+  return route.path === to || route.path.startsWith(`${to}/`)
+}
 </script>
 
 <template>
   <div class="flex min-h-screen flex-col">
-    <header class="sticky top-0 z-40 border-b bg-background">
-      <div class="mx-auto flex h-16 max-w-7xl items-center gap-8 px-4 md:px-6">
+    <header class="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
+      <div class="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 md:px-6">
         <NuxtLink to="/" class="flex shrink-0 items-center gap-2.5 text-lg font-semibold">
-          <Trophy class="size-6" />
+          <span class="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Trophy class="size-5" />
+          </span>
           {{ configuration?.name ?? 'NoCTF' }}
         </NuxtLink>
-        <nav class="flex min-w-0 items-center gap-2 overflow-x-auto text-base">
-          <Button variant="ghost" size="sm" class="px-3 text-base" as-child>
-            <NuxtLink to="/competitions">竞赛</NuxtLink>
-          </Button>
-          <Button v-if="isLoggedIn" variant="ghost" size="sm" class="px-3 text-base" as-child>
-            <NuxtLink to="/admin/competitions">竞赛管理</NuxtLink>
-          </Button>
-          <Button v-if="canOrganize" variant="ghost" size="sm" class="px-3 text-base" as-child>
-            <NuxtLink to="/admin/challenges">题库管理</NuxtLink>
-          </Button>
-          <Button v-if="isAdministrator" variant="ghost" size="sm" class="px-3 text-base" as-child>
-            <NuxtLink to="/admin/platform">平台管理</NuxtLink>
+        <nav class="flex min-w-0 items-center gap-1 overflow-x-auto">
+          <Button
+            v-for="item in navItems.filter((i) => i.show)"
+            :key="item.to"
+            variant="ghost"
+            as-child
+            :class="isActive(item.to) ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'"
+          >
+            <NuxtLink :to="item.to">{{ item.label }}</NuxtLink>
           </Button>
         </nav>
         <div class="ml-auto flex items-center gap-2">
+          <ThemeToggle />
           <template v-if="isLoggedIn">
             <Button variant="ghost" size="icon" as-child>
               <NuxtLink to="/notifications" aria-label="通知">
@@ -74,10 +86,10 @@ const { configuration } = usePlatform()
             </DropdownMenu>
           </template>
           <template v-else>
-            <Button variant="ghost" size="sm" as-child>
+            <Button variant="ghost" as-child>
               <NuxtLink to="/auth/login">登录</NuxtLink>
             </Button>
-            <Button size="sm" as-child>
+            <Button as-child>
               <NuxtLink to="/auth/register">注册</NuxtLink>
             </Button>
           </template>
@@ -87,11 +99,15 @@ const { configuration } = usePlatform()
     <main class="flex-1">
       <slot />
     </main>
-    <footer class="border-t py-4">
-      <p class="mx-auto max-w-7xl px-4 text-xs text-muted-foreground">
-        {{ configuration?.name ?? 'NoCTF' }}
-        <span v-if="configuration?.description"> · {{ configuration.description }}</span>
-      </p>
+    <footer class="border-t">
+      <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-muted-foreground md:px-6">
+        <p class="flex items-center gap-2">
+          <Trophy class="size-3.5 text-primary" />
+          <span class="font-medium text-foreground">{{ configuration?.name ?? 'NoCTF' }}</span>
+          <span v-if="configuration?.description"> · {{ configuration.description }}</span>
+        </p>
+        <p class="font-mono">Powered by NoCTF</p>
+      </div>
     </footer>
   </div>
 </template>

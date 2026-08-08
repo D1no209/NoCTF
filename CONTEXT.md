@@ -19,6 +19,11 @@ an independent source of requirements.
   observation. It never stores an accumulated score; ManualAdjust/HintUnlock are ordinary event kinds.
 - **Leaderboard projection** recomputes scores from PostgreSQL facts and current configuration.
   Redis stores a replaceable snapshot and projection state; PostgreSQL remains the source of truth.
+- **Leaderboard matrix** is the public projection of competition challenges as columns and teams as
+  ranked rows. Each sparse cell is one team's current score contribution for one competition challenge
+  plus its solve time, solver, and optional CTF blood rank; an absent cell has no public result.
+- **Manual score adjustment** always targets one team and one competition challenge. It changes that
+  leaderboard cell and the team's total; there is no competition-wide or unscoped team adjustment.
 - **Team ban** is a moderation fact, not a Submission. Changing it advances the competition's
   leaderboard revision.
 - **Fix attempt** is consumed only by a team-controlled failed validation. Platform, Runner, storage,

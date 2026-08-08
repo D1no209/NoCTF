@@ -24,19 +24,15 @@ public enum LeaderboardDataScopeProtocol { Live, Frozen, Hidden }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<LeaderboardProjectionStateProtocol>))]
 public enum LeaderboardProjectionStateProtocol { Processing }
 
-[JsonConverter(typeof(StrictPascalCaseEnumConverter<LeaderboardSlotKindProtocol>))]
-public enum LeaderboardSlotKindProtocol { Challenge, Service, Break, Fix, Control, Stage }
-
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<LeaderboardBloodRankProtocol>))]
 public enum LeaderboardBloodRankProtocol { First = 1, Second = 2, Third = 3 }
 
-[JsonConverter(typeof(StrictPascalCaseEnumConverter<LeaderboardPenaltyKindProtocol>))]
-public enum LeaderboardPenaltyKindProtocol { WrongSubmission, HintUnlock }
-
-public sealed record LeaderboardChallengeSummaryResponse(
+public sealed record LeaderboardCellResponse(
     Guid CompetitionChallengeId,
-    string Direction,
-    int SolveCount);
+    long Score,
+    DateTimeOffset? SolvedAt,
+    string? SolverName,
+    LeaderboardBloodRankProtocol? BloodRank);
 
 public sealed record LeaderboardEntryResponse(
     int Rank,
@@ -45,54 +41,7 @@ public sealed record LeaderboardEntryResponse(
     long Score,
     int SolveCount,
     DateTimeOffset? LastScoreAt,
-    IReadOnlyList<LeaderboardChallengeSummaryResponse> Challenges);
-
-public sealed record LeaderboardSlotSummaryResponse(
-    string SlotKey,
-    LeaderboardSlotKindProtocol Kind,
-    string Label,
-    int SuccessCount,
-    DateTimeOffset? LastOccurredAt,
-    LeaderboardBloodRankProtocol? BloodRank,
-    DateTimeOffset? BloodAt);
-
-public sealed record LeaderboardSubjectSummaryResponse(
-    Guid SubjectId,
-    string SubjectName,
-    long Score,
-    int SuccessCount,
-    IReadOnlyList<LeaderboardSlotSummaryResponse> Slots);
-
-public sealed record LeaderboardBloodSummaryResponse(
-    string SlotKey,
-    LeaderboardSlotKindProtocol SlotKind,
-    LeaderboardBloodRankProtocol BloodRank,
-    Guid TeamId,
-    string TeamName,
-    DateTimeOffset OccurredAt);
-
-public sealed record LeaderboardScorePointResponse(DateTimeOffset At, long Score);
-
-public sealed record LeaderboardSolveRecordResponse(
-    Guid CompetitionChallengeId,
-    DateTimeOffset At,
-    long Points,
-    int SolveOrdinal,
-    string? SubmitterName);
-
-public sealed record LeaderboardPenaltyRecordResponse(
-    DateTimeOffset At,
-    long Points,
-    LeaderboardPenaltyKindProtocol Kind);
-
-public sealed record LeaderboardTeamSeriesResponse(
-    Guid TeamId,
-    string TeamName,
-    IReadOnlyList<LeaderboardScorePointResponse> Points)
-{
-    public IReadOnlyList<LeaderboardSolveRecordResponse> Solves { get; init; } = [];
-    public IReadOnlyList<LeaderboardPenaltyRecordResponse> Penalties { get; init; } = [];
-}
+    IReadOnlyList<LeaderboardCellResponse> Cells);
 
 public sealed record LeaderboardChallengeInfoResponse(
     Guid CompetitionChallengeId,
@@ -104,9 +53,6 @@ public sealed record LeaderboardProtocolResponse(
     DateTimeOffset GeneratedAt,
     IReadOnlyList<LeaderboardEntryResponse> Entries)
 {
-    public IReadOnlyList<LeaderboardSubjectSummaryResponse> Subjects { get; init; } = [];
-    public IReadOnlyList<LeaderboardBloodSummaryResponse> Bloods { get; init; } = [];
-    public IReadOnlyList<LeaderboardTeamSeriesResponse> Series { get; init; } = [];
     public IReadOnlyList<LeaderboardChallengeInfoResponse> Challenges { get; init; } = [];
     public long SnapshotRevision { get; init; }
     public long TargetRevision { get; init; }
@@ -133,19 +79,29 @@ internal static partial class LeaderboardProtocolMapper
     private static partial LeaderboardProjectionStateProtocol ToProtocol(LeaderboardProjectionState value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
-    private static partial LeaderboardSlotKindProtocol ToProtocol(LeaderboardSlotKind value);
-
-    [MapEnum(EnumMappingStrategy.ByName)]
     private static partial LeaderboardBloodRankProtocol ToProtocol(LeaderboardBloodRank value);
-
-    [MapEnum(EnumMappingStrategy.ByName)]
-    private static partial LeaderboardPenaltyKindProtocol ToProtocol(LeaderboardPenaltyKind value);
 
     private static LeaderboardVisibilityProtocol ToProtocol(
         NoCTF.Domain.Competitions.CompetitionLeaderboardVisibility value) =>
         CompetitionProtocolMapper.ToProtocol(value);
 
     public static partial LeaderboardProtocolResponse ToResponse(LeaderboardResponse value);
+
+    private static LeaderboardEntryResponse ToResponse(LeaderboardEntry value) => new(
+        value.Rank,
+        value.TeamId,
+        value.TeamName,
+        value.Score,
+        value.SolveCount,
+        value.LastScoreAt,
+        value.Cells.Select(ToResponse).ToList());
+
+    private static LeaderboardCellResponse ToResponse(LeaderboardCell value) => new(
+        value.CompetitionChallengeId,
+        value.Score,
+        value.SolvedAt,
+        value.SolverName,
+        value.BloodRank is null ? null : ToProtocol(value.BloodRank.Value));
 
     public static partial LeaderboardProcessingProtocolResponse ToResponse(
         LeaderboardProcessingResponse value);
