@@ -26,19 +26,10 @@ internal sealed class CompetitionChallengeConfiguration : IEntityTypeConfigurati
             .HasFilter("deleted_at IS NULL");
         builder.HasIndex(item => new { item.CompetitionId, item.ChallengeId }).IsUnique()
             .HasFilter("deleted_at IS NULL");
-        builder.HasMany(item => item.Hints)
-            .WithOne()
-            .HasForeignKey(hint => hint.CompetitionChallengeId)
-            .OnDelete(DeleteBehavior.Restrict);
-    }
-}
-
-internal sealed class CompetitionChallengeHintConfiguration
-    : IEntityTypeConfiguration<CompetitionChallengeHint>
-{
-    public void Configure(EntityTypeBuilder<CompetitionChallengeHint> builder)
-    {
-        builder.ToTable("competition_challenge_hints");
-        builder.HasKey(hint => hint.Id);
+        builder.OwnsMany(item => item.Hints, hints =>
+        {
+            hints.ToJson("hints_json");
+            hints.Property(hint => hint.Content).IsRequired();
+        });
     }
 }

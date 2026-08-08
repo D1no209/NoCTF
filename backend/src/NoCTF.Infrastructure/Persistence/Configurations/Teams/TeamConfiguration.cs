@@ -27,6 +27,9 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
             .HasForeignKey(team => team.CaptainId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(team => team.AvatarFile).WithMany()
+            .HasForeignKey(team => team.AvatarFileId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(table =>
         {
             table.HasCheckConstraint(

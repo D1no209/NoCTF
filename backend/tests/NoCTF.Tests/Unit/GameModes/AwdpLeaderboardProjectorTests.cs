@@ -381,7 +381,7 @@ public sealed class AwdpLeaderboardProjectorTests
                 CreatedAt = occurredAt ?? at
             });
 
-    private static CompetitionLifecycleAudit Lifecycle(
+    private static CompetitionLifecycleTransition Lifecycle(
         CompetitionStatus from,
         CompetitionStatus to,
         DateTimeOffset at) => new()

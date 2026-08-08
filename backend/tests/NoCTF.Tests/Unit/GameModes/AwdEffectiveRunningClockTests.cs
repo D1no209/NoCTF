@@ -21,7 +21,7 @@ public sealed class AwdEffectiveRunningClockTests
         await Assert.That(effective).IsEqualTo(TimeSpan.FromMinutes(3));
     }
 
-    private static CompetitionLifecycleAudit Audit(
+    private static CompetitionLifecycleTransition Audit(
         CompetitionStatus from,
         CompetitionStatus to,
         DateTimeOffset at) => new()

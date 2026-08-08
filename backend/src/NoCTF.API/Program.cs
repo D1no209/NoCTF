@@ -2,6 +2,7 @@ using NoCTF.API.Composition;
 using NoCTF.API.Security;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Infrastructure;
+using NoCTF.Infrastructure.Messaging;
 using FastEndpoints.Swagger;
 using NoCTF.Application.Messaging;
 using Wolverine;
@@ -79,7 +80,7 @@ builder.UseWolverine(options =>
         options.PublishMessage<SendPasswordReset>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<SendPasswordChangedNotification>()
             .ToPostgresqlQueue("noctf-worker");
-        options.PublishMessage<CleanupObject>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<CleanupFile>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ChallengePublished>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<TeamBanned>().ToPostgresqlQueue("noctf-worker");
@@ -92,7 +93,7 @@ builder.UseWolverine(options =>
     }
 });
 if (development)
-    builder.Services.AddHostedService<DevelopmentWorkerBootstrapper>();
+    builder.Services.AddSingularAgent<MaintenanceTickAgent>();
 
 var app = builder.Build();
 if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))

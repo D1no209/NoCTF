@@ -68,7 +68,7 @@ internal static class CurrentUserMapping
         LinkGenerator links,
         HttpContext httpContext)
     {
-        var avatarUrl = AvatarUrl(profile.Id, profile.AvatarObjectKey, links, httpContext);
+        var avatarUrl = AvatarUrl(profile.Id, profile.AvatarFileId, links, httpContext);
 
         return new(
             profile.Id,
@@ -84,12 +84,12 @@ internal static class CurrentUserMapping
 
     public static string? AvatarUrl(
         Guid userId,
-        string? avatarObjectKey,
+        Guid? avatarFileId,
         LinkGenerator links,
         HttpContext httpContext)
     {
         string? avatarUrl = null;
-        if (!string.IsNullOrWhiteSpace(avatarObjectKey))
+        if (avatarFileId is not null)
         {
             var path = links.GetPathByName(
                 httpContext,
@@ -97,8 +97,7 @@ internal static class CurrentUserMapping
                 new { userId });
             if (path is not null)
             {
-                var revision = Uri.EscapeDataString(Path.GetFileName(avatarObjectKey));
-                avatarUrl = $"{path}?revision={revision}";
+                avatarUrl = $"{path}?revision={avatarFileId.Value:N}";
             }
         }
 

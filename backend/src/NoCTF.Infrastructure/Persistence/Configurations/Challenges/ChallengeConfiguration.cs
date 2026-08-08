@@ -39,11 +39,8 @@ internal sealed class ChallengeAttachmentConfiguration
     {
         builder.ToTable("challenge_attachments");
         builder.HasKey(attachment => attachment.Id);
-        builder.Property(attachment => attachment.ObjectKey).HasMaxLength(1024);
-        builder.Property(attachment => attachment.FileName).HasMaxLength(260);
-        builder.Property(attachment => attachment.ContentType).HasMaxLength(255);
-        builder.Property(attachment => attachment.Length).HasColumnName("byte_length");
-        builder.Property(attachment => attachment.Sha256Bytes).HasColumnName("sha256");
-        builder.HasIndex(attachment => attachment.ObjectKey).IsUnique();
+        builder.HasOne(attachment => attachment.File).WithMany()
+            .HasForeignKey(attachment => attachment.FileId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

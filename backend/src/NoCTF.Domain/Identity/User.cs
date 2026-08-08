@@ -19,8 +19,8 @@ public sealed class User
     public int TokenVersion { get; set; }
     [MaxLength(500)]
     public string? Description { get; set; }
-    [MaxLength(1024)]
-    public string? AvatarObjectKey { get; set; }
+    public Guid? AvatarFileId { get; set; }
+    public NoCTF.Domain.Storage.StoredFile? AvatarFile { get; set; }
     public bool IsEmailPublic { get; set; }
     public DateTimeOffset? EmailVerifiedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

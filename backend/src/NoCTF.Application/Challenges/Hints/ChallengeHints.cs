@@ -33,7 +33,7 @@ public sealed record ChallengeHintSaveResult(
     ChallengeHintView? Hint,
     ChallengeHintSaveFailure? Failure = null);
 
-public sealed record HintUnlockResult(ChallengeHintView Hint, bool Created);
+public sealed record HintUnlockResult(Guid SubmissionId, bool Created);
 
 public enum HintUnlockFailure
 {

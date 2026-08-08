@@ -10,7 +10,7 @@ public class TeamRegistrationTests
     public async Task CreateTeam_AutoApproveCreatesCaptainTeam()
     {
         var store = new Store(new(CompetitionStatus.Published, true, false));
-        var command = new CreateTeamCommand(Guid.NewGuid(), Guid.NewGuid(), "alpha", null, DateTimeOffset.UtcNow);
+        var command = new CreateTeamCommand(Guid.NewGuid(), Guid.NewGuid(), "alpha", DateTimeOffset.UtcNow);
 
         var result = await new CreateTeam(store).ExecuteAsync(command);
 
@@ -23,7 +23,7 @@ public class TeamRegistrationTests
     public async Task CreateTeam_RunningCompetitionRejectsRegistration()
     {
         var store = new Store(new(CompetitionStatus.Running, true, false));
-        var result = await new CreateTeam(store).ExecuteAsync(new(Guid.NewGuid(), Guid.NewGuid(), "alpha", null, DateTimeOffset.UtcNow));
+        var result = await new CreateTeam(store).ExecuteAsync(new(Guid.NewGuid(), Guid.NewGuid(), "alpha", DateTimeOffset.UtcNow));
         await Assert.That(result.FailureCode).IsEqualTo(TeamRegistrationFailure.RegistrationClosed);
     }
 
@@ -50,7 +50,6 @@ public class TeamRegistrationTests
                 Guid.NewGuid(),
                 command.CompetitionId,
                 command.Name,
-                command.AvatarUrl,
                 command.UserId,
                 [command.UserId],
                 status,

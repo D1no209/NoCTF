@@ -12,7 +12,7 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<LeaderboardChallengeFact>? Challenges = null,
     string? CompetitionConfigurationJson = null,
     DateTimeOffset? CompetitionStartTime = null,
-    IReadOnlyList<CompetitionLifecycleAudit>? LifecycleAudits = null,
+    IReadOnlyList<CompetitionLifecycleTransition>? LifecycleAudits = null,
     IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds = null,
     DateTimeOffset? ProjectedAt = null);
 
@@ -37,7 +37,9 @@ public sealed record LeaderboardSubmissionFact(
     DateTimeOffset ReceivedAt,
     ScoringEvent Event,
     Guid? VictimTeamId = null,
-    string? SubmitterName = null);
+    string? SubmitterName = null,
+    string? SubmittedFlag = null,
+    long? HintCost = null);
 
 public sealed record LeaderboardSystemFact(ScoringEvent Event, long CurrentValue = 0);
 

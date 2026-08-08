@@ -27,21 +27,41 @@ using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Worker;
 
 public static class BackendMessageHandlers
 {
-    private static readonly TimeSpan RunnerReconciliationInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RunnerDependencyRetryDelay = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan CompetitionLifecycleInterval = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan AwdCheckerDispatchInterval = TimeSpan.FromSeconds(1);
 
-    public static Task Handle(
-        CleanupObject message,
+    public static async Task Handle(
+        CleanupFile message,
+        NoCtfDbContext db,
         IObjectStorage objects,
-        CancellationToken cancellationToken) =>
-        objects.DeleteAsync(message.ObjectKey, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM files WHERE id = {message.FileId} FOR UPDATE",
+            cancellationToken);
+        var file = await db.Files.SingleOrDefaultAsync(item => item.Id == message.FileId, cancellationToken);
+        if (file is null)
+            return;
+        var referenced = await db.Users.AnyAsync(item => item.AvatarFileId == file.Id, cancellationToken)
+            || await db.Teams.AnyAsync(item => item.AvatarFileId == file.Id, cancellationToken)
+            || await db.Competitions.AnyAsync(item => item.PosterFileId == file.Id, cancellationToken)
+            || await db.PlatformSettings.AnyAsync(item => item.LogoFileId == file.Id, cancellationToken)
+            || await db.Set<ChallengeAttachment>().AnyAsync(item => item.FileId == file.Id, cancellationToken)
+            || await db.PatchUploads.AnyAsync(item => item.FileId == file.Id, cancellationToken)
+            || await db.DataExports.AnyAsync(item => item.FileId == file.Id, cancellationToken);
+        if (referenced)
+            return;
+        await objects.DeleteAsync(file.ObjectKey, cancellationToken);
+        db.Files.Remove(file);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
 
     public static async Task Handle(
         SendEmailVerification message,
@@ -104,12 +124,6 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken)
     {
         const int batchSize = 500;
-        var schedule = await db.DurableMaintenanceSchedules.SingleAsync(
-            candidate => candidate.Kind == MaintenanceChainKind.AwdCheckerDispatch,
-            cancellationToken);
-        if (schedule.ProcessingVersion != message.ProcessingVersion)
-            return MessageExecutionOutcome.Superseded;
-
         var targets = await db.RuntimeInstances
             .Where(runtime => runtime.State == RuntimeState.Running
                 && ((runtime.NextCheckerDueAt != null
@@ -208,12 +222,8 @@ public static class BackendMessageHandlers
         }
 
         var pageIsFull = targets.Count == batchSize;
-        var nextAt = pageIsFull ? DateTimeOffset.UtcNow : DateTimeOffset.UtcNow.Add(AwdCheckerDispatchInterval);
-        AdvanceMaintenanceSchedule(schedule, nextAt);
-        await outbox.ScheduleAsync(new DispatchAwdCheckers(
-            nextAt,
-            schedule.ProcessingVersion,
-            pageIsFull ? targets[^1].Runtime.Id : null), nextAt);
+        if (pageIsFull)
+            await outbox.PublishAsync(new DispatchAwdCheckers(message.At, targets[^1].Runtime.Id));
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return applied ? MessageExecutionOutcome.Applied : MessageExecutionOutcome.Idempotent;
@@ -242,36 +252,37 @@ public static class BackendMessageHandlers
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
             return;
-        var recipients = competition.ManagerIds.Append(competition.OwnerId).Distinct().ToArray();
         var existing = await db.Notifications.AsNoTracking()
-            .Where(notification => recipients.Contains(notification.UserId)
-                && notification.CompetitionId == message.CompetitionId
-                && notification.EntityId == message.ChallengeFlagId
+            .AnyAsync(notification =>
+                notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                && notification.TargetId == message.CompetitionId
+                && notification.RelatedType == EntityReferenceKind.CompetitionChallenge
+                && notification.RelatedId == message.CompetitionChallengeId
                 && notification.Kind == NotificationKind.RuntimeStateChanged)
-            .Select(notification => notification.UserId)
-            .ToListAsync(cancellationToken);
+            ;
+        if (existing)
+            return;
         var payload = JsonSerializer.Serialize(new
         {
+            schemaVersion = 1,
             code = "awd_flag_injection_failed",
             message.CompetitionChallengeId,
             message.ChallengeFlagId,
             message.Generation,
             message.ProcessingVersion
         });
-        foreach (var userId in recipients.Except(existing))
+        db.Notifications.Add(new Notification
         {
-            db.Notifications.Add(new Notification
-            {
-                Id = Guid.CreateVersion7(message.OccurredAt),
-                UserId = userId,
-                CompetitionId = message.CompetitionId,
-                EntityId = message.ChallengeFlagId,
-                Kind = NotificationKind.RuntimeStateChanged,
-                SourceEventKey = $"awd-flag-injection-failed:{message.ChallengeFlagId:N}:{message.ProcessingVersion}",
-                PayloadJson = payload,
-                CreatedAt = message.OccurredAt
-            });
-        }
+            Id = Guid.CreateVersion7(message.OccurredAt),
+            SourceType = NotificationSourceType.System,
+            TargetType = NotificationTargetType.CompetitionCollaborators,
+            TargetId = message.CompetitionId,
+            Kind = NotificationKind.RuntimeStateChanged,
+            ContentJson = payload,
+            RelatedType = EntityReferenceKind.CompetitionChallenge,
+            RelatedId = message.CompetitionChallengeId,
+            SentAt = message.OccurredAt
+        });
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -286,19 +297,19 @@ public static class BackendMessageHandlers
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
             return;
-        var recipients = competition.ManagerIds.Append(competition.OwnerId).Distinct().ToArray();
-        var failureId = CreateAwdCheckerFailureId(
-            message.RuntimeInstanceId,
-            message.CheckerSequence);
         var existing = await db.Notifications.AsNoTracking()
-            .Where(notification => recipients.Contains(notification.UserId)
-                && notification.CompetitionId == message.CompetitionId
-                && notification.EntityId == failureId
+            .AnyAsync(notification =>
+                notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                && notification.TargetId == message.CompetitionId
+                && notification.RelatedType == EntityReferenceKind.RuntimeInstance
+                && notification.RelatedId == message.RuntimeInstanceId
                 && notification.Kind == NotificationKind.ManagementFailure)
-            .Select(notification => notification.UserId)
-            .ToListAsync(cancellationToken);
+            ;
+        if (existing)
+            return;
         var payload = JsonSerializer.Serialize(new
         {
+            schemaVersion = 1,
             code = "awd_checker_callback_missing",
             message.CompetitionChallengeId,
             message.RuntimeInstanceId,
@@ -306,31 +317,19 @@ public static class BackendMessageHandlers
             message.CheckerSequence,
             message.ProcessingVersion
         });
-        foreach (var userId in recipients.Except(existing))
+        db.Notifications.Add(new Notification
         {
-            db.Notifications.Add(new Notification
-            {
-                Id = Guid.CreateVersion7(message.OccurredAt),
-                UserId = userId,
-                CompetitionId = message.CompetitionId,
-                EntityId = failureId,
-                Kind = NotificationKind.ManagementFailure,
-                SourceEventKey = $"awd-checker-callback-missing:{failureId:N}",
-                PayloadJson = payload,
-                CreatedAt = message.OccurredAt
-            });
-        }
+            Id = Guid.CreateVersion7(message.OccurredAt),
+            SourceType = NotificationSourceType.System,
+            TargetType = NotificationTargetType.CompetitionCollaborators,
+            TargetId = message.CompetitionId,
+            Kind = NotificationKind.ManagementFailure,
+            ContentJson = payload,
+            RelatedType = EntityReferenceKind.RuntimeInstance,
+            RelatedId = message.RuntimeInstanceId,
+            SentAt = message.OccurredAt
+        });
         await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private static Guid CreateAwdCheckerFailureId(Guid runtimeInstanceId, long checkerSequence)
-    {
-        Span<byte> input = stackalloc byte[24];
-        runtimeInstanceId.TryWriteBytes(input[..16]);
-        BinaryPrimitives.WriteInt64BigEndian(input[16..], checkerSequence);
-        Span<byte> hash = stackalloc byte[32];
-        SHA256.HashData(input, hash);
-        return new Guid(hash[..16]);
     }
 
     public static async Task Handle(
@@ -355,17 +354,7 @@ public static class BackendMessageHandlers
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
-        var schedule = await db.DurableMaintenanceSchedules.SingleAsync(
-            candidate => candidate.Kind == MaintenanceChainKind.CompetitionLifecycle,
-            cancellationToken);
-        if (schedule.ProcessingVersion != message.ProcessingVersion)
-            return MessageExecutionOutcome.Superseded;
         var transitions = await advancer.ExecuteAsync(message.At, cancellationToken);
-        var nextAt = DateTimeOffset.UtcNow.Add(CompetitionLifecycleInterval);
-        AdvanceMaintenanceSchedule(schedule, nextAt);
-        await outbox.ScheduleAsync(
-            new AdvanceCompetitionLifecycle(nextAt, schedule.ProcessingVersion),
-            nextAt);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return transitions.Count > 0
@@ -830,12 +819,6 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken)
     {
         var applied = false;
-        var schedule = await db.DurableMaintenanceSchedules.SingleAsync(
-            candidate => candidate.Kind == MaintenanceChainKind.RunnerAssignmentReconciliation,
-            cancellationToken);
-        if (schedule.ProcessingVersion != message.ProcessingVersion)
-            return MessageExecutionOutcome.Superseded;
-
         var expiredRuntimes = await db.RuntimeInstances
             .Where(instance => instance.State == RuntimeState.Running
                 && instance.ExpiresAt != null
@@ -882,13 +865,8 @@ public static class BackendMessageHandlers
             if (heartbeat == RunnerHeartbeatStatus.Unavailable)
             {
                 var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
-                AdvanceMaintenanceSchedule(schedule, retryAt);
                 await outbox.ScheduleAsync(
-                    message with
-                    {
-                        At = retryAt,
-                        ProcessingVersion = schedule.ProcessingVersion
-                    },
+                    message with { At = retryAt },
                     retryAt);
                 await db.SaveChangesAsync(cancellationToken);
                 await outbox.FlushOutgoingMessagesAsync();
@@ -923,13 +901,8 @@ public static class BackendMessageHandlers
                 if (inventory.Availability == RunnerPoolInventoryAvailability.Unavailable)
                 {
                     var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
-                    AdvanceMaintenanceSchedule(schedule, retryAt);
                     await outbox.ScheduleAsync(
-                        message with
-                        {
-                            At = retryAt,
-                            ProcessingVersion = schedule.ProcessingVersion
-                        },
+                        message with { At = retryAt },
                         retryAt);
                     await db.SaveChangesAsync(cancellationToken);
                     await outbox.FlushOutgoingMessagesAsync();
@@ -945,13 +918,8 @@ public static class BackendMessageHandlers
                     if (heartbeat == RunnerHeartbeatStatus.Unavailable)
                     {
                         var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
-                        AdvanceMaintenanceSchedule(schedule, retryAt);
                         await outbox.ScheduleAsync(
-                            message with
-                            {
-                                At = retryAt,
-                                ProcessingVersion = schedule.ProcessingVersion
-                            },
+                            message with { At = retryAt },
                             retryAt);
                         await db.SaveChangesAsync(cancellationToken);
                         await outbox.FlushOutgoingMessagesAsync();
@@ -1011,16 +979,10 @@ public static class BackendMessageHandlers
         foreach (var audit in resourceAudits)
             await outbox.PublishToRunnerNodeAsync(audit);
         applied |= resourceAudits.Count > 0;
-        var nextAt = pageIsFull || expiredRuntimes.Count == 500
-            ? DateTimeOffset.UtcNow
-            : DateTimeOffset.UtcNow.Add(RunnerReconciliationInterval);
-        AdvanceMaintenanceSchedule(schedule, nextAt);
-        await outbox.ScheduleAsync(
-            new ReconcileRunnerAssignments(
-                nextAt,
-                schedule.ProcessingVersion,
-                pageIsFull ? assignments[^1].Id : null),
-            nextAt);
+        if (pageIsFull || expiredRuntimes.Count == 500)
+            await outbox.PublishAsync(new ReconcileRunnerAssignments(
+                message.At,
+                pageIsFull ? assignments[^1].Id : null));
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return applied
@@ -1055,14 +1017,6 @@ public static class BackendMessageHandlers
     {
         // Tombstone: safely consume already-persisted legacy messages without releasing or dispatching.
         return Task.FromResult(MessageExecutionOutcome.Superseded);
-    }
-
-    private static void AdvanceMaintenanceSchedule(
-        DurableMaintenanceSchedule schedule,
-        DateTimeOffset nextAt)
-    {
-        schedule.ProcessingVersion = checked(schedule.ProcessingVersion + 1);
-        schedule.UpdatedAt = nextAt;
     }
 
     public static async Task Handle(

@@ -1,4 +1,3 @@
-using NoCTF.Application.Storage;
 using NoCTF.Domain.Identity;
 
 namespace NoCTF.Application.Administration.UserAccounts;
@@ -15,11 +14,7 @@ public enum UserDeletionReferenceKind
     PatchUpload,
     Notification,
     ScoringEvent,
-    CompetitionLifecycleAudit,
-    CompetitionQuestion,
-    CompetitionQuestionEntry,
-    CompetitionEvent,
-    UserAccountLifecycleAudit
+    CompetitionEvent
 }
 
 public sealed record UserDeletionReference(
@@ -57,7 +52,7 @@ public enum UserDeletionState
 public sealed record UserDeletionStoreResult(
     UserDeletionState State,
     UserDeletionPreview? Preview = null,
-    string? AvatarObjectKey = null);
+    Guid? PreviousAvatarFileId = null);
 
 public interface IUserAccountAdministrationStore
 {
@@ -75,9 +70,7 @@ public interface IUserAccountAdministrationStore
         CancellationToken cancellationToken);
 }
 
-public sealed class ManageUserAccounts(
-    IUserAccountAdministrationStore store,
-    IObjectStorage objects)
+public sealed class ManageUserAccounts(IUserAccountAdministrationStore store)
 {
     public const int MaximumReasonLength = 500;
 
@@ -99,26 +92,12 @@ public sealed class ManageUserAccounts(
         if (normalizedReason.Length is < 3 or > MaximumReasonLength)
             return new(UserDeletionState.ReasonInvalid);
 
-        var result = await store.DeleteAsync(
+        return await store.DeleteAsync(
             userId,
             actorUserId,
             mode,
             normalizedReason,
             now,
             ct);
-        if (result.State is UserDeletionState.PhysicallyDeleted or UserDeletionState.Anonymized
-            && !string.IsNullOrWhiteSpace(result.AvatarObjectKey))
-        {
-            try
-            {
-                await objects.DeleteAsync(result.AvatarObjectKey, CancellationToken.None);
-            }
-            catch
-            {
-                // Account state is authoritative; orphan cleanup remains best effort.
-            }
-        }
-
-        return result;
     }
 }

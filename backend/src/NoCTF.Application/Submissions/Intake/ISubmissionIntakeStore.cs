@@ -27,4 +27,14 @@ public interface ISubmissionIntakeStore
         SubmissionAdmissionSnapshot snapshot,
         int? maxAttempts,
         CancellationToken cancellationToken);
+
+    Task<SubmissionAcceptanceResult> TryAcceptHintUnlockAsync(
+        HintUnlockSubmissionReceived received,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
+
+    Task<SubmissionAcceptanceResult> TryAcceptManualAdjustmentAsync(
+        ManualAdjustmentSubmissionReceived received,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
 }

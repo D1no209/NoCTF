@@ -41,15 +41,8 @@ public sealed class DataExport
     public DateTimeOffset? CompletedAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }
     public DateTimeOffset PurgeAt { get; set; }
-    [MaxLength(1024)]
-    public string? ObjectKey { get; set; }
-    [MaxLength(256)]
-    public string? FileName { get; set; }
-    [MaxLength(128)]
-    public string? ContentType { get; set; }
-    public long? Length { get; set; }
-    [MaxLength(64)]
-    public string? Sha256 { get; set; }
+    public Guid? FileId { get; set; }
+    public NoCTF.Domain.Storage.StoredFile? File { get; set; }
     public DataExportFailureCode? FailureCode { get; set; }
     [MaxLength(512)]
     public string? FailureDetail { get; set; }

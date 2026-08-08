@@ -4,6 +4,7 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Application.Competitions.Events;
 
@@ -41,7 +42,12 @@ public sealed record CompetitionEventDraft(
     CompetitionQuestionStatus? QuestionStatus = null,
     int? RuntimeGeneration = null,
     int? HostPort = null,
-    string? Reason = null);
+    string? Reason = null,
+    EntityReferenceKind? SubjectType = null,
+    Guid? SubjectId = null,
+    EntityReferenceKind? RelatedType = null,
+    Guid? RelatedId = null,
+    string? PayloadJson = null);
 
 public sealed record CompetitionEventCommitted(
     Guid CompetitionId,

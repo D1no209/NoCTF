@@ -9,6 +9,8 @@
 - Scheduled Message；
 - Dead Letter。
 
+维护调度由 Wolverine SingularAgent 只投递 durable tick：Runner assignment/lifecycle 每 30 秒，AWD checker dispatch 每 1 秒。Handler 使用 transaction-level advisory lock 和当前状态幂等，满页最多 500 条并通过 Outbox 投递固定 Cutoff/Cursor 的续页；Agent 不直接执行业务，也不使用 durable maintenance schedule 表。
+
 EF Core 业务事务与 Outbox 必须通过 Wolverine EF Core integration 绑定。参考官方资料：[Wolverine full LLM documentation](https://wolverinefx.net/llms-full.txt)。业务任务不得以 `System.Threading.Channels`、fire-and-forget Task 或仅内存定时器承载。
 
 ## 消息归属
@@ -18,7 +20,7 @@ EF Core 业务事务与 Outbox 必须通过 Wolverine EF Core integration 绑定
 | EvaluateSubmission / DrainManualEvaluation | Worker |
 | Invalidate/ProjectLeaderboard | Worker |
 | AdvanceCompetitionLifecycle / GenerateFlags / RotateAwdRound | Worker |
-| SendNotification / CleanupObject | Worker |
+| SendNotification / CleanupFile | Worker |
 | Start/Stop/ResetRuntime | Runner Pool |
 | InjectAwdFlag / RunAwdChecker | Runner Pool |
 | RunAwdpFixVerification | Runner Pool |

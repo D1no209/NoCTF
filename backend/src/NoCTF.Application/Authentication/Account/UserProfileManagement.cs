@@ -116,7 +116,7 @@ public sealed class ReplaceCurrentUserAvatar(
         UserAvatarReplacement? replacement;
         try
         {
-            replacement = await users.ReplaceAvatarAsync(userId, stored.ObjectKey, now, ct);
+            replacement = await users.ReplaceAvatarAsync(userId, stored, now, ct);
         }
         catch
         {
@@ -129,10 +129,6 @@ public sealed class ReplaceCurrentUserAvatar(
             await TryDeleteAsync(stored.ObjectKey);
             return AvatarReplacementResult.MissingUser();
         }
-
-        if (!string.IsNullOrWhiteSpace(replacement.PreviousObjectKey)
-            && !string.Equals(replacement.PreviousObjectKey, stored.ObjectKey, StringComparison.Ordinal))
-            await TryDeleteAsync(replacement.PreviousObjectKey);
 
         return AvatarReplacementResult.Success(replacement.Profile);
     }
@@ -179,14 +175,14 @@ public sealed class GetUserAvatar(
         Guid userId,
         CancellationToken ct = default)
     {
-        var objectKey = await users.GetAvatarObjectKeyAsync(userId, ct);
-        if (string.IsNullOrWhiteSpace(objectKey))
+        var file = await users.GetAvatarFileAsync(userId, ct);
+        if (file is null)
             return null;
 
-        var metadata = await objects.InspectAsync(objectKey, ct);
+        var metadata = await objects.InspectAsync(file.ObjectKey, ct);
         if (metadata is null)
             return null;
 
-        return new(await objects.OpenReadAsync(objectKey, ct), metadata.ContentType);
+        return new(await objects.OpenReadAsync(file.ObjectKey, ct), file.ContentType);
     }
 }

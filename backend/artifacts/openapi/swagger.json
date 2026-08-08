@@ -26,6 +26,156 @@
         }
       }
     },
+    "/api/v1/competitions/{competitionId}/teams/{teamId}/avatar": {
+      "delete": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Clears a team's avatar and queues unreferenced File cleanup.",
+        "operationId": "TeamAvatar_Clear",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Returns a team's current avatar.",
+        "operationId": "TeamAvatar_Get",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Replaces a team's avatar with an immutable File reference.",
+        "operationId": "TeamAvatar_Replace",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UploadTeamAvatarRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsUploadTeamAvatarRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsTeamsTeamAvatarResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/teams": {
       "post": {
         "tags": [
@@ -1689,6 +1839,52 @@
         ]
       }
     },
+    "/api/v1/notifications/{notificationId}/thread": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Read an authorized notification thread.",
+        "description": "Returns the immutable linear notification chain in chronological order.",
+        "operationId": "ReadNotificationThreadEndpoint",
+        "parameters": [
+          {
+            "name": "notificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsNotificationsNotificationListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/internal/v1/awdp/fix-archives/{submissionId}": {
       "get": {
         "tags": [
@@ -1882,6 +2078,30 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/competitions/{competitionId}/poster": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Returns a competition's current poster.",
+        "operationId": "CompetitionPoster_Get",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
           "404": {
             "description": "Not Found"
           }
@@ -2568,22 +2788,12 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Created",
+          "202": {
+            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsAcceptedSubmissionResponse"
                 }
               }
             }
@@ -2865,7 +3075,7 @@
           "Competitions"
         ],
         "summary": "Lists competition questions visible to the current user.",
-        "description": "The asker receives private questions, observers receive read-only private projections, handlers receive their authorized queue, and publishedOnly exposes only explicitly published anonymized questions.",
+        "description": "The asker receives their own threads; observers receive read-only projections and handlers receive their authorized queue.",
         "operationId": "ListCompetitionQuestions",
         "parameters": [
           {
@@ -2907,14 +3117,6 @@
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionStatusCode"
                 }
               ]
-            }
-          },
-          {
-            "name": "publishedOnly",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "boolean"
             }
           },
           {
@@ -3007,93 +3209,6 @@
           },
           "403": {
             "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/competitions/{competitionId}/questions/{questionId}/publication": {
-      "put": {
-        "tags": [
-          "Competitions"
-        ],
-        "summary": "Explicitly publishes one reviewed question and handler reply.",
-        "description": "This exceptional workflow anonymizes the asker in participant projections. Hint or competition announcement should normally be preferred for broadly useful guidance.",
-        "operationId": "PublishCompetitionQuestion",
-        "parameters": [
-          {
-            "name": "competitionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "questionId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "PublishCompetitionQuestionRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsPublishCompetitionQuestionRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -4279,6 +4394,72 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/submissions/manual-adjustments": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Queues a signed manual score adjustment.",
+        "description": "The delta is persisted as the canonical signed Int32 SubmittedFlag on a ManualAdjust submission.",
+        "operationId": "CreateManualAdjustmentEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CreateManualAdjustmentRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationSubmissionsCreateManualAdjustmentRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsSubmissionsAcceptedSubmissionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -7091,6 +7272,179 @@
           },
           "403": {
             "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/poster": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Clears a competition poster and queues unreferenced File cleanup.",
+        "operationId": "AdminCompetitionPoster_Clear",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replaces a competition poster with an immutable File reference.",
+        "operationId": "AdminCompetitionPoster_Replace",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UploadCompetitionPosterRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsUploadCompetitionPosterRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPosterResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/announcements": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Publish one competition announcement.",
+        "description": "Management announcements default to collaborators; participant visibility must be explicit.",
+        "operationId": "CreateCompetitionAnnouncementEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "CreateCompetitionAnnouncementRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionAnnouncementRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsNotificationsNotificationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -10399,81 +10753,6 @@
             "Bearer": []
           }
         ]
-      },
-      "put": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Updates attachment display metadata.",
-        "description": "Updates the display name and MIME type without replacing the stored object.",
-        "operationId": "AdminChallengeBankUpdateAttachment",
-        "parameters": [
-          {
-            "name": "challengeId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "attachmentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "x-name": "UpdateChallengeAttachmentRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankUpdateChallengeAttachmentRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ]
       }
     },
     "/api/v1/admin/challenges/{challengeId}/flags/{flagId}": {
@@ -11289,10 +11568,6 @@
           "name": {
             "type": "string"
           },
-          "avatarUrl": {
-            "type": "string",
-            "nullable": true
-          },
           "captainId": {
             "type": "string",
             "format": "guid"
@@ -11339,10 +11614,6 @@
         "properties": {
           "name": {
             "type": "string"
-          },
-          "avatarUrl": {
-            "type": "string",
-            "nullable": true
           }
         }
       },
@@ -11633,10 +11904,33 @@
         "properties": {
           "name": {
             "type": "string"
-          },
-          "avatarUrl": {
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsTeamAvatarResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fileId": {
             "type": "string",
-            "nullable": true
+            "format": "guid"
+          },
+          "contentType": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsTeamsUploadTeamAvatarRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "nullable": false
           }
         }
       },
@@ -11702,12 +11996,16 @@
         "x-enumNames": [
           "Flag",
           "Break",
-          "Fix"
+          "Fix",
+          "HintUnlock",
+          "ManualAdjust"
         ],
         "enum": [
           "Flag",
           "Break",
-          "Fix"
+          "Fix",
+          "HintUnlock",
+          "ManualAdjust"
         ]
       },
       "NoCTFAPIEndpointsSubmissionsSubmissionEvaluationStateProtocol": {
@@ -11781,7 +12079,9 @@
           "AwdpPatchTimeout",
           "AwdpServiceDown",
           "AwdpViolation",
-          "ForeignTeamFlagDetected"
+          "ForeignTeamFlagDetected",
+          "InsufficientScore",
+          "HintUnavailable"
         ],
         "enum": [
           "FlagNotSupported",
@@ -11813,7 +12113,9 @@
           "AwdpPatchTimeout",
           "AwdpServiceDown",
           "AwdpViolation",
-          "ForeignTeamFlagDetected"
+          "ForeignTeamFlagDetected",
+          "InsufficientScore",
+          "HintUnavailable"
         ]
       },
       "NoCTFAPIEndpointsSubmissionsGetSubmissionStatusRequest": {
@@ -12243,30 +12545,93 @@
             "type": "string",
             "format": "guid"
           },
-          "competitionId": {
+          "sourceType": {
+            "$ref": "#/components/schemas/NoCTFDomainNotificationsNotificationSourceType"
+          },
+          "sourceId": {
             "type": "string",
             "format": "guid",
             "nullable": true
           },
-          "entityId": {
+          "targetType": {
+            "$ref": "#/components/schemas/NoCTFDomainNotificationsNotificationTargetType"
+          },
+          "targetId": {
             "type": "string",
-            "format": "guid",
-            "nullable": true
+            "format": "guid"
           },
           "kind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsNotificationsNotificationKindProtocol"
           },
-          "payload": {},
-          "createdAt": {
+          "content": {},
+          "relatedType": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFDomainSharedEntityReferenceKind"
+              }
+            ]
+          },
+          "relatedId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "replyToId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "sentAt": {
             "type": "string",
             "format": "date-time"
           }
         }
       },
+      "NoCTFDomainNotificationsNotificationSourceType": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "System",
+          "User",
+          "Competition",
+          "Team",
+          "Platform"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "NoCTFDomainNotificationsNotificationTargetType": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "User",
+          "CompetitionCollaborators",
+          "CompetitionParticipants",
+          "TeamMembers",
+          "PlatformAdministrators"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
       "NoCTFAPIEndpointsNotificationsNotificationKindProtocol": {
         "type": "string",
         "description": "",
         "x-enumNames": [
+          "Message",
+          "CompetitionAnnouncement",
+          "QuestionOpened",
+          "QuestionStatusChanged",
           "CompetitionLifecycleChanged",
           "TeamRegistrationChanged",
           "SubmissionEvaluated",
@@ -12277,15 +12642,16 @@
           "ChallengePublished",
           "HintPublished",
           "TeamBanned",
-          "CompetitionQuestionOpened",
-          "CompetitionQuestionReplied",
-          "CompetitionQuestionStatusChanged",
           "CheatIncidentDetected",
           "TeamBanCorrected",
           "DataExportReady",
           "DataExportFailed"
         ],
         "enum": [
+          "Message",
+          "CompetitionAnnouncement",
+          "QuestionOpened",
+          "QuestionStatusChanged",
           "CompetitionLifecycleChanged",
           "TeamRegistrationChanged",
           "SubmissionEvaluated",
@@ -12296,13 +12662,46 @@
           "ChallengePublished",
           "HintPublished",
           "TeamBanned",
-          "CompetitionQuestionOpened",
-          "CompetitionQuestionReplied",
-          "CompetitionQuestionStatusChanged",
           "CheatIncidentDetected",
           "TeamBanCorrected",
           "DataExportReady",
           "DataExportFailed"
+        ]
+      },
+      "NoCTFDomainSharedEntityReferenceKind": {
+        "type": "integer",
+        "description": "",
+        "x-enumNames": [
+          "User",
+          "Competition",
+          "Team",
+          "Challenge",
+          "CompetitionChallenge",
+          "ChallengeHint",
+          "Submission",
+          "ScoringEvent",
+          "RuntimeInstance",
+          "DataExport",
+          "File",
+          "CompetitionEvent",
+          "Notification",
+          "Platform"
+        ],
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13
         ]
       },
       "NoCTFAPIEndpointsNotificationsListNotificationsRequest": {
@@ -13005,11 +13404,6 @@
           "RuntimeExtended",
           "RuntimeReset",
           "RuntimePortAllocated",
-          "AnnouncementPublished",
-          "QuestionOpened",
-          "QuestionReplied",
-          "QuestionStatusChanged",
-          "QuestionPublished",
           "ProtectedSubmissionFlagAccessed",
           "CheatIncidentDetected",
           "CheatIncidentConfirmed",
@@ -13055,11 +13449,6 @@
           "RuntimeExtended",
           "RuntimeReset",
           "RuntimePortAllocated",
-          "AnnouncementPublished",
-          "QuestionOpened",
-          "QuestionReplied",
-          "QuestionStatusChanged",
-          "QuestionPublished",
           "ProtectedSubmissionFlagAccessed",
           "CheatIncidentDetected",
           "CheatIncidentConfirmed",
@@ -13331,13 +13720,15 @@
           "SubmissionEvaluation",
           "AwdServiceStatus",
           "HintUnlock",
-          "KohObservation"
+          "KohObservation",
+          "ManualAdjust"
         ],
         "enum": [
           "SubmissionEvaluation",
           "AwdServiceStatus",
           "HintUnlock",
-          "KohObservation"
+          "KohObservation",
+          "ManualAdjust"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol": {
@@ -13508,45 +13899,6 @@
         "type": "object",
         "additionalProperties": false
       },
-      "NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "guid"
-          },
-          "competitionChallengeId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "content": {
-            "type": "string"
-          },
-          "cost": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "publishedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "deletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
       "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -13605,11 +13957,6 @@
             "type": "integer",
             "format": "int32"
           },
-          "publishedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -13625,12 +13972,6 @@
             "type": "boolean"
           },
           "canClose": {
-            "type": "boolean"
-          },
-          "canPublish": {
-            "type": "boolean"
-          },
-          "canViewPrivate": {
             "type": "boolean"
           },
           "entries": {
@@ -13673,13 +14014,11 @@
         "type": "string",
         "description": "",
         "x-enumNames": [
-          "Public",
           "Asker",
           "Observer",
           "Handler"
         ],
         "enum": [
-          "Public",
           "Asker",
           "Observer",
           "Handler"
@@ -13732,11 +14071,6 @@
             "format": "guid",
             "nullable": true
           },
-          "publishedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -13748,13 +14082,11 @@
         "description": "",
         "x-enumNames": [
           "Message",
-          "StatusTransition",
-          "Publication"
+          "StatusTransition"
         ],
         "enum": [
           "Message",
-          "StatusTransition",
-          "Publication"
+          "StatusTransition"
         ]
       },
       "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode": {
@@ -13796,8 +14128,7 @@
           "TeamNotEligible",
           "RevisionConflict",
           "InvalidTransition",
-          "QuestionClosed",
-          "ReplyNotPublishable"
+          "QuestionClosed"
         ],
         "enum": [
           "InvalidRequest",
@@ -13806,8 +14137,7 @@
           "TeamNotEligible",
           "RevisionConflict",
           "InvalidTransition",
-          "QuestionClosed",
-          "ReplyNotPublishable"
+          "QuestionClosed"
         ]
       },
       "NoCTFAPIEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest": {
@@ -13912,27 +14242,6 @@
       "NoCTFAPIEndpointsChallengesQuestionsListCompetitionQuestionsRequest": {
         "type": "object",
         "additionalProperties": false
-      },
-      "NoCTFAPIEndpointsChallengesQuestionsPublishCompetitionQuestionRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "replyEntryId",
-          "expectedRevision"
-        ],
-        "properties": {
-          "replyEntryId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": false
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0,
-            "nullable": false
-          }
-        }
       },
       "NoCTFAPIEndpointsAuthenticationChangePasswordFailureResponse": {
         "type": "object",
@@ -14495,6 +14804,32 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationSubmissionsCreateManualAdjustmentRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "teamId",
+          "competitionChallengeId"
+        ],
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid",
+            "minLength": 1,
+            "nullable": false
+          },
+          "delta": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "NoCTFAPIEndpointsSubmissionsAdminSubmissionStatusResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -14951,11 +15286,7 @@
           "PatchUpload",
           "Notification",
           "ScoringEvent",
-          "CompetitionLifecycleAudit",
-          "CompetitionQuestion",
-          "CompetitionQuestionEntry",
-          "CompetitionEvent",
-          "UserAccountLifecycleAudit"
+          "CompetitionEvent"
         ],
         "enum": [
           "CompetitionOwner",
@@ -14968,11 +15299,7 @@
           "PatchUpload",
           "Notification",
           "ScoringEvent",
-          "CompetitionLifecycleAudit",
-          "CompetitionQuestion",
-          "CompetitionQuestionEntry",
-          "CompetitionEvent",
-          "UserAccountLifecycleAudit"
+          "CompetitionEvent"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformDeletePlatformUserRequest": {
@@ -15842,11 +16169,20 @@
             "format": "date-time",
             "nullable": true
           },
+          "fileId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
           "fileName": {
             "type": "string",
             "nullable": true
           },
-          "length": {
+          "contentType": {
+            "type": "string",
+            "nullable": true
+          },
+          "byteLength": {
             "type": "integer",
             "format": "int64",
             "nullable": true
@@ -15941,6 +16277,43 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionAnnouncementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "body"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 16000,
+            "minLength": 0,
+            "nullable": false
+          },
+          "audience": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsAnnouncementAudience"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsAnnouncementAudience": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Collaborators",
+          "Participants"
+        ],
+        "enum": [
+          "Collaborators",
+          "Participants"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictResponse": {
         "type": "object",
@@ -16398,6 +16771,33 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0.0
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPosterResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "contentType": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsUploadCompetitionPosterRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "nullable": false
           }
         }
       },
@@ -16931,6 +17331,45 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationChallengesChallengeHintResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "content": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationChallengesSaveChallengeHintRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -17305,28 +17744,6 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0.0
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationChallengeBankUpdateChallengeAttachmentRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "fileName",
-          "contentType"
-        ],
-        "properties": {
-          "fileName": {
-            "type": "string",
-            "maxLength": 260,
-            "minLength": 0,
-            "nullable": false
-          },
-          "contentType": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 0,
-            "nullable": false
           }
         }
       },

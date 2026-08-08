@@ -77,8 +77,10 @@ public sealed record DataExportResponse(
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     DateTimeOffset? ExpiresAt,
+    Guid? FileId,
     string? FileName,
-    long? Length,
+    string? ContentType,
+    long? ByteLength,
     string? Sha256,
     DataExportFailureCodeProtocol? FailureCode,
     string? FailureDetail);
@@ -156,8 +158,10 @@ public sealed class CreateCompetitionDataExportEndpoint(
         item.StartedAt,
         item.CompletedAt,
         item.ExpiresAt,
+        item.FileId,
         item.FileName,
-        item.Length,
+        item.ContentType,
+        item.ByteLength,
         item.Sha256,
         item.FailureCode is null ? null : DataExportProtocolMapper.ToProtocol(item.FailureCode.Value),
         item.FailureDetail);

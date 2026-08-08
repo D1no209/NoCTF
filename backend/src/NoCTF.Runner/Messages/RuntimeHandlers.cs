@@ -911,9 +911,6 @@ public static class RuntimeWriteBackHandler
         {
             instance.PublishedPorts.Add(new RuntimePublishedPort
             {
-                Id = Guid.CreateVersion7(allocatedAt),
-                RuntimeInstanceId = instance.Id,
-                CompetitionId = instance.CompetitionId,
                 ServiceName = mapping.ServiceName,
                 ContainerPort = mapping.ContainerPort,
                 HostPort = mapping.HostPort,

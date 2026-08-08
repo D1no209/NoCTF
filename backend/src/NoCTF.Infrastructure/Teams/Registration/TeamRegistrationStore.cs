@@ -44,7 +44,6 @@ public sealed class TeamRegistrationStore(
             CompetitionId = command.CompetitionId,
             Name = name,
             NormalizedName = name.ToUpperInvariant(),
-            AvatarUrl = command.AvatarUrl,
             CaptainId = command.UserId,
             MemberIds = [command.UserId],
             InvitationToken = CreateInvitationToken(),
@@ -85,7 +84,7 @@ public sealed class TeamRegistrationStore(
             .Where(x => x.CompetitionId == competitionId && x.DeletedAt == null
                 && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
             .OrderBy(x => x.Name)
-            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
+            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.CaptainId, x.MemberIds,
                 x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt)).ToListAsync(ct);
 
     public async Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
@@ -172,7 +171,7 @@ public sealed class TeamRegistrationStore(
     public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken ct) =>
         db.Teams.AsNoTracking().Where(x => x.Id == teamId && x.CompetitionId == competitionId && x.DeletedAt == null
                 && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
-            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
+            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.CaptainId, x.MemberIds,
                 x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt)).SingleOrDefaultAsync(ct);
 
     public Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct) =>
@@ -180,7 +179,7 @@ public sealed class TeamRegistrationStore(
                 && team.MemberIds.Contains(userId)
                 && team.DeletedAt == null
                 && (includePending || team.RegistrationStatus == TeamRegistrationStatus.Approved))
-            .Select(team => new TeamView(team.Id, team.CompetitionId, team.Name, team.AvatarUrl,
+            .Select(team => new TeamView(team.Id, team.CompetitionId, team.Name,
                 team.CaptainId, team.MemberIds, team.RegistrationStatus, team.IsLocked,
                 team.IsBanned, team.RegisteredAt))
             .SingleOrDefaultAsync(ct);
@@ -207,7 +206,6 @@ public sealed class TeamRegistrationStore(
         if (entity.IsLocked) return new(null, TeamRegistrationFailure.TeamLocked);
         entity.Name = name;
         entity.NormalizedName = name.ToUpperInvariant();
-        entity.AvatarUrl = command.AvatarUrl;
         await events.RecordAsync(new(
             entity.CompetitionId,
             CompetitionEventKind.TeamUpdated,
@@ -257,7 +255,7 @@ public sealed class TeamRegistrationStore(
     }
 
     private static TeamView Map(Team x) => new(
-        x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
+        x.Id, x.CompetitionId, x.Name, x.CaptainId, x.MemberIds,
         x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt);
 
     private static string CreateInvitationToken()

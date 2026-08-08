@@ -4,12 +4,11 @@ using NoCTF.Domain.Teams;
 
 namespace NoCTF.Application.Teams.Registration;
 
-public sealed record CreateTeamCommand(Guid CompetitionId, Guid UserId, string Name, string? AvatarUrl, DateTimeOffset RegisteredAt);
+public sealed record CreateTeamCommand(Guid CompetitionId, Guid UserId, string Name, DateTimeOffset RegisteredAt);
 public sealed record TeamView(
     Guid Id,
     Guid CompetitionId,
     string Name,
-    string? AvatarUrl,
     Guid CaptainId,
     IReadOnlyList<Guid> MemberIds,
     TeamRegistrationStatus RegistrationStatus,
@@ -34,7 +33,7 @@ public enum TeamRegistrationFailure
 public sealed record TeamCreateStoreResult(TeamView? Team, TeamRegistrationFailure? Failure = null);
 public sealed record TeamReviewStoreResult(bool Changed, TeamRegistrationFailure? Failure = null);
 public sealed record TeamUpdateStoreResult(TeamView? Team, TeamRegistrationFailure? Failure = null);
-public sealed record UpdateTeamCommand(Guid CompetitionId, Guid TeamId, string Name, string? AvatarUrl);
+public sealed record UpdateTeamCommand(Guid CompetitionId, Guid TeamId, string Name);
 
 public interface ITeamRegistrationStore
 {

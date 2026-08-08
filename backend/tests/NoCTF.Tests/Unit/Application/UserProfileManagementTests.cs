@@ -103,13 +103,14 @@ public sealed class UserProfileManagementTests
     }
 
     [Test]
-    public async Task Avatar_switches_metadata_before_cleaning_the_previous_object()
+    public async Task Avatar_switches_to_the_new_file_reference()
     {
         var users = Substitute.For<IUserAuthenticationStore>();
         var objects = Substitute.For<IObjectStorage>();
         var images = Substitute.For<IAvatarImageProcessor>();
         const string storedKey = "users/new-avatar.png";
-        const string previousKey = "users/old-avatar.png";
+        var previousFileId = Guid.NewGuid();
+        var currentFileId = Guid.NewGuid();
         var normalized = new byte[] { 9, 8, 7 };
         images.Process(Arg.Any<ReadOnlyMemory<byte>>())
             .Returns(AvatarImageProcessingResult.Success(new(
@@ -126,10 +127,10 @@ public sealed class UserProfileManagementTests
             .Returns(new StoredObject(storedKey, "avatar.webp", "image/webp", 3, new string('A', 64)));
         users.ReplaceAvatarAsync(
                 UserId,
-                storedKey,
+                Arg.Is<StoredObject>(value => value != null && value.ObjectKey == storedKey),
                 Now,
                 Arg.Any<CancellationToken>())
-            .Returns(new UserAvatarReplacement(Profile(avatarObjectKey: storedKey), previousKey));
+            .Returns(new UserAvatarReplacement(Profile(avatarFileId: currentFileId), previousFileId));
         var replace = new ReplaceCurrentUserAvatar(users, objects, images);
 
         var result = await replace.ExecuteAsync(
@@ -142,10 +143,12 @@ public sealed class UserProfileManagementTests
         await Assert.That(result.Profile).IsNotNull();
         await users.Received(1).ReplaceAvatarAsync(
             UserId,
-            storedKey,
+            Arg.Is<StoredObject>(value => value != null && value.ObjectKey == storedKey),
             Now,
             Arg.Any<CancellationToken>());
-        await objects.Received(1).DeleteAsync(previousKey, CancellationToken.None);
+        await objects.DidNotReceive().DeleteAsync(
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -176,7 +179,7 @@ public sealed class UserProfileManagementTests
 
     private static UserProfile Profile(
         string? description = null,
-        string? avatarObjectKey = null,
+        Guid? avatarFileId = null,
         bool isEmailPublic = false) =>
         new(
             UserId,
@@ -186,6 +189,6 @@ public sealed class UserProfileManagementTests
             UserKind.Human,
             true,
             description,
-            avatarObjectKey,
+            avatarFileId,
             isEmailPublic);
 }

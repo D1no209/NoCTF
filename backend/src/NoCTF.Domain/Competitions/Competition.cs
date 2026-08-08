@@ -9,6 +9,8 @@ public sealed class Competition
     [MaxLength(160)]
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public Guid? PosterFileId { get; set; }
+    public NoCTF.Domain.Storage.StoredFile? PosterFile { get; set; }
     public Guid OwnerId { get; set; }
     public Guid[] ManagerIds { get; set; } = [];
     public Guid[] JudgeIds { get; set; } = [];
@@ -41,6 +43,4 @@ public sealed class Competition
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
-    public List<CompetitionLifecycleAudit> LifecycleAudits { get; set; } = [];
-    public List<CompetitionLeaderboardVisibilityAudit> LeaderboardVisibilityAudits { get; set; } = [];
 }

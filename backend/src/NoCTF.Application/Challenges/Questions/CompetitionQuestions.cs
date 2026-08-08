@@ -5,7 +5,6 @@ namespace NoCTF.Application.Challenges.Questions;
 
 public enum CompetitionQuestionAccess : short
 {
-    Public,
     Asker,
     Observer,
     Handler
@@ -24,8 +23,7 @@ public enum CompetitionQuestionFailure : short
     RevisionConflict,
     InvalidTransition,
     QuestionClosed,
-    EntryNotFound,
-    ReplyNotPublishable
+    EntryNotFound
 }
 
 public sealed record CompetitionQuestionCreationContext(
@@ -46,7 +44,6 @@ public sealed record CompetitionQuestionEntryView(
     CompetitionQuestionStatus? FromStatus,
     CompetitionQuestionStatus? ToStatus,
     Guid? TargetEntryId,
-    DateTimeOffset? PublishedAt,
     DateTimeOffset CreatedAt);
 
 public sealed record CompetitionQuestionView(
@@ -64,7 +61,6 @@ public sealed record CompetitionQuestionView(
     CompetitionQuestionStatus Status,
     CompetitionQuestionAccess Access,
     int Revision,
-    DateTimeOffset? PublishedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<CompetitionQuestionEntryView> Entries);
@@ -99,21 +95,12 @@ public sealed record ChangeCompetitionQuestionStatusCommand(
     int ExpectedRevision,
     DateTimeOffset Now);
 
-public sealed record PublishCompetitionQuestionCommand(
-    Guid CompetitionId,
-    Guid QuestionId,
-    Guid ReplyEntryId,
-    Guid ActorUserId,
-    int ExpectedRevision,
-    DateTimeOffset Now);
-
 public sealed record CompetitionQuestionQuery(
     Guid CompetitionId,
     Guid ActorUserId,
     Guid? CompetitionChallengeId,
     CompetitionQuestionSubject? Subject,
     CompetitionQuestionStatus? Status,
-    bool PublishedOnly,
     int Limit);
 
 public interface ICompetitionQuestionStore
@@ -140,9 +127,6 @@ public interface ICompetitionQuestionStore
         ChangeCompetitionQuestionStatusCommand command,
         CancellationToken cancellationToken);
 
-    Task<CompetitionQuestionMutationResult> PublishAsync(
-        PublishCompetitionQuestionCommand command,
-        CancellationToken cancellationToken);
 }
 
 public static class CompetitionQuestionRules
@@ -324,16 +308,4 @@ public sealed class ChangeCompetitionQuestionStatus(ICompetitionQuestionStore st
                 null,
                 CompetitionQuestionFailure.InvalidRequest))
             : store.ChangeStatusAsync(command, ct);
-}
-
-public sealed class PublishCompetitionQuestion(ICompetitionQuestionStore store)
-{
-    public Task<CompetitionQuestionMutationResult> ExecuteAsync(
-        PublishCompetitionQuestionCommand command,
-        CancellationToken ct = default) =>
-        command.ExpectedRevision < 0 || command.ReplyEntryId == Guid.Empty
-            ? Task.FromResult(new CompetitionQuestionMutationResult(
-                null,
-                CompetitionQuestionFailure.InvalidRequest))
-            : store.PublishAsync(command, ct);
 }

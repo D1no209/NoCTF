@@ -7,6 +7,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.Infrastructure.Persistence;
 using ZiggyCreatures.Caching.Fusion;
@@ -20,6 +21,13 @@ public sealed class FusionLeaderboardCache(
     ILeaderboardRefreshPublisher publisher,
     IFusionCache cache) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
+    private sealed record LifecyclePayload(
+        int SchemaVersion,
+        CompetitionStatus From,
+        CompetitionStatus To,
+        bool Automatic,
+        string? Reason);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly TimeSpan ttl = TimeSpan.FromSeconds(Math.Max(5, configuration.GetValue("Leaderboard:CacheTtlSeconds", 60)));
 
@@ -152,7 +160,8 @@ public sealed class FusionLeaderboardCache(
                         item.Submission.ReceivedAt,
                         item.ScoringEvent,
                         item.ScoringEvent.VictimTeamId,
-                        user.UserName))
+                        user.UserName,
+                        item.Submission.SubmittedFlag))
                 .ToListAsync(ct);
         }
         else
@@ -177,9 +186,22 @@ public sealed class FusionLeaderboardCache(
                         item.Submission.ReceivedAt,
                         item.ScoringEvent,
                         item.ScoringEvent.VictimTeamId,
-                        user.UserName))
+                        user.UserName,
+                        item.Submission.SubmittedFlag))
                 .ToListAsync(ct);
         }
+
+        var currentHintCosts = (await challengeInstances.ToListAsync(ct))
+            .SelectMany(item => item.Hints)
+            .ToDictionary(item => item.Id, item => item.Cost);
+        submissions = submissions
+            .Select(item => item with
+            {
+                HintCost = item.Event.SpecificationId is Guid hintId
+                    ? currentHintCosts.GetValueOrDefault(hintId)
+                    : null
+            })
+            .ToList();
 
         var systemEvents = historical
             ? db.ScoringEvents.IgnoreQueryFilters().AsNoTracking()
@@ -191,23 +213,38 @@ public sealed class FusionLeaderboardCache(
             : db.ScoringEvents.AsNoTracking()
                 .Where(scoringEvent => scoringEvent.CompetitionId == competitionId
                     && scoringEvent.SubmissionId == null);
-        var system = await systemEvents
-            .Select(scoringEvent => new LeaderboardSystemFact(
-                scoringEvent,
-                scoringEvent.Kind == ScoringEventKind.HintUnlock
-                    && scoringEvent.SpecificationId != null
-                    ? db.Set<CompetitionChallengeHint>()
-                        .Where(hint => hint.Id == scoringEvent.SpecificationId
-                            && (hint.DeletedAt == null
-                                || historical && hint.DeletedAt > projectedAt))
-                        .Select(hint => hint.Cost)
-                        .SingleOrDefault()
-                    : 0))
+        var hintCosts = (await challengeInstances.ToListAsync(ct))
+            .SelectMany(challenge => challenge.Hints)
+            .Where(hint => hint.HiddenAt == null || historical && hint.HiddenAt > projectedAt)
+            .ToDictionary(hint => hint.Id, hint => hint.Cost);
+        var loadedSystemEvents = await systemEvents.ToListAsync(ct);
+        var system = loadedSystemEvents.Select(scoringEvent => new LeaderboardSystemFact(
+            scoringEvent,
+            scoringEvent.Kind == ScoringEventKind.HintUnlock
+                && scoringEvent.SpecificationId is { } hintId
+                ? hintCosts.GetValueOrDefault(hintId)
+                : 0)).ToList();
+        var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
+            .Where(@event => @event.CompetitionId == competitionId
+                && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged
+                && (!historical || @event.OccurredAt <= projectedAt))
+            .OrderBy(@event => @event.OccurredAt)
             .ToListAsync(ct);
-        var lifecycleAudits = await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
-            .Where(audit => audit.CompetitionId == competitionId
-                && (!historical || audit.OccurredAt <= projectedAt))
-            .ToListAsync(ct);
+        var lifecycleAudits = lifecycleEvents.Select(@event =>
+        {
+            var payload = JsonSerializer.Deserialize<LifecyclePayload>(@event.PayloadJson, JsonOptions)!;
+            return new CompetitionLifecycleTransition
+            {
+                Id = @event.Id,
+                CompetitionId = @event.CompetitionId,
+                From = payload.From,
+                To = payload.To,
+                ActorId = @event.ActorUserId,
+                Reason = payload.Reason,
+                Automatic = payload.Automatic,
+                OccurredAt = @event.OccurredAt
+            };
+        }).ToList();
 
         IReadOnlyList<LeaderboardAwdRoundFact> awdRounds = [];
         if (competition.Mode == GameMode.Awd)

@@ -108,18 +108,6 @@ public sealed class CompetitionVisibilityStore(
 
         if (!scheduled && (before != after || after == CompetitionLeaderboardVisibility.Frozen))
         {
-            db.Set<CompetitionLeaderboardVisibilityAudit>().Add(new()
-            {
-                Id = Guid.CreateVersion7(command.Now),
-                CompetitionId = competition.Id,
-                From = before,
-                To = after,
-                DataCutoffAt = after == CompetitionLeaderboardVisibility.Frozen ? startsAt : null,
-                ActorId = command.ActorId,
-                Reason = NormalizeReason(command.Reason),
-                Automatic = false,
-                OccurredAt = command.Now
-            });
             await events.RecordAsync(new(
                 competition.Id,
                 CompetitionEventKind.LeaderboardVisibilityChanged,
@@ -127,6 +115,15 @@ public sealed class CompetitionVisibilityStore(
                 CompetitionEventVisibility.Public,
                 command.Now,
                 ActorUserId: command.ActorId,
+                PayloadJson: JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    from = before,
+                    to = after,
+                    dataCutoffAt = after == CompetitionLeaderboardVisibility.Frozen ? startsAt : null,
+                    automatic = false,
+                    reason = NormalizeReason(command.Reason)
+                }, JsonOptions),
                 CompetitionStatus: competition.Status,
                 LeaderboardVisibility: after), ct);
         }
@@ -206,25 +203,23 @@ public sealed class CompetitionVisibilityStore(
 
         competition.LeaderboardVisibilityAppliedAt = now;
         competition.UpdatedAt = now;
-        db.Set<CompetitionLeaderboardVisibilityAudit>().Add(new()
-        {
-            Id = Guid.CreateVersion7(now),
-            CompetitionId = competition.Id,
-            From = CompetitionLeaderboardVisibility.Normal,
-            To = competition.LeaderboardVisibility,
-            DataCutoffAt = competition.LeaderboardVisibility == CompetitionLeaderboardVisibility.Frozen
-                ? startsAt
-                : null,
-            Reason = "scheduled_visibility_started",
-            Automatic = true,
-            OccurredAt = now
-        });
         await events.RecordAsync(new(
             competition.Id,
             CompetitionEventKind.LeaderboardVisibilityChanged,
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Public,
             now,
+            PayloadJson: JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                from = CompetitionLeaderboardVisibility.Normal,
+                to = competition.LeaderboardVisibility,
+                dataCutoffAt = competition.LeaderboardVisibility == CompetitionLeaderboardVisibility.Frozen
+                    ? (DateTimeOffset?)startsAt
+                    : null,
+                automatic = true,
+                reason = "scheduled_visibility_started"
+            }, JsonOptions),
             CompetitionStatus: competition.Status,
             LeaderboardVisibility: competition.LeaderboardVisibility), ct);
         await LeaderboardRevision.IncrementAsync(db, competition.Id, ct);

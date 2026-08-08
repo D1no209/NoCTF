@@ -10,12 +10,17 @@ using NoCTF.Application.Notifications;
 using NoCTF.Domain.Notifications;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.API.Endpoints.Notifications;
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<NotificationKindProtocol>))]
 public enum NotificationKindProtocol
 {
+    Message,
+    CompetitionAnnouncement,
+    QuestionOpened,
+    QuestionStatusChanged,
     CompetitionLifecycleChanged,
     TeamRegistrationChanged,
     SubmissionEvaluated,
@@ -26,9 +31,6 @@ public enum NotificationKindProtocol
     ChallengePublished,
     HintPublished,
     TeamBanned,
-    CompetitionQuestionOpened,
-    CompetitionQuestionReplied,
-    CompetitionQuestionStatusChanged,
     CheatIncidentDetected,
     TeamBanCorrected,
     DataExportReady,
@@ -64,11 +66,16 @@ public sealed class ListNotificationsValidator : Validator<ListNotificationsRequ
 
 public sealed record NotificationResponse(
     Guid Id,
-    Guid? CompetitionId,
-    Guid? EntityId,
+    NotificationSourceType SourceType,
+    Guid? SourceId,
+    NotificationTargetType TargetType,
+    Guid TargetId,
     NotificationKindProtocol Kind,
-    JsonElement Payload,
-    DateTimeOffset CreatedAt);
+    JsonElement Content,
+    EntityReferenceKind? RelatedType,
+    Guid? RelatedId,
+    Guid? ReplyToId,
+    DateTimeOffset SentAt);
 
 public sealed record NotificationListResponse(
     IReadOnlyList<NotificationResponse> Items,
@@ -120,16 +127,21 @@ public sealed class ListNotificationsEndpoint(
             ct);
         var response = items.Select(item => new NotificationResponse(
             item.Id,
-            item.CompetitionId,
-            item.EntityId,
+            item.SourceType,
+            item.SourceId,
+            item.TargetType,
+            item.TargetId,
             NotificationProtocolMapper.ToProtocol(item.Kind),
-            JsonSerializer.Deserialize<JsonElement>(item.PayloadJson),
-            item.CreatedAt)).ToArray();
+            JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
+            item.RelatedType,
+            item.RelatedId,
+            item.ReplyToId,
+            item.SentAt)).ToArray();
         var next = items.Count == request.Limit
             ? cursors.Encode(
                 CursorEndpoint,
                 user.UserId.ToString("N"),
-                new(items[^1].CreatedAt, items[^1].Id))
+                new(items[^1].SentAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new NotificationListResponse(response, next));
     }

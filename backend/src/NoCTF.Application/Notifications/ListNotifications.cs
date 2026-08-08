@@ -1,14 +1,20 @@
 using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Application.Notifications;
 
 public sealed record NotificationView(
     Guid Id,
-    Guid? CompetitionId,
-    Guid? EntityId,
+    NotificationSourceType SourceType,
+    Guid? SourceId,
+    NotificationTargetType TargetType,
+    Guid TargetId,
     NotificationKind Kind,
-    string PayloadJson,
-    DateTimeOffset CreatedAt);
+    string ContentJson,
+    EntityReferenceKind? RelatedType,
+    Guid? RelatedId,
+    Guid? ReplyToId,
+    DateTimeOffset SentAt);
 
 public interface INotificationReader
 {
@@ -29,6 +35,12 @@ public interface INotificationReader
         KeysetNotificationPosition position,
         int limit,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<NotificationView>?> ReadThreadAsync(
+        Guid userId,
+        Guid notificationId,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<NotificationView>?>(null);
 }
 
 public sealed record KeysetNotificationPosition(DateTimeOffset CreatedAt, Guid Id);

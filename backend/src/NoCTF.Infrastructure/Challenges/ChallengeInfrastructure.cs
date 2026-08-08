@@ -63,7 +63,6 @@ internal static class ChallengeInfrastructure
         services.AddScoped<GetCompetitionQuestion>();
         services.AddScoped<AddCompetitionQuestionMessage>();
         services.AddScoped<ChangeCompetitionQuestionStatus>();
-        services.AddScoped<PublishCompetitionQuestion>();
         return services;
     }
 }

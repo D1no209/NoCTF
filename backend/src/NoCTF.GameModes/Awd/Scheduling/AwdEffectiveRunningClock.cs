@@ -6,7 +6,7 @@ namespace NoCTF.GameModes.Awd.Scheduling;
 public static class AwdEffectiveRunningClock
 {
     public static TimeSpan Calculate(
-        IEnumerable<CompetitionLifecycleAudit> audits,
+        IEnumerable<CompetitionLifecycleTransition> audits,
         DateTimeOffset at)
     {
         var total = TimeSpan.Zero;

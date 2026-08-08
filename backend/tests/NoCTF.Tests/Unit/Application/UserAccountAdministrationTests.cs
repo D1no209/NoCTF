@@ -10,8 +10,7 @@ public sealed class UserAccountAdministrationTests
     public async Task Deletion_requires_a_meaningful_reason_before_store_mutation()
     {
         var store = Substitute.For<IUserAccountAdministrationStore>();
-        var objects = Substitute.For<IObjectStorage>();
-        var accounts = new ManageUserAccounts(store, objects);
+        var accounts = new ManageUserAccounts(store);
 
         var result = await accounts.DeleteAsync(
             Guid.NewGuid(),
@@ -31,11 +30,10 @@ public sealed class UserAccountAdministrationTests
     }
 
     [Test]
-    public async Task Successful_anonymization_cleans_the_detached_avatar_object()
+    public async Task Successful_anonymization_returns_the_detached_file_id()
     {
         var store = Substitute.For<IUserAccountAdministrationStore>();
-        var objects = Substitute.For<IObjectStorage>();
-        const string avatarObjectKey = "users/avatar.webp";
+        var avatarFileId = Guid.NewGuid();
         store.DeleteAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<Guid>(),
@@ -45,8 +43,8 @@ public sealed class UserAccountAdministrationTests
                 Arg.Any<CancellationToken>())
             .Returns(new UserDeletionStoreResult(
                 UserDeletionState.Anonymized,
-                AvatarObjectKey: avatarObjectKey));
-        var accounts = new ManageUserAccounts(store, objects);
+                PreviousAvatarFileId: avatarFileId));
+        var accounts = new ManageUserAccounts(store);
 
         var result = await accounts.DeleteAsync(
             Guid.NewGuid(),
@@ -56,6 +54,6 @@ public sealed class UserAccountAdministrationTests
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.State).IsEqualTo(UserDeletionState.Anonymized);
-        await objects.Received(1).DeleteAsync(avatarObjectKey, CancellationToken.None);
+        await Assert.That(result.PreviousAvatarFileId).IsEqualTo(avatarFileId);
     }
 }

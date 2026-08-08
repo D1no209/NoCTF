@@ -25,3 +25,21 @@ public sealed record FixSubmissionReceived(
     Guid UserId,
     Guid PatchUploadId,
     DateTimeOffset ReceivedAt);
+
+public sealed record HintUnlockSubmissionReceived(
+    Guid SubmissionId,
+    Guid CompetitionId,
+    Guid TeamId,
+    Guid CompetitionChallengeId,
+    Guid UserId,
+    Guid HintId,
+    DateTimeOffset ReceivedAt);
+
+public sealed record ManualAdjustmentSubmissionReceived(
+    Guid SubmissionId,
+    Guid CompetitionId,
+    Guid TeamId,
+    Guid CompetitionChallengeId,
+    Guid UserId,
+    int Delta,
+    DateTimeOffset ReceivedAt);
