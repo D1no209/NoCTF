@@ -26,7 +26,6 @@ public interface IBusinessFileReferenceStore
         Guid competitionId,
         Guid teamId,
         Guid fileId,
-        StoredObject stored,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
@@ -47,7 +46,6 @@ public interface IBusinessFileReferenceStore
         bool isAdministrator,
         Guid competitionId,
         Guid fileId,
-        StoredObject stored,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
@@ -66,7 +64,8 @@ public sealed record BusinessFileContent(Stream Content, string ContentType, str
 
 public sealed class ManageBusinessImages(
     IBusinessFileReferenceStore references,
-    IObjectStorage objects)
+    IObjectStorage objects,
+    ManagedFileUploads uploads)
 {
     public async Task<BusinessFileReferenceResult> ReplaceTeamAvatarAsync(
         Guid actorUserId,
@@ -80,17 +79,33 @@ public sealed class ManageBusinessImages(
         CancellationToken ct = default)
     {
         var fileId = Guid.CreateVersion7(now);
-        var stored = await objects.PutAsync(
+        var uploaded = await uploads.CreateAsync(
+            fileId,
             $"teams/{teamId:N}/avatars/{fileId:N}",
             NormalizeFileName(fileName),
             NormalizeContentType(contentType),
             content,
+            now,
             ct);
-        var result = await references.ReplaceTeamAvatarAsync(
-            actorUserId, isAdministrator, competitionId, teamId, fileId, stored, now, ct);
-        if (result.State != BusinessFileReferenceState.Updated)
-            await TryDeleteAsync(stored.ObjectKey);
-        return result;
+        var attached = false;
+        try
+        {
+            var result = await references.ReplaceTeamAvatarAsync(
+                actorUserId,
+                isAdministrator,
+                competitionId,
+                teamId,
+                uploaded.FileId,
+                now,
+                ct);
+            attached = result.State == BusinessFileReferenceState.Updated;
+            return result;
+        }
+        finally
+        {
+            if (!attached)
+                await uploads.AbandonAsync(uploaded.FileId);
+        }
     }
 
     public Task<BusinessFileReferenceResult> ClearTeamAvatarAsync(
@@ -121,17 +136,32 @@ public sealed class ManageBusinessImages(
         CancellationToken ct = default)
     {
         var fileId = Guid.CreateVersion7(now);
-        var stored = await objects.PutAsync(
+        var uploaded = await uploads.CreateAsync(
+            fileId,
             $"competitions/{competitionId:N}/posters/{fileId:N}",
             NormalizeFileName(fileName),
             NormalizeContentType(contentType),
             content,
+            now,
             ct);
-        var result = await references.ReplaceCompetitionPosterAsync(
-            actorUserId, isAdministrator, competitionId, fileId, stored, now, ct);
-        if (result.State != BusinessFileReferenceState.Updated)
-            await TryDeleteAsync(stored.ObjectKey);
-        return result;
+        var attached = false;
+        try
+        {
+            var result = await references.ReplaceCompetitionPosterAsync(
+                actorUserId,
+                isAdministrator,
+                competitionId,
+                uploaded.FileId,
+                now,
+                ct);
+            attached = result.State == BusinessFileReferenceState.Updated;
+            return result;
+        }
+        finally
+        {
+            if (!attached)
+                await uploads.AbandonAsync(uploaded.FileId);
+        }
     }
 
     public Task<BusinessFileReferenceResult> ClearCompetitionPosterAsync(
@@ -147,18 +177,6 @@ public sealed class ManageBusinessImages(
         await references.GetCompetitionPosterAsync(competitionId, ct) is { } file
             ? new(await objects.OpenReadAsync(file.ObjectKey, ct), file.ContentType, file.FileName)
             : null;
-
-    private async Task TryDeleteAsync(string objectKey)
-    {
-        try
-        {
-            await objects.DeleteAsync(objectKey, CancellationToken.None);
-        }
-        catch
-        {
-            // The object has no database reference; bucket lifecycle cleanup is the final fallback.
-        }
-    }
 
     private static string NormalizeFileName(string value) =>
         string.IsNullOrWhiteSpace(value) ? "image" : value.Trim()[..Math.Min(value.Trim().Length, 260)];

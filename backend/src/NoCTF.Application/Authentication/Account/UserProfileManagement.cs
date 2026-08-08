@@ -79,7 +79,7 @@ public sealed class UpdateCurrentUserProfile(IUserAuthenticationStore users)
 
 public sealed class ReplaceCurrentUserAvatar(
     IUserAuthenticationStore users,
-    IObjectStorage objects,
+    ManagedFileUploads uploads,
     IAvatarImageProcessor imageProcessor)
 {
     public async Task<AvatarReplacementResult> ExecuteAsync(
@@ -101,48 +101,41 @@ public sealed class ReplaceCurrentUserAvatar(
         if (!MatchesSourceMetadata(fileName, contentType, image.SourceContentType))
             return AvatarReplacementResult.Rejected(AvatarImageFailure.SourceMetadataMismatch);
 
-        var objectKey = $"users/{userId:N}/avatars/{Guid.CreateVersion7(now):N}.{image.Extension}";
-        StoredObject stored;
+        var fileId = Guid.CreateVersion7(now);
+        var objectKey = $"users/{userId:N}/avatars/{fileId:N}.{image.Extension}";
+        ManagedFileUpload uploaded;
         await using (var stream = new MemoryStream(image.Content.ToArray(), writable: false))
         {
-            stored = await objects.PutAsync(
+            uploaded = await uploads.CreateAsync(
+                fileId,
                 objectKey,
                 $"avatar.{image.Extension}",
                 image.ContentType,
                 stream,
+                now,
                 ct);
         }
 
         UserAvatarReplacement? replacement;
+        var attached = false;
         try
         {
-            replacement = await users.ReplaceAvatarAsync(userId, stored, now, ct);
+            replacement = await users.ReplaceAvatarAsync(
+                userId,
+                uploaded.FileId,
+                now,
+                ct);
+            attached = replacement is not null;
         }
-        catch
+        finally
         {
-            await TryDeleteAsync(stored.ObjectKey);
-            throw;
+            if (!attached)
+                await uploads.AbandonAsync(uploaded.FileId);
         }
 
-        if (replacement is null)
-        {
-            await TryDeleteAsync(stored.ObjectKey);
-            return AvatarReplacementResult.MissingUser();
-        }
-
-        return AvatarReplacementResult.Success(replacement.Profile);
-    }
-
-    private async Task TryDeleteAsync(string objectKey)
-    {
-        try
-        {
-            await objects.DeleteAsync(objectKey, CancellationToken.None);
-        }
-        catch
-        {
-            // The database remains the source of truth; orphan cleanup is best effort.
-        }
+        return replacement is null
+            ? AvatarReplacementResult.MissingUser()
+            : AvatarReplacementResult.Success(replacement.Profile);
     }
 
     private static bool MatchesSourceMetadata(

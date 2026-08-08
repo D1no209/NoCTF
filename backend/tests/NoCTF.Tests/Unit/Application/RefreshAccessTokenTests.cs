@@ -68,7 +68,7 @@ public sealed class RefreshAccessTokenTests
             bool isEmailPublic,
             DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.FromResult<UserProfile?>(null);
-        public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, StoredObject storedObject,
+        public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, Guid fileId,
             DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.FromResult<UserAvatarReplacement?>(null);
         public Task<string?> GetAvatarObjectKeyAsync(Guid userId,

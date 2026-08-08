@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.RefreshJwt;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -36,6 +37,7 @@ public sealed class UserProfilePersistenceTests
             }));
             var now = DateTimeOffset.UtcNow;
             var userId = Guid.CreateVersion7(now);
+            var avatarFileId = Guid.CreateVersion7(now.AddMinutes(2));
             const string avatarObjectKey = "users/profile/avatar.webp";
 
             await using (var db = new NoCtfDbContext(options))
@@ -58,14 +60,20 @@ public sealed class UserProfilePersistenceTests
                     true,
                     now.AddMinutes(1),
                     cancellationToken);
+                db.Files.Add(new StoredFile
+                {
+                    Id = avatarFileId,
+                    ObjectKey = avatarObjectKey,
+                    FileName = "avatar.webp",
+                    ContentType = "image/webp",
+                    ByteLength = 4,
+                    Sha256 = new byte[32],
+                    CreatedAt = now.AddMinutes(2)
+                });
+                await db.SaveChangesAsync(cancellationToken);
                 await users.ReplaceAvatarAsync(
                     userId,
-                    new NoCTF.Application.Storage.StoredObject(
-                        avatarObjectKey,
-                        "avatar.webp",
-                        "image/webp",
-                        4,
-                        new string('A', 64)),
+                    avatarFileId,
                     now.AddMinutes(2),
                     cancellationToken);
             }

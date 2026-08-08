@@ -49,7 +49,7 @@ public interface IUserAuthenticationStore
         CancellationToken cancellationToken);
     Task<UserAvatarReplacement?> ReplaceAvatarAsync(
         Guid userId,
-        StoredObject storedObject,
+        Guid fileId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<BusinessFileReference?> GetAvatarFileAsync(

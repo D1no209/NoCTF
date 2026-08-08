@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
@@ -29,6 +30,7 @@ public sealed class PlatformConfigurationPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             var now = DateTimeOffset.UtcNow;
+            var logoFileId = Guid.CreateVersion7(now);
             using var cacheServices = new ServiceCollection()
                 .AddFusionCache(NoCtfCacheNames.ReadModels)
                 .Services
@@ -52,6 +54,25 @@ public sealed class PlatformConfigurationPersistenceTests
                 await Assert.That(seeded.Name).IsEqualTo("NoCTF");
                 await Assert.That(updated).IsNotNull();
                 await Assert.That(updated!.Revision).IsEqualTo(seeded.Revision + 1);
+
+                db.Files.Add(new StoredFile
+                {
+                    Id = logoFileId,
+                    ObjectKey = "platform/logo/test.png",
+                    FileName = "test.png",
+                    ContentType = "image/png",
+                    ByteLength = 8,
+                    Sha256 = new byte[32],
+                    CreatedAt = now
+                });
+                await db.SaveChangesAsync(cancellationToken);
+                var logo = await store.ReplaceLogoAsync(
+                    logoFileId,
+                    updated.Revision,
+                    now.AddSeconds(1),
+                    cancellationToken);
+                await Assert.That(logo).IsNotNull();
+                await Assert.That(logo!.Configuration.LogoFileId).IsEqualTo(logoFileId);
             }
 
             await using (var db = new NoCtfDbContext(options))
@@ -69,6 +90,7 @@ public sealed class PlatformConfigurationPersistenceTests
                 await Assert.That(persisted.Name).IsEqualTo("NoCTF Arena");
                 await Assert.That(persisted.Description)
                     .IsEqualTo("Production competition platform");
+                await Assert.That(persisted.LogoFileId).IsEqualTo(logoFileId);
             }
         });
     }
