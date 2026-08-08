@@ -1,8 +1,12 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -53,30 +57,26 @@ public sealed class PlatformAuditLogStoreTests
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
                     CreatedAt = now,
-                    UpdatedAt = now,
-                    LifecycleAudits =
-                    [
-                        new CompetitionLifecycleAudit
-                        {
-                            Id = Guid.CreateVersion7(now.AddMilliseconds(3)),
-                            CompetitionId = competitionId,
-                            From = CompetitionStatus.Published,
-                            To = CompetitionStatus.Running,
-                            ActorId = actorId,
-                            Reason = "start",
-                            OccurredAt = now.AddMinutes(1)
-                        }
-                    ]
+                    UpdatedAt = now
                 });
-                seed.UserAccountLifecycleAudits.Add(new UserAccountLifecycleAudit
+                seed.Notifications.Add(new Notification
                 {
                     Id = Guid.CreateVersion7(now.AddMilliseconds(4)),
-                    TargetUserId = targetId,
-                    TargetUserName = "audit-target",
-                    ActorUserId = actorId,
-                    Action = UserAccountLifecycleAction.Disabled,
-                    Reason = "policy",
-                    OccurredAt = now.AddMinutes(2)
+                    SourceType = NotificationSourceType.User,
+                    SourceId = actorId,
+                    TargetType = NotificationTargetType.PlatformAdministrators,
+                    TargetId = Guid.Empty,
+                    Kind = NotificationKind.UserAccountLifecycleChanged,
+                    ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
+                        1,
+                        targetId,
+                        "audit-target",
+                        UserAccountLifecycleAction.Disabled,
+                        "policy",
+                        false), new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    RelatedType = EntityReferenceKind.User,
+                    RelatedId = targetId,
+                    SentAt = now.AddMinutes(2)
                 });
                 seed.CompetitionEvents.Add(new CompetitionEvent
                 {
@@ -86,8 +86,14 @@ public sealed class PlatformAuditLogStoreTests
                     Level = CompetitionEventLevel.Information,
                     Visibility = CompetitionEventVisibility.Public,
                     ActorUserId = actorId,
-                    CompetitionStatus = CompetitionStatus.Running,
-                    Reason = "started from immutable event",
+                    SubjectType = EntityReferenceKind.Competition,
+                    SubjectId = competitionId,
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        competitionStatus = CompetitionStatus.Running,
+                        reason = "started from immutable event"
+                    }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
                     OccurredAt = now.AddMinutes(1)
                 });
                 seed.CompetitionEvents.Add(new CompetitionEvent
@@ -98,7 +104,13 @@ public sealed class PlatformAuditLogStoreTests
                     Level = CompetitionEventLevel.Warning,
                     Visibility = CompetitionEventVisibility.Staff,
                     ActorUserId = actorId,
-                    Reason = "runtime state changed",
+                    SubjectType = EntityReferenceKind.Competition,
+                    SubjectId = competitionId,
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        reason = "runtime state changed"
+                    }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
                     OccurredAt = now.AddMinutes(1.5)
                 });
                 await seed.SaveChangesAsync(cancellationToken);

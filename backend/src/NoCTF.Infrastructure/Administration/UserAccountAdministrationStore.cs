@@ -1,4 +1,5 @@
 using System.Data;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Identity;
@@ -15,6 +16,9 @@ public sealed class UserAccountAdministrationStore(
     ITransactionalMessageOutbox? messageOutbox = null)
     : IUserAccountAdministrationStore
 {
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     private readonly ITransactionalMessageOutbox outbox =
         messageOutbox ?? new OpenApiTransactionalMessageOutbox();
     public async Task<UserDeletionPreview?> PreviewDeletionAsync(
@@ -66,6 +70,12 @@ public sealed class UserAccountAdministrationStore(
 
         if (mode == UserDeletionMode.HardDelete)
         {
+            RecordLifecycleFact(
+                user,
+                actorUserId,
+                UserAccountLifecycleAction.PhysicallyDeleted,
+                reason,
+                now);
             db.Users.Remove(user);
             if (previousAvatarFileId is { } previous)
                 await outbox.PublishAsync(new CleanupFile(previous));
@@ -90,12 +100,48 @@ public sealed class UserAccountAdministrationStore(
         user.AvatarFile = null;
         user.IsEmailPublic = false;
         user.UpdatedAt = now;
+        RecordLifecycleFact(
+            user,
+            actorUserId,
+            UserAccountLifecycleAction.Anonymized,
+            reason,
+            now,
+            originalUserName);
         if (previousAvatarFileId is { } previousFileId)
             await outbox.PublishAsync(new CleanupFile(previousFileId));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return new(UserDeletionState.Anonymized, preview, previousAvatarFileId);
+    }
+
+    private void RecordLifecycleFact(
+        User user,
+        Guid actorUserId,
+        UserAccountLifecycleAction action,
+        string reason,
+        DateTimeOffset occurredAt,
+        string? targetUserName = null)
+    {
+        db.Notifications.Add(new Notification
+        {
+            Id = Guid.CreateVersion7(occurredAt),
+            SourceType = NotificationSourceType.User,
+            SourceId = actorUserId,
+            TargetType = NotificationTargetType.PlatformAdministrators,
+            TargetId = Guid.Empty,
+            Kind = NotificationKind.UserAccountLifecycleChanged,
+            ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
+                1,
+                user.Id,
+                targetUserName ?? user.UserName,
+                action,
+                reason,
+                false), JsonOptions),
+            RelatedType = EntityReferenceKind.User,
+            RelatedId = user.Id,
+            SentAt = occurredAt
+        });
     }
 
     private async Task<UserDeletionPreview> BuildPreviewAsync(
@@ -145,8 +191,10 @@ public sealed class UserAccountAdministrationStore(
             db.Notifications.CountAsync(notification =>
                 notification.SourceType == NotificationSourceType.User
                     && notification.SourceId == user.Id
-                || notification.TargetType == NotificationTargetType.User
-                    && notification.TargetId == user.Id, ct));
+                || (notification.TargetType == NotificationTargetType.User
+                    && notification.TargetId == user.Id)
+                || (notification.RelatedType == EntityReferenceKind.User
+                    && notification.RelatedId == user.Id), ct));
         await AddReferenceAsync(
             UserDeletionReferenceKind.ScoringEvent,
             db.ScoringEvents.CountAsync(scoringEvent =>

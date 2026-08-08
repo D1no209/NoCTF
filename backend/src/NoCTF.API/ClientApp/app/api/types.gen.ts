@@ -294,7 +294,7 @@ export type NoCtfDomainNotificationsNotificationSourceType = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfDomainNotificationsNotificationTargetType = 0 | 1 | 2 | 3 | 4;
 
-export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'Message' | 'CompetitionAnnouncement' | 'QuestionOpened' | 'QuestionStatusChanged' | 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'SubmissionEvaluated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'DataExportReady' | 'DataExportFailed';
+export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'Message' | 'CompetitionAnnouncement' | 'QuestionOpened' | 'QuestionStatusChanged' | 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'SubmissionEvaluated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'DataExportReady' | 'DataExportFailed' | 'UserAccountLifecycleChanged';
 
 export type NoCtfDomainSharedEntityReferenceKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13;
 

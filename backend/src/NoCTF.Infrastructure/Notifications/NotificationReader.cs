@@ -1,6 +1,7 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Notifications;
+using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 
 namespace NoCTF.Infrastructure.Notifications;
@@ -139,8 +140,10 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                          AND {{userId}} = ANY(t.member_ids)))
                    OR (n.target_type = 4 AND EXISTS (
                        SELECT 1 FROM users AS u
-                       WHERE u.id = {{userId}} AND u.kind = 0 AND u.role = 1
-                         AND u.account_status = 0))
+                       WHERE u.id = {{userId}}
+                         AND u.kind = {{(short)UserKind.Human}}
+                         AND u.role = {{(short)UserRole.Administrator}}
+                         AND u.account_status = {{(short)UserAccountStatus.Active}}))
                 UNION
                 SELECT n.* FROM notifications AS n
                 WHERE n.kind = 2 AND n.source_type = 1 AND n.source_id = {{userId}}
