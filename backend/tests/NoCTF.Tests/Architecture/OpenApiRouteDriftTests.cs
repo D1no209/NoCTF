@@ -28,11 +28,12 @@ public partial class OpenApiRouteDriftTests
             .Where(match => match.Success)
             .Select(match =>
                 $"{match.Groups[1].Value} {match.Groups[2].Value}")
+            .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
 
         await Assert.That(actual).IsEquivalentTo(expected);
-        await Assert.That(actual).Count().IsEqualTo(182);
+        await Assert.That(actual).Count().IsEqualTo(189);
 
         var operationIds = swagger.RootElement.GetProperty("paths")
             .EnumerateObject()

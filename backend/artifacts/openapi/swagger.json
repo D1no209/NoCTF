@@ -4413,7 +4413,7 @@
         ],
         "summary": "Queues a signed manual score adjustment.",
         "description": "The delta is persisted as the canonical signed Int32 SubmittedFlag on a ManualAdjust submission.",
-        "operationId": "CreateManualAdjustmentEndpoint",
+        "operationId": "AdminCreateManualAdjustment",
         "parameters": [
           {
             "name": "competitionId",
@@ -7286,7 +7286,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Clears a competition poster and queues unreferenced File cleanup.",
+        "summary": "Clears a competition poster.",
+        "description": "Removes the poster reference and queues cleanup when the immutable File is no longer referenced.",
         "operationId": "AdminCompetitionPoster_Clear",
         "parameters": [
           {
@@ -7322,7 +7323,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Replaces a competition poster with an immutable File reference.",
+        "summary": "Replaces a competition poster.",
+        "description": "Stores a validated image as an immutable File and atomically replaces the competition poster reference.",
         "operationId": "AdminCompetitionPoster_Replace",
         "parameters": [
           {
@@ -7392,7 +7394,7 @@
         ],
         "summary": "Publish one competition announcement.",
         "description": "Management announcements default to collaborators; participant visibility must be explicit.",
-        "operationId": "CreateCompetitionAnnouncementEndpoint",
+        "operationId": "AdminCreateCompetitionAnnouncement",
         "parameters": [
           {
             "name": "competitionId",

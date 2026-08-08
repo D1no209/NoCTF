@@ -46,6 +46,7 @@ public sealed class CreateCompetitionAnnouncementEndpoint(
     {
         Post("/admin/competitions/{competitionId}/announcements");
         AuthSchemes("Bearer");
+        Description(builder => builder.WithName("AdminCreateCompetitionAnnouncement"));
         Summary(summary =>
         {
             summary.Summary = "Publish one competition announcement.";

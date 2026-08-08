@@ -15,7 +15,12 @@ public sealed class ClearCompetitionPosterEndpoint(
         Delete("/admin/competitions/{competitionId}/poster");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminCompetitionPoster_Clear"));
-        Summary(summary => summary.Summary = "Clears a competition poster and queues unreferenced File cleanup.");
+        Summary(summary =>
+        {
+            summary.Summary = "Clears a competition poster.";
+            summary.Description =
+                "Removes the poster reference and queues cleanup when the immutable File is no longer referenced.";
+        });
     }
 
     public override async Task<Results<NoContent, NotFound, ForbidHttpResult>> ExecuteAsync(

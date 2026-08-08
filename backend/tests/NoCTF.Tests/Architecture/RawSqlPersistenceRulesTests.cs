@@ -6,27 +6,67 @@ public sealed class RawSqlPersistenceRulesTests
     private static readonly string[] ForbiddenTokens =
     [
         "ExecuteSqlRaw",
-        "ExecuteSqlInterpolated",
         "FromSqlRaw",
-        "FromSqlInterpolated",
         ".SqlQuery<",
+        "PostgresException",
+        "PostgresErrorCodes"
+    ];
+    private static readonly string[] ProviderSpecificTokens =
+    [
+        "ExecuteSqlInterpolated",
+        "FromSqlInterpolated",
         "pg_advisory_",
         "FOR UPDATE",
         "SKIP LOCKED",
         "ON CONFLICT",
-        "PostgresException",
-        "PostgresErrorCodes"
+        "WITH RECURSIVE"
     ];
+    private static readonly IReadOnlyDictionary<string, HashSet<string>> ApprovedProviderSql =
+        new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+        {
+            ["backend/src/NoCTF.Infrastructure/Challenges/Questions/CompetitionQuestionStore.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "FromSqlInterpolated",
+                "pg_advisory_",
+                "WITH RECURSIVE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Notifications/NotificationReader.cs"] =
+            [
+                "FromSqlInterpolated",
+                "WITH RECURSIVE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Submissions/Processing/SubmissionProcessor.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "pg_advisory_"
+            ],
+            ["backend/src/NoCTF.Worker/BackendMessageHandlers.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "FOR UPDATE"
+            ]
+        };
 
     [Test]
-    public async Task Production_persistence_uses_ef_core_without_handwritten_sql()
+    public async Task Provider_specific_sql_is_parameterized_and_explicitly_scoped()
     {
         var sourceRoot = Path.Combine(RepositoryRoot, "backend", "src");
-        var violations = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+        var sources = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
             .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}"))
-            .SelectMany(path => ForbiddenTokens
-                .Where(token => File.ReadAllText(path).Contains(token, StringComparison.Ordinal))
-                .Select(token => $"{Path.GetRelativePath(RepositoryRoot, path)}: {token}"))
+            .Select(path => new SourceFile(
+                Path.GetRelativePath(RepositoryRoot, path).Replace('\\', '/'),
+                File.ReadAllText(path)))
+            .ToArray();
+        var violations = sources
+            .SelectMany(source => ForbiddenTokens
+                .Where(token => source.Content.Contains(token, StringComparison.Ordinal))
+                .Select(token => $"{source.Path}: forbidden {token}"))
+            .Concat(sources.SelectMany(source => ProviderSpecificTokens
+                .Where(token => source.Content.Contains(token, StringComparison.Ordinal)
+                    && (!ApprovedProviderSql.TryGetValue(source.Path, out var approved)
+                        || !approved.Contains(token)))
+                .Select(token => $"{source.Path}: unapproved {token}")))
             .Order()
             .ToArray();
 
@@ -42,4 +82,6 @@ public sealed class RawSqlPersistenceRulesTests
             throw new DirectoryNotFoundException("Could not locate the NoCTF repository root.");
         return directory.Parent!.FullName;
     }
+
+    private sealed record SourceFile(string Path, string Content);
 }

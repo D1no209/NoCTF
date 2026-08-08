@@ -4200,7 +4200,7 @@ export type AdminUpholdTeamBanAppealResponses = {
 
 export type AdminUpholdTeamBanAppealResponse = AdminUpholdTeamBanAppealResponses[keyof AdminUpholdTeamBanAppealResponses];
 
-export type CreateManualAdjustmentEndpointData = {
+export type AdminCreateManualAdjustmentData = {
     body: NoCtfapiEndpointsAdministrationSubmissionsCreateManualAdjustmentRequest;
     path: {
         competitionId: string;
@@ -4209,7 +4209,7 @@ export type CreateManualAdjustmentEndpointData = {
     url: '/api/v1/admin/competitions/{competitionId}/submissions/manual-adjustments';
 };
 
-export type CreateManualAdjustmentEndpointErrors = {
+export type AdminCreateManualAdjustmentErrors = {
     /**
      * Bad Request
      */
@@ -4224,16 +4224,16 @@ export type CreateManualAdjustmentEndpointErrors = {
     403: unknown;
 };
 
-export type CreateManualAdjustmentEndpointError = CreateManualAdjustmentEndpointErrors[keyof CreateManualAdjustmentEndpointErrors];
+export type AdminCreateManualAdjustmentError = AdminCreateManualAdjustmentErrors[keyof AdminCreateManualAdjustmentErrors];
 
-export type CreateManualAdjustmentEndpointResponses = {
+export type AdminCreateManualAdjustmentResponses = {
     /**
      * Accepted
      */
     202: NoCtfapiEndpointsSubmissionsAcceptedSubmissionResponse;
 };
 
-export type CreateManualAdjustmentEndpointResponse = CreateManualAdjustmentEndpointResponses[keyof CreateManualAdjustmentEndpointResponses];
+export type AdminCreateManualAdjustmentResponse = AdminCreateManualAdjustmentResponses[keyof AdminCreateManualAdjustmentResponses];
 
 export type AdminGetSubmissionData = {
     body?: never;
@@ -5741,7 +5741,7 @@ export type AdminCompetitionPosterReplaceResponses = {
 
 export type AdminCompetitionPosterReplaceResponse = AdminCompetitionPosterReplaceResponses[keyof AdminCompetitionPosterReplaceResponses];
 
-export type CreateCompetitionAnnouncementEndpointData = {
+export type AdminCreateCompetitionAnnouncementData = {
     body: NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionAnnouncementRequest;
     path: {
         competitionId: string;
@@ -5750,7 +5750,7 @@ export type CreateCompetitionAnnouncementEndpointData = {
     url: '/api/v1/admin/competitions/{competitionId}/announcements';
 };
 
-export type CreateCompetitionAnnouncementEndpointErrors = {
+export type AdminCreateCompetitionAnnouncementErrors = {
     /**
      * Bad Request
      */
@@ -5769,16 +5769,16 @@ export type CreateCompetitionAnnouncementEndpointErrors = {
     404: unknown;
 };
 
-export type CreateCompetitionAnnouncementEndpointError = CreateCompetitionAnnouncementEndpointErrors[keyof CreateCompetitionAnnouncementEndpointErrors];
+export type AdminCreateCompetitionAnnouncementError = AdminCreateCompetitionAnnouncementErrors[keyof AdminCreateCompetitionAnnouncementErrors];
 
-export type CreateCompetitionAnnouncementEndpointResponses = {
+export type AdminCreateCompetitionAnnouncementResponses = {
     /**
      * Created
      */
     201: NoCtfapiEndpointsNotificationsNotificationResponse;
 };
 
-export type CreateCompetitionAnnouncementEndpointResponse = CreateCompetitionAnnouncementEndpointResponses[keyof CreateCompetitionAnnouncementEndpointResponses];
+export type AdminCreateCompetitionAnnouncementResponse = AdminCreateCompetitionAnnouncementResponses[keyof AdminCreateCompetitionAnnouncementResponses];
 
 export type AdminListCompetitionsData = {
     body?: never;
