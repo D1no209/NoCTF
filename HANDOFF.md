@@ -126,6 +126,20 @@
 - 本轮未修改数据模型、数据表或 migration。只创建本地提交，未 push、未部署；生产仍运行
   `0.1.0-alpha.1`，等待新的明确授权。
 
+## 2026-08-09 Alpha.3 生产部署
+
+- 用户明确授权后，`b640f075`、`4544de6a`、`17f2ca11`、`53104c14` 已快进推送至远程
+  `main`；生产服务器 `/root/NoCTF` 同步至 `53104c14` 并完成镜像构建与 Compose 滚动重建。
+- 生产访问 GitHub Release 下载 Kompose 时再次长时间无响应；部署终止了尚未切换服务的卡住构建，
+  复用原生产 Runner 中相同的 Kompose `v1.38.0` 工具层，仅重新编译并替换 Runner 应用程序集。
+  临时 Dockerfile、日志和状态文件均已删除，仓库文件和未跟踪的生产 Compose 覆盖文件未被改写。
+- Migration 容器退出码为 0；API、Runner、PostgreSQL、Redis 均为 healthy，Worker 正常运行。
+  API、Worker、Runner 程序集版本全部确认为 `0.1.0-alpha.3`；HTTPS `/` 与 `/health` 返回 200，
+  新精确终止路由的未认证请求返回 401。新容器启动后的 API、Worker、Runner 日志中无 `fail:`、
+  `crit:`、未处理异常或 Fatal。
+- 已清理本次部署的临时文件、14.46 GB BuildKit 缓存和 1.315 GB 无引用镜像；根分区占用由构建
+  峰值 82% 降至 61%，剩余约 16 GB。数据库、Redis、上传卷和 HTTPS 证书保持原有数据与配置。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
