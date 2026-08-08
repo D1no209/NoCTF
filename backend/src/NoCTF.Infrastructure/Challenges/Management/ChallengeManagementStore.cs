@@ -5,7 +5,6 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Challenges;
 using NoCTF.Application.Messaging;
-using Npgsql;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 
@@ -31,9 +30,8 @@ public sealed class ChallengeManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
-        await ChallengeWriteLock.AcquireAsync(db, command.ChallengeId, ct);
         var competitionMode = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == command.CompetitionId)
             .Select(competition => competition.Mode)
@@ -49,6 +47,26 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.TemplateNotFound);
         if (template.Mode != competitionMode)
             return new(null, ChallengeMutationFailure.TemplateModeMismatch);
+        var templateFence = await db.Challenges
+            .Where(challenge =>
+                challenge.Id == command.ChallengeId
+                && challenge.Mode == competitionMode
+                && challenge.Revision == template.Revision)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(
+                challenge => challenge.Revision,
+                challenge => challenge.Revision + 1), ct);
+        if (templateFence == 0)
+            return new(null, ChallengeMutationFailure.RevisionConflict);
+        template.Revision = checked(template.Revision + 1);
+        var trackedTemplate = db.ChangeTracker.Entries<Challenge>()
+            .SingleOrDefault(entry => entry.Entity.Id == template.Id);
+        if (trackedTemplate is not null)
+        {
+            var revision = trackedTemplate.Property(challenge => challenge.Revision);
+            revision.OriginalValue = template.Revision;
+            revision.CurrentValue = template.Revision;
+            revision.IsModified = false;
+        }
 
         var entity = new CompetitionChallenge
         {
@@ -77,9 +95,26 @@ public sealed class ChallengeManagementStore(
             await outbox.FlushOutgoingMessagesAsync();
             return new(Map(entity, template));
         }
-        catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
+        catch (DbUpdateConcurrencyException)
         {
-            return new(null, MapCompetitionChallengeConflict(exception));
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return new(null, ChallengeMutationFailure.RevisionConflict);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            var failure = await FindCompetitionChallengeConflictAsync(
+                entity.Id,
+                entity.CompetitionId,
+                entity.ChallengeId,
+                entity.Order,
+                includeIdConflict: true,
+                ct);
+            if (failure is null)
+                throw;
+            return new(null, failure.Value);
         }
     }
 
@@ -109,7 +144,7 @@ public sealed class ChallengeManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
 
         var entity = await db.CompetitionChallenges
@@ -166,9 +201,26 @@ public sealed class ChallengeManagementStore(
                 .SingleAsync(challenge => challenge.Id == entity.ChallengeId, ct);
             return new(Map(entity, template));
         }
-        catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
+        catch (DbUpdateConcurrencyException)
         {
-            return new(null, MapCompetitionChallengeConflict(exception));
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return new(null, ChallengeMutationFailure.RevisionConflict);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            var failure = await FindCompetitionChallengeConflictAsync(
+                entity.Id,
+                entity.CompetitionId,
+                entity.ChallengeId,
+                entity.Order,
+                includeIdConflict: false,
+                ct);
+            if (failure is null)
+                throw;
+            return new(null, failure.Value);
         }
     }
 
@@ -209,7 +261,7 @@ public sealed class ChallengeManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return ChallengeMutationFailure.CompetitionNotFound;
 
         var entity = await db.CompetitionChallenges.IgnoreQueryFilters()
@@ -224,7 +276,6 @@ public sealed class ChallengeManagementStore(
             return ChallengeMutationFailure.LifecycleStateConflict;
         if (restore)
         {
-            await ChallengeWriteLock.AcquireAsync(db, entity.ChallengeId, ct);
             var templateMode = await db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.ChallengeId)
                 .Select(challenge => (GameMode?)challenge.Mode)
@@ -262,10 +313,26 @@ public sealed class ChallengeManagementStore(
             await outbox.FlushOutgoingMessagesAsync();
             return null;
         }
-        catch (DbUpdateException exception) when (IsCompetitionChallengeConflict(exception))
+        catch (DbUpdateConcurrencyException)
         {
-            db.Entry(entity).State = EntityState.Detached;
-            return MapCompetitionChallengeConflict(exception);
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            return ChallengeMutationFailure.RevisionConflict;
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            var failure = await FindCompetitionChallengeConflictAsync(
+                entity.Id,
+                entity.CompetitionId,
+                entity.ChallengeId,
+                entity.Order,
+                includeIdConflict: false,
+                ct);
+            if (failure is null)
+                throw;
+            return failure.Value;
         }
     }
 
@@ -326,27 +393,27 @@ public sealed class ChallengeManagementStore(
             template.CreatedAt,
             instance.UpdatedAt);
 
-    private static bool IsCompetitionChallengeConflict(DbUpdateException exception) =>
-        exception.InnerException is PostgresException
-        {
-            SqlState: PostgresErrorCodes.UniqueViolation,
-            ConstraintName: "pk_competition_challenges"
-                or "ix_competition_challenges_competition_id_challenge_id"
-                or "ix_competition_challenges_competition_id_order"
-        };
-
-    private static ChallengeMutationFailure MapCompetitionChallengeConflict(
-        DbUpdateException exception) =>
-        ((PostgresException)exception.InnerException!).ConstraintName switch
-        {
-            "pk_competition_challenges" =>
-                ChallengeMutationFailure.ResourceIdConflict,
-            "ix_competition_challenges_competition_id_challenge_id" =>
-                ChallengeMutationFailure.ChallengeTemplateConflict,
-            "ix_competition_challenges_competition_id_order" =>
-                ChallengeMutationFailure.ChallengeOrderConflict,
-            _ => throw new InvalidOperationException(
-                "The competition challenge conflict constraint was not recognized.",
-                exception)
-        };
+    private async Task<ChallengeMutationFailure?> FindCompetitionChallengeConflictAsync(
+        Guid id,
+        Guid competitionId,
+        Guid challengeId,
+        int order,
+        bool includeIdConflict,
+        CancellationToken ct)
+    {
+        if (includeIdConflict && await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(item => item.Id == id, ct))
+            return ChallengeMutationFailure.ResourceIdConflict;
+        if (await db.CompetitionChallenges.AsNoTracking().AnyAsync(item =>
+                item.Id != id
+                && item.CompetitionId == competitionId
+                && item.ChallengeId == challengeId, ct))
+            return ChallengeMutationFailure.ChallengeTemplateConflict;
+        if (await db.CompetitionChallenges.AsNoTracking().AnyAsync(item =>
+                item.Id != id
+                && item.CompetitionId == competitionId
+                && item.Order == order, ct))
+            return ChallengeMutationFailure.ChallengeOrderConflict;
+        return null;
+    }
 }

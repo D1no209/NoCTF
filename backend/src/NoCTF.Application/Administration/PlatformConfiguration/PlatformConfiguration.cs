@@ -12,13 +12,13 @@ public static class PlatformConfigurationRules
 public sealed record PlatformConfigurationView(
     string Name,
     string? Description,
-    string? LogoObjectKey,
+    Guid? LogoFileId,
     long Revision,
     DateTimeOffset UpdatedAt);
 
 public sealed record PlatformLogoReplacement(
     PlatformConfigurationView Configuration,
-    string? PreviousObjectKey);
+    Guid? PreviousFileId);
 
 public interface IPlatformConfigurationStore
 {
@@ -32,10 +32,12 @@ public interface IPlatformConfigurationStore
         CancellationToken cancellationToken);
 
     Task<PlatformLogoReplacement?> ReplaceLogoAsync(
-        string objectKey,
+        StoredObject storedObject,
         long expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+
+    Task<BusinessFileReference?> GetLogoFileAsync(CancellationToken cancellationToken);
 }
 
 public enum PlatformConfigurationUpdateState
@@ -128,7 +130,7 @@ public sealed class ManagePlatformConfiguration(
         try
         {
             replacement = await settings.ReplaceLogoAsync(
-                stored.ObjectKey,
+                stored,
                 expectedRevision,
                 now,
                 ct);
@@ -145,29 +147,22 @@ public sealed class ManagePlatformConfiguration(
             return new(PlatformLogoUpdateState.RevisionConflict);
         }
 
-        if (!string.IsNullOrWhiteSpace(replacement.PreviousObjectKey)
-            && !string.Equals(
-                replacement.PreviousObjectKey,
-                stored.ObjectKey,
-                StringComparison.Ordinal))
-            await TryDeleteAsync(replacement.PreviousObjectKey);
-
         return new(PlatformLogoUpdateState.Updated, replacement.Configuration);
     }
 
     public async Task<PlatformLogoContent?> GetLogoAsync(CancellationToken ct = default)
     {
-        var configuration = await settings.GetAsync(ct);
-        if (string.IsNullOrWhiteSpace(configuration.LogoObjectKey))
+        var file = await settings.GetLogoFileAsync(ct);
+        if (file is null)
             return null;
 
-        var metadata = await objects.InspectAsync(configuration.LogoObjectKey, ct);
+        var metadata = await objects.InspectAsync(file.ObjectKey, ct);
         if (metadata is null)
             return null;
 
         return new(
-            await objects.OpenReadAsync(configuration.LogoObjectKey, ct),
-            metadata.ContentType);
+            await objects.OpenReadAsync(file.ObjectKey, ct),
+            file.ContentType);
     }
 
     private async Task TryDeleteAsync(string objectKey)

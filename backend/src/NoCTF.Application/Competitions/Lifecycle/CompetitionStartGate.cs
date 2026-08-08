@@ -20,8 +20,20 @@ public sealed record CompetitionStartGateSnapshot(
     int ApprovedTeamCount,
     int MaxConcurrentRuntimeInstancesPerTeam);
 
+public enum StartGateFailureCode
+{
+    CompetitionNotPublished,
+    CompetitionConfigurationInvalid,
+    PublishedChallengeRequired,
+    ApprovedTeamRequired,
+    RuntimeQuotaInsufficient,
+    ChallengeModeMismatch,
+    ChallengeRulesInvalid,
+    RuntimeDefinitionInvalid
+}
+
 public sealed record StartGateError(
-    string Code,
+    StartGateFailureCode Code,
     Guid? CompetitionChallengeId,
     string Message);
 
@@ -47,7 +59,7 @@ public sealed class CompetitionStartGate(
         var errors = new List<StartGateError>();
         if (snapshot.Status != CompetitionStatus.Published)
             errors.Add(new(
-                "competition_not_published",
+                StartGateFailureCode.CompetitionNotPublished,
                 null,
                 "The competition must be Published before it can start."));
         var publishedChallengeConfigurations = snapshot.Challenges
@@ -61,15 +73,15 @@ public sealed class CompetitionStartGate(
                      snapshot.ConfigurationJson,
                      snapshot.ApprovedTeamCount,
                      publishedChallengeConfigurations))
-            errors.Add(new("competition_configuration_invalid", null, message));
+            errors.Add(new(StartGateFailureCode.CompetitionConfigurationInvalid, null, message));
         if (!snapshot.Challenges.Any(challenge => challenge.Published))
             errors.Add(new(
-                "published_challenge_required",
+                StartGateFailureCode.PublishedChallengeRequired,
                 null,
                 "At least one CompetitionChallenge must be published."));
         if (snapshot.ApprovedTeamCount == 0)
             errors.Add(new(
-                "approved_team_required",
+                StartGateFailureCode.ApprovedTeamRequired,
                 null,
                 "At least one approved team is required."));
         var publishedChallengeCount = snapshot.Challenges.Count(challenge => challenge.Published);
@@ -78,7 +90,7 @@ public sealed class CompetitionStartGate(
             && publishedChallengeCount > snapshot.MaxConcurrentRuntimeInstancesPerTeam)
         {
             errors.Add(new(
-                "RuntimeQuotaInsufficient",
+                StartGateFailureCode.RuntimeQuotaInsufficient,
                 null,
                 $"MaxConcurrentRuntimeInstancesPerTeam must be at least {publishedChallengeCount} for the published AWD challenges."));
         }
@@ -87,7 +99,7 @@ public sealed class CompetitionStartGate(
             if (challenge.ChallengeMode != snapshot.Mode)
             {
                 errors.Add(new(
-                    "challenge_mode_mismatch",
+                    StartGateFailureCode.ChallengeModeMismatch,
                     challenge.CompetitionChallengeId,
                     $"Challenge mode {challenge.ChallengeMode} does not match competition mode {snapshot.Mode}."));
                 continue;
@@ -98,14 +110,14 @@ public sealed class CompetitionStartGate(
                          snapshot.ConfigurationJson,
                          snapshot.ApprovedTeamCount))
                 errors.Add(new(
-                    "challenge_rules_invalid",
+                    StartGateFailureCode.ChallengeRulesInvalid,
                     challenge.CompetitionChallengeId,
                     message));
             foreach (var message in challengeConfigurations.ValidateDefinitionForStart(
                          snapshot.Mode,
                          challenge.DefinitionJson))
                 errors.Add(new(
-                    "RuntimeDefinitionInvalid",
+                    StartGateFailureCode.RuntimeDefinitionInvalid,
                     challenge.CompetitionChallengeId,
                     message));
         }
@@ -114,7 +126,7 @@ public sealed class CompetitionStartGate(
                 error.Code,
                 error.CompetitionChallengeId,
                 error.Message))
-            .OrderBy(error => error.Code, StringComparer.Ordinal)
+            .OrderBy(error => error.Code)
             .ThenBy(error => error.CompetitionChallengeId)
             .ThenBy(error => error.Message, StringComparer.Ordinal)
             .ToArray();

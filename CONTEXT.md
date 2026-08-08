@@ -13,10 +13,10 @@ an independent source of requirements.
 - **Competition challenge** is one competition's use of a challenge template. It owns ordering,
   publication, base score, rules, revision, and hints; it never selects a Runtime provider or Runner
   pool.
-- **Submission** is the persisted participant input and processing state. It never stores a score,
-  score delta, or rank.
+- **Submission** is the persisted input and processing state. `ManualAdjust` intentionally stores its
+  canonical signed Int32 delta as `SubmittedFlag`; there is no additional score column.
 - **Scoring event** is a persisted evaluation fact derived from a Submission or trusted system
-  observation. It also never stores a score, score delta, or rank.
+  observation. It never stores an accumulated score; ManualAdjust/HintUnlock are ordinary event kinds.
 - **Leaderboard projection** recomputes scores from PostgreSQL facts and current configuration.
   Redis stores a replaceable snapshot and projection state; PostgreSQL remains the source of truth.
 - **Team ban** is a moderation fact, not a Submission. Changing it advances the competition's
@@ -48,3 +48,16 @@ an independent source of requirements.
   host port `0`. No platform HAProxy or ingress proxy is inserted for Docker Runtime exposure.
 - Frontend HTTP calls consume the generated OpenAPI client and types; deployment base URLs are
   resolved centrally rather than hardcoded by features.
+
+## Persistence vocabulary
+
+- `competition_events` is the append-only fact stream for lifecycle, leaderboard visibility, runtime,
+  submission, scoring, and other competition facts. Lifecycle payloads carry `from`, `to`,
+  `automatic`, and `reason`; no audit child tables exist.
+- `platform_settings` is the singleton `id=1` row for platform identity, logo FileId, email
+  verification, password reset, and SMTP settings, all guarded by one optimistic `Revision`.
+- `account_tokens` combines email-verification and password-reset tokens with a `Kind` enum.
+- `files` is immutable metadata shared by avatars, posters, attachments, patches, and exports.
+- `notifications` is the durable dynamic-audience feed and linear question thread. A competition
+  management announcement uses `SourceId=sender UserId`, `TargetId=CompetitionId`, and
+  `TargetType=CompetitionCollaborators` by default.

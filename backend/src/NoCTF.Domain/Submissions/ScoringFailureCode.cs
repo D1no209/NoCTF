@@ -31,5 +31,7 @@ public enum ScoringFailureCode
     AwdpPatchTimeout,
     AwdpServiceDown,
     AwdpViolation,
-    ForeignTeamFlagDetected
+    ForeignTeamFlagDetected,
+    InsufficientScore,
+    HintUnavailable
 }

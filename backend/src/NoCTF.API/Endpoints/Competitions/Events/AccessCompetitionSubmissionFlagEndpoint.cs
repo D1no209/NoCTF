@@ -2,6 +2,7 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Submissions;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Submissions;
@@ -25,7 +26,7 @@ public sealed class AccessCompetitionSubmissionFlagValidator
 
 public sealed record AccessCompetitionSubmissionFlagResponse(
     Guid SubmissionId,
-    SubmissionKind SubmissionKind,
+    SubmissionKindProtocol SubmissionKind,
     string SubmittedFlag,
     DateTimeOffset AccessedAt);
 
@@ -74,7 +75,7 @@ public sealed class AccessCompetitionSubmissionFlagEndpoint(
         }
         return TypedResults.Ok(new AccessCompetitionSubmissionFlagResponse(
             result.View.SubmissionId,
-            result.View.SubmissionKind,
+            SubmissionMapper.ToProtocol(result.View.SubmissionKind),
             result.View.SubmittedFlag,
             result.View.AccessedAt));
     }

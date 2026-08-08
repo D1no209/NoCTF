@@ -124,36 +124,10 @@ public interface IChallengeRuntimeTemplateCatalog
 
 public sealed record RuntimePlacement(RuntimeProvider Provider, string RunnerPool);
 
-public sealed record RuntimePublishedPortTarget(string? ServiceName, int ContainerPort);
-
 public sealed record RuntimePublishedPortMapping(
     string? ServiceName,
     int ContainerPort,
     int HostPort);
-
-public sealed record RuntimePublishedPortRange
-{
-    public const int StartPort = 61000;
-    public const int EndPort = 64999;
-
-    public RuntimePublishedPortRange(
-        int start = StartPort,
-        int end = EndPort)
-    {
-        if (start is < 49152 or > 65535)
-            throw new ArgumentOutOfRangeException(nameof(start));
-        if (end < start || end > 65535)
-            throw new ArgumentOutOfRangeException(nameof(end));
-        Start = start;
-        End = end;
-    }
-
-    public int Start { get; }
-    public int End { get; }
-    public int Count => checked(End - Start + 1);
-
-    public bool Contains(int port) => port >= Start && port <= End;
-}
 
 /// <summary>Resolves platform-owned Runtime placement independently of challenge definitions.</summary>
 public interface IRuntimePlacementPolicy

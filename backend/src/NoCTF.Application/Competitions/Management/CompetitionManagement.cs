@@ -39,6 +39,17 @@ public enum CompetitionCreationState
     RoleNotEligible
 }
 
+public enum CompetitionManagementFailureCode
+{
+    CompetitionActive,
+    CompetitionFinished,
+    CompetitionNotFound,
+    InvalidTitle,
+    InvalidTeamSize,
+    InvalidSchedule,
+    CompetitionConflict
+}
+
 public sealed record CompetitionCreationResult(
     CompetitionCreationState State,
     CompetitionView? Competition = null,
@@ -73,16 +84,22 @@ public interface ICompetitionManagementStore
 
 public static class CompetitionManagementPolicy
 {
-    public static OperationResult ValidateUpdate(CompetitionView current, UpdateCompetitionCommand command)
+    public static OperationResult<CompetitionManagementFailureCode> ValidateUpdate(CompetitionView current, UpdateCompetitionCommand command)
     {
-        return OperationResult.Success();
+        return OperationResult<CompetitionManagementFailureCode>.Success();
     }
 
-    public static OperationResult ValidateDelete(CompetitionStatus status) => status switch
+    public static OperationResult<CompetitionManagementFailureCode> ValidateDelete(CompetitionStatus status) => status switch
     {
         CompetitionStatus.Running or CompetitionStatus.Paused =>
-            OperationResult.Failure("competition_active", "An active competition cannot be deleted."),
-        _ => OperationResult.Success()
+            OperationResult<CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionActive,
+                "An active competition cannot be deleted."),
+        CompetitionStatus.Finished =>
+            OperationResult<CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionFinished,
+                "Finished competitions are read-only."),
+        _ => OperationResult<CompetitionManagementFailureCode>.Success()
     };
 }
 
@@ -129,37 +146,57 @@ public sealed class ListCompetitions(ICompetitionManagementStore store)
 
 public sealed class UpdateCompetition(ICompetitionManagementStore store)
 {
-    public async Task<OperationResult<CompetitionView>> ExecuteAsync(UpdateCompetitionCommand command, CancellationToken ct = default)
+    public async Task<OperationResult<CompetitionView, CompetitionManagementFailureCode>> ExecuteAsync(UpdateCompetitionCommand command, CancellationToken ct = default)
     {
         var current = await store.FindAsync(command.CompetitionId, true, ct);
-        if (current is null) return OperationResult<CompetitionView>.Failure("competition_not_found", "Competition was not found.");
+        if (current is null)
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionNotFound,
+                "Competition was not found.");
         var mutation = CompetitionManagementPolicy.ValidateUpdate(current, command);
         if (!mutation.Succeeded)
-            return OperationResult<CompetitionView>.Failure(mutation.ErrorCode!, mutation.ErrorMessage!);
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                mutation.FailureCode!.Value, mutation.ErrorMessage!);
         if (string.IsNullOrWhiteSpace(command.Title) || command.Title.Length > 160)
-            return OperationResult<CompetitionView>.Failure("invalid_title", "Competition title is required and must be at most 160 characters.");
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.InvalidTitle,
+                "Competition title is required and must be at most 160 characters.");
         if (command.MaxTeamMembers < 1)
-            return OperationResult<CompetitionView>.Failure("invalid_team_size", "MaxTeamMembers must be greater than zero.");
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.InvalidTeamSize,
+                "MaxTeamMembers must be greater than zero.");
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
-            return OperationResult<CompetitionView>.Failure(schedule.ErrorCode!, schedule.ErrorMessage!);
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                schedule.FailureCode == CompetitionLifecyclePolicy.FailureCode.InvalidSchedule
+                    ? CompetitionManagementFailureCode.InvalidSchedule
+                    : CompetitionManagementFailureCode.CompetitionConflict,
+                schedule.ErrorMessage!);
         var updated = await store.UpdateAsync(command, current.Status, ct);
         return updated is null
-            ? OperationResult<CompetitionView>.Failure("competition_conflict", "Competition status changed concurrently.")
-            : OperationResult<CompetitionView>.Success(updated);
+            ? OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionConflict,
+                "Competition status changed concurrently.")
+            : OperationResult<CompetitionView, CompetitionManagementFailureCode>.Success(updated);
     }
 }
 
 public sealed class DeleteCompetition(ICompetitionManagementStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(Guid competitionId, Guid actorId, DateTimeOffset now, CancellationToken ct = default)
+    public async Task<OperationResult<CompetitionManagementFailureCode>> ExecuteAsync(Guid competitionId, Guid actorId, DateTimeOffset now, CancellationToken ct = default)
     {
         var current = await store.FindAsync(competitionId, true, ct);
-        if (current is null) return OperationResult.Failure("competition_not_found", "Competition was not found.");
+        if (current is null)
+            return OperationResult<CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionNotFound,
+                "Competition was not found.");
         var mutation = CompetitionManagementPolicy.ValidateDelete(current.Status);
-        if (!mutation.Succeeded) return mutation;
+        if (!mutation.Succeeded)
+            return mutation;
         return await store.SoftDeleteAsync(competitionId, current.Status, actorId, now, ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure("competition_conflict", "Competition changed concurrently.");
+            ? OperationResult<CompetitionManagementFailureCode>.Success()
+            : OperationResult<CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.CompetitionConflict,
+                "Competition changed concurrently.");
     }
 }

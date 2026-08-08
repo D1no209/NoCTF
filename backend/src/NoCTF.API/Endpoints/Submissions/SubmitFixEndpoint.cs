@@ -56,8 +56,8 @@ public sealed class SubmitFixEndpoint(SubmitFix submitFix, IUserContext userCont
             DateTimeOffset.UtcNow), cancellationToken);
         if (!result.Succeeded)
             return SubmissionProblemDetails.Create(
-                SubmissionProblemDetails.StatusFor(result.ErrorCode),
-                result.ErrorCode,
+                SubmissionProblemDetails.StatusFor(result.FailureCode),
+                result.FailureCode,
                 result.ErrorMessage);
         return TypedResults.Accepted<AcceptedSubmissionResponse>(
             $"/api/v1/competitions/{request.CompetitionId}/submissions/{result.Value!.SubmissionId}",

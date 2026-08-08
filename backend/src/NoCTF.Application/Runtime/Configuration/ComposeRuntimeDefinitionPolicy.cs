@@ -306,20 +306,27 @@ public static class ComposeRuntimeDefinitionPolicy
             .OrderBy(binding => binding.ServiceName, StringComparer.Ordinal)
             .ThenBy(binding => binding.ContainerPort)
             .ToArray();
-        var mappings = (request.PublishedPorts ?? [])
+        var suppliedMappings = (request.PublishedPorts ?? [])
             .OrderBy(mapping => mapping.ServiceName, StringComparer.Ordinal)
             .ThenBy(mapping => mapping.ContainerPort)
             .ToArray();
-        if (targets.Length != mappings.Length
-            || targets.Zip(mappings).Any(pair =>
+        if (suppliedMappings.Length > 0
+            && (targets.Length != suppliedMappings.Length
+            || targets.Zip(suppliedMappings).Any(pair =>
                 !string.Equals(
                     pair.First.ServiceName,
                     pair.Second.ServiceName,
                     StringComparison.Ordinal)
                 || pair.First.ContainerPort != pair.Second.ContainerPort
-                || pair.Second.HostPort is < 1 or > 65535))
+                || pair.Second.HostPort != 0)))
             throw new InvalidOperationException(
-                "Docker Compose published port mappings must exactly match its public endpoint bindings.");
+                "Docker Compose published port mappings must request Docker-assigned host ports for every public endpoint binding.");
+        var mappings = targets
+            .Select(target => new RuntimePublishedPortMapping(
+                target.ServiceName,
+                target.ContainerPort,
+                0))
+            .ToArray();
         return mappings
             .GroupBy(mapping => mapping.ServiceName!, StringComparer.Ordinal)
             .ToDictionary(

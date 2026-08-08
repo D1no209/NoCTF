@@ -6,6 +6,7 @@ using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
+using NoCTF.API.Endpoints.Competitions;
 
 namespace NoCTF.API.Endpoints.Challenges;
 
@@ -25,13 +26,13 @@ public sealed record ChallengeResponse(
     DateTimeOffset UpdatedAt,
     string? ControlFlag = null,
     IReadOnlyList<string>? Urls = null,
-    CompetitionLeaderboardVisibility LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal,
-    LeaderboardDataScope DataScope = LeaderboardDataScope.Live);
+    LeaderboardVisibilityProtocol LeaderboardVisibility = LeaderboardVisibilityProtocol.Normal,
+    LeaderboardDataScopeProtocol DataScope = LeaderboardDataScopeProtocol.Live);
 
 public sealed record ChallengeListResponse(
     IReadOnlyList<ChallengeResponse> Items,
-    CompetitionLeaderboardVisibility LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal,
-    LeaderboardDataScope DataScope = LeaderboardDataScope.Live);
+    LeaderboardVisibilityProtocol LeaderboardVisibility = LeaderboardVisibilityProtocol.Normal,
+    LeaderboardDataScopeProtocol DataScope = LeaderboardDataScopeProtocol.Live);
 
 internal static class ChallengeMapper
 {
@@ -56,8 +57,8 @@ internal static class ChallengeMapper
             view.UpdatedAt,
             koh?.ControlFlag,
             koh?.Urls,
-            visibility,
-            dataScope);
+            CompetitionProtocolMapper.ToProtocol(visibility),
+            LeaderboardProtocolMapper.ToProtocol(dataScope));
 
     public static ChallengeListResponse ToListResponse(
         IReadOnlyList<ChallengeView> views,
@@ -68,8 +69,8 @@ internal static class ChallengeMapper
                 view,
                 visibility: visibility,
                 dataScope: dataScope)).ToArray(),
-            visibility,
-            dataScope);
+            CompetitionProtocolMapper.ToProtocol(visibility),
+            LeaderboardProtocolMapper.ToProtocol(dataScope));
 }
 
 public sealed class GetChallengeRequest

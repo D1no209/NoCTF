@@ -1,6 +1,6 @@
 using NoCTF.API.Endpoints.Administration.Competitions;
 using NoCTF.API.Endpoints.Administration.Teams;
-using NoCTF.Domain.Competitions;
+using NoCTF.API.Endpoints.Competitions;
 
 namespace NoCTF.Tests.Unit.Api;
 
@@ -13,7 +13,7 @@ public sealed class AdminRequestValidatorTests
         var create = new CreateCompetitionRequest
         {
             Title = "CTF",
-            Mode = GameMode.Ctf,
+            Mode = GameModeProtocol.Ctf,
             StartTime = now,
             EndTime = now.AddHours(1),
             MaxTeamMembers = 5

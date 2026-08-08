@@ -2,6 +2,7 @@ using NoCTF.API.Composition;
 using NoCTF.API.Security;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Infrastructure;
+using NoCTF.Infrastructure.Messaging;
 using FastEndpoints.Swagger;
 using NoCTF.Application.Messaging;
 using Wolverine;
@@ -15,10 +16,15 @@ using NoCTF.Infrastructure.Administration;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Worker;
+using NoCTF.Runner.Composition;
+using NoCTF.Runner.Messages;
+using NoCTF.API.SignalR.Publishing;
 
 var builder = WebApplication.CreateBuilder(args);
 var exportSwagger = args.Contains("--export-openapi", StringComparer.OrdinalIgnoreCase)
     || args.Contains("--export-swagger-docs", StringComparer.OrdinalIgnoreCase);
+var development = builder.Environment.IsDevelopment() && !exportSwagger;
 builder.Configuration["OpenApi:Exporting"] = exportSwagger.ToString();
 builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = null);
@@ -26,15 +32,33 @@ builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = long.MaxValue);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUserContext, HttpUserContext>();
-builder.Services.AddNoCtfApi(builder.Configuration, includeInfrastructure: true);
+builder.Services.AddNoCtfApi(
+    builder.Configuration,
+    includeInfrastructure: true,
+    development);
 builder.Services.AddNoCtfAuthentication(builder.Configuration);
-if (!exportSwagger)
+if (development)
+{
+    builder.Services.AddNoCtfRunner(builder.Configuration, development: true);
+}
+if (!exportSwagger && !development)
     builder.Services.AddNoCtfPlatformLogging(
         builder.Configuration,
         PlatformLogService.Api);
 builder.UseWolverine(options =>
 {
-    if (!exportSwagger)
+    if (development)
+    {
+        options.Discovery.IncludeType(typeof(BackendMessageHandlers));
+        options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
+        options.Discovery.IncludeType(typeof(DataExportMessageHandlers));
+        options.Discovery.IncludeType(typeof(KohPollingHandler));
+        options.Discovery.IncludeType(typeof(KohObservationHandler));
+        options.Discovery.IncludeType(typeof(LocalCompetitionEventMessageHandler));
+        options.Discovery.IncludeAssembly(typeof(RuntimeProviderHandler).Assembly);
+        options.StubAllExternalTransports();
+    }
+    else if (!exportSwagger)
     {
         var postgres = builder.Configuration.GetConnectionString("PostgreSql")
             ?? throw new InvalidOperationException("ConnectionStrings:PostgreSql is required.");
@@ -56,7 +80,7 @@ builder.UseWolverine(options =>
         options.PublishMessage<SendPasswordReset>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<SendPasswordChangedNotification>()
             .ToPostgresqlQueue("noctf-worker");
-        options.PublishMessage<CleanupObject>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<CleanupFile>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ChallengePublished>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<PublishHintNotification>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<TeamBanned>().ToPostgresqlQueue("noctf-worker");
@@ -68,15 +92,19 @@ builder.UseWolverine(options =>
         options.PublishMessage<PurgeDataExport>().ToPostgresqlQueue("noctf-worker");
     }
 });
+if (development)
+    builder.Services.AddSingularAgent<MaintenanceTickAgent>();
 
 var app = builder.Build();
 if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))
 {
-    await app.Services.MigrateNoCtfAsync();
+    await app.Services.InitializeNoCtfAsync();
     await app.StartAsync();
     await app.StopAsync();
     return;
 }
+if (development)
+    await app.Services.InitializeNoCtfAsync();
 app.UseNoCtfPipeline();
 app.UseNoCtfEndpoints();
 if (exportSwagger)

@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Teams.Moderation;
@@ -9,8 +10,8 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 
 public sealed record CompetitionLeaderboardVisibilityResponse(
     Guid CompetitionId,
-    CompetitionLeaderboardVisibility ConfiguredVisibility,
-    CompetitionLeaderboardVisibility EffectiveVisibility,
+    LeaderboardVisibilityProtocol ConfiguredVisibility,
+    LeaderboardVisibilityProtocol EffectiveVisibility,
     DateTimeOffset? StartsAt,
     DateTimeOffset? AppliedAt,
     int Revision);
@@ -21,8 +22,8 @@ internal static class CompetitionLeaderboardVisibilityMapper
         CompetitionVisibilityConfigurationView view) =>
         new(
             view.CompetitionId,
-            view.ConfiguredVisibility,
-            view.EffectiveVisibility,
+            CompetitionProtocolMapper.ToProtocol(view.ConfiguredVisibility),
+            CompetitionProtocolMapper.ToProtocol(view.EffectiveVisibility),
             view.StartsAt,
             view.AppliedAt,
             view.Revision);

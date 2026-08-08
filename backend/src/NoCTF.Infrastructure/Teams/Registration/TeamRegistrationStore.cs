@@ -22,37 +22,30 @@ public sealed class TeamRegistrationStore(
 
     public Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
-            .Select(x => new TeamRegistrationPolicy(
-                x.Status,
-                x.TeamRegistrationAutoApprove,
-                x.DeletedAt != null,
-                x.MaxTeamMembers))
+            .Select(x => new TeamRegistrationPolicy(x.Status, x.TeamRegistrationAutoApprove, x.DeletedAt != null))
             .SingleOrDefaultAsync(ct);
 
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
     {
         var name = command.Name.Trim();
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-        var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        var competitionStatus = await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
         if (competitionStatus is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
         if (competitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
             return new(null, TeamRegistrationFailure.RegistrationClosed);
-        var memberIds = (command.MemberIds ?? [command.UserId]).ToArray();
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
-            && x.MemberIds.Any(memberId => memberIds.Contains(memberId)), ct))
+            && x.MemberIds.Contains(command.UserId), ct))
             return new(null, TeamRegistrationFailure.UserAlreadyRegistered);
         var id = Guid.CreateVersion7(command.RegisteredAt);
         var team = new Team
         {
             Id = id,
             CompetitionId = command.CompetitionId,
-            TeamProfileId = command.TeamProfileId,
             Name = name,
             NormalizedName = name.ToUpperInvariant(),
-            AvatarUrl = command.AvatarUrl,
-            CaptainId = command.CaptainId ?? command.UserId,
-            MemberIds = memberIds,
+            CaptainId = command.UserId,
+            MemberIds = [command.UserId],
             InvitationToken = CreateInvitationToken(),
             RegistrationStatus = status,
             RegisteredAt = command.RegisteredAt
@@ -91,13 +84,13 @@ public sealed class TeamRegistrationStore(
             .Where(x => x.CompetitionId == competitionId && x.DeletedAt == null
                 && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
             .OrderBy(x => x.Name)
-            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
-                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TeamProfileId)).ToListAsync(ct);
+            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.CaptainId, x.MemberIds,
+                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt)).ToListAsync(ct);
 
     public async Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var competitionStatus = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        var competitionStatus = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (competitionStatus is null) return new(false, TeamRegistrationFailure.CompetitionNotFound);
         if (competitionStatus == CompetitionStatus.Finished) return new(false, TeamRegistrationFailure.CompetitionFinished);
         var exists = await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId
@@ -136,7 +129,7 @@ public sealed class TeamRegistrationStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null)
             return new(false, TeamRegistrationFailure.CompetitionNotFound);
         if (status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
@@ -178,17 +171,17 @@ public sealed class TeamRegistrationStore(
     public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken ct) =>
         db.Teams.AsNoTracking().Where(x => x.Id == teamId && x.CompetitionId == competitionId && x.DeletedAt == null
                 && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
-            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
-                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TeamProfileId)).SingleOrDefaultAsync(ct);
+            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.CaptainId, x.MemberIds,
+                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt)).SingleOrDefaultAsync(ct);
 
     public Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct) =>
         db.Teams.AsNoTracking().Where(team => team.CompetitionId == competitionId
                 && team.MemberIds.Contains(userId)
                 && team.DeletedAt == null
                 && (includePending || team.RegistrationStatus == TeamRegistrationStatus.Approved))
-            .Select(team => new TeamView(team.Id, team.CompetitionId, team.Name, team.AvatarUrl,
+            .Select(team => new TeamView(team.Id, team.CompetitionId, team.Name,
                 team.CaptainId, team.MemberIds, team.RegistrationStatus, team.IsLocked,
-                team.IsBanned, team.RegisteredAt, team.TeamProfileId))
+                team.IsBanned, team.RegisteredAt))
             .SingleOrDefaultAsync(ct);
 
     public async Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken ct) =>
@@ -204,7 +197,7 @@ public sealed class TeamRegistrationStore(
     {
         var name = command.Name.Trim();
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        var status = await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
         if (status is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
         if (status == CompetitionStatus.Finished) return new(null, TeamRegistrationFailure.CompetitionFinished);
         var entity = await db.Teams.SingleOrDefaultAsync(x => x.Id == command.TeamId
@@ -213,7 +206,6 @@ public sealed class TeamRegistrationStore(
         if (entity.IsLocked) return new(null, TeamRegistrationFailure.TeamLocked);
         entity.Name = name;
         entity.NormalizedName = name.ToUpperInvariant();
-        entity.AvatarUrl = command.AvatarUrl;
         await events.RecordAsync(new(
             entity.CompetitionId,
             CompetitionEventKind.TeamUpdated,
@@ -237,7 +229,7 @@ public sealed class TeamRegistrationStore(
     public async Task<TeamRegistrationFailure?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null) return TeamRegistrationFailure.CompetitionNotFound;
         if (status is CompetitionStatus.Running or CompetitionStatus.Paused) return TeamRegistrationFailure.CompetitionActive;
         if (status == CompetitionStatus.Finished) return TeamRegistrationFailure.CompetitionFinished;
@@ -263,8 +255,8 @@ public sealed class TeamRegistrationStore(
     }
 
     private static TeamView Map(Team x) => new(
-        x.Id, x.CompetitionId, x.Name, x.AvatarUrl, x.CaptainId, x.MemberIds,
-        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TeamProfileId);
+        x.Id, x.CompetitionId, x.Name, x.CaptainId, x.MemberIds,
+        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt);
 
     private static string CreateInvitationToken()
     {

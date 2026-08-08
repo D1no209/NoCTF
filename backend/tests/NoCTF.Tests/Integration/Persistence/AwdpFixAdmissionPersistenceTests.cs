@@ -49,7 +49,7 @@ public sealed class AwdpFixAdmissionPersistenceTests
                     fixture.PatchUploadId,
                     fixture.Now), cancellationToken);
 
-                await Assert.That(result.ErrorCode).IsEqualTo("break_required");
+                await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.BreakRequired);
             }
 
             await using (var verifyRejectedDb = new NoCtfDbContext(options))

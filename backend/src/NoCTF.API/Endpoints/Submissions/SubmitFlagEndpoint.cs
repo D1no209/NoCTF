@@ -4,12 +4,82 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Status;
 using NoCTF.Domain.Submissions;
 using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Submissions;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<SubmissionKindProtocol>))]
+public enum SubmissionKindProtocol
+{
+    Flag,
+    Break,
+    Fix,
+    HintUnlock,
+    ManualAdjust
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<SubmissionEvaluationStateProtocol>))]
+public enum SubmissionEvaluationStateProtocol
+{
+    Pending,
+    Queued,
+    Processing,
+    Completed,
+    PlatformFailed
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoringResultProtocol>))]
+public enum ScoringResultProtocol
+{
+    Correct,
+    Wrong,
+    Duplicate,
+    AttemptsExhausted,
+    PlatformFailed,
+    Rejected
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoringFailureCodeProtocol>))]
+public enum ScoringFailureCodeProtocol
+{
+    FlagNotSupported,
+    FixNotSupported,
+    BreakAttemptsExhausted,
+    FixAttemptsExhausted,
+    BreakRequired,
+    ArchiveValidationUnavailable,
+    FixArchiveMissing,
+    FixArchiveLengthMismatch,
+    FixArchiveContentTypeMismatch,
+    FixArchiveHashMismatch,
+    StorageTimeout,
+    StorageUnavailable,
+    CheckerPlatformError,
+    SelfAttackRejected,
+    DuplicateAttack,
+    DuplicateAchievement,
+    UnknownTeamIdentifier,
+    InvalidObservation,
+    ProducerTimeout,
+    ProducerUnavailable,
+    AmbiguousFlagMatch,
+    FlagExpired,
+    RoundOutOfRange,
+    HardeningActive,
+    AwdpFixFailed,
+    AwdpPatchFailed,
+    AwdpPatchTimeout,
+    AwdpServiceDown,
+    AwdpViolation,
+    ForeignTeamFlagDetected,
+    InsufficientScore,
+    HintUnavailable
+}
 
 public sealed record AcceptedSubmissionResponse(Guid SubmissionId, DateTimeOffset ReceivedAt);
 
@@ -18,10 +88,10 @@ public sealed record SubmissionStatusResponse(
     Guid CompetitionId,
     Guid TeamId,
     Guid CompetitionChallengeId,
-    SubmissionKind Kind,
-    SubmissionEvaluationState EvaluationState,
-    ScoringResult? Result,
-    ScoringFailureCode? FailureCode,
+    SubmissionKindProtocol Kind,
+    SubmissionEvaluationStateProtocol EvaluationState,
+    ScoringResultProtocol? Result,
+    ScoringFailureCodeProtocol? FailureCode,
     DateTimeOffset ReceivedAt,
     DateTimeOffset EvaluationUpdatedAt,
     long ProcessingVersion);
@@ -32,13 +102,35 @@ public sealed record AdminSubmissionStatusResponse(
     Guid TeamId,
     Guid CompetitionChallengeId,
     Guid SubmittedByUserId,
-    SubmissionKind Kind,
-    SubmissionEvaluationState EvaluationState,
-    ScoringResult? Result,
-    ScoringFailureCode? FailureCode,
+    SubmissionKindProtocol Kind,
+    SubmissionEvaluationStateProtocol EvaluationState,
+    ScoringResultProtocol? Result,
+    ScoringFailureCodeProtocol? FailureCode,
     DateTimeOffset ReceivedAt,
     DateTimeOffset EvaluationUpdatedAt,
     long ProcessingVersion);
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<SubmissionAdmissionFailureCode>))]
+public enum SubmissionAdmissionFailureCode
+{
+    ResourceDeleted,
+    ChallengeUnavailable,
+    TeamForbidden,
+    TeamBanned,
+    SubmissionKindUnsupported,
+    CompetitionPaused,
+    CompetitionNotPublished,
+    CompetitionNotStarted,
+    CompetitionFinished,
+    CompetitionUnavailable,
+    BreakRequired,
+    AttemptsExhausted,
+    FlagInvalid,
+    FlagBatchNotSupported,
+    SubmissionScopeNotFound,
+    SubmissionConcurrency,
+    PatchUploadNotFound
+}
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
 public static partial class SubmissionMapper
@@ -47,27 +139,65 @@ public static partial class SubmissionMapper
     public static partial SubmissionStatusResponse ToStatusResponse(SubmissionStatusView view);
     public static partial AdminSubmissionStatusResponse ToAdminStatusResponse(
         AdminSubmissionStatusView view);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SubmissionAdmissionFailureCode ToProtocol(
+        SubmissionFailureCode failureCode);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SubmissionKindProtocol ToProtocol(SubmissionKind value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SubmissionEvaluationStateProtocol ToProtocol(
+        SubmissionEvaluationState value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ScoringResultProtocol ToProtocol(ScoringResult value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ScoringFailureCodeProtocol ToProtocol(ScoringFailureCode value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SubmissionKind ToDomain(SubmissionKindProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SubmissionEvaluationState ToDomain(
+        SubmissionEvaluationStateProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ScoringResult ToDomain(ScoringResultProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ScoringFailureCode ToDomain(ScoringFailureCodeProtocol value);
 }
 
 internal static class SubmissionProblemDetails
 {
-    public static int StatusFor(string? code) => code switch
+    public static int StatusFor(SubmissionFailureCode? code) => code switch
     {
-        "team_banned" or "team_forbidden" => StatusCodes.Status403Forbidden,
-        "competition_finished" or "competition_not_started" or "break_required" =>
+        SubmissionFailureCode.TeamBanned or SubmissionFailureCode.TeamForbidden =>
+            StatusCodes.Status403Forbidden,
+        SubmissionFailureCode.CompetitionFinished or SubmissionFailureCode.CompetitionNotStarted
+            or SubmissionFailureCode.BreakRequired =>
             StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest
     };
 
-    public static ProblemHttpResult Create(int status, string? code, string? detail) =>
+    public static ProblemHttpResult Create(
+        int status,
+        SubmissionFailureCode? code,
+        string? detail) =>
         TypedResults.Problem(
             statusCode: status,
             title: "Submission was not accepted.",
             detail: detail,
             type: "https://httpstatuses.com/" + status,
-            extensions: string.IsNullOrWhiteSpace(code)
+            extensions: code is null
                 ? null
-                : new Dictionary<string, object?> { ["code"] = code });
+                : new Dictionary<string, object?>
+                {
+                    ["code"] = SubmissionMapper.ToProtocol(code.Value)
+                });
 }
 
 public sealed class SubmitFlagRequest
@@ -137,8 +267,8 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
             cancellationToken);
         if (!result.Succeeded)
             return SubmissionProblemDetails.Create(
-                SubmissionProblemDetails.StatusFor(result.ErrorCode),
-                result.ErrorCode,
+                SubmissionProblemDetails.StatusFor(result.FailureCode),
+                result.FailureCode,
                 result.ErrorMessage);
         var accepted = new List<FlagSubmissionItem>(values.Count);
         foreach (var submission in result.Value!)

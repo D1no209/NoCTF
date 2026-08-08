@@ -455,7 +455,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
             },
         PublishedPorts:
         [
-            new("web", 8080, PublishedPort(operationId))
+            new("web", 8080, 0)
         ]);
 
     private static ComposeRequest PrivateRequest(Guid operationId) => new(
@@ -495,8 +495,4 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 }
             });
 
-    private static int PublishedPort(Guid operationId) =>
-        RuntimePublishedPortRange.StartPort
-        + BitConverter.ToUInt16(operationId.ToByteArray())
-        % new RuntimePublishedPortRange().Count;
 }

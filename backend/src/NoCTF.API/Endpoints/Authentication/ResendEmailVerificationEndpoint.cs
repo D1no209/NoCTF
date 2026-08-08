@@ -34,7 +34,7 @@ public sealed class ResendEmailVerificationEndpoint(
                 detail: result.ErrorMessage,
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = result.ErrorCode
+                    ["code"] = result.FailureCode
                 });
     }
 }

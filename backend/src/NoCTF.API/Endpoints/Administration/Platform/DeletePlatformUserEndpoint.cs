@@ -8,7 +8,7 @@ using NoCTF.Application.Administration.UserAccounts;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
-[JsonConverter(typeof(JsonStringEnumConverter<PlatformUserDeletionMode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<PlatformUserDeletionMode>))]
 public enum PlatformUserDeletionMode
 {
     HardDelete,
@@ -33,7 +33,7 @@ public sealed class DeletePlatformUserValidator : Validator<DeletePlatformUserRe
     }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<PlatformUserDeletionOutcomeCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<PlatformUserDeletionOutcomeCode>))]
 public enum PlatformUserDeletionOutcomeCode
 {
     PhysicallyDeleted,
@@ -42,7 +42,7 @@ public enum PlatformUserDeletionOutcomeCode
 
 public sealed record PlatformUserDeletionResponse(PlatformUserDeletionOutcomeCode Outcome);
 
-[JsonConverter(typeof(JsonStringEnumConverter<PlatformUserDeletionConflictCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<PlatformUserDeletionConflictCode>))]
 public enum PlatformUserDeletionConflictCode
 {
     HardDeleteBlocked,

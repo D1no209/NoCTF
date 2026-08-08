@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Teams;
 using NoCTF.API.Security;
 using NoCTF.Application.Teams.Appeals;
 using NoCTF.Application.Teams.Moderation;
@@ -18,7 +19,7 @@ public sealed record AdminTeamBanAppealResponse(
     string SubmittedByUserName,
     string Statement,
     DateTimeOffset SubmittedAt,
-    TeamBanAppealStatus Status,
+    TeamBanAppealStatusProtocol Status,
     Guid? ResolvedByUserId,
     string? ResolvedByUserName,
     string? ResolutionReason,
@@ -29,7 +30,7 @@ public sealed record AdminTeamBanCaseResponse(
     Guid CompetitionId,
     Guid TeamId,
     string TeamName,
-    TeamBanSource Source,
+    TeamBanSourceProtocol Source,
     DateTimeOffset BannedAt,
     bool IsCurrentlyBanned,
     bool CanResolve,
@@ -95,7 +96,7 @@ public sealed class ListTeamBanAppealsEndpoint(
             banCase.CompetitionId,
             banCase.TeamId,
             banCase.TeamName,
-            banCase.Source,
+            TeamMapper.ToProtocol(banCase.Source),
             banCase.BannedAt,
             banCase.IsCurrentlyBanned,
             canModerate
@@ -107,7 +108,7 @@ public sealed class ListTeamBanAppealsEndpoint(
                 appeal.SubmittedByUserName,
                 appeal.Statement,
                 appeal.SubmittedAt,
-                appeal.Status,
+                TeamMapper.ToProtocol(appeal.Status),
                 appeal.ResolvedByUserId,
                 appeal.ResolvedByUserName,
                 appeal.ResolutionReason,

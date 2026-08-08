@@ -274,7 +274,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
 
         await Assert.That((await createTask).Failure).IsNull();
         await Assert.That((await updateTask).State)
-            .IsEqualTo(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
+            .IsEqualTo(ChallengeTemplateWriteState.RevisionConflict);
         await createOutbox.Received(1).PublishAsync(
             Arg.Is<InvalidateLeaderboard>(message =>
                 message!.CompetitionId == fixture.ConcurrentCompetitionId));
@@ -288,7 +288,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             "Original description",
             "Web",
             """{"schemaVersion":1}""",
-            0,
+            1,
             fixture.Now,
             cancellationToken);
         await using var verifyDb = new NoCtfDbContext(options);
@@ -357,7 +357,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         await Assert.That((await updateTask).State)
             .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
         await Assert.That((await createTask).Failure)
-            .IsEqualTo(ChallengeMutationFailure.TemplateModeMismatch);
+            .IsEqualTo(ChallengeMutationFailure.RevisionConflict);
         await AssertTemplateAsync(
             options,
             fixture.UpdateFirstChallengeId,

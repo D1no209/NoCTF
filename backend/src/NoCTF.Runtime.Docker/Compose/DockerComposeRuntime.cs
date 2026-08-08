@@ -23,10 +23,10 @@ public sealed class DockerComposeRuntime(
     public async Task<ComposeReceipt> UpAsync(ComposeRequest request, CancellationToken cancellationToken)
     {
         if ((request.PublishedPorts ?? []).Any(mapping =>
-                !options.EffectivePublishedPortRange.Contains(mapping.HostPort)))
+                mapping.HostPort != 0))
             throw new ArgumentOutOfRangeException(
                 nameof(request),
-                "Docker published ports must be allocated inside the configured high-port range.");
+                "Docker Compose public endpoints must request Docker-assigned host ports.");
         var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
         Directory.CreateDirectory(workDirectory);
         var directory = Path.Combine(workDirectory, request.OperationId.ToString("N"));

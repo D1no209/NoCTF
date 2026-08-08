@@ -71,12 +71,12 @@ public sealed class UpdateCompetitionEndpoint(
             request.MaxConcurrentRuntimeInstancesPerTeam!.Value,
             user.UserId,
             DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode == "competition_not_found")
+        if (result.FailureCode == CompetitionManagementFailureCode.CompetitionNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
         {
             return TypedResults.Problem(
-                statusCode: result.ErrorCode == "competition_conflict"
+                statusCode: result.FailureCode == CompetitionManagementFailureCode.CompetitionConflict
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
                 title: "Competition was not updated.",

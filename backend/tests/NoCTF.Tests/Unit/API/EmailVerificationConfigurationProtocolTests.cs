@@ -20,7 +20,7 @@ public sealed class EmailVerificationConfigurationProtocolTests
             PasswordResetMaxRequestsPerHour = 3,
             SmtpHost = "smtp.noctf.test",
             SmtpPort = 587,
-            SmtpSecurityMode = SmtpSecurityMode.StartTls,
+            SmtpSecurityMode = SmtpSecurityModeProtocol.StartTls,
             SmtpUserName = string.Empty,
             SmtpFromAddress = "no-reply@noctf.test",
             SmtpFromName = "NoCTF",
@@ -36,7 +36,7 @@ public sealed class EmailVerificationConfigurationProtocolTests
 
         await Assert.That(json).Contains("\"smtpSecurityMode\":\"StartTls\"");
         await Assert.That(json).DoesNotContain("smtpEnableSsl");
-        await Assert.That(roundTrip!.SmtpSecurityMode).IsEqualTo(SmtpSecurityMode.StartTls);
+        await Assert.That(roundTrip!.SmtpSecurityMode).IsEqualTo(SmtpSecurityModeProtocol.StartTls);
 
         var rejected = false;
         try

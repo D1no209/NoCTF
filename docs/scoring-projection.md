@@ -13,6 +13,12 @@ ScoringEvent 只保存事实，绝不保存分数。排行榜使用当前 Compet
 
 因此 `configuration_revision` 记录某次判定使用的配置版本只用于诊断和重判选择，不用于恢复旧分值；投影永远读取当前投影参数。
 
+`SubmissionKind` 还包含 `HintUnlock` 与 `ManualAdjust`。ManualAdjust 的 signed Int32 delta 存在
+`Submission.SubmittedFlag`（例如 `-10`），没有 `additional_id` 或独立 delta 列；评估始终产生
+`ScoringEventKind.ManualAdjust / Correct`。HintUnlock 的 SubmittedFlag 是 canonical UUID，并产生
+`ScoringEventKind.HintUnlock`。四种模式在最终排序前扣除当前 Hint Cost 并加入当前 ManualAdjust delta，
+CTF 时间线也插入这两个事件。
+
 封禁/软删除 Team 不进入榜单；其事实、针对它的攻防事实均从当前投影排除。Unban 恢复未删除事实。
 误判纠错在比赛结束后仍可递增 leaderboard revision 并触发同一投影链路，因此恢复的是原有不可变
 Submission/ScoringEvent 事实，不创建补偿分数或修改历史记录，也不会重启已结束比赛的 Runtime。

@@ -9,7 +9,8 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
 {
     public LeaderboardProjectionResult Project(LeaderboardProjectionInput input)
     {
-        var entries = projectors.Get(input.Mode).Project(input);
+        var projection = projectors.Get(input.Mode).Project(input);
+        var entries = projection.Entries;
         var observations = BuildObservations(input);
         var bloods = BuildBloods(input, observations);
         var bloodsByTeamAndSlot = bloods.ToDictionary(
@@ -45,7 +46,18 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
                 slots.Sum(slot => slot.SuccessCount),
                 slots);
         }).ToList();
-        return new(entries, subjects, bloods);
+        var challenges = (input.Challenges ?? [])
+            .Where(challenge => !challenge.IsDeleted)
+            .Select(challenge => new LeaderboardChallengeInfo(
+                challenge.Id,
+                challenge.Title,
+                challenge.Direction))
+            .ToList();
+        return new(entries, subjects, bloods)
+        {
+            Series = projection.Series,
+            Challenges = challenges
+        };
     }
 
     private static LeaderboardBloodSummary? BloodAt(

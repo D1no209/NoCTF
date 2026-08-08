@@ -58,6 +58,17 @@ public enum RuntimeMutationFailure
     ConfigurationInvalid
 }
 
+public enum RuntimeMutationFailureCode
+{
+    InvalidExtension,
+    RuntimeNotFound,
+    RuntimeActionUnsupported,
+    RuntimeStateConflict,
+    RuntimeCapacityExceeded,
+    RuntimeConfigurationInvalid,
+    RuntimeConflict
+}
+
 public sealed record RuntimeMutationResult(
     RuntimeInstanceView? Runtime,
     RuntimeMutationFailure? Failure = null);
@@ -109,30 +120,30 @@ public sealed class GetPlayerRuntime(IRuntimeInstanceStore store)
 
 public sealed class MutatePlayerRuntime(IRuntimeInstanceStore store)
 {
-    public async Task<OperationResult<RuntimeInstanceView>> ExecuteAsync(
+    public async Task<OperationResult<RuntimeInstanceView, RuntimeMutationFailureCode>> ExecuteAsync(
         RuntimeMutationCommand command,
         CancellationToken ct = default)
     {
         if (command.Action == RuntimeAction.Extend &&
             (command.Extension is null || command.Extension <= TimeSpan.Zero || command.Extension > TimeSpan.FromHours(24)))
         {
-            return OperationResult<RuntimeInstanceView>.Failure(
-                "invalid_extension",
+            return OperationResult<RuntimeInstanceView, RuntimeMutationFailureCode>.Failure(
+                RuntimeMutationFailureCode.InvalidExtension,
                 "Extension must be greater than zero and no more than 24 hours.");
         }
 
         var result = await store.MutatePlayerRuntimeAsync(command, ct);
         if (result.Runtime is not null)
-            return OperationResult<RuntimeInstanceView>.Success(result.Runtime);
+            return OperationResult<RuntimeInstanceView, RuntimeMutationFailureCode>.Success(result.Runtime);
         var failure = result.Failure ?? RuntimeMutationFailure.Conflict;
-        return OperationResult<RuntimeInstanceView>.Failure(failure switch
+        return OperationResult<RuntimeInstanceView, RuntimeMutationFailureCode>.Failure(failure switch
         {
-            RuntimeMutationFailure.NotFound => "runtime_not_found",
-            RuntimeMutationFailure.Unsupported => "runtime_action_unsupported",
-            RuntimeMutationFailure.InvalidState => "runtime_state_conflict",
-            RuntimeMutationFailure.CapacityExceeded => "runtime_capacity_exceeded",
-            RuntimeMutationFailure.ConfigurationInvalid => "runtime_configuration_invalid",
-            _ => "runtime_conflict"
+            RuntimeMutationFailure.NotFound => RuntimeMutationFailureCode.RuntimeNotFound,
+            RuntimeMutationFailure.Unsupported => RuntimeMutationFailureCode.RuntimeActionUnsupported,
+            RuntimeMutationFailure.InvalidState => RuntimeMutationFailureCode.RuntimeStateConflict,
+            RuntimeMutationFailure.CapacityExceeded => RuntimeMutationFailureCode.RuntimeCapacityExceeded,
+            RuntimeMutationFailure.ConfigurationInvalid => RuntimeMutationFailureCode.RuntimeConfigurationInvalid,
+            _ => RuntimeMutationFailureCode.RuntimeConflict
         }, "Runtime action was rejected.");
     }
 }

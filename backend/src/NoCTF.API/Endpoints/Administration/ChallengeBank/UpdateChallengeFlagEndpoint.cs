@@ -37,7 +37,7 @@ public sealed class UpdateChallengeFlagEndpoint(
             user.UserId,
             user.IsAdministrator,
             ct);
-        if (result.ErrorCode == "flag_not_found")
+        if (result.FailureCode == ChallengeFlagFailureCode.FlagNotFound)
             return TypedResults.NotFound();
         return result.Succeeded
             ? TypedResults.Ok(ChallengeFlagMapping.ToResponse(result.Value!))

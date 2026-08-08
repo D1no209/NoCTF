@@ -19,8 +19,14 @@ public enum CompetitionOwnerTransferState
     Transferred,
     InvalidOwnerId,
     NotFound,
+    RevisionConflict,
     UserNotFound,
     RoleNotEligible
+}
+
+public enum HardDeleteCompetitionFailureCode
+{
+    HardDeleteConflict
 }
 
 public sealed record CompetitionOwnerTransferResult(
@@ -93,16 +99,16 @@ public sealed class RestoreCompetition(IAdminCompetitionStore store)
 
 public sealed class HardDeleteCompetition(IAdminCompetitionStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<OperationResult<HardDeleteCompetitionFailureCode>> ExecuteAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
         CancellationToken ct = default) =>
         await store.HardDeleteAsync(competitionId, actorId, isAdministrator, ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure(
-                "competition_hard_delete_conflict",
-                "Only a finished competition with no active runtime can be permanently deleted by its owner or an administrator.");
+            ? OperationResult<HardDeleteCompetitionFailureCode>.Success()
+            : OperationResult<HardDeleteCompetitionFailureCode>.Failure(
+                HardDeleteCompetitionFailureCode.HardDeleteConflict,
+                "Competition was not found, still has dependent facts, or access was denied.");
 }
 
 public sealed class TransferCompetitionOwner(IAdminCompetitionStore store)

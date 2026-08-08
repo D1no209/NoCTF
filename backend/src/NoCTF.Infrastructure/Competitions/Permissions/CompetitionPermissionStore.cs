@@ -84,7 +84,7 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct);
+        await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
         var competition = await db.Competitions.SingleOrDefaultAsync(
             item => item.Id == command.CompetitionId && item.DeletedAt == null,
             ct);
@@ -177,7 +177,14 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
         competition.ObserverIds = command.ObserverIds.Distinct().Order().ToArray();
         competition.PermissionRevision = checked(competition.PermissionRevision + 1);
         competition.UpdatedAt = DateTimeOffset.UtcNow;
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(CompetitionPermissionUpdateState.RevisionConflict);
+        }
         await transaction.CommitAsync(ct);
         return new(CompetitionPermissionUpdateState.Updated);
     }

@@ -1,9 +1,16 @@
 namespace NoCTF.Application.Challenges.Flags;
 
+public enum MissingFlagFailureCode
+{
+    CompetitionNotFound,
+    GameModeUnsupported,
+    FlagGenerationFailed
+}
+
 public sealed record MissingFlagGenerationFailure(
     Guid CompetitionChallengeId,
     Guid TeamId,
-    string Code,
+    MissingFlagFailureCode Code,
     string Description);
 
 public interface IMissingFlagGenerator

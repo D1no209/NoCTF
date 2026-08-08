@@ -4,7 +4,6 @@ using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Challenges;
-using Npgsql;
 
 namespace NoCTF.Infrastructure.Challenges.Bank;
 
@@ -16,7 +15,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
     {
         var challengeId = command.ChallengeId ?? Guid.CreateVersion7(command.CreatedAt);
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
             db,
             [command.OwnerId],
@@ -57,13 +55,14 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             await transaction.CommitAsync(ct);
             return new(ChallengeTemplateWriteState.Succeeded, result);
         }
-        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+        catch (DbUpdateException)
         {
-            SqlState: PostgresErrorCodes.UniqueViolation
-        })
-        {
-            db.Entry(entity).State = EntityState.Detached;
-            return new(ChallengeTemplateWriteState.ResourceIdConflict);
+            await transaction.RollbackAsync(ct);
+            db.ChangeTracker.Clear();
+            if (await db.Challenges.IgnoreQueryFilters().AsNoTracking()
+                    .AnyAsync(challenge => challenge.Id == challengeId, ct))
+                return new(ChallengeTemplateWriteState.ResourceIdConflict);
+            throw;
         }
     }
 
@@ -104,7 +103,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, command.ChallengeId, ct);
         var entity = await WriteAuthorized(db.Challenges, command.ActorId, command.IsAdministrator)
             .SingleOrDefaultAsync(challenge => challenge.Id == command.ChallengeId, ct);
         if (entity is null)
@@ -128,7 +126,14 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.DefinitionJson = command.DefinitionJson;
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(ChallengeTemplateWriteState.RevisionConflict);
+        }
         var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
@@ -144,7 +149,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(
                 item => item.ChallengeId == challengeId && item.DeletedAt == null,
                 ct))
@@ -168,7 +172,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var entity = await WriteAuthorized(
                 db.Challenges.IgnoreQueryFilters(),
                 actorId,
@@ -215,7 +218,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
     {
         var normalized = managerIds.Distinct().Order().ToArray();
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var entity = await db.Challenges.SingleOrDefaultAsync(challenge =>
             challenge.Id == challengeId &&
             (isAdministrator || challenge.OwnerId == actorId), ct);
@@ -266,7 +268,6 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await ChallengeWriteLock.AcquireAsync(db, challengeId, ct);
         var entity = await db.Challenges.SingleOrDefaultAsync(challenge =>
             challenge.Id == challengeId &&
             (isAdministrator || challenge.OwnerId == actorId), ct);
@@ -301,7 +302,14 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.ManagerIds = managerIds;
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(ChallengeTemplateWriteState.RevisionConflict);
+        }
         var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);

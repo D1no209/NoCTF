@@ -17,7 +17,16 @@ public sealed class LogoutEndpoint(IConfiguration configuration)
     {
         if (!RefreshRequestGuard.IsAllowed(HttpContext.Request, configuration))
             return TypedResults.Unauthorized();
-        HttpContext.Response.Cookies.Delete("__Secure-noctf_refresh", new CookieOptions { Path = "/api/v1/auth" });
+        // The deletion must carry the same __Secure- prefix requirements as the original
+        // cookie (Secure attribute), otherwise browsers refuse to clear it and logout
+        // silently leaves the refresh session alive.
+        HttpContext.Response.Cookies.Delete("__Secure-noctf_refresh", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/api/v1/auth"
+        });
         return TypedResults.NoContent();
     }
 }

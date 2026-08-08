@@ -2,17 +2,60 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Domain.Identity;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Authentication;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<UserRoleProtocol>))]
+public enum UserRoleProtocol
+{
+    User,
+    Organizer,
+    Administrator
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<UserKindProtocol>))]
+public enum UserKindProtocol
+{
+    Human,
+    Bot
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<UserAccountStatusProtocol>))]
+public enum UserAccountStatusProtocol
+{
+    Active,
+    Banned,
+    Disabled,
+    Anonymized
+}
+
+[Mapper]
+public static partial class IdentityProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial UserRoleProtocol ToProtocol(UserRole value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial UserKindProtocol ToProtocol(UserKind value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial UserAccountStatusProtocol ToProtocol(UserAccountStatus value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial UserRole ToDomain(UserRoleProtocol value);
+}
 
 public sealed record CurrentUserResponse(
     Guid UserId,
     string UserName,
     string Email,
-    UserRole Role,
-    UserKind Kind,
+    UserRoleProtocol Role,
+    UserKindProtocol Kind,
     bool EmailVerified,
     string? Description,
     string? AvatarUrl,
@@ -25,14 +68,14 @@ internal static class CurrentUserMapping
         LinkGenerator links,
         HttpContext httpContext)
     {
-        var avatarUrl = AvatarUrl(profile.Id, profile.AvatarObjectKey, links, httpContext);
+        var avatarUrl = AvatarUrl(profile.Id, profile.AvatarFileId, links, httpContext);
 
         return new(
             profile.Id,
             profile.UserName,
             profile.Email,
-            profile.Role,
-            profile.Kind,
+            IdentityProtocolMapper.ToProtocol(profile.Role),
+            IdentityProtocolMapper.ToProtocol(profile.Kind),
             profile.EmailVerified,
             profile.Description,
             avatarUrl,
@@ -41,12 +84,12 @@ internal static class CurrentUserMapping
 
     public static string? AvatarUrl(
         Guid userId,
-        string? avatarObjectKey,
+        Guid? avatarFileId,
         LinkGenerator links,
         HttpContext httpContext)
     {
         string? avatarUrl = null;
-        if (!string.IsNullOrWhiteSpace(avatarObjectKey))
+        if (avatarFileId is not null)
         {
             var path = links.GetPathByName(
                 httpContext,
@@ -54,8 +97,7 @@ internal static class CurrentUserMapping
                 new { userId });
             if (path is not null)
             {
-                var revision = Uri.EscapeDataString(Path.GetFileName(avatarObjectKey));
-                avatarUrl = $"{path}?revision={revision}";
+                avatarUrl = $"{path}?revision={avatarFileId.Value:N}";
             }
         }
 

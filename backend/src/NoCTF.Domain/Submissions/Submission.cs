@@ -20,6 +20,7 @@ public sealed class Submission
     public DateTimeOffset EvaluationUpdatedAt { get; set; }
     public Guid? CurrentScoringEventId { get; set; }
     public long ProcessingVersion { get; set; }
+    public Guid? EvaluationClaimId { get; set; }
     [MaxLength(32)]
     public byte[]? EvaluationResultBodySha256 { get; set; }
 }

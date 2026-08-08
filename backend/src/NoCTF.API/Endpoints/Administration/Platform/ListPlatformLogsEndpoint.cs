@@ -5,15 +5,24 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.API.Pagination;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.API.Serialization;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
+
+ [JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformLogLevelProtocol>))]
+public enum PlatformLogLevelProtocol { Trace, Debug, Information, Warning, Error, Critical }
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformLogServiceProtocol>))]
+public enum PlatformLogServiceProtocol { Api, Worker, Runner }
 
 public sealed class ListPlatformLogsRequest
 {
     [QueryParam]
-    public PlatformLogLevel MinimumLevel { get; set; } = PlatformLogLevel.Warning;
+    public PlatformLogLevelProtocol MinimumLevel { get; set; } = PlatformLogLevelProtocol.Warning;
     [QueryParam]
-    public PlatformLogService? Service { get; set; }
+    public PlatformLogServiceProtocol? Service { get; set; }
     [QueryParam]
     public DateTimeOffset? From { get; set; }
     [QueryParam]
@@ -63,8 +72,8 @@ public sealed class ListPlatformLogsValidator : Validator<ListPlatformLogsReques
 public sealed record PlatformLogResponse(
     string Cursor,
     DateTimeOffset Timestamp,
-    PlatformLogService Service,
-    PlatformLogLevel Level,
+    PlatformLogServiceProtocol Service,
+    PlatformLogLevelProtocol Level,
     string Category,
     int EventId,
     string? EventName,
@@ -82,14 +91,27 @@ public sealed record PlatformLogListResponse(
     IReadOnlyList<PlatformLogResponse> Items,
     string? NextCursor);
 
-internal static class PlatformLogMapping
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
+internal static partial class PlatformLogMapping
 {
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial PlatformLogLevel ToDomain(PlatformLogLevelProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial PlatformLogService ToDomain(PlatformLogServiceProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial PlatformLogLevelProtocol ToProtocol(PlatformLogLevel value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial PlatformLogServiceProtocol ToProtocol(PlatformLogService value);
+
     public static PlatformLogResponse ToResponse(PlatformLogView view) =>
         new(
             view.Cursor,
             view.Timestamp,
-            view.Service,
-            view.Level,
+            ToProtocol(view.Service),
+            ToProtocol(view.Level),
             view.Category,
             view.EventId,
             view.EventName,
@@ -150,8 +172,8 @@ public sealed class ListPlatformLogsEndpoint(
         }
         var result = await platform.QueryLogsAsync(
             new(
-                request.MinimumLevel,
-                request.Service,
+                PlatformLogMapping.ToDomain(request.MinimumLevel),
+                request.Service is null ? null : PlatformLogMapping.ToDomain(request.Service.Value),
                 request.From,
                 request.To,
                 Normalize(request.Category),

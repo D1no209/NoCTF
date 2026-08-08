@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Teams.Moderation;
@@ -10,10 +11,10 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 public sealed record ChallengeConfigurationResponse(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
-    GameMode Mode,
+    GameModeProtocol Mode,
     string Json,
     int Revision,
-    CompetitionStatus CompetitionStatus,
+    CompetitionStatusProtocol CompetitionStatus,
     DateTimeOffset UpdatedAt);
 
 internal static class ChallengeConfigurationMapping
@@ -22,10 +23,10 @@ internal static class ChallengeConfigurationMapping
         new(
             view.CompetitionId,
             view.CompetitionChallengeId,
-            view.Mode,
+            CompetitionProtocolMapper.ToProtocol(view.Mode),
             view.Json,
             view.Revision,
-            view.CompetitionStatus,
+            CompetitionProtocolMapper.ToProtocol(view.CompetitionStatus),
             view.UpdatedAt);
 }
 

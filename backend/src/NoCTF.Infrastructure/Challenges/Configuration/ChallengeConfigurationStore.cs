@@ -50,7 +50,7 @@ public sealed class ChallengeConfigurationStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionWriteLock.AcquireAsync(db, competitionId, ct);
+        var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null) return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
         var competition = await db.Competitions.AsNoTracking()
             .Where(candidate => candidate.Id == competitionId
@@ -67,17 +67,38 @@ public sealed class ChallengeConfigurationStore(
             .SingleOrDefaultAsync(ct);
         if (published is null)
             return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
-        var changed = await db.CompetitionChallenges
-            .Where(configuration =>
-                configuration.Id == challengeId
-                && configuration.Revision == expectedRevision
-                && configuration.CompetitionId == competitionId
-                && configuration.DeletedAt == null
-                )
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(configuration => configuration.RulesJson, json)
-                .SetProperty(configuration => configuration.Revision, expectedRevision + 1)
-                .SetProperty(configuration => configuration.UpdatedAt, updatedAt), ct);
+        int changed;
+        if (db.Database.IsRelational())
+        {
+            changed = await db.CompetitionChallenges
+                .Where(configuration =>
+                    configuration.Id == challengeId
+                    && configuration.Revision == expectedRevision
+                    && configuration.CompetitionId == competitionId
+                    && configuration.DeletedAt == null
+                    )
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(configuration => configuration.RulesJson, json)
+                    .SetProperty(configuration => configuration.Revision, expectedRevision + 1)
+                    .SetProperty(configuration => configuration.UpdatedAt, updatedAt), ct);
+        }
+        else
+        {
+            // EF Core InMemory does not support ExecuteUpdateAsync; apply the same
+            // optimistic-concurrency update through the change tracker.
+            var tracked = await db.CompetitionChallenges.SingleOrDefaultAsync(
+                configuration => configuration.Id == challengeId
+                    && configuration.Revision == expectedRevision
+                    && configuration.CompetitionId == competitionId
+                    && configuration.DeletedAt == null, ct);
+            if (tracked is not null)
+            {
+                tracked.RulesJson = json;
+                tracked.Revision = expectedRevision + 1;
+                tracked.UpdatedAt = updatedAt;
+            }
+            changed = tracked is null ? 0 : 1;
+        }
 
         if (changed != 1) return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
         await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
@@ -86,15 +107,33 @@ public sealed class ChallengeConfigurationStore(
             && status == CompetitionStatus.Running
             && published.Value)
         {
-            await db.RuntimeInstances
-                .Where(runtime => runtime.CompetitionId == competitionId
-                    && runtime.CompetitionChallengeId == challengeId
-                    && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(runtime => runtime.CheckerSequence, runtime => runtime.CheckerSequence + 1)
-                    .SetProperty(runtime => runtime.LastAppliedCheckerSequence, runtime => runtime.CheckerSequence + 1)
-                    .SetProperty(runtime => runtime.CheckerDeadlineAt, (DateTimeOffset?)null)
-                    .SetProperty(runtime => runtime.NextCheckerDueAt, updatedAt), ct);
+            if (db.Database.IsRelational())
+            {
+                await db.RuntimeInstances
+                    .Where(runtime => runtime.CompetitionId == competitionId
+                        && runtime.CompetitionChallengeId == challengeId
+                        && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(runtime => runtime.CheckerSequence, runtime => runtime.CheckerSequence + 1)
+                        .SetProperty(runtime => runtime.LastAppliedCheckerSequence, runtime => runtime.CheckerSequence + 1)
+                        .SetProperty(runtime => runtime.CheckerDeadlineAt, (DateTimeOffset?)null)
+                        .SetProperty(runtime => runtime.NextCheckerDueAt, updatedAt), ct);
+            }
+            else
+            {
+                var runtimes = await db.RuntimeInstances
+                    .Where(runtime => runtime.CompetitionId == competitionId
+                        && runtime.CompetitionChallengeId == challengeId
+                        && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
+                    .ToListAsync(ct);
+                foreach (var runtime in runtimes)
+                {
+                    runtime.CheckerSequence += 1;
+                    runtime.LastAppliedCheckerSequence = runtime.CheckerSequence;
+                    runtime.CheckerDeadlineAt = null;
+                    runtime.NextCheckerDueAt = updatedAt;
+                }
+            }
             await outbox.PublishAsync(new AdvanceAwdRound(
                 competitionId,
                 challengeId,
@@ -102,6 +141,8 @@ public sealed class ChallengeConfigurationStore(
                 competition.ConfigurationRevision,
                 checked(expectedRevision + 1)));
         }
+        if (!db.Database.IsRelational())
+            await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return new(await FindAsync(competitionId, challengeId, ct));

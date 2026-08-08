@@ -47,15 +47,6 @@ public sealed class DataExportStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
             cancellationToken);
-        var lockKey = string.Join(
-            ':',
-            "data-export",
-            command.RequestedByUserId.ToString("N"),
-            ((short)command.Scope).ToString());
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
-            cancellationToken);
-
         var existing = await db.DataExports.AsNoTracking()
             .Where(item => item.RequestedByUserId == command.RequestedByUserId
                 && item.Scope == command.Scope
@@ -75,13 +66,31 @@ public sealed class DataExportStore(
             IncludeProtectedFlags = command.IncludeProtectedFlags,
             Reason = command.Reason,
             Status = DataExportStatus.Queued,
+            ActiveSlot = 1,
             PurgeAt = now.AddDays(30)
         };
         db.DataExports.Add(entity);
         await outbox.PublishAsync(new GenerateDataExport(entity.Id));
         await outbox.ScheduleAsync(new PurgeDataExport(entity.Id), entity.PurgeAt);
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            var concurrent = await db.DataExports.AsNoTracking()
+                .Where(item => item.RequestedByUserId == command.RequestedByUserId
+                    && item.Scope == command.Scope
+                    && item.ActiveSlot == 1)
+                .OrderByDescending(item => item.RequestedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (concurrent is null)
+                throw;
+            return new(Map(concurrent), RequestDataExportFailure.ActiveExportExists);
+        }
         await outbox.FlushOutgoingMessagesAsync();
         return new(Map(entity));
     }
@@ -115,7 +124,7 @@ public sealed class DataExportStore(
             }
         }
 
-        var items = await db.DataExports.AsNoTracking()
+        var items = await db.DataExports.AsNoTracking().Include(item => item.File)
             .Where(item => item.Scope == query.Scope
                 && item.CompetitionId == query.CompetitionId
                 && (query.RequesterIsAdministrator
@@ -130,7 +139,7 @@ public sealed class DataExportStore(
         AccessDataExportQuery query,
         CancellationToken cancellationToken)
     {
-        var entity = await db.DataExports.AsNoTracking()
+        var entity = await db.DataExports.AsNoTracking().Include(item => item.File)
             .SingleOrDefaultAsync(item => item.Id == query.DataExportId, cancellationToken);
         if (entity is null)
             return new(Failure: AccessDataExportFailure.NotFound);
@@ -161,25 +170,20 @@ public sealed class DataExportStore(
         {
             return new(Failure: AccessDataExportFailure.Expired);
         }
-        if (entity.Status != DataExportStatus.Available
-            || entity.ObjectKey is null
-            || entity.FileName is null
-            || entity.ContentType is null
-            || entity.Length is null
-            || entity.Sha256 is null)
+        if (entity.Status != DataExportStatus.Available || entity.File is null)
         {
             return new(Failure: AccessDataExportFailure.NotReady);
         }
 
-        if (await objectStorage.InspectAsync(entity.ObjectKey, cancellationToken) is null)
+        if (await objectStorage.InspectAsync(entity.File.ObjectKey, cancellationToken) is null)
             return new(Failure: AccessDataExportFailure.ObjectMissing);
-        var content = await objectStorage.OpenReadAsync(entity.ObjectKey, cancellationToken);
+        var content = await objectStorage.OpenReadAsync(entity.File.ObjectKey, cancellationToken);
         return new(new DataExportDownload(
             content,
-            entity.FileName,
-            entity.ContentType,
-            entity.Length.Value,
-            entity.Sha256));
+            entity.File.FileName,
+            entity.File.ContentType,
+            entity.File.ByteLength,
+            Convert.ToHexString(entity.File.Sha256)));
     }
 
     internal static DataExportView Map(DataExport item) => new(
@@ -194,9 +198,11 @@ public sealed class DataExportStore(
         item.StartedAt,
         item.CompletedAt,
         item.ExpiresAt,
-        item.FileName,
-        item.Length,
-        item.Sha256,
+        item.FileId,
+        item.File?.FileName,
+        item.File?.ContentType,
+        item.File?.ByteLength,
+        item.File is null ? null : Convert.ToHexString(item.File.Sha256),
         item.FailureCode,
         item.FailureDetail);
 }

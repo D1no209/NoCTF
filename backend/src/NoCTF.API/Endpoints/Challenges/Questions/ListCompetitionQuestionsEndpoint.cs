@@ -11,7 +11,6 @@ public sealed class ListCompetitionQuestionsRequest
     public Guid? CompetitionChallengeId { get; set; }
     public CompetitionQuestionSubjectCode? Subject { get; set; }
     public CompetitionQuestionStatusCode? Status { get; set; }
-    public bool PublishedOnly { get; set; }
     public int Limit { get; set; } = 50;
 }
 public sealed class ListCompetitionQuestionsValidator
@@ -42,7 +41,7 @@ public sealed class ListCompetitionQuestionsEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Lists competition questions visible to the current user.";
-            summary.Description = "The asker receives private questions, observers receive read-only private projections, handlers receive their authorized queue, and publishedOnly exposes only explicitly published anonymized questions.";
+            summary.Description = "The asker receives their own threads; observers receive read-only projections and handlers receive their authorized queue.";
         });
     }
 
@@ -61,7 +60,6 @@ public sealed class ListCompetitionQuestionsEndpoint(
             request.Status is null
                 ? null
                 : CompetitionQuestionResponseMapper.ToDomain(request.Status.Value),
-            request.PublishedOnly,
             request.Limit), ct);
         return TypedResults.Ok(new CompetitionQuestionListResponse(
             items.Select(CompetitionQuestionResponseMapper.ToResponse).ToArray()));

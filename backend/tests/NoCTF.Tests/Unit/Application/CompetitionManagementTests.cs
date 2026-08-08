@@ -97,7 +97,7 @@ public class CompetitionManagementTests
     }
 
     [Test]
-    public async Task FinishedCompetition_AllowsUpdateAndArchive()
+    public async Task FinishedCompetition_AllowsUpdateButRejectsDelete()
     {
         var now = DateTimeOffset.UtcNow;
         var store = new Store { Last = new(Guid.NewGuid(), "CTF", null, GameMode.Ctf, now, now.AddHours(2), CompetitionStatus.Finished, true, 5, 0, Guid.NewGuid()) };
@@ -107,7 +107,7 @@ public class CompetitionManagementTests
         var delete = await new DeleteCompetition(store).ExecuteAsync(store.Last.Id, Guid.NewGuid(), now);
 
         await Assert.That(update.Succeeded).IsTrue();
-        await Assert.That(delete.Succeeded).IsTrue();
+        await Assert.That(delete.FailureCode).IsEqualTo(CompetitionManagementFailureCode.CompetitionFinished);
     }
 
     [Test]
@@ -118,7 +118,7 @@ public class CompetitionManagementTests
 
         var result = await new DeleteCompetition(store).ExecuteAsync(store.Last.Id, Guid.NewGuid(), now);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("competition_active");
+        await Assert.That(result.FailureCode).IsEqualTo(CompetitionManagementFailureCode.CompetitionActive);
     }
 
     private sealed class Store : ICompetitionManagementStore

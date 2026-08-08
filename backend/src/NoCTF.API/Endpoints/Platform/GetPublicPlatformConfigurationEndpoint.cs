@@ -26,7 +26,7 @@ internal static class PublicPlatformConfigurationMapping
         LinkGenerator links,
         HttpContext httpContext)
     {
-        if (string.IsNullOrWhiteSpace(configuration.LogoObjectKey))
+        if (configuration.LogoFileId is null)
             return null;
 
         var path = links.GetPathByName(httpContext, "PlatformLogo_Get", values: null);

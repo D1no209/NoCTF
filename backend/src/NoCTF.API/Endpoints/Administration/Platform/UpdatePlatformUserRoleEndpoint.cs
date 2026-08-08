@@ -2,6 +2,7 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Authentication;
 using NoCTF.Application.Administration;
 using NoCTF.Domain.Identity;
 using System.Text.Json.Serialization;
@@ -10,7 +11,7 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 
 public sealed class UpdatePlatformUserRoleRequest
 {
-    public UserRole Role { get; set; }
+    public UserRoleProtocol Role { get; set; }
 }
 
 public sealed class UpdatePlatformUserRoleValidator : Validator<UpdatePlatformUserRoleRequest>
@@ -19,7 +20,7 @@ public sealed class UpdatePlatformUserRoleValidator : Validator<UpdatePlatformUs
         RuleFor(request => request.Role).IsInEnum();
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<UpdatePlatformUserRoleConflictCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<UpdatePlatformUserRoleConflictCode>))]
 public enum UpdatePlatformUserRoleConflictCode
 {
     ActiveOwnerOrManagerAssignments
@@ -64,7 +65,7 @@ public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
         var userId = Route<Guid>("userId");
         var result = await platform.UpdateRoleAsync(
             userId,
-            request.Role,
+            IdentityProtocolMapper.ToDomain(request.Role),
             DateTimeOffset.UtcNow,
             ct);
         return result.State switch

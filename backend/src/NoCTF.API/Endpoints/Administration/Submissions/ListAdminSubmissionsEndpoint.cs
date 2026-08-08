@@ -17,10 +17,10 @@ public sealed class ListAdminSubmissionsRequest
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
     [QueryParam] public Guid? TeamId { get; set; }
     [QueryParam] public Guid? UserId { get; set; }
-    [QueryParam] public SubmissionKind? SubmissionKind { get; set; }
-    [QueryParam] public SubmissionEvaluationState? EvaluationState { get; set; }
-    [QueryParam] public ScoringResult? ScoringResult { get; set; }
-    [QueryParam] public ScoringFailureCode? FailureCode { get; set; }
+    [QueryParam] public SubmissionKindProtocol? SubmissionKind { get; set; }
+    [QueryParam] public SubmissionEvaluationStateProtocol? EvaluationState { get; set; }
+    [QueryParam] public ScoringResultProtocol? ScoringResult { get; set; }
+    [QueryParam] public ScoringFailureCodeProtocol? FailureCode { get; set; }
     [QueryParam] public DateTimeOffset? ReceivedFrom { get; set; }
     [QueryParam] public DateTimeOffset? ReceivedTo { get; set; }
     [QueryParam] public string? SubmittedFlag { get; set; }
@@ -69,8 +69,11 @@ public sealed class ListAdminSubmissionsEndpoint(
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
         var filter = new SubmissionListFilter(
             competitionId, request.CompetitionChallengeId, request.TeamId, request.UserId,
-            request.SubmissionKind, request.EvaluationState, request.ScoringResult,
-            request.FailureCode, request.ReceivedFrom, request.ReceivedTo,
+            request.SubmissionKind is null ? null : SubmissionMapper.ToDomain(request.SubmissionKind.Value),
+            request.EvaluationState is null ? null : SubmissionMapper.ToDomain(request.EvaluationState.Value),
+            request.ScoringResult is null ? null : SubmissionMapper.ToDomain(request.ScoringResult.Value),
+            request.FailureCode is null ? null : SubmissionMapper.ToDomain(request.FailureCode.Value),
+            request.ReceivedFrom, request.ReceivedTo,
             request.SubmittedFlag, request.HasCurrentScoringEvent);
         var items = await list.AdminAsync(
             filter, position?.CreatedAt, position?.Id, request.Limit, ct);

@@ -51,8 +51,12 @@ public sealed class NotificationFeedEndpointTests
         var secondId = Guid.CreateVersion7(now.AddSeconds(2));
         reader.Items =
         [
-            new(firstId, null, null, NotificationKind.ChallengePublished, "{}", now.AddSeconds(1)),
-            new(secondId, null, null, NotificationKind.HintPublished, "{}", now.AddSeconds(2))
+            new(firstId, NotificationSourceType.System, null,
+                NotificationTargetType.User, ActorId, NotificationKind.ChallengePublished,
+                "{}", null, null, null, now.AddSeconds(1)),
+            new(secondId, NotificationSourceType.System, null,
+                NotificationTargetType.User, ActorId, NotificationKind.HintPublished,
+                "{}", null, null, null, now.AddSeconds(2))
         ];
         using var feedResponse = await client.GetAsync(
             $"/api/v1/notifications/feed?limit=2&cursor={Uri.EscapeDataString(initial.NextCursor)}");
@@ -90,7 +94,7 @@ public sealed class NotificationFeedEndpointTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
         await Assert.That(problem.RootElement.GetProperty("code").GetString())
-            .IsEqualTo("cursor_invalid");
+            .IsEqualTo("CursorInvalid");
         await Assert.That(reader.ReadCalls).IsEqualTo(0);
     }
 

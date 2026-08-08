@@ -7,13 +7,13 @@ using NoCTF.Domain.Challenges.Questions;
 
 namespace NoCTF.API.Endpoints.Challenges.Questions;
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionSubjectCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionSubjectCode>))]
 public enum CompetitionQuestionSubjectCode
 {
     Challenge,
     Platform
 }
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionStatusCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionStatusCode>))]
 public enum CompetitionQuestionStatusCode
 {
     Pending,
@@ -22,24 +22,22 @@ public enum CompetitionQuestionStatusCode
     Closed
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionAccessCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionAccessCode>))]
 public enum CompetitionQuestionAccessCode
 {
-    Public,
     Asker,
     Observer,
     Handler
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionEntryKindCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionEntryKindCode>))]
 public enum CompetitionQuestionEntryKindCode
 {
     Message,
-    StatusTransition,
-    Publication
+    StatusTransition
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionParticipantRoleCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionParticipantRoleCode>))]
 public enum CompetitionQuestionParticipantRoleCode
 {
     Asker,
@@ -56,7 +54,6 @@ public sealed record CompetitionQuestionEntryResponse(
     CompetitionQuestionStatusCode? FromStatus,
     CompetitionQuestionStatusCode? ToStatus,
     Guid? TargetEntryId,
-    DateTimeOffset? PublishedAt,
     DateTimeOffset CreatedAt);
 
 public sealed record CompetitionQuestionResponse(
@@ -74,14 +71,11 @@ public sealed record CompetitionQuestionResponse(
     CompetitionQuestionStatusCode Status,
     CompetitionQuestionAccessCode Access,
     int Revision,
-    DateTimeOffset? PublishedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     bool CanReply,
     bool CanResolve,
     bool CanClose,
-    bool CanPublish,
-    bool CanViewPrivate,
     IReadOnlyList<CompetitionQuestionEntryResponse> Entries);
 
 internal static class CompetitionQuestionResponseMapper
@@ -105,7 +99,6 @@ internal static class CompetitionQuestionResponseMapper
             ToStatus(source.Status),
             (CompetitionQuestionAccessCode)source.Access,
             source.Revision,
-            source.PublishedAt,
             source.CreatedAt,
             source.UpdatedAt,
             CanReply: asker && source.Status != CompetitionQuestionStatus.Closed
@@ -115,8 +108,6 @@ internal static class CompetitionQuestionResponseMapper
                 || handler && source.Status is CompetitionQuestionStatus.Pending
                     or CompetitionQuestionStatus.Replied,
             CanClose: handler && source.Status != CompetitionQuestionStatus.Closed,
-            CanPublish: handler && source.Status != CompetitionQuestionStatus.Pending,
-            CanViewPrivate: source.Access != CompetitionQuestionAccess.Public,
             source.Entries.Select(ToResponse).ToArray());
     }
 
@@ -138,7 +129,6 @@ internal static class CompetitionQuestionResponseMapper
             source.FromStatus is null ? null : ToStatus(source.FromStatus.Value),
             source.ToStatus is null ? null : ToStatus(source.ToStatus.Value),
             source.TargetEntryId,
-            source.PublishedAt,
             source.CreatedAt);
 
     private static CompetitionQuestionSubjectCode ToSubject(

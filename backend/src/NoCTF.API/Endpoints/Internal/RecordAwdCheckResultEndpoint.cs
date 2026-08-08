@@ -3,19 +3,46 @@ using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Runtime;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Internal;
 
 public sealed class RecordAwdCheckResultRequest
 {
-    [JsonConverter(typeof(AwdServiceStateJsonConverter))]
-    public AwdServiceState State { get; set; }
+    public AwdServiceStateProtocol State { get; set; }
 }
 
-public sealed class AwdServiceStateJsonConverter()
-    : JsonStringEnumConverter<AwdServiceState>(namingPolicy: null, allowIntegerValues: false);
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdServiceStateProtocol>))]
+public enum AwdServiceStateProtocol
+{
+    Unknown,
+    Up,
+    Down,
+    CheckerAbnormalExit,
+    CheckerTimedOut
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<InternalResultDispositionProtocol>))]
+public enum InternalResultDispositionProtocol
+{
+    Applied,
+    Duplicate,
+    Superseded
+}
+
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
+internal static partial class InternalResultProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial AwdServiceState ToDomain(AwdServiceStateProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial InternalResultDispositionProtocol ToProtocol(
+        InternalResultDisposition value);
+}
 
 public sealed class RecordAwdCheckResultValidator : Validator<RecordAwdCheckResultRequest>
 {
@@ -23,7 +50,7 @@ public sealed class RecordAwdCheckResultValidator : Validator<RecordAwdCheckResu
         RuleFor(request => request.State).IsInEnum();
 }
 
-public sealed record InternalResultResponse(string Disposition);
+public sealed record InternalResultResponse(InternalResultDispositionProtocol Disposition);
 
 public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
     : Endpoint<RecordAwdCheckResultRequest,
@@ -67,16 +94,18 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
             generation,
             checkerSequence,
             processingVersion,
-            request.State,
+            InternalResultProtocolMapper.ToDomain(request.State),
             DateTimeOffset.UtcNow), ct);
         return disposition switch
         {
             InternalResultDisposition.Applied or InternalResultDisposition.Duplicate =>
-                TypedResults.Ok(new InternalResultResponse(disposition.ToString().ToLowerInvariant())),
+                TypedResults.Ok(new InternalResultResponse(
+                    InternalResultProtocolMapper.ToProtocol(disposition))),
             InternalResultDisposition.Superseded =>
                 TypedResults.Accepted(
                     uri: (string?)null,
-                    value: new InternalResultResponse("superseded")),
+                    value: new InternalResultResponse(
+                        InternalResultDispositionProtocol.Superseded)),
             InternalResultDisposition.NotFound => TypedResults.NotFound(),
             _ => TypedResults.Conflict()
         };

@@ -44,7 +44,7 @@ public sealed class CreateCompetitionQuestionValidator
     }
 }
 
-[JsonConverter(typeof(JsonStringEnumConverter<CompetitionQuestionFailureCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionQuestionFailureCode>))]
 public enum CompetitionQuestionFailureCode
 {
     InvalidRequest,
@@ -53,8 +53,7 @@ public enum CompetitionQuestionFailureCode
     TeamNotEligible,
     RevisionConflict,
     InvalidTransition,
-    QuestionClosed,
-    ReplyNotPublishable
+    QuestionClosed
 }
 
 public sealed record CompetitionQuestionFailureResponse(
@@ -79,7 +78,6 @@ internal static class CompetitionQuestionFailureMapper
             CompetitionQuestionFailure.RevisionConflict => CompetitionQuestionFailureCode.RevisionConflict,
             CompetitionQuestionFailure.InvalidTransition => CompetitionQuestionFailureCode.InvalidTransition,
             CompetitionQuestionFailure.QuestionClosed => CompetitionQuestionFailureCode.QuestionClosed,
-            CompetitionQuestionFailure.ReplyNotPublishable => CompetitionQuestionFailureCode.ReplyNotPublishable,
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)
         };
 }

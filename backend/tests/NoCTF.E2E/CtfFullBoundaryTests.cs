@@ -215,15 +215,15 @@ public sealed class CtfFullBoundaryTests
             "ctf-player",
             "ctf-player-password",
             cancellationToken));
-        var globalTeam = await SendJsonAsync(
+        var team = await SendJsonAsync(
             player,
             HttpMethod.Post,
-            "/api/v1/teams",
+            $"/api/v1/competitions/{competitionId}/teams",
             new { name = "Boundary Team" },
             HttpStatusCode.Created,
             cancellationToken);
-        var globalTeamId = globalTeam.GetProperty("id").GetGuid();
-        var captainId = globalTeam.GetProperty("captainId").GetGuid();
+        var teamId = team.GetProperty("id").GetGuid();
+        var captainId = team.GetProperty("captainId").GetGuid();
 
         await SendJsonAsync(
             anonymous,
@@ -245,28 +245,19 @@ public sealed class CtfFullBoundaryTests
         var invitation = await SendWithoutBodyForJsonAsync(
             player,
             HttpMethod.Post,
-            $"/api/v1/teams/{globalTeamId}/invitation-token/rotate",
+            $"/api/v1/competitions/{competitionId}/teams/{teamId}/invitation-token/rotate",
             HttpStatusCode.OK,
             cancellationToken);
         var invitationToken = invitation.GetProperty("invitationToken").GetString()
             ?? throw new InvalidOperationException("Invitation rotation did not return a token.");
         await Assert.That(invitationToken.Length).IsEqualTo(32);
-        await SendJsonAsync(
+        await SendJsonWithoutResponseAsync(
             teammate,
             HttpMethod.Post,
-            "/api/v1/teams/join",
+            $"/api/v1/competitions/{competitionId}/teams/join",
             new { invitationToken },
-            HttpStatusCode.OK,
+            HttpStatusCode.NoContent,
             cancellationToken);
-
-        var team = await SendJsonAsync(
-            player,
-            HttpMethod.Post,
-            $"/api/v1/competitions/{competitionId}/team-registrations",
-            new { teamId = globalTeamId },
-            HttpStatusCode.Created,
-            cancellationToken);
-        var teamId = team.GetProperty("id").GetGuid();
 
         var captainTeam = await GetJsonAsync(
             player,

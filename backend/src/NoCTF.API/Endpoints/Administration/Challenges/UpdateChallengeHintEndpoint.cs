@@ -42,7 +42,7 @@ public sealed class UpdateChallengeHintEndpoint(
             request.Cost,
             request.PublishedAt,
             DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode == "hint_not_found")
+        if (result.FailureCode == ChallengeHintFailureCode.HintNotFound)
             return TypedResults.NotFound();
         return result.Succeeded
             ? TypedResults.Ok(ChallengeHintMapping.ToResponse(result.Value!))

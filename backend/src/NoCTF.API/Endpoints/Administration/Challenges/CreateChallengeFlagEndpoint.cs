@@ -44,16 +44,16 @@ public sealed class CreateChallengeFlagEndpoint(
             actorId: null,
             isAdministrator: true,
             ct);
-        if (result.ErrorCode == "flag_not_found")
+        if (result.FailureCode == ChallengeFlagFailureCode.FlagNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: result.ErrorCode == "resource_id_conflict"
+                statusCode: result.FailureCode == ChallengeFlagFailureCode.ResourceIdConflict
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
                 title: "Flag was not created.",
                 detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
+                extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() });
         var response = ChallengeFlagMapping.ToResponse(result.Value!);
         return TypedResults.Created(
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{response.Id}",

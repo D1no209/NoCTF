@@ -10,6 +10,11 @@ namespace NoCTF.Runtime.Docker.Containers;
 public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobRunner,
     IAttachedOneShotJobRunner, IContainerSandboxLifecycle, IDisposable
 {
+    private const string NetworkPurposeAwdpCallback = "awdp-callback";
+    private const string NetworkPurposeAwdCheckerCallback = "awd-checker-callback";
+    private const string NetworkPurposeAwdChecker = "awd-checker";
+    private const string NetworkPurposeAwdpVerification = "awdp-verification";
+    private const string NetworkPurposePersistentRuntime = "persistent-runtime";
     private readonly DockerClient client;
     private readonly DockerRuntimeOptions options;
 
@@ -25,16 +30,16 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     {
         if (request.Provider != RuntimeProvider.Docker)
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Docker runtime cannot create another provider.");
-        if (request.PortMappings.Any(mapping =>
-                !options.EffectivePublishedPortRange.Contains(mapping.Value)))
-            throw new ArgumentOutOfRangeException(
-                nameof(request),
-                "Docker published ports must be allocated inside the configured high-port range.");
+        ValidatePortMappings(request);
 
         var exposedPorts = request.ContainerPorts.ToDictionary(port => $"{port}/tcp", _ => new EmptyStruct());
         var bindings = request.PortMappings.ToDictionary(
             pair => $"{pair.Key}/tcp",
-            pair => (IList<PortBinding>)[new() { HostPort = pair.Value.ToString() }]);
+            pair => (IList<PortBinding>)[new()
+            {
+                HostPort = pair.Value.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture)
+            }]);
         var containerName = $"noctf-{request.OperationId:N}";
         CreateContainerResponse? response = null;
         try
@@ -75,8 +80,10 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 await ConnectInternalCallbackAsync(request, response.ID, cancellationToken);
             await client.Containers.StartContainerAsync(
                 response.ID, new ContainerStartParameters(), cancellationToken);
+            var created = await client.Containers.InspectContainerAsync(
+                response.ID, cancellationToken);
             return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
-                SnapshotPublishedPorts(request),
+                ReadPublishedPorts(created, request.PortMappings.Keys),
                 options.PublicHost,
                 request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
                     ? "target"
@@ -123,6 +130,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         if (request.Provider != RuntimeProvider.Docker)
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider,
                 "Docker runtime cannot reconcile another provider.");
+        ValidatePortMappings(request);
 
         var resourceName = $"noctf-{request.OperationId:N}";
         ContainerInspectResponse? existing;
@@ -178,7 +186,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             RuntimeProvider.Docker,
             existing.ID,
             RuntimeStatus.Running,
-            SnapshotPublishedPorts(request),
+            ReadPublishedPorts(existing, request.PortMappings.Keys),
             options.PublicHost,
             resourceName,
             RuntimeInstanceId: request.RuntimeInstanceId,
@@ -606,7 +614,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         CancellationToken cancellationToken)
     {
         if (network.Labels?.TryGetValue("noctf.io/network-purpose", out var purpose) == true
-            && purpose is "awdp-callback" or "awd-checker-callback")
+            && purpose is NetworkPurposeAwdpCallback or NetworkPurposeAwdCheckerCallback)
         {
             var current = await client.Networks.InspectNetworkAsync(network.ID, cancellationToken);
             foreach (var containerId in current.Containers?.Keys ?? [])
@@ -646,10 +654,36 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             string.Equals(network.Name, networkName, StringComparison.Ordinal));
     }
 
-    // Host ports are allocated before provisioning. Docker inspect is eventually
-    // consistent immediately after Start and must not replace that durable mapping.
-    private static IReadOnlyDictionary<int, int> SnapshotPublishedPorts(ContainerRequest request) =>
-        request.PortMappings.ToDictionary(pair => pair.Key, pair => pair.Value);
+    private static IReadOnlyDictionary<int, int> ReadPublishedPorts(
+        ContainerInspectResponse container,
+        IEnumerable<int> requestedPorts)
+    {
+        var actual = container.NetworkSettings?.Ports
+            ?? throw new InvalidOperationException("Docker did not report network port bindings.");
+        var mappings = new Dictionary<int, int>();
+        foreach (var containerPort in requestedPorts)
+        {
+            if (!actual.TryGetValue($"{containerPort}/tcp", out var bindings)
+                || bindings is null
+                || !TryGetPublishedHostPort(bindings, out var hostPort))
+                throw new InvalidOperationException(
+                    $"Docker did not assign a host port for container port {containerPort}.");
+            mappings.Add(containerPort, hostPort);
+        }
+        return mappings;
+    }
+
+    private static void ValidatePortMappings(ContainerRequest request)
+    {
+        if (request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
+            && request.PortMappings.Any(mapping => mapping.Value != 0))
+            throw new ArgumentOutOfRangeException(
+                nameof(request),
+                "Persistent Docker runtimes must request Docker-assigned host ports.");
+        if (request.NetworkPurpose != ContainerNetworkPurpose.PersistentRuntime
+            && request.PortMappings.Any(mapping => mapping.Value is < 0 or > 65535))
+            throw new ArgumentOutOfRangeException(nameof(request));
+    }
 
     private static void ValidateExistingContainer(
         ContainerInspectResponse container,
@@ -661,7 +695,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             request.Generation);
         if (!HasResourceIdentity(container.Config?.Labels, identity)
             || !HasJobKind(container.Config?.Labels, JobKind(request.NetworkPurpose))
-            || !HasPublishedPortBindings(container.HostConfig?.PortBindings, request.PortMappings))
+            || !HasPublishedPortBindings(container.NetworkSettings?.Ports, request.PortMappings))
             throw new InvalidOperationException(
                 $"Docker Container '{resourceName}' has a different ownership identity, purpose, or published port contract.");
     }
@@ -678,16 +712,30 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         foreach (var mapping in expected)
         {
             if (!actual.TryGetValue($"{mapping.Key}/tcp", out var bindings)
-                || bindings.Count != 1
-                || !int.TryParse(
-                    bindings[0].HostPort,
-                    System.Globalization.NumberStyles.None,
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    out var hostPort)
-                || hostPort != mapping.Value)
+                || !TryGetPublishedHostPort(bindings, out var hostPort)
+                || mapping.Value != 0 && hostPort != mapping.Value)
                 return false;
         }
         return true;
+    }
+
+    private static bool TryGetPublishedHostPort(
+        IEnumerable<PortBinding> bindings,
+        out int hostPort)
+    {
+        var ports = bindings
+            .Select(binding => int.TryParse(
+                binding.HostPort,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed)
+                ? parsed
+                : 0)
+            .Where(port => port is >= 1 and <= 65535)
+            .Distinct()
+            .ToArray();
+        hostPort = ports.Length == 1 ? ports[0] : 0;
+        return hostPort != 0;
     }
 
     private async Task RemoveContainerAsync(
@@ -756,14 +804,14 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     private static string CallbackNetworkPurpose(ContainerRequest request) =>
         request.NetworkPurpose == ContainerNetworkPurpose.AwdChecker
-            ? "awd-checker-callback"
-            : "awdp-callback";
+            ? NetworkPurposeAwdCheckerCallback
+            : NetworkPurposeAwdpCallback;
 
     private static string JobKind(ContainerNetworkPurpose purpose) => purpose switch
     {
-        ContainerNetworkPurpose.AwdChecker => "awd-checker",
-        ContainerNetworkPurpose.AwdpVerification => "awdp-verification",
-        ContainerNetworkPurpose.PersistentRuntime => "persistent-runtime",
+        ContainerNetworkPurpose.AwdChecker => NetworkPurposeAwdChecker,
+        ContainerNetworkPurpose.AwdpVerification => NetworkPurposeAwdpVerification,
+        ContainerNetworkPurpose.PersistentRuntime => NetworkPurposePersistentRuntime,
         _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, null)
     };
 

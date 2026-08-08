@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -12,13 +14,27 @@ using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeVisibilityProtocol>))]
+public enum ChallengeVisibilityProtocol
+{
+    Private,
+    Shared
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<SpecificationKindProtocol>))]
+public enum SpecificationKindProtocol
+{
+    Attachment,
+    AwdRound,
+    RuntimeDefinition,
+    Hint
+}
+
 public sealed class CreateChallengeTemplateRequest
 {
     public Guid? Id { get; set; }
-    [JsonConverter(typeof(JsonStringEnumConverter<GameMode>))]
-    public GameMode Mode { get; set; }
-    [JsonConverter(typeof(JsonStringEnumConverter<ChallengeVisibility>))]
-    public ChallengeVisibility Visibility { get; set; }
+    public GameModeProtocol Mode { get; set; }
+    public ChallengeVisibilityProtocol Visibility { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Direction { get; set; } = string.Empty;
@@ -29,8 +45,8 @@ public sealed record ChallengeTemplateResponse(
     Guid Id,
     Guid OwnerId,
     IReadOnlyList<Guid> ManagerIds,
-    GameMode Mode,
-    ChallengeVisibility Visibility,
+    GameModeProtocol Mode,
+    ChallengeVisibilityProtocol Visibility,
     string Title,
     string? Description,
     string Direction,
@@ -41,7 +57,7 @@ public sealed record ChallengeTemplateResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-[JsonConverter(typeof(JsonStringEnumConverter<ChallengeTemplateConflictCode>))]
+[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<ChallengeTemplateConflictCode>))]
 public enum ChallengeTemplateConflictCode
 {
     ResourceIdConflict,
@@ -106,8 +122,8 @@ internal static partial class ChallengeTemplateMapper
         new(
             request.Id,
             ownerId,
-            request.Mode,
-            request.Visibility,
+            CompetitionProtocolMapper.ToDomain(request.Mode),
+            ToDomain(request.Visibility),
             request.Title,
             request.Description,
             request.Direction,
@@ -118,6 +134,21 @@ internal static partial class ChallengeTemplateMapper
         IReadOnlyList<ChallengeTemplateView> source);
     public static ChallengeTemplateListResponse ToListResponse(IReadOnlyList<ChallengeTemplateView> source) =>
         new(ToResponses(source));
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ChallengeVisibility ToDomain(ChallengeVisibilityProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial ChallengeVisibilityProtocol ToProtocol(ChallengeVisibility value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SpecificationKind ToDomain(SpecificationKindProtocol value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial SpecificationKindProtocol ToProtocol(SpecificationKind value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    private static partial GameModeProtocol ToProtocol(GameMode value);
 }
 
 public sealed class CreateChallengeTemplateEndpoint(

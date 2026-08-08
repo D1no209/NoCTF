@@ -118,9 +118,24 @@ public enum ChallengeTemplateDeleteFailure
     InUse
 }
 
+public enum ChallengeTemplateValidationFailureCode
+{
+    InvalidMode,
+    InvalidTitle,
+    InvalidDirection,
+    InvalidDefinition,
+    InvalidRevision
+}
+
+public enum ChallengeTemplateDeleteFailureCode
+{
+    ChallengeInUse,
+    ChallengeNotFound
+}
+
 public static class ChallengeTemplateValidation
 {
-    public static OperationResult Validate(
+    public static OperationResult<ChallengeTemplateValidationFailureCode> Validate(
         GameMode mode,
         string title,
         string direction,
@@ -128,16 +143,25 @@ public static class ChallengeTemplateValidation
         int expectedRevision = 0)
     {
         if (!Enum.IsDefined(mode))
-            return OperationResult.Failure("invalid_mode", "Mode is invalid.");
+            return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
+                ChallengeTemplateValidationFailureCode.InvalidMode, "Mode is invalid.");
         if (string.IsNullOrWhiteSpace(title) || title.Length > 160)
-            return OperationResult.Failure("invalid_title", "Title is required and must be at most 160 characters.");
+            return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
+                ChallengeTemplateValidationFailureCode.InvalidTitle,
+                "Title is required and must be at most 160 characters.");
         if (string.IsNullOrWhiteSpace(direction) || direction.Length > 96)
-            return OperationResult.Failure("invalid_direction", "Direction is required and must be at most 96 characters.");
+            return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
+                ChallengeTemplateValidationFailureCode.InvalidDirection,
+                "Direction is required and must be at most 96 characters.");
         if (string.IsNullOrWhiteSpace(definitionJson))
-            return OperationResult.Failure("invalid_definition", "DefinitionJson is required.");
+            return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
+                ChallengeTemplateValidationFailureCode.InvalidDefinition,
+                "DefinitionJson is required.");
         if (expectedRevision < 0)
-            return OperationResult.Failure("invalid_revision", "ExpectedRevision cannot be negative.");
-        return OperationResult.Success();
+            return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
+                ChallengeTemplateValidationFailureCode.InvalidRevision,
+                "ExpectedRevision cannot be negative.");
+        return OperationResult<ChallengeTemplateValidationFailureCode>.Success();
     }
 }
 
@@ -239,7 +263,7 @@ public sealed class UpdateChallengeTemplate(
 
 public sealed class DeleteChallengeTemplate(IChallengeBankStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<OperationResult<ChallengeTemplateDeleteFailureCode>> ExecuteAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
@@ -254,12 +278,12 @@ public sealed class DeleteChallengeTemplate(IChallengeBankStore store)
             ct);
         return failure switch
         {
-            null => OperationResult.Success(),
-            ChallengeTemplateDeleteFailure.InUse => OperationResult.Failure(
-                "challenge_in_use",
+            null => OperationResult<ChallengeTemplateDeleteFailureCode>.Success(),
+            ChallengeTemplateDeleteFailure.InUse => OperationResult<ChallengeTemplateDeleteFailureCode>.Failure(
+                ChallengeTemplateDeleteFailureCode.ChallengeInUse,
                 "Challenge is still referenced by an active competition challenge."),
-            _ => OperationResult.Failure(
-                "challenge_not_found",
+            _ => OperationResult<ChallengeTemplateDeleteFailureCode>.Failure(
+                ChallengeTemplateDeleteFailureCode.ChallengeNotFound,
                 "Challenge was not found or access was denied.")
         };
     }

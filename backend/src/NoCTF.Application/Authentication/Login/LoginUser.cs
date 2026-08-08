@@ -15,9 +15,14 @@ public sealed record LoginResult(
     DateTimeOffset AccessTokenExpiresAt,
     string RefreshToken);
 
+public enum LoginFailureCode
+{
+    InvalidCredentials
+}
+
 public sealed class LoginUser(IUserAuthenticationStore store, IAccessTokenIssuer issuer)
 {
-    public async Task<OperationResult<LoginResult>> ExecuteAsync(
+    public async Task<OperationResult<LoginResult, LoginFailureCode>> ExecuteAsync(
         LoginCommand command,
         CancellationToken cancellationToken = default)
     {
@@ -25,11 +30,13 @@ public sealed class LoginUser(IUserAuthenticationStore store, IAccessTokenIssuer
         if (user is null
             || user.Kind != UserKind.Human
             || !await store.VerifyPasswordAsync(user.Id, command.Password, cancellationToken))
-            return OperationResult<LoginResult>.Failure("invalid_credentials", "Invalid credentials.");
+            return OperationResult<LoginResult, LoginFailureCode>.Failure(
+                LoginFailureCode.InvalidCredentials,
+                "Invalid credentials.");
 
         var token = issuer.Issue(user, DateTimeOffset.UtcNow);
         var refreshToken = issuer.IssueRefresh(user);
-        return OperationResult<LoginResult>.Success(new(
+        return OperationResult<LoginResult, LoginFailureCode>.Success(new(
             user.Id,
             user.UserName,
             user.Role,

@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Authentication;
 using NoCTF.Application.Administration;
 using NoCTF.Domain.Identity;
 
@@ -9,9 +10,9 @@ public sealed record PlatformUserResponse(
     Guid Id,
     string UserName,
     string Email,
-    UserKind Kind,
-    UserRole Role,
-    UserAccountStatus AccountStatus,
+    UserKindProtocol Kind,
+    UserRoleProtocol Role,
+    UserAccountStatusProtocol AccountStatus,
     int TokenVersion,
     bool EmailVerified,
     DateTimeOffset CreatedAt,
@@ -23,7 +24,10 @@ internal static class PlatformUserMapping
 {
     public static PlatformUserResponse ToResponse(PlatformUserView view) =>
         new(
-            view.Id, view.UserName, view.Email, view.Kind, view.Role, view.AccountStatus,
+            view.Id, view.UserName, view.Email,
+            IdentityProtocolMapper.ToProtocol(view.Kind),
+            IdentityProtocolMapper.ToProtocol(view.Role),
+            IdentityProtocolMapper.ToProtocol(view.AccountStatus),
             view.TokenVersion,
             view.EmailVerified, view.CreatedAt, view.UpdatedAt);
 }

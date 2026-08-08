@@ -23,7 +23,7 @@ public class SubmissionAdmissionPolicyTests
 
         var result = Check(snapshot, snapshot.EndAt.AddTicks(1));
 
-        await Assert.That(result.ErrorCode).IsEqualTo("competition_finished");
+        await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.CompetitionFinished);
     }
 
     [Test]
@@ -33,7 +33,7 @@ public class SubmissionAdmissionPolicyTests
 
         var result = Check(snapshot, DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("team_banned");
+        await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.TeamBanned);
     }
 
     [Test]
@@ -52,7 +52,7 @@ public class SubmissionAdmissionPolicyTests
         DateTimeOffset.UtcNow.AddMinutes(1),
         false, false, true, false, false, true, true);
 
-    private static NoCTF.Application.Common.OperationResult Check(
+    private static NoCTF.Application.Common.OperationResult<SubmissionFailureCode> Check(
         SubmissionAdmissionSnapshot snapshot,
         DateTimeOffset receivedAt) => SubmissionAdmissionPolicy.Check(
         snapshot,

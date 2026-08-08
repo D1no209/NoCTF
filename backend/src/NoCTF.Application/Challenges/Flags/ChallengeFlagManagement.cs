@@ -47,6 +47,16 @@ public enum ChallengeFlagSaveFailure
     ResourceIdConflict
 }
 
+public enum ChallengeFlagFailureCode
+{
+    InvalidFlag,
+    InvalidSpecification,
+    InvalidValidityWindow,
+    InvalidTemplateFlagScope,
+    ResourceIdConflict,
+    FlagNotFound
+}
+
 public sealed record ChallengeFlagSaveResult(
     ChallengeFlagView? Flag,
     ChallengeFlagSaveFailure? Failure = null);
@@ -106,7 +116,7 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         CancellationToken ct = default) =>
         store.FindAsync(scope, flagId, actorId, isAdministrator, includeDeleted, ct);
 
-    public async Task<OperationResult<ChallengeFlagView>> SaveAsync(
+    public async Task<OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>> SaveAsync(
         SaveChallengeFlagCommand command,
         Guid? actorId,
         bool isAdministrator,
@@ -114,40 +124,40 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
     {
         var bytes = Encoding.UTF8.GetBytes(command.Flag);
         if (bytes.Length is < 1 or > 4096 || bytes.Contains((byte)0))
-            return OperationResult<ChallengeFlagView>.Failure(
-                "invalid_flag",
+            return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.InvalidFlag,
                 "Flag must be 1..4096 UTF-8 bytes and cannot contain NUL.");
         if ((command.SpecificationKind is null) != (command.SpecificationId is null))
-            return OperationResult<ChallengeFlagView>.Failure(
-                "invalid_specification",
+            return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.InvalidSpecification,
                 "SpecificationKind and SpecificationId must both be present or absent.");
         if (command.ValidStart is not null &&
             command.ValidUntil is not null &&
             command.ValidStart >= command.ValidUntil)
-            return OperationResult<ChallengeFlagView>.Failure(
-                "invalid_validity_window",
+            return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.InvalidValidityWindow,
                 "ValidStart must be earlier than ValidUntil.");
         if (command.Scope.ChallengeId is not null && teamOrWindowPresent(command))
-            return OperationResult<ChallengeFlagView>.Failure(
-                "invalid_template_flag_scope",
+            return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.InvalidTemplateFlagScope,
                 "Template flags cannot be team-scoped or time-windowed.");
 
         var result = await store.SaveAsync(command, actorId, isAdministrator, ct);
         return result.Failure switch
         {
             ChallengeFlagSaveFailure.ResourceIdConflict =>
-                OperationResult<ChallengeFlagView>.Failure(
-                    "resource_id_conflict",
+                OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.ResourceIdConflict,
                     "The requested flag ID is already in use."),
             ChallengeFlagSaveFailure.ScopeNotFound or ChallengeFlagSaveFailure.FlagNotFound =>
-                OperationResult<ChallengeFlagView>.Failure(
-                    "flag_not_found",
+                OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.FlagNotFound,
                     "Flag scope was not found, access was denied, or the flag does not exist."),
-            _ => OperationResult<ChallengeFlagView>.Success(result.Flag!)
+            _ => OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Success(result.Flag!)
         };
     }
 
-    public async Task<OperationResult> DeleteAsync(
+    public async Task<OperationResult<ChallengeFlagFailureCode>> DeleteAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
@@ -155,10 +165,12 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         DateTimeOffset now,
         CancellationToken ct = default) =>
         await store.DeleteAsync(scope, flagId, actorId, isAdministrator, now, ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure("flag_not_found", "Flag was not found or access was denied.");
+            ? OperationResult<ChallengeFlagFailureCode>.Success()
+            : OperationResult<ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.FlagNotFound,
+                "Flag was not found or access was denied.");
 
-    public async Task<OperationResult> RestoreAsync(
+    public async Task<OperationResult<ChallengeFlagFailureCode>> RestoreAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
@@ -166,9 +178,9 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         DateTimeOffset now,
         CancellationToken ct = default) =>
         await store.RestoreAsync(scope, flagId, actorId, isAdministrator, now, ct)
-            ? OperationResult.Success()
-            : OperationResult.Failure(
-                "flag_not_found",
+            ? OperationResult<ChallengeFlagFailureCode>.Success()
+            : OperationResult<ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.FlagNotFound,
                 "Deleted flag was not found or access was denied.");
 
     private static bool teamOrWindowPresent(SaveChallengeFlagCommand command) =>

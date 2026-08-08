@@ -47,7 +47,6 @@ public sealed class TeamLeaderboardInvalidationPersistenceTests
                         fixture.RegistrationCompetitionId,
                         fixture.RegistrationCaptainId,
                         "Registration Team",
-                        null,
                         fixture.Now),
                     TeamRegistrationStatus.Pending,
                     cancellationToken);
@@ -79,8 +78,7 @@ public sealed class TeamLeaderboardInvalidationPersistenceTests
                     new UpdateTeamCommand(
                         fixture.RegistrationCompetitionId,
                         teamId,
-                        "Updated Registration Team",
-                        null),
+                        "Updated Registration Team"),
                     cancellationToken);
                 await Assert.That(updated.Team).IsNotNull();
 

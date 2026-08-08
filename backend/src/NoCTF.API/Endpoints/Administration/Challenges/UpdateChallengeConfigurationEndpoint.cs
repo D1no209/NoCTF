@@ -60,11 +60,11 @@ public sealed class UpdateChallengeConfigurationEndpoint(
             request.Json,
             DateTimeOffset.UtcNow,
             ct);
-        if (result.ErrorCode is "competition_not_found" or "challenge_not_found")
+        if (result.FailureCode is ChallengeConfigurationFailureCode.CompetitionNotFound or ChallengeConfigurationFailureCode.ChallengeNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
         {
-            var status = result.ErrorCode is "configuration_conflict" or "configuration_locked"
+            var status = result.FailureCode is ChallengeConfigurationFailureCode.ConfigurationConflict or ChallengeConfigurationFailureCode.ConfigurationLocked
                 ? StatusCodes.Status409Conflict
                 : StatusCodes.Status400BadRequest;
             return TypedResults.Problem(

@@ -5,6 +5,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Submissions;
+using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Internal;
 
@@ -24,6 +25,13 @@ public enum AwdpFixResultOutcome
 
 public sealed class AwdpFixOutcomeJsonConverter()
     : JsonStringEnumConverter<AwdpFixResultOutcome>(namingPolicy: null, allowIntegerValues: false);
+
+[Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
+internal static partial class AwdpFixOutcomeMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial AwdpFixOutcome ToDomain(AwdpFixResultOutcome value);
+}
 
 public sealed class RecordAwdpCheckResultValidator : Validator<RecordAwdpCheckResultRequest>
 {
@@ -73,23 +81,18 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
             generation,
             processingVersion,
             runtimeProcessingVersion,
-            request.Outcome switch
-            {
-                AwdpFixResultOutcome.Fixed => AwdpFixOutcome.Fixed,
-                AwdpFixResultOutcome.StillVulnerable => AwdpFixOutcome.StillVulnerable,
-                AwdpFixResultOutcome.RuleViolation => AwdpFixOutcome.RuleViolation,
-                AwdpFixResultOutcome.ServiceUnavailable => AwdpFixOutcome.ServiceUnavailable,
-                _ => throw new ArgumentOutOfRangeException(nameof(request), request.Outcome, null)
-            },
+            AwdpFixOutcomeMapper.ToDomain(request.Outcome),
             DateTimeOffset.UtcNow), ct);
         return disposition switch
         {
             InternalResultDisposition.Applied or InternalResultDisposition.Duplicate =>
-                TypedResults.Ok(new InternalResultResponse(disposition.ToString().ToLowerInvariant())),
+                TypedResults.Ok(new InternalResultResponse(
+                    InternalResultProtocolMapper.ToProtocol(disposition))),
             InternalResultDisposition.Superseded =>
                 TypedResults.Accepted(
                     uri: (string?)null,
-                    value: new InternalResultResponse("superseded")),
+                    value: new InternalResultResponse(
+                        InternalResultDispositionProtocol.Superseded)),
             InternalResultDisposition.NotFound => TypedResults.NotFound(),
             _ => TypedResults.Conflict()
         };

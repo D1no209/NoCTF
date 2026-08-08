@@ -9,6 +9,7 @@ using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using System.Text.Json;
 
 namespace NoCTF.Infrastructure.Challenges.Hints;
 
@@ -16,8 +17,21 @@ public sealed class ChallengeHintStore(
     NoCtfDbContext db,
     ILeaderboardProjectionEngine projection,
     ITransactionalMessageOutbox outbox,
+    TeamChallengeCriticalSection criticalSection,
     ICompetitionEventRecorder? eventRecorder = null) : IChallengeHintStore
 {
+    public ChallengeHintStore(
+        NoCtfDbContext db,
+        ILeaderboardProjectionEngine projection,
+        ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder? eventRecorder = null)
+        : this(
+            db,
+            projection,
+            outbox,
+            new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry()),
+            eventRecorder) { }
+
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
@@ -30,11 +44,9 @@ public sealed class ChallengeHintStore(
         if (!await ScopeExistsAsync(competitionId, competitionChallengeId, ct))
             return null;
         var entity = await db.CompetitionChallenges
-            .Include(challenge => challenge.Hints)
             .SingleAsync(challenge => challenge.Id == competitionChallengeId, ct);
-        return entity.Hints.Where(hint => includeDeleted || hint.DeletedAt == null)
-            .OrderBy(hint => hint.CreatedAt).ThenBy(hint => hint.Id)
-            .Select(Map).ToArray();
+        return entity.Hints.Where(hint => includeDeleted || hint.HiddenAt == null)
+            .Select(hint => Map(hint, entity.Id, entity.UpdatedAt)).ToArray();
     }
 
     public async Task<ChallengeHintView?> FindAsync(
@@ -47,11 +59,10 @@ public sealed class ChallengeHintStore(
         if (!await ScopeExistsAsync(competitionId, competitionChallengeId, ct))
             return null;
         var entity = await db.CompetitionChallenges
-            .Include(challenge => challenge.Hints)
             .SingleAsync(challenge => challenge.Id == competitionChallengeId, ct);
         var hint = entity.Hints.SingleOrDefault(item =>
-            item.Id == hintId && (includeDeleted || item.DeletedAt == null));
-        return hint is null ? null : Map(hint);
+            item.Id == hintId && (includeDeleted || item.HiddenAt == null));
+        return hint is null ? null : Map(hint, entity.Id, entity.UpdatedAt);
     }
 
     public async Task<ChallengeHintSaveResult> SaveAsync(
@@ -59,11 +70,10 @@ public sealed class ChallengeHintStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, command.CompetitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct) is null)
             return new(null, ChallengeHintSaveFailure.ScopeNotFound);
 
         var challenge = await db.CompetitionChallenges
-            .Include(item => item.Hints)
             .SingleOrDefaultAsync(item =>
                 item.Id == command.CompetitionChallengeId &&
                 item.CompetitionId == command.CompetitionId, ct);
@@ -72,7 +82,7 @@ public sealed class ChallengeHintStore(
         CompetitionChallengeHint hint;
         if (!command.IsCreate && command.HintId is Guid hintId)
         {
-            hint = challenge.Hints.SingleOrDefault(item => item.Id == hintId && item.DeletedAt == null)
+            hint = challenge.Hints.SingleOrDefault(item => item.Id == hintId && item.HiddenAt == null)
                 ?? null!;
             if (hint is null)
                 return new(null, ChallengeHintSaveFailure.HintNotFound);
@@ -80,24 +90,19 @@ public sealed class ChallengeHintStore(
         else
         {
             var requestedId = command.HintId ?? Guid.CreateVersion7(command.Now);
-            if (await db.Set<CompetitionChallengeHint>().IgnoreQueryFilters().AsNoTracking()
-                    .AnyAsync(item => item.Id == requestedId, ct))
+            if (challenge.Hints.Any(item => item.Id == requestedId))
                 return new(null, ChallengeHintSaveFailure.ResourceIdConflict);
             hint = new CompetitionChallengeHint
             {
-                Id = requestedId,
-                CompetitionChallengeId = command.CompetitionChallengeId,
-                CreatedAt = command.Now
+                Id = requestedId
             };
-            db.Set<CompetitionChallengeHint>().Add(hint);
+            challenge.Hints.Add(hint);
         }
         var wasPublished = hint.PublishedAt is { } previousPublishedAt
             && previousPublishedAt <= command.Now;
         hint.Content = command.Content;
         hint.Cost = command.Cost;
         hint.PublishedAt = command.PublishedAt;
-        hint.PublicationRevision = checked(hint.PublicationRevision + 1);
-        hint.UpdatedAt = command.Now;
         challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = command.Now;
         try
@@ -114,7 +119,7 @@ public sealed class ChallengeHintStore(
                 ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
-            return new(Map(hint));
+            return new(Map(hint, challenge.Id, challenge.UpdatedAt));
         }
         catch (DbUpdateException) when (command.IsCreate)
         {
@@ -130,20 +135,17 @@ public sealed class ChallengeHintStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return false;
 
         var challenge = await db.CompetitionChallenges
-            .Include(item => item.Hints)
             .SingleOrDefaultAsync(item =>
                 item.Id == competitionChallengeId &&
                 item.CompetitionId == competitionId, ct);
-        var hint = challenge?.Hints.SingleOrDefault(item => item.Id == hintId && item.DeletedAt == null);
+        var hint = challenge?.Hints.SingleOrDefault(item => item.Id == hintId && item.HiddenAt == null);
         if (hint is null)
             return false;
-        hint.DeletedAt = now;
-        hint.PublicationRevision = checked(hint.PublicationRevision + 1);
-        hint.UpdatedAt = now;
+        hint.HiddenAt = now;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
@@ -162,21 +164,18 @@ public sealed class ChallengeHintStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionWriteLock.AcquireAsync(db, competitionId, ct) is null)
+        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
             return false;
 
         var challenge = await db.CompetitionChallenges
-            .Include(item => item.Hints)
             .SingleOrDefaultAsync(item =>
                 item.Id == competitionChallengeId &&
                 item.CompetitionId == competitionId, ct);
         var hint = challenge?.Hints.SingleOrDefault(item =>
-            item.Id == hintId && item.DeletedAt != null);
+            item.Id == hintId && item.HiddenAt != null);
         if (hint is null)
             return false;
-        hint.DeletedAt = null;
-        hint.PublicationRevision = checked(hint.PublicationRevision + 1);
-        hint.UpdatedAt = now;
+        hint.HiddenAt = null;
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
@@ -213,68 +212,54 @@ public sealed class ChallengeHintStore(
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({competitionId.ToString() + ":" + teamId.ToString()}, 0))",
+        await using var unlockLease = await criticalSection.AcquireAsync(
+            db,
+            teamId.Value,
+            competitionChallengeId,
             ct);
         var challenge = await db.CompetitionChallenges
-            .Include(item => item.Hints)
             .SingleOrDefaultAsync(item =>
                 item.Id == competitionChallengeId &&
                 item.CompetitionId == competitionId &&
                 item.IsPublished, ct);
         var hint = challenge?.Hints.SingleOrDefault(item =>
             item.Id == hintId &&
-            item.DeletedAt == null &&
+            item.HiddenAt == null &&
             item.PublishedAt != null &&
             item.PublishedAt <= now);
         if (hint is null)
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
-        var existing = await db.ScoringEvents.AnyAsync(item =>
+        var existing = await db.Submissions.AsNoTracking().Where(item =>
             item.CompetitionId == competitionId &&
             item.TeamId == teamId &&
-            item.Kind == ScoringEventKind.HintUnlock &&
-            item.SpecificationKind == SpecificationKind.Hint &&
-            item.SpecificationId == hintId, ct);
-        if (existing)
-            return HintUnlockAttempt.Success(new(Map(hint), false));
+            item.Kind == SubmissionKind.HintUnlock &&
+            item.SubmittedFlag == hintId.ToString("D"))
+            .OrderByDescending(item => item.ReceivedAt)
+            .Select(item => (Guid?)item.Id)
+            .FirstOrDefaultAsync(ct);
+        if (existing is Guid existingId)
+            return HintUnlockAttempt.Success(new(existingId, false));
 
-        var score = await AuthoritativeScoreAsync(competitionId, teamId.Value, now, ct);
-        if (score < hint.Cost)
-            return HintUnlockAttempt.Failed(HintUnlockFailure.InsufficientScore);
-        var competition = await db.Competitions.SingleAsync(item => item.Id == competitionId, ct);
-        db.ScoringEvents.Add(new ScoringEvent
+        var submissionId = Guid.CreateVersion7(now);
+        db.Submissions.Add(new Submission
         {
-            Id = Guid.CreateVersion7(now),
+            Id = submissionId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
-            TeamId = teamId,
-            Kind = ScoringEventKind.HintUnlock,
-            Result = ScoringResult.Correct,
-            SpecificationKind = SpecificationKind.Hint,
-            SpecificationId = hintId,
-            CompetitionConfigurationRevision = competition.ConfigurationRevision,
-            CompetitionChallengeRevision = challenge!.Revision,
-            OccurredAt = now,
-            CreatedAt = now
+            TeamId = teamId.Value,
+            SubmittedByUserId = userId,
+            Kind = SubmissionKind.HintUnlock,
+            SubmittedFlag = hintId.ToString("D"),
+            ReceivedAt = now,
+            EvaluationState = SubmissionEvaluationState.Queued,
+            EvaluationUpdatedAt = now,
+            ProcessingVersion = 0
         });
-        await events.RecordAsync(new(
-            competitionId,
-            CompetitionEventKind.HintUnlocked,
-            CompetitionEventLevel.Information,
-            CompetitionEventVisibility.Team,
-            now,
-            ActorUserId: userId,
-            TeamId: teamId,
-            CompetitionChallengeId: competitionChallengeId,
-            HintId: hintId,
-            ScoringEventKind: ScoringEventKind.HintUnlock,
-            ScoringResult: ScoringResult.Correct), ct);
+        await outbox.PublishAsync(new EvaluateSubmission(submissionId, 0));
         await db.SaveChangesAsync(ct);
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
-        return HintUnlockAttempt.Success(new(Map(hint), true));
+        return HintUnlockAttempt.Success(new(submissionId, true));
     }
 
     private async Task<long> AuthoritativeScoreAsync(
@@ -297,30 +282,51 @@ public sealed class ChallengeHintStore(
             .Where(item => item.CompetitionId == competitionId)
             .Join(db.Challenges.IgnoreQueryFilters().AsNoTracking(), item => item.ChallengeId, template => template.Id,
                 (item, template) => new LeaderboardChallengeFact(
-                    item.Id, template.Direction, item.DeletedAt != null || template.DeletedAt != null,
+                    item.Id, template.Direction, template.Title, item.DeletedAt != null || template.DeletedAt != null,
                     item.RulesJson))
             .ToListAsync(ct);
         var submissions = await db.Submissions.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId && item.CurrentScoringEventId != null)
             .Join(db.ScoringEvents.AsNoTracking(), item => item.CurrentScoringEventId, fact => (Guid?)fact.Id,
-                (item, fact) => new LeaderboardSubmissionFact(
-                    item.Id, item.TeamId, item.CompetitionChallengeId, item.Kind, item.ReceivedAt, fact,
-                    fact.VictimTeamId))
+                (item, fact) => new { Submission = item, ScoringEvent = fact })
+            .Join(db.Users.AsNoTracking(), item => item.Submission.SubmittedByUserId, user => user.Id,
+                (item, user) => new LeaderboardSubmissionFact(
+                    item.Submission.Id, item.Submission.TeamId, item.Submission.CompetitionChallengeId,
+                    item.Submission.Kind, item.Submission.ReceivedAt, item.ScoringEvent,
+                    item.ScoringEvent.VictimTeamId, user.UserName,
+                    item.Submission.SubmittedFlag))
             .ToListAsync(ct);
-        var system = await db.ScoringEvents.AsNoTracking()
+        var hintCosts = (await db.CompetitionChallenges.AsNoTracking()
+                .Where(item => item.CompetitionId == competitionId)
+                .ToListAsync(ct))
+            .SelectMany(item => item.Hints)
+            .ToDictionary(item => item.Id, item => item.Cost);
+        var systemEvents = await db.ScoringEvents.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId && item.SubmissionId == null)
-            .Select(item => new LeaderboardSystemFact(
-                item,
-                item.Kind == ScoringEventKind.HintUnlock && item.SpecificationId != null
-                    ? db.Set<CompetitionChallengeHint>()
-                        .Where(hint => hint.Id == item.SpecificationId && hint.DeletedAt == null)
-                        .Select(hint => hint.Cost)
-                        .SingleOrDefault()
-                    : 0))
             .ToListAsync(ct);
-        var lifecycleAudits = await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
-            .Where(audit => audit.CompetitionId == competitionId)
+        var system = systemEvents.Select(item => new LeaderboardSystemFact(
+            item,
+            item.Kind == ScoringEventKind.HintUnlock && item.SpecificationId is { } hintId
+                ? hintCosts.GetValueOrDefault(hintId)
+                : 0)).ToList();
+        var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
+            .Where(item => item.CompetitionId == competitionId
+                && item.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
+            .OrderBy(item => item.OccurredAt)
             .ToListAsync(ct);
+        var lifecycleAudits = lifecycleEvents.Select(item =>
+        {
+            using var payload = JsonDocument.Parse(item.PayloadJson);
+            return new CompetitionLifecycleTransition
+            {
+                Id = item.Id,
+                CompetitionId = item.CompetitionId,
+                From = Enum.Parse<CompetitionStatus>(payload.RootElement.GetProperty("from").GetString()!, true),
+                To = Enum.Parse<CompetitionStatus>(payload.RootElement.GetProperty("to").GetString()!, true),
+                ActorId = item.ActorUserId,
+                OccurredAt = item.OccurredAt
+            };
+        }).ToList();
         IReadOnlyList<LeaderboardAwdRoundFact> awdRounds = [];
         if (competition.Mode == GameMode.Awd)
         {
@@ -376,7 +382,7 @@ public sealed class ChallengeHintStore(
             challengeTitle,
             hint.Cost,
             publishedAt,
-            hint.PublicationRevision);
+            challenge.Revision);
         if (publishedAt <= now)
             await outbox.PublishAsync(message);
         else
@@ -387,8 +393,11 @@ public sealed class ChallengeHintStore(
         db.CompetitionChallenges.AnyAsync(
             item => item.Id == competitionChallengeId && item.CompetitionId == competitionId, ct);
 
-    private static ChallengeHintView Map(CompetitionChallengeHint hint) =>
+    private static ChallengeHintView Map(
+        CompetitionChallengeHint hint,
+        Guid competitionChallengeId,
+        DateTimeOffset updatedAt) =>
         new(
-            hint.Id, hint.CompetitionChallengeId, hint.Content, hint.Cost,
-            hint.PublishedAt, hint.DeletedAt, hint.CreatedAt, hint.UpdatedAt);
+            hint.Id, competitionChallengeId, hint.Content, hint.Cost,
+            hint.PublishedAt, hint.HiddenAt, updatedAt, updatedAt);
 }

@@ -11,6 +11,7 @@ public static class EndpointRegistration
     {
         app.UseFastEndpoints(options =>
         {
+            options.Endpoints.ShortNames = true;
             options.Endpoints.RoutePrefix = "api/v1";
             options.Errors.ContentType = "application/problem+json";
             options.Errors.ProducesMetadataType = typeof(ValidationProblemDetails);

@@ -19,18 +19,16 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasIndex(team => new { team.CompetitionId, team.NormalizedName }).IsUnique()
             .HasFilter("deleted_at IS NULL");
         builder.HasIndex(team => new { team.CompetitionId, team.RegistrationStatus });
-        builder.HasIndex(team => new { team.CompetitionId, team.TeamProfileId }).IsUnique()
-            .HasFilter("team_profile_id IS NOT NULL AND deleted_at IS NULL");
         builder.HasIndex(team => team.InvitationToken).IsUnique();
         builder.HasIndex(team => team.MemberIds).HasMethod("gin");
         builder.HasOne<NoCTF.Domain.Competitions.Competition>().WithMany()
             .HasForeignKey(team => team.CompetitionId)
             .OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<TeamProfile>().WithMany()
-            .HasForeignKey(team => team.TeamProfileId)
-            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
             .HasForeignKey(team => team.CaptainId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(team => team.AvatarFile).WithMany()
+            .HasForeignKey(team => team.AvatarFileId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(table =>
         {

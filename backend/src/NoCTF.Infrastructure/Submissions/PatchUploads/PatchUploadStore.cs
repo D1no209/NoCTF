@@ -8,14 +8,26 @@ using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Submissions.Intake;
+using NoCTF.Domain.Storage;
 
 namespace NoCTF.Infrastructure.Submissions.PatchUploads;
 
 public sealed class PatchUploadStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
+    SubmissionAttemptCriticalSection attemptCriticalSection,
     ILogger<PatchUploadStore> logger) : IPatchUploadStore
 {
+    public PatchUploadStore(
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        ILogger<PatchUploadStore> logger)
+        : this(
+            db,
+            outbox,
+            new SubmissionAttemptCriticalSection(new LocalCriticalSectionRegistry()),
+            logger) { }
+
     public async Task<PatchUploadScope?> ResolveScopeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -63,7 +75,7 @@ public sealed class PatchUploadStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
             ct);
-        await SubmissionAttemptLock.AcquireAsync(
+        await using var attemptLease = await attemptCriticalSection.AcquireAsync(
             db,
             scope.TeamId,
             scope.CompetitionChallengeId,
@@ -74,7 +86,7 @@ public sealed class PatchUploadStore(
             .Where(upload => upload.TeamId == scope.TeamId
                 && upload.CompetitionChallengeId == scope.CompetitionChallengeId
                 && upload.ConsumedAt == null)
-            .Select(upload => new { upload.Id, upload.ObjectKey })
+            .Select(upload => new { upload.Id, upload.FileId })
             .SingleOrDefaultAsync(ct);
         if (previous is not null)
         {
@@ -86,6 +98,17 @@ public sealed class PatchUploadStore(
                 return false;
         }
 
+        var file = new StoredFile
+        {
+            Id = Guid.CreateVersion7(uploadedAt),
+            ObjectKey = objectKey,
+            FileName = fileName,
+            ContentType = contentType,
+            ByteLength = byteLength,
+            Sha256 = sha256,
+            CreatedAt = uploadedAt
+        };
+        db.Files.Add(file);
         db.PatchUploads.Add(new PatchUpload
         {
             Id = patchUploadId,
@@ -93,17 +116,14 @@ public sealed class PatchUploadStore(
             CompetitionChallengeId = scope.CompetitionChallengeId,
             TeamId = scope.TeamId,
             UploadedByUserId = scope.UserId,
-            ObjectKey = objectKey,
-            OriginalFileName = fileName,
-            ContentType = contentType,
-            ByteLength = byteLength,
-            Sha256 = sha256,
+            FileId = file.Id,
+            File = file,
             UploadedAt = uploadedAt
         });
         try
         {
             if (previous is not null)
-                await outbox.PublishAsync(new CleanupObject(previous.ObjectKey));
+                await outbox.PublishAsync(new CleanupFile(previous.FileId));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             try

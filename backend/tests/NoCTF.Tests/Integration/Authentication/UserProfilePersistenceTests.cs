@@ -60,7 +60,12 @@ public sealed class UserProfilePersistenceTests
                     cancellationToken);
                 await users.ReplaceAvatarAsync(
                     userId,
-                    avatarObjectKey,
+                    new NoCTF.Application.Storage.StoredObject(
+                        avatarObjectKey,
+                        "avatar.webp",
+                        "image/webp",
+                        4,
+                        new string('A', 64)),
                     now.AddMinutes(2),
                     cancellationToken);
             }
@@ -72,7 +77,11 @@ public sealed class UserProfilePersistenceTests
 
                 await Assert.That(profile).IsNotNull();
                 await Assert.That(profile!.Description).IsEqualTo("Persistent profile");
-                await Assert.That(profile.AvatarObjectKey).IsEqualTo(avatarObjectKey);
+                await Assert.That(profile.AvatarFileId).IsNotNull();
+                var storedFile = await db.Files.SingleAsync(
+                    file => file.Id == profile.AvatarFileId,
+                    cancellationToken);
+                await Assert.That(storedFile.ObjectKey).IsEqualTo(avatarObjectKey);
                 await Assert.That(profile.IsEmailPublic).IsTrue();
             }
         });
@@ -137,7 +146,7 @@ public sealed class UserProfilePersistenceTests
                 new StaleRefreshIssuer(new(userId, before.TokenVersion)))
                 .ExecuteAsync("old-refresh", cancellationToken);
             await Assert.That(refresh.Succeeded).IsFalse();
-            await Assert.That(refresh.ErrorCode).IsEqualTo("refresh_invalid");
+            await Assert.That(refresh.FailureCode).IsEqualTo(RefreshAccessTokenFailureCode.RefreshInvalid);
         });
     }
 

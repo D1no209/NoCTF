@@ -14,8 +14,10 @@ public sealed record DataExportView(
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     DateTimeOffset? ExpiresAt,
+    Guid? FileId,
     string? FileName,
-    long? Length,
+    string? ContentType,
+    long? ByteLength,
     string? Sha256,
     DataExportFailureCode? FailureCode,
     string? FailureDetail);

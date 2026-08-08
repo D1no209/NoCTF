@@ -1,13 +1,14 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Notifications;
+using NoCTF.Application.Notifications;
+using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Notifications;
 
 public sealed class CompetitionNotificationDelivery(
-    NoCtfDbContext db,
-    CompetitionNotificationAudienceResolver audiences)
+    NoCtfDbContext db)
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
@@ -21,28 +22,22 @@ public sealed class CompetitionNotificationDelivery(
         Guid? requiredTeamId,
         CancellationToken ct)
     {
-        var recipients = await audiences.ResolveAsync(
-            competitionId,
-            requiredTeamId,
-            ct);
-        if (recipients.Count == 0)
-            return;
-
-        var payloadJson = JsonSerializer.Serialize(payload, JsonOptions);
-        var createdAt = DateTimeOffset.UtcNow;
-        foreach (var userId in recipients)
+        _ = sourceEventKey;
+        db.Notifications.Add(new Notification
         {
-            var notificationId = Guid.CreateVersion7(createdAt);
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO notifications
-                    (id, user_id, competition_id, entity_id, kind, source_event_key, payload_json, created_at)
-                VALUES
-                    ({notificationId}, {userId}, {competitionId}, {entityId}, {(short)kind}, {sourceEventKey}, {payloadJson}::jsonb, {createdAt})
-                ON CONFLICT (user_id, source_event_key) DO NOTHING
-                """,
-                ct);
-        }
+            Id = Guid.CreateVersion7(),
+            SourceType = NotificationSourceType.System,
+            TargetType = requiredTeamId is null
+                ? NotificationTargetType.CompetitionParticipants
+                : NotificationTargetType.TeamMembers,
+            TargetId = requiredTeamId ?? competitionId,
+            Kind = kind,
+            ContentJson = EnsureObjectPayload(payload),
+            RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition,
+            RelatedId = competitionId,
+            SentAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync(ct);
     }
 
     public async Task DeliverToUsersAsync<TPayload>(
@@ -66,20 +61,80 @@ public sealed class CompetitionNotificationDelivery(
         if (recipients.Length == 0)
             return;
 
-        var payloadJson = JsonSerializer.Serialize(payload, JsonOptions);
-        var createdAt = DateTimeOffset.UtcNow;
-        foreach (var userId in recipients)
+        _ = sourceEventKey;
+        var sentAt = DateTimeOffset.UtcNow;
+        db.Notifications.AddRange(recipients.Select((userId, index) => new Notification
         {
-            var notificationId = Guid.CreateVersion7(createdAt);
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO notifications
-                    (id, user_id, competition_id, entity_id, kind, source_event_key, payload_json, created_at)
-                VALUES
-                    ({notificationId}, {userId}, {competitionId}, {entityId}, {(short)kind}, {sourceEventKey}, {payloadJson}::jsonb, {createdAt})
-                ON CONFLICT (user_id, source_event_key) DO NOTHING
-                """,
-                ct);
-        }
+            Id = Guid.CreateVersion7(sentAt.AddTicks(index)),
+            SourceType = NotificationSourceType.System,
+            TargetType = NotificationTargetType.User,
+            TargetId = userId,
+            Kind = kind,
+            ContentJson = EnsureObjectPayload(payload),
+            RelatedType = NoCTF.Domain.Shared.EntityReferenceKind.Competition,
+            RelatedId = competitionId,
+            SentAt = sentAt
+        }));
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<NotificationView?> CreateAnnouncementAsync(
+        Guid competitionId,
+        Guid sourceUserId,
+        string title,
+        string body,
+        bool participants,
+        DateTimeOffset sentAt,
+        CancellationToken ct)
+    {
+        var exists = await db.Competitions.AsNoTracking()
+            .AnyAsync(competition => competition.Id == competitionId, ct);
+        if (!exists)
+            return null;
+        var notification = new Notification
+        {
+            Id = Guid.CreateVersion7(sentAt),
+            SourceType = NotificationSourceType.User,
+            SourceId = sourceUserId,
+            TargetType = participants
+                ? NotificationTargetType.CompetitionParticipants
+                : NotificationTargetType.CompetitionCollaborators,
+            TargetId = competitionId,
+            Kind = NotificationKind.CompetitionAnnouncement,
+            ContentJson = JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                subject = title,
+                title,
+                body
+            }, JsonOptions),
+            RelatedType = EntityReferenceKind.Competition,
+            RelatedId = competitionId,
+            SentAt = sentAt
+        };
+        db.Notifications.Add(notification);
+        await db.SaveChangesAsync(ct);
+        return new(
+            notification.Id,
+            notification.SourceType,
+            notification.SourceId,
+            notification.TargetType,
+            notification.TargetId,
+            notification.Kind,
+            notification.ContentJson,
+            notification.RelatedType,
+            notification.RelatedId,
+            notification.ReplyToId,
+            notification.SentAt);
+    }
+
+    private static string EnsureObjectPayload<TPayload>(TPayload payload)
+    {
+        var element = JsonSerializer.SerializeToElement(payload, JsonOptions);
+        if (element.ValueKind != JsonValueKind.Object)
+            return JsonSerializer.Serialize(new { schemaVersion = 1, value = element }, JsonOptions);
+        var values = element.EnumerateObject().ToDictionary(property => property.Name, property => property.Value);
+        values.TryAdd("schemaVersion", JsonSerializer.SerializeToElement(1));
+        return JsonSerializer.Serialize(values, JsonOptions);
     }
 }

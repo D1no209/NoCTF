@@ -1,0 +1,248 @@
+<script setup lang="ts">
+import type { GameModeValue, RuntimeTemplateModel } from '~/utils/game-config'
+import {
+  bytesToMib,
+  coresToNanoCpus,
+  emptyContainerDefinition,
+  emptyComposeDefinition,
+  FlagSource,
+  mibToBytes,
+  nanoCpusToCores,
+  RuntimeAllocation,
+  UrlExposure,
+} from '~/utils/game-config'
+
+const props = withDefaults(defineProps<{
+  runtime: RuntimeTemplateModel
+  mode: GameModeValue
+  disabled?: boolean
+}>(), {
+  disabled: false,
+})
+
+const isCompose = computed(() => props.runtime.definition.kind === 'compose')
+
+const kindOptions = computed(() =>
+  props.mode === 'Awdp'
+    ? [{ value: 'container', label: '单容器' }]
+    : [
+        { value: 'container', label: '单容器' },
+        { value: 'compose', label: 'Docker Compose' },
+      ],
+)
+
+function switchKind(kind: string): void {
+  if (kind === props.runtime.definition.kind) return
+  props.runtime.definition = kind === 'compose' ? emptyComposeDefinition() : emptyContainerDefinition()
+}
+
+const flagSourceOptions = computed(() => {
+  const all = [
+    { value: FlagSource.Static, label: '静态 Flag(模板预置)' },
+    { value: FlagSource.PerTeam, label: '每队独立 Flag' },
+    { value: FlagSource.AwdRotation, label: '按轮次轮换(AWD)' },
+  ]
+  return props.mode === 'Ctf' ? all.slice(0, 2) : all
+})
+
+const exposureOptions = computed(() => {
+  if (props.mode === 'Ctf') {
+    return [{ value: UrlExposure.OwnerOnly, label: '仅队伍自己可见' }]
+  }
+  return [
+    { value: UrlExposure.OwnerOnly, label: '仅队伍自己可见' },
+    { value: UrlExposure.Participants, label: '所有参赛者可见' },
+  ]
+})
+
+/** KoH 控制检查入口:单条绑定,用 0/1 元素的数组适配 UrlBindingList。 */
+const controlBindingList = computed({
+  get: () => (props.runtime.controlCheckUrlBinding ? [props.runtime.controlCheckUrlBinding] : []),
+  set: (list) => {
+    props.runtime.controlCheckUrlBinding = list[0] ?? null
+  },
+})
+
+// 切换游戏模式时,把运行时约束校正到目标模式(后端校验会拒绝不满足的组合)。
+watch(
+  () => props.mode,
+  (mode) => {
+    const runtime = props.runtime
+    runtime.allocation = mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
+    if (mode !== 'Koh') runtime.controlCheckUrlBinding = null
+    if (mode === 'Ctf') {
+      for (const binding of runtime.urlBindings) binding.exposure = UrlExposure.OwnerOnly
+    }
+    if (mode === 'Awdp') {
+      runtime.urlBindings = []
+      if (runtime.definition.kind === 'compose') {
+        runtime.definition = emptyContainerDefinition()
+      }
+      else {
+        runtime.definition.containerPorts = []
+      }
+    }
+  },
+)
+</script>
+
+<template>
+  <FieldGroup>
+    <Field>
+      <FieldLabel>分配方式</FieldLabel>
+      <div class="flex items-center gap-2">
+        <Badge variant="secondary">
+          {{ runtime.allocation === RuntimeAllocation.Shared ? '共享' : '每队独立' }}
+        </Badge>
+        <FieldDescription v-if="mode === 'Koh'">KoH 要求所有队伍共享同一套环境。</FieldDescription>
+        <FieldDescription v-else>{{ mode }} 要求每个队伍独立的运行环境。</FieldDescription>
+      </div>
+    </Field>
+
+    <Field>
+      <FieldLabel>运行环境类型</FieldLabel>
+      <Select
+        :model-value="runtime.definition.kind"
+        :disabled="disabled || mode === 'Awdp'"
+        @update:model-value="switchKind(String($event))"
+      >
+        <SelectTrigger class="w-full sm:max-w-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem v-for="option in kindOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      <FieldDescription v-if="mode === 'Awdp'">AWDP 仅支持单容器运行环境。</FieldDescription>
+    </Field>
+
+    <DefinitionContainer
+      v-if="runtime.definition.kind === 'container'"
+      :definition="runtime.definition"
+      :mode="mode"
+      :flag-source="runtime.flagSource"
+      :disabled="disabled"
+    />
+    <DefinitionCompose
+      v-else
+      :definition="runtime.definition"
+      :disabled="disabled"
+    />
+
+    <FieldSet class="rounded-md border p-3">
+      <FieldLegend class="text-sm font-medium">资源限制(实例整体)</FieldLegend>
+      <div class="grid gap-4 sm:grid-cols-3">
+        <Field>
+          <FieldLabel>内存(MiB)</FieldLabel>
+          <NullableNumberInput
+            :model-value="bytesToMib(runtime.limits.memoryBytes)"
+            :min="1"
+            placeholder="如 512"
+            :disabled="disabled"
+            @update:model-value="runtime.limits.memoryBytes = mibToBytes($event)"
+          />
+        </Field>
+        <Field>
+          <FieldLabel>CPU(核)</FieldLabel>
+          <NullableNumberInput
+            :model-value="nanoCpusToCores(runtime.limits.nanoCpus)"
+            :min="0"
+            step="0.1"
+            placeholder="如 1"
+            :disabled="disabled"
+            @update:model-value="runtime.limits.nanoCpus = coresToNanoCpus($event)"
+          />
+        </Field>
+        <Field>
+          <FieldLabel>进程数上限</FieldLabel>
+          <NullableNumberInput
+            :model-value="runtime.limits.pidsLimit"
+            :min="1"
+            placeholder="如 256"
+            :disabled="disabled"
+            @update:model-value="runtime.limits.pidsLimit = $event"
+          />
+        </Field>
+      </div>
+      <FieldDescription>启动实例前必须全部填写,用于隔离队伍环境。</FieldDescription>
+    </FieldSet>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <Field>
+        <FieldLabel>实例存活时间(秒)</FieldLabel>
+        <NullableNumberInput
+          :model-value="runtime.ttlSeconds"
+          :min="1"
+          :max="604800"
+          placeholder="到点自动回收"
+          :disabled="disabled"
+          @update:model-value="runtime.ttlSeconds = $event"
+        />
+      </Field>
+      <Field>
+        <FieldLabel>操作超时(秒)</FieldLabel>
+        <NullableNumberInput
+          :model-value="runtime.operationTimeoutSeconds"
+          :min="1"
+          :max="300"
+          placeholder="启动/停止操作超时"
+          :disabled="disabled"
+          @update:model-value="runtime.operationTimeoutSeconds = $event"
+        />
+      </Field>
+    </div>
+
+    <Field>
+      <FieldLabel>Flag 来源</FieldLabel>
+      <Select
+        :model-value="String(runtime.flagSource)"
+        :disabled="disabled"
+        @update:model-value="runtime.flagSource = Number($event)"
+      >
+        <SelectTrigger class="w-full sm:max-w-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectItem v-for="option in flagSourceOptions" :key="option.value" :value="String(option.value)">
+              {{ option.label }}
+            </SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </Field>
+
+    <Field v-if="mode !== 'Awdp'">
+      <FieldLabel>访问入口</FieldLabel>
+      <UrlBindingList
+        :model-value="runtime.urlBindings"
+        :exposure-options="exposureOptions"
+        :show-service-name="isCompose"
+        :disabled="disabled"
+        @update:model-value="runtime.urlBindings = $event"
+      />
+      <FieldDescription v-if="mode === 'Koh'">
+        KoH 开赛时要求至少一个「所有参赛者可见」的入口。
+      </FieldDescription>
+      <FieldDescription v-else-if="mode === 'Awd'">
+        AWD 中选手互相访问对方服务,通常需要「所有参赛者可见」的入口。
+      </FieldDescription>
+    </Field>
+
+    <Field v-if="mode === 'Koh'">
+      <FieldLabel>控制检查入口</FieldLabel>
+      <UrlBindingList
+        v-model="controlBindingList"
+        :exposure-options="[{ value: UrlExposure.Participants, label: '平台检查使用' }]"
+        :show-service-name="isCompose"
+        add-label="设置控制检查入口"
+        :disabled="disabled"
+      />
+      <FieldDescription>平台周期性检查控制权的地址;KoH 开赛必填。</FieldDescription>
+    </Field>
+  </FieldGroup>
+</template>

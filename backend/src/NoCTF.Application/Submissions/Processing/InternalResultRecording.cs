@@ -71,17 +71,9 @@ public sealed record AwdpFixResult(
         AwdpFixOutcome outcome,
         DateTimeOffset occurredAt)
     {
-        var canonical = outcome switch
-        {
-            AwdpFixOutcome.Fixed => "Fixed",
-            AwdpFixOutcome.StillVulnerable => "StillVulnerable",
-            AwdpFixOutcome.RuleViolation => "RuleViolation",
-            AwdpFixOutcome.ServiceUnavailable => "ServiceUnavailable",
-            AwdpFixOutcome.PatchFailed => "PatchFailed",
-            AwdpFixOutcome.PatchTimeout => "PatchTimeout",
-            AwdpFixOutcome.PlatformFailed => "PlatformFailed",
-            _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
-        };
+        if (!Enum.IsDefined(outcome))
+            throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null);
+        var canonical = Enum.GetName(outcome)!;
         return new(
             submissionId,
             runtimeInstanceId,

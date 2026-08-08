@@ -12,8 +12,8 @@ public sealed class FixArchiveReader(NoCtfDbContext db) : IFixArchiveReader
         db.PatchUploads.AsNoTracking()
             .Where(upload => upload.SubmissionId == submissionId)
             .Select(upload => new FixArchiveDescriptor(
-                upload.ObjectKey,
-                upload.OriginalFileName,
-                upload.ContentType))
+                upload.File.ObjectKey,
+                upload.File.FileName,
+                upload.File.ContentType))
             .SingleOrDefaultAsync(ct);
 }

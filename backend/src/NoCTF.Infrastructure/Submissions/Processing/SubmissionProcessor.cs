@@ -8,6 +8,7 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Submissions.Intake;
 using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 using NoCTF.GameModes.Awd.Scheduling;
@@ -15,6 +16,8 @@ using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using System.Globalization;
+using System.Text.Json;
 
 namespace NoCTF.Infrastructure.Submissions.Processing;
 
@@ -24,9 +27,28 @@ public sealed class SubmissionProcessor(
     ISubmissionAdmissionModePolicy admissionModePolicy,
     IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
+    BloodRankCriticalSection bloodRankCriticalSection,
     ICompetitionEventRecorder? eventRecorder = null,
     ILogger<SubmissionProcessor>? logger = null) : ISubmissionProcessor
 {
+    public SubmissionProcessor(
+        NoCtfDbContext db,
+        ISubmissionEvaluatorCatalog evaluatorCatalog,
+        ISubmissionAdmissionModePolicy admissionModePolicy,
+        IRuntimePlacementPolicy placementPolicy,
+        ITransactionalMessageOutbox outbox,
+        ICompetitionEventRecorder? eventRecorder = null,
+        ILogger<SubmissionProcessor>? logger = null)
+        : this(
+            db,
+            evaluatorCatalog,
+            admissionModePolicy,
+            placementPolicy,
+            outbox,
+            new BloodRankCriticalSection(new LocalCriticalSectionRegistry()),
+            eventRecorder,
+            logger) { }
+
     private static readonly CompetitionEventKind[] CheatResolutionKinds =
     [
         CompetitionEventKind.CheatIncidentConfirmed,
@@ -106,6 +128,19 @@ public sealed class SubmissionProcessor(
             configuration.Competition.Mode,
             configuration.Competition.ConfigurationJson,
             configuration.CompetitionChallenge.RulesJson);
+        if (submission.Kind is SubmissionKind.HintUnlock or SubmissionKind.ManualAdjust)
+        {
+            var special = await EvaluateSpecialAsync(
+                submission,
+                configuration.Competition,
+                configuration.CompetitionChallenge,
+                cancellationToken);
+            return new(
+                special,
+                configuration.Competition.ConfigurationRevision,
+                configuration.CompetitionChallenge.Revision,
+                configuration.Challenge.Revision);
+        }
         var maxAttempts = submission.Kind is SubmissionKind.Flag or SubmissionKind.Break
             ? rules.MaxFlagAttempts
             : rules.MaxFixAttempts;
@@ -159,10 +194,25 @@ public sealed class SubmissionProcessor(
         TimeSpan? effectiveRunningTime = null;
         if (configuration.Competition.Mode == GameMode.Awd)
         {
-            var lifecycle = await db.Set<CompetitionLifecycleAudit>().AsNoTracking()
-                .Where(audit => audit.CompetitionId == submission.CompetitionId
-                    && audit.OccurredAt <= submission.ReceivedAt)
+            var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
+                .Where(@event => @event.CompetitionId == submission.CompetitionId
+                    && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged
+                    && @event.OccurredAt <= submission.ReceivedAt)
+                .OrderBy(@event => @event.OccurredAt)
                 .ToListAsync(cancellationToken);
+            var lifecycle = lifecycleEvents.Select(@event =>
+            {
+                using var payload = JsonDocument.Parse(@event.PayloadJson);
+                return new CompetitionLifecycleTransition
+                {
+                    Id = @event.Id,
+                    CompetitionId = @event.CompetitionId,
+                    From = Enum.Parse<CompetitionStatus>(payload.RootElement.GetProperty("from").GetString()!, true),
+                    To = Enum.Parse<CompetitionStatus>(payload.RootElement.GetProperty("to").GetString()!, true),
+                    ActorId = @event.ActorUserId,
+                    OccurredAt = @event.OccurredAt
+                };
+            }).ToList();
             effectiveRunningTime = AwdEffectiveRunningClock.Calculate(
                 lifecycle, submission.ReceivedAt);
         }
@@ -183,6 +233,108 @@ public sealed class SubmissionProcessor(
             configuration.Challenge.Revision);
     }
 
+    private async Task<ScoringEventDecision> EvaluateSpecialAsync(
+        Submission submission,
+        Competition competition,
+        NoCTF.Domain.Challenges.CompetitionChallenge challenge,
+        CancellationToken ct)
+    {
+        if (submission.Kind == SubmissionKind.ManualAdjust)
+        {
+            if (!int.TryParse(
+                    submission.SubmittedFlag,
+                    NumberStyles.AllowLeadingSign,
+                    CultureInfo.InvariantCulture,
+                    out var delta)
+                || delta == 0
+                || delta.ToString(CultureInfo.InvariantCulture) != submission.SubmittedFlag)
+            {
+                return new(
+                    ScoringEventKind.ManualAdjust,
+                    ScoringResult.Rejected,
+                    ScoringFailureCode.HintUnavailable,
+                    submission.ReceivedAt,
+                    "manual-adjust-v1");
+            }
+            return new(
+                ScoringEventKind.ManualAdjust,
+                ScoringResult.Correct,
+                null,
+                submission.ReceivedAt,
+                "manual-adjust-v1");
+        }
+
+        if (!Guid.TryParseExact(submission.SubmittedFlag, "D", out var hintId))
+            return new(ScoringEventKind.HintUnlock, ScoringResult.Rejected,
+                ScoringFailureCode.HintUnavailable, submission.ReceivedAt, "hint-unlock-v1");
+        var hint = challenge.Hints.SingleOrDefault(item =>
+            item.Id == hintId
+            && item.PublishedAt is not null
+            && item.PublishedAt <= submission.ReceivedAt
+            && item.HiddenAt is null);
+        if (hint is null || !challenge.IsPublished)
+            return new(ScoringEventKind.HintUnlock, ScoringResult.Rejected,
+                ScoringFailureCode.HintUnavailable, submission.ReceivedAt, "hint-unlock-v1");
+
+        var alreadyUnlocked = await db.Submissions.AsNoTracking()
+            .Where(item => item.CompetitionId == submission.CompetitionId
+                && item.TeamId == submission.TeamId
+                && item.Kind == SubmissionKind.HintUnlock
+                && item.Id != submission.Id
+                && item.CurrentScoringEventId != null)
+            .Join(db.ScoringEvents.AsNoTracking(), item => item.CurrentScoringEventId,
+                scoring => (Guid?)scoring.Id, (item, scoring) => new { item, scoring })
+            .AnyAsync(item => item.scoring.DeletedAt == null
+                && item.scoring.Result == ScoringResult.Correct
+                && item.item.SubmittedFlag == submission.SubmittedFlag, ct);
+        if (alreadyUnlocked)
+            return new(ScoringEventKind.HintUnlock, ScoringResult.Duplicate,
+                null, submission.ReceivedAt, "hint-unlock-v1",
+                SpecificationKind: SpecificationKind.Hint, SpecificationId: hintId);
+
+        var current = await db.Submissions.AsNoTracking()
+            .Where(item => item.CompetitionId == submission.CompetitionId
+                && item.TeamId == submission.TeamId
+                && item.CurrentScoringEventId != null
+                && item.Id != submission.Id)
+            .Join(db.ScoringEvents.AsNoTracking(), item => item.CurrentScoringEventId,
+                scoring => (Guid?)scoring.Id, (item, scoring) => new { item, scoring })
+            .Where(item => item.scoring.DeletedAt == null)
+            .ToListAsync(ct);
+        var challengeScores = await db.CompetitionChallenges.AsNoTracking()
+            .Where(item => item.CompetitionId == submission.CompetitionId)
+            .ToDictionaryAsync(item => item.Id, item => item.BaseScore, ct);
+        var hints = await db.CompetitionChallenges.AsNoTracking()
+            .Where(item => item.CompetitionId == submission.CompetitionId)
+            .ToListAsync(ct);
+        var costs = hints.SelectMany(item => item.Hints)
+            .ToDictionary(item => item.Id, item => item.Cost);
+        long score = 0;
+        foreach (var item in current)
+        {
+            if (item.scoring.Result != ScoringResult.Correct)
+                continue;
+            score = item.item.Kind switch
+            {
+                SubmissionKind.ManualAdjust when int.TryParse(item.item.SubmittedFlag,
+                    NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var delta)
+                    => checked(score + delta),
+                SubmissionKind.HintUnlock when Guid.TryParseExact(item.item.SubmittedFlag, "D", out var id)
+                    => checked(score - costs.GetValueOrDefault(id)),
+                SubmissionKind.Flag or SubmissionKind.Break
+                    => checked(score + challengeScores.GetValueOrDefault(item.item.CompetitionChallengeId)),
+                _ => score
+            };
+        }
+        if (score < hint.Cost)
+            return new(ScoringEventKind.HintUnlock, ScoringResult.Rejected,
+                ScoringFailureCode.InsufficientScore, submission.ReceivedAt, "hint-unlock-v1",
+                SpecificationKind: SpecificationKind.Hint, SpecificationId: hintId);
+        return new(ScoringEventKind.HintUnlock, ScoringResult.Correct, null,
+            submission.ReceivedAt, "hint-unlock-v1",
+            SpecificationKind: SpecificationKind.Hint, SpecificationId: hintId);
+    }
+
     private async Task CompleteAsync(
         Guid submissionId,
         long processingVersion,
@@ -197,6 +349,33 @@ public sealed class SubmissionProcessor(
             || submission.EvaluationState != SubmissionEvaluationState.Processing
             || submission.ProcessingVersion != processingVersion)
             return;
+
+        if (submission.Kind is SubmissionKind.HintUnlock or SubmissionKind.ManualAdjust)
+        {
+            await AcquireTeamScoringLockAsync(
+                submission.CompetitionId,
+                submission.TeamId,
+                cancellationToken);
+            var specialScope = await db.Competitions.AsNoTracking()
+                .Where(competition => competition.Id == submission.CompetitionId)
+                .Join(
+                    db.CompetitionChallenges.AsNoTracking()
+                        .Where(challenge => challenge.Id == submission.CompetitionChallengeId),
+                    competition => competition.Id,
+                    challenge => challenge.CompetitionId,
+                    (competition, challenge) => new { Competition = competition, Challenge = challenge })
+                .SingleAsync(cancellationToken);
+            evaluation = evaluation with
+            {
+                Decision = await EvaluateSpecialAsync(
+                    submission,
+                    specialScope.Competition,
+                    specialScope.Challenge,
+                    cancellationToken),
+                CompetitionRevision = specialScope.Competition.ConfigurationRevision,
+                CompetitionChallengeRevision = specialScope.Challenge.Revision
+            };
+        }
 
         var now = DateTimeOffset.UtcNow;
         if (evaluation.Decision.Result == ScoringResult.PlatformFailed)
@@ -331,8 +510,6 @@ public sealed class SubmissionProcessor(
         if (submission.CurrentScoringEventId is { } currentEventId)
         {
             var current = await db.ScoringEvents
-                .FromSqlInterpolated(
-                    $"SELECT * FROM scoring_events WHERE id = {currentEventId} FOR UPDATE")
                 .IgnoreQueryFilters()
                 .SingleAsync(item => item.Id == currentEventId, cancellationToken);
             if (current.FailureCode == ScoringFailureCode.ForeignTeamFlagDetected)
@@ -368,7 +545,7 @@ public sealed class SubmissionProcessor(
             SubmissionId = submission.Id,
             TeamId = submission.TeamId,
             VictimTeamId = evaluation.Decision.VictimTeamId,
-            Kind = ScoringEventKind.SubmissionEvaluation,
+            Kind = evaluation.Decision.Kind,
             Result = evaluation.Decision.Result,
             FailureCode = evaluation.Decision.FailureCode,
             SpecificationKind = evaluation.Decision.SpecificationKind,
@@ -492,6 +669,14 @@ public sealed class SubmissionProcessor(
         await outbox.FlushOutgoingMessagesAsync();
     }
 
+    private Task AcquireTeamScoringLockAsync(
+        Guid competitionId,
+        Guid teamId,
+        CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM pg_advisory_xact_lock(hashtextextended({competitionId.ToString() + ":" + teamId}, 0))",
+            ct);
+
     private async Task<BloodAwarded?> TryCreateBloodAwardAsync(
         Submission submission,
         Evaluation evaluation,
@@ -508,8 +693,9 @@ public sealed class SubmissionProcessor(
         if (competitionMode != GameMode.Ctf)
             return null;
 
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({"blood:" + submission.CompetitionChallengeId.ToString("N")}, 0))",
+        await using var bloodLease = await bloodRankCriticalSection.AcquireAsync(
+            db,
+            submission.CompetitionChallengeId,
             ct);
         var solvedTeamIds = await db.Submissions.AsNoTracking()
             .Where(candidate =>

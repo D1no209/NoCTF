@@ -1,8 +1,7 @@
 using System.ComponentModel.DataAnnotations;
-using NoCTF.Domain.Challenges.Questions;
-using NoCTF.Domain.Runtime;
-using NoCTF.Domain.Submissions;
-using NoCTF.Domain.Teams;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Domain.Competitions.Events;
 
@@ -40,11 +39,6 @@ public enum CompetitionEventKind : short
     RuntimeExtended,
     RuntimeReset,
     RuntimePortAllocated,
-    AnnouncementPublished,
-    QuestionOpened,
-    QuestionReplied,
-    QuestionStatusChanged,
-    QuestionPublished,
     ProtectedSubmissionFlagAccessed,
     CheatIncidentDetected,
     CheatIncidentConfirmed,
@@ -80,27 +74,52 @@ public sealed class CompetitionEvent
     public CompetitionEventLevel Level { get; set; }
     public CompetitionEventVisibility Visibility { get; set; }
     public Guid? ActorUserId { get; set; }
-    public Guid? RelatedUserId { get; set; }
-    public Guid? TeamId { get; set; }
-    public Guid? CompetitionChallengeId { get; set; }
-    public Guid? HintId { get; set; }
-    public Guid? RuntimeInstanceId { get; set; }
-    public Guid? SubmissionId { get; set; }
-    public Guid? ScoringEventId { get; set; }
-    public Guid? QuestionId { get; set; }
+    public EntityReferenceKind SubjectType { get; set; }
+    public Guid SubjectId { get; set; }
+    public EntityReferenceKind? RelatedType { get; set; }
+    public Guid? RelatedId { get; set; }
     public Guid? ParentEventId { get; set; }
-    public CompetitionStatus? CompetitionStatus { get; set; }
-    public CompetitionLeaderboardVisibility? LeaderboardVisibility { get; set; }
-    public TeamRegistrationStatus? TeamRegistrationStatus { get; set; }
-    public SubmissionKind? SubmissionKind { get; set; }
-    public SubmissionEvaluationState? SubmissionState { get; set; }
-    public ScoringEventKind? ScoringEventKind { get; set; }
-    public ScoringResult? ScoringResult { get; set; }
-    public RuntimeState? RuntimeState { get; set; }
-    public CompetitionQuestionStatus? QuestionStatus { get; set; }
-    public int? RuntimeGeneration { get; set; }
-    public int? HostPort { get; set; }
-    [MaxLength(512)]
-    public string? Reason { get; set; }
+    public string PayloadJson { get; set; } = "{\"schemaVersion\":1}";
     public DateTimeOffset OccurredAt { get; set; }
+
+    [NotMapped] public Guid? RelatedUserId => Reference(EntityReferenceKind.User);
+    [NotMapped] public Guid? TeamId => Reference(EntityReferenceKind.Team);
+    [NotMapped] public Guid? CompetitionChallengeId => Reference(EntityReferenceKind.CompetitionChallenge);
+    [NotMapped] public Guid? HintId => Reference(EntityReferenceKind.ChallengeHint);
+    [NotMapped] public Guid? RuntimeInstanceId => Reference(EntityReferenceKind.RuntimeInstance);
+    [NotMapped] public Guid? SubmissionId => Reference(EntityReferenceKind.Submission);
+    [NotMapped] public Guid? ScoringEventId => Reference(EntityReferenceKind.ScoringEvent);
+    [NotMapped] public Guid? QuestionId => Reference(EntityReferenceKind.Notification);
+    [NotMapped] public CompetitionStatus? CompetitionStatus => Payload<CompetitionStatus>("competitionStatus");
+    [NotMapped] public CompetitionLeaderboardVisibility? LeaderboardVisibility => Payload<CompetitionLeaderboardVisibility>("leaderboardVisibility");
+    [NotMapped] public NoCTF.Domain.Teams.TeamRegistrationStatus? TeamRegistrationStatus => Payload<NoCTF.Domain.Teams.TeamRegistrationStatus>("teamRegistrationStatus");
+    [NotMapped] public NoCTF.Domain.Submissions.SubmissionKind? SubmissionKind => Payload<NoCTF.Domain.Submissions.SubmissionKind>("submissionKind");
+    [NotMapped] public NoCTF.Domain.Submissions.SubmissionEvaluationState? SubmissionState => Payload<NoCTF.Domain.Submissions.SubmissionEvaluationState>("submissionState");
+    [NotMapped] public NoCTF.Domain.Submissions.ScoringEventKind? ScoringEventKind => Payload<NoCTF.Domain.Submissions.ScoringEventKind>("scoringEventKind");
+    [NotMapped] public NoCTF.Domain.Submissions.ScoringResult? ScoringResult => Payload<NoCTF.Domain.Submissions.ScoringResult>("scoringResult");
+    [NotMapped] public NoCTF.Domain.Runtime.RuntimeState? RuntimeState => Payload<NoCTF.Domain.Runtime.RuntimeState>("runtimeState");
+    [NotMapped] public NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus? QuestionStatus => Payload<NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus>("questionStatus");
+    [NotMapped] public int? RuntimeGeneration => Payload<int>("runtimeGeneration");
+    [NotMapped] public int? HostPort => Payload<int>("hostPort");
+    [NotMapped] public string? Reason => Payload<string>("reason");
+
+    private Guid? Reference(EntityReferenceKind kind) =>
+        SubjectType == kind ? SubjectId : RelatedType == kind ? RelatedId : null;
+
+    private T? Payload<T>(string propertyName)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(PayloadJson);
+            return document.RootElement.TryGetProperty(propertyName, out var value)
+                && value.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined)
+                ? value.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)
+                    { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } })
+                : default;
+        }
+        catch (JsonException)
+        {
+            return default;
+        }
+    }
 }

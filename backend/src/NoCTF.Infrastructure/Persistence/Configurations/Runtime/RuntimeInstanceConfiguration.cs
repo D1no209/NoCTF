@@ -70,28 +70,8 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             .HasForeignKey(instance => instance.ReplacesRuntimeInstanceId).OnDelete(DeleteBehavior.Restrict);
         builder.OwnsMany(instance => instance.PublishedPorts, ports =>
         {
-            ports.ToTable("runtime_published_ports", table =>
-            {
-                table.HasCheckConstraint(
-                    "ck_runtime_published_ports_container_port",
-                    "container_port BETWEEN 1 AND 65535");
-                table.HasCheckConstraint(
-                    "ck_runtime_published_ports_host_port",
-                    "host_port BETWEEN 61000 AND 64999");
-            });
-            ports.WithOwner()
-                .HasForeignKey(port => new { port.RuntimeInstanceId, port.CompetitionId })
-                .HasPrincipalKey(instance => new { instance.Id, instance.CompetitionId });
-            ports.HasKey(port => port.Id);
-            ports.Property(port => port.Id).ValueGeneratedNever();
+            ports.ToJson("published_ports_json");
             ports.Property(port => port.ServiceName).HasMaxLength(63);
-            ports.HasIndex(port => new { port.CompetitionId, port.HostPort }).IsUnique();
-            ports.HasIndex(port => new
-            {
-                port.RuntimeInstanceId,
-                port.ServiceName,
-                port.ContainerPort
-            }).IsUnique().AreNullsDistinct(false);
         });
     }
 }

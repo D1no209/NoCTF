@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Wolverine.EntityFrameworkCore;
@@ -10,12 +11,21 @@ internal static class PersistenceInfrastructure
     internal static IServiceCollection AddNoCtfPersistence(
         this IServiceCollection services,
         IConfiguration configuration,
-        bool exporting)
+        bool exporting,
+        bool development)
     {
-        if (exporting)
+        services.AddSingleton<LocalCriticalSectionRegistry>();
+        if (exporting || development)
         {
+            var databaseName = exporting
+                ? "noctf-openapi"
+                : configuration["Development:DatabaseName"] ?? "noctf-development";
             services.AddDbContext<NoCtfDbContext>(options =>
-                options.UseInMemoryDatabase("noctf-openapi"));
+                options.UseInMemoryDatabase(databaseName)
+                    .ConfigureWarnings(warnings => warnings.Ignore(
+                        InMemoryEventId.TransactionIgnoredWarning)),
+                contextLifetime: ServiceLifetime.Scoped,
+                optionsLifetime: ServiceLifetime.Singleton);
             return services;
         }
 

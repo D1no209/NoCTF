@@ -1,0 +1,79 @@
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using ZiggyCreatures.Caching.Fusion;
+using ZiggyCreatures.Caching.Fusion.Backplane.StackExchangeRedis;
+
+namespace NoCTF.Infrastructure.Caching;
+
+public static class NoCtfCacheNames
+{
+    public const string ReadModels = "read-models";
+    public const string LocalComputation = "local-computation";
+}
+
+public static class CachingInfrastructure
+{
+    internal static IServiceCollection AddNoCtfCaching(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool development)
+    {
+        services.AddNoCtfLocalComputationCaching(configuration);
+
+        var leaderboard = services.AddFusionCache()
+            .WithOptions(options => options.CacheKeyPrefix = "noctf:leaderboard:")
+            .WithDefaultEntryOptions(options =>
+                options.Duration = TimeSpan.FromSeconds(Math.Max(
+                    5,
+                    configuration.GetValue("Leaderboard:CacheTtlSeconds", 60))));
+        var readModels = services.AddFusionCache(NoCtfCacheNames.ReadModels)
+            .WithOptions(options => options.CacheKeyPrefix = "noctf:read-models:")
+            .WithDefaultEntryOptions(options =>
+                options.Duration = TimeSpan.FromSeconds(Math.Max(
+                    5,
+                    configuration.GetValue("Caching:ReadModelsTtlSeconds", 60))));
+        if (development)
+            return services;
+
+        var redis = configuration.GetConnectionString("Redis")
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings:Redis is required for distributed caching.");
+        services.AddStackExchangeRedisCache(options => options.Configuration = redis);
+        leaderboard
+            .WithRegisteredDistributedCache()
+            .WithBackplane(new RedisBackplane(new RedisBackplaneOptions
+            {
+                Configuration = redis
+            }));
+        readModels
+            .WithRegisteredDistributedCache()
+            .WithBackplane(new RedisBackplane(new RedisBackplaneOptions
+            {
+                Configuration = redis
+            }));
+        return services;
+    }
+
+    public static IServiceCollection AddNoCtfLocalComputationCaching(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        if (services.Any(descriptor =>
+                descriptor.ServiceType == typeof(LocalComputationCacheRegistration)))
+            return services;
+
+        services.AddSingleton<LocalComputationCacheRegistration>();
+        services.AddFusionCacheSystemTextJsonSerializer(
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        services.AddFusionCache(NoCtfCacheNames.LocalComputation)
+            .WithOptions(options => options.CacheKeyPrefix = "noctf:local-computation:")
+            .WithDefaultEntryOptions(options =>
+                options.Duration = TimeSpan.FromMinutes(Math.Max(
+                    1,
+                    configuration.GetValue("Caching:LocalComputationTtlMinutes", 30))));
+        return services;
+    }
+
+    private sealed class LocalComputationCacheRegistration;
+}

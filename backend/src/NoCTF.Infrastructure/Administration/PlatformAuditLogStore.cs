@@ -3,6 +3,7 @@ using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Infrastructure.Administration;
 
@@ -67,86 +68,28 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 item.CompetitionId,
                 item.ActorUserId,
                 null,
-                item.CompetitionStatus,
                 null,
-                item.LeaderboardVisibility,
+                null,
+                null,
                 null,
                 item.Kind,
                 item.Level,
                 item.Visibility,
-                item.RelatedUserId,
-                item.TeamId,
-                item.CompetitionChallengeId,
-                item.RuntimeInstanceId,
-                item.SubmissionId,
-                item.ScoringEventId,
-                item.QuestionId,
-                item.SubmissionKind,
-                item.SubmissionState,
-                item.ScoringEventKind,
-                item.ScoringResult,
+                Reference(item, EntityReferenceKind.User),
+                Reference(item, EntityReferenceKind.Team),
+                Reference(item, EntityReferenceKind.CompetitionChallenge),
+                Reference(item, EntityReferenceKind.RuntimeInstance),
+                Reference(item, EntityReferenceKind.Submission),
+                Reference(item, EntityReferenceKind.ScoringEvent),
+                Reference(item, EntityReferenceKind.Notification),
+                null,
+                null,
+                null,
+                null,
                 competitionTitles.GetValueOrDefault(item.CompetitionId),
-                item.Reason,
+                item.PayloadJson,
                 false,
                 item.OccurredAt)));
-        }
-
-        if (query.CompetitionId is null
-            && query.Kind is (null or PlatformAuditKind.UserAccountLifecycle))
-        {
-            var accountAudits = db.UserAccountLifecycleAudits.AsNoTracking();
-            if (query.From is not null)
-                accountAudits = accountAudits.Where(audit =>
-                    audit.OccurredAt >= query.From.Value);
-            if (query.To is not null)
-                accountAudits = accountAudits.Where(audit =>
-                    audit.OccurredAt <= query.To.Value);
-            if (query.ActorId is not null)
-                accountAudits = accountAudits.Where(audit =>
-                    audit.ActorUserId == query.ActorId.Value);
-            if (query.BeforeOccurredAt is DateTimeOffset beforeOccurredAt
-                && query.BeforeId is Guid beforeId)
-            {
-                accountAudits = accountAudits.Where(audit =>
-                    audit.OccurredAt < beforeOccurredAt
-                    || audit.OccurredAt == beforeOccurredAt
-                    && audit.Id.CompareTo(beforeId) < 0);
-            }
-
-            items.AddRange((await accountAudits
-                .OrderByDescending(audit => audit.OccurredAt)
-                .ThenByDescending(audit => audit.Id)
-                .Take(query.Limit)
-                .ToArrayAsync(ct))
-                .Select(audit => new PlatformAuditView(
-                    audit.Id,
-                    PlatformAuditKind.UserAccountLifecycle,
-                    audit.TargetUserId,
-                    null,
-                    audit.ActorUserId,
-                    null,
-                    null,
-                    null,
-                    null,
-                    audit.Action,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    audit.TargetUserName,
-                    audit.Reason,
-                    false,
-                    audit.OccurredAt)));
         }
 
         return items
@@ -164,5 +107,8 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
             PlatformAuditKind.CompetitionLeaderboardVisibility,
         _ => PlatformAuditKind.CompetitionEvent
     };
+
+    private static Guid? Reference(CompetitionEvent item, EntityReferenceKind kind) =>
+        item.SubjectType == kind ? item.SubjectId : item.RelatedType == kind ? item.RelatedId : null;
 
 }

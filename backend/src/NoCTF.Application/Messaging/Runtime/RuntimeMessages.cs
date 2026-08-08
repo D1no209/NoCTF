@@ -12,5 +12,4 @@ public sealed record ReleaseRunnerCapacity(
 
 public sealed record ReconcileRunnerAssignments(
     DateTimeOffset At,
-    long ProcessingVersion,
     Guid? AfterRuntimeInstanceId = null);

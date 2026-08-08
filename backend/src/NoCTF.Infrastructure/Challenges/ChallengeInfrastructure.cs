@@ -15,6 +15,7 @@ using NoCTF.Infrastructure.Challenges.Hints;
 using NoCTF.Infrastructure.Challenges.Management;
 using NoCTF.Application.Challenges.Questions;
 using NoCTF.Infrastructure.Challenges.Questions;
+using NoCTF.Infrastructure.Caching;
 
 namespace NoCTF.Infrastructure.Challenges;
 
@@ -22,8 +23,11 @@ internal static class ChallengeInfrastructure
 {
     internal static IServiceCollection AddNoCtfChallenges(this IServiceCollection services)
     {
+        services.AddScoped<TeamChallengeCriticalSection>();
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
-        services.AddSingleton<IChallengeRuntimeTemplateCatalog, ChallengeRuntimeTemplateCatalog>();
+        services.AddSingleton<ChallengeRuntimeTemplateCatalog>();
+        services.AddSingleton<IChallengeRuntimeTemplateCatalog,
+            FusionChallengeRuntimeTemplateCatalog>();
         services.AddScoped<IPerTeamRuntimeFlagStore, PostgresPerTeamRuntimeFlagStore>();
         services.AddScoped<IChallengeManagementStore, ChallengeManagementStore>();
         services.AddScoped<IChallengeBankStore, ChallengeBankStore>();
@@ -59,7 +63,6 @@ internal static class ChallengeInfrastructure
         services.AddScoped<GetCompetitionQuestion>();
         services.AddScoped<AddCompetitionQuestionMessage>();
         services.AddScoped<ChangeCompetitionQuestionStatus>();
-        services.AddScoped<PublishCompetitionQuestion>();
         return services;
     }
 }

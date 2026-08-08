@@ -21,6 +21,7 @@ public sealed class KubernetesComposeRuntime(
     private const string ManagedLabel = "noctf.io/managed";
     private const string RuntimeIdLabel = "noctf.io/runtime-instance-id";
     private const string GenerationLabel = "noctf.io/generation";
+    private const string ExternalReasonExitCode = "ExitCode";
 
     public async Task<ComposeReceipt> UpAsync(
         ComposeRequest request,
@@ -645,7 +646,7 @@ public sealed class KubernetesComposeRuntime(
         {
             var exit = causes.EnumerateArray().FirstOrDefault(cause =>
                 cause.TryGetProperty("reason", out var reason)
-                && reason.GetString() == "ExitCode");
+                && reason.GetString() == ExternalReasonExitCode);
             if (exit.ValueKind != JsonValueKind.Undefined
                 && exit.TryGetProperty("message", out var message)
                 && int.TryParse(message.GetString(), out var exitCode))

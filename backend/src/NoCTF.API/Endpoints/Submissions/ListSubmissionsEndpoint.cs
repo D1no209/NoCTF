@@ -29,10 +29,10 @@ public sealed record SubmissionListItemResponse(
     Guid CompetitionChallengeId,
     Guid TeamId,
     Guid SubmittedByUserId,
-    SubmissionKind Kind,
-    SubmissionEvaluationState EvaluationState,
-    ScoringResult? Result,
-    ScoringFailureCode? FailureCode,
+    SubmissionKindProtocol Kind,
+    SubmissionEvaluationStateProtocol EvaluationState,
+    ScoringResultProtocol? Result,
+    ScoringFailureCodeProtocol? FailureCode,
     DateTimeOffset ReceivedAt,
     long ProcessingVersion);
 
@@ -45,8 +45,13 @@ internal static class SubmissionListMapping
     public static SubmissionListItemResponse ToResponse(SubmissionListItem item) =>
         new(
             item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
-            item.SubmittedByUserId, item.Kind, item.EvaluationState, item.Result,
-            item.FailureCode, item.ReceivedAt, item.ProcessingVersion);
+            item.SubmittedByUserId,
+            SubmissionMapper.ToProtocol(item.Kind),
+            SubmissionMapper.ToProtocol(item.EvaluationState),
+            item.Result is null ? null : SubmissionMapper.ToProtocol(item.Result.Value),
+            item.FailureCode is null ? null : SubmissionMapper.ToProtocol(item.FailureCode.Value),
+            item.ReceivedAt,
+            item.ProcessingVersion);
 }
 
 public sealed class ListSubmissionsEndpoint(

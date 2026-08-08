@@ -3,10 +3,26 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Authentication.Account;
-using NoCTF.Domain.Identity;
+using NoCTF.API.Serialization;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
 using MvcProblemDetails = Microsoft.AspNetCore.Mvc.ProblemDetails;
 
 namespace NoCTF.API.Endpoints.Authentication;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RegisterFailureCode>))]
+public enum RegisterFailureCode
+{
+    UserNameConflict,
+    EmailConflict
+}
+
+[Mapper]
+internal static partial class RegisterProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial RegisterFailureCode ToProtocol(RegisterUserFailureCode value);
+}
 
 public sealed class RegisterRequest
 {
@@ -25,7 +41,7 @@ public sealed record RegisterResponse(
     Guid UserId,
     string UserName,
     string Email,
-    UserRole Role,
+    UserRoleProtocol Role,
     bool EmailVerified,
     bool RequiresEmailVerification,
     bool VerificationEmailQueued);
@@ -70,7 +86,10 @@ public sealed class RegisterEndpoint(RegisterUser register)
                 Status = StatusCodes.Status409Conflict,
                 Title = "Account registration conflict.",
                 Detail = result.ErrorMessage,
-                Extensions = { ["code"] = result.ErrorCode }
+                Extensions =
+                {
+                    ["code"] = RegisterProtocolMapper.ToProtocol(result.FailureCode!.Value)
+                }
             });
 
         var registration = result.Value!;
@@ -81,7 +100,7 @@ public sealed class RegisterEndpoint(RegisterUser register)
                 profile.Id,
                 profile.UserName,
                 profile.Email,
-                profile.Role,
+                IdentityProtocolMapper.ToProtocol(profile.Role),
                 profile.EmailVerified,
                 registration.RequiresEmailVerification,
                 registration.VerificationEmailQueued));
