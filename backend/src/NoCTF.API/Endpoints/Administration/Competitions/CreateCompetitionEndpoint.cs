@@ -17,6 +17,7 @@ public sealed class CreateCompetitionRequest
     public DateTimeOffset StartTime { get; set; }
     public DateTimeOffset EndTime { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
+    public bool AllowTeamRegistrationWhileRunning { get; set; }
     public int MaxTeamMembers { get; set; } = 5;
     public int? MaxConcurrentRuntimeInstancesPerTeam { get; set; }
 }
@@ -72,7 +73,8 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
             request.MaxTeamMembers,
             request.MaxConcurrentRuntimeInstancesPerTeam!.Value,
             user.UserId,
-            DateTimeOffset.UtcNow), ct);
+            DateTimeOffset.UtcNow,
+            request.AllowTeamRegistrationWhileRunning), ct);
         return result.State switch
         {
             CompetitionCreationState.Created =>

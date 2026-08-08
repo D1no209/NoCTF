@@ -32,7 +32,8 @@ public sealed record RuntimeInstanceView(
     string? RunnerId = null,
     string? ProviderReceiptJson = null,
     string? ControlCheckUrl = null,
-    IReadOnlyList<RuntimePublishedPortView>? PublishedPorts = null);
+    IReadOnlyList<RuntimePublishedPortView>? PublishedPorts = null,
+    DateTimeOffset? StateChangedAt = null);
 
 public sealed record RuntimePublishedPortView(
     string? ServiceName,
@@ -55,7 +56,9 @@ public enum RuntimeMutationFailure
     InvalidState,
     CapacityExceeded,
     Conflict,
-    ConfigurationInvalid
+    ConfigurationInvalid,
+    NotStuck,
+    InvalidReason
 }
 
 public enum RuntimeMutationFailureCode

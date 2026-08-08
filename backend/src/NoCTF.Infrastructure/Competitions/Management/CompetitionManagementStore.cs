@@ -56,6 +56,7 @@ public sealed class CompetitionManagementStore(
             EndAt = command.EndTime,
             Status = CompetitionStatus.Draft,
             TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove,
+            AllowTeamRegistrationWhileRunning = command.AllowTeamRegistrationWhileRunning,
             MaxTeamMembers = command.MaxTeamMembers,
             MaxConcurrentRuntimeInstancesPerTeam = command.MaxConcurrentRuntimeInstancesPerTeam,
             CreatedAt = command.CreatedAt,
@@ -119,6 +120,7 @@ public sealed class CompetitionManagementStore(
         competition.StartAt = command.StartTime;
         competition.EndAt = command.EndTime;
         competition.TeamRegistrationAutoApprove = command.TeamRegistrationAutoApprove;
+        competition.AllowTeamRegistrationWhileRunning = command.AllowTeamRegistrationWhileRunning;
         competition.MaxTeamMembers = command.MaxTeamMembers;
         competition.MaxConcurrentRuntimeInstancesPerTeam =
             command.MaxConcurrentRuntimeInstancesPerTeam;
@@ -192,11 +194,13 @@ public sealed class CompetitionManagementStore(
         query.Select(x => new CompetitionView(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt,
             x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
             x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
-            x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt));
+            x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt,
+            x.AllowTeamRegistrationWhileRunning));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
             x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
             x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
-            x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt);
+            x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt,
+            x.AllowTeamRegistrationWhileRunning);
 }

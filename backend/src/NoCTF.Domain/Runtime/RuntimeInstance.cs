@@ -37,6 +37,15 @@ public enum RuntimeFailureCode : short
     PublishedPortRangeExhausted
 }
 
+public enum RuntimeCleanupResult : short
+{
+    Pending,
+    ResourcesAbsent,
+    ResourcesRemain,
+    CleanupFailed,
+    CapacityOwnershipConflict
+}
+
 public sealed class RuntimePublishedPort
 {
     [MaxLength(63)]

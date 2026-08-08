@@ -41,6 +41,14 @@ public interface IAdminRuntimeStore
         Guid actorUserId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+    Task<RuntimeMutationResult> ForceTerminateAsync(
+        Guid competitionId,
+        Guid runtimeInstanceId,
+        long expectedProcessingVersion,
+        Guid actorUserId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }
 
 public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
@@ -84,4 +92,42 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
             actorUserId,
             now,
             ct);
+
+    public Task<RuntimeMutationResult> ForceTerminateAsync(
+        Guid competitionId,
+        Guid runtimeInstanceId,
+        long expectedProcessingVersion,
+        Guid actorUserId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken ct = default)
+    {
+        var normalizedReason = reason.Trim();
+        return normalizedReason.Length is >= 8 and <= 512
+            ? store.ForceTerminateAsync(
+                competitionId,
+                runtimeInstanceId,
+                expectedProcessingVersion,
+                actorUserId,
+                normalizedReason,
+                now,
+                ct)
+            : Task.FromResult(new RuntimeMutationResult(
+                null,
+                RuntimeMutationFailure.InvalidReason));
+    }
+}
+
+public static class RuntimeForceTerminationPolicy
+{
+    public static readonly TimeSpan StuckThreshold = TimeSpan.FromMinutes(5);
+
+    public static DateTimeOffset? AvailableAt(RuntimeInstanceView runtime) =>
+        runtime.State is RuntimeState.Provisioning or RuntimeState.Stopping
+        && !string.IsNullOrWhiteSpace(runtime.RunnerId)
+            ? (runtime.StateChangedAt ?? runtime.CreatedAt).Add(StuckThreshold)
+            : null;
+
+    public static bool CanForceTerminate(RuntimeInstanceView runtime, DateTimeOffset now) =>
+        AvailableAt(runtime) is { } availableAt && availableAt <= now;
 }

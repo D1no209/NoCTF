@@ -40,6 +40,30 @@ public sealed class RuntimeClaimFactoryTests
     }
 
     [Test]
+    public async Task Container_security_treats_null_cap_add_as_empty()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "challenge:v1",
+                Security: new ContainerSecurityPolicy(
+                    true,
+                    true,
+                    true,
+                    ["ALL"],
+                    null!)));
+
+        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+            instance,
+            GameMode.Ctf,
+            template,
+            "{}");
+
+        await Assert.That(claim.Definition.Security.CapAdd).IsEmpty();
+    }
+
+    [Test]
     public async Task Ctf_per_team_container_overrides_the_configured_flag_value()
     {
         var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);

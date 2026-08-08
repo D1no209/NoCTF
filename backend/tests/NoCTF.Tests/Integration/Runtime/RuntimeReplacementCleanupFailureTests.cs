@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
@@ -25,6 +26,60 @@ namespace NoCTF.Tests.Integration.Runtime;
 [Category("Integration")]
 public sealed class RuntimeReplacementCleanupFailureTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Force_termination_completion_stops_the_old_instance_and_dispatches_replacement(
+        CancellationToken cancellationToken)
+    {
+        await RunAsync(async options =>
+        {
+            var fixture = await SeedAsync(
+                options,
+                includeReplacement: true,
+                includeUnrelated: false,
+                cancellationToken);
+            var outbox = new RecordingOutbox();
+            var events = new RecordingCompetitionEventRecorder();
+            var completedAt = fixture.Now.AddMinutes(6);
+
+            await using (var db = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeForceTerminated(
+                        fixture.OldRuntimeId,
+                        fixture.OldProcessingVersion,
+                        1,
+                        "runner-a",
+                        fixture.UserId,
+                        "The runtime exceeded the cleanup timeout.",
+                        fixture.Now.AddMinutes(5),
+                        completedAt,
+                        RuntimeCleanupResult.ResourcesAbsent),
+                    db,
+                    outbox,
+                    cancellationToken,
+                    events);
+            }
+
+            await using var verify = new NoCtfDbContext(options);
+            var old = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+                instance => instance.Id == fixture.OldRuntimeId,
+                cancellationToken);
+            await Assert.That(old.State).IsEqualTo(RuntimeState.Stopped);
+            await Assert.That(old.StoppedAt).IsEqualTo(completedAt);
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>().Single())
+                .IsEqualTo(new DispatchRuntime(
+                    fixture.ReplacementRuntimeId,
+                    fixture.ReplacementProcessingVersion));
+            var completed = events.Drafts.Single();
+            await Assert.That(completed.Kind)
+                .IsEqualTo(NoCTF.Domain.Competitions.Events.CompetitionEventKind.RuntimeForceTerminationCompleted);
+            await Assert.That(completed.RuntimeCleanupResult)
+                .IsEqualTo(RuntimeCleanupResult.ResourcesAbsent);
+            await Assert.That(completed.ActorUserId).IsEqualTo(fixture.UserId);
+        }, cancellationToken);
+    }
+
     [Test]
     [Arguments(false)]
     [Arguments(true)]
@@ -1002,5 +1057,18 @@ public sealed class RuntimeReplacementCleanupFailureTests
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
 
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+    }
+
+    private sealed class RecordingCompetitionEventRecorder : ICompetitionEventRecorder
+    {
+        public List<CompetitionEventDraft> Drafts { get; } = [];
+
+        public ValueTask<Guid> RecordAsync(
+            CompetitionEventDraft draft,
+            CancellationToken cancellationToken = default)
+        {
+            Drafts.Add(draft);
+            return ValueTask.FromResult(Guid.CreateVersion7(draft.OccurredAt));
+        }
     }
 }

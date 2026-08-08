@@ -9,6 +9,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
@@ -92,6 +93,44 @@ public sealed class RuntimeQuotaPersistenceTests
                 await Assert.That(stale.Failure).IsEqualTo(RuntimeMutationFailure.Conflict);
                 await Assert.That(staleOutbox.Published).IsEmpty();
             }
+
+            await using (var assignmentDb = new NoCtfDbContext(options))
+            {
+                var assigned = await assignmentDb.RuntimeInstances.SingleAsync(
+                    runtime => runtime.Id == runtimeInstanceId,
+                    cancellationToken);
+                assigned.RunnerId = "runner-a";
+                await assignmentDb.SaveChangesAsync(cancellationToken);
+            }
+
+            var forceOutbox = new RecordingOutbox();
+            var forceEvents = new RecordingCompetitionEventRecorder();
+            await using (var forceDb = new NoCtfDbContext(options))
+            {
+                var forced = await CreateAdminStore(forceDb, forceOutbox, forceEvents)
+                    .ForceTerminateAsync(
+                        fixture.CompetitionId,
+                        runtimeInstanceId,
+                        expectedProcessingVersion: 1,
+                        actorUserId,
+                        "Runner cleanup exceeded the operation timeout.",
+                        fixture.Now.Add(RuntimeForceTerminationPolicy.StuckThreshold),
+                        cancellationToken);
+
+                await Assert.That(forced.Failure).IsNull();
+                await Assert.That(forced.Runtime!.ProcessingVersion).IsEqualTo(2);
+            }
+
+            var forceMessage = forceOutbox.Published.OfType<ForceTerminateRuntime>().Single();
+            await Assert.That(forceMessage.RuntimeInstanceId).IsEqualTo(runtimeInstanceId);
+            await Assert.That(forceMessage.Generation).IsEqualTo(1);
+            var forceEvent = forceEvents.Drafts.Single();
+            await Assert.That(forceEvent.Kind)
+                .IsEqualTo(CompetitionEventKind.RuntimeForceTerminationRequested);
+            await Assert.That(forceEvent.RuntimeCleanupResult)
+                .IsEqualTo(RuntimeCleanupResult.Pending);
+            await Assert.That(forceEvent.Reason)
+                .IsEqualTo("Runner cleanup exceeded the operation timeout.");
         });
     }
 
@@ -482,8 +521,11 @@ public sealed class RuntimeQuotaPersistenceTests
         public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
             where T : IRunnerPoolMessage => ValueTask.CompletedTask;
 
-        public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
-            ValueTask.CompletedTask;
+        public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage
+        {
+            Published.Add(message!);
+            return ValueTask.CompletedTask;
+        }
 
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;

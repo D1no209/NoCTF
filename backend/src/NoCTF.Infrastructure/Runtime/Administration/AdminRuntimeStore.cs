@@ -9,6 +9,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Infrastructure.Runtime.Administration;
 
@@ -91,7 +92,17 @@ public sealed class AdminRuntimeStore(
                         port.ContainerPort,
                         port.HostPort,
                         port.AllocatedAt))
-                    .ToArray()))
+                    .ToArray(),
+                db.CompetitionEvents
+                    .Where(eventItem =>
+                        eventItem.CompetitionId == item.CompetitionId
+                        && eventItem.Kind == CompetitionEventKind.RuntimeStateChanged
+                        && eventItem.SubjectType == EntityReferenceKind.RuntimeInstance
+                        && eventItem.SubjectId == item.Id)
+                    .OrderByDescending(eventItem => eventItem.OccurredAt)
+                    .ThenByDescending(eventItem => eventItem.Id)
+                    .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
+                    .FirstOrDefault()))
             .ToListAsync(ct);
     }
 
@@ -115,8 +126,113 @@ public sealed class AdminRuntimeStore(
                         port.ContainerPort,
                         port.HostPort,
                         port.AllocatedAt))
-                    .ToArray()))
+                    .ToArray(),
+                db.CompetitionEvents
+                    .Where(eventItem =>
+                        eventItem.CompetitionId == item.CompetitionId
+                        && eventItem.Kind == CompetitionEventKind.RuntimeStateChanged
+                        && eventItem.SubjectType == EntityReferenceKind.RuntimeInstance
+                        && eventItem.SubjectId == item.Id)
+                    .OrderByDescending(eventItem => eventItem.OccurredAt)
+                    .ThenByDescending(eventItem => eventItem.Id)
+                    .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
+                    .FirstOrDefault()))
             .SingleOrDefaultAsync(ct);
+
+    public async Task<RuntimeMutationResult> ForceTerminateAsync(
+        Guid competitionId,
+        Guid runtimeInstanceId,
+        long expectedProcessingVersion,
+        Guid actorUserId,
+        string reason,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var scope = await db.RuntimeInstances.AsNoTracking()
+            .Where(instance =>
+                instance.Id == runtimeInstanceId
+                && instance.CompetitionId == competitionId)
+            .Select(instance => new
+            {
+                instance.TeamId,
+                instance.CompetitionChallengeId,
+                StateChangedAt = db.CompetitionEvents
+                    .Where(eventItem =>
+                        eventItem.CompetitionId == competitionId
+                        && eventItem.Kind == CompetitionEventKind.RuntimeStateChanged
+                        && eventItem.SubjectType == EntityReferenceKind.RuntimeInstance
+                        && eventItem.SubjectId == runtimeInstanceId)
+                    .OrderByDescending(eventItem => eventItem.OccurredAt)
+                    .ThenByDescending(eventItem => eventItem.Id)
+                    .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
+                    .FirstOrDefault()
+            })
+            .SingleOrDefaultAsync(ct);
+        if (scope is null)
+            return new(null, RuntimeMutationFailure.NotFound);
+
+        await using var criticalSection = scope.TeamId is Guid teamId
+            ? await runtimeQuota.AcquireLockAsync(db, competitionId, teamId, ct)
+            : await sharedRuntimeCriticalSection.AcquireAsync(
+                db,
+                scope.CompetitionChallengeId,
+                ct);
+        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(candidate =>
+            candidate.Id == runtimeInstanceId
+            && candidate.CompetitionId == competitionId,
+            ct);
+        if (instance is null)
+            return new(null, RuntimeMutationFailure.NotFound);
+        if (instance.ProcessingVersion != expectedProcessingVersion)
+            return new(null, RuntimeMutationFailure.Conflict);
+        var current = Map(instance, scope.StateChangedAt);
+        if (!RuntimeForceTerminationPolicy.CanForceTerminate(current, now))
+            return new(null, RuntimeMutationFailure.NotStuck);
+
+        var runnerId = instance.RunnerId
+            ?? throw new InvalidOperationException(
+                "Force termination requires an owning Runner assignment.");
+        instance.State = RuntimeState.Stopping;
+        instance.FailureCode = null;
+        instance.RunnerAssignmentReleaseToken = null;
+        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await outbox.PublishToRunnerNodeAsync(new ForceTerminateRuntime(
+            instance.Id,
+            instance.ProcessingVersion,
+            instance.Generation,
+            instance.RuntimeProvider,
+            instance.RunnerPool,
+            runnerId,
+            actorUserId,
+            reason,
+            now));
+        await events.RecordAsync(new(
+            instance.CompetitionId,
+            CompetitionEventKind.RuntimeForceTerminationRequested,
+            CompetitionEventLevel.Warning,
+            CompetitionEventVisibility.Staff,
+            now,
+            ActorUserId: actorUserId,
+            TeamId: instance.TeamId,
+            CompetitionChallengeId: instance.CompetitionChallengeId,
+            RuntimeInstanceId: instance.Id,
+            RuntimeState: instance.State,
+            RuntimeCleanupResult: RuntimeCleanupResult.Pending,
+            RuntimeGeneration: instance.Generation,
+            Reason: reason), ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            await outbox.FlushOutgoingMessagesAsync();
+            return new(Map(instance, now));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return new(null, RuntimeMutationFailure.Conflict);
+        }
+    }
 
     public async Task<RuntimeMutationResult> TerminateAsync(
         Guid competitionId,
@@ -448,7 +564,9 @@ public sealed class AdminRuntimeStore(
             ReplacesRuntimeInstanceId: null
         };
 
-    private static RuntimeInstanceView Map(RuntimeInstance item) =>
+    private static RuntimeInstanceView Map(
+        RuntimeInstance item,
+        DateTimeOffset? stateChangedAt = null) =>
         new(
             item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
             item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
@@ -463,5 +581,6 @@ public sealed class AdminRuntimeStore(
                     port.ContainerPort,
                     port.HostPort,
                     port.AllocatedAt))
-                .ToArray());
+                .ToArray(),
+            stateChangedAt);
 }

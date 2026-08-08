@@ -38,6 +38,7 @@ public sealed class Competition
     [ConcurrencyCheck]
     public CompetitionStatus Status { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
+    public bool AllowTeamRegistrationWhileRunning { get; set; }
     public int MaxTeamMembers { get; set; } = 5;
     public int MaxConcurrentRuntimeInstancesPerTeam { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

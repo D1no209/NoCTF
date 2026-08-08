@@ -338,6 +338,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     endTime?: string;
     status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
     teamRegistrationAutoApprove?: boolean;
+    allowTeamRegistrationWhileRunning?: boolean;
     maxTeamMembers?: number;
     maxConcurrentRuntimeInstancesPerTeam?: number;
     ownerId?: string;
@@ -487,7 +488,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'SubmissionReceived' | 'SubmissionEvaluated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedSubmissionFlagAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'ProtectedCompetitionExportCreated' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'SubmissionReceived' | 'SubmissionEvaluated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedSubmissionFlagAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'ProtectedCompetitionExportCreated' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -530,6 +531,7 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     scoringEventKind?: NoCtfapiEndpointsCompetitionsEventsScoringEventKindProtocol | null;
     scoringResult?: NoCtfapiEndpointsSubmissionsScoringResultProtocol | null;
     runtimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
+    runtimeCleanupResult?: NoCtfapiEndpointsCompetitionsEventsRuntimeCleanupResultProtocol | null;
     questionStatus?: NoCtfapiEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol | null;
     runtimeGeneration?: number | null;
     hostPort?: number | null;
@@ -540,6 +542,8 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol = 'Public' | 'Team' | 'Staff';
 
 export type NoCtfapiEndpointsCompetitionsEventsScoringEventKindProtocol = 'SubmissionEvaluation' | 'AwdServiceStatus' | 'HintUnlock' | 'KohObservation' | 'ManualAdjust';
+
+export type NoCtfapiEndpointsCompetitionsEventsRuntimeCleanupResultProtocol = 'Pending' | 'ResourcesAbsent' | 'ResourcesRemain' | 'CleanupFailed' | 'CapacityOwnershipConflict';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol = 'Pending' | 'Replied' | 'Resolved' | 'Closed';
 
@@ -889,6 +893,11 @@ export type NoCtfapiEndpointsAdministrationSubmissionsRejudgeSubmissionResponse 
     cutoff?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationRuntimeForceTerminateRuntimeRequest = {
+    expectedProcessingVersion: number;
+    reason: string;
+};
+
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     id?: string;
     competitionId?: string;
@@ -910,6 +919,8 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     runningAt?: string | null;
     expiresAt?: string | null;
     stoppedAt?: string | null;
+    forceTerminationAvailableAt?: string | null;
+    canForceTerminate?: boolean;
 };
 
 export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
@@ -1246,6 +1257,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest 
     startTime?: string;
     endTime?: string;
     teamRegistrationAutoApprove?: boolean;
+    allowTeamRegistrationWhileRunning?: boolean;
     maxTeamMembers?: number;
     maxConcurrentRuntimeInstancesPerTeam: number;
 };
@@ -1321,6 +1333,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest 
     startTime?: string;
     endTime?: string;
     teamRegistrationAutoApprove?: boolean;
+    allowTeamRegistrationWhileRunning?: boolean;
     maxTeamMembers?: number;
     maxConcurrentRuntimeInstancesPerTeam: number;
 };
@@ -4467,6 +4480,47 @@ export type AdminExtendTeamRuntimeResponses = {
 };
 
 export type AdminExtendTeamRuntimeResponse = AdminExtendTeamRuntimeResponses[keyof AdminExtendTeamRuntimeResponses];
+
+export type AdminForceTerminateRuntimeData = {
+    body: NoCtfapiEndpointsAdministrationRuntimeForceTerminateRuntimeRequest;
+    path: {
+        competitionId: string;
+        runtimeInstanceId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/force-terminate';
+};
+
+export type AdminForceTerminateRuntimeErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: FastEndpointsErrorResponse;
+};
+
+export type AdminForceTerminateRuntimeError = AdminForceTerminateRuntimeErrors[keyof AdminForceTerminateRuntimeErrors];
+
+export type AdminForceTerminateRuntimeResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsRuntimeRuntimeAcceptedResponse;
+};
+
+export type AdminForceTerminateRuntimeResponse = AdminForceTerminateRuntimeResponses[keyof AdminForceTerminateRuntimeResponses];
 
 export type AdminGetRuntimeData = {
     body?: never;

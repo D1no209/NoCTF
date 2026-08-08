@@ -28,6 +28,25 @@ public class TeamRegistrationTests
     }
 
     [Test]
+    public async Task CreateTeam_RunningCompetitionAllowsRegistrationWhenConfigured()
+    {
+        var store = new Store(new(
+            CompetitionStatus.Running,
+            AutoApprove: false,
+            CompetitionDeleted: false,
+            AllowWhileRunning: true));
+
+        var result = await new CreateTeam(store).ExecuteAsync(new(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "alpha",
+            DateTimeOffset.UtcNow));
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Pending);
+    }
+
+    [Test]
     public async Task ReviewTeamRegistration_FinishedCompetitionRejectsBeforeWrite()
     {
         var store = new Store(new(CompetitionStatus.Finished, true, false));

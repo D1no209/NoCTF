@@ -59,7 +59,9 @@ public sealed record AdminRuntimeResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
     DateTimeOffset? ExpiresAt,
-    DateTimeOffset? StoppedAt);
+    DateTimeOffset? StoppedAt,
+    DateTimeOffset? ForceTerminationAvailableAt,
+    bool CanForceTerminate);
 
 public sealed record AdminRuntimeListResponse(
     IReadOnlyList<AdminRuntimeResponse> Items,
@@ -67,8 +69,10 @@ public sealed record AdminRuntimeListResponse(
 
 internal static class AdminRuntimeMapping
 {
-    public static AdminRuntimeResponse ToResponse(RuntimeInstanceView view) =>
-        new(
+    public static AdminRuntimeResponse ToResponse(RuntimeInstanceView view)
+    {
+        var availableAt = RuntimeForceTerminationPolicy.AvailableAt(view);
+        return new(
             view.Id, view.CompetitionId, view.CompetitionChallengeId, view.TeamId,
             view.Generation,
             RuntimeProtocolMapper.ToProtocol(view.RuntimeKind),
@@ -80,7 +84,10 @@ internal static class AdminRuntimeMapping
             view.ProcessingVersion,
             view.Urls, view.ProviderReceiptJson, view.ControlCheckUrl,
             view.PublishedPorts ?? [], view.CreatedAt,
-            view.RunningAt, view.ExpiresAt, view.StoppedAt);
+            view.RunningAt, view.ExpiresAt, view.StoppedAt,
+            availableAt,
+            availableAt is { } value && value <= DateTimeOffset.UtcNow);
+    }
 }
 
 public sealed class ListAdminRuntimesEndpoint(

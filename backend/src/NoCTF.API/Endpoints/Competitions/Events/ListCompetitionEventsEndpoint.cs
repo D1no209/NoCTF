@@ -35,7 +35,9 @@ public enum CompetitionEventKindProtocol
     ProtectedSubmissionFlagAccessed, CheatIncidentDetected,
     CheatIncidentConfirmed, CheatIncidentDismissed, CheatIncidentSuperseded,
     CheatIncidentCorrected, ProtectedCompetitionExportCreated, TeamBanAppealSubmitted,
-    TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished
+    TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished,
+    RuntimeForceTerminationRequested, RuntimeForceTerminationCompleted,
+    RuntimeForceTerminationFailed
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]
@@ -53,6 +55,16 @@ public enum ScoringEventKindProtocol { SubmissionEvaluation, AwdServiceStatus, H
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionQuestionStatusProtocol>))]
 public enum CompetitionQuestionStatusProtocol { Pending, Replied, Resolved, Closed }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeCleanupResultProtocol>))]
+public enum RuntimeCleanupResultProtocol
+{
+    Pending,
+    ResourcesAbsent,
+    ResourcesRemain,
+    CleanupFailed,
+    CapacityOwnershipConflict
+}
+
 [Mapper]
 internal static partial class CompetitionEventProtocolMapper
 {
@@ -62,6 +74,7 @@ internal static partial class CompetitionEventProtocolMapper
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventAccessLevelProtocol ToProtocol(CompetitionEventAccessLevel value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial ScoringEventKindProtocol ToProtocol(ScoringEventKind value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionQuestionStatusProtocol ToProtocol(CompetitionQuestionStatus value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial RuntimeCleanupResultProtocol ToProtocol(RuntimeCleanupResult value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventKind ToDomain(CompetitionEventKindProtocol value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventLevel ToDomain(CompetitionEventLevelProtocol value);
 }
@@ -123,6 +136,7 @@ public sealed record CompetitionEventResponse(
     ScoringEventKindProtocol? ScoringEventKind,
     ScoringResultProtocol? ScoringResult,
     RuntimeStateProtocol? RuntimeState,
+    RuntimeCleanupResultProtocol? RuntimeCleanupResult,
     CompetitionQuestionStatusProtocol? QuestionStatus,
     int? RuntimeGeneration,
     int? HostPort,
@@ -266,6 +280,9 @@ public sealed class ListCompetitionEventsEndpoint(
             item.ScoringEventKind is null ? null : CompetitionEventProtocolMapper.ToProtocol(item.ScoringEventKind.Value),
             item.ScoringResult is null ? null : SubmissionMapper.ToProtocol(item.ScoringResult.Value),
             item.RuntimeState is null ? null : RuntimeProtocolMapper.ToProtocol(item.RuntimeState.Value),
+            item.RuntimeCleanupResult is null
+                ? null
+                : CompetitionEventProtocolMapper.ToProtocol(item.RuntimeCleanupResult.Value),
             item.QuestionStatus is null ? null : CompetitionEventProtocolMapper.ToProtocol(item.QuestionStatus.Value),
             item.RuntimeGeneration,
             item.HostPort,

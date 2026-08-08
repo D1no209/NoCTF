@@ -16,7 +16,11 @@ public sealed record TeamView(
     bool IsLocked,
     bool IsBanned,
     DateTimeOffset RegisteredAt);
-public sealed record TeamRegistrationPolicy(CompetitionStatus Status, bool AutoApprove, bool CompetitionDeleted);
+public sealed record TeamRegistrationPolicy(
+    CompetitionStatus Status,
+    bool AutoApprove,
+    bool CompetitionDeleted,
+    bool AllowWhileRunning = false);
 public enum TeamRegistrationFailure
 {
     InvalidTeamName,
@@ -68,7 +72,7 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
         var policy = await store.GetPolicyAsync(command.CompetitionId, ct);
         if (policy is null || policy.CompetitionDeleted)
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionNotFound, "Competition was not found.");
-        if (policy.Status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+        if (RegistrationIsClosed(policy))
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.RegistrationClosed, "Team registration is closed.");
         var created = await store.TryCreateAsync(command with { Name = name },
             policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
@@ -76,6 +80,10 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
             ? OperationResult<TeamView, TeamRegistrationFailure>.Success(created.Team)
             : OperationResult<TeamView, TeamRegistrationFailure>.Failure(created.Failure ?? TeamRegistrationFailure.TeamConflict, "The team could not be created.");
     }
+
+    private static bool RegistrationIsClosed(TeamRegistrationPolicy policy) =>
+        policy.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
+        || policy.Status == CompetitionStatus.Running && !policy.AllowWhileRunning;
 }
 
 public sealed class ListCompetitionTeams(ITeamRegistrationStore store)
@@ -148,7 +156,8 @@ public sealed class ResubmitTeamRegistration(ITeamRegistrationStore store)
         var policy = await store.GetPolicyAsync(competitionId, ct);
         if (policy is null || policy.CompetitionDeleted)
             return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionNotFound, "Competition was not found.");
-        if (policy.Status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+        if (policy.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
+            || policy.Status == CompetitionStatus.Running && !policy.AllowWhileRunning)
             return OperationResult<TeamRegistrationFailure>.Failure(TeamRegistrationFailure.RegistrationClosed, "Team registration is closed.");
         var result = await store.ResubmitAsync(competitionId, teamId, userId, ct);
         return result.Changed

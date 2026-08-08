@@ -12,6 +12,7 @@ public sealed class RunnerNodeMessageContractTests
     [Arguments(typeof(StopContainerRuntime))]
     [Arguments(typeof(StopComposeRuntime))]
     [Arguments(typeof(StopOvaRuntime))]
+    [Arguments(typeof(ForceTerminateRuntime))]
     [Arguments(typeof(ReconcileRuntimeResources))]
     [Arguments(typeof(InjectAwdFlag))]
     [Arguments(typeof(RunAwdChecker))]
@@ -28,6 +29,7 @@ public sealed class RunnerNodeMessageContractTests
     [Arguments(typeof(StopContainerRuntime))]
     [Arguments(typeof(StopComposeRuntime))]
     [Arguments(typeof(StopOvaRuntime))]
+    [Arguments(typeof(ForceTerminateRuntime))]
     public async Task Stop_work_does_not_persist_the_provider_receipt(Type messageType)
     {
         await Assert.That(messageType.GetProperty("ProviderReceiptJson")).IsNull();

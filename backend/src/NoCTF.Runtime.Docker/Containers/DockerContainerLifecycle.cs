@@ -74,7 +74,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     SecurityOpt = request.Security.NoNewPrivileges ? ["no-new-privileges:true"] : [],
                     ReadonlyRootfs = request.Security.ReadonlyRootfs,
                     CapDrop = request.Security.CapDrop.ToList(),
-                    CapAdd = request.Security.CapAdd.ToList()
+                    CapAdd = request.Security.CapAdd?.ToList() ?? []
                 }
             }, cancellationToken);
             if (request.AllowInternalCallback)
@@ -83,7 +83,25 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 response.ID, new ContainerStartParameters(), cancellationToken);
             var created = await client.Containers.InspectContainerAsync(
                 response.ID, cancellationToken);
-            return new(request.OperationId, RuntimeProvider.Docker, response.ID, RuntimeStatus.Running,
+            var status = ToRuntimeStatus(created.State?.Status);
+            if (status == RuntimeStatus.Starting)
+            {
+                var deadline = DateTimeOffset.UtcNow.Add(
+                    request.OperationTimeout ?? TimeSpan.FromMinutes(2));
+                while (status == RuntimeStatus.Starting && DateTimeOffset.UtcNow < deadline)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+                    created = await client.Containers.InspectContainerAsync(
+                        response.ID, cancellationToken);
+                    status = ToRuntimeStatus(created.State?.Status);
+                }
+            }
+            if (status != RuntimeStatus.Running)
+            {
+                throw new InvalidOperationException(
+                    $"Docker container {response.ID} did not reach the running state; current state is {status}.");
+            }
+            return new(request.OperationId, RuntimeProvider.Docker, response.ID, status,
                 ReadPublishedPorts(created, request.PortMappings.Keys),
                 options.PublicHost,
                 request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime

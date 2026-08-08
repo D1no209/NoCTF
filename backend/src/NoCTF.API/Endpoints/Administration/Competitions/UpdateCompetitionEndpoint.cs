@@ -16,6 +16,7 @@ public sealed class UpdateCompetitionRequest
     public DateTimeOffset StartTime { get; set; }
     public DateTimeOffset EndTime { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; }
+    public bool AllowTeamRegistrationWhileRunning { get; set; }
     public int MaxTeamMembers { get; set; }
     public int? MaxConcurrentRuntimeInstancesPerTeam { get; set; }
 }
@@ -70,7 +71,8 @@ public sealed class UpdateCompetitionEndpoint(
             request.MaxTeamMembers,
             request.MaxConcurrentRuntimeInstancesPerTeam!.Value,
             user.UserId,
-            DateTimeOffset.UtcNow), ct);
+            DateTimeOffset.UtcNow,
+            request.AllowTeamRegistrationWhileRunning), ct);
         if (result.FailureCode == CompetitionManagementFailureCode.CompetitionNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)

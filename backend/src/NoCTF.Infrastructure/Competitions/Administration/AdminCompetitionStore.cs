@@ -21,9 +21,11 @@ public sealed class AdminCompetitionStore(
             .Select(competition => new CompetitionView(
                 competition.Id, competition.Title, competition.Description, competition.Mode,
                 competition.StartAt, competition.EndAt, competition.Status,
-                competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers,
+                competition.TeamRegistrationAutoApprove,
+                competition.MaxTeamMembers,
                 competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId,
-                competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt))
+                competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt,
+                competition.AllowTeamRegistrationWhileRunning))
             .ToListAsync(ct);
 
     public Task<CompetitionView?> FindAsync(
@@ -41,9 +43,11 @@ public sealed class AdminCompetitionStore(
             .Select(competition => new CompetitionView(
                 competition.Id, competition.Title, competition.Description, competition.Mode,
                 competition.StartAt, competition.EndAt, competition.Status,
-                competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers,
+                competition.TeamRegistrationAutoApprove,
+                competition.MaxTeamMembers,
                 competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId,
-                competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt))
+                competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt,
+                competition.AllowTeamRegistrationWhileRunning))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -217,8 +221,10 @@ public sealed class AdminCompetitionStore(
         new(
             competition.Id, competition.Title, competition.Description, competition.Mode,
             competition.StartAt, competition.EndAt, competition.Status,
-            competition.TeamRegistrationAutoApprove, competition.MaxTeamMembers,
+            competition.TeamRegistrationAutoApprove,
+            competition.MaxTeamMembers,
             competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId,
-            competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt);
+            competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt,
+            competition.AllowTeamRegistrationWhileRunning);
 
 }

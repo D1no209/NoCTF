@@ -22,16 +22,29 @@ public sealed class TeamRegistrationStore(
 
     public Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken ct) =>
         db.Competitions.AsNoTracking().Where(x => x.Id == competitionId)
-            .Select(x => new TeamRegistrationPolicy(x.Status, x.TeamRegistrationAutoApprove, x.DeletedAt != null))
+            .Select(x => new TeamRegistrationPolicy(
+                x.Status,
+                x.TeamRegistrationAutoApprove,
+                x.DeletedAt != null,
+                x.AllowTeamRegistrationWhileRunning))
             .SingleOrDefaultAsync(ct);
 
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
     {
         var name = command.Name.Trim();
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-        var competitionStatus = await CompetitionStateReader.ReadAsync(db, command.CompetitionId, ct);
-        if (competitionStatus is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
-        if (competitionStatus is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == command.CompetitionId && item.DeletedAt == null)
+            .Select(item => new
+            {
+                item.Status,
+                item.AllowTeamRegistrationWhileRunning
+            })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
+        if (competition.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
+            || competition.Status == CompetitionStatus.Running
+                && !competition.AllowTeamRegistrationWhileRunning)
             return new(null, TeamRegistrationFailure.RegistrationClosed);
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
@@ -129,10 +142,19 @@ public sealed class TeamRegistrationStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
-        if (status is null)
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == competitionId && item.DeletedAt == null)
+            .Select(item => new
+            {
+                item.Status,
+                item.AllowTeamRegistrationWhileRunning
+            })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null)
             return new(false, TeamRegistrationFailure.CompetitionNotFound);
-        if (status is CompetitionStatus.Running or CompetitionStatus.Paused or CompetitionStatus.Finished)
+        if (competition.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
+            || competition.Status == CompetitionStatus.Running
+                && !competition.AllowTeamRegistrationWhileRunning)
             return new(false, TeamRegistrationFailure.RegistrationClosed);
         var changed = await db.Teams
             .Where(team =>
