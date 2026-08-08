@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Hints;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -89,7 +88,7 @@ public sealed class ChallengeHintUnlockPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        return await new ChallengeHintStore(db, new FixedScoreProjection(), outbox)
+        return await new ChallengeHintStore(db, outbox)
             .UnlockAsync(
                 fixture.CompetitionId,
                 fixture.CompetitionChallengeId,
@@ -228,22 +227,6 @@ public sealed class ChallengeHintUnlockPersistenceTests
         Guid HintId,
         Guid FirstMemberId,
         Guid SecondMemberId);
-
-    private sealed class FixedScoreProjection : ILeaderboardProjectionEngine
-    {
-        public LeaderboardProjectionResult Project(LeaderboardProjectionInput input) =>
-            new(
-                input.Teams.Select((team, index) => new LeaderboardEntry(
-                    index + 1,
-                    team.Id,
-                    team.Name,
-                    100,
-                    1,
-                    input.ProjectedAt,
-                    [])).ToArray(),
-                [],
-                []);
-    }
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {

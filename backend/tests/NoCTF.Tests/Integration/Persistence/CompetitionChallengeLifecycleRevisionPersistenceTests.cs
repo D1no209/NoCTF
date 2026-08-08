@@ -531,7 +531,6 @@ public sealed class CompetitionChallengeLifecycleRevisionPersistenceTests
         ITransactionalMessageOutbox? outbox = null) =>
         new(
             db,
-            Substitute.For<ILeaderboardProjectionEngine>(),
             outbox ?? Substitute.For<ITransactionalMessageOutbox>());
 
     private static ChallengeManagementStore CreateManagementStore(
