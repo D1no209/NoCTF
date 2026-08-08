@@ -23,6 +23,7 @@ using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.DataExports;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Storage;
+using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -69,6 +70,8 @@ public sealed class DataExportPersistenceTests
                     await processor.GenerateAsync(defaultExportId, cancellationToken);
                 }
 
+                Guid defaultFileId;
+                string defaultObjectKey;
                 await using (var verify = new NoCtfDbContext(options))
                 {
                     var job = await verify.DataExports.Include(item => item.File).SingleAsync(
@@ -77,6 +80,8 @@ public sealed class DataExportPersistenceTests
                     await Assert.That(job.Status).IsEqualTo(DataExportStatus.Available);
                     await Assert.That(job.ExpiresAt).IsEqualTo(now.AddHours(24));
                     await Assert.That(job.File!.ByteLength).IsGreaterThan(0);
+                    defaultFileId = job.File.Id;
+                    defaultObjectKey = job.File.ObjectKey;
                     await using var archiveStream = await storage.OpenReadAsync(
                         job.File.ObjectKey,
                         cancellationToken);
@@ -186,12 +191,16 @@ public sealed class DataExportPersistenceTests
                     await Processor(db, storage, outbox, time)
                         .GenerateAsync(platformExportId, cancellationToken);
                 }
+                Guid platformFileId;
+                string platformObjectKey;
                 await using (var verify = new NoCtfDbContext(options))
                 {
                     var job = await verify.DataExports.Include(item => item.File).SingleAsync(
                         item => item.Id == platformExportId,
                         cancellationToken);
                     await Assert.That(job.File!.ContentType).IsEqualTo("application/x-ndjson");
+                    platformFileId = job.File.Id;
+                    platformObjectKey = job.File.ObjectKey;
                     await using var stream = await storage.OpenReadAsync(
                         job.File.ObjectKey,
                         cancellationToken);
@@ -215,7 +224,32 @@ public sealed class DataExportPersistenceTests
                     await Assert.That(expired.Status).IsEqualTo(DataExportStatus.Expired);
                     await Assert.That(expired.FileId).IsNull();
                     await Assert.That(expired.File).IsNull();
+                    await Assert.That(await verify.Files.AnyAsync(
+                        item => item.Id == defaultFileId,
+                        cancellationToken)).IsTrue();
                 }
+                await Assert.That(await storage.InspectAsync(
+                    defaultObjectKey,
+                    cancellationToken)).IsNotNull();
+                var expiredCleanup = outbox.Published.OfType<CleanupFile>()
+                    .Single(message => message.FileId == defaultFileId);
+                await using (var db = new NoCtfDbContext(options))
+                {
+                    await BackendMessageHandlers.Handle(
+                        expiredCleanup,
+                        db,
+                        storage,
+                        cancellationToken);
+                }
+                await using (var verify = new NoCtfDbContext(options))
+                {
+                    await Assert.That(await verify.Files.AnyAsync(
+                        item => item.Id == defaultFileId,
+                        cancellationToken)).IsFalse();
+                }
+                await Assert.That(await storage.InspectAsync(
+                    defaultObjectKey,
+                    cancellationToken)).IsNull();
 
                 time.Advance(TimeSpan.FromDays(31));
                 await using (var db = new NoCtfDbContext(options))
@@ -233,6 +267,43 @@ public sealed class DataExportPersistenceTests
                             == CompetitionEventKind.ProtectedCompetitionExportCreated,
                         cancellationToken)).IsTrue();
                 }
+
+                await using (var db = new NoCtfDbContext(options))
+                {
+                    await Processor(db, storage, outbox, time)
+                        .PurgeAsync(platformExportId, cancellationToken);
+                }
+                await using (var verify = new NoCtfDbContext(options))
+                {
+                    await Assert.That(await verify.DataExports.AnyAsync(
+                        item => item.Id == platformExportId,
+                        cancellationToken)).IsFalse();
+                    await Assert.That(await verify.Files.AnyAsync(
+                        item => item.Id == platformFileId,
+                        cancellationToken)).IsTrue();
+                }
+                await Assert.That(await storage.InspectAsync(
+                    platformObjectKey,
+                    cancellationToken)).IsNotNull();
+                var purgedCleanup = outbox.Published.OfType<CleanupFile>()
+                    .Single(message => message.FileId == platformFileId);
+                await using (var db = new NoCtfDbContext(options))
+                {
+                    await BackendMessageHandlers.Handle(
+                        purgedCleanup,
+                        db,
+                        storage,
+                        cancellationToken);
+                }
+                await using (var verify = new NoCtfDbContext(options))
+                {
+                    await Assert.That(await verify.Files.AnyAsync(
+                        item => item.Id == platformFileId,
+                        cancellationToken)).IsFalse();
+                }
+                await Assert.That(await storage.InspectAsync(
+                    platformObjectKey,
+                    cancellationToken)).IsNull();
             }
             finally
             {
