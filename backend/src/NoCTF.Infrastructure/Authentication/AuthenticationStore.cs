@@ -7,16 +7,19 @@ using NoCTF.Application.Storage;
 using NoCTF.Domain.Storage;
 using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.Messaging;
+using NoCTF.Infrastructure.Storage;
 
 namespace NoCTF.Infrastructure.Authentication;
 
 public sealed class AuthenticationStore(
     NoCtfDbContext db,
     IPasswordHasher<User> passwordHasher,
-    ITransactionalMessageOutbox? messageOutbox = null) : IUserAuthenticationStore
+    ITransactionalMessageOutbox? messageOutbox = null,
+    FileReferenceLock? fileReferenceLock = null) : IUserAuthenticationStore
 {
     private readonly ITransactionalMessageOutbox outbox =
         messageOutbox ?? new OpenApiTransactionalMessageOutbox();
+    private readonly FileReferenceLock fileLock = fileReferenceLock ?? new FileReferenceLock();
     public async Task<AuthenticatedUser?> FindByLoginAsync(
         string login,
         CancellationToken ct)
@@ -95,34 +98,26 @@ public sealed class AuthenticationStore(
 
     public async Task<UserAvatarReplacement?> ReplaceAvatarAsync(
         Guid userId,
-        StoredObject storedObject,
+        Guid fileId,
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var user = await db.Users.Include(item => item.AvatarFile).SingleOrDefaultAsync(item =>
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var user = await db.Users.SingleOrDefaultAsync(item =>
             item.Id == userId && item.AccountStatus == UserAccountStatus.Active,
             ct);
         if (user is null)
             return null;
+        if (!await fileLock.AcquireAsync(db, fileId, ct))
+            return null;
 
         var previousFileId = user.AvatarFileId;
-        var file = new StoredFile
-        {
-            Id = Guid.CreateVersion7(now),
-            ObjectKey = storedObject.ObjectKey,
-            FileName = storedObject.FileName,
-            ContentType = storedObject.ContentType,
-            ByteLength = storedObject.Length,
-            Sha256 = Convert.FromHexString(storedObject.Sha256),
-            CreatedAt = now
-        };
-        db.Files.Add(file);
-        user.AvatarFileId = file.Id;
-        user.AvatarFile = file;
+        user.AvatarFileId = fileId;
         user.UpdatedAt = now;
-        if (previousFileId is { } previous && previous != file.Id)
+        if (previousFileId is { } previous && previous != fileId)
             await outbox.PublishAsync(new CleanupFile(previous));
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return new UserAvatarReplacement(ToProfile(user), previousFileId);
     }

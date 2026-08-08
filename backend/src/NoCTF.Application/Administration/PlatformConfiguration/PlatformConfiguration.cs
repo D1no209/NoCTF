@@ -32,7 +32,7 @@ public interface IPlatformConfigurationStore
         CancellationToken cancellationToken);
 
     Task<PlatformLogoReplacement?> ReplaceLogoAsync(
-        StoredObject storedObject,
+        Guid fileId,
         long expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
@@ -67,7 +67,8 @@ public sealed record PlatformLogoContent(Stream Content, string ContentType);
 
 public sealed class ManagePlatformConfiguration(
     IPlatformConfigurationStore settings,
-    IObjectStorage objects)
+    IObjectStorage objects,
+    ManagedFileUploads uploads)
 {
     public Task<PlatformConfigurationView> GetAsync(CancellationToken ct = default) =>
         settings.GetAsync(ct);
@@ -114,40 +115,41 @@ public sealed class ManagePlatformConfiguration(
             || !string.Equals(contentType, image.Value.ContentType, StringComparison.OrdinalIgnoreCase))
             return new(PlatformLogoUpdateState.InvalidFormat);
 
-        var objectKey = $"platform/logo/{Guid.CreateVersion7(now):N}.{image.Value.Extension}";
-        StoredObject stored;
+        var fileId = Guid.CreateVersion7(now);
+        var objectKey = $"platform/logo/{fileId:N}.{image.Value.Extension}";
+        ManagedFileUpload uploaded;
         await using (var stream = new MemoryStream(content.ToArray(), writable: false))
         {
-            stored = await objects.PutAsync(
+            uploaded = await uploads.CreateAsync(
+                fileId,
                 objectKey,
                 fileName,
                 image.Value.ContentType,
                 stream,
+                now,
                 ct);
         }
 
         PlatformLogoReplacement? replacement;
+        var attached = false;
         try
         {
             replacement = await settings.ReplaceLogoAsync(
-                stored,
+                uploaded.FileId,
                 expectedRevision,
                 now,
                 ct);
+            attached = replacement is not null;
         }
-        catch
+        finally
         {
-            await TryDeleteAsync(stored.ObjectKey);
-            throw;
+            if (!attached)
+                await uploads.AbandonAsync(uploaded.FileId);
         }
 
-        if (replacement is null)
-        {
-            await TryDeleteAsync(stored.ObjectKey);
-            return new(PlatformLogoUpdateState.RevisionConflict);
-        }
-
-        return new(PlatformLogoUpdateState.Updated, replacement.Configuration);
+        return replacement is null
+            ? new(PlatformLogoUpdateState.RevisionConflict)
+            : new(PlatformLogoUpdateState.Updated, replacement.Configuration);
     }
 
     public async Task<PlatformLogoContent?> GetLogoAsync(CancellationToken ct = default)
@@ -163,18 +165,6 @@ public sealed class ManagePlatformConfiguration(
         return new(
             await objects.OpenReadAsync(file.ObjectKey, ct),
             file.ContentType);
-    }
-
-    private async Task TryDeleteAsync(string objectKey)
-    {
-        try
-        {
-            await objects.DeleteAsync(objectKey, CancellationToken.None);
-        }
-        catch
-        {
-            // The database remains authoritative; orphan cleanup is best effort.
-        }
     }
 
     private static RasterImage? DetectImage(ReadOnlySpan<byte> content)

@@ -8,7 +8,8 @@ namespace NoCTF.Infrastructure.Storage;
 
 public sealed class BusinessFileReferenceStore(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox) : IBusinessFileReferenceStore
+    ITransactionalMessageOutbox outbox,
+    FileReferenceLock fileLock) : IBusinessFileReferenceStore
 {
     public async Task<BusinessFileReferenceResult> ReplaceTeamAvatarAsync(
         Guid actorUserId,
@@ -16,7 +17,6 @@ public sealed class BusinessFileReferenceStore(
         Guid competitionId,
         Guid teamId,
         Guid fileId,
-        StoredObject stored,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -30,10 +30,11 @@ public sealed class BusinessFileReferenceStore(
         if (!isAdministrator && team.CaptainId != actorUserId
             && !await CanManageCompetitionAsync(competitionId, actorUserId, ct))
             return new(BusinessFileReferenceState.Forbidden);
+        if (!await fileLock.AcquireAsync(db, fileId, ct))
+            return new(BusinessFileReferenceState.NotFound);
 
         var previousFileId = team.AvatarFileId;
-        var file = CreateFile(fileId, stored, now);
-        db.Files.Add(file);
+        var file = await db.Files.SingleAsync(candidate => candidate.Id == fileId, ct);
         team.AvatarFileId = file.Id;
         await db.SaveChangesAsync(ct);
         if (previousFileId is { } previous && previous != file.Id)
@@ -90,7 +91,6 @@ public sealed class BusinessFileReferenceStore(
         bool isAdministrator,
         Guid competitionId,
         Guid fileId,
-        StoredObject stored,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -102,10 +102,11 @@ public sealed class BusinessFileReferenceStore(
         if (!isAdministrator && competition.OwnerId != actorUserId
             && !competition.ManagerIds.Contains(actorUserId))
             return new(BusinessFileReferenceState.Forbidden);
+        if (!await fileLock.AcquireAsync(db, fileId, ct))
+            return new(BusinessFileReferenceState.NotFound);
 
         var previousFileId = competition.PosterFileId;
-        var file = CreateFile(fileId, stored, now);
-        db.Files.Add(file);
+        var file = await db.Files.SingleAsync(candidate => candidate.Id == fileId, ct);
         competition.PosterFileId = file.Id;
         competition.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
@@ -163,21 +164,6 @@ public sealed class BusinessFileReferenceStore(
             && competition.DeletedAt == null
             && (competition.OwnerId == actorUserId
                 || competition.ManagerIds.Contains(actorUserId)), ct);
-
-    private static StoredFile CreateFile(
-        Guid fileId,
-        StoredObject stored,
-        DateTimeOffset now) =>
-        new()
-        {
-            Id = fileId,
-            ObjectKey = stored.ObjectKey,
-            FileName = stored.FileName,
-            ContentType = stored.ContentType,
-            ByteLength = stored.Length,
-            Sha256 = Convert.FromHexString(stored.Sha256),
-            CreatedAt = now
-        };
 
     private static BusinessFileReference Map(StoredFile file) =>
         new(file.Id, file.ObjectKey, file.FileName, file.ContentType);

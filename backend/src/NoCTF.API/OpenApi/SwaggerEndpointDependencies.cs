@@ -102,7 +102,7 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
         Task.FromResult<UserProfile?>(null);
     public Task<UserAvatarReplacement?> ReplaceAvatarAsync(
         Guid userId,
-        StoredObject storedObject,
+        Guid fileId,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult<UserAvatarReplacement?>(null);

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Storage;
@@ -72,8 +73,17 @@ public sealed class FileReferenceLock
     public async Task<bool> AcquireAsync(
         NoCtfDbContext db,
         Guid fileId,
-        CancellationToken cancellationToken) =>
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT 1 FROM files WHERE id = {fileId} FOR UPDATE",
-            cancellationToken) == 1;
+        CancellationToken cancellationToken)
+    {
+        var transaction = db.Database.CurrentTransaction
+            ?? throw new InvalidOperationException("A transaction is required to lock a file reference.");
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.Transaction = transaction.GetDbTransaction();
+        command.CommandText = "SELECT 1 FROM files WHERE id = @file_id FOR UPDATE";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "file_id";
+        parameter.Value = fileId;
+        command.Parameters.Add(parameter);
+        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+    }
 }

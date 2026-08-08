@@ -2,6 +2,7 @@ using NSubstitute;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Identity;
+using System.Security.Cryptography;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -85,10 +86,14 @@ public sealed class UserProfileManagementTests
     {
         var users = Substitute.For<IUserAuthenticationStore>();
         var objects = Substitute.For<IObjectStorage>();
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
         var images = Substitute.For<IAvatarImageProcessor>();
         images.Process(Arg.Any<ReadOnlyMemory<byte>>())
             .Returns(AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage));
-        var replace = new ReplaceCurrentUserAvatar(users, objects, images);
+        var replace = new ReplaceCurrentUserAvatar(
+            users,
+            new ManagedFileUploads(registry, objects),
+            images);
 
         var result = await replace.ExecuteAsync(
             UserId,
@@ -107,11 +112,12 @@ public sealed class UserProfileManagementTests
     {
         var users = Substitute.For<IUserAuthenticationStore>();
         var objects = Substitute.For<IObjectStorage>();
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
         var images = Substitute.For<IAvatarImageProcessor>();
-        const string storedKey = "users/new-avatar.png";
-        var previousFileId = Guid.NewGuid();
         var currentFileId = Guid.NewGuid();
         var normalized = new byte[] { 9, 8, 7 };
+        Guid registeredFileId = default;
+        Guid attachedFileId = default;
         images.Process(Arg.Any<ReadOnlyMemory<byte>>())
             .Returns(AvatarImageProcessingResult.Success(new(
                 normalized,
@@ -124,14 +130,28 @@ public sealed class UserProfileManagementTests
                 "image/webp",
                 Arg.Any<Stream>(),
                 Arg.Any<CancellationToken>())
-            .Returns(new StoredObject(storedKey, "avatar.webp", "image/webp", 3, new string('A', 64)));
-        users.ReplaceAvatarAsync(
-                UserId,
-                Arg.Is<StoredObject>(value => value != null && value.ObjectKey == storedKey),
+            .Returns(call => new StoredObject(
+                call.ArgAt<string>(0),
+                "avatar.webp",
+                "image/webp",
+                3,
+                Convert.ToHexString(SHA256.HashData(normalized))));
+        registry.RegisterAsync(
+                Arg.Do<Guid>(value => registeredFileId = value),
+                Arg.Any<StoredObject>(),
                 Now,
                 Arg.Any<CancellationToken>())
-            .Returns(new UserAvatarReplacement(Profile(avatarFileId: currentFileId), previousFileId));
-        var replace = new ReplaceCurrentUserAvatar(users, objects, images);
+            .Returns(Task.CompletedTask);
+        users.ReplaceAvatarAsync(
+                UserId,
+                Arg.Do<Guid>(value => attachedFileId = value),
+                Now,
+                Arg.Any<CancellationToken>())
+            .Returns(new UserAvatarReplacement(Profile(avatarFileId: currentFileId), Guid.NewGuid()));
+        var replace = new ReplaceCurrentUserAvatar(
+            users,
+            new ManagedFileUploads(registry, objects),
+            images);
 
         var result = await replace.ExecuteAsync(
             UserId,
@@ -141,14 +161,14 @@ public sealed class UserProfileManagementTests
             Now);
 
         await Assert.That(result.Profile).IsNotNull();
+        await Assert.That(registeredFileId).IsNotEqualTo(Guid.Empty);
+        await Assert.That(attachedFileId).IsEqualTo(registeredFileId);
         await users.Received(1).ReplaceAvatarAsync(
             UserId,
-            Arg.Is<StoredObject>(value => value != null && value.ObjectKey == storedKey),
+            Arg.Any<Guid>(),
             Now,
             Arg.Any<CancellationToken>());
-        await objects.DidNotReceive().DeleteAsync(
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>());
+        await registry.DidNotReceiveWithAnyArgs().AbandonAsync(default, default);
     }
 
     [Test]
@@ -156,6 +176,7 @@ public sealed class UserProfileManagementTests
     {
         var users = Substitute.For<IUserAuthenticationStore>();
         var objects = Substitute.For<IObjectStorage>();
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
         var images = Substitute.For<IAvatarImageProcessor>();
         images.Process(Arg.Any<ReadOnlyMemory<byte>>())
             .Returns(AvatarImageProcessingResult.Success(new(
@@ -164,7 +185,10 @@ public sealed class UserProfileManagementTests
                 "webp",
                 "image/png")));
 
-        var result = await new ReplaceCurrentUserAvatar(users, objects, images).ExecuteAsync(
+        var result = await new ReplaceCurrentUserAvatar(
+            users,
+            new ManagedFileUploads(registry, objects),
+            images).ExecuteAsync(
             UserId,
             "avatar.jpg",
             "image/jpeg",

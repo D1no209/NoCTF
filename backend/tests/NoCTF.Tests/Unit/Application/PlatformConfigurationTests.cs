@@ -1,6 +1,7 @@
 using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Storage;
 using NSubstitute;
+using System.Security.Cryptography;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -23,9 +24,11 @@ public sealed class PlatformConfigurationTests
                 null,
                 4,
                 now));
+        var objects = Substitute.For<IObjectStorage>();
         var configuration = new ManagePlatformConfiguration(
             store,
-            Substitute.For<IObjectStorage>());
+            objects,
+            Uploads(objects));
 
         var result = await configuration.UpdateAsync(
             "  NoCTF Arena  ",
@@ -46,9 +49,11 @@ public sealed class PlatformConfigurationTests
     public async Task Logo_replacement_rejects_mismatched_content_without_storage_write()
     {
         var objects = Substitute.For<IObjectStorage>();
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
         var configuration = new ManagePlatformConfiguration(
             Substitute.For<IPlatformConfigurationStore>(),
-            objects);
+            objects,
+            new ManagedFileUploads(registry, objects));
 
         var result = await configuration.ReplaceLogoAsync(
             "logo.png",
@@ -72,6 +77,10 @@ public sealed class PlatformConfigurationTests
         var now = DateTimeOffset.UtcNow;
         var store = Substitute.For<IPlatformConfigurationStore>();
         var objects = Substitute.For<IObjectStorage>();
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        Guid registeredFileId = default;
+        Guid attachedFileId = default;
         objects.PutAsync(
                 Arg.Any<string>(),
                 "logo.png",
@@ -83,9 +92,15 @@ public sealed class PlatformConfigurationTests
                 "logo.png",
                 "image/png",
                 8,
-                "sha256"));
-        store.ReplaceLogoAsync(
+                Convert.ToHexString(SHA256.HashData(png))));
+        registry.RegisterAsync(
+                Arg.Do<Guid>(value => registeredFileId = value),
                 Arg.Any<StoredObject>(),
+                now,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        store.ReplaceLogoAsync(
+                Arg.Do<Guid>(value => attachedFileId = value),
                 2,
                 now,
                 Arg.Any<CancellationToken>())
@@ -97,8 +112,10 @@ public sealed class PlatformConfigurationTests
                     3,
                     now),
                 Guid.NewGuid()));
-        var configuration = new ManagePlatformConfiguration(store, objects);
-        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        var configuration = new ManagePlatformConfiguration(
+            store,
+            objects,
+            new ManagedFileUploads(registry, objects));
 
         var result = await configuration.ReplaceLogoAsync(
             "logo.png",
@@ -108,8 +125,11 @@ public sealed class PlatformConfigurationTests
             now);
 
         await Assert.That(result.State).IsEqualTo(PlatformLogoUpdateState.Updated);
-        await objects.DidNotReceive().DeleteAsync(
-            Arg.Any<string>(),
-            Arg.Any<CancellationToken>());
+        await Assert.That(registeredFileId).IsNotEqualTo(Guid.Empty);
+        await Assert.That(attachedFileId).IsEqualTo(registeredFileId);
+        await registry.DidNotReceiveWithAnyArgs().AbandonAsync(default, default);
     }
+
+    private static ManagedFileUploads Uploads(IObjectStorage objects) =>
+        new(Substitute.For<IManagedFileUploadRegistry>(), objects);
 }
