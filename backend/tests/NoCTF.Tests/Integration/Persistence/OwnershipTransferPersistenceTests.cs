@@ -8,6 +8,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Challenges.Attachments;
 using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Management;
@@ -525,6 +526,18 @@ public sealed class OwnershipTransferPersistenceTests
                 """,
                 cancellationToken);
 
+            var attachmentFileId = Guid.CreateVersion7(now.AddSeconds(1));
+            db.Files.Add(new StoredFile
+            {
+                Id = attachmentFileId,
+                ObjectKey = $"attachments/{attachmentId:N}",
+                FileName = "serialized.txt",
+                ContentType = "text/plain",
+                ByteLength = 10,
+                Sha256 = new byte[32],
+                CreatedAt = now.AddMinutes(1)
+            });
+            await db.SaveChangesAsync(cancellationToken);
             await using var attachmentDb = new NoCtfDbContext(options);
             await using var transferDb = new NoCtfDbContext(options);
             var attachmentTask = new ChallengeAttachmentStore(attachmentDb).AddAsync(
@@ -532,12 +545,7 @@ public sealed class OwnershipTransferPersistenceTests
                 previousOwnerId,
                 true,
                 attachmentId,
-                new StoredObject(
-                    $"challenges/{challengeId:N}/attachments/{attachmentId:N}",
-                    "serialized.txt",
-                    "text/plain",
-                    10,
-                    new string('0', 64)),
+                attachmentFileId,
                 now.AddMinutes(1),
                 cancellationToken);
             await WaitForPostgresSleepAsync(db, cancellationToken);

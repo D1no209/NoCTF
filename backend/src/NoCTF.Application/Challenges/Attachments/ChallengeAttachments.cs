@@ -51,7 +51,7 @@ public interface IChallengeAttachmentStore
         Guid actorId,
         bool isAdministrator,
         Guid attachmentId,
-        StoredObject storedObject,
+        Guid fileId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<bool> AttachmentIdExistsAsync(
@@ -86,7 +86,7 @@ public interface IChallengeAttachmentStore
 
 public sealed class ManageChallengeAttachments(
     IChallengeAttachmentStore store,
-    IObjectStorage objects)
+    ManagedFileUploads uploads)
 {
     public Task<IReadOnlyList<ChallengeAttachmentView>?> ListAsync(
         Guid challengeId,
@@ -115,34 +115,33 @@ public sealed class ManageChallengeAttachments(
             return OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>.Failure(
                 ChallengeAttachmentFailureCode.ResourceIdConflict,
                 "The requested attachment ID is already in use.");
-        var objectKey = $"challenges/{challengeId:N}/attachments/{attachmentId:N}";
-        var stored = await objects.PutAsync(
-            objectKey,
+        var fileId = Guid.CreateVersion7(now);
+        var uploaded = await uploads.CreateAsync(
+            fileId,
+            $"attachments/{attachmentId:N}",
             fileName.Trim(),
             string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType,
             content,
+            now,
             ct);
         AddChallengeAttachmentState saved;
         var added = false;
         try
         {
             saved = await store.AddAsync(
-                challengeId, actorId, isAdministrator, attachmentId, stored, now, ct);
+                challengeId,
+                actorId,
+                isAdministrator,
+                attachmentId,
+                uploaded.FileId,
+                now,
+                ct);
             added = saved == AddChallengeAttachmentState.Added;
         }
         finally
         {
             if (!added)
-            {
-                try
-                {
-                    await objects.DeleteAsync(stored.ObjectKey, CancellationToken.None);
-                }
-                catch
-                {
-                    // Compensating cleanup is best-effort and must preserve the primary outcome.
-                }
-            }
+                await uploads.AbandonAsync(uploaded.FileId);
         }
         if (saved != AddChallengeAttachmentState.Added)
         {
@@ -157,10 +156,10 @@ public sealed class ManageChallengeAttachments(
         return OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>.Success(new(
             attachmentId,
             challengeId,
-            stored.FileName,
-            stored.ContentType,
-            stored.Length,
-            stored.Sha256,
+            uploaded.StoredObject.FileName,
+            uploaded.StoredObject.ContentType,
+            uploaded.StoredObject.Length,
+            uploaded.StoredObject.Sha256,
             null,
             now));
     }

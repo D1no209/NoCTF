@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Identity;
@@ -17,6 +18,59 @@ namespace NoCTF.Tests.Integration.Persistence;
 [NotInParallel]
 public sealed class FileCleanupPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Registration_persists_a_delayed_cleanup_lease_and_abandonment_accelerates_it(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_file_registry")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.Parse("2026-08-08T00:00:00Z");
+            var fileId = Guid.CreateVersion7(now);
+            var outbox = new RecordingOutbox();
+
+            await using (var db = new NoCtfDbContext(options))
+            {
+                await db.Database.MigrateAsync(cancellationToken);
+                var registry = new ManagedFileUploadRegistry(
+                    db,
+                    outbox,
+                    NullLogger<ManagedFileUploadRegistry>.Instance);
+                await registry.RegisterAsync(
+                    fileId,
+                    new StoredObject(
+                        "attachments/leased",
+                        "leased.txt",
+                        "text/plain",
+                        5,
+                        new string('0', 64)),
+                    now,
+                    cancellationToken);
+
+                await Assert.That(await db.Files.AnyAsync(
+                    candidate => candidate.Id == fileId,
+                    cancellationToken)).IsTrue();
+                var scheduled = outbox.Scheduled.Single();
+                await Assert.That(scheduled.Message).IsEqualTo(new CleanupFile(fileId));
+                await Assert.That(scheduled.At).IsEqualTo(now.AddHours(24));
+
+                await registry.AbandonAsync(fileId, cancellationToken);
+                await Assert.That(outbox.Published.Single())
+                    .IsEqualTo(new CleanupFile(fileId));
+            }
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Cleanup_preserves_shared_references_and_retries_storage_failures(
@@ -221,5 +275,41 @@ public sealed class FileCleanupPersistenceTests
 
             return inner.DeleteAsync(objectKey, cancellationToken);
         }
+    }
+
+    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    {
+        public List<object> Published { get; } = [];
+        public List<(object Message, DateTimeOffset At)> Scheduled { get; } = [];
+
+        public ValueTask PublishAsync<T>(T message)
+        {
+            Published.Add(message!);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt)
+        {
+            Scheduled.Add((message!, scheduledAt));
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask PublishToRunnerPoolAsync<T>(T message)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
+            ValueTask.CompletedTask;
+
+        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
+            ValueTask.CompletedTask;
+
+        public ValueTask PublishToRunnerNodeAsync<T>(T message)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
+            ValueTask.CompletedTask;
+
+        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
+            ValueTask.CompletedTask;
+
+        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
     }
 }

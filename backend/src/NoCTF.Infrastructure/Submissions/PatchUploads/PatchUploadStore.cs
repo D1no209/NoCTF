@@ -7,8 +7,8 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.Submissions.Intake;
-using NoCTF.Domain.Storage;
 
 namespace NoCTF.Infrastructure.Submissions.PatchUploads;
 
@@ -16,6 +16,7 @@ public sealed class PatchUploadStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
     SubmissionAttemptCriticalSection attemptCriticalSection,
+    FileReferenceLock fileLock,
     ILogger<PatchUploadStore> logger) : IPatchUploadStore
 {
     public PatchUploadStore(
@@ -26,6 +27,7 @@ public sealed class PatchUploadStore(
             db,
             outbox,
             new SubmissionAttemptCriticalSection(new LocalCriticalSectionRegistry()),
+            new FileReferenceLock(),
             logger) { }
 
     public async Task<PatchUploadScope?> ResolveScopeAsync(
@@ -64,11 +66,7 @@ public sealed class PatchUploadStore(
     public async Task<bool> SaveAsync(
         Guid patchUploadId,
         PatchUploadScope scope,
-        string objectKey,
-        string fileName,
-        string contentType,
-        long byteLength,
-        byte[] sha256,
+        Guid fileId,
         DateTimeOffset uploadedAt,
         CancellationToken ct)
     {
@@ -81,6 +79,8 @@ public sealed class PatchUploadStore(
             scope.CompetitionChallengeId,
             SubmissionKind.Fix,
             ct);
+        if (!await fileLock.AcquireAsync(db, fileId, ct))
+            return false;
 
         var previous = await db.PatchUploads.AsNoTracking()
             .Where(upload => upload.TeamId == scope.TeamId
@@ -98,17 +98,6 @@ public sealed class PatchUploadStore(
                 return false;
         }
 
-        var file = new StoredFile
-        {
-            Id = Guid.CreateVersion7(uploadedAt),
-            ObjectKey = objectKey,
-            FileName = fileName,
-            ContentType = contentType,
-            ByteLength = byteLength,
-            Sha256 = sha256,
-            CreatedAt = uploadedAt
-        };
-        db.Files.Add(file);
         db.PatchUploads.Add(new PatchUpload
         {
             Id = patchUploadId,
@@ -116,8 +105,7 @@ public sealed class PatchUploadStore(
             CompetitionChallengeId = scope.CompetitionChallengeId,
             TeamId = scope.TeamId,
             UploadedByUserId = scope.UserId,
-            FileId = file.Id,
-            File = file,
+            FileId = fileId,
             UploadedAt = uploadedAt
         });
         try

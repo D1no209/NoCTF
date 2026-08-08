@@ -12,6 +12,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Storage;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Challenges.Attachments;
 using NoCTF.Infrastructure.Challenges.Bank;
@@ -143,18 +144,25 @@ public sealed class GitOpsPersistenceContractTests
                 cancellationToken))!.ActiveCompetitionReferenceCount).IsEqualTo(1);
 
             var attachmentId = Guid.CreateVersion7(now.AddMilliseconds(5));
+            var attachmentFileId = Guid.CreateVersion7(now.AddMilliseconds(6));
+            db.Files.Add(new StoredFile
+            {
+                Id = attachmentFileId,
+                ObjectKey = $"attachments/{attachmentId:N}",
+                FileName = "handout.txt",
+                ContentType = "text/plain",
+                ByteLength = 7,
+                Sha256 = new byte[32],
+                CreatedAt = now
+            });
+            await db.SaveChangesAsync(cancellationToken);
             var attachmentStore = new ChallengeAttachmentStore(db);
             await Assert.That(await attachmentStore.AddAsync(
                 challengeId,
                 botId,
                 false,
                 attachmentId,
-                new StoredObject(
-                    $"challenges/{challengeId:N}/attachments/{attachmentId:N}",
-                    "handout.txt",
-                    "text/plain",
-                    7,
-                    new string('0', 64)),
+                attachmentFileId,
                 now,
                 cancellationToken)).IsEqualTo(AddChallengeAttachmentState.Added);
             await Assert.That(await attachmentStore.DeleteAsync(

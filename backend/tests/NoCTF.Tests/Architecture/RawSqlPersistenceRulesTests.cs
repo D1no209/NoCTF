@@ -36,6 +36,11 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "WITH RECURSIVE"
             ],
+            ["backend/src/NoCTF.Infrastructure/Storage/ManagedFileUploadRegistry.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Submissions/Processing/SubmissionProcessor.cs"] =
             [
                 "ExecuteSqlInterpolated",
