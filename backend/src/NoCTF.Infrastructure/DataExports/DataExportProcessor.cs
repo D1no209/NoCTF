@@ -583,8 +583,12 @@ public sealed class DataExportProcessor(
             .ToArrayAsync(cancellationToken);
         var ids = incidents.Select(item => item.Id).ToArray();
         var resolutions = await db.CompetitionEvents.AsNoTracking()
-            .Where(item => item.ScoringEventId != null
-                && ids.Contains(item.ScoringEventId.Value)
+            .Where(item => item.CompetitionId == competitionId
+                && (item.SubjectType == EntityReferenceKind.ScoringEvent
+                    && ids.Contains(item.SubjectId)
+                    || item.RelatedType == EntityReferenceKind.ScoringEvent
+                    && item.RelatedId != null
+                    && ids.Contains(item.RelatedId.Value))
                 && CheatResolutionKinds.Contains(item.Kind))
             .OrderBy(item => item.OccurredAt)
             .ThenBy(item => item.Id)

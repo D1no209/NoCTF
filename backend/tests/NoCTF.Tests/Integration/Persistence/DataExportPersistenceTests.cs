@@ -1,9 +1,11 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Application.DataExports;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
@@ -12,6 +14,8 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.DataExports;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Administration;
@@ -67,14 +71,14 @@ public sealed class DataExportPersistenceTests
 
                 await using (var verify = new NoCtfDbContext(options))
                 {
-                    var job = await verify.DataExports.SingleAsync(
+                    var job = await verify.DataExports.Include(item => item.File).SingleAsync(
                         item => item.Id == defaultExportId,
                         cancellationToken);
                     await Assert.That(job.Status).IsEqualTo(DataExportStatus.Available);
                     await Assert.That(job.ExpiresAt).IsEqualTo(now.AddHours(24));
-                    await Assert.That(job.Length!.Value).IsGreaterThan(0);
+                    await Assert.That(job.File!.ByteLength).IsGreaterThan(0);
                     await using var archiveStream = await storage.OpenReadAsync(
-                        job.ObjectKey!,
+                        job.File.ObjectKey,
                         cancellationToken);
                     using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read);
                     var names = archive.Entries.Select(entry => entry.FullName).ToArray();
@@ -137,11 +141,11 @@ public sealed class DataExportPersistenceTests
 
                 await using (var verify = new NoCtfDbContext(options))
                 {
-                    var job = await verify.DataExports.SingleAsync(
+                    var job = await verify.DataExports.Include(item => item.File).SingleAsync(
                         item => item.Id == protectedExportId,
                         cancellationToken);
                     await using var archiveStream = await storage.OpenReadAsync(
-                        job.ObjectKey!,
+                        job.File!.ObjectKey,
                         cancellationToken);
                     using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read);
                     var challenges = await ReadEntryAsync(
@@ -184,14 +188,14 @@ public sealed class DataExportPersistenceTests
                 }
                 await using (var verify = new NoCtfDbContext(options))
                 {
-                    var job = await verify.DataExports.SingleAsync(
+                    var job = await verify.DataExports.Include(item => item.File).SingleAsync(
                         item => item.Id == platformExportId,
                         cancellationToken);
-                    await Assert.That(job.ContentType).IsEqualTo("application/x-ndjson");
+                    await Assert.That(job.File!.ContentType).IsEqualTo("application/x-ndjson");
                     await using var stream = await storage.OpenReadAsync(
-                        job.ObjectKey!,
+                        job.File.ObjectKey,
                         cancellationToken);
-                    using var reader = new StreamReader(stream, Encoding.UTF8);
+                    using var reader = new StreamReader(stream, Encoding.UTF8, true);
                     var auditExport = await reader.ReadToEndAsync(cancellationToken);
                     await Assert.That(auditExport).Contains("UserAccountLifecycle");
                     await Assert.That(auditExport).Contains("CompetitionEvent");
@@ -205,12 +209,12 @@ public sealed class DataExportPersistenceTests
                 }
                 await using (var verify = new NoCtfDbContext(options))
                 {
-                    var expired = await verify.DataExports.SingleAsync(
+                    var expired = await verify.DataExports.Include(item => item.File).SingleAsync(
                         item => item.Id == defaultExportId,
                         cancellationToken);
                     await Assert.That(expired.Status).IsEqualTo(DataExportStatus.Expired);
-                    await Assert.That(expired.ObjectKey).IsNull();
-                    await Assert.That(expired.Sha256).IsNotNull();
+                    await Assert.That(expired.FileId).IsNull();
+                    await Assert.That(expired.File).IsNull();
                 }
 
                 time.Advance(TimeSpan.FromDays(31));
@@ -337,7 +341,7 @@ public sealed class DataExportPersistenceTests
                     await Assert.That(failed.Status).IsEqualTo(DataExportStatus.Failed);
                     await Assert.That(failed.FailureCode)
                         .IsEqualTo(DataExportFailureCode.SizeLimitExceeded);
-                    await Assert.That(failed.ObjectKey).IsNull();
+                    await Assert.That(failed.FileId).IsNull();
                 }
             }
             finally
@@ -452,18 +456,6 @@ public sealed class DataExportPersistenceTests
             Status = CompetitionStatus.Running,
             CreatedAt = now,
             UpdatedAt = now,
-            LifecycleAudits =
-            [
-                new CompetitionLifecycleAudit
-                {
-                    Id = Guid.CreateVersion7(now.AddMilliseconds(10)),
-                    CompetitionId = ids.CompetitionId,
-                    From = CompetitionStatus.Published,
-                    To = CompetitionStatus.Running,
-                    ActorId = ids.OwnerId,
-                    OccurredAt = now
-                }
-            ]
         });
         db.Challenges.Add(new Challenge
         {
@@ -492,12 +484,10 @@ public sealed class DataExportPersistenceTests
                 new CompetitionChallengeHint
                 {
                     Id = Guid.CreateVersion7(now.AddMilliseconds(11)),
-                    CompetitionChallengeId = ids.CompetitionChallengeId,
                     Content = "Historical hint",
                     Cost = 10,
-                    CreatedAt = now,
-                    UpdatedAt = now,
-                    DeletedAt = now.AddMinutes(9)
+                    PublishedAt = now,
+                    HiddenAt = now.AddMinutes(9)
                 }
             ]
         });
@@ -545,16 +535,33 @@ public sealed class DataExportPersistenceTests
         db.CompetitionEvents.AddRange(
             new CompetitionEvent
             {
+                Id = Guid.CreateVersion7(now.AddMilliseconds(10)),
+                CompetitionId = ids.CompetitionId,
+                Kind = CompetitionEventKind.CompetitionLifecycleChanged,
+                Level = CompetitionEventLevel.Information,
+                Visibility = CompetitionEventVisibility.Public,
+                ActorUserId = ids.OwnerId,
+                SubjectType = EntityReferenceKind.Competition,
+                SubjectId = ids.CompetitionId,
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    competitionStatus = CompetitionStatus.Running
+                }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                OccurredAt = now
+            },
+            new CompetitionEvent
+            {
                 Id = Guid.CreateVersion7(now.AddMilliseconds(12)),
                 CompetitionId = ids.CompetitionId,
                 Kind = CompetitionEventKind.CheatIncidentDetected,
                 Level = CompetitionEventLevel.Warning,
                 Visibility = CompetitionEventVisibility.Staff,
                 ActorUserId = ids.MemberId,
-                TeamId = ids.SourceTeamId,
-                CompetitionChallengeId = ids.CompetitionChallengeId,
-                SubmissionId = ids.SubmissionId,
-                ScoringEventId = ids.ScoringEventId,
+                SubjectType = EntityReferenceKind.ScoringEvent,
+                SubjectId = ids.ScoringEventId,
+                RelatedType = EntityReferenceKind.Team,
+                RelatedId = ids.SourceTeamId,
                 OccurredAt = now
             },
             new CompetitionEvent
@@ -565,22 +572,35 @@ public sealed class DataExportPersistenceTests
                 Level = CompetitionEventLevel.Information,
                 Visibility = CompetitionEventVisibility.Staff,
                 ActorUserId = ids.AdministratorId,
-                TeamId = ids.SourceTeamId,
-                CompetitionChallengeId = ids.CompetitionChallengeId,
-                SubmissionId = ids.SubmissionId,
-                ScoringEventId = ids.ScoringEventId,
-                Reason = "False positive",
+                SubjectType = EntityReferenceKind.ScoringEvent,
+                SubjectId = ids.ScoringEventId,
+                RelatedType = EntityReferenceKind.Team,
+                RelatedId = ids.SourceTeamId,
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    reason = "False positive"
+                }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
                 OccurredAt = now.AddMinutes(1)
             });
-        db.UserAccountLifecycleAudits.Add(new UserAccountLifecycleAudit
+        db.Notifications.Add(new Notification
         {
             Id = Guid.CreateVersion7(now.AddMilliseconds(14)),
-            TargetUserId = ids.MemberId,
-            TargetUserName = "export-member",
-            ActorUserId = ids.AdministratorId,
-            Action = UserAccountLifecycleAction.Disabled,
-            Reason = "Historical account action",
-            OccurredAt = now.AddMinutes(2)
+            SourceType = NotificationSourceType.User,
+            SourceId = ids.AdministratorId,
+            TargetType = NotificationTargetType.PlatformAdministrators,
+            TargetId = Guid.Empty,
+            Kind = NotificationKind.UserAccountLifecycleChanged,
+            ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
+                1,
+                ids.MemberId,
+                "export-member",
+                UserAccountLifecycleAction.Disabled,
+                "Historical account action",
+                false), new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            RelatedType = EntityReferenceKind.User,
+            RelatedId = ids.MemberId,
+            SentAt = now.AddMinutes(2)
         });
         await db.SaveChangesAsync(cancellationToken);
         return ids;

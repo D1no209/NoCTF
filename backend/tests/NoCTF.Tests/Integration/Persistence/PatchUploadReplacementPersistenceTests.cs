@@ -12,6 +12,7 @@ using NoCTF.Application.Submissions.PatchUploads;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Storage;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Registration;
@@ -29,6 +30,7 @@ using Wolverine.Postgresql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
+[Category("PatchUploadReplacement")]
 [NotInParallel]
 public sealed class PatchUploadReplacementPersistenceTests
 {
@@ -89,6 +91,7 @@ public sealed class PatchUploadReplacementPersistenceTests
                 {
                     var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
                     var uploads = await db.PatchUploads.AsNoTracking()
+                        .Include(upload => upload.File)
                         .Where(upload =>
                             upload.TeamId == fixture.TeamId
                             && upload.CompetitionChallengeId == fixture.CompetitionChallengeId)
@@ -309,7 +312,7 @@ public sealed class PatchUploadReplacementPersistenceTests
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
             options.ListenToPostgresqlQueue("patch-upload-cleanup-test")
                 .UseDurableInbox();
-            options.PublishMessage<CleanupObject>()
+            options.PublishMessage<CleanupFile>()
                 .ToPostgresqlQueue("patch-upload-cleanup-test");
         });
         return builder.Build();
@@ -398,6 +401,17 @@ public sealed class PatchUploadReplacementPersistenceTests
         await using var scope = host.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         var patchUploadId = Guid.CreateVersion7(fixture.Now);
+        var file = new StoredFile
+        {
+            Id = Guid.CreateVersion7(fixture.Now),
+            ObjectKey = stored.ObjectKey,
+            FileName = stored.FileName,
+            ContentType = stored.ContentType,
+            ByteLength = stored.Length,
+            Sha256 = Convert.FromHexString(stored.Sha256),
+            CreatedAt = fixture.Now
+        };
+        db.Files.Add(file);
         db.PatchUploads.Add(new PatchUpload
         {
             Id = patchUploadId,
@@ -405,11 +419,8 @@ public sealed class PatchUploadReplacementPersistenceTests
             CompetitionChallengeId = fixture.CompetitionChallengeId,
             TeamId = fixture.TeamId,
             UploadedByUserId = fixture.MemberId,
-            ObjectKey = stored.ObjectKey,
-            OriginalFileName = stored.FileName,
-            ContentType = stored.ContentType,
-            ByteLength = stored.Length,
-            Sha256 = Convert.FromHexString(stored.Sha256),
+            FileId = file.Id,
+            File = file,
             UploadedAt = fixture.Now
         });
         await db.SaveChangesAsync(cancellationToken);
@@ -574,8 +585,9 @@ public sealed class PatchUploadReplacementPersistenceTests
 public sealed class PatchUploadCleanupHandler
 {
     public static Task Handle(
-        CleanupObject message,
+        CleanupFile message,
+        NoCtfDbContext db,
         IObjectStorage objects,
         CancellationToken cancellationToken) =>
-        BackendMessageHandlers.Handle(message, objects, cancellationToken);
+        BackendMessageHandlers.Handle(message, db, objects, cancellationToken);
 }
