@@ -2,6 +2,7 @@
 import { toast } from 'vue-sonner'
 import {
   adminExtendTeamRuntime,
+  adminForceTerminateRuntime,
   adminGetRuntime,
   adminListCompetitionChallenges,
   adminListRuntimes,
@@ -22,6 +23,7 @@ import { useCompetitionAdmin } from '~/lib/admin-competition'
 definePageMeta({ middleware: 'auth' })
 
 const { competitionId, canWrite } = useCompetitionAdmin()
+const { isAdministrator } = useAuth()
 
 // ---- Reference data ----
 const challengeOptions = ref<{ id: string; title: string }[]>([])
@@ -171,6 +173,47 @@ async function submitTermination() {
   }
 }
 
+// ---- Administrator-only stuck runtime cleanup ----
+const forceTerminateDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
+const forceTerminateReason = ref('')
+const forceTerminateConfirmed = ref(false)
+const forceTerminatePending = ref(false)
+
+function openForceTermination(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse) {
+  forceTerminateReason.value = ''
+  forceTerminateConfirmed.value = false
+  forceTerminateDialog.value = rt
+}
+
+async function submitForceTermination() {
+  const rt = forceTerminateDialog.value
+  const reason = forceTerminateReason.value.trim()
+  if (!rt?.id || rt.processingVersion === undefined || rt.processingVersion === null
+    || reason.length < 8 || !forceTerminateConfirmed.value) return
+  forceTerminatePending.value = true
+  try {
+    const { data, error } = await adminForceTerminateRuntime({
+      path: { competitionId, runtimeInstanceId: rt.id },
+      body: {
+        expectedProcessingVersion: rt.processingVersion,
+        reason,
+      },
+    })
+    if (error) throw error
+    toast.success('强制终结已交由 Runner 清理')
+    forceTerminateDialog.value = null
+    await waitForRuntime(data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped')
+    refreshList()
+    if (detailOpen.value && detail.value?.id === rt.id) await openDetail(rt.id)
+  }
+  catch (e) {
+    toast.error(parseApiError(e).message)
+  }
+  finally {
+    forceTerminatePending.value = false
+  }
+}
+
 // ---- Extend ----
 const extendDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
 const extendSeconds = ref(1800)
@@ -313,6 +356,12 @@ onMounted(() => {
                     @click="terminateDialog = rt"
                   >终止</Button>
                   <Button
+                    v-if="isAdministrator && rt.canForceTerminate"
+                    variant="destructive" size="sm"
+                    :disabled="opPending !== null || forceTerminatePending"
+                    @click="openForceTermination(rt)"
+                  >强制终结</Button>
+                  <Button
                     variant="ghost" size="sm" :disabled="opPending !== null"
                     @click="runRuntimeOp(rt, 'reset')"
                   >
@@ -416,6 +465,50 @@ onMounted(() => {
           <AlertDialogAction variant="destructive" :disabled="terminatePending" @click="submitTermination">
             <Spinner v-if="terminatePending" data-icon="inline-start" />
             确认终止
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog
+      :open="forceTerminateDialog !== null"
+      @update:open="(open) => { if (!open && !forceTerminatePending) forceTerminateDialog = null }"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>强制终结卡住的实例？</AlertDialogTitle>
+          <AlertDialogDescription>
+            Runner 将按实例 ID 与资源标签清理实际资源，并在确认资源不存在、容量已释放后才把实例标记为 Stopped。
+            该操作只用于长时间停在 Provisioning 或 Stopping 的实例。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <FieldGroup>
+          <Field>
+            <FieldLabel for="force-termination-reason">操作原因</FieldLabel>
+            <Textarea
+              id="force-termination-reason"
+              v-model="forceTerminateReason"
+              maxlength="512"
+              placeholder="至少 8 个字符；将写入不可变比赛审计"
+            />
+            <FieldDescription>{{ forceTerminateReason.trim().length }}/512</FieldDescription>
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox id="force-termination-confirm" v-model="forceTerminateConfirmed" />
+            <FieldLabel for="force-termination-confirm" class="font-normal">
+              我确认这是卡住的实例，并理解清理失败时实例不会被强改为 Stopped。
+            </FieldLabel>
+          </Field>
+        </FieldGroup>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="forceTerminatePending">取消</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            :disabled="forceTerminatePending || !forceTerminateConfirmed || forceTerminateReason.trim().length < 8"
+            @click="submitForceTermination"
+          >
+            <Spinner v-if="forceTerminatePending" data-icon="inline-start" />
+            确认强制终结
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -19,6 +19,7 @@ const description = ref('')
 const startTime = ref('')
 const endTime = ref('')
 const teamRegistrationAutoApprove = ref(false)
+const allowTeamRegistrationWhileRunning = ref(false)
 const maxTeamMembers = ref(1)
 const maxConcurrentRuntimeInstancesPerTeam = ref(1)
 const savingMeta = ref(false)
@@ -31,6 +32,7 @@ watch(competition, (c) => {
   startTime.value = isoToLocalInput(c.startTime)
   endTime.value = isoToLocalInput(c.endTime)
   teamRegistrationAutoApprove.value = c.teamRegistrationAutoApprove ?? false
+  allowTeamRegistrationWhileRunning.value = c.allowTeamRegistrationWhileRunning ?? false
   maxTeamMembers.value = c.maxTeamMembers ?? 1
   maxConcurrentRuntimeInstancesPerTeam.value = c.maxConcurrentRuntimeInstancesPerTeam ?? 1
 }, { immediate: true })
@@ -53,6 +55,7 @@ async function saveMeta() {
         startTime: start,
         endTime: end,
         teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
+        allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
         maxTeamMembers: maxTeamMembers.value,
         maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
       },
@@ -148,6 +151,13 @@ onMounted(loadConfig)
             <Field orientation="horizontal">
               <Checkbox id="c-auto-approve" v-model="teamRegistrationAutoApprove" :disabled="!canWrite" />
               <FieldLabel for="c-auto-approve" class="font-normal">队伍注册自动通过</FieldLabel>
+            </Field>
+            <Field orientation="horizontal">
+              <Checkbox id="c-allow-running-registration" v-model="allowTeamRegistrationWhileRunning" :disabled="!canWrite" />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="c-allow-running-registration" class="font-normal">比赛进行中仍允许创建队伍</FieldLabel>
+                <FieldDescription>关闭时，比赛进入 Running 后停止接收新队伍与重新报名。</FieldDescription>
+              </div>
             </Field>
             <Field v-if="canWrite">
               <Button type="submit" :disabled="savingMeta">

@@ -274,6 +274,7 @@ public sealed class DataExportProcessor(
                     competition.AccumulatedRunningSeconds,
                     competition.Status,
                     competition.TeamRegistrationAutoApprove,
+                    competition.AllowTeamRegistrationWhileRunning,
                     competition.MaxTeamMembers,
                     competition.MaxConcurrentRuntimeInstancesPerTeam,
                     competition.CreatedAt,

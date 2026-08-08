@@ -49,7 +49,10 @@ public enum CompetitionEventKind : short
     TeamBanAppealSubmitted,
     TeamBanAppealUpheld,
     TeamBanAppealAccepted,
-    TeamBanCorrectionPublished
+    TeamBanCorrectionPublished,
+    RuntimeForceTerminationRequested,
+    RuntimeForceTerminationCompleted,
+    RuntimeForceTerminationFailed
 }
 
 public enum CompetitionEventLevel : short
@@ -98,6 +101,8 @@ public sealed class CompetitionEvent
     [NotMapped] public NoCTF.Domain.Submissions.ScoringEventKind? ScoringEventKind => PayloadValue<NoCTF.Domain.Submissions.ScoringEventKind>("scoringEventKind");
     [NotMapped] public NoCTF.Domain.Submissions.ScoringResult? ScoringResult => PayloadValue<NoCTF.Domain.Submissions.ScoringResult>("scoringResult");
     [NotMapped] public NoCTF.Domain.Runtime.RuntimeState? RuntimeState => PayloadValue<NoCTF.Domain.Runtime.RuntimeState>("runtimeState");
+    [NotMapped] public NoCTF.Domain.Runtime.RuntimeCleanupResult? RuntimeCleanupResult =>
+        PayloadValue<NoCTF.Domain.Runtime.RuntimeCleanupResult>("runtimeCleanupResult");
     [NotMapped] public NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus? QuestionStatus => PayloadValue<NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus>("questionStatus");
     [NotMapped] public int? RuntimeGeneration => PayloadValue<int>("runtimeGeneration");
     [NotMapped] public int? HostPort => PayloadValue<int>("hostPort");

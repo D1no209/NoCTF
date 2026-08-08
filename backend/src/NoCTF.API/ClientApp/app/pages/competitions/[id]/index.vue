@@ -84,6 +84,14 @@ const canParticipate = computed(
     && competition.value?.status === CompetitionStatus.Running,
 )
 
+const teamRegistrationOpen = computed(() => {
+  const status = competition.value?.status
+  return status === CompetitionStatus.Visible
+    || status === CompetitionStatus.Published
+    || status === CompetitionStatus.Running
+      && competition.value?.allowTeamRegistrationWhileRunning === true
+})
+
 // 创建队伍
 const createOpen = ref(false)
 const createName = ref('')
@@ -195,7 +203,7 @@ const isCaptain = computed(
           </template>
 
           <template v-else-if="!myTeam">
-            <Dialog v-model:open="createOpen">
+            <Dialog v-if="teamRegistrationOpen" v-model:open="createOpen">
               <DialogTrigger as-child>
                 <Button size="lg" variant="secondary">
                   <UserPlus data-icon="inline-start" />
@@ -223,6 +231,10 @@ const isCaptain = computed(
                 </form>
               </DialogContent>
             </Dialog>
+
+            <Alert v-else class="w-auto border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground">
+              <AlertDescription>当前比赛阶段已关闭新队伍创建。</AlertDescription>
+            </Alert>
 
             <Dialog v-model:open="joinOpen">
               <DialogTrigger as-child>

@@ -14,7 +14,8 @@ public sealed record CreateCompetitionCommand(
     int MaxTeamMembers,
     int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    bool AllowTeamRegistrationWhileRunning = false);
 
 public sealed record CompetitionView(
     Guid Id,
@@ -29,7 +30,8 @@ public sealed record CompetitionView(
     int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId,
     CompetitionLeaderboardVisibility LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal,
-    DateTimeOffset? LeaderboardVisibilityStartsAt = null);
+    DateTimeOffset? LeaderboardVisibilityStartsAt = null,
+    bool AllowTeamRegistrationWhileRunning = false);
 
 public enum CompetitionCreationState
 {
@@ -69,7 +71,8 @@ public sealed record UpdateCompetitionCommand(
     int MaxTeamMembers,
     int MaxConcurrentRuntimeInstancesPerTeam,
     Guid ActorId,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool AllowTeamRegistrationWhileRunning = false);
 
 public interface ICompetitionManagementStore
 {

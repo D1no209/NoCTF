@@ -6,6 +6,10 @@ using NoCTF.Application.Competitions.Management;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Management;
+using NoCTF.Application.Teams.Registration;
+using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Messaging;
+using NoCTF.Infrastructure.Teams.Registration;
 using Testcontainers.PostgreSql;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -98,6 +102,31 @@ public sealed class CompetitionManagementPersistenceTests
             await Assert.That(refreshed!.Title).IsEqualTo("Renamed competition");
             await Assert.That(refreshedList.Single(item => item.Id == competitionId).Title)
                 .IsEqualTo("Renamed competition");
+
+            var runningCompetition = await db.Competitions.SingleAsync(
+                item => item.Id == competitionId,
+                cancellationToken);
+            runningCompetition.Status = CompetitionStatus.Running;
+            runningCompetition.AllowTeamRegistrationWhileRunning = true;
+            await db.SaveChangesAsync(cancellationToken);
+
+            var registrations = new TeamRegistrationStore(
+                db,
+                new OpenApiTransactionalMessageOutbox());
+            var allowed = await registrations.TryCreateAsync(
+                new(competitionId, ownerId, "Running team", now.AddMinutes(2)),
+                TeamRegistrationStatus.Approved,
+                cancellationToken);
+            await Assert.That(allowed.Team).IsNotNull();
+
+            runningCompetition.AllowTeamRegistrationWhileRunning = false;
+            await db.SaveChangesAsync(cancellationToken);
+            var rejected = await registrations.TryCreateAsync(
+                new(competitionId, Guid.NewGuid(), "Late team", now.AddMinutes(3)),
+                TeamRegistrationStatus.Approved,
+                cancellationToken);
+            await Assert.That(rejected.Failure)
+                .IsEqualTo(TeamRegistrationFailure.RegistrationClosed);
         });
     }
 

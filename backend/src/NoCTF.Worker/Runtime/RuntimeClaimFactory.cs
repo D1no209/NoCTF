@@ -43,8 +43,7 @@ public static class RuntimeClaimFactory
                         MergeLabels(definition.Labels, instance),
                         ContainerPortMappings(instance.RuntimeProvider, definition.PortMappings),
                         limits,
-                        definition.Security
-                            ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
+                        NormalizeSecurity(definition.Security),
                         ttl,
                         OperationTimeout: operationTimeout,
                         NetworkIsolation: ContainerNetworkIsolation.Isolated,
@@ -144,6 +143,14 @@ public static class RuntimeClaimFactory
         return provider == RuntimeProvider.Docker
             ? configured.Keys.ToDictionary(port => port, _ => 0)
             : configured;
+    }
+
+    private static ContainerSecurityPolicy NormalizeSecurity(
+        ContainerSecurityPolicy? security)
+    {
+        var configured = security
+            ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []);
+        return configured with { CapAdd = configured.CapAdd ?? [] };
     }
 
     private static string? ResolvePerTeamFlag(

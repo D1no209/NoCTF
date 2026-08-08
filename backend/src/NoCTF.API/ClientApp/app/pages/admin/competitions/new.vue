@@ -13,6 +13,7 @@ const mode = ref<NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
 const startTime = ref('')
 const endTime = ref('')
 const teamRegistrationAutoApprove = ref(false)
+const allowTeamRegistrationWhileRunning = ref(false)
 const maxTeamMembers = ref(5)
 const maxConcurrentRuntimeInstancesPerTeam = ref(1)
 const error = ref<string | null>(null)
@@ -44,6 +45,7 @@ async function submit() {
         startTime: start,
         endTime: end,
         teamRegistrationAutoApprove: teamRegistrationAutoApprove.value,
+        allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
         maxTeamMembers: maxTeamMembers.value,
         maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
       },
@@ -125,6 +127,13 @@ async function submit() {
             <Field orientation="horizontal">
               <Checkbox id="auto-approve" v-model="teamRegistrationAutoApprove" />
               <FieldLabel for="auto-approve" class="font-normal">队伍注册自动通过(无需审批)</FieldLabel>
+            </Field>
+            <Field orientation="horizontal">
+              <Checkbox id="allow-running-registration" v-model="allowTeamRegistrationWhileRunning" />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="allow-running-registration" class="font-normal">比赛进行中仍允许创建队伍</FieldLabel>
+                <FieldDescription>关闭时，比赛进入 Running 后停止接收新队伍与重新报名。</FieldDescription>
+              </div>
             </Field>
             <Field>
               <Button type="submit" :disabled="pending || !canOrganize" class="w-full">

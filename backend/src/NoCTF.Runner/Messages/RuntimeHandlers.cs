@@ -113,13 +113,23 @@ public sealed class RuntimeProviderHandler(
             var work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is null)
                 return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
-            var receipt = JsonSerializer.Deserialize<ContainerReceipt>(work.ProviderReceiptJson)
-                ?? throw new InvalidOperationException("Provider receipt is invalid.");
-            await IsolatedContainerProvisioner.DestroyAsync(
-                providers.Containers(work.Provider),
-                providers.Sandbox(work.Provider),
-                receipt,
-                cancellationToken);
+            if (work.ProviderReceiptJson is { } receiptJson)
+            {
+                var receipt = JsonSerializer.Deserialize<ContainerReceipt>(receiptJson)
+                    ?? throw new InvalidOperationException("Provider receipt is invalid.");
+                await IsolatedContainerProvisioner.DestroyAsync(
+                    providers.Containers(work.Provider),
+                    providers.Sandbox(work.Provider),
+                    receipt,
+                    cancellationToken);
+            }
+            else
+            {
+                await DestroyUnreceiptedRuntimeAsync(
+                    message.RuntimeInstanceId,
+                    work,
+                    cancellationToken);
+            }
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
@@ -131,6 +141,64 @@ public sealed class RuntimeProviderHandler(
                 message.RuntimeInstanceId,
                 message.ProcessingVersion,
                 RuntimeFailureCode.CleanupFailed);
+        }
+    }
+
+    public async Task<object> Handle(
+        ForceTerminateRuntime message,
+        CancellationToken cancellationToken)
+    {
+        ValidateAssignment(message);
+        try
+        {
+            var work = await workReader.ReadStopAsync(message, cancellationToken);
+            if (work is not null
+                && (work.Provider != message.Provider || work.Generation != message.Generation))
+            {
+                return ForceTerminationFailed(
+                    message,
+                    DateTimeOffset.UtcNow,
+                    RuntimeCleanupResult.CleanupFailed);
+            }
+
+            var reconciler = ReadResourceReconciler(message.Provider);
+            var identity = new RuntimeResourceIdentity(
+                message.RuntimeInstanceId,
+                message.Generation);
+            await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+            var remaining = await reconciler.ListManagedAsync(cancellationToken);
+            if (remaining.Contains(identity))
+            {
+                return ForceTerminationFailed(
+                    message,
+                    DateTimeOffset.UtcNow,
+                    RuntimeCleanupResult.ResourcesRemain);
+            }
+
+            var release = await capacity.ReleaseAsync(
+                message.RuntimeInstanceId,
+                message.RunnerId,
+                cancellationToken);
+            if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+            {
+                return ForceTerminationFailed(
+                    message,
+                    DateTimeOffset.UtcNow,
+                    RuntimeCleanupResult.CapacityOwnershipConflict);
+            }
+
+            return ForceTerminationSucceeded(message, DateTimeOffset.UtcNow);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return ForceTerminationFailed(
+                message,
+                DateTimeOffset.UtcNow,
+                RuntimeCleanupResult.CleanupFailed);
         }
     }
 
@@ -227,9 +295,19 @@ public sealed class RuntimeProviderHandler(
             var work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is null)
                 return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
-            var receipt = JsonSerializer.Deserialize<ComposeReceipt>(work.ProviderReceiptJson)
-                ?? throw new InvalidOperationException("Provider receipt is invalid.");
-            await providers.Compose(work.Provider).DownAsync(receipt, cancellationToken);
+            if (work.ProviderReceiptJson is { } receiptJson)
+            {
+                var receipt = JsonSerializer.Deserialize<ComposeReceipt>(receiptJson)
+                    ?? throw new InvalidOperationException("Provider receipt is invalid.");
+                await providers.Compose(work.Provider).DownAsync(receipt, cancellationToken);
+            }
+            else
+            {
+                await DestroyUnreceiptedRuntimeAsync(
+                    message.RuntimeInstanceId,
+                    work,
+                    cancellationToken);
+            }
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
@@ -334,9 +412,19 @@ public sealed class RuntimeProviderHandler(
                 return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
             if (work.Provider != RuntimeProvider.Libvirt)
                 throw new InvalidOperationException("OVA Runtime receipt provider is invalid.");
-            var receipt = JsonSerializer.Deserialize<OvaRuntimeReceipt>(work.ProviderReceiptJson)
-                ?? throw new InvalidOperationException("Provider receipt is invalid.");
-            await providers.Appliance(work.Provider).DestroyAsync(receipt, cancellationToken);
+            if (work.ProviderReceiptJson is { } receiptJson)
+            {
+                var receipt = JsonSerializer.Deserialize<OvaRuntimeReceipt>(receiptJson)
+                    ?? throw new InvalidOperationException("Provider receipt is invalid.");
+                await providers.Appliance(work.Provider).DestroyAsync(receipt, cancellationToken);
+            }
+            else
+            {
+                await DestroyUnreceiptedRuntimeAsync(
+                    message.RuntimeInstanceId,
+                    work,
+                    cancellationToken);
+            }
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
@@ -403,6 +491,51 @@ public sealed class RuntimeProviderHandler(
         resourceReconcilers.SingleOrDefault(candidate => candidate.Provider == provider)
         ?? throw new InvalidOperationException(
             $"Runtime resource reconciliation is unavailable for '{provider}'.");
+
+    private async Task DestroyUnreceiptedRuntimeAsync(
+        Guid runtimeInstanceId,
+        RuntimeStopWork work,
+        CancellationToken cancellationToken)
+    {
+        var reconciler = ReadResourceReconciler(work.Provider);
+        var identity = new RuntimeResourceIdentity(runtimeInstanceId, work.Generation);
+        await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+        var remaining = await reconciler.ListManagedAsync(cancellationToken);
+        if (remaining.Contains(identity))
+        {
+            throw new InvalidOperationException(
+                "Runtime resources remain after identity-based cleanup.");
+        }
+    }
+
+    private static RuntimeForceTerminated ForceTerminationSucceeded(
+        ForceTerminateRuntime message,
+        DateTimeOffset completedAt) =>
+        new(
+            message.RuntimeInstanceId,
+            message.ProcessingVersion,
+            message.Generation,
+            message.RunnerId,
+            message.ActorUserId,
+            message.Reason,
+            message.RequestedAt,
+            completedAt,
+            RuntimeCleanupResult.ResourcesAbsent);
+
+    private static RuntimeForceTerminationFailed ForceTerminationFailed(
+        ForceTerminateRuntime message,
+        DateTimeOffset completedAt,
+        RuntimeCleanupResult result) =>
+        new(
+            message.RuntimeInstanceId,
+            message.ProcessingVersion,
+            message.Generation,
+            message.RunnerId,
+            message.ActorUserId,
+            message.Reason,
+            message.RequestedAt,
+            completedAt,
+            result);
 
     private async Task ReleaseCapacityOrThrowAsync(
         IRuntimeProvisionMessage message,
@@ -761,6 +894,90 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    public static async Task Handle(
+        RuntimeForceTerminated message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events = null)
+    {
+        events ??= NullCompetitionEventRecorder.Instance;
+        var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.Id == message.RuntimeInstanceId,
+            cancellationToken);
+        if (instance is null
+            || instance.ProcessingVersion != message.ProcessingVersion
+            || instance.State != RuntimeState.Stopping
+            || instance.Generation != message.Generation
+            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
+            return;
+
+        instance.State = RuntimeState.Stopped;
+        instance.StoppedAt = message.CompletedAt;
+        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
+            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
+                && candidate.State == RuntimeState.Queued,
+            cancellationToken);
+        if (replacement is not null)
+        {
+            await outbox.PublishAsync(new DispatchRuntime(
+                replacement.Id,
+                replacement.ProcessingVersion));
+        }
+        await events.RecordAsync(new(
+            instance.CompetitionId,
+            CompetitionEventKind.RuntimeForceTerminationCompleted,
+            CompetitionEventLevel.Warning,
+            CompetitionEventVisibility.Staff,
+            message.CompletedAt,
+            ActorUserId: message.ActorUserId,
+            TeamId: instance.TeamId,
+            CompetitionChallengeId: instance.CompetitionChallengeId,
+            RuntimeInstanceId: instance.Id,
+            RuntimeState: instance.State,
+            RuntimeCleanupResult: message.CleanupResult,
+            RuntimeGeneration: instance.Generation,
+            Reason: message.Reason), cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    public static async Task Handle(
+        RuntimeForceTerminationFailed message,
+        NoCtfDbContext db,
+        CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events = null)
+    {
+        events ??= NullCompetitionEventRecorder.Instance;
+        var instance = await db.RuntimeInstances.AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate => candidate.Id == message.RuntimeInstanceId,
+                cancellationToken);
+        if (instance is null
+            || instance.ProcessingVersion != message.ProcessingVersion
+            || instance.State != RuntimeState.Stopping
+            || instance.Generation != message.Generation
+            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
+            return;
+
+        await events.RecordAsync(new(
+            instance.CompetitionId,
+            CompetitionEventKind.RuntimeForceTerminationFailed,
+            CompetitionEventLevel.Error,
+            CompetitionEventVisibility.Staff,
+            message.CompletedAt,
+            ActorUserId: message.ActorUserId,
+            TeamId: instance.TeamId,
+            CompetitionChallengeId: instance.CompetitionChallengeId,
+            RuntimeInstanceId: instance.Id,
+            RuntimeState: instance.State,
+            RuntimeCleanupResult: message.CleanupResult,
+            RuntimeGeneration: instance.Generation,
+            Reason: message.Reason), cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public static async Task Handle(

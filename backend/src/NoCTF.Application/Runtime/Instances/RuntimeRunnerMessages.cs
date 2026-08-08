@@ -71,6 +71,17 @@ public sealed record ReconcileRuntimeResources(
     string RunnerId,
     DateTimeOffset RequestedAt) : IRunnerNodeMessage;
 
+public sealed record ForceTerminateRuntime(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    int Generation,
+    RuntimeProvider Provider,
+    string RunnerPool,
+    string RunnerId,
+    Guid ActorUserId,
+    string Reason,
+    DateTimeOffset RequestedAt) : IRuntimeStopMessage;
+
 public interface IRuntimeProvisionMessage : IRunnerNodeMessage
 {
     Guid RuntimeInstanceId { get; }
@@ -86,7 +97,8 @@ public interface IRuntimeStopMessage : IRunnerNodeMessage
 
 public sealed record RuntimeStopWork(
     RuntimeProvider Provider,
-    string ProviderReceiptJson);
+    string? ProviderReceiptJson,
+    int Generation = 0);
 
 public enum RuntimeProvisionWorkStatus
 {
@@ -147,3 +159,25 @@ public sealed record RuntimeStopFailed(
     Guid RuntimeInstanceId,
     long ProcessingVersion,
     RuntimeFailureCode FailureCode);
+
+public sealed record RuntimeForceTerminated(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    int Generation,
+    string RunnerId,
+    Guid ActorUserId,
+    string Reason,
+    DateTimeOffset RequestedAt,
+    DateTimeOffset CompletedAt,
+    RuntimeCleanupResult CleanupResult);
+
+public sealed record RuntimeForceTerminationFailed(
+    Guid RuntimeInstanceId,
+    long ProcessingVersion,
+    int Generation,
+    string RunnerId,
+    Guid ActorUserId,
+    string Reason,
+    DateTimeOffset RequestedAt,
+    DateTimeOffset CompletedAt,
+    RuntimeCleanupResult CleanupResult);

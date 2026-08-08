@@ -106,7 +106,7 @@ public sealed class KubernetesContainerLifecycle(
                             Capabilities = new V1Capabilities
                             {
                                 Drop = request.Security.CapDrop.ToList(),
-                                Add = request.Security.CapAdd.ToList()
+                                Add = request.Security.CapAdd?.ToList() ?? []
                             }
                         },
                         Resources = new V1ResourceRequirements

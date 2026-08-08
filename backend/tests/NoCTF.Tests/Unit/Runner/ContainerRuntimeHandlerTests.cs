@@ -52,11 +52,108 @@ public sealed class ContainerRuntimeHandlerTests
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
 
+    [Test]
+    public async Task Stop_without_receipt_cleans_by_runtime_identity_before_releasing_capacity()
+    {
+        var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var reconciler = new RecordingResourceReconciler();
+        var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var handler = CreateHandler(
+            new RecordingContainerLifecycle(),
+            new RecordingSandboxLifecycle(),
+            capacity,
+            new FixedWorkReader(new(
+                RuntimeProvider.Docker,
+                ProviderReceiptJson: null,
+                Generation: 3)),
+            reconciler);
+        var message = new StopContainerRuntime(
+            runtimeInstanceId,
+            8,
+            "default",
+            "runner-a");
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeStopped>();
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
+    }
+
+    [Test]
+    public async Task Force_termination_uses_identity_cleanup_and_confirms_resources_are_absent()
+    {
+        var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var reconciler = new RecordingResourceReconciler();
+        var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var handler = CreateHandler(
+            new RecordingContainerLifecycle(),
+            new RecordingSandboxLifecycle(),
+            capacity,
+            new FixedWorkReader(new(
+                RuntimeProvider.Docker,
+                ProviderReceiptJson: "{\"stale\":true}",
+                Generation: 3)),
+            reconciler);
+        var message = new ForceTerminateRuntime(
+            runtimeInstanceId,
+            9,
+            3,
+            RuntimeProvider.Docker,
+            "default",
+            "runner-a",
+            Guid.NewGuid(),
+            "The runtime exceeded the cleanup timeout.",
+            DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeForceTerminated>();
+        await Assert.That(((RuntimeForceTerminated)result).CleanupResult)
+            .IsEqualTo(RuntimeCleanupResult.ResourcesAbsent);
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
+    }
+
+    [Test]
+    public async Task Force_termination_without_current_work_still_reconciles_provider_identity()
+    {
+        var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var reconciler = new RecordingResourceReconciler();
+        var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.AlreadyReleased);
+        var handler = CreateHandler(
+            new RecordingContainerLifecycle(),
+            new RecordingSandboxLifecycle(),
+            capacity,
+            new FixedWorkReader(null),
+            reconciler);
+        var message = new ForceTerminateRuntime(
+            runtimeInstanceId,
+            9,
+            3,
+            RuntimeProvider.Docker,
+            "default",
+            "runner-a",
+            Guid.NewGuid(),
+            "Retry an idempotent force-termination request.",
+            DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeForceTerminated>();
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
+    }
+
     private static RuntimeProviderHandler CreateHandler(
         IContainerLifecycle lifecycle,
         IContainerSandboxLifecycle sandbox,
         IRunnerCapacityGate capacity,
-        IRuntimeNodeWorkReader reader)
+        IRuntimeNodeWorkReader reader,
+        IRuntimeManagedResourceReconciler? reconciler = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -67,7 +164,7 @@ public sealed class ContainerRuntimeHandlerTests
             .Build();
         return new(
             new RecordingProviderCatalog(lifecycle, sandbox),
-            [new RecordingResourceReconciler()],
+            [reconciler ?? new RecordingResourceReconciler()],
             configuration,
             capacity,
             reader);
@@ -156,7 +253,7 @@ public sealed class ContainerRuntimeHandlerTests
             throw new NotSupportedException();
     }
 
-    private sealed class FixedWorkReader(RuntimeStopWork stop) : IRuntimeNodeWorkReader
+    private sealed class FixedWorkReader(RuntimeStopWork? stop) : IRuntimeNodeWorkReader
     {
         public Task<RuntimeProvisionWorkStatus> ReadProvisionStatusAsync(
             IRuntimeProvisionMessage message,
@@ -208,6 +305,7 @@ public sealed class ContainerRuntimeHandlerTests
 
     private sealed class RecordingResourceReconciler : IRuntimeManagedResourceReconciler
     {
+        public List<RuntimeResourceIdentity> Destroyed { get; } = [];
         public RuntimeProvider Provider => RuntimeProvider.Docker;
 
         public Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
@@ -216,7 +314,10 @@ public sealed class ContainerRuntimeHandlerTests
 
         public Task DestroyByIdentityAsync(
             RuntimeResourceIdentity identity,
-            CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+            CancellationToken cancellationToken)
+        {
+            Destroyed.Add(identity);
+            return Task.CompletedTask;
+        }
     }
 }

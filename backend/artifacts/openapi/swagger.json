@@ -4988,6 +4988,95 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/force-terminate": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Force-terminates a stuck runtime instance.",
+        "description": "Queues Runner-owned identity cleanup for a runtime stuck in Provisioning or Stopping for at least five minutes.",
+        "operationId": "AdminForceTerminateRuntime",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "runtimeInstanceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ForceTerminateRuntimeRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeForceTerminateRuntimeRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}": {
       "get": {
         "tags": [
@@ -12929,6 +13018,9 @@
           "teamRegistrationAutoApprove": {
             "type": "boolean"
           },
+          "allowTeamRegistrationWhileRunning": {
+            "type": "boolean"
+          },
           "maxTeamMembers": {
             "type": "integer",
             "format": "int32"
@@ -13509,7 +13601,10 @@
           "TeamBanAppealSubmitted",
           "TeamBanAppealUpheld",
           "TeamBanAppealAccepted",
-          "TeamBanCorrectionPublished"
+          "TeamBanCorrectionPublished",
+          "RuntimeForceTerminationRequested",
+          "RuntimeForceTerminationCompleted",
+          "RuntimeForceTerminationFailed"
         ],
         "enum": [
           "CompetitionCreated",
@@ -13554,7 +13649,10 @@
           "TeamBanAppealSubmitted",
           "TeamBanAppealUpheld",
           "TeamBanAppealAccepted",
-          "TeamBanCorrectionPublished"
+          "TeamBanCorrectionPublished",
+          "RuntimeForceTerminationRequested",
+          "RuntimeForceTerminationCompleted",
+          "RuntimeForceTerminationFailed"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {
@@ -13766,6 +13864,14 @@
               }
             ]
           },
+          "runtimeCleanupResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsRuntimeCleanupResultProtocol"
+              }
+            ]
+          },
           "questionStatus": {
             "nullable": true,
             "oneOf": [
@@ -13824,6 +13930,24 @@
           "HintUnlock",
           "KohObservation",
           "ManualAdjust"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsEventsRuntimeCleanupResultProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Pending",
+          "ResourcesAbsent",
+          "ResourcesRemain",
+          "CleanupFailed",
+          "CapacityOwnershipConflict"
+        ],
+        "enum": [
+          "Pending",
+          "ResourcesAbsent",
+          "ResourcesRemain",
+          "CleanupFailed",
+          "CapacityOwnershipConflict"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol": {
@@ -15039,6 +15163,27 @@
           }
         }
       },
+      "NoCTFAPIEndpointsAdministrationRuntimeForceTerminateRuntimeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedProcessingVersion",
+          "reason"
+        ],
+        "properties": {
+          "expectedProcessingVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0.0
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 8,
+            "nullable": false
+          }
+        }
+      },
       "NoCTFAPIEndpointsAdministrationRuntimeAdminRuntimeResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -15130,6 +15275,14 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "forceTerminationAvailableAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "canForceTerminate": {
+            "type": "boolean"
           }
         }
       },
@@ -16492,6 +16645,9 @@
           "teamRegistrationAutoApprove": {
             "type": "boolean"
           },
+          "allowTeamRegistrationWhileRunning": {
+            "type": "boolean"
+          },
           "maxTeamMembers": {
             "type": "integer",
             "format": "int32",
@@ -16754,6 +16910,9 @@
             "format": "date-time"
           },
           "teamRegistrationAutoApprove": {
+            "type": "boolean"
+          },
+          "allowTeamRegistrationWhileRunning": {
             "type": "boolean"
           },
           "maxTeamMembers": {
