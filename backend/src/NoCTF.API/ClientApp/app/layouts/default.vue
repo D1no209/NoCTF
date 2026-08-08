@@ -8,22 +8,22 @@ const { configuration } = usePlatform()
 <template>
   <div class="flex min-h-screen flex-col">
     <header class="sticky top-0 z-40 border-b bg-background">
-      <div class="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
-        <NuxtLink to="/" class="flex items-center gap-2 text-base font-semibold">
-          <Trophy class="size-5" />
+      <div class="mx-auto flex h-16 max-w-7xl items-center gap-8 px-4 md:px-6">
+        <NuxtLink to="/" class="flex shrink-0 items-center gap-2.5 text-lg font-semibold">
+          <Trophy class="size-6" />
           {{ configuration?.name ?? 'NoCTF' }}
         </NuxtLink>
-        <nav class="flex items-center gap-1 text-sm">
-          <Button variant="ghost" size="sm" as-child>
+        <nav class="flex min-w-0 items-center gap-2 overflow-x-auto text-base">
+          <Button variant="ghost" size="sm" class="px-3 text-base" as-child>
             <NuxtLink to="/competitions">竞赛</NuxtLink>
           </Button>
-          <Button v-if="isLoggedIn" variant="ghost" size="sm" as-child>
+          <Button v-if="isLoggedIn" variant="ghost" size="sm" class="px-3 text-base" as-child>
             <NuxtLink to="/admin/competitions">竞赛管理</NuxtLink>
           </Button>
-          <Button v-if="canOrganize" variant="ghost" size="sm" as-child>
+          <Button v-if="canOrganize" variant="ghost" size="sm" class="px-3 text-base" as-child>
             <NuxtLink to="/admin/challenges">题库管理</NuxtLink>
           </Button>
-          <Button v-if="isAdministrator" variant="ghost" size="sm" as-child>
+          <Button v-if="isAdministrator" variant="ghost" size="sm" class="px-3 text-base" as-child>
             <NuxtLink to="/admin/platform">平台管理</NuxtLink>
           </Button>
         </nav>

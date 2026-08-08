@@ -115,8 +115,13 @@ onMounted(async () => {
         <Badge variant="outline">我的角色:{{ RoleLabel[role] }}</Badge>
       </div>
       <Tabs :model-value="activeTab" @update:model-value="(v) => navigateTo(String(v))">
-        <TabsList>
-          <TabsTrigger v-for="item in visibleNav" :key="item.to" :value="item.to">
+        <TabsList class="max-w-full justify-start gap-1 overflow-x-auto overflow-y-hidden p-1 group-data-horizontal/tabs:h-11">
+          <TabsTrigger
+            v-for="item in visibleNav"
+            :key="item.to"
+            :value="item.to"
+            class="h-9 flex-none px-3.5 text-base"
+          >
             {{ item.label }}
           </TabsTrigger>
         </TabsList>
