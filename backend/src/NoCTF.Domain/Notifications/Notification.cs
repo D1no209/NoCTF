@@ -55,5 +55,6 @@ public enum NotificationKind : short
     CheatIncidentDetected,
     TeamBanCorrected,
     DataExportReady,
-    DataExportFailed
+    DataExportFailed,
+    UserAccountLifecycleChanged
 }

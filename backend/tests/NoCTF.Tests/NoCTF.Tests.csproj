@@ -28,8 +28,6 @@
   <ItemGroup>
     <!-- These remaining scenarios assert tables/contracts removed by the new initial baseline.
          Each exclusion is removed when that scenario is rewritten against the consolidated model. -->
-    <Compile Remove="Integration\Administration\PlatformAuditLogStoreTests.cs" />
-    <Compile Remove="Integration\Authentication\UserAccountDeletionPersistenceTests.cs" />
     <Compile Remove="Integration\Messaging\WolverineTransactionalOutboxTests.cs" />
     <Compile Remove="Integration\Persistence\AwdCheckerPersistenceTests.cs" />
     <Compile Remove="Integration\Persistence\AwdpFixAdmissionPersistenceTests.cs" />

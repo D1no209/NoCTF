@@ -54,6 +54,14 @@ public sealed record UserDeletionStoreResult(
     UserDeletionPreview? Preview = null,
     Guid? PreviousAvatarFileId = null);
 
+public sealed record UserAccountLifecycleFact(
+    int SchemaVersion,
+    Guid TargetUserId,
+    string TargetUserName,
+    UserAccountLifecycleAction Action,
+    string Reason,
+    bool Automatic);
+
 public interface IUserAccountAdministrationStore
 {
     Task<UserDeletionPreview?> PreviewDeletionAsync(

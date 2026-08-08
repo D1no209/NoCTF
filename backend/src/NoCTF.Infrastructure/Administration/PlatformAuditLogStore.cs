@@ -1,7 +1,10 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.PlatformLogs;
+using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Notifications;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Shared;
 
@@ -9,6 +12,9 @@ namespace NoCTF.Infrastructure.Administration;
 
 public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLogStore
 {
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     public async Task<IReadOnlyList<PlatformAuditView>> QueryAsync(
         PlatformAuditQuery query,
         CancellationToken ct)
@@ -87,9 +93,42 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 null,
                 null,
                 competitionTitles.GetValueOrDefault(item.CompetitionId),
-                item.PayloadJson,
+                item.Reason,
                 false,
                 item.OccurredAt)));
+        }
+
+        if (query.CompetitionId is null
+            && query.Kind is null or PlatformAuditKind.UserAccountLifecycle)
+        {
+            var lifecycleFacts = db.Notifications.AsNoTracking().Where(notification =>
+                notification.Kind == NotificationKind.UserAccountLifecycleChanged
+                && notification.TargetType == NotificationTargetType.PlatformAdministrators);
+            if (query.From is not null)
+                lifecycleFacts = lifecycleFacts.Where(notification =>
+                    notification.SentAt >= query.From.Value);
+            if (query.To is not null)
+                lifecycleFacts = lifecycleFacts.Where(notification =>
+                    notification.SentAt <= query.To.Value);
+            if (query.ActorId is not null)
+                lifecycleFacts = lifecycleFacts.Where(notification =>
+                    notification.SourceType == NotificationSourceType.User
+                    && notification.SourceId == query.ActorId.Value);
+            if (query.BeforeOccurredAt is DateTimeOffset beforeOccurredAt
+                && query.BeforeId is Guid beforeId)
+            {
+                lifecycleFacts = lifecycleFacts.Where(notification =>
+                    notification.SentAt < beforeOccurredAt
+                    || notification.SentAt == beforeOccurredAt
+                    && notification.Id.CompareTo(beforeId) < 0);
+            }
+
+            var lifecycleItems = await lifecycleFacts
+                .OrderByDescending(notification => notification.SentAt)
+                .ThenByDescending(notification => notification.Id)
+                .Take(query.Limit)
+                .ToArrayAsync(ct);
+            items.AddRange(lifecycleItems.Select(ToAuditView));
         }
 
         return items
@@ -110,5 +149,42 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
 
     private static Guid? Reference(CompetitionEvent item, EntityReferenceKind kind) =>
         item.SubjectType == kind ? item.SubjectId : item.RelatedType == kind ? item.RelatedId : null;
+
+    private static PlatformAuditView ToAuditView(Notification notification)
+    {
+        var fact = JsonSerializer.Deserialize<UserAccountLifecycleFact>(
+            notification.ContentJson,
+            JsonOptions) ?? throw new InvalidOperationException(
+            $"Notification {notification.Id} has no user lifecycle payload.");
+        return new(
+            notification.Id,
+            PlatformAuditKind.UserAccountLifecycle,
+            fact.TargetUserId,
+            null,
+            notification.SourceId,
+            null,
+            null,
+            null,
+            null,
+            fact.Action,
+            null,
+            null,
+            null,
+            fact.TargetUserId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            fact.TargetUserName,
+            fact.Reason,
+            fact.Automatic,
+            notification.SentAt);
+    }
 
 }

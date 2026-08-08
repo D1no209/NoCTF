@@ -171,6 +171,7 @@ export function notificationText(
     BloodAwarded: `恭喜,你在${challenge}拿下了血榜名次`, ChallengePublished: `竞赛${title}发布了新题目${challenge}`, HintPublished: `${challenge}发布了新提示`,
     TeamBanned: `你的队伍${team}已被封禁`, CompetitionQuestionOpened: `竞赛${title}有新的咨询`, CompetitionQuestionReplied: '你的咨询已有新回复',
     CompetitionQuestionStatusChanged: '你的咨询状态已变更', CheatIncidentDetected: '检测到疑似作弊行为', TeamBanCorrected: '队伍封禁已被纠正', DataExportReady: '数据导出已就绪', DataExportFailed: '数据导出失败',
+    UserAccountLifecycleChanged: '用户账号状态已变更',
   }
   return templates[String(notification.kind)] ?? '你有一条新通知'
 }

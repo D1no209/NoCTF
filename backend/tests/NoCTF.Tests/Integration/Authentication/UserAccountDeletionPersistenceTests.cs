@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
@@ -44,15 +47,18 @@ public sealed class UserAccountDeletionPersistenceTests
                     User(referencedUserId, "Player", "player@example.test", UserRole.User, now),
                     User(unusedUserId, "Unused", "unused@example.test", UserRole.User, now),
                     User(auditedUserId, "Auditor", "auditor@example.test", UserRole.User, now));
-                db.UserAccountLifecycleAudits.Add(new UserAccountLifecycleAudit
+                db.Notifications.Add(new Notification
                 {
                     Id = Guid.CreateVersion7(now.AddTicks(5)),
-                    TargetUserId = Guid.NewGuid(),
-                    TargetUserName = "Historical account",
-                    ActorUserId = auditedUserId,
-                    Action = UserAccountLifecycleAction.Disabled,
-                    Reason = "Historical audit fixture",
-                    OccurredAt = now
+                    SourceType = NotificationSourceType.System,
+                    SourceId = null,
+                    TargetType = NotificationTargetType.PlatformAdministrators,
+                    TargetId = Guid.Empty,
+                    Kind = NotificationKind.Message,
+                    ContentJson = "{\"schemaVersion\":1}",
+                    RelatedType = EntityReferenceKind.User,
+                    RelatedId = auditedUserId,
+                    SentAt = now
                 });
                 db.Competitions.Add(new Competition
                 {
@@ -107,7 +113,7 @@ public sealed class UserAccountDeletionPersistenceTests
 
                 await Assert.That(auditedPreview!.CanHardDelete).IsFalse();
                 await Assert.That(auditedPreview.References.Any(reference =>
-                    reference.Kind == UserDeletionReferenceKind.UserAccountLifecycleAudit
+                    reference.Kind == UserDeletionReferenceKind.Notification
                     && reference.Count == 1)).IsTrue();
                 await Assert.That(preview!.CanHardDelete).IsFalse();
                 await Assert.That(preview.References.Any(reference =>
@@ -138,8 +144,27 @@ public sealed class UserAccountDeletionPersistenceTests
                 await Assert.That(await db.Users.AnyAsync(
                     user => user.Id == unusedUserId,
                     cancellationToken)).IsFalse();
-                await Assert.That(await db.UserAccountLifecycleAudits.CountAsync(
-                    cancellationToken)).IsEqualTo(3);
+                await Assert.That(await db.Notifications.CountAsync(cancellationToken))
+                    .IsEqualTo(3);
+                var lifecycleFacts = await new PlatformAuditLogStore(db).QueryAsync(
+                    new(
+                        PlatformAuditKind.UserAccountLifecycle,
+                        null,
+                        null,
+                        null,
+                        actorId,
+                        null,
+                        null,
+                        10),
+                    cancellationToken);
+                await Assert.That(lifecycleFacts).Count().IsEqualTo(2);
+                await Assert.That(lifecycleFacts[0].UserAccountAction)
+                    .IsEqualTo(UserAccountLifecycleAction.PhysicallyDeleted);
+                await Assert.That(lifecycleFacts[0].Reason).IsEqualTo("Unused test account");
+                await Assert.That(lifecycleFacts[1].UserAccountAction)
+                    .IsEqualTo(UserAccountLifecycleAction.Anonymized);
+                await Assert.That(lifecycleFacts[1].Reason)
+                    .IsEqualTo("Requested account closure");
                 await Assert.That(await new AccessTokenVersionReader(db).IsCurrentAsync(
                     referencedUserId,
                     0,
