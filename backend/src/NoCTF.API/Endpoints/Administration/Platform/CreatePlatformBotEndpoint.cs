@@ -2,7 +2,7 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using System.Text.Json.Serialization;
+using NoCTF.API.Endpoints.Authentication;
 using NoCTF.Application.Administration;
 using NoCTF.Domain.Identity;
 
@@ -17,8 +17,7 @@ public sealed class CreatePlatformBotRequest
         get => userName;
         set => userName = value?.Trim() ?? string.Empty;
     }
-    [JsonConverter(typeof(JsonStringEnumConverter<UserRole>))]
-    public UserRole Role { get; set; } = UserRole.Organizer;
+    public UserRoleProtocol Role { get; set; } = UserRoleProtocol.Organizer;
 }
 
 public sealed class CreatePlatformBotValidator : Validator<CreatePlatformBotRequest>
@@ -30,7 +29,7 @@ public sealed class CreatePlatformBotValidator : Validator<CreatePlatformBotRequ
             .Length(3, 64)
             .Matches("^[A-Za-z0-9_-]+$");
         RuleFor(request => request.Role)
-            .Must(role => role is UserRole.User or UserRole.Organizer);
+            .Must(role => role is UserRoleProtocol.User or UserRoleProtocol.Organizer);
     }
 }
 
@@ -59,7 +58,7 @@ public sealed class CreatePlatformBotEndpoint(ManagePlatform platform)
     {
         var result = await platform.CreateBotAsync(
             request.UserName,
-            request.Role,
+            IdentityProtocolMapper.ToDomain(request.Role),
             DateTimeOffset.UtcNow,
             ct);
         if (result.State == CreateBotState.UserNameConflict)

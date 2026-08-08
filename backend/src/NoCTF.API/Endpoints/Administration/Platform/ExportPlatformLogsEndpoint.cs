@@ -8,8 +8,8 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 
 public sealed class ExportPlatformLogsRequest
 {
-    [QueryParam] public PlatformLogLevel MinimumLevel { get; set; } = PlatformLogLevel.Warning;
-    [QueryParam] public PlatformLogService? Service { get; set; }
+    [QueryParam] public PlatformLogLevelProtocol MinimumLevel { get; set; } = PlatformLogLevelProtocol.Warning;
+    [QueryParam] public PlatformLogServiceProtocol? Service { get; set; }
     [QueryParam] public DateTimeOffset From { get; set; }
     [QueryParam] public DateTimeOffset To { get; set; }
     [QueryParam] public string? Category { get; set; }
@@ -65,8 +65,8 @@ public sealed class ExportPlatformLogsEndpoint(ExportPlatformLogs export)
         CancellationToken ct)
     {
         var result = await export.ExecuteAsync(new PlatformLogQuery(
-            request.MinimumLevel,
-            request.Service,
+            PlatformLogMapping.ToDomain(request.MinimumLevel),
+            request.Service is null ? null : PlatformLogMapping.ToDomain(request.Service.Value),
             request.From,
             request.To,
             Normalize(request.Category),

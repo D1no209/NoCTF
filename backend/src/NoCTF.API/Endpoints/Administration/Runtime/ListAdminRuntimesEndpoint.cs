@@ -3,6 +3,7 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Runtime;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.Application.Runtime.Instances;
@@ -16,11 +17,11 @@ public sealed class ListAdminRuntimesRequest
 {
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
     [QueryParam] public Guid? TeamId { get; set; }
-    [QueryParam] public RuntimeKind? RuntimeKind { get; set; }
-    [QueryParam] public RuntimeProvider? Provider { get; set; }
+    [QueryParam] public RuntimeKindProtocol? RuntimeKind { get; set; }
+    [QueryParam] public RuntimeProviderProtocol? Provider { get; set; }
     [QueryParam] public string? RunnerPool { get; set; }
     [QueryParam] public string? RunnerId { get; set; }
-    [QueryParam] public RuntimeState? State { get; set; }
+    [QueryParam] public RuntimeStateProtocol? State { get; set; }
     [QueryParam] public DateTimeOffset? ExpiresBefore { get; set; }
     [QueryParam] public int? HostPort { get; set; }
     [QueryParam] public string? Cursor { get; set; }
@@ -33,9 +34,7 @@ public sealed class ListAdminRuntimesValidator : Validator<ListAdminRuntimesRequ
     {
         RuleFor(request => request.Limit).InclusiveBetween(1, 200);
         RuleFor(request => request.HostPort)
-            .InclusiveBetween(
-                RuntimePublishedPortRange.StartPort,
-                RuntimePublishedPortRange.EndPort)
+            .InclusiveBetween(1, 65535)
             .When(request => request.HostPort.HasValue);
     }
 }
@@ -46,12 +45,12 @@ public sealed record AdminRuntimeResponse(
     Guid CompetitionChallengeId,
     Guid? TeamId,
     int Generation,
-    RuntimeKind RuntimeKind,
-    RuntimeProvider Provider,
+    RuntimeKindProtocol RuntimeKind,
+    RuntimeProviderProtocol Provider,
     string RunnerPool,
     string? RunnerId,
-    RuntimeState State,
-    RuntimeFailureCode? FailureCode,
+    RuntimeStateProtocol State,
+    RuntimeFailureCodeProtocol? FailureCode,
     long ProcessingVersion,
     IReadOnlyList<string> Urls,
     string? ProviderReceiptJson,
@@ -71,8 +70,14 @@ internal static class AdminRuntimeMapping
     public static AdminRuntimeResponse ToResponse(RuntimeInstanceView view) =>
         new(
             view.Id, view.CompetitionId, view.CompetitionChallengeId, view.TeamId,
-            view.Generation, view.RuntimeKind, view.Provider, view.RunnerPool,
-            view.RunnerId, view.State, view.FailureCode, view.ProcessingVersion,
+            view.Generation,
+            RuntimeProtocolMapper.ToProtocol(view.RuntimeKind),
+            RuntimeProtocolMapper.ToProtocol(view.Provider),
+            view.RunnerPool,
+            view.RunnerId,
+            RuntimeProtocolMapper.ToProtocol(view.State),
+            view.FailureCode is null ? null : RuntimeProtocolMapper.ToProtocol(view.FailureCode.Value),
+            view.ProcessingVersion,
             view.Urls, view.ProviderReceiptJson, view.ControlCheckUrl,
             view.PublishedPorts ?? [], view.CreatedAt,
             view.RunningAt, view.ExpiresAt, view.StoppedAt);
@@ -116,8 +121,13 @@ public sealed class ListAdminRuntimesEndpoint(
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
         var items = await runtimes.ListAsync(new(
                 competitionId, request.CompetitionChallengeId, request.TeamId,
-                request.RuntimeKind, request.Provider, request.RunnerPool,
-                request.RunnerId, request.State, request.ExpiresBefore, request.HostPort),
+                request.RuntimeKind is null ? null : RuntimeProtocolMapper.ToDomain(request.RuntimeKind.Value),
+                request.Provider is null ? null : RuntimeProtocolMapper.ToDomain(request.Provider.Value),
+                request.RunnerPool,
+                request.RunnerId,
+                request.State is null ? null : RuntimeProtocolMapper.ToDomain(request.State.Value),
+                request.ExpiresBefore,
+                request.HostPort),
             position?.CreatedAt, position?.Id, request.Limit, ct);
         var next = items.Count == request.Limit
             ? cursors.Encode(CursorEndpoint, filterKey, new(items[^1].CreatedAt, items[^1].Id))

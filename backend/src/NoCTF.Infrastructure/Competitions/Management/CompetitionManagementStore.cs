@@ -14,7 +14,8 @@ namespace NoCTF.Infrastructure.Competitions.Management;
 public sealed class CompetitionManagementStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox? messageOutbox = null,
-    ICompetitionEventRecorder? eventRecorder = null) : ICompetitionManagementStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    CompetitionReadModelCache? readModels = null) : ICompetitionManagementStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -76,15 +77,30 @@ public sealed class CompetitionManagementStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
+        if (readModels is not null)
+            await readModels.InvalidateAsync(competition.Id, ct);
         return new(CompetitionCreationState.Created, Map(competition));
     }
 
-    public async Task<CompetitionView?> FindAsync(Guid competitionId, bool includeDraft, CancellationToken ct) =>
-        await Project(EntityQuery(includeDraft).Where(x => x.Id == competitionId))
-            .SingleOrDefaultAsync(ct);
+    public Task<CompetitionView?> FindAsync(
+        Guid competitionId,
+        bool includeDraft,
+        CancellationToken ct) =>
+        includeDraft || readModels is null
+            ? LoadAsync(competitionId, includeDraft, ct)
+            : readModels.GetAsync(
+                competitionId,
+                token => LoadAsync(competitionId, includeDraft: false, token),
+                ct);
 
-    public async Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken ct) =>
-        await Project(EntityQuery(includeDraft).OrderByDescending(x => x.StartAt)).ToListAsync(ct);
+    public async Task<IReadOnlyList<CompetitionView>> ListAsync(
+        bool includeDraft,
+        CancellationToken ct) =>
+        includeDraft || readModels is null
+            ? await LoadListAsync(includeDraft, ct)
+            : await readModels.ListAsync(
+                token => LoadListAsync(includeDraft: false, token),
+                ct);
 
     public async Task<CompetitionView?> UpdateAsync(
         UpdateCompetitionCommand command,
@@ -117,6 +133,8 @@ public sealed class CompetitionManagementStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
+        if (readModels is not null)
+            await readModels.InvalidateAsync(competition.Id, ct);
         return Map(competition);
     }
 
@@ -133,7 +151,8 @@ public sealed class CompetitionManagementStore(
                 && x.DeletedAt == null
                 && x.Status == expectedStatus
                 && x.Status != CompetitionStatus.Running
-                && x.Status != CompetitionStatus.Paused, ct);
+                && x.Status != CompetitionStatus.Paused
+                && x.Status != CompetitionStatus.Finished, ct);
         if (competition is null)
             return false;
         competition.DeletedAt = deletedAt;
@@ -149,8 +168,21 @@ public sealed class CompetitionManagementStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
+        if (readModels is not null)
+            await readModels.InvalidateAsync(competition.Id, ct);
         return true;
     }
+
+    private Task<CompetitionView?> LoadAsync(
+        Guid competitionId,
+        bool includeDraft,
+        CancellationToken ct) =>
+        Project(EntityQuery(includeDraft).Where(competition => competition.Id == competitionId))
+            .SingleOrDefaultAsync(ct);
+
+    private Task<CompetitionView[]> LoadListAsync(bool includeDraft, CancellationToken ct) =>
+        Project(EntityQuery(includeDraft).OrderByDescending(competition => competition.StartAt))
+            .ToArrayAsync(ct);
 
     private IQueryable<Competition> EntityQuery(bool includeDraft) =>
         db.Competitions.AsNoTracking()

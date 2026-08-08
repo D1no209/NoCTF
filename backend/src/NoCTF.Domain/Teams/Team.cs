@@ -6,13 +6,16 @@ namespace NoCTF.Domain.Teams;
 public sealed class Team
 {
     public Guid Id { get; set; }
+    [ConcurrencyCheck]
+    public long ConcurrencyVersion { get; set; }
+    public long CriticalSectionVersion { get; set; }
     public Guid CompetitionId { get; set; }
-    public Guid? TeamProfileId { get; set; }
     [MaxLength(128)]
     public string Name { get; set; } = string.Empty;
     [MaxLength(128)]
     public string NormalizedName { get; set; } = string.Empty;
-    public string? AvatarUrl { get; set; }
+    public Guid? AvatarFileId { get; set; }
+    public NoCTF.Domain.Storage.StoredFile? AvatarFile { get; set; }
     public Guid CaptainId { get; set; }
     public Guid[] MemberIds { get; set; } = [];
     [StringLength(32, MinimumLength = 32)]

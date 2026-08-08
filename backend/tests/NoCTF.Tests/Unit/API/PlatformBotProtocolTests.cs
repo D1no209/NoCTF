@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Endpoints.Administration.Platform;
 using NoCTF.Domain.Identity;
 
@@ -11,20 +12,18 @@ public sealed class PlatformBotProtocolTests
 
     [Test]
     [Arguments("\"Organizer\"")]
-    [Arguments("1")]
-    public async Task CreateBot_accepts_named_and_legacy_numeric_role(string roleJson)
+    public async Task CreateBot_accepts_named_role(string roleJson)
     {
         var request = JsonSerializer.Deserialize<CreatePlatformBotRequest>(
             $$"""{"userName":"repository-bot","role":{{roleJson}}}""",
             WebJson);
 
         await Assert.That(request).IsNotNull();
-        await Assert.That(request!.Role).IsEqualTo(UserRole.Organizer);
+        await Assert.That(request!.Role).IsEqualTo(UserRoleProtocol.Organizer);
     }
 
     [Test]
     [Arguments("\"User\"")]
-    [Arguments("0")]
     public async Task CreateBot_accepts_notification_relay_role(string roleJson)
     {
         var request = JsonSerializer.Deserialize<CreatePlatformBotRequest>(
@@ -32,7 +31,7 @@ public sealed class PlatformBotProtocolTests
             WebJson);
 
         await Assert.That(request).IsNotNull();
-        await Assert.That(request!.Role).IsEqualTo(UserRole.User);
+        await Assert.That(request!.Role).IsEqualTo(UserRoleProtocol.User);
     }
 
     [Test]

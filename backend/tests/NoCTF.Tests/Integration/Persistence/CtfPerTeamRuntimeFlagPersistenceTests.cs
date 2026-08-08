@@ -78,9 +78,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 dispatch,
                 db,
                 templates,
-                new PostgresRuntimePublishedPortAllocator(
-                    db,
-                    new RuntimePublishedPortRange()),
                 outbox,
                 cancellationToken);
             var claim = outbox.RunnerPoolMessages.OfType<ClaimContainerRuntime>().Single();

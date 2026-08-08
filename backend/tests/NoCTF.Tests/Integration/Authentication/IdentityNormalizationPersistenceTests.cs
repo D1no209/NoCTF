@@ -85,7 +85,7 @@ public sealed class IdentityNormalizationPersistenceTests
                     cancellationToken);
                 var login = await store.FindByLoginAsync("  pLaYeR_oNe  ", cancellationToken);
 
-                await Assert.That(duplicate.ErrorCode).IsEqualTo("username_conflict");
+                await Assert.That(duplicate.FailureCode).IsEqualTo(RegisterUserFailureCode.UserNameConflict);
                 await Assert.That(login!.Id).IsEqualTo(firstUserId);
             }
 
@@ -96,7 +96,7 @@ public sealed class IdentityNormalizationPersistenceTests
                     .SingleAsync(cancellationToken);
                 var store = new TeamRegistrationStore(db, new NoopOutbox());
                 var created = await new CreateTeam(store).ExecuteAsync(
-                    new(competitionId, firstUserId, "  Alpha  ", null, now),
+                    new(competitionId, firstUserId, "  Alpha  ", now),
                     cancellationToken);
 
                 await Assert.That(created.Succeeded).IsTrue();
@@ -107,11 +107,11 @@ public sealed class IdentityNormalizationPersistenceTests
             {
                 var store = new TeamRegistrationStore(db, new NoopOutbox());
                 var duplicate = await new CreateTeam(store).ExecuteAsync(
-                    new(competitionId, secondUserId, "alpha", null, now.AddTicks(1)),
+                    new(competitionId, secondUserId, "alpha", now.AddTicks(1)),
                     cancellationToken);
 
-                await Assert.That(duplicate.ErrorCode)
-                    .IsEqualTo("team_name_or_membership_conflict");
+                await Assert.That(duplicate.FailureCode)
+                    .IsEqualTo(TeamRegistrationFailure.TeamNameOrMembershipConflict);
             }
         });
     }

@@ -183,17 +183,42 @@ public sealed class RuntimeClaimHandler(
         try
         {
             var nextVersion = checked(processingVersion + 1);
-            var updated = await db.RuntimeInstances
-                .Where(candidate => candidate.Id == runtimeInstanceId
-                    && candidate.State == RuntimeState.Queued
-                    && candidate.ProcessingVersion == processingVersion
-                    && candidate.Generation == generation)
-                .ExecuteUpdateAsync(
-                    setters => setters
-                        .SetProperty(candidate => candidate.State, RuntimeState.Provisioning)
-                        .SetProperty(candidate => candidate.RunnerId, runnerId)
-                        .SetProperty(candidate => candidate.ProcessingVersion, nextVersion),
+            int updated;
+            if (db.Database.IsRelational())
+            {
+                updated = await db.RuntimeInstances
+                    .Where(candidate => candidate.Id == runtimeInstanceId
+                        && candidate.State == RuntimeState.Queued
+                        && candidate.ProcessingVersion == processingVersion
+                        && candidate.Generation == generation)
+                    .ExecuteUpdateAsync(
+                        setters => setters
+                            .SetProperty(candidate => candidate.State, RuntimeState.Provisioning)
+                            .SetProperty(candidate => candidate.RunnerId, runnerId)
+                            .SetProperty(candidate => candidate.ProcessingVersion, nextVersion),
+                        cancellationToken);
+            }
+            else
+            {
+                var tracked = await db.RuntimeInstances.SingleOrDefaultAsync(
+                    candidate => candidate.Id == runtimeInstanceId
+                        && candidate.State == RuntimeState.Queued
+                        && candidate.ProcessingVersion == processingVersion
+                        && candidate.Generation == generation,
                     cancellationToken);
+                if (tracked is null)
+                {
+                    updated = 0;
+                }
+                else
+                {
+                    tracked.State = RuntimeState.Provisioning;
+                    tracked.RunnerId = runnerId;
+                    tracked.ProcessingVersion = nextVersion;
+                    await db.SaveChangesAsync(cancellationToken);
+                    updated = 1;
+                }
+            }
             if (updated == 0)
             {
                 var assignmentStillOwnsClaim = await db.RuntimeInstances.AsNoTracking().AnyAsync(

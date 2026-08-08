@@ -41,7 +41,7 @@ public sealed class SendEmailVerificationTestEndpoint(
                     title: "SMTP delivery is not configured.",
                     extensions: new Dictionary<string, object?>
                     {
-                        ["code"] = "email_delivery_not_configured"
+                        ["code"] = PlatformProblemCode.EmailDeliveryNotConfigured
                     })
             };
         }
@@ -53,7 +53,7 @@ public sealed class SendEmailVerificationTestEndpoint(
                 detail: "Check the SMTP host, credentials, encryption mode, and network access.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "smtp_delivery_failed",
+                    ["code"] = PlatformProblemCode.SmtpDeliveryFailed,
                     ["failure"] = exception.Failure.ToString()
                 });
         }

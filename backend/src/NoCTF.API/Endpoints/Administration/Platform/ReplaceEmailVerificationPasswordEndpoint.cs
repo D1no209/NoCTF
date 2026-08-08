@@ -58,7 +58,7 @@ public sealed class ReplaceEmailVerificationPasswordEndpoint(
                 detail: "Reload the configuration before replacing the SMTP password.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "email_verification_configuration_conflict"
+                    ["code"] = PlatformProblemCode.EmailVerificationConfigurationConflict
                 });
         }
         if (result.State == EmailVerificationConfigurationUpdateState.Invalid)
@@ -68,7 +68,7 @@ public sealed class ReplaceEmailVerificationPasswordEndpoint(
                 title: "SMTP password is invalid.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "smtp_password_invalid"
+                    ["code"] = PlatformProblemCode.SmtpPasswordInvalid
                 });
         }
 

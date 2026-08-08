@@ -14,40 +14,46 @@ using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.Submissions;
 using NoCTF.Infrastructure.Teams;
 using NoCTF.Infrastructure.DataExports;
+using NoCTF.Infrastructure.Caching;
 
 namespace NoCTF.Infrastructure;
 
 public static class ServiceRegistration
 {
-    public static async Task MigrateNoCtfAsync(
+    public static async Task InitializeNoCtfAsync(
         this IServiceProvider services,
         CancellationToken cancellationToken = default)
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-        await db.Database.MigrateAsync(cancellationToken);
+        if (db.Database.IsRelational())
+            await db.Database.MigrateAsync(cancellationToken);
+        else
+            await db.Database.EnsureCreatedAsync(cancellationToken);
         await scope.ServiceProvider.GetRequiredService<AdministratorBootstrapper>()
             .SeedAsync(cancellationToken);
     }
 
     public static IServiceCollection AddNoCtfInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool development = false)
     {
         var exporting = configuration.GetValue<bool>("OpenApi:Exporting");
 
-        services.AddNoCtfPersistence(configuration, exporting);
-        services.AddNoCtfMessaging(exporting);
-        services.AddNoCtfRuntime(configuration);
+        services.AddNoCtfCaching(configuration, development);
+        services.AddNoCtfPersistence(configuration, exporting, development);
+        services.AddNoCtfMessaging(exporting, development);
+        services.AddNoCtfRuntime(configuration, development);
         services.AddNoCtfSubmissions();
         services.AddNoCtfScoring();
-        services.AddNoCtfNotifications();
+        services.AddNoCtfNotifications(development);
         services.AddNoCtfTeams();
         services.AddNoCtfChallenges();
         services.AddNoCtfStorage(configuration);
-        services.AddNoCtfCompetitions();
+        services.AddNoCtfCompetitions(development);
         services.AddNoCtfAuthentication();
-        services.AddNoCtfAdministration(configuration, exporting);
+        services.AddNoCtfAdministration(configuration, exporting, development);
         services.AddNoCtfDataExports();
 
         return services;

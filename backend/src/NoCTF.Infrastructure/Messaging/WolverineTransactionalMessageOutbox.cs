@@ -71,3 +71,41 @@ public sealed class OpenApiTransactionalMessageOutbox : ITransactionalMessageOut
         where T : IRunnerNodeMessage => ValueTask.CompletedTask;
     public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
 }
+
+public sealed class DevelopmentTransactionalMessageOutbox(IMessageBus bus)
+    : ITransactionalMessageOutbox
+{
+    private readonly List<Func<ValueTask>> pending = [];
+
+    public ValueTask PublishAsync<T>(T message)
+    {
+        pending.Add(() => bus.PublishAsync(message));
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt)
+    {
+        pending.Add(() => bus.ScheduleAsync(message, scheduledAt));
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
+        PublishAsync(message);
+
+    public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
+        where T : IRunnerPoolMessage => ScheduleAsync(message, scheduledAt);
+
+    public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
+        PublishAsync(message);
+
+    public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+        where T : IRunnerNodeMessage => ScheduleAsync(message, scheduledAt);
+
+    public async Task FlushOutgoingMessagesAsync()
+    {
+        var batch = pending.ToArray();
+        pending.Clear();
+        foreach (var publish in batch)
+            await publish();
+    }
+}

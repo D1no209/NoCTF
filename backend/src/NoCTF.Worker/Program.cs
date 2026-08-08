@@ -14,9 +14,12 @@ using NoCTF.Infrastructure.Administration;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Application.Competitions.Events;
+using Wolverine.Runtime.Agents;
+using NoCTF.Infrastructure.Messaging;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddNoCtfInfrastructure(builder.Configuration);
+builder.Services.AddSingularAgent<MaintenanceTickAgent>();
 builder.Services.AddNoCtfPlatformLogging(
     builder.Configuration,
     PlatformLogService.Worker);
@@ -73,22 +76,4 @@ builder.UseWolverine(options =>
 });
 
 var host = builder.Build();
-await host.StartAsync();
-await using (var scope = host.Services.CreateAsyncScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-    var schedules = await db.DurableMaintenanceSchedules.ToDictionaryAsync(
-        schedule => schedule.Kind,
-        schedule => schedule.ProcessingVersion);
-    var bus = host.Services.GetRequiredService<IMessageBus>();
-    await bus.SendAsync(new ReconcileRunnerAssignments(
-        DateTimeOffset.UtcNow,
-        schedules[MaintenanceChainKind.RunnerAssignmentReconciliation]));
-    await bus.SendAsync(new AdvanceCompetitionLifecycle(
-        DateTimeOffset.UtcNow,
-        schedules[MaintenanceChainKind.CompetitionLifecycle]));
-    await bus.SendAsync(new DispatchAwdCheckers(
-        DateTimeOffset.UtcNow,
-        schedules[MaintenanceChainKind.AwdCheckerDispatch]));
-}
-await host.WaitForShutdownAsync();
+await host.RunAsync();

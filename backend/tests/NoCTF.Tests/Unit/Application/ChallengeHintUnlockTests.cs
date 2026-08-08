@@ -5,11 +5,11 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class ChallengeHintUnlockTests
 {
     [Test]
-    [Arguments(HintUnlockFailure.NotFound, "hint_not_found")]
-    [Arguments(HintUnlockFailure.InsufficientScore, "insufficient_score")]
+    [Arguments(HintUnlockFailure.NotFound, ChallengeHintFailureCode.HintNotFound)]
+    [Arguments(HintUnlockFailure.InsufficientScore, ChallengeHintFailureCode.InsufficientScore)]
     public async Task Unlock_maps_store_failures_to_stable_codes(
         HintUnlockFailure failure,
-        string expectedCode)
+        ChallengeHintFailureCode expectedCode)
     {
         var result = await new UnlockChallengeHint(new Store(
                 HintUnlockAttempt.Failed(failure)))
@@ -21,32 +21,27 @@ public sealed class ChallengeHintUnlockTests
                 DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.ErrorCode).IsEqualTo(expectedCode);
+        await Assert.That(result.FailureCode).IsEqualTo(expectedCode);
     }
 
     [Test]
     public async Task Unlock_preserves_created_fact_state()
     {
-        var hint = new ChallengeHintView(
-            Guid.NewGuid(),
-            Guid.NewGuid(),
-            "First clue",
-            0,
-            DateTimeOffset.UtcNow,
-            null,
-            DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow);
+        var competitionChallengeId = Guid.NewGuid();
+        var hintId = Guid.NewGuid();
+        var submissionId = Guid.NewGuid();
         var result = await new UnlockChallengeHint(new Store(
-                HintUnlockAttempt.Success(new HintUnlockResult(hint, true))))
+                HintUnlockAttempt.Success(new HintUnlockResult(submissionId, true))))
             .ExecuteAsync(
                 Guid.NewGuid(),
-                hint.CompetitionChallengeId,
-                hint.Id,
+                competitionChallengeId,
+                hintId,
                 Guid.NewGuid(),
                 DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(result.Value!.Created).IsTrue();
+        await Assert.That(result.Value.SubmissionId).IsEqualTo(submissionId);
     }
 
     private sealed class Store(HintUnlockAttempt attempt) : IChallengeHintStore

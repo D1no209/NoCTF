@@ -44,9 +44,9 @@ public sealed class ExtendRuntimeEndpoint(
             RuntimeAction.Extend,
             TimeSpan.FromSeconds(request.Seconds),
             DateTimeOffset.UtcNow), ct);
-        if (result.ErrorCode is "runtime_not_found" or "runtime_action_unsupported")
+        if (result.FailureCode is RuntimeMutationFailureCode.RuntimeNotFound or RuntimeMutationFailureCode.RuntimeActionUnsupported)
             return TypedResults.NotFound();
-        if (result.ErrorCode is "runtime_state_conflict" or "runtime_conflict")
+        if (result.FailureCode is RuntimeMutationFailureCode.RuntimeStateConflict or RuntimeMutationFailureCode.RuntimeConflict)
             return TypedResults.Conflict();
         if (!result.Succeeded)
             return TypedResults.Problem(

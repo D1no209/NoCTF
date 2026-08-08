@@ -2,7 +2,11 @@
 
 ## Provider
 
-统一 `IObjectStorage`：S3Compatible（生产默认）与 LocalFileSystem（开发/测试/单节点）。Bucket/目录不公开。平台生成 ObjectKey；原文件名只作显示。
+统一 `IObjectStorage`：S3Compatible（生产默认）与 LocalFileSystem（开发/测试/单节点）。Bucket/目录不公开。平台生成不可猜测 ObjectKey；原文件名只进入不可变 `files.file_name`。
+
+业务表不再保存 ObjectKey、文件名、MIME、长度或 SHA256；只保存 `FileId`，所有 FK 为 Restrict。Users/Teams Avatar、Competition Poster、Platform Logo、ChallengeAttachment、PatchUpload、DataExport 都引用 `files`。
+
+上传顺序固定为：受控临时文件计算长度/SHA256 → 创建 File 行 → 上传最终对象 → 事务锁定 File 并建立业务引用。替换引用时向 Wolverine Outbox 投递 `CleanupFile(FileId)`；Worker 检查全部引用，确认无引用后先删对象、成功再硬删 File 行，失败按 Wolverine 重试。File 元数据不可编辑，改名/MIME 必须上传新 File。
 
 对象键：
 
@@ -13,11 +17,11 @@ fix-uploads/{patchUploadId}
 
 OVA 不属于对象存储，由 Runtime 配置外部 URL。
 
-数据库保存 ObjectKey、显示文件名、内容类型、字节数、SHA-256。SHA 在流式上传中计算。应用不设置 HTTP payload/file size 上限。
+只有 `files` 保存 ObjectKey、显示文件名、内容类型、字节数、SHA-256。SHA 在流式上传中计算；业务表只保存 FileId。
 
 ## Attachment
 
-Attachment 属于 Challenge 模板。内容不可原位替换；修改内容创建新 Id。显示名称可修改。存在 Flag Specification、RandomOne 选择或发布引用时禁止删除。
+Attachment 属于 Challenge 模板。文件内容、显示名称和 MIME 都不可原位修改；任何变化都上传新 File 并替换业务引用。存在 Flag Specification、RandomOne 选择或发布引用时禁止删除。
 
 下载 API 先授权。All 策略允许列出 AttachmentId/显示元数据并按 Id 下载；RandomOne 策略只暴露不带 Id 的单数下载路由，并在该请求中完成隐式选择。S3Compatible 返回 60 秒预签名 GET 的 302；LocalFileSystem 由 API stream。RandomOne 玩家不获得候选 AttachmentId/ObjectKey/列表，任何玩家都不获得 FlagId。
 

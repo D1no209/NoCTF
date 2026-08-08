@@ -39,9 +39,9 @@ public sealed class AwdpCheckerExecutorTests
         await Assert.That(request.Environment["TARGET_READY_TIMEOUT_SECONDS"]).IsEqualTo("30");
         await Assert.That(request.Environment["NOCTF_CALLBACK_TOKEN"]).IsEqualTo("callback-token");
         await Assert.That(request.Environment).DoesNotContainKey("OBJECT_KEY");
-        await Assert.That(request.Labels["noctf.io/purpose"]).IsEqualTo("awdp-checker");
-        await Assert.That(request.Labels["noctf.io/managed"]).IsEqualTo("true");
-        await Assert.That(request.Labels["noctf.io/generation"]).IsEqualTo("3");
+        await Assert.That(request.Labels).IsEmpty();
+        await Assert.That(request.NetworkPurpose)
+            .IsEqualTo(ContainerNetworkPurpose.AwdpVerification);
         await Assert.That(request.PortMappings).IsEmpty();
         await Assert.That(request.AllowInternalCallback).IsTrue();
     }

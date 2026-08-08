@@ -22,5 +22,13 @@ internal sealed class DataExportConfiguration : IEntityTypeConfiguration<DataExp
         });
         builder.HasIndex(item => item.Status);
         builder.HasIndex(item => item.PurgeAt);
+        builder.HasIndex(item => new
+        {
+            item.RequestedByUserId,
+            item.Scope,
+            item.ActiveSlot
+        }).IsUnique();
+        builder.HasOne(item => item.File).WithMany()
+            .HasForeignKey(item => item.FileId).OnDelete(DeleteBehavior.Restrict);
     }
 }

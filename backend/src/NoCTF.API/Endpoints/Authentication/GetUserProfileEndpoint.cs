@@ -47,7 +47,7 @@ public sealed class GetUserProfileEndpoint(
 
         var avatarUrl = CurrentUserMapping.AvatarUrl(
             profile.Id,
-            profile.AvatarObjectKey,
+            profile.AvatarFileId,
             links,
             HttpContext);
         return TypedResults.Ok(new PublicUserProfileResponse(

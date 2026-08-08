@@ -4,15 +4,38 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Submissions.Intake;
 
-internal static class SubmissionAttemptLock
+public sealed class SubmissionAttemptCriticalSection(LocalCriticalSectionRegistry localLeases)
 {
-    public static Task AcquireAsync(
+    public async ValueTask<IAsyncDisposable> AcquireAsync(
         NoCtfDbContext db,
         Guid teamId,
         Guid competitionChallengeId,
         SubmissionKind kind,
-        CancellationToken cancellationToken) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({"s" + teamId.ToString("N") + competitionChallengeId.ToString("N") + ((short)kind).ToString()}, 0))",
-            cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        if (!db.Database.IsRelational())
+        {
+            return await localLeases.AcquireAsync(
+                "submission-attempt",
+                $"{teamId:N}:{competitionChallengeId:N}:{(short)kind}",
+                cancellationToken);
+        }
+
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(TimeSpan.FromSeconds(2));
+        try
+        {
+            var affected = await db.Teams.Where(team => team.Id == teamId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    team => team.CriticalSectionVersion,
+                    team => team.CriticalSectionVersion + 1), budget.Token);
+            if (affected != 1)
+                throw new DbUpdateConcurrencyException("The submission team no longer exists.");
+            return NoopCriticalSectionLease.Instance;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new FeatureCriticalSectionTimeoutException("submission-attempt");
+        }
+    }
 }

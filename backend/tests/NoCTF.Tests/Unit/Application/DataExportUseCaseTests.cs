@@ -68,6 +68,8 @@ public sealed class DataExportUseCaseTests
             null,
             null,
             null,
+            null,
+            null,
             null);
         store.RequestAsync(
                 Arg.Any<RequestDataExportCommand>(),

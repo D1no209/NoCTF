@@ -20,20 +20,11 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(user => user.NormalizedUserName).IsUnique();
         builder.HasIndex(user => user.NormalizedEmail).IsUnique()
             .HasFilter("normalized_email <> ''");
+        builder.HasOne(user => user.AvatarFile).WithMany()
+            .HasForeignKey(user => user.AvatarFileId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(table => table.HasCheckConstraint(
             "ck_users_bot_role",
             "\"kind\" <> 1 OR \"role\" IN (0, 1)"));
-    }
-}
-
-internal sealed class UserAccountLifecycleAuditConfiguration
-    : IEntityTypeConfiguration<UserAccountLifecycleAudit>
-{
-    public void Configure(EntityTypeBuilder<UserAccountLifecycleAudit> builder)
-    {
-        builder.ToTable("user_account_lifecycle_audits");
-        builder.Property(audit => audit.Action).HasConversion<short>();
-        builder.HasIndex(audit => new { audit.TargetUserId, audit.OccurredAt });
-        builder.HasIndex(audit => new { audit.ActorUserId, audit.OccurredAt });
     }
 }

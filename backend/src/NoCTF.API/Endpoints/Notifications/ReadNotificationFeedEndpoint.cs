@@ -67,7 +67,7 @@ public sealed class ReadNotificationFeedEndpoint(
                 title: "Invalid cursor.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "cursor_invalid"
+                    ["code"] = NotificationFailureCode.CursorInvalid
                 });
         }
 
@@ -90,15 +90,20 @@ public sealed class ReadNotificationFeedEndpoint(
             ct);
         var next = items.Count == 0
             ? position
-            : new KeysetNotificationPosition(items[^1].CreatedAt, items[^1].Id);
+            : new KeysetNotificationPosition(items[^1].SentAt, items[^1].Id);
         return TypedResults.Ok(new NotificationFeedResponse(
             items.Select(item => new NotificationResponse(
                 item.Id,
-                item.CompetitionId,
-                item.EntityId,
-                item.Kind,
-                JsonSerializer.Deserialize<JsonElement>(item.PayloadJson),
-                item.CreatedAt)).ToArray(),
+                item.SourceType,
+                item.SourceId,
+                item.TargetType,
+                item.TargetId,
+                NotificationProtocolMapper.ToProtocol(item.Kind),
+                JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
+                item.RelatedType,
+                item.RelatedId,
+                item.ReplyToId,
+                item.SentAt)).ToArray(),
             Encode(cursorScope, next)));
     }
 

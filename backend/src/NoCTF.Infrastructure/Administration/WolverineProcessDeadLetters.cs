@@ -9,6 +9,15 @@ using Wolverine.Runtime;
 
 namespace NoCTF.Infrastructure.Administration;
 
+public interface IProcessDeadLetterStore
+{
+    Task<IReadOnlyList<DeadLetterEnvelope>> ListAsync(
+        int limit,
+        CancellationToken cancellationToken);
+    Task<DeadLetterEnvelope?> FindAsync(Guid messageId, CancellationToken cancellationToken);
+    Task<bool> ReplayAsync(Guid messageId, CancellationToken cancellationToken);
+}
+
 public static class WolverinePersistenceSchemas
 {
     public const string Api = "wolverine_api";
@@ -18,7 +27,7 @@ public static class WolverinePersistenceSchemas
     public static IReadOnlyList<string> All { get; } = [Api, Worker, Runner];
 }
 
-public sealed class WolverineProcessDeadLetters : IAsyncDisposable
+public sealed class WolverineProcessDeadLetters : IProcessDeadLetterStore, IAsyncDisposable
 {
     private readonly IHost storageHost;
     private readonly IWolverineRuntime storageRuntime;
@@ -133,4 +142,5 @@ public sealed class WolverineProcessDeadLetters : IAsyncDisposable
             initializationLock.Release();
         }
     }
+
 }

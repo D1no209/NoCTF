@@ -80,9 +80,6 @@ public sealed class DockerContainerLifecycleTests
             ContainerReceipt? receipt = null;
             try
             {
-                var hostPort = RandomNumberGenerator.GetInt32(
-                    RuntimePublishedPortRange.StartPort,
-                    RuntimePublishedPortRange.EndPort + 1);
                 var request = new ContainerRequest(
                     operationId,
                     RuntimeProvider.Docker,
@@ -96,7 +93,7 @@ public sealed class DockerContainerLifecycleTests
                         ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
                         ["noctf.io/generation"] = "1"
                     },
-                    new Dictionary<int, int> { [8080] = hostPort },
+                    new Dictionary<int, int> { [8080] = 0 },
                     new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
                     new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                     TimeSpan.FromMinutes(5),
@@ -119,7 +116,7 @@ public sealed class DockerContainerLifecycleTests
 
                 await Assert.That(receipt.InternalHost)
                     .IsEqualTo("target");
-                await Assert.That(receipt.PortMappings[8080]).IsEqualTo(hostPort);
+                await Assert.That(receipt.PortMappings[8080]).IsGreaterThan(0);
                 await Assert.That(replay.ResourceId).IsEqualTo(receipt.ResourceId);
                 await Assert.That(replay.PortMappings[8080])
                     .IsEqualTo(receipt.PortMappings[8080]);
@@ -201,18 +198,10 @@ public sealed class DockerContainerLifecycleTests
                 DockerEndpoint(),
                 platformNetworkName,
                 "localhost"));
-            var publishedPorts = new HashSet<int>();
-            while (publishedPorts.Count < operationIds.Length)
-            {
-                publishedPorts.Add(RandomNumberGenerator.GetInt32(
-                    RuntimePublishedPortRange.StartPort,
-                    RuntimePublishedPortRange.EndPort + 1));
-            }
-            var ports = publishedPorts.ToArray();
             var receipts = new List<ContainerReceipt>();
             try
             {
-                var provisionTasks = operationIds.Select((operationId, index) =>
+                var provisionTasks = operationIds.Select(operationId =>
                     lifecycle.CreateAsync(
                         new ContainerRequest(
                             operationId,
@@ -221,7 +210,7 @@ public sealed class DockerContainerLifecycleTests
                             ["/bin/sh", "-c", "mkdir -p /www && echo target > /www/index.html && exec httpd -f -p 8080 -h /www"],
                             new Dictionary<string, string>(),
                             new Dictionary<string, string>(),
-                            new Dictionary<int, int> { [8080] = ports[index] },
+                            new Dictionary<int, int> { [8080] = 0 },
                             new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
                             new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                             TimeSpan.FromMinutes(5),
@@ -235,7 +224,7 @@ public sealed class DockerContainerLifecycleTests
                 for (var index = 0; index < receipts.Count; index++)
                 {
                     var receipt = receipts[index];
-                    await Assert.That(receipt.PortMappings[8080]).IsEqualTo(ports[index]);
+                    await Assert.That(receipt.PortMappings[8080]).IsGreaterThan(0);
                     var expanded = RuntimeUrlExpander.ExpandContainer(
                         receipt,
                         [new RuntimeUrlBinding(
@@ -244,13 +233,15 @@ public sealed class DockerContainerLifecycleTests
                             ContainerPort: 8080)],
                         null);
                     await Assert.That(expanded.Urls.Single())
-                        .IsEqualTo($"http://localhost:{ports[index]}/");
+                        .IsEqualTo($"http://localhost:{receipt.PortMappings[8080]}/");
                     var response = await GetEventuallyAsync(
                         http,
                         expanded.Urls.Single(),
                         cancellationToken);
                     await Assert.That(response.Trim()).IsEqualTo("target");
                 }
+                await Assert.That(receipts.Select(item => item.PortMappings[8080]).Distinct())
+                    .Count().IsEqualTo(receipts.Count);
             }
             finally
             {
@@ -286,14 +277,6 @@ public sealed class DockerContainerLifecycleTests
                 DockerEndpoint(),
                 platformNetworkName,
                 "localhost"));
-            var ports = new HashSet<int>();
-            while (ports.Count < 2)
-            {
-                ports.Add(RandomNumberGenerator.GetInt32(
-                    RuntimePublishedPortRange.StartPort,
-                    RuntimePublishedPortRange.EndPort + 1));
-            }
-            var allocatedPorts = ports.ToArray();
             var labels = new Dictionary<string, string>
             {
                 ["noctf.io/managed"] = "true",
@@ -308,7 +291,7 @@ public sealed class DockerContainerLifecycleTests
                 ["sleep", "300"],
                 new Dictionary<string, string>(),
                 labels,
-                new Dictionary<int, int> { [8080] = allocatedPorts[0] },
+                new Dictionary<int, int> { [8080] = 0 },
                 new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
                 new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                 TimeSpan.FromMinutes(5),
@@ -326,11 +309,11 @@ public sealed class DockerContainerLifecycleTests
                         {
                             PortMappings = new Dictionary<int, int>
                             {
-                                [8080] = allocatedPorts[1]
+                                [8080] = 61000
                             }
                         },
                         cancellationToken);
-                await Assert.That(changedPort).Throws<InvalidOperationException>();
+                await Assert.That(changedPort).Throws<ArgumentOutOfRangeException>();
 
                 var generationTwoLabels = labels.ToDictionary(
                     pair => pair.Key,
@@ -349,12 +332,12 @@ public sealed class DockerContainerLifecycleTests
                 var existing = await docker.Containers.InspectContainerAsync(
                     receipt.ResourceId,
                     cancellationToken);
-                string? actualHostPort = null;
-                if (existing.HostConfig?.PortBindings is { } actualBindings
+                IReadOnlyList<string> actualHostPorts = [];
+                if (existing.NetworkSettings?.Ports is { } actualBindings
                     && actualBindings.TryGetValue("8080/tcp", out var portBindings))
-                    actualHostPort = portBindings.SingleOrDefault()?.HostPort;
-                await Assert.That(actualHostPort)
-                    .IsEqualTo(allocatedPorts[0].ToString(
+                    actualHostPorts = [.. portBindings.Select(binding => binding.HostPort).Distinct()];
+                await Assert.That(actualHostPorts).Contains(
+                    receipt.PortMappings[8080].ToString(
                         System.Globalization.CultureInfo.InvariantCulture));
             }
             finally

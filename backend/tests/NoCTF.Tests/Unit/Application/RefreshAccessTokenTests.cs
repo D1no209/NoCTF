@@ -1,6 +1,7 @@
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.RefreshJwt;
 using NoCTF.Domain.Identity;
+using NoCTF.Application.Storage;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -18,7 +19,7 @@ public sealed class RefreshAccessTokenTests
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.ErrorCode).IsEqualTo("refresh_invalid");
+        await Assert.That(result.FailureCode).IsEqualTo(RefreshAccessTokenFailureCode.RefreshInvalid);
     }
 
     [Test]
@@ -47,7 +48,7 @@ public sealed class RefreshAccessTokenTests
             .ExecuteAsync("refresh-token");
 
         await Assert.That(result.Succeeded).IsFalse();
-        await Assert.That(result.ErrorCode).IsEqualTo("refresh_invalid");
+        await Assert.That(result.FailureCode).IsEqualTo(RefreshAccessTokenFailureCode.RefreshInvalid);
     }
 
     private sealed class Store(AuthenticatedUser user) : IUserAuthenticationStore
@@ -67,7 +68,7 @@ public sealed class RefreshAccessTokenTests
             bool isEmailPublic,
             DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.FromResult<UserProfile?>(null);
-        public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, string objectKey,
+        public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, StoredObject storedObject,
             DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.FromResult<UserAvatarReplacement?>(null);
         public Task<string?> GetAvatarObjectKeyAsync(Guid userId,

@@ -7,10 +7,13 @@ internal static class MessagingInfrastructure
 {
     internal static IServiceCollection AddNoCtfMessaging(
         this IServiceCollection services,
-        bool exporting)
+        bool exporting,
+        bool development)
     {
         if (exporting)
             services.AddScoped<ITransactionalMessageOutbox, OpenApiTransactionalMessageOutbox>();
+        else if (development)
+            services.AddScoped<ITransactionalMessageOutbox, DevelopmentTransactionalMessageOutbox>();
         else
             services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
 

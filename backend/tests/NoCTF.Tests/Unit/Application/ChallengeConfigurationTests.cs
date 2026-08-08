@@ -43,7 +43,7 @@ public class ChallengeConfigurationTests
             "{}",
             DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("invalid_configuration");
+        await Assert.That(result.FailureCode).IsEqualTo(ChallengeConfigurationFailureCode.InvalidConfiguration);
         await Assert.That(store.UpdateCalls).IsEqualTo(0);
     }
 
@@ -62,7 +62,7 @@ public class ChallengeConfigurationTests
             ValidJson,
             DateTimeOffset.UtcNow);
 
-        await Assert.That(result.ErrorCode).IsEqualTo("configuration_conflict");
+        await Assert.That(result.FailureCode).IsEqualTo(ChallengeConfigurationFailureCode.ConfigurationConflict);
     }
 
     [Test]

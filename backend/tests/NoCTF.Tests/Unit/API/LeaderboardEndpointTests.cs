@@ -122,13 +122,13 @@ public sealed class LeaderboardEndpointTests
 
         using var response = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard");
-        var body = await response.Content.ReadFromJsonAsync<LeaderboardResponse>();
+        var body = await response.Content.ReadFromJsonAsync<LeaderboardProtocolResponse>();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(body).IsNotNull();
         await Assert.That(body!.Visibility)
-            .IsEqualTo(CompetitionLeaderboardVisibility.Blackout);
-        await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScope.Hidden);
+            .IsEqualTo(LeaderboardVisibilityProtocol.Blackout);
+        await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScopeProtocol.Hidden);
         await Assert.That(body.Entries).IsEmpty();
         await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
     }
@@ -148,13 +148,13 @@ public sealed class LeaderboardEndpointTests
 
         using var response = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard");
-        var body = await response.Content.ReadFromJsonAsync<LeaderboardResponse>();
+        var body = await response.Content.ReadFromJsonAsync<LeaderboardProtocolResponse>();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(body).IsNotNull();
         await Assert.That(body!.Visibility)
-            .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
-        await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
+            .IsEqualTo(LeaderboardVisibilityProtocol.Frozen);
+        await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScopeProtocol.Frozen);
         await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
     }
 

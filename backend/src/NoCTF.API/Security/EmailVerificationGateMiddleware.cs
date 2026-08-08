@@ -1,7 +1,15 @@
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.API.Serialization;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Security;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<EmailVerificationProblemCode>))]
+internal enum EmailVerificationProblemCode
+{
+    EmailVerificationRequired
+}
 
 public sealed class EmailVerificationGateMiddleware(RequestDelegate next)
 {
@@ -56,7 +64,7 @@ public sealed class EmailVerificationGateMiddleware(RequestDelegate next)
             detail: "Verify the account email address before using this feature.",
             extensions: new Dictionary<string, object?>
             {
-                ["code"] = "email_verification_required"
+                ["code"] = EmailVerificationProblemCode.EmailVerificationRequired
             }).ExecuteAsync(context);
     }
 }

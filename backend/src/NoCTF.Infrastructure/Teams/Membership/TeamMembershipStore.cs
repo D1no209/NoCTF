@@ -220,11 +220,15 @@ public sealed class TeamMembershipStore(
                 && (competition.OwnerId == userId || competition.ManagerIds.Contains(userId)),
             ct);
 
-    private Task AcquireMembershipLockAsync(
+    private async Task AcquireMembershipLockAsync(
         Guid competitionId,
         Guid userId,
-        CancellationToken ct) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({'m' + competitionId.ToString("N") + userId.ToString("N")}, 0))",
+        CancellationToken ct)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(
+            candidate => candidate.Id == userId,
             ct);
+        if (user is not null)
+            user.ConcurrencyVersion = checked(user.ConcurrencyVersion + 1);
+    }
 }

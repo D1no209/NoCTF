@@ -10,15 +10,29 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Flags;
+using NoCTF.Infrastructure.Challenges;
 
 namespace NoCTF.Infrastructure.Competitions.Awd;
 
 public sealed class PostgresAwdRoundCoordinator(
     NoCtfDbContext db,
-    AwdRoundConfigurationCatalog configurations,
+    IAwdRoundConfigurationCatalog configurations,
     ITransactionalMessageOutbox outbox,
-    TimeProvider timeProvider) : IAwdRoundCoordinator
+    TimeProvider timeProvider,
+    TeamChallengeCriticalSection teamChallengeCriticalSection) : IAwdRoundCoordinator
 {
+    public PostgresAwdRoundCoordinator(
+        NoCtfDbContext db,
+        IAwdRoundConfigurationCatalog configurations,
+        ITransactionalMessageOutbox outbox,
+        TimeProvider timeProvider)
+        : this(
+            db,
+            configurations,
+            outbox,
+            timeProvider,
+            new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry())) { }
+
     public async Task<MessageExecutionOutcome> GenerateFlagsAsync(
         GenerateAwdFlags message,
         CancellationToken cancellationToken)
@@ -34,7 +48,7 @@ public sealed class PostgresAwdRoundCoordinator(
         await using var transaction = ownsTransaction
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
-        var status = await CompetitionWriteLock.AcquireAsync(
+        var status = await CompetitionStateReader.ReadAsync(
             db,
             message.CompetitionId,
             cancellationToken);
@@ -93,6 +107,7 @@ public sealed class PostgresAwdRoundCoordinator(
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved
                 && !team.IsBanned
                 && team.DeletedAt == null)
+            .OrderBy(team => team.Id)
             .Select(team => team.Id)
             .ToListAsync(cancellationToken);
         var existingFlags = await db.ChallengeFlags.AsNoTracking()
@@ -125,6 +140,18 @@ public sealed class PostgresAwdRoundCoordinator(
         var candidates = existingFlags.Select(flag => flag.Flag).ToHashSet(StringComparer.Ordinal);
         foreach (var teamId in missing)
         {
+            await using var teamLease = await teamChallengeCriticalSection.AcquireAsync(
+                db,
+                teamId,
+                message.CompetitionChallengeId,
+                cancellationToken);
+            if (await db.ChallengeFlags.AsNoTracking().AnyAsync(flag =>
+                    flag.CompetitionChallengeId == message.CompetitionChallengeId
+                    && flag.TeamId == teamId
+                    && flag.SpecificationKind == SpecificationKind.AwdRound
+                    && flag.SpecificationId == message.Round.Value,
+                    cancellationToken))
+                continue;
             var context = new PerTeamFlagContext(
                 target.Competition.FlagDerivationSecret,
                 message.CompetitionId,
@@ -160,6 +187,7 @@ public sealed class PostgresAwdRoundCoordinator(
                     runtime.RunnerPool,
                     runtime.RunnerId));
             }
+            await db.SaveChangesAsync(cancellationToken);
         }
         var scheduledSuccessor = !ScheduleMatches(
             target.Challenge,
@@ -202,7 +230,7 @@ public sealed class PostgresAwdRoundCoordinator(
         await using var transaction = ownsTransaction
             ? await db.Database.BeginTransactionAsync(cancellationToken)
             : null;
-        var status = await CompetitionWriteLock.AcquireAsync(
+        var status = await CompetitionStateReader.ReadAsync(
             db,
             message.CompetitionId,
             cancellationToken);

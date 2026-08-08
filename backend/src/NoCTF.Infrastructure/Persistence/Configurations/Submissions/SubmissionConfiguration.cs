@@ -38,6 +38,9 @@ internal sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submiss
             .OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(table => table.HasCheckConstraint(
             "ck_submissions_payload",
-            "(kind IN (0, 1) AND submitted_flag IS NOT NULL AND submitted_flag_sha256 IS NOT NULL AND patch_upload_id IS NULL) OR (kind = 2 AND submitted_flag IS NULL AND submitted_flag_sha256 IS NULL AND patch_upload_id IS NOT NULL)"));
+            "(kind IN (0, 1) AND submitted_flag IS NOT NULL AND octet_length(submitted_flag_sha256) = 32 AND patch_upload_id IS NULL) "
+            + "OR (kind = 2 AND submitted_flag IS NULL AND submitted_flag_sha256 IS NULL AND patch_upload_id IS NOT NULL) "
+            + "OR (kind = 3 AND submitted_flag ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' AND submitted_flag_sha256 IS NULL AND patch_upload_id IS NULL) "
+            + "OR (kind = 4 AND submitted_flag ~ '^-?(0|[1-9][0-9]*)$' AND submitted_flag <> '0' AND submitted_flag <> '-0' AND submitted_flag::bigint BETWEEN -2147483648 AND 2147483647 AND submitted_flag_sha256 IS NULL AND patch_upload_id IS NULL)"));
     }
 }

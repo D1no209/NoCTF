@@ -9,6 +9,16 @@ public static class LeaderboardRevision
         Guid competitionId,
         CancellationToken ct)
     {
+        if (!db.Database.IsRelational())
+        {
+            var competition = await db.Competitions.SingleOrDefaultAsync(
+                candidate => candidate.Id == competitionId,
+                ct);
+            if (competition is null)
+                throw new InvalidOperationException("Competition disappeared while its leaderboard revision was being updated.");
+            competition.LeaderboardRevision = checked(competition.LeaderboardRevision + 1);
+            return;
+        }
         var changed = await db.Competitions
             .Where(competition => competition.Id == competitionId)
             .ExecuteUpdateAsync(

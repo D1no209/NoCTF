@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Administration.Challenges;
 using NoCTF.API.Security;
+using NoCTF.API.Endpoints.Submissions;
 using NoCTF.Application.Challenges.Hints;
 
 namespace NoCTF.API.Endpoints.Challenges;
@@ -11,7 +12,7 @@ public sealed class UnlockChallengeHintEndpoint(
     UnlockChallengeHint unlock,
     IUserContext user)
     : EndpointWithoutRequest<
-        Results<Created<ChallengeHintResponse>, Ok<ChallengeHintResponse>, NotFound, Conflict>>
+        Results<Accepted<AcceptedSubmissionResponse>, NotFound, Conflict>>
 {
     public override void Configure()
     {
@@ -24,7 +25,7 @@ public sealed class UnlockChallengeHintEndpoint(
         });
     }
 
-    public override async Task<Results<Created<ChallengeHintResponse>, Ok<ChallengeHintResponse>, NotFound, Conflict>> ExecuteAsync(
+    public override async Task<Results<Accepted<AcceptedSubmissionResponse>, NotFound, Conflict>> ExecuteAsync(
         CancellationToken ct)
     {
         var result = await unlock.ExecuteAsync(
@@ -34,13 +35,12 @@ public sealed class UnlockChallengeHintEndpoint(
             user.UserId,
             DateTimeOffset.UtcNow,
             ct);
-        if (result.ErrorCode == "hint_not_found")
+        if (result.FailureCode == ChallengeHintFailureCode.HintNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Conflict();
-        var response = ChallengeHintMapping.ToResponse(result.Value!.Hint);
-        return result.Value.Created
-            ? TypedResults.Created(HttpContext.Request.Path, response)
-            : TypedResults.Ok(response);
+        return TypedResults.Accepted(
+            uri: $"/api/v1/competitions/{Route<Guid>("competitionId")}/submissions/{result.Value!.SubmissionId}",
+            value: new AcceptedSubmissionResponse(result.Value.SubmissionId, DateTimeOffset.UtcNow));
     }
 }

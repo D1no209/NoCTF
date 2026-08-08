@@ -6,7 +6,9 @@ namespace NoCTF.Infrastructure.Notifications;
 
 internal static class NotificationInfrastructure
 {
-    internal static IServiceCollection AddNoCtfNotifications(this IServiceCollection services)
+    internal static IServiceCollection AddNoCtfNotifications(
+        this IServiceCollection services,
+        bool development)
     {
         services.AddScoped<ICompetitionHubAccess, CompetitionHubAccess>();
         services.AddScoped<INotificationReader, NotificationReader>();
@@ -14,8 +16,11 @@ internal static class NotificationInfrastructure
         services.AddScoped<ReadNotificationFeed>();
         services.AddScoped<CompetitionNotificationAudienceResolver>();
         services.AddScoped<CompetitionNotificationDelivery>();
-        services.AddSingleton<ILeaderboardRefreshPublisher, RedisLeaderboardRefreshPublisher>();
-        services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
+        if (!development)
+        {
+            services.AddSingleton<ILeaderboardRefreshPublisher, RedisLeaderboardRefreshPublisher>();
+            services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
+        }
         return services;
     }
 }

@@ -34,12 +34,12 @@ public sealed class DeleteChallengeTemplateEndpoint(
             ct);
         if (result.Succeeded)
             return TypedResults.NoContent();
-        return result.ErrorCode == "challenge_in_use"
+        return result.FailureCode == ChallengeTemplateDeleteFailureCode.ChallengeInUse
             ? TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Challenge was not deleted.",
                 detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode })
+                extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() })
             : TypedResults.NotFound();
     }
 }

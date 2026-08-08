@@ -27,21 +27,41 @@ using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Worker;
 
 public static class BackendMessageHandlers
 {
-    private static readonly TimeSpan RunnerReconciliationInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RunnerDependencyRetryDelay = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan CompetitionLifecycleInterval = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan AwdCheckerDispatchInterval = TimeSpan.FromSeconds(1);
 
-    public static Task Handle(
-        CleanupObject message,
+    public static async Task Handle(
+        CleanupFile message,
+        NoCtfDbContext db,
         IObjectStorage objects,
-        CancellationToken cancellationToken) =>
-        objects.DeleteAsync(message.ObjectKey, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM files WHERE id = {message.FileId} FOR UPDATE",
+            cancellationToken);
+        var file = await db.Files.SingleOrDefaultAsync(item => item.Id == message.FileId, cancellationToken);
+        if (file is null)
+            return;
+        var referenced = await db.Users.AnyAsync(item => item.AvatarFileId == file.Id, cancellationToken)
+            || await db.Teams.AnyAsync(item => item.AvatarFileId == file.Id, cancellationToken)
+            || await db.Competitions.AnyAsync(item => item.PosterFileId == file.Id, cancellationToken)
+            || await db.PlatformSettings.AnyAsync(item => item.LogoFileId == file.Id, cancellationToken)
+            || await db.Set<ChallengeAttachment>().AnyAsync(item => item.FileId == file.Id, cancellationToken)
+            || await db.PatchUploads.AnyAsync(item => item.FileId == file.Id, cancellationToken)
+            || await db.DataExports.AnyAsync(item => item.FileId == file.Id, cancellationToken);
+        if (referenced)
+            return;
+        await objects.DeleteAsync(file.ObjectKey, cancellationToken);
+        db.Files.Remove(file);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
 
     public static async Task Handle(
         SendEmailVerification message,
@@ -104,12 +124,6 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken)
     {
         const int batchSize = 500;
-        var schedule = await db.DurableMaintenanceSchedules.SingleAsync(
-            candidate => candidate.Kind == MaintenanceChainKind.AwdCheckerDispatch,
-            cancellationToken);
-        if (schedule.ProcessingVersion != message.ProcessingVersion)
-            return MessageExecutionOutcome.Superseded;
-
         var targets = await db.RuntimeInstances
             .Where(runtime => runtime.State == RuntimeState.Running
                 && ((runtime.NextCheckerDueAt != null
@@ -208,12 +222,8 @@ public static class BackendMessageHandlers
         }
 
         var pageIsFull = targets.Count == batchSize;
-        var nextAt = pageIsFull ? DateTimeOffset.UtcNow : DateTimeOffset.UtcNow.Add(AwdCheckerDispatchInterval);
-        AdvanceMaintenanceSchedule(schedule, nextAt);
-        await outbox.ScheduleAsync(new DispatchAwdCheckers(
-            nextAt,
-            schedule.ProcessingVersion,
-            pageIsFull ? targets[^1].Runtime.Id : null), nextAt);
+        if (pageIsFull)
+            await outbox.PublishAsync(new DispatchAwdCheckers(message.At, targets[^1].Runtime.Id));
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return applied ? MessageExecutionOutcome.Applied : MessageExecutionOutcome.Idempotent;
@@ -242,36 +252,37 @@ public static class BackendMessageHandlers
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
             return;
-        var recipients = competition.ManagerIds.Append(competition.OwnerId).Distinct().ToArray();
         var existing = await db.Notifications.AsNoTracking()
-            .Where(notification => recipients.Contains(notification.UserId)
-                && notification.CompetitionId == message.CompetitionId
-                && notification.EntityId == message.ChallengeFlagId
+            .AnyAsync(notification =>
+                notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                && notification.TargetId == message.CompetitionId
+                && notification.RelatedType == EntityReferenceKind.CompetitionChallenge
+                && notification.RelatedId == message.CompetitionChallengeId
                 && notification.Kind == NotificationKind.RuntimeStateChanged)
-            .Select(notification => notification.UserId)
-            .ToListAsync(cancellationToken);
+            ;
+        if (existing)
+            return;
         var payload = JsonSerializer.Serialize(new
         {
+            schemaVersion = 1,
             code = "awd_flag_injection_failed",
             message.CompetitionChallengeId,
             message.ChallengeFlagId,
             message.Generation,
             message.ProcessingVersion
         });
-        foreach (var userId in recipients.Except(existing))
+        db.Notifications.Add(new Notification
         {
-            db.Notifications.Add(new Notification
-            {
-                Id = Guid.CreateVersion7(message.OccurredAt),
-                UserId = userId,
-                CompetitionId = message.CompetitionId,
-                EntityId = message.ChallengeFlagId,
-                Kind = NotificationKind.RuntimeStateChanged,
-                SourceEventKey = $"awd-flag-injection-failed:{message.ChallengeFlagId:N}:{message.ProcessingVersion}",
-                PayloadJson = payload,
-                CreatedAt = message.OccurredAt
-            });
-        }
+            Id = Guid.CreateVersion7(message.OccurredAt),
+            SourceType = NotificationSourceType.System,
+            TargetType = NotificationTargetType.CompetitionCollaborators,
+            TargetId = message.CompetitionId,
+            Kind = NotificationKind.RuntimeStateChanged,
+            ContentJson = payload,
+            RelatedType = EntityReferenceKind.CompetitionChallenge,
+            RelatedId = message.CompetitionChallengeId,
+            SentAt = message.OccurredAt
+        });
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -286,19 +297,19 @@ public static class BackendMessageHandlers
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
             return;
-        var recipients = competition.ManagerIds.Append(competition.OwnerId).Distinct().ToArray();
-        var failureId = CreateAwdCheckerFailureId(
-            message.RuntimeInstanceId,
-            message.CheckerSequence);
         var existing = await db.Notifications.AsNoTracking()
-            .Where(notification => recipients.Contains(notification.UserId)
-                && notification.CompetitionId == message.CompetitionId
-                && notification.EntityId == failureId
+            .AnyAsync(notification =>
+                notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                && notification.TargetId == message.CompetitionId
+                && notification.RelatedType == EntityReferenceKind.RuntimeInstance
+                && notification.RelatedId == message.RuntimeInstanceId
                 && notification.Kind == NotificationKind.ManagementFailure)
-            .Select(notification => notification.UserId)
-            .ToListAsync(cancellationToken);
+            ;
+        if (existing)
+            return;
         var payload = JsonSerializer.Serialize(new
         {
+            schemaVersion = 1,
             code = "awd_checker_callback_missing",
             message.CompetitionChallengeId,
             message.RuntimeInstanceId,
@@ -306,31 +317,19 @@ public static class BackendMessageHandlers
             message.CheckerSequence,
             message.ProcessingVersion
         });
-        foreach (var userId in recipients.Except(existing))
+        db.Notifications.Add(new Notification
         {
-            db.Notifications.Add(new Notification
-            {
-                Id = Guid.CreateVersion7(message.OccurredAt),
-                UserId = userId,
-                CompetitionId = message.CompetitionId,
-                EntityId = failureId,
-                Kind = NotificationKind.ManagementFailure,
-                SourceEventKey = $"awd-checker-callback-missing:{failureId:N}",
-                PayloadJson = payload,
-                CreatedAt = message.OccurredAt
-            });
-        }
+            Id = Guid.CreateVersion7(message.OccurredAt),
+            SourceType = NotificationSourceType.System,
+            TargetType = NotificationTargetType.CompetitionCollaborators,
+            TargetId = message.CompetitionId,
+            Kind = NotificationKind.ManagementFailure,
+            ContentJson = payload,
+            RelatedType = EntityReferenceKind.RuntimeInstance,
+            RelatedId = message.RuntimeInstanceId,
+            SentAt = message.OccurredAt
+        });
         await db.SaveChangesAsync(cancellationToken);
-    }
-
-    private static Guid CreateAwdCheckerFailureId(Guid runtimeInstanceId, long checkerSequence)
-    {
-        Span<byte> input = stackalloc byte[24];
-        runtimeInstanceId.TryWriteBytes(input[..16]);
-        BinaryPrimitives.WriteInt64BigEndian(input[16..], checkerSequence);
-        Span<byte> hash = stackalloc byte[32];
-        SHA256.HashData(input, hash);
-        return new Guid(hash[..16]);
     }
 
     public static async Task Handle(
@@ -355,17 +354,7 @@ public static class BackendMessageHandlers
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
-        var schedule = await db.DurableMaintenanceSchedules.SingleAsync(
-            candidate => candidate.Kind == MaintenanceChainKind.CompetitionLifecycle,
-            cancellationToken);
-        if (schedule.ProcessingVersion != message.ProcessingVersion)
-            return MessageExecutionOutcome.Superseded;
         var transitions = await advancer.ExecuteAsync(message.At, cancellationToken);
-        var nextAt = DateTimeOffset.UtcNow.Add(CompetitionLifecycleInterval);
-        AdvanceMaintenanceSchedule(schedule, nextAt);
-        await outbox.ScheduleAsync(
-            new AdvanceCompetitionLifecycle(nextAt, schedule.ProcessingVersion),
-            nextAt);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return transitions.Count > 0
@@ -436,12 +425,12 @@ public static class BackendMessageHandlers
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var runtime = await db.RuntimeInstances.FromSqlInterpolated(
-                $"SELECT * FROM runtime_instances WHERE id = {message.RuntimeInstanceId} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
-        var submission = await db.Submissions.FromSqlInterpolated(
-                $"SELECT * FROM submissions WHERE id = {message.SubmissionId} FOR UPDATE")
-            .SingleOrDefaultAsync(cancellationToken);
+        var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
+            item => item.Id == message.RuntimeInstanceId,
+            cancellationToken);
+        var submission = await db.Submissions.SingleOrDefaultAsync(
+            item => item.Id == message.SubmissionId,
+            cancellationToken);
         if (runtime is null
             || submission is null
             || runtime.Purpose != RuntimePurpose.AwdpTarget
@@ -497,7 +486,6 @@ public static class BackendMessageHandlers
         DispatchRuntime message,
         NoCtfDbContext db,
         IChallengeRuntimeTemplateCatalog templates,
-        IRuntimePublishedPortAllocator publishedPorts,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken,
         ICompetitionEventRecorder? events = null)
@@ -600,6 +588,15 @@ public static class BackendMessageHandlers
                     template,
                     target.Instance.RuntimeProvider,
                     DateTimeOffset.UtcNow);
+                if (target.Instance.RuntimeProvider == RuntimeProvider.Docker)
+                {
+                    definition = definition with
+                    {
+                        PortMappings = definition.PortMappings.Keys.ToDictionary(
+                            port => port,
+                            _ => 0)
+                    };
+                }
                 claim = new ClaimContainerRuntime(
                     target.Instance.Id,
                     target.Instance.ProcessingVersion,
@@ -632,45 +629,6 @@ public static class BackendMessageHandlers
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
-        }
-        if (target.Instance.RuntimeProvider == RuntimeProvider.Docker)
-        {
-            var targets = RuntimePublishedPortClaims.Targets(claim);
-            await using var allocationTransaction = db.Database.CurrentTransaction is null
-                ? await db.Database.BeginTransactionAsync(cancellationToken)
-                : null;
-            var allocation = await publishedPorts.AllocateAsync(
-                target.Instance,
-                targets,
-                DateTimeOffset.UtcNow,
-                cancellationToken);
-            if (allocation.Failure is { } failure)
-            {
-                target.Instance.State = RuntimeState.Failed;
-                target.Instance.FailureCode = failure ==
-                    RuntimePublishedPortAllocationFailure.RangeExhausted
-                        ? RuntimeFailureCode.PublishedPortRangeExhausted
-                        : RuntimeFailureCode.InvalidConfiguration;
-                target.Instance.ProcessingVersion =
-                    checked(target.Instance.ProcessingVersion + 1);
-                await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
-                await RecordRuntimeStateAsync(
-                    events,
-                    target.Instance,
-                    CompetitionEventLevel.Error,
-                    DateTimeOffset.UtcNow,
-                    cancellationToken);
-                await db.SaveChangesAsync(cancellationToken);
-                if (allocationTransaction is not null)
-                    await allocationTransaction.CommitAsync(cancellationToken);
-                await outbox.FlushOutgoingMessagesAsync();
-                return;
-            }
-            claim = RuntimePublishedPortClaims.Apply(claim, allocation.Mappings);
-            if (targets.Count > 0)
-                await db.SaveChangesAsync(cancellationToken);
-            if (allocationTransaction is not null)
-                await allocationTransaction.CommitAsync(cancellationToken);
         }
         await PublishRuntimeClaimAsync(outbox, claim);
         await outbox.FlushOutgoingMessagesAsync();
@@ -861,12 +819,6 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken)
     {
         var applied = false;
-        var schedule = await db.DurableMaintenanceSchedules.SingleAsync(
-            candidate => candidate.Kind == MaintenanceChainKind.RunnerAssignmentReconciliation,
-            cancellationToken);
-        if (schedule.ProcessingVersion != message.ProcessingVersion)
-            return MessageExecutionOutcome.Superseded;
-
         var expiredRuntimes = await db.RuntimeInstances
             .Where(instance => instance.State == RuntimeState.Running
                 && instance.ExpiresAt != null
@@ -913,13 +865,8 @@ public static class BackendMessageHandlers
             if (heartbeat == RunnerHeartbeatStatus.Unavailable)
             {
                 var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
-                AdvanceMaintenanceSchedule(schedule, retryAt);
                 await outbox.ScheduleAsync(
-                    message with
-                    {
-                        At = retryAt,
-                        ProcessingVersion = schedule.ProcessingVersion
-                    },
+                    message with { At = retryAt },
                     retryAt);
                 await db.SaveChangesAsync(cancellationToken);
                 await outbox.FlushOutgoingMessagesAsync();
@@ -954,13 +901,8 @@ public static class BackendMessageHandlers
                 if (inventory.Availability == RunnerPoolInventoryAvailability.Unavailable)
                 {
                     var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
-                    AdvanceMaintenanceSchedule(schedule, retryAt);
                     await outbox.ScheduleAsync(
-                        message with
-                        {
-                            At = retryAt,
-                            ProcessingVersion = schedule.ProcessingVersion
-                        },
+                        message with { At = retryAt },
                         retryAt);
                     await db.SaveChangesAsync(cancellationToken);
                     await outbox.FlushOutgoingMessagesAsync();
@@ -976,13 +918,8 @@ public static class BackendMessageHandlers
                     if (heartbeat == RunnerHeartbeatStatus.Unavailable)
                     {
                         var retryAt = DateTimeOffset.UtcNow.Add(RunnerDependencyRetryDelay);
-                        AdvanceMaintenanceSchedule(schedule, retryAt);
                         await outbox.ScheduleAsync(
-                            message with
-                            {
-                                At = retryAt,
-                                ProcessingVersion = schedule.ProcessingVersion
-                            },
+                            message with { At = retryAt },
                             retryAt);
                         await db.SaveChangesAsync(cancellationToken);
                         await outbox.FlushOutgoingMessagesAsync();
@@ -1042,16 +979,10 @@ public static class BackendMessageHandlers
         foreach (var audit in resourceAudits)
             await outbox.PublishToRunnerNodeAsync(audit);
         applied |= resourceAudits.Count > 0;
-        var nextAt = pageIsFull || expiredRuntimes.Count == 500
-            ? DateTimeOffset.UtcNow
-            : DateTimeOffset.UtcNow.Add(RunnerReconciliationInterval);
-        AdvanceMaintenanceSchedule(schedule, nextAt);
-        await outbox.ScheduleAsync(
-            new ReconcileRunnerAssignments(
-                nextAt,
-                schedule.ProcessingVersion,
-                pageIsFull ? assignments[^1].Id : null),
-            nextAt);
+        if (pageIsFull || expiredRuntimes.Count == 500)
+            await outbox.PublishAsync(new ReconcileRunnerAssignments(
+                message.At,
+                pageIsFull ? assignments[^1].Id : null));
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return applied
@@ -1088,14 +1019,6 @@ public static class BackendMessageHandlers
         return Task.FromResult(MessageExecutionOutcome.Superseded);
     }
 
-    private static void AdvanceMaintenanceSchedule(
-        DurableMaintenanceSchedule schedule,
-        DateTimeOffset nextAt)
-    {
-        schedule.ProcessingVersion = checked(schedule.ProcessingVersion + 1);
-        schedule.UpdatedAt = nextAt;
-    }
-
     public static async Task Handle(
         DrainSubmissions message,
         NoCtfDbContext db,
@@ -1103,71 +1026,72 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken)
     {
         const int batchSize = 500;
-        IQueryable<NoCTF.Domain.Submissions.Submission> query;
+        var candidates = db.Submissions.Where(submission =>
+            submission.CompetitionId == message.CompetitionId
+            && submission.CompetitionChallengeId == message.CompetitionChallengeId
+            && submission.ReceivedAt <= message.Cutoff);
         if (message.SubmissionId is Guid submissionId)
         {
-            query = db.Submissions.FromSqlInterpolated(
-                $"""
-                SELECT s.*
-                FROM submissions AS s
-                WHERE s.id = {submissionId}
-                  AND s.competition_id = {message.CompetitionId}
-                  AND s.competition_challenge_id = {message.CompetitionChallengeId}
-                  AND s.received_at <= {message.Cutoff}
-                FOR UPDATE SKIP LOCKED
-                """);
+            candidates = candidates.Where(submission =>
+                submission.Id == submissionId
+                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued
+                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing);
         }
         else if (message.Rejudge)
         {
-            query = db.Submissions.FromSqlInterpolated(
-                $"""
-                SELECT s.*
-                FROM submissions AS s
-                WHERE s.competition_id = {message.CompetitionId}
-                  AND s.competition_challenge_id = {message.CompetitionChallengeId}
-                  AND s.received_at <= {message.Cutoff}
-                  AND s.current_scoring_event_id IS NOT NULL
-                  AND s.kind IN (0, 1)
-                  AND s.evaluation_state <> 1
-                  AND s.evaluation_state <> 2
-                ORDER BY s.received_at, s.id
-                LIMIT {batchSize}
-                FOR UPDATE SKIP LOCKED
-                """);
+            candidates = candidates.Where(submission =>
+                submission.CurrentScoringEventId != null
+                && (submission.Kind == NoCTF.Domain.Submissions.SubmissionKind.Flag
+                    || submission.Kind == NoCTF.Domain.Submissions.SubmissionKind.Break)
+                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued
+                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing);
         }
         else
         {
-            query = db.Submissions.FromSqlInterpolated(
-                $"""
-                SELECT s.*
-                FROM submissions AS s
-                WHERE s.competition_id = {message.CompetitionId}
-                  AND s.competition_challenge_id = {message.CompetitionChallengeId}
-                  AND s.received_at <= {message.Cutoff}
-                  AND (
-                    s.evaluation_state = 0
-                    OR (s.evaluation_state = 4 AND s.current_scoring_event_id IS NULL)
-                  )
-                ORDER BY s.received_at, s.id
-                LIMIT {batchSize}
-                FOR UPDATE SKIP LOCKED
-                """);
+            candidates = candidates.Where(submission =>
+                submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Pending
+                || (submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed
+                    && submission.CurrentScoringEventId == null));
         }
 
-        var submissions = await query.ToListAsync(cancellationToken);
+        var candidateIds = await candidates.AsNoTracking()
+            .OrderBy(submission => submission.ReceivedAt)
+            .ThenBy(submission => submission.Id)
+            .Take(message.SubmissionId is null ? batchSize : 1)
+            .Select(submission => submission.Id)
+            .ToArrayAsync(cancellationToken);
+        if (candidateIds.Length == 0)
+            return;
+
+        var claimId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
+        await candidates.Where(submission => candidateIds.Contains(submission.Id))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(
+                    submission => submission.EvaluationState,
+                    NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued)
+                .SetProperty(submission => submission.EvaluationFailureCode,
+                    (NoCTF.Domain.Submissions.ScoringFailureCode?)null)
+                .SetProperty(submission => submission.EvaluationResultBodySha256,
+                    (byte[]?)null)
+                .SetProperty(submission => submission.EvaluationUpdatedAt, now)
+                .SetProperty(
+                    submission => submission.ProcessingVersion,
+                    submission => submission.ProcessingVersion + 1)
+                .SetProperty(submission => submission.EvaluationClaimId, claimId),
+                cancellationToken);
+        var submissions = await db.Submissions.AsNoTracking()
+            .Where(submission => submission.EvaluationClaimId == claimId)
+            .OrderBy(submission => submission.ReceivedAt)
+            .ThenBy(submission => submission.Id)
+            .ToArrayAsync(cancellationToken);
         foreach (var submission in submissions)
         {
-            submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued;
-            submission.EvaluationFailureCode = null;
-            submission.EvaluationResultBodySha256 = null;
-            submission.EvaluationUpdatedAt = now;
-            submission.ProcessingVersion = checked(submission.ProcessingVersion + 1);
             await outbox.PublishAsync(new EvaluateSubmission(
                 submission.Id,
                 submission.ProcessingVersion));
         }
-        if (submissions.Count == batchSize && message.SubmissionId is null)
+        if (candidateIds.Length == batchSize && message.SubmissionId is null)
             await outbox.PublishAsync(message);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();

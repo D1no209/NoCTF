@@ -4,7 +4,12 @@ public sealed record KohProducerSettings(
     int PollIntervalSeconds,
     long ControlPointsPerInterval);
 
-public sealed class KohProducerConfigurationCatalog
+public interface IKohProducerConfigurationCatalog
+{
+    KohProducerSettings Get(string competitionConfigurationJson, string challengeRulesJson);
+}
+
+public sealed class KohProducerConfigurationCatalog : IKohProducerConfigurationCatalog
 {
     public KohProducerSettings Get(string competitionConfigurationJson, string challengeRulesJson)
     {

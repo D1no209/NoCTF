@@ -5,10 +5,50 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
+using NoCTF.API.Serialization;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Notifications;
+using Riok.Mapperly.Abstractions;
+using System.Text.Json.Serialization;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.API.Endpoints.Notifications;
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<NotificationKindProtocol>))]
+public enum NotificationKindProtocol
+{
+    Message,
+    CompetitionAnnouncement,
+    QuestionOpened,
+    QuestionStatusChanged,
+    CompetitionLifecycleChanged,
+    TeamRegistrationChanged,
+    SubmissionEvaluated,
+    RuntimeStateChanged,
+    StartGateFailed,
+    ManagementFailure,
+    BloodAwarded,
+    ChallengePublished,
+    HintPublished,
+    TeamBanned,
+    CheatIncidentDetected,
+    TeamBanCorrected,
+    DataExportReady,
+    DataExportFailed
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<NotificationFailureCode>))]
+public enum NotificationFailureCode
+{
+    CursorInvalid
+}
+
+[Mapper]
+internal static partial class NotificationProtocolMapper
+{
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial NotificationKindProtocol ToProtocol(NotificationKind value);
+}
 
 public sealed class ListNotificationsRequest
 {
@@ -26,11 +66,16 @@ public sealed class ListNotificationsValidator : Validator<ListNotificationsRequ
 
 public sealed record NotificationResponse(
     Guid Id,
-    Guid? CompetitionId,
-    Guid? EntityId,
-    NotificationKind Kind,
-    JsonElement Payload,
-    DateTimeOffset CreatedAt);
+    NotificationSourceType SourceType,
+    Guid? SourceId,
+    NotificationTargetType TargetType,
+    Guid TargetId,
+    NotificationKindProtocol Kind,
+    JsonElement Content,
+    EntityReferenceKind? RelatedType,
+    Guid? RelatedId,
+    Guid? ReplyToId,
+    DateTimeOffset SentAt);
 
 public sealed record NotificationListResponse(
     IReadOnlyList<NotificationResponse> Items,
@@ -71,7 +116,7 @@ public sealed class ListNotificationsEndpoint(
                 title: "Invalid cursor.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = "cursor_invalid"
+                    ["code"] = NotificationFailureCode.CursorInvalid
                 });
 
         var items = await list.ExecuteAsync(
@@ -82,16 +127,21 @@ public sealed class ListNotificationsEndpoint(
             ct);
         var response = items.Select(item => new NotificationResponse(
             item.Id,
-            item.CompetitionId,
-            item.EntityId,
-            item.Kind,
-            JsonSerializer.Deserialize<JsonElement>(item.PayloadJson),
-            item.CreatedAt)).ToArray();
+            item.SourceType,
+            item.SourceId,
+            item.TargetType,
+            item.TargetId,
+            NotificationProtocolMapper.ToProtocol(item.Kind),
+            JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
+            item.RelatedType,
+            item.RelatedId,
+            item.ReplyToId,
+            item.SentAt)).ToArray();
         var next = items.Count == request.Limit
             ? cursors.Encode(
                 CursorEndpoint,
                 user.UserId.ToString("N"),
-                new(items[^1].CreatedAt, items[^1].Id))
+                new(items[^1].SentAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new NotificationListResponse(response, next));
     }

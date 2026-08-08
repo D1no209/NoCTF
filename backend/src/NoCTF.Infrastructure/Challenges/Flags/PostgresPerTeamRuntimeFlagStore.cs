@@ -5,9 +5,14 @@ using NoCTF.Domain.Challenges;
 
 namespace NoCTF.Infrastructure.Challenges.Flags;
 
-public sealed class PostgresPerTeamRuntimeFlagStore(NoCtfDbContext db)
+public sealed class PostgresPerTeamRuntimeFlagStore(
+    NoCtfDbContext db,
+    TeamChallengeCriticalSection criticalSection)
     : IPerTeamRuntimeFlagStore
 {
+    public PostgresPerTeamRuntimeFlagStore(NoCtfDbContext db)
+        : this(db, new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry())) { }
+
     public async Task<string> EnsureAsync(
         Guid competitionId,
         Guid competitionChallengeId,
@@ -15,9 +20,10 @@ public sealed class PostgresPerTeamRuntimeFlagStore(NoCtfDbContext db)
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var lockKey = $"runtime-flag:{competitionChallengeId:D}:{teamId:D}";
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
+        await using var generationLease = await criticalSection.AcquireAsync(
+            db,
+            teamId,
+            competitionChallengeId,
             cancellationToken);
 
         var existing = await db.ChallengeFlags.SingleOrDefaultAsync(

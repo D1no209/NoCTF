@@ -19,14 +19,6 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(competition => competition.Status).HasConversion<short>();
         builder.Property(competition => competition.LeaderboardVisibility).HasConversion<short>();
         builder.Property(competition => competition.FrozenLeaderboardSnapshotJson).HasColumnType("jsonb");
-        builder.HasMany(competition => competition.LifecycleAudits)
-            .WithOne()
-            .HasForeignKey(audit => audit.CompetitionId)
-            .OnDelete(DeleteBehavior.Restrict);
-        builder.HasMany(competition => competition.LeaderboardVisibilityAudits)
-            .WithOne()
-            .HasForeignKey(audit => audit.CompetitionId)
-            .OnDelete(DeleteBehavior.Restrict);
         builder.HasQueryFilter(competition => competition.DeletedAt == null);
         builder.HasIndex(competition => new { competition.Status, competition.StartAt });
         builder.HasIndex(competition => new
@@ -39,6 +31,9 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(competition => competition.ObserverIds).HasMethod("gin");
         builder.HasOne<NoCTF.Domain.Identity.User>().WithMany()
             .HasForeignKey(competition => competition.OwnerId)
+            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(competition => competition.PosterFile).WithMany()
+            .HasForeignKey(competition => competition.PosterFileId)
             .OnDelete(DeleteBehavior.Restrict);
         builder.ToTable(table => table.HasCheckConstraint(
             "ck_competitions_schedule",
@@ -63,31 +58,5 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
                 + "OR (leaderboard_visibility_applied_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NOT NULL))) "
                 + "OR (leaderboard_visibility = 2 AND leaderboard_visibility_starts_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NULL))");
         });
-    }
-}
-
-internal sealed class CompetitionLeaderboardVisibilityAuditConfiguration
-    : IEntityTypeConfiguration<CompetitionLeaderboardVisibilityAudit>
-{
-    public void Configure(EntityTypeBuilder<CompetitionLeaderboardVisibilityAudit> builder)
-    {
-        builder.ToTable("competition_leaderboard_visibility_audits");
-        builder.HasKey(audit => audit.Id);
-        builder.Property(audit => audit.From).HasConversion<short>();
-        builder.Property(audit => audit.To).HasConversion<short>();
-        builder.HasIndex(audit => new { audit.CompetitionId, audit.OccurredAt });
-    }
-}
-
-internal sealed class CompetitionLifecycleAuditConfiguration
-    : IEntityTypeConfiguration<CompetitionLifecycleAudit>
-{
-    public void Configure(EntityTypeBuilder<CompetitionLifecycleAudit> builder)
-    {
-        builder.ToTable("competition_lifecycle_audits");
-        builder.HasKey(audit => audit.Id);
-        builder.Property(audit => audit.From).HasConversion<short>();
-        builder.Property(audit => audit.To).HasConversion<short>();
-        builder.HasIndex(audit => new { audit.CompetitionId, audit.OccurredAt });
     }
 }

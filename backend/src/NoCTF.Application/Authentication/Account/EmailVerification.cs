@@ -14,6 +14,16 @@ public enum EmailVerificationState
     InvalidOrExpired
 }
 
+public enum EmailVerificationFailureCode
+{
+    EmailAlreadyVerified,
+    EmailVerificationDisabled,
+    EmailDeliveryNotConfigured,
+    EmailVerificationRateLimited,
+    UserNotFound,
+    EmailVerificationInvalid
+}
+
 public interface IEmailVerificationStore
 {
     Task<bool> IsRequiredAsync(CancellationToken cancellationToken);
@@ -29,7 +39,7 @@ public interface IEmailVerificationStore
 
 public sealed class ResendEmailVerification(IEmailVerificationStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<OperationResult<EmailVerificationFailureCode>> ExecuteAsync(
         Guid userId,
         DateTimeOffset now,
         CancellationToken ct = default)
@@ -37,30 +47,31 @@ public sealed class ResendEmailVerification(IEmailVerificationStore store)
         var state = await store.IssueAsync(userId, now, ct);
         return state switch
         {
-            EmailVerificationState.Issued => OperationResult.Success(),
-            EmailVerificationState.AlreadyVerified => OperationResult.Failure(
-                "email_already_verified", "The email address is already verified."),
-            EmailVerificationState.Disabled => OperationResult.Failure(
-                "email_verification_disabled", "Email verification is disabled."),
-            EmailVerificationState.DeliveryNotConfigured => OperationResult.Failure(
-                "email_delivery_not_configured", "Email delivery is not configured."),
-            EmailVerificationState.RateLimited => OperationResult.Failure(
-                "email_verification_rate_limited",
+            EmailVerificationState.Issued => OperationResult<EmailVerificationFailureCode>.Success(),
+            EmailVerificationState.AlreadyVerified => OperationResult<EmailVerificationFailureCode>.Failure(
+                EmailVerificationFailureCode.EmailAlreadyVerified, "The email address is already verified."),
+            EmailVerificationState.Disabled => OperationResult<EmailVerificationFailureCode>.Failure(
+                EmailVerificationFailureCode.EmailVerificationDisabled, "Email verification is disabled."),
+            EmailVerificationState.DeliveryNotConfigured => OperationResult<EmailVerificationFailureCode>.Failure(
+                EmailVerificationFailureCode.EmailDeliveryNotConfigured, "Email delivery is not configured."),
+            EmailVerificationState.RateLimited => OperationResult<EmailVerificationFailureCode>.Failure(
+                EmailVerificationFailureCode.EmailVerificationRateLimited,
                 "A verification email was sent recently. Try again later."),
-            _ => OperationResult.Failure("user_not_found", "User was not found.")
+            _ => OperationResult<EmailVerificationFailureCode>.Failure(
+                EmailVerificationFailureCode.UserNotFound, "User was not found.")
         };
     }
 }
 
 public sealed class VerifyEmail(IEmailVerificationStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<OperationResult<EmailVerificationFailureCode>> ExecuteAsync(
         string token,
         DateTimeOffset now,
         CancellationToken ct = default) =>
         await store.VerifyAsync(token, now, ct) == EmailVerificationState.Verified
-            ? OperationResult.Success()
-            : OperationResult.Failure(
-                "email_verification_invalid",
+            ? OperationResult<EmailVerificationFailureCode>.Success()
+            : OperationResult<EmailVerificationFailureCode>.Failure(
+                EmailVerificationFailureCode.EmailVerificationInvalid,
                 "The verification token is invalid or expired.");
 }

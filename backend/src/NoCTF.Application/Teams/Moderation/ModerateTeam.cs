@@ -13,9 +13,11 @@ public sealed record TeamModerationCommand(
 
 public enum TeamModerationFailure
 {
+    BanReasonRequired,
     CompetitionNotFound,
     CompetitionFinished,
-    TeamNotFound
+    TeamNotFound,
+    TeamModerationFailed
 }
 
 public sealed record TeamModerationStoreResult(TeamModerationFailure? Failure = null)
@@ -41,29 +43,29 @@ public interface ICompetitionModerationAuthorizer
 /// <summary>Applies a relational ban ruling and schedules an in-process reconstruction.</summary>
 public sealed class ModerateTeam(ITeamModerationStore store)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<OperationResult<TeamModerationFailure>> ExecuteAsync(
         TeamModerationCommand command,
         CancellationToken cancellationToken = default)
     {
         var reason = command.Reason?.Trim();
         if (command.Ban && (string.IsNullOrWhiteSpace(reason) || reason.Length > 512))
-            return OperationResult.Failure("ban_reason_required", "A ban reason is required.");
+            return OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.BanReasonRequired, "A ban reason is required.");
         command = command with { Reason = reason };
         var status = await store.GetCompetitionStatusAsync(command.CompetitionId, cancellationToken);
         if (status is null)
-            return OperationResult.Failure("competition_not_found", "Competition was not found.");
+            return OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.CompetitionNotFound, "Competition was not found.");
         if (status == CompetitionStatus.Finished)
-            return OperationResult.Failure("competition_finished", "Finished competitions are read-only.");
+            return OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.CompetitionFinished, "Finished competitions are read-only.");
 
         var result = await store.ApplyAsync(command, cancellationToken);
         if (!result.Succeeded) return result.Failure switch
         {
-            TeamModerationFailure.CompetitionNotFound => OperationResult.Failure("competition_not_found", "Competition was not found."),
-            TeamModerationFailure.CompetitionFinished => OperationResult.Failure("competition_finished", "Finished competitions are read-only."),
-            TeamModerationFailure.TeamNotFound => OperationResult.Failure("team_not_found", "Team was not found."),
-            _ => OperationResult.Failure("team_moderation_failed", "Team moderation failed.")
+            TeamModerationFailure.CompetitionNotFound => OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.CompetitionNotFound, "Competition was not found."),
+            TeamModerationFailure.CompetitionFinished => OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.CompetitionFinished, "Finished competitions are read-only."),
+            TeamModerationFailure.TeamNotFound => OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.TeamNotFound, "Team was not found."),
+            _ => OperationResult<TeamModerationFailure>.Failure(TeamModerationFailure.TeamModerationFailed, "Team moderation failed.")
         };
 
-        return OperationResult.Success();
+        return OperationResult<TeamModerationFailure>.Success();
     }
 }

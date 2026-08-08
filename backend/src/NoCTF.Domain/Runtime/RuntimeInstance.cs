@@ -39,9 +39,6 @@ public enum RuntimeFailureCode : short
 
 public sealed class RuntimePublishedPort
 {
-    public Guid Id { get; set; }
-    public Guid RuntimeInstanceId { get; set; }
-    public Guid CompetitionId { get; set; }
     [MaxLength(63)]
     public string? ServiceName { get; set; }
     public int ContainerPort { get; set; }

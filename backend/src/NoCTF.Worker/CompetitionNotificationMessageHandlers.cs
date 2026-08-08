@@ -6,6 +6,7 @@ using NoCTF.Infrastructure.Notifications;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Shared;
 
 namespace NoCTF.Worker;
 
@@ -56,25 +57,24 @@ public static class CompetitionNotificationMessageHandlers
         CancellationToken ct,
         ICompetitionEventRecorder? eventRecorder = null)
     {
-        var isCurrent = await db.Set<NoCTF.Domain.Challenges.CompetitionChallengeHint>()
-            .AsNoTracking()
-            .AnyAsync(hint =>
+        var challenge = await db.CompetitionChallenges.AsNoTracking()
+            .SingleOrDefaultAsync(candidate =>
+                candidate.Id == message.CompetitionChallengeId
+                && candidate.CompetitionId == message.CompetitionId, ct);
+        var isCurrent = challenge is not null
+            && challenge.Revision == message.PublicationRevision
+            && challenge.Hints.Any(hint =>
                 hint.Id == message.HintId
-                && hint.CompetitionChallengeId == message.CompetitionChallengeId
-                && hint.DeletedAt == null
-                && hint.PublicationRevision == message.PublicationRevision
+                && hint.HiddenAt == null
                 && hint.PublishedAt == message.PublishedAt
-                && hint.PublishedAt <= DateTimeOffset.UtcNow
-                && db.CompetitionChallenges.Any(challenge =>
-                    challenge.Id == hint.CompetitionChallengeId
-                    && challenge.CompetitionId == message.CompetitionId),
-                ct);
+                && hint.PublishedAt <= DateTimeOffset.UtcNow);
         if (!isCurrent)
             return;
 
         var alreadyRecorded = await db.CompetitionEvents.AsNoTracking().AnyAsync(
             item => item.CompetitionId == message.CompetitionId
-                && item.HintId == message.HintId
+                && item.SubjectType == EntityReferenceKind.ChallengeHint
+                && item.SubjectId == message.HintId
                 && item.Kind == CompetitionEventKind.HintPublished
                 && item.OccurredAt == message.PublishedAt,
             ct);

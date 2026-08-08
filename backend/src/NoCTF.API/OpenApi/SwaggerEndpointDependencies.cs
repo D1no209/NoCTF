@@ -9,6 +9,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Submissions.PatchUploads;
 using NoCTF.Domain.Competitions;
+using NoCTF.Application.Storage;
 
 namespace NoCTF.API.OpenApi;
 
@@ -34,6 +35,14 @@ internal sealed class SwaggerSubmissionStore : ISubmissionIntakeStore
                 SubmissionAcceptanceState.SnapshotChanged)).ToArray());
     public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
         FixSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
+    public Task<SubmissionAcceptanceResult> TryAcceptHintUnlockAsync(
+        HintUnlockSubmissionReceived received,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
+    public Task<SubmissionAcceptanceResult> TryAcceptManualAdjustmentAsync(
+        ManualAdjustmentSubmissionReceived received,
         CancellationToken cancellationToken) =>
         Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
 }
@@ -97,14 +106,14 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
         Task.FromResult<UserProfile?>(null);
     public Task<UserAvatarReplacement?> ReplaceAvatarAsync(
         Guid userId,
-        string objectKey,
+        StoredObject storedObject,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult<UserAvatarReplacement?>(null);
-    public Task<string?> GetAvatarObjectKeyAsync(
+    public Task<BusinessFileReference?> GetAvatarFileAsync(
         Guid userId,
         CancellationToken cancellationToken) =>
-        Task.FromResult<string?>(null);
+        Task.FromResult<BusinessFileReference?>(null);
     public Task<CreateUserState> CreateAsync(
         Guid userId,
         string userName,

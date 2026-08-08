@@ -4,7 +4,9 @@ public enum SubmissionKind
 {
     Flag,
     Break,
-    Fix
+    Fix,
+    HintUnlock,
+    ManualAdjust
 }
 
 public enum EvaluationDispatchMode : short

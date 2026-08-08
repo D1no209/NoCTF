@@ -35,6 +35,15 @@ public enum CompetitionLifecycleEffects
     CleanupRuntimes = 2
 }
 
+public enum CompetitionTransitionFailureCode
+{
+    CompetitionNotFound,
+    CompetitionStartGateFailed,
+    InvalidSchedule,
+    InvalidLifecycleTransition,
+    LifecycleConflict
+}
+
 /// <summary>Advances published and running competitions using wall-clock deadlines without extending pauses.</summary>
 public sealed class AdvanceCompetitionLifecycleUseCase(
     ICompetitionLifecycleStore store,
@@ -97,7 +106,7 @@ public sealed class TransitionCompetitionLifecycle(
     ICompetitionLifecycleNotificationPublisher? notifications = null,
     CompetitionStartGate? startGate = null)
 {
-    public async Task<OperationResult> ExecuteAsync(
+    public async Task<OperationResult<CompetitionTransitionFailureCode>> ExecuteAsync(
         Guid competitionId,
         CompetitionStatus target,
         Guid? actorId,
@@ -106,22 +115,32 @@ public sealed class TransitionCompetitionLifecycle(
     {
         var current = await store.GetStatusAsync(competitionId, cancellationToken);
         if (current is null)
-            return OperationResult.Failure("competition_not_found", "Competition was not found.");
+            return OperationResult<CompetitionTransitionFailureCode>.Failure(
+                CompetitionTransitionFailureCode.CompetitionNotFound,
+                "Competition was not found.");
         if (target == CompetitionStatus.Running
             && current == CompetitionStatus.Published
             && startGate is not null)
         {
             var errors = await startGate.ValidateAsync(competitionId, cancellationToken);
             if (errors is null)
-                return OperationResult.Failure("competition_not_found", "Competition was not found.");
+                return OperationResult<CompetitionTransitionFailureCode>.Failure(
+                    CompetitionTransitionFailureCode.CompetitionNotFound,
+                    "Competition was not found.");
             if (errors.Count > 0)
-                return OperationResult.Failure(
-                    "competition_start_gate_failed",
+                return OperationResult<CompetitionTransitionFailureCode>.Failure(
+                    CompetitionTransitionFailureCode.CompetitionStartGateFailed,
                     string.Join(" ", errors.Select(error => error.Message)));
         }
         var validation = CompetitionLifecyclePolicy.ValidateTransition(current.Value, target);
         if (!validation.Succeeded)
-            return validation;
+            return OperationResult<CompetitionTransitionFailureCode>.Failure(
+                validation.FailureCode switch
+                {
+                    CompetitionLifecyclePolicy.FailureCode.InvalidSchedule => CompetitionTransitionFailureCode.InvalidSchedule,
+                    _ => CompetitionTransitionFailureCode.InvalidLifecycleTransition
+                },
+                validation.ErrorMessage!);
         if (!await store.TryTransitionWithAuditAsync(
                 competitionId,
                 current.Value,
@@ -131,9 +150,11 @@ public sealed class TransitionCompetitionLifecycle(
                 false,
                 AdvanceCompetitionLifecycleUseCase.EffectsFor(target),
                 cancellationToken))
-            return OperationResult.Failure("lifecycle_conflict", "Competition status changed concurrently.");
+            return OperationResult<CompetitionTransitionFailureCode>.Failure(
+                CompetitionTransitionFailureCode.LifecycleConflict,
+                "Competition status changed concurrently.");
         if (notifications is not null)
             await notifications.PublishAsync(competitionId, current.Value, target, DateTimeOffset.UtcNow, cancellationToken);
-        return OperationResult.Success();
+        return OperationResult<CompetitionTransitionFailureCode>.Success();
     }
 }

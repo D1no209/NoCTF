@@ -5,5 +5,6 @@ public enum ScoringEventKind
     SubmissionEvaluation,
     AwdServiceStatus,
     HintUnlock,
-    KohObservation
+    KohObservation,
+    ManualAdjust
 }

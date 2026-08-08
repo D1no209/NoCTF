@@ -1,9 +1,17 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Serialization;
+using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints;
 
-public sealed record HealthResponse(string Status);
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<HealthStatus>))]
+public enum HealthStatus
+{
+    Ok
+}
+
+public sealed record HealthResponse(HealthStatus Status);
 
 public sealed class HealthEndpoint : EndpointWithoutRequest<Ok<HealthResponse>>
 {
@@ -15,5 +23,5 @@ public sealed class HealthEndpoint : EndpointWithoutRequest<Ok<HealthResponse>>
     }
 
     public override Task<Ok<HealthResponse>> ExecuteAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(TypedResults.Ok(new HealthResponse("ok")));
+        Task.FromResult(TypedResults.Ok(new HealthResponse(HealthStatus.Ok)));
 }

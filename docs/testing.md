@@ -80,6 +80,48 @@ skip；Release 的受控 Libvirt Runner 应设置该变量并使用专用 fixtur
 
 ## 端到端
 
+### 无容器开发宿主
+
+`Development` 环境由 API 单进程承载 HTTP API 与 Worker 的 Wolverine handlers，使用
+EF Core InMemory、Wolverine 本地内存队列、FusionCache L1 和 Runner 容量门。生命周期、
+Runner assignment、AWD checker 的维护消息也由该进程启动；排行榜投影和 SignalR 通知
+仍执行真实应用逻辑，只省略 Redis L2、backplane 和通知中继。生产使用相同的排行榜与
+订阅实现，仅通过配置为 FusionCache 附加 Redis。它不会连接 PostgreSQL 或 Redis，也不要求任何
+依赖容器；若本机 Docker Engine 可用，内置 Runner 会通过 Docker 的 `bridge` 网络直接
+创建题目 Runtime，否则只有 Runtime 操作不可用，API 仍可启动。数据只在进程生命周期内
+存在，且该模式不证明 PostgreSQL 约束、事务、锁或 Wolverine durable inbox/outbox 行为。
+
+FusionCache 按用途分为三个 profile：默认实例承载排行榜，`read-models` 缓存平台配置与
+公开比赛查询，`local-computation` 缓存 Runtime/AWD/KoH 配置 JSON 的解析结果。生产环境中
+前两者使用 Redis L2 与 backplane 进行跨进程失效；纯计算结果只保留进程内 L1，避免把可由
+输入稳定重建的数据写入 Redis。相关 TTL 可通过 `Leaderboard:CacheTtlSeconds`、
+`Caching:ReadModelsTtlSeconds` 与 `Caching:LocalComputationTtlMinutes` 调整。
+
+从 `backend` 目录启动：
+
+```bash
+dotnet run --project src/NoCTF.API/NoCTF.API.csproj --launch-profile Development
+```
+
+默认地址是 `http://localhost:5080`，开发管理员是 `dev-admin`，密码是
+`dev-admin-change-me`。这些值仅来自 `appsettings.Development.json`，可用环境变量
+覆盖。无容器 E2E 烟雾测试默认自托管 Development API：
+
+```bash
+dotnet test tests/NoCTF.E2E/NoCTF.E2E.csproj \
+  --treenode-filter "/*/*/*/*[Category=DevelopmentE2E]"
+```
+
+也可在 API 运行时测试外部进程：
+
+```bash
+NOCTF_E2E_BASE_URL=http://localhost:5080 \
+NOCTF_E2E_ADMIN_USER=dev-admin \
+NOCTF_E2E_ADMIN_PASSWORD=dev-admin-change-me \
+dotnet test tests/NoCTF.E2E/NoCTF.E2E.csproj \
+  --treenode-filter "/*/*/*/*[Category=DevelopmentE2E]"
+```
+
 本地 E2E 使用 .NET 10 file-based app 统一编排，不依赖 PowerShell、Bash、WSL、
 固定端口或当前工作目录。入口位于 `backend/tests/e2e.cs`，默认运行四种模式的
 Full 套件：

@@ -1,0 +1,56 @@
+import { client } from '~/api/client.gen'
+import { getAccessToken, refreshSession } from '~/lib/session'
+import { statusErrorMessage } from '~/utils/api-error'
+
+/**
+ * Configure the generated hey-api client:
+ * - inject the in-memory Bearer token into every request;
+ * - on 401 (outside /auth/*), single-flight refresh then retry the request once;
+ * - when an error response carries no problem+json body (e.g. bare 401/403),
+ *   synthesize a status-based message so callers never see a bare「请求失败」.
+ */
+export default defineNuxtPlugin(() => {
+  client.interceptors.request.use((request) => {
+    const token = getAccessToken()
+    if (token) {
+      request.headers.set('Authorization', `Bearer ${token}`)
+    }
+    return request
+  })
+
+  client.interceptors.response.use(async (response, request, options) => {
+    if (response.status !== 401 || request.url.includes('/api/v1/auth/')) {
+      return response
+    }
+    const refreshed = await refreshSession()
+    if (!refreshed) {
+      return response
+    }
+    const headers = new Headers(request.headers)
+    headers.set('Authorization', `Bearer ${getAccessToken()}`)
+    const body = (options.serializedBody as BodyInit | undefined) ?? (options.body as BodyInit | undefined)
+    return fetch(
+      new Request(request.url, {
+        method: options.method ?? 'GET',
+        headers,
+        body: options.method === 'GET' || options.method === 'HEAD' ? undefined : body,
+        credentials: 'same-origin',
+      }),
+    )
+  })
+
+  client.interceptors.error.use((error, response, request) => {
+    // 保留真实的 problem+json 响应体(detail/title/errors)。
+    if (error && typeof error === 'object' && !(error instanceof Error)) {
+      const problem = error as Record<string, unknown>
+      if (typeof problem.detail === 'string' || typeof problem.title === 'string' || problem.errors) {
+        return error
+      }
+    }
+    // 空响应体(如登录 401)或网络错误:合成带状态码的 problem 形状,
+    // parseApiError 会读出其中的 detail 与 status。
+    const status = response?.ok === false ? response.status : undefined
+    const url = response?.url ?? request?.url
+    return { status, detail: statusErrorMessage(status, url) }
+  })
+})

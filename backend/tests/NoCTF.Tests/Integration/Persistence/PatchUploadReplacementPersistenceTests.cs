@@ -152,7 +152,7 @@ public sealed class PatchUploadReplacementPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Replacement_and_fix_consumption_share_the_same_advisory_lock(
+    public async Task Replacement_and_fix_consumption_preserve_the_attempt_invariant(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -208,19 +208,6 @@ public sealed class PatchUploadReplacementPersistenceTests
                         cancellationToken);
                 }
 
-                await using var holderScope = host.Services.CreateAsyncScope();
-                var holderDb = holderScope.ServiceProvider
-                    .GetRequiredService<NoCtfDbContext>();
-                await using var holderTransaction = await holderDb.Database
-                    .BeginTransactionAsync(cancellationToken);
-                var advisoryKey = AttemptLockKey(
-                    fixture.TeamId,
-                    fixture.CompetitionChallengeId,
-                    SubmissionKind.Fix);
-                await holderDb.Database.ExecuteSqlInterpolatedAsync(
-                    $"SELECT pg_advisory_xact_lock(hashtextextended({advisoryKey}, 0))",
-                    cancellationToken);
-
                 var replacementTask = SaveReplacementAsync(
                     host,
                     fixture,
@@ -235,20 +222,14 @@ public sealed class PatchUploadReplacementPersistenceTests
                     fixture.Now.AddSeconds(1),
                     cancellationToken);
 
-                await WaitForAdvisoryWaitersAsync(
-                    holderDb,
-                    expectedCount: 2,
-                    cancellationToken);
-                await Assert.That(replacementTask.IsCompleted).IsFalse();
-                await Assert.That(submissionTask.IsCompleted).IsFalse();
-                await holderTransaction.CommitAsync(cancellationToken);
-
-                var replacementSaved = await replacementTask;
-                var submission = await submissionTask;
+                var replacementSaved = await replacementTask.WaitAsync(
+                    TimeSpan.FromSeconds(2), cancellationToken);
+                var submission = await submissionTask.WaitAsync(
+                    TimeSpan.FromSeconds(2), cancellationToken);
                 await Assert.That(replacementSaved).IsTrue();
                 await Assert.That(
                     submission.Succeeded
-                    || submission.ErrorCode == "patch_upload_not_found").IsTrue();
+                    || submission.FailureCode == SubmissionFailureCode.PatchUploadNotFound).IsTrue();
 
                 await using (var verifyScope = host.Services.CreateAsyncScope())
                 {
@@ -435,7 +416,7 @@ public sealed class PatchUploadReplacementPersistenceTests
         return patchUploadId;
     }
 
-    private static async Task<OperationResult<CreatedPatchUpload>> UploadAsync(
+    private static async Task<OperationResult<CreatedPatchUpload, PatchUploadFailureCode>> UploadAsync(
         IHost host,
         Fixture fixture,
         string script,
@@ -481,7 +462,7 @@ public sealed class PatchUploadReplacementPersistenceTests
         await Assert.That(result.Succeeded).IsTrue();
     }
 
-    private static async Task<OperationResult<SubmissionAccepted>> SubmitAsync(
+    private static async Task<OperationResult<SubmissionAccepted, SubmissionFailureCode>> SubmitAsync(
         IHost host,
         Fixture fixture,
         Guid patchUploadId,
@@ -530,37 +511,6 @@ public sealed class PatchUploadReplacementPersistenceTests
                 uploadedAt,
                 cancellationToken);
     }
-
-    private static async Task WaitForAdvisoryWaitersAsync(
-        NoCtfDbContext db,
-        int expectedCount,
-        CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.AddMinutes(1);
-        while (true)
-        {
-            var waiting = await db.Database.SqlQuery<int>(
-                    $"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND wait_event = 'advisory'")
-                .SingleAsync(cancellationToken);
-            if (waiting >= expectedCount)
-                return;
-            if (DateTimeOffset.UtcNow >= deadline)
-            {
-                throw new TimeoutException(
-                    $"Expected {expectedCount} operations to wait on the submission advisory lock, but observed {waiting}.");
-            }
-            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
-        }
-    }
-
-    private static string AttemptLockKey(
-        Guid teamId,
-        Guid competitionChallengeId,
-        SubmissionKind kind) =>
-        "s"
-        + teamId.ToString("N")
-        + competitionChallengeId.ToString("N")
-        + ((short)kind).ToString();
 
     private static async Task WaitUntilDeletedAsync(
         IObjectStorage objects,

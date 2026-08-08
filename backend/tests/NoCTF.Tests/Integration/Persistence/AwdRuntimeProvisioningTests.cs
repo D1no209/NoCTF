@@ -23,7 +23,7 @@ public sealed class AwdRuntimeProvisioningTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Stopping_runtime_defers_the_entire_pass_then_quota_is_enforced_after_cleanup(
+    public async Task Stopping_runtime_defers_only_its_team_then_quota_is_enforced_after_cleanup(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -78,13 +78,13 @@ public sealed class AwdRuntimeProvisioningTests
             await Assert.That(await db.RuntimeInstances.AsNoTracking().CountAsync(
                     runtime => runtime.CompetitionId == fixture.CompetitionId,
                     cancellationToken))
-                .IsEqualTo(1);
+                .IsEqualTo(2);
             await Assert.That(await db.RuntimeInstances.AsNoTracking().CountAsync(
                     runtime => runtime.CompetitionChallengeId == fixture.CompetitionChallengeId
                         && runtime.TeamId == stoppingTeamId,
                     cancellationToken))
                 .IsEqualTo(1);
-            await Assert.That(outbox.Published).IsEmpty();
+            await Assert.That(outbox.Published.OfType<DispatchRuntime>()).HasSingleItem();
 
             stoppingRuntime.State = RuntimeState.Stopped;
             stoppingRuntime.StoppedAt = fixture.Now.AddSeconds(2);

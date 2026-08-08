@@ -65,6 +65,14 @@ public enum CompetitionConfigurationUpdateFailure
     ConfigurationLocked,
     RevisionConflict
 }
+
+public enum CompetitionConfigurationFailureCode
+{
+    CompetitionNotFound,
+    InvalidConfiguration,
+    ConfigurationLocked,
+    ConfigurationConflict
+}
 public sealed record CompetitionConfigurationUpdateResult(
     CompetitionConfigurationView? Configuration,
     CompetitionConfigurationUpdateFailure? Failure = null);
@@ -78,18 +86,23 @@ public sealed class UpdateCompetitionConfiguration(
     ICompetitionConfigurationStore store,
     ICompetitionConfigurationValidator validator)
 {
-    public async Task<OperationResult<CompetitionConfigurationView>> ExecuteAsync(
+    public async Task<OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>> ExecuteAsync(
         Guid competitionId, int expectedRevision, string json, DateTimeOffset now, CancellationToken ct = default)
     {
         var current = await store.FindAsync(competitionId, ct);
-        if (current is null) return OperationResult<CompetitionConfigurationView>.Failure("competition_not_found", "Competition was not found.");
+        if (current is null)
+            return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Failure(
+                CompetitionConfigurationFailureCode.CompetitionNotFound,
+                "Competition was not found.");
         var errors = validator.Validate(
             current.Mode,
             json,
             current.EligibleTeamCount,
             current.ChallengeConfigurations.Select(challenge => challenge.Json).ToArray());
         if (errors.Count > 0)
-            return OperationResult<CompetitionConfigurationView>.Failure("invalid_configuration", string.Join(" ", errors));
+            return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Failure(
+                CompetitionConfigurationFailureCode.InvalidConfiguration,
+                string.Join(" ", errors));
         const bool allowWhileRunning = true;
         var result = await store.TryUpdateAsync(
             competitionId,
@@ -102,11 +115,11 @@ public sealed class UpdateCompetitionConfiguration(
         if (result.Configuration is null)
         {
             var failure = result.Failure ?? CompetitionConfigurationUpdateFailure.RevisionConflict;
-            return OperationResult<CompetitionConfigurationView>.Failure(failure switch
+            return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Failure(failure switch
             {
-                CompetitionConfigurationUpdateFailure.CompetitionNotFound => "competition_not_found",
-                CompetitionConfigurationUpdateFailure.ConfigurationLocked => "configuration_locked",
-                _ => "configuration_conflict"
+                CompetitionConfigurationUpdateFailure.CompetitionNotFound => CompetitionConfigurationFailureCode.CompetitionNotFound,
+                CompetitionConfigurationUpdateFailure.ConfigurationLocked => CompetitionConfigurationFailureCode.ConfigurationLocked,
+                _ => CompetitionConfigurationFailureCode.ConfigurationConflict
             }, failure switch
             {
                 CompetitionConfigurationUpdateFailure.CompetitionNotFound => "Competition was not found.",
@@ -114,6 +127,6 @@ public sealed class UpdateCompetitionConfiguration(
                 _ => "Configuration revision changed concurrently."
             });
         }
-        return OperationResult<CompetitionConfigurationView>.Success(result.Configuration);
+        return OperationResult<CompetitionConfigurationView, CompetitionConfigurationFailureCode>.Success(result.Configuration);
     }
 }

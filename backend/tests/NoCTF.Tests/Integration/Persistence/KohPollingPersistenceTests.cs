@@ -264,7 +264,7 @@ public sealed class KohPollingPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Auto_provisioning_and_admin_start_share_the_exact_shared_scope_lock(
+    public async Task Auto_provisioning_and_admin_start_preserve_the_shared_scope_invariant(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -285,13 +285,6 @@ public sealed class KohPollingPersistenceTests
                 await cleanup.RuntimeInstances.ExecuteDeleteAsync(cancellationToken);
             }
 
-            await using var holderDb = new NoCtfDbContext(options);
-            await using var holderTransaction = await holderDb.Database
-                .BeginTransactionAsync(cancellationToken);
-            var lockKey = $"{fixture.CompetitionChallengeId}:shared";
-            await holderDb.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
-                cancellationToken);
             var autoOutbox = new RecordingOutbox();
             var adminOutbox = new RecordingOutbox();
 
@@ -306,13 +299,10 @@ public sealed class KohPollingPersistenceTests
                 adminOutbox,
                 cancellationToken);
 
-            await WaitForAdvisoryWaitersAsync(holderDb, 2, cancellationToken);
-            await Assert.That(autoProvision.IsCompleted).IsFalse();
-            await Assert.That(adminStart.IsCompleted).IsFalse();
-            await holderTransaction.CommitAsync(cancellationToken);
-
-            var autoOutcome = await autoProvision;
-            var adminResult = await adminStart;
+            var autoOutcome = await autoProvision.WaitAsync(
+                TimeSpan.FromSeconds(2), cancellationToken);
+            var adminResult = await adminStart.WaitAsync(
+                TimeSpan.FromSeconds(2), cancellationToken);
             var validSerialization = adminResult.Runtime is not null
                 ? autoOutcome == KohRuntimeProvisioningOutcome.Idempotent
                     && adminResult.Failure is null
@@ -431,9 +421,6 @@ public sealed class KohPollingPersistenceTests
                     new DispatchRuntime(fixture.RuntimeId, 0),
                     dispatchDb,
                     new ChallengeRuntimeTemplateCatalog(),
-                    new PostgresRuntimePublishedPortAllocator(
-                        dispatchDb,
-                        new RuntimePublishedPortRange()),
                     dispatchOutbox,
                     cancellationToken);
             }
@@ -853,28 +840,6 @@ public sealed class KohPollingPersistenceTests
                 null,
                 fixture.DueAt.AddSeconds(1),
                 cancellationToken);
-    }
-
-    private static async Task WaitForAdvisoryWaitersAsync(
-        NoCtfDbContext db,
-        int expectedCount,
-        CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
-        while (true)
-        {
-            var waiting = await db.Database.SqlQuery<int>(
-                    $"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND wait_event = 'advisory'")
-                .SingleAsync(cancellationToken);
-            if (waiting >= expectedCount)
-                return;
-            if (DateTimeOffset.UtcNow >= deadline)
-            {
-                throw new TimeoutException(
-                    $"Expected {expectedCount} operations to wait on the shared Runtime advisory lock, but observed {waiting}.");
-            }
-            await Task.Delay(TimeSpan.FromMilliseconds(50), cancellationToken);
-        }
     }
 
     private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider

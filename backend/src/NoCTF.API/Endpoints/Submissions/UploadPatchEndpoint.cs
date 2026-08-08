@@ -58,7 +58,7 @@ public sealed class UploadPatchEndpoint(
             stream,
             DateTimeOffset.UtcNow,
             ct);
-        if (result.ErrorCode == "patch_upload_not_available")
+        if (result.FailureCode == PatchUploadFailureCode.PatchUploadNotAvailable)
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.UnprocessableEntity(new Microsoft.AspNetCore.Mvc.ProblemDetails
@@ -66,7 +66,7 @@ public sealed class UploadPatchEndpoint(
                 Status = StatusCodes.Status422UnprocessableEntity,
                 Title = "Patch archive was rejected.",
                 Detail = result.ErrorMessage,
-                Extensions = { ["code"] = result.ErrorCode }
+                Extensions = { ["code"] = result.FailureCode?.ToString() }
             });
         return TypedResults.Created(
             $"/api/v1/competitions/{request.CompetitionId}/challenges/{request.CompetitionChallengeId}/patch-upload",

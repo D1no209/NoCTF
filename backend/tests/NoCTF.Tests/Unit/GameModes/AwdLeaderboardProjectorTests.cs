@@ -39,11 +39,11 @@ public sealed class AwdLeaderboardProjectorTests
                 Attack(attackerB, victim, challengeId, roundId, now.AddSeconds(2))
             ],
             [],
-            [new(challengeId, "Pwn", false)],
+            [new(challengeId, "Pwn", "Pwn challenge", false)],
             configuration,
             now.AddMinutes(-10));
 
-        var rows = new AwdLeaderboardProjector().Project(input).ToDictionary(row => row.TeamId);
+        var rows = new AwdLeaderboardProjector().Project(input).Entries.ToDictionary(row => row.TeamId);
 
         await Assert.That(rows[attackerA].Score).IsEqualTo(50);
         await Assert.That(rows[attackerB].Score).IsEqualTo(50);
@@ -84,13 +84,13 @@ public sealed class AwdLeaderboardProjectorTests
             [new(teamId, "team", false, false, start)],
             [],
             events,
-            [new(challengeId, "Pwn", false)],
+            [new(challengeId, "Pwn", "Pwn challenge", false)],
             configuration,
             start,
             AwdRounds: rounds,
             ProjectedAt: start.AddSeconds(25));
 
-        var row = new AwdLeaderboardProjector().Project(input).Single();
+        var row = new AwdLeaderboardProjector().Project(input).Entries.Single();
 
         await Assert.That(row.Score).IsEqualTo(5);
     }
@@ -241,11 +241,11 @@ public sealed class AwdLeaderboardProjectorTests
             teams,
             attacks,
             systemEvents,
-            challengeIds.Select(id => new LeaderboardChallengeFact(id, "Pwn", false)).ToList(),
+            challengeIds.Select(id => new LeaderboardChallengeFact(id, "Pwn", "Pwn challenge", false)).ToList(),
             configuration,
             projectedAt.AddHours(-1),
             AwdRounds: rounds,
-            ProjectedAt: projectedAt));
+            ProjectedAt: projectedAt)).Entries;
     }
 
     private static LeaderboardSystemFact Hint(

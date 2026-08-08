@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NoCTF.Application.Storage;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Authentication;
 using NoCTF.API.Security;
@@ -112,7 +113,7 @@ public sealed class ChangePasswordEndpointTests
         public Task<UserProfile?> UpdateProfileAsync(Guid userId, string? description,
             bool isEmailPublic, DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
-        public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, string objectKey,
+        public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, StoredObject storedObject,
             DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<string?> GetAvatarObjectKeyAsync(Guid userId, CancellationToken cancellationToken) =>

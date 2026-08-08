@@ -10,8 +10,8 @@ namespace NoCTF.API.Endpoints.Competitions.Events;
 
 public sealed class ExportCompetitionEventsRequest
 {
-    [QueryParam] public CompetitionEventKind? Kind { get; set; }
-    [QueryParam] public CompetitionEventLevel? MinimumLevel { get; set; }
+    [QueryParam] public CompetitionEventKindProtocol? Kind { get; set; }
+    [QueryParam] public CompetitionEventLevelProtocol? MinimumLevel { get; set; }
     [QueryParam] public Guid? TeamId { get; set; }
     [QueryParam] public Guid? UserId { get; set; }
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
@@ -63,8 +63,8 @@ public sealed class ExportCompetitionEventsEndpoint(
         var result = await export.ExecuteAsync(new CompetitionEventQuery(
             competitionId,
             user.UserId,
-            request.Kind,
-            request.MinimumLevel,
+            request.Kind is null ? null : CompetitionEventProtocolMapper.ToDomain(request.Kind.Value),
+            request.MinimumLevel is null ? null : CompetitionEventProtocolMapper.ToDomain(request.MinimumLevel.Value),
             request.TeamId,
             request.UserId,
             request.CompetitionChallengeId,
