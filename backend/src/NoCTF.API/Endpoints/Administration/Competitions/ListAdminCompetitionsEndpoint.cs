@@ -8,10 +8,15 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 
 public sealed record AdminCompetitionListResponse(IReadOnlyList<CompetitionResponse> Items);
 
+public sealed class ListAdminCompetitionsRequest
+{
+    public bool IncludeDeleted { get; set; }
+}
+
 public sealed class ListAdminCompetitionsEndpoint(
     ListAdminCompetitions list,
     IUserContext user)
-    : EndpointWithoutRequest<Ok<AdminCompetitionListResponse>>
+    : Endpoint<ListAdminCompetitionsRequest, Ok<AdminCompetitionListResponse>>
 {
     public override void Configure()
     {
@@ -25,9 +30,15 @@ public sealed class ListAdminCompetitionsEndpoint(
         });
     }
 
-    public override async Task<Ok<AdminCompetitionListResponse>> ExecuteAsync(CancellationToken ct)
+    public override async Task<Ok<AdminCompetitionListResponse>> ExecuteAsync(
+        ListAdminCompetitionsRequest request,
+        CancellationToken ct)
     {
-        var items = await list.ExecuteAsync(user.UserId, user.IsAdministrator, ct);
+        var items = await list.ExecuteAsync(
+            user.UserId,
+            user.IsAdministrator,
+            request.IncludeDeleted,
+            ct);
         return TypedResults.Ok(new AdminCompetitionListResponse(
             items.Select(CompetitionMapper.ToResponse).ToArray()));
     }

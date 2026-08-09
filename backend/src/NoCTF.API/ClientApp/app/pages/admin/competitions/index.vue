@@ -6,12 +6,14 @@ import type { CompetitionAdminRole } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
 
+const route = useRoute()
 const { user, isAdministrator, canOrganize } = useAuth()
 
 const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
 const roles = ref<Record<string, CompetitionAdminRole>>({})
 const loading = ref(true)
 const error = ref<string | null>(null)
+const includeDeleted = ref(route.query.includeDeleted === 'true')
 
 const RoleLabel: Record<CompetitionAdminRole, string> = {
   owner: '负责人',
@@ -36,7 +38,9 @@ async function probeRole(competition: NoCtfapiEndpointsCompetitionsCompetitionRe
 async function load() {
   loading.value = true
   error.value = null
-  const { data, error: e } = await adminListCompetitions()
+  const { data, error: e } = await adminListCompetitions({
+    query: { includeDeleted: includeDeleted.value },
+  })
   if (e || !data) {
     error.value = parseApiError(e).message
     loading.value = false
@@ -50,22 +54,32 @@ async function load() {
   roles.value = Object.fromEntries(entries)
 }
 
+watch(includeDeleted, () => {
+  void load()
+})
+
 onMounted(load)
 </script>
 
 <template>
   <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h1 class="text-2xl font-semibold">竞赛管理</h1>
         <p class="text-sm text-muted-foreground">我参与管理的全部竞赛</p>
       </div>
-      <Button v-if="canOrganize" as-child>
-        <NuxtLink to="/admin/competitions/new">
-          <Plus data-icon="inline-start" />
-          新建竞赛
-        </NuxtLink>
-      </Button>
+      <div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 text-sm text-muted-foreground">
+          <Checkbox v-model="includeDeleted" />
+          包含已删除
+        </label>
+        <Button v-if="canOrganize" as-child>
+          <NuxtLink to="/admin/competitions/new">
+            <Plus data-icon="inline-start" />
+            新建竞赛
+          </NuxtLink>
+        </Button>
+      </div>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -91,6 +105,7 @@ onMounted(load)
             <div class="flex shrink-0 items-center gap-1">
               <GameModeBadge :mode="c.mode" />
               <CompetitionStatusBadge :status="c.status" />
+              <Badge v-if="c.deletedAt" variant="destructive">已删除</Badge>
             </div>
           </div>
           <CardDescription class="line-clamp-2">{{ c.description || '暂无描述' }}</CardDescription>

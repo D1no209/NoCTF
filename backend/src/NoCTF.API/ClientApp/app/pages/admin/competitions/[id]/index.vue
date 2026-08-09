@@ -24,6 +24,7 @@ const pendingAction = ref<string | null>(null)
 const actionError = ref<string | null>(null)
 
 const status = computed(() => competition.value?.status)
+const isDeleted = computed(() => !!competition.value?.deletedAt)
 
 const steps = [
   { value: 'Draft', label: '草稿' },
@@ -167,7 +168,7 @@ async function softDelete() {
     const { error } = await adminDeleteCompetition({ path: { competitionId } })
     if (error) throw error
     toast.success('竞赛已删除')
-    await navigateTo('/admin/competitions')
+    await refresh()
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -210,6 +211,12 @@ async function hardDelete() {
     deleteConfirm.value = null
   }
 }
+
+async function submitDelete() {
+  const action = deleteConfirm.value
+  if (action === 'hard') await hardDelete()
+  else if (action === 'soft') await softDelete()
+}
 </script>
 
 <template>
@@ -235,7 +242,7 @@ async function hardDelete() {
           <AlertDescription>{{ actionError }}</AlertDescription>
         </Alert>
 
-        <div v-if="canWrite" class="flex flex-wrap items-center gap-2">
+        <div v-if="canWrite && !isDeleted" class="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" :disabled="validating" @click="validateStart">
             <Spinner v-if="validating" data-icon="inline-start" />
             启动前检查
@@ -272,7 +279,7 @@ async function hardDelete() {
       </CardContent>
     </Card>
 
-    <Card v-if="canWrite">
+    <Card v-if="canWrite && !isDeleted">
       <CardHeader>
         <CardTitle>Flag 生成</CardTitle>
         <CardDescription>为动态 Flag 题目批量生成缺失的队伍 Flag(幂等)</CardDescription>
@@ -297,12 +304,15 @@ async function hardDelete() {
     <Card v-if="canWrite">
       <CardHeader>
         <CardTitle class="text-destructive">危险区</CardTitle>
+        <CardDescription v-if="isDeleted">
+          此竞赛已于 {{ adminFormatDateTime(competition.deletedAt) }} 删除。恢复不会丢失历史数据；彻底删除受历史引用保护。
+        </CardDescription>
       </CardHeader>
       <CardContent class="flex flex-wrap items-center gap-2">
-        <Button variant="outline" size="sm" :disabled="deleting" @click="deleteConfirm = 'soft'">
+        <Button v-if="!isDeleted" variant="outline" size="sm" :disabled="deleting" @click="deleteConfirm = 'soft'">
           删除竞赛
         </Button>
-        <template v-if="canManagePermissions">
+        <template v-if="isDeleted && canManagePermissions">
           <Button variant="outline" size="sm" :disabled="restoring" @click="restore">
             <Spinner v-if="restoring" data-icon="inline-start" />
             恢复已删除竞赛
@@ -321,13 +331,16 @@ async function hardDelete() {
           <AlertDialogDescription>{{ confirmTarget?.confirm?.description }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogCancel :disabled="pendingAction !== null">取消</AlertDialogCancel>
+          <Button
+            type="button"
             :variant="confirmTarget?.destructive ? 'destructive' : 'default'"
+            :disabled="pendingAction !== null"
             @click="confirmTarget && execute(confirmTarget)"
           >
-            确认
-          </AlertDialogAction>
+            <Spinner v-if="pendingAction !== null" data-icon="inline-start" />
+            {{ pendingAction !== null ? '处理中' : '确认' }}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -343,10 +356,16 @@ async function hardDelete() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" @click="deleteConfirm === 'hard' ? hardDelete() : softDelete()">
-            确认删除
-          </AlertDialogAction>
+          <AlertDialogCancel :disabled="deleting || hardDeleting">取消</AlertDialogCancel>
+          <Button
+            type="button"
+            variant="destructive"
+            :disabled="deleting || hardDeleting"
+            @click="submitDelete"
+          >
+            <Spinner v-if="deleting || hardDeleting" data-icon="inline-start" />
+            {{ deleting || hardDeleting ? '处理中' : '确认删除' }}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
