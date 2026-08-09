@@ -4,6 +4,9 @@ import { Bell, LogOut, Settings, ShieldCheck, Trophy, User } from '@lucide/vue'
 const { user, isLoggedIn, isAdministrator, canOrganize, logout } = useAuth()
 const { configuration } = usePlatform()
 const route = useRoute()
+const { hasUnread, refreshUnread } = useNotificationUnread()
+
+let notificationTimer: ReturnType<typeof setInterval> | undefined
 
 const navItems = computed(() => [
   { to: '/competitions', label: '竞赛', show: true },
@@ -15,6 +18,20 @@ const navItems = computed(() => [
 function isActive(to: string) {
   return route.path === to || route.path.startsWith(`${to}/`)
 }
+
+onMounted(() => {
+  void refreshUnread()
+  notificationTimer = setInterval(() => void refreshUnread(), 20_000)
+})
+
+watch(
+  () => user.value?.userId,
+  () => void refreshUnread(),
+)
+
+onBeforeUnmount(() => {
+  if (notificationTimer) clearInterval(notificationTimer)
+})
 </script>
 
 <template>
@@ -42,8 +59,18 @@ function isActive(to: string) {
           <ThemeToggle />
           <template v-if="isLoggedIn">
             <Button variant="ghost" size="icon" as-child>
-              <NuxtLink to="/notifications" aria-label="通知">
+              <NuxtLink
+                to="/notifications"
+                class="relative"
+                :aria-label="hasUnread ? '通知，有未读消息' : '通知'"
+              >
                 <Bell />
+                <span
+                  v-if="hasUnread"
+                  class="absolute top-1 right-1 size-2.5 rounded-full border-2 border-background bg-destructive"
+                  aria-hidden="true"
+                />
+                <span v-if="hasUnread" class="sr-only">有未读通知</span>
               </NuxtLink>
             </Button>
             <DropdownMenu>

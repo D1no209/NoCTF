@@ -59,7 +59,7 @@ public sealed class CreateCompetitionAnnouncementEndpoint(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanModerateAsync(user.UserId, competitionId, ct))
+        if (!await authorizer.CanJudgeAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var item = await notifications.CreateAnnouncementAsync(
             competitionId,
