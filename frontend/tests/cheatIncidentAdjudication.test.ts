@@ -14,6 +14,9 @@ const apiSource = await Bun.file(
 const panelSource = await Bun.file(
   new URL('../src/components/admin/competition-detail/AdminCompetitionCheatIncidentsPanel.vue', import.meta.url),
 ).text()
+const resolutionSource = await Bun.file(
+  new URL('../src/composables/useCheatIncidentResolution.ts', import.meta.url),
+).text()
 const workspaceSource = await Bun.file(
   new URL('../src/components/admin/competition-detail/AdminCompetitionDetailWorkspace.vue', import.meta.url),
 ).text()
@@ -52,7 +55,11 @@ describe('cross-team Flag adjudication', () => {
     expect(panelSource).toContain('detail.canDismiss')
     expect(panelSource).toContain('detail.canConfirm')
     expect(panelSource).toContain('detail.canCorrect')
-    expect(panelSource).toContain('resolutionReason.trim().length < 8')
+    expect(resolutionSource).toContain('const minimumReasonLength = 8')
+    expect(panelSource).toContain('resolutionRemainingCharacters > 0')
+    expect(panelSource).toContain('invalidateCheatIncidentResolutionQueries')
+    expect(panelSource).toContain('readCheatIncidentResolutionError')
+    expect(panelSource).toContain('detail.sourceTeamIsBanned')
   })
 
   test('integrates a pending-count tab with complete bilingual states', () => {

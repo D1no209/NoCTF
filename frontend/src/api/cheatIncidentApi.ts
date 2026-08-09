@@ -26,6 +26,35 @@ function unwrap<T>(result: GeneratedResult<T>, message: string): T {
   return result.data as T
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value))
+}
+
+export function readCheatIncidentResolutionError(error: unknown, fallback: string) {
+  if (error instanceof ApiError && isRecord(error.details)) {
+    if (typeof error.details.detail === 'string' && error.details.detail.trim())
+      return error.details.detail
+
+    if (isRecord(error.details.errors)) {
+      for (const messages of Object.values(error.details.errors)) {
+        if (Array.isArray(messages)) {
+          const message = messages.find(value => typeof value === 'string' && value.trim())
+          if (typeof message === 'string')
+            return message
+        }
+      }
+    }
+
+    if (typeof error.details.title === 'string' && error.details.title.trim())
+      return error.details.title
+  }
+
+  if (error instanceof Error && !(error instanceof ApiError) && error.message.trim())
+    return error.message
+
+  return fallback
+}
+
 export type CheatIncidentPage
   = NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListResponse
 export type CheatIncidentDetail

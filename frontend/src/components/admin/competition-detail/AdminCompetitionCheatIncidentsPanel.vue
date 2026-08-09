@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { CheatIncidentDetail, CheatIncidentStatus } from '@/api/cheatIncidentApi'
+import type { CheatIncidentStatus } from '@/api/cheatIncidentApi'
 import type {
   NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse,
   NoCtfapiEndpointsTeamsTeamResponse,
 } from '@/api/generated/types.gen'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import type { CheatIncidentResolutionAction } from '@/composables/useCheatIncidentResolution'
+import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -23,7 +24,10 @@ import {
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { cheatIncidentApi } from '@/api/cheatIncidentApi'
+import {
+  cheatIncidentApi,
+  readCheatIncidentResolutionError,
+} from '@/api/cheatIncidentApi'
 import { queryKeys } from '@/api/queryKeys'
 import { Alert } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -48,6 +52,10 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  invalidateCheatIncidentResolutionQueries,
+  useCheatIncidentResolution,
+} from '@/composables/useCheatIncidentResolution'
 import { COMPETITION_HUB_PATH, useSignalR } from '@/composables/useSignalR'
 import { useAuthStore } from '@/stores/auth'
 
@@ -55,8 +63,6 @@ const props = defineProps<{
   competitionId: string
   competitionTeams?: NoCtfapiEndpointsTeamsTeamResponse[]
 }>()
-
-type ResolutionAction = 'dismiss' | 'confirm' | 'correct'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
@@ -93,10 +99,7 @@ const draft = reactive({
 const applied = ref({ ...draft })
 const cursor = ref<string | null>(null)
 const cursorHistory = ref<Array<string | null>>([])
-const detail = ref<CheatIncidentDetail | null>(null)
-const resolutionOpen = ref(false)
-const resolutionAction = ref<ResolutionAction | null>(null)
-const resolutionReason = ref('')
+const selectedScoringEventId = ref<string | null>(null)
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null
 
 const query = computed(() => ({
@@ -138,41 +141,62 @@ const selectableTeams = computed(() => (props.competitionTeams ?? [])
   .filter((team): team is NoCtfapiEndpointsTeamsTeamResponse & { id: string } =>
     typeof team.id === 'string' && team.id.length > 0))
 
-const evidenceMutation = useMutation({
-  mutationFn: (scoringEventId: string) => cheatIncidentApi.get(
+const {
+  data: detail,
+  isError: isEvidenceError,
+  isFetching: isEvidenceFetching,
+  isPending: isEvidencePending,
+} = useQuery({
+  queryKey: computed(() => queryKeys.adminCompetitionCheatIncident(
     props.competitionId,
-    scoringEventId,
+    selectedScoringEventId.value ?? '',
+  )),
+  queryFn: () => cheatIncidentApi.get(
+    props.competitionId,
+    selectedScoringEventId.value!,
   ),
-  onSuccess: (value) => { detail.value = value },
-  onError: () => toast.error(t('admin.competitionDetail.cheatEvidenceLoadError')),
+  enabled: computed(() => Boolean(props.competitionId && selectedScoringEventId.value)),
+  retry: false,
 })
 
-const resolutionMutation = useMutation({
-  mutationFn: async ({ action, scoringEventId, reason }: {
-    action: ResolutionAction
-    scoringEventId: string
-    reason: string
-  }) => {
+watch(isEvidenceError, (hasError) => {
+  if (hasError)
+    toast.error(t('admin.competitionDetail.cheatEvidenceLoadError'))
+})
+
+const {
+  action: resolutionAction,
+  begin: openResolution,
+  canSubmit: resolutionCanSubmit,
+  cancel: cancelResolution,
+  error: resolutionError,
+  isOpen: resolutionOpen,
+  isSubmitting: resolutionIsSubmitting,
+  reason: resolutionReason,
+  remainingCharacters: resolutionRemainingCharacters,
+  setOpen: setResolutionOpen,
+  submit: submitResolutionRequest,
+  target: resolutionTarget,
+} = useCheatIncidentResolution({
+  execute: async ({ action, scoringEventId, reason }) => {
     if (action === 'dismiss')
       return cheatIncidentApi.dismiss(props.competitionId, scoringEventId, reason)
     if (action === 'confirm')
       return cheatIncidentApi.confirm(props.competitionId, scoringEventId, reason)
     return cheatIncidentApi.correct(props.competitionId, scoringEventId, reason)
   },
-  onSuccess: () => {
-    toast.success(t(`admin.competitionDetail.cheatActionSuccess.${resolutionAction.value}`))
-    resolutionOpen.value = false
-    resolutionReason.value = ''
-    resolutionAction.value = null
-    detail.value = null
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.adminCompetitionCheatIncidents(props.competitionId),
-    })
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.adminCompetitionTeams(props.competitionId),
-    })
+  onSuccess: ({ action, scoringEventId }) => {
+    toast.success(t(`admin.competitionDetail.cheatActionSuccess.${action}`))
+    void invalidateCheatIncidentResolutionQueries(
+      queryClient,
+      props.competitionId,
+      scoringEventId,
+    )
   },
-  onError: () => toast.error(t('admin.competitionDetail.cheatActionError')),
+  readError: error => readCheatIncidentResolutionError(
+    error,
+    t('admin.competitionDetail.cheatActionError'),
+  ),
 })
 
 const { connection, isConnected, start } = useSignalR({
@@ -205,7 +229,7 @@ function applyFilters() {
   applied.value = { ...draft }
   cursor.value = null
   cursorHistory.value = []
-  detail.value = null
+  selectedScoringEventId.value = null
 }
 
 function resetFilters() {
@@ -227,14 +251,14 @@ function nextPage() {
     return
   cursorHistory.value.push(cursor.value)
   cursor.value = page.value.nextCursor
-  detail.value = null
+  selectedScoringEventId.value = null
 }
 
 function previousPage() {
   if (cursorHistory.value.length === 0)
     return
   cursor.value = cursorHistory.value.pop() ?? null
-  detail.value = null
+  selectedScoringEventId.value = null
 }
 
 function statusLabel(status?: CheatIncidentStatus) {
@@ -264,8 +288,7 @@ function formatTime(value?: string | null) {
 function openEvidence(incident: NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse) {
   if (!incident.scoringEventId)
     return
-  detail.value = null
-  evidenceMutation.mutate(incident.scoringEventId)
+  selectedScoringEventId.value = incident.scoringEventId
 }
 
 async function copyFlag() {
@@ -280,28 +303,28 @@ async function copyFlag() {
   }
 }
 
-function beginResolution(action: ResolutionAction) {
-  resolutionAction.value = action
-  resolutionReason.value = ''
-  resolutionOpen.value = true
+function beginResolution(action: CheatIncidentResolutionAction) {
+  if (!detail.value?.scoringEventId)
+    return
+
+  openResolution(action, {
+    scoringEventId: detail.value.scoringEventId,
+    sourceTeamId: detail.value.sourceTeamId,
+    sourceTeamName: detail.value.sourceTeamName,
+  })
 }
 
 function submitResolution() {
-  const scoringEventId = detail.value?.scoringEventId
-  const action = resolutionAction.value
-  const reason = resolutionReason.value.trim()
-  if (!scoringEventId || !action || reason.length < 8)
-    return
-  resolutionMutation.mutate({ action, scoringEventId, reason })
+  void submitResolutionRequest()
 }
 
-function actionTitle(action: ResolutionAction | null) {
+function actionTitle(action: CheatIncidentResolutionAction | null) {
   return action
     ? t(`admin.competitionDetail.cheatActions.${action}.title`)
     : ''
 }
 
-function actionDescription(action: ResolutionAction | null) {
+function actionDescription(action: CheatIncidentResolutionAction | null) {
   return action
     ? t(`admin.competitionDetail.cheatActions.${action}.description`)
     : ''
@@ -461,8 +484,11 @@ onUnmounted(() => {
               </TableRow>
               <TableRow v-for="incident in incidents" v-else :key="incident.scoringEventId">
                 <TableCell>
-                  <div class="font-medium">
-                    {{ incident.sourceTeamName ?? '-' }}
+                  <div class="flex flex-wrap items-center gap-2 font-medium">
+                    <span>{{ incident.sourceTeamName ?? '-' }}</span>
+                    <Badge v-if="incident.sourceTeamIsBanned" variant="destructive">
+                      {{ t('admin.competitionDetail.cheatSourceTeamBanned') }}
+                    </Badge>
                   </div>
                   <code class="text-[10px] text-muted-foreground">{{ incident.sourceTeamId }}</code>
                 </TableCell>
@@ -493,7 +519,7 @@ onUnmounted(() => {
                     variant="ghost"
                     size="icon"
                     class="size-8"
-                    :disabled="evidenceMutation.isPending.value"
+                    :disabled="isEvidenceFetching"
                     :title="t('admin.competitionDetail.cheatReviewEvidence')"
                     @click="openEvidence(incident)"
                   >
@@ -519,19 +545,22 @@ onUnmounted(() => {
       </CardContent>
     </Card>
 
-    <Card v-if="evidenceMutation.isPending.value || detail" class="min-w-0 border-2 border-destructive/30">
+    <Card v-if="selectedScoringEventId" class="min-w-0 border-2 border-destructive/30">
       <CardHeader class="flex-row items-center justify-between gap-3 border-b bg-destructive/5">
         <CardTitle class="flex items-center gap-2 text-base">
           <Eye class="size-4" />{{ t('admin.competitionDetail.cheatEvidenceTitle') }}
         </CardTitle>
-        <Button variant="ghost" size="sm" @click="detail = null">
+        <Button variant="ghost" size="sm" @click="selectedScoringEventId = null">
           {{ t('common.close') }}
         </Button>
       </CardHeader>
       <CardContent class="space-y-5 pt-5">
-        <div v-if="evidenceMutation.isPending.value" class="py-10 text-center text-sm text-muted-foreground">
+        <div v-if="isEvidencePending" class="py-10 text-center text-sm text-muted-foreground">
           <Loader2 class="mr-2 inline size-4 animate-spin" />{{ t('admin.competitionDetail.cheatEvidenceLoading') }}
         </div>
+        <Alert v-else-if="isEvidenceError" variant="destructive">
+          {{ t('admin.competitionDetail.cheatEvidenceLoadError') }}
+        </Alert>
         <template v-else-if="detail">
           <Alert variant="warning">
             {{ t('admin.competitionDetail.cheatEvidenceAuditHint') }}
@@ -540,8 +569,11 @@ onUnmounted(() => {
             <div>
               <div class="text-xs uppercase text-muted-foreground">
                 {{ t('admin.competitionDetail.cheatSourceTeam') }}
-              </div><div class="font-medium">
-                {{ detail.sourceTeamName }}
+              </div><div class="flex flex-wrap items-center gap-2 font-medium">
+                <span>{{ detail.sourceTeamName }}</span>
+                <Badge v-if="detail.sourceTeamIsBanned" variant="destructive">
+                  {{ t('admin.competitionDetail.cheatSourceTeamBanned') }}
+                </Badge>
               </div>
             </div>
             <div>
@@ -597,12 +629,33 @@ onUnmounted(() => {
       </CardContent>
     </Card>
 
-    <Dialog v-model:open="resolutionOpen">
+    <Dialog :open="resolutionOpen" @update:open="setResolutionOpen">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ actionTitle(resolutionAction) }}</DialogTitle>
           <DialogDescription>{{ actionDescription(resolutionAction) }}</DialogDescription>
         </DialogHeader>
+        <div class="grid gap-3 border-2 border-border bg-muted/30 p-3 text-sm sm:grid-cols-2">
+          <div>
+            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {{ t('admin.competitionDetail.cheatResolutionAction') }}
+            </div>
+            <div class="mt-1 font-semibold">
+              {{ actionTitle(resolutionAction) }}
+            </div>
+          </div>
+          <div>
+            <div class="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {{ t('admin.competitionDetail.cheatResolutionTarget') }}
+            </div>
+            <div class="mt-1 break-all font-semibold">
+              {{ resolutionTarget?.sourceTeamName || resolutionTarget?.sourceTeamId || t('common.unknown') }}
+            </div>
+          </div>
+        </div>
+        <Alert v-if="resolutionError" variant="destructive" role="alert">
+          {{ resolutionError }}
+        </Alert>
         <div class="space-y-2">
           <Label for="cheat-resolution-reason">{{ t('admin.competitionDetail.cheatReason') }}</Label>
           <Textarea
@@ -610,22 +663,32 @@ onUnmounted(() => {
             v-model="resolutionReason"
             :maxlength="512"
             :placeholder="t('admin.competitionDetail.cheatReasonPlaceholder')"
+            :aria-invalid="resolutionRemainingCharacters > 0"
+            aria-describedby="cheat-resolution-reason-validation cheat-resolution-reason-hint"
           />
-          <p class="text-xs text-muted-foreground">
+          <p
+            v-if="resolutionRemainingCharacters > 0"
+            id="cheat-resolution-reason-validation"
+            class="text-xs font-medium text-destructive"
+            role="alert"
+          >
+            {{ t('admin.competitionDetail.cheatReasonTooShort', { count: resolutionRemainingCharacters }) }}
+          </p>
+          <p id="cheat-resolution-reason-hint" class="text-xs text-muted-foreground">
             {{ t('admin.competitionDetail.cheatReasonHint') }}
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" :disabled="resolutionMutation.isPending.value" @click="resolutionOpen = false">
+          <Button variant="outline" :disabled="resolutionIsSubmitting" @click="cancelResolution">
             {{ t('common.cancel') }}
           </Button>
           <Button
             :variant="resolutionAction === 'confirm' ? 'destructive' : 'default'"
-            :disabled="resolutionReason.trim().length < 8 || resolutionMutation.isPending.value"
+            :disabled="!resolutionCanSubmit"
             @click="submitResolution"
           >
-            <Loader2 v-if="resolutionMutation.isPending.value" class="mr-2 size-4 animate-spin" />
-            {{ t('common.confirm') }}
+            <Loader2 v-if="resolutionIsSubmitting" class="mr-2 size-4 animate-spin" />
+            {{ resolutionIsSubmitting ? t('common.submitting') : t('common.confirm') }}
           </Button>
         </DialogFooter>
       </DialogContent>
