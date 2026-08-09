@@ -455,6 +455,40 @@
   `0.1.0-alpha.16`；获得新的明确授权后再构建 Alpha.17 API 镜像，并在浏览器中验收默认“全部”、
   空日期正常加载、非法范围中文反馈及作弊通知卡片跳转。
 
+## 2026-08-10 Alpha.18 比赛通知、裁判处置与动态分值一致性
+
+- 功能提交 `450748b9a8758e095846ed8a65013dfb9199878d` 完成三个相互关联的比赛工作台缺口。
+  参赛者比赛页新增“公告/通知”入口，复用现有不可变 Notification 与 ReplyTo 线程：列表按
+  `competitionId` 强类型查询，卡片打开同页详情，完整显示官方公告标题、正文、发布人和发布时间，
+  并展示同一事件后续回复/状态变化。题目发布、血榜、咨询、封禁/纠正、作弊、提交、Runtime、报名
+  与普通生命周期消息分别精确导航到题目、咨询详情、封禁申诉区、管理作弊详情、提交、题目环境、
+  我的队伍或带事件类型筛选的比赛动态。全局通知中心改为复用同一详情组件。
+- Notification HTTP 契约新增可选 `competitionId` 查询条件和 `sourceDisplayName` 响应字段；签名 cursor
+  scope 包含用户与比赛，禁止跨筛选复用。PostgreSQL 仍用原有递归可见性/线程查询，Development 的
+  EF InMemory 仅增加等价内存遍历分支，以保证本地浏览器验收可用。`TeamBanCorrected` 只投递受影响
+  队伍成员，不再把个别队伍纠正广播给全部参赛者。没有新增数据表、DbSet、migration 或 snapshot。
+- 裁判权限边界改为显式角色：管理比赛响应新增 `administrationRole`（Owner/Manager/Judge/Observer），
+  前端不再从 `canConfirm` 反推 Manager。Judge 可以人工封禁队伍，并可驳回或确认作弊事件；解封、
+  封禁纠正、报名审批和配置写入仍只属于 Owner/Manager/平台管理员，Observer 保持只读。真实 HTTP
+  回归覆盖 Judge 封禁成功、Observer 403，以及 Judge 对两种作弊处置均可执行。
+- 排行榜题目元数据新增 `currentScore`。CTF 投影使用与排行榜行分数相同的有效规则、动态表达式、
+  当前有效解题数和有效队伍数计算当前题目分值；题目卡不再展示可能失真的模板 `BaseScore`，而是
+  显示动态当前分值。本队已解题同时显示实际结算分（包含已配置血榜奖励）以及一血/二血/三血标记，
+  因此截图中的“卡片 1000、榜单 500、血榜不可见”不再出现。投影测试同时断言 CurrentScore 与
+  CurrentPoints 百分比血奖语义。
+- OpenAPI 已从后端重新导出，`swagger.json`、`wwwroot/openapi/v1.json` 与 TypeScript SDK 均由工具
+  重生成，没有手工编辑生成文件。平台版本由 `0.1.0-alpha.17` 递增为 `0.1.0-alpha.18`。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；非 Integration TUnit
+  629/629、Notification PostgreSQL Testcontainers 1/1 通过；ClientApp `bun test` 56/56、
+  `bun run typecheck`、`bun run build`、`git diff --check` 全部通过。仓库仍无 lint script/ESLint
+  配置，因此未伪造 lint 结果；Nuxt 只保留既有大 chunk、插件耗时和第三方 trailing-slash 警告。
+- 浏览器在可丢弃 Development 比赛中实际验收：比赛导航出现“公告/通知”，工作人员公告卡片可打开，
+  URL 带稳定 notification id，详情正确显示完整标题、正文、`dev-admin` 发布人、发布时间和“暂无后续
+  回复或状态变化”。验收临时进程与内存数据已清理；没有修改生产比赛、队伍、作弊事实或通知。
+- 本阶段只创建本地功能提交与本 HANDOFF 提交，尚未 push、尚未部署；生产仍运行
+  `0.1.0-alpha.16`。获得明确授权后再推送并部署 Alpha.17–Alpha.18，使用可丢弃生产比赛复核动态
+  分值/血榜、Judge 封禁边界、通知精确跳转及控制台状态。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
