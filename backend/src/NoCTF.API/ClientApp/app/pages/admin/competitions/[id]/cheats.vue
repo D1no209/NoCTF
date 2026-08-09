@@ -11,6 +11,8 @@ import type {
 } from '~/api'
 import type { CheatIncidentResolutionRequest } from '~/composables/useCheatIncidentResolution'
 import { useCheatIncidentResolution } from '~/composables/useCheatIncidentResolution'
+import { watchCompetition } from '~/composables/useCompetitionHub'
+import { createLatestPageRefresh } from '~/lib/latest-page-refresh'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
@@ -23,7 +25,7 @@ const filterFrom = ref('')
 const filterTo = ref('')
 const pendingCount = ref<number | null>(null)
 
-const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagination<
+const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
   NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse
 >(async (cursor) => {
   const { data, error } = await adminListCheatIncidents({
@@ -41,9 +43,10 @@ const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagin
   return data ?? {}
 })
 
+const { loadNextPage, refreshLatest } = createLatestPageRefresh({ loadMore, reset })
+
 function applyFilters() {
-  reset()
-  void loadMore()
+  void refreshLatest()
 }
 
 // ---- Detail sheet ----
@@ -81,8 +84,7 @@ async function refreshResolvedIncident(request: CheatIncidentResolutionRequest) 
   if (detailOpen.value)
     await openDetail(request.scoringEventId)
 
-  reset()
-  await loadMore()
+  await refreshLatest()
 }
 
 const {
@@ -132,7 +134,20 @@ function handleResolutionOpen(value: boolean) {
   setResolutionOpen(value)
 }
 
-onMounted(() => void loadMore())
+let unwatchCompetition: (() => void) | null = null
+
+onMounted(() => {
+  void refreshLatest()
+  unwatchCompetition = watchCompetition(competitionId, {
+    competitionEventChanged: () => void refreshLatest(),
+    onReconnected: () => void refreshLatest(),
+  })
+})
+
+onBeforeUnmount(() => {
+  unwatchCompetition?.()
+  unwatchCompetition = null
+})
 </script>
 
 <template>
@@ -160,6 +175,10 @@ onMounted(() => void loadMore())
         {{ pendingCount }} 件待处理
       </Badge>
     </div>
+
+    <Alert v-if="listError" variant="destructive">
+      <AlertDescription>{{ listError.message }}</AlertDescription>
+    </Alert>
 
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
     <Empty v-else-if="initialized && items.length === 0">
@@ -202,7 +221,7 @@ onMounted(() => void loadMore())
         </TableBody>
       </Table>
       <div v-if="hasMore" class="flex justify-center">
-        <Button variant="outline" :disabled="loading" @click="loadMore">
+        <Button variant="outline" :disabled="loading" @click="loadNextPage">
           <Spinner v-if="loading" data-icon="inline-start" />
           加载更多
         </Button>
