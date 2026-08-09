@@ -335,6 +335,47 @@
   文件、题目镜像、运行时容器或任何业务数据。本部署文档提交只需同步生产 checkout，无需再次迁移
   或重建服务。
 
+## 2026-08-09 Alpha.9–Alpha.15 管理、参赛与通知链路续推
+
+- `e098e17c`（`0.1.0-alpha.9`）：管理端作弊事件列表收到实时更新后会回到第一页并重新读取最新事实；
+  连续事件会合并刷新，加载更多与实时刷新不会互相覆盖。
+- `4f55bd1c`（`0.1.0-alpha.10`）：恢复比赛删除、已删除比赛恢复和彻底删除操作。三类操作保留各自的
+  二次确认目标直至异步 SDK 请求真正开始，避免受控弹窗先清空操作状态后表现为按钮无响应。
+- `e1f36068`（`0.1.0-alpha.11`）：参赛题目响应补充解题人数和本队已解状态；开赛前由服务端和前端
+  双重隐藏题目。题目卡显示解题人数及颜色无关的已解旗帜标记，正确 Flag 仅触发一次并尊重
+  `prefers-reduced-motion` 的庆祝动画。比赛动态从不可变事件 payload 恢复题目名称。
+- `675227c2`（`0.1.0-alpha.12`）：封禁申诉与私密咨询改为显式提交、loading 防重复、行内校验和
+  保留输入的错误状态；咨询弹窗扩大且题目类咨询必须选择题目。增加 `/reset-password` 页面别名，
+  与邮件中已投递的密码重置 URL 一致。
+- `af0cc13b`（`0.1.0-alpha.13`）：通知铃铛按最新不可变通知 ID 显示未读红点，通知中心读取后写入
+  本地已读游标；管理比赛页恢复全局赛事公告，Owner、Manager、Judge 可通过生成 SDK 向参赛者发布，
+  Observer 保持只读。事件投影优先读取 payload 中保存的题目引用，因此旧事实也能显示题目名称。
+- `a0fbfbb1`（`0.1.0-alpha.14`）：确认作弊并封禁来源队伍时，`TeamBanned` 消息携带强类型
+  `ConfirmedCheating` 公告类型，Worker 幂等发布参赛者纪律公告：
+  “队伍「名称」经核实存在作弊行为，现已由赛事组委会予以封禁。”普通人工封禁新增
+  `announcePublicly` 强类型请求字段及默认关闭的前端选项；开启时使用“违反赛事规则”文案，均不公开
+  管理员填写的原因或证据。通知中心同时显示公告标题和正文。
+- `52a5a788`（`0.1.0-alpha.15`）：CTF Flag 首次由非正确结果转为 Correct 后，在同一评测事务中认领
+  该队伍、该比赛题目的 Player Container/Compose Runtime。Queued 实例直接标为 Stopped，其余活动
+  或带资源回执的失败实例进入现有 `Stopping -> StopRuntime -> Runner 清理 -> Stopped` 状态机；记录
+  Submission 与 Runtime 关联的不可变比赛事件。团队级事务锁在计分/血榜判定后获取，避免并发提交
+  重复派发且不阻塞排行榜并发更新。重复重判已正确结果不会误停后来重新启动的环境；AWD、AWDP、
+  KoH 和 OVA Runtime 不受影响。
+- HTTP/OpenAPI 契约变化：参赛题目投影新增解题进度字段；`BanTeamRequest` 新增可选布尔字段
+  `announcePublicly`。两次契约变更均通过 API 导出重新生成 `swagger.json`、`v1.json` 和 TypeScript
+  SDK；生成文件没有手工编辑。没有新增数据表或 migration。
+- 最终验证：`dotnet build backend/NoCTF.slnx --no-restore` 为 0 警告/0 错误；作弊持久化测试 1/1、
+  通知投递 PostgreSQL 测试 3/3、提交处理与运行时自动停止 PostgreSQL 测试 4/4 通过；ClientApp
+  `bun test` 41/41、`bun run typecheck`、`bun run build` 通过，OpenAPI 导出和 `bun run api:gen` 成功。
+  Nuxt 仅保留既有大 chunk/Nitro 第三方警告。ClientApp 没有 lint script 或 ESLint 配置，因此没有
+  伪造 lint 结果。`git diff --check` 通过。
+- 本轮使用独立干净 worktree 和 `codex/cheat-latest-refresh` 分支，未覆盖主工作区或其他 Agent 的
+  未提交修改。以上提交尚未 push、尚未部署，生产仍不包含 Alpha.9–Alpha.15；因此破坏性按钮、作弊
+  封禁公告和正确 Flag 自动停容器没有在生产浏览器中执行。部署授权后应使用可丢弃比赛数据分别验收。
+- 待确认：用户提出“自定义配置 Flag 头”，现有系统只有 AWD 竞赛级/题目级 `PerTeamFlagTemplate.Header`
+  和 CTF 动态运行时固定 `flag{...}`。必须先确认作用域、是否约束手工静态 Flag、以及修改后是否轮换
+  已生成 Flag；不得在答案明确前擅自改变历史 Flag 或计分语义。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
