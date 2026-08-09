@@ -744,6 +744,7 @@ export type NoCtfapiEndpointsAdministrationTeamsAcceptTeamBanAppealRequest = {
 
 export type NoCtfapiEndpointsAdministrationTeamsBanTeamRequest = {
     reason?: string;
+    announcePublicly?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationTeamsCorrectTeamBanRequest = {

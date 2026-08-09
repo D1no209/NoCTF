@@ -84,7 +84,10 @@ public sealed class TeamModerationStore(
                 command.CompetitionId,
                 team.Id,
                 team.Name,
-                command.OccurredAt));
+                command.OccurredAt,
+                command.AnnouncePublicly
+                    ? TeamBanAnnouncementKind.RuleViolation
+                    : null));
         }
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();

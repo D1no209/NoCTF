@@ -89,6 +89,7 @@ async function submitUnban() {
 // ---- Ban / correct-ban with reason ----
 const banDialog = ref<{ team: NoCtfapiEndpointsTeamsTeamResponse; mode: 'ban' | 'correct' } | null>(null)
 const banReason = ref('')
+const banAnnouncePublicly = ref(false)
 const banPending = ref(false)
 const banReasonValid = computed(() => {
   const length = banReason.value.trim().length
@@ -98,6 +99,7 @@ const banReasonValid = computed(() => {
 function openBan(team: NoCtfapiEndpointsTeamsTeamResponse, mode: 'ban' | 'correct') {
   banDialog.value = { team, mode }
   banReason.value = ''
+  banAnnouncePublicly.value = false
 }
 
 async function submitBan() {
@@ -107,7 +109,13 @@ async function submitBan() {
   try {
     const path = { competitionId, teamId: ctx.team.id }
     const { error } = ctx.mode === 'ban'
-      ? await adminBanTeam({ path, body: { reason: banReason.value.trim() } })
+      ? await adminBanTeam({
+          path,
+          body: {
+            reason: banReason.value.trim(),
+            announcePublicly: banAnnouncePublicly.value,
+          },
+        })
       : await adminCorrectTeamBan({ path, body: { reason: banReason.value.trim() } })
     if (error) throw error
     toast.success(ctx.mode === 'ban' ? '队伍已封禁' : '封禁已纠正')
@@ -312,6 +320,15 @@ onMounted(() => {
             <FieldDescription v-else>
               当前 {{ banReason.trim().length }}/512。
             </FieldDescription>
+          </Field>
+          <Field v-if="banDialog?.mode === 'ban'" orientation="horizontal">
+            <Checkbox id="ban-announce-publicly" v-model="banAnnouncePublicly" />
+            <div class="grid gap-1.5 leading-none">
+              <FieldLabel for="ban-announce-publicly">封禁后发布赛事纪律公告</FieldLabel>
+              <FieldDescription>
+                默认关闭。开启后将向参赛者公告该队伍因违反赛事规则被封禁，不公开处置原因或证据。
+              </FieldDescription>
+            </div>
           </Field>
         </FieldGroup>
         <DialogFooter>

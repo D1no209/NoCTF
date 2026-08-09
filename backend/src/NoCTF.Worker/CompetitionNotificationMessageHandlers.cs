@@ -108,11 +108,12 @@ public static class CompetitionNotificationMessageHandlers
         await db.SaveChangesAsync(ct);
     }
 
-    public static Task Handle(
+    public static async Task Handle(
         TeamBanned message,
         CompetitionNotificationDelivery delivery,
-        CancellationToken ct) =>
-        delivery.DeliverAsync(
+        CancellationToken ct)
+    {
+        await delivery.DeliverAsync(
             message.CompetitionId,
             message.TeamId,
             NotificationKind.TeamBanned,
@@ -124,6 +125,37 @@ public static class CompetitionNotificationMessageHandlers
                 message.BannedAt),
             message.TeamId,
             ct);
+
+        if (message.AnnouncementKind is not { } announcementKind)
+            return;
+
+        var body = announcementKind switch
+        {
+            TeamBanAnnouncementKind.ConfirmedCheating =>
+                $"队伍「{message.TeamName}」经核实存在作弊行为，现已由赛事组委会予以封禁。",
+            TeamBanAnnouncementKind.RuleViolation =>
+                $"队伍「{message.TeamName}」因违反赛事规则，现已由赛事组委会予以封禁。",
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(message),
+                announcementKind,
+                "Unsupported team ban announcement kind.")
+        };
+        await delivery.DeliverAsync(
+            message.CompetitionId,
+            message.TeamId,
+            NotificationKind.CompetitionAnnouncement,
+            $"team-ban-announcement:{message.TeamId:N}:{message.BannedAt.UtcTicks}:{announcementKind}",
+            new TeamBanAnnouncementPayload(
+                message.CompetitionId,
+                message.TeamId,
+                message.TeamName,
+                announcementKind,
+                "赛事纪律公告",
+                body,
+                message.BannedAt),
+            requiredTeamId: null,
+            ct);
+    }
 
     public static async Task Handle(
         ForeignTeamFlagDetected message,

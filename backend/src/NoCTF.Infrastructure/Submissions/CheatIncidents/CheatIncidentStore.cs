@@ -268,7 +268,8 @@ public sealed class CheatIncidentStore(
                 command.CompetitionId,
                 team.Id,
                 team.Name,
-                command.OccurredAt));
+                command.OccurredAt,
+                TeamBanAnnouncementKind.ConfirmedCheating));
         }
         else if (operation == ResolutionOperation.CorrectAndUnban)
         {

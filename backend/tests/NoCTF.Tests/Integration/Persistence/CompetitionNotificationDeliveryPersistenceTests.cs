@@ -250,6 +250,27 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(notifications[0].ContentJson)
                 .Contains($"team-banned:{bannedTeamId:N}:1");
 
+            var announcedBan = new TeamBanned(
+                competitionId,
+                bannedTeamId,
+                "Banned",
+                now.AddMilliseconds(1),
+                TeamBanAnnouncementKind.ConfirmedCheating);
+            await CompetitionNotificationMessageHandlers.Handle(announcedBan, delivery, ct);
+            await CompetitionNotificationMessageHandlers.Handle(announcedBan, delivery, ct);
+
+            var announcements = await db.Notifications.AsNoTracking()
+                .Where(notification =>
+                    notification.RelatedId == competitionId
+                    && notification.Kind == NotificationKind.CompetitionAnnouncement)
+                .ToArrayAsync(ct);
+            await Assert.That(announcements).Count().IsEqualTo(1);
+            await Assert.That(announcements[0].TargetType)
+                .IsEqualTo(NotificationTargetType.CompetitionParticipants);
+            await Assert.That(announcements[0].ContentJson).Contains("赛事纪律公告");
+            await Assert.That(announcements[0].ContentJson).Contains("作弊行为");
+            await Assert.That(announcements[0].ContentJson).Contains("Banned");
+
             await delivery.DeliverAsync(
                 competitionId,
                 Guid.CreateVersion7(),
@@ -275,11 +296,15 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             var bannedMemberFeed = await reader.ReadFeedAsync(bannedMemberId, start, 10, ct);
 
             await Assert.That(ownerFeed).IsEmpty();
-            await Assert.That(approvedMemberFeed).Count().IsEqualTo(1);
-            await Assert.That(approvedMemberFeed[0].Kind)
-                .IsEqualTo(NotificationKind.ChallengePublished);
+            await Assert.That(approvedMemberFeed.Select(notification => notification.Kind))
+                .IsEquivalentTo([
+                    NotificationKind.CompetitionAnnouncement,
+                    NotificationKind.ChallengePublished
+                ]);
             await Assert.That(unrelatedFeed).IsEmpty();
-            await Assert.That(bannedMemberFeed).Count().IsEqualTo(1);
+            await Assert.That(bannedMemberFeed).Count().IsEqualTo(2);
+            await Assert.That(bannedMemberFeed.All(
+                notification => notification.Kind == NotificationKind.TeamBanned)).IsTrue();
         });
     }
 
