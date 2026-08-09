@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Competitions.Events;
+using NoCTF.Runner.Composition;
 
 namespace NoCTF.Tests.Unit.Infrastructure;
 
@@ -34,5 +35,26 @@ public sealed class CompetitionEventRegistrationTests
                 .IsEqualTo(typeof(CompetitionEventStore));
             await Assert.That(registration.ImplementationFactory).IsNull();
         }
+    }
+
+    [Test]
+    public async Task Standalone_runner_registers_the_persistent_event_recorder()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Redis"] = "localhost:6379",
+                ["RunnerScoring:CallbackBaseUrl"] = "https://api.internal"
+            })
+            .Build();
+        var services = new ServiceCollection();
+
+        services.AddNoCtfRunner(configuration);
+
+        var registration = services.Single(candidate =>
+            candidate.ServiceType == typeof(ICompetitionEventRecorder));
+        await Assert.That(registration.ImplementationType)
+            .IsEqualTo(typeof(CompetitionEventStore));
+        await Assert.That(registration.Lifetime).IsEqualTo(ServiceLifetime.Scoped);
     }
 }

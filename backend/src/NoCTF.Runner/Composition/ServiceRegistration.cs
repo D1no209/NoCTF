@@ -20,6 +20,8 @@ using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Infrastructure.Competitions.Events;
 
 namespace NoCTF.Runner.Composition;
 
@@ -33,6 +35,7 @@ public static class ServiceRegistration
         bool development = false)
     {
         ValidateRunnerScoringCallbackBaseUrl(configuration);
+        services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
         services.AddNoCtfLocalComputationCaching(configuration);
         services.AddHttpClient();
         var configuredProvider = configuration["Runner:Provider"];
