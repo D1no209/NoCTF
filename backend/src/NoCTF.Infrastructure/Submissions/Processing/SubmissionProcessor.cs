@@ -511,11 +511,13 @@ public sealed class SubmissionProcessor(
             return;
         }
 
+        ScoringResult? previousScoringResult = null;
         if (submission.CurrentScoringEventId is { } currentEventId)
         {
             var current = await db.ScoringEvents
                 .IgnoreQueryFilters()
                 .SingleAsync(item => item.Id == currentEventId, cancellationToken);
+            previousScoringResult = current.Result;
             if (current.FailureCode == ScoringFailureCode.ForeignTeamFlagDetected)
             {
                 var resolved = await db.CompetitionEvents.AsNoTracking().AnyAsync(
@@ -617,6 +619,14 @@ public sealed class SubmissionProcessor(
             submission,
             evaluation,
             cancellationToken);
+        if (previousScoringResult != ScoringResult.Correct)
+        {
+            await StopSolvedChallengeRuntimesAsync(
+                submission,
+                scoringEvent,
+                now,
+                cancellationToken);
+        }
         await outbox.PublishAsync(new InvalidateLeaderboard(submission.CompetitionId));
         if (bloodAward is not null)
             await outbox.PublishAsync(bloodAward);
@@ -674,6 +684,75 @@ public sealed class SubmissionProcessor(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private async Task StopSolvedChallengeRuntimesAsync(
+        Submission submission,
+        ScoringEvent scoringEvent,
+        DateTimeOffset occurredAt,
+        CancellationToken ct)
+    {
+        if (submission.Kind != SubmissionKind.Flag
+            || scoringEvent.Result != ScoringResult.Correct)
+            return;
+
+        var competitionMode = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == submission.CompetitionId)
+            .Select(competition => competition.Mode)
+            .SingleAsync(ct);
+        if (competitionMode != GameMode.Ctf)
+            return;
+
+        await AcquireTeamScoringLockAsync(
+            submission.CompetitionId,
+            submission.TeamId,
+            ct);
+        var runtimes = await db.RuntimeInstances
+            .Where(instance =>
+                instance.CompetitionId == submission.CompetitionId
+                && instance.CompetitionChallengeId == submission.CompetitionChallengeId
+                && instance.TeamId == submission.TeamId
+                && instance.Purpose == RuntimePurpose.Player
+                && (instance.RuntimeKind == RuntimeKind.Container
+                    || instance.RuntimeKind == RuntimeKind.Compose)
+                && (instance.State == RuntimeState.Queued
+                    || instance.State == RuntimeState.Provisioning
+                    || instance.State == RuntimeState.Running
+                    || instance.State == RuntimeState.Failed
+                        && instance.ProviderReceiptJson != null))
+            .OrderBy(instance => instance.Generation)
+            .ToListAsync(ct);
+        foreach (var runtime in runtimes)
+        {
+            runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
+            if (runtime.State == RuntimeState.Queued)
+            {
+                runtime.State = RuntimeState.Stopped;
+                runtime.StoppedAt = occurredAt;
+            }
+            else
+            {
+                runtime.State = RuntimeState.Stopping;
+                runtime.RunnerAssignmentReleaseToken = null;
+                await outbox.PublishAsync(new StopRuntime(
+                    runtime.Id,
+                    runtime.ProcessingVersion));
+            }
+
+            await events.RecordAsync(new(
+                runtime.CompetitionId,
+                CompetitionEventKind.RuntimeStateChanged,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Team,
+                occurredAt,
+                ActorUserId: submission.SubmittedByUserId,
+                TeamId: runtime.TeamId,
+                CompetitionChallengeId: runtime.CompetitionChallengeId,
+                RuntimeInstanceId: runtime.Id,
+                SubmissionId: submission.Id,
+                RuntimeState: runtime.State,
+                RuntimeGeneration: runtime.Generation), ct);
+        }
     }
 
     private Task AcquireTeamScoringLockAsync(
