@@ -47,7 +47,7 @@ onMounted(async () => {
     <ul v-else class="flex flex-col gap-2">
       <li v-for="notification in items" :key="notification.id">
         <NuxtLink
-          :to="notificationCompetitionId(notification) ? `/competitions/${notificationCompetitionId(notification)}` : '/notifications'"
+          :to="notificationTargetPath(notification)"
           class="block rounded-md border px-4 py-3 transition-colors hover:border-primary/50"
         >
           <p class="text-sm">{{ notificationText(notification) }}</p>
