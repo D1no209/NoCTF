@@ -51,8 +51,34 @@
   3/3；Resolved 追问重开 Pending；通知详情展示从根到当前回复的完整线程，“查看咨询”精确跳回
   question URL。浏览器控制台无新增咨询错误，仅观察到仓库既有 `Toaster` 组件解析 Warning。独立
   PostgreSQL/Redis、测试账号/比赛和本地进程均已清理，未修改生产数据。
-- 本阶段只创建本地功能提交与本 HANDOFF 提交，尚未 push、尚未部署。下一步获得明确授权后再推送
-  并部署 Alpha.19，然后用可丢弃生产比赛复核角色权限、并发上限、精确通知和脱敏日志。
+- 本阶段功能提交与原 HANDOFF 提交已经用户授权推送并部署；生产结果、镜像、迁移和验收记录见下节。
+
+## 2026-08-10 Alpha.17–Alpha.19 生产部署
+
+- 用户明确授权后，Alpha.17–Alpha.19 共 6 个功能/文档提交已从 `f2144eed` 无冲突快进推送到远程
+  `main`，功能与部署镜像基线为 `e64c8bca`。生产 `/root/NoCTF` 通过只包含该范围的增量 Git bundle
+  快进到相同提交；既有未跟踪 `deploy/docker-compose.prod.yml`、根目录 `.env`、HTTPS 证书、
+  PostgreSQL/Redis/上传卷及运行中的题目容器均未改写。
+- 在独立干净 worktree 构建并核对的 `linux/amd64` 镜像为：API
+  `sha256:68bc848d34f83b2bdcd9d21b5effae4a3a5f23f2b320a8bec2900e26520a83ad`、Migration
+  `sha256:b93335c8053f340df5af8bcd4602ea8bdb7e88b26a4bbd6c2b37cbec261fb308`、Worker
+  `sha256:0cdf3f83c82e33cf6e20382926ca009a1095f074ba7a22173bbeed01b7e3f668`、Runner
+  `sha256:dc8640c9c5793b26938ab42d6ada7005a1f761b86259c5ebfd6325dc4ccc7092`；程序集包含
+  `0.1.0-alpha.19`。681,551,360 字节镜像归档和 82,748 字节 Git bundle 的本地/服务器 SHA-256
+  完全一致后才加载。原 Alpha.16 四类镜像保留 `rollback-f2144eed` 标签。
+- Migration 容器成功应用 EF CLI 生成的 `20260809175649_ConfigureCompetitionQuestions`：只在
+  `competitions` 增加 `max_active_questions_per_team=5`、
+  `max_participant_messages_before_handler_reply=3`、
+  `allow_challenge_owners_to_handle_questions=true` 和正值约束，没有新增业务表。随后使用生产 `.env`
+  与既有双 Compose 文件以 `--no-build --no-deps` 重建 API、Worker、Runner；PostgreSQL 与 Redis
+  未重启。API、Runner 为 healthy，Worker 正常，三者 restart count 均为 0。
+- 外网 HTTPS `/`、`/health` 返回 200；浏览器式 `Accept: text/html` 下 `/competitions`、
+  `/notifications`、`/verify-email`、`/reset-password` 深链均返回 SPA 入口 200。API/Worker/Runner 启动
+  后仅出现一次 Wolverine 在旧节点退出期间清理远端 agent 的瞬时超时；服务健康未受影响，后续观察
+  窗口未复发。部署传输目录已按精确路径删除，未执行全局 Docker prune；回滚镜像保留。
+- 本次生产验收没有创建、回复、关闭或修改真实咨询、比赛、队伍、作弊事实、通知、Flag 或 Runtime。
+  完整工单流程已在部署前用 Edge 和可丢弃本地数据验收；若要做生产有状态复核，必须使用明确标记的
+  可丢弃比赛，不能消费现有真实咨询或申诉证据。
 
 ## 2026-08-08 生产部署与邮箱验证链接热修
 
