@@ -435,6 +435,26 @@
   正确 Flag 自动停止容器和作弊封禁公告等有状态流程仍应只在可丢弃比赛数据上补浏览器验收；构建前
   的完整后端、真实依赖集成和 ClientApp 门禁结果见上方 Alpha.9–Alpha.16 两节。
 
+## 2026-08-10 Alpha.17 作弊筛选与通知导航修复
+
+- `654dbc6d` 修复管理端作弊页首次加载把空日期展开为 1970–2999、违反后端 31 天查询约束的问题。
+  空日期现在固定为页面本次已应用的最近 31 天窗口；筛选草稿与已应用筛选分离，分页、加载更多和
+  SignalR 失效刷新复用同一范围，不会因每次重新取当前时间而使签名 cursor 的筛选键漂移。
+- 状态筛选新增可见的“全部”选项并设为默认值，调用生成 SDK 时映射为 `status: null`。手动日期筛选
+  必须同时填写起止时间；无效日期、倒序和超过 31 天均在前端显示中文行内错误并停止请求，合法的
+  0–31 天范围继续传给 `adminListCheatIncidents`。页面同时明确提示空日期和最大范围语义。
+- 通知中心新增集中式卡片目标解析：`CheatIncidentDetected` 使用通知既有强类型 kind 和 content 中的
+  `competitionId` 跳转到 `/admin/competitions/{competitionId}/cheats`；其他比赛通知保持跳转参赛者
+  工作区，没有比赛关联的通知保持在通知中心。没有新增接口、手写 API URL、DTO 或枚举。
+- 平台版本由 `0.1.0-alpha.16` 递增为 `0.1.0-alpha.17`。没有 HTTP/OpenAPI 契约、生成 SDK、数据模型
+  或 migration 变化。新增 9 项回归测试；ClientApp `bun test` 52/52、`bun run typecheck`、
+  `bun run build` 通过，Nuxt 只保留既有大 chunk、插件耗时及第三方 trailing-slash deprecation
+  Warning；`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误，`git diff --check`
+  通过。仓库没有 lint script 或 ESLint 配置，因此未伪造 lint 结果。
+- 本阶段仅创建本地功能提交与本 HANDOFF 提交，尚未 push、尚未部署。生产仍运行
+  `0.1.0-alpha.16`；获得新的明确授权后再构建 Alpha.17 API 镜像，并在浏览器中验收默认“全部”、
+  空日期正常加载、非法范围中文反馈及作弊通知卡片跳转。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
