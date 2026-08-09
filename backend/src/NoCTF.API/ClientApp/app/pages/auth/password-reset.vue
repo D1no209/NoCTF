@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { authenticationCompletePasswordReset, authenticationRequestPasswordReset } from '~/api'
 
-definePageMeta({ middleware: 'guest' })
+definePageMeta({ middleware: 'guest', alias: ['/reset-password'] })
 
 const route = useRoute()
 const token = computed(() => (typeof route.query.token === 'string' ? route.query.token : null))
