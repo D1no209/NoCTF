@@ -372,9 +372,42 @@
 - 本轮使用独立干净 worktree 和 `codex/cheat-latest-refresh` 分支，未覆盖主工作区或其他 Agent 的
   未提交修改。以上提交尚未 push、尚未部署，生产仍不包含 Alpha.9–Alpha.15；因此破坏性按钮、作弊
   封禁公告和正确 Flag 自动停容器没有在生产浏览器中执行。部署授权后应使用可丢弃比赛数据分别验收。
-- 待确认：用户提出“自定义配置 Flag 头”，现有系统只有 AWD 竞赛级/题目级 `PerTeamFlagTemplate.Header`
-  和 CTF 动态运行时固定 `flag{...}`。必须先确认作用域、是否约束手工静态 Flag、以及修改后是否轮换
-  已生成 Flag；不得在答案明确前擅自改变历史 Flag 或计分语义。
+- 后续用户已明确“自定义配置 Flag 头”的作用域、静态 Flag 边界与历史值策略；决策及实现记录见下方
+  Alpha.16 小节。
+
+## 2026-08-09 Alpha.16 动态 Flag 模板与 Header 配置
+
+- 用户通过 `/grilling` 明确：配置只作用于动态容器生成的 Flag；手工/静态 Flag 不受影响；模板修改
+  只影响今后首次生成的 Flag，已持久化事实继续有效。`af2b481c` 据此为 CTF 竞赛配置和题目
+  Definition 增加可选 `flagTemplate`，优先级固定为“题目覆盖 > 竞赛默认 > 平台默认
+  `flag{[TEAMHASH]}`”。题目覆盖仅允许和 `Runtime.FlagSource=PerTeam` 一起保存，RulesJson 禁止承载
+  Definition 所有的模板字段；非法占位符在保存阶段被拒绝。
+- CTF 每队 Flag Store 现在在创建缺失事实前同时读取 Competition 配置、Challenge Definition 与派生
+  Secret，通过既有 `PerTeamFlagGenerator` 生成；默认配置仍严格复现历史 `flag{32 位 TEAMHASH}`。
+  Store 仍先按“队伍×比赛题目×RuntimeDefinition”读取旧事实，因此配置更新、Reset 和容器 Generation
+  变化都不会轮换旧 Flag。真实 PostgreSQL 回归同时验证题目覆盖、竞赛回退、静态题零生成、旧队伍
+  保持原值和新队伍采用新 Header。
+- AWD 修复了一个既有接线缺口：管理端早已能保存竞赛级 `FlagTemplate`，但轮次生成器此前只读取题目
+  Definition，导致竞赛默认实际无效。现在统一按同一优先级解析；当轮已有 `ChallengeFlag` 仍幂等复用，
+  新模板只作用于后续缺失的“队伍×题目×轮次”事实。前端模板初值由随机正文改为平台真实默认
+  `[TEAMHASH]`，避免管理员仅改 Header 时意外改变正文语义。
+- AWDP 当前产品模型没有长期参赛者攻击 Runtime 或自动动态 Break Flag producer；只有不暴露公网、
+  `TeamId=null` 的一次性 Fix 验证 target，Break Flag 仍来自题库/比赛 Flag 事实。本轮严格遵守“手工
+  Flag 不受影响”，没有把 AWDP 手工 Flag 伪装为自动生成，也没有新增无效配置项。若要让 AWDP
+  也具备可配置 Header 的动态攻击 Flag，必须另立阶段先实现长期攻击靶机、生成、注入与轮换闭环，
+  不能只加一个无人消费的前端字段。
+- 平台版本由 `0.1.0-alpha.15` 递增为 `0.1.0-alpha.16`。配置 JSON 是既有 `configurationJson` /
+  `definitionJson` 的内部强类型模式字段，schemaVersion 维持现有值；没有 HTTP/OpenAPI 路由、请求/
+  响应 DTO、生成 TypeScript SDK、数据表或 migration 变化。`dotnet ef migrations
+  has-pending-model-changes` 确认模型无变化。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；非集成 TUnit
+  627/627；真实依赖集成组 154/154，通过且仅 Kubernetes、Libvirt 两项因未配置外部环境按门禁跳过；
+  其中 CTF Flag PostgreSQL 2/2、AWD 轮次 PostgreSQL 1/1、Flag 模板单测 7/7。ClientApp
+  `bun test` 43/43、`bun run typecheck`、`bun run build`、`git diff --check` 全部通过；Nuxt 仅保留
+  既有大 chunk、插件耗时与第三方 trailing-slash deprecation 警告。
+- 本阶段已创建本地功能提交 `af2b481c`，尚未 push、尚未部署。生产仍不包含 Alpha.9–Alpha.16，
+  因此浏览器不能验收新配置控件；部署获得明确授权后，应使用可丢弃 CTF/AWD 比赛验证保存 Header、
+  新 Flag 前缀与旧 Flag 不变，并检查浏览器控制台无新增错误。
 
 ## 已落地的主要能力
 
