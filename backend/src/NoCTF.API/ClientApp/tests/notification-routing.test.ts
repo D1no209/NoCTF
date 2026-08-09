@@ -1,26 +1,55 @@
 import { describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../app/api'
-import { notificationTargetPath } from '../app/utils/labels'
+import { notificationThreadRootId, notificationTargetPath } from '../app/utils/labels'
 
 function notification(
   kind: NoCtfapiEndpointsNotificationsNotificationResponse['kind'],
   competitionId?: string,
+  content: Record<string, unknown> = {},
 ): NoCtfapiEndpointsNotificationsNotificationResponse {
   return {
+    id: 'notification-1',
     kind,
-    content: competitionId ? { competitionId } : {},
+    content: competitionId ? { competitionId, ...content } : content,
   }
 }
 
 describe('notificationTargetPath', () => {
   test('routes cheat incident cards to competition administration', () => {
-    expect(notificationTargetPath(notification('CheatIncidentDetected', 'competition-1')))
-      .toBe('/admin/competitions/competition-1/cheats')
+    expect(notificationTargetPath(notification('CheatIncidentDetected', 'competition-1', {
+      scoringEventId: 'incident-1',
+    })))
+      .toBe('/admin/competitions/competition-1/cheats?incident=incident-1')
   })
 
-  test('keeps ordinary competition cards in the participant workspace', () => {
+  test('routes challenge and blood notifications to their challenge', () => {
+    expect(notificationTargetPath(notification('ChallengePublished', 'competition-1', {
+      competitionChallengeId: 'challenge-1',
+    })))
+      .toBe('/competitions/competition-1/challenges/challenge-1')
+    expect(notificationTargetPath(notification('BloodAwarded', 'competition-1', {
+      competitionChallengeId: 'challenge-1',
+    })))
+      .toBe('/competitions/competition-1/challenges/challenge-1')
+  })
+
+  test('routes question activity to the matching consultation and reads its root thread', () => {
+    const item = notification('Message', 'competition-1', { questionId: 'question-1' })
+    expect(notificationTargetPath(item))
+      .toBe('/competitions/competition-1/questions?question=question-1')
+    expect(notificationThreadRootId(item)).toBe('question-1')
+  })
+
+  test('routes bans and corrections to the ban and appeal section', () => {
+    expect(notificationTargetPath(notification('TeamBanned', 'competition-1', {
+      teamId: 'team-1',
+    })))
+      .toBe('/competitions/competition-1/my/team#ban-appeal')
+  })
+
+  test('routes ordinary lifecycle messages to the competition event stream', () => {
     expect(notificationTargetPath(notification('CompetitionLifecycleChanged', 'competition-1')))
-      .toBe('/competitions/competition-1')
+      .toBe('/competitions/competition-1/events?kind=CompetitionLifecycleChanged')
   })
 
   test('keeps notifications without a competition on the notification page', () => {
@@ -28,8 +57,19 @@ describe('notificationTargetPath', () => {
       .toBe('/notifications')
   })
 
-  test('notification cards use the centralized target resolver', async () => {
-    const page = await Bun.file(new URL('../app/pages/notifications.vue', import.meta.url)).text()
-    expect(page).toContain(':to="notificationTargetPath(notification)"')
+  test('notification centers open readable detail and use the generated thread SDK', async () => {
+    const component = await Bun.file(
+      new URL('../app/components/notifications/NotificationCenter.vue', import.meta.url),
+    ).text()
+    const competitionPage = await Bun.file(
+      new URL('../app/pages/competitions/[id]/notifications.vue', import.meta.url),
+    ).text()
+
+    expect(component).toContain('readNotificationThreadEndpoint({')
+    expect(component).toContain('competitionId: props.competitionId')
+    expect(component).toContain('notificationTargetPath(selected.value)')
+    expect(component).toContain('sourceLabel(selected)')
+    expect(component).toContain('notificationBody(selected)')
+    expect(competitionPage).toContain(':competition-id="competitionId"')
   })
 })

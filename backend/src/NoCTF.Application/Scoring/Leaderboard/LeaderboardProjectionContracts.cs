@@ -52,7 +52,8 @@ public sealed record LeaderboardAwdRoundFact(
 
 public sealed record GameModeLeaderboardProjection(
     IReadOnlyList<LeaderboardEntry> Entries,
-    IReadOnlyList<LeaderboardCellFact> Cells);
+    IReadOnlyList<LeaderboardCellFact> Cells,
+    IReadOnlyDictionary<Guid, long>? CurrentScores = null);
 
 public interface IGameModeLeaderboardProjector
 {

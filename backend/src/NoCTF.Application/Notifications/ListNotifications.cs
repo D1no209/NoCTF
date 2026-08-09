@@ -14,7 +14,8 @@ public sealed record NotificationView(
     EntityReferenceKind? RelatedType,
     Guid? RelatedId,
     Guid? ReplyToId,
-    DateTimeOffset SentAt);
+    DateTimeOffset SentAt,
+    string? SourceDisplayName = null);
 
 public interface INotificationReader
 {
@@ -24,6 +25,20 @@ public interface INotificationReader
         Guid? beforeId,
         int limit,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<NotificationView>> ListCompetitionAsync(
+        Guid userId,
+        Guid competitionId,
+        DateTimeOffset? beforeCreatedAt,
+        Guid? beforeId,
+        int limit,
+        CancellationToken cancellationToken) =>
+        ListAsync(
+            userId,
+            beforeCreatedAt,
+            beforeId,
+            limit,
+            cancellationToken);
 
     Task<KeysetNotificationPosition> GetFeedCheckpointAsync(
         Guid userId,
@@ -49,11 +64,20 @@ public sealed class ListNotifications(INotificationReader reader)
 {
     public Task<IReadOnlyList<NotificationView>> ExecuteAsync(
         Guid userId,
+        Guid? competitionId,
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
         CancellationToken ct = default) =>
-        reader.ListAsync(userId, beforeCreatedAt, beforeId, limit, ct);
+        competitionId is { } id
+            ? reader.ListCompetitionAsync(
+                userId,
+                id,
+                beforeCreatedAt,
+                beforeId,
+                limit,
+                ct)
+            : reader.ListAsync(userId, beforeCreatedAt, beforeId, limit, ct);
 }
 
 public sealed class ReadNotificationFeed(INotificationReader reader)

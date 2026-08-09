@@ -16,10 +16,14 @@ describe('notification unread state', () => {
     const page = await Bun.file(
       new URL('../app/pages/notifications.vue', import.meta.url),
     ).text()
+    const center = await Bun.file(
+      new URL('../app/components/notifications/NotificationCenter.vue', import.meta.url),
+    ).text()
 
     expect(layout).toContain(":aria-label=\"hasUnread ? '通知，有未读消息' : '通知'\"")
     expect(layout).toContain('<span v-if="hasUnread" class="sr-only">有未读通知</span>')
-    expect(page).toContain('markAllRead(items.value[0]?.id)')
+    expect(page).toContain('<NotificationCenter />')
+    expect(center).toContain('markAllRead(items.value[0]?.id)')
   })
 })
 

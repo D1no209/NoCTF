@@ -15,6 +15,8 @@ export interface CompetitionAdminContext {
   role: Ref<CompetitionAdminRole>
   /** owner or manager: show write controls. */
   canWrite: ComputedRef<boolean>
+  /** owner, manager, or judge: show adjudication and team-ban controls. */
+  canJudge: ComputedRef<boolean>
   /** owner or platform administrator: show permission/ownership controls. */
   canManagePermissions: ComputedRef<boolean>
   refresh: () => Promise<void>

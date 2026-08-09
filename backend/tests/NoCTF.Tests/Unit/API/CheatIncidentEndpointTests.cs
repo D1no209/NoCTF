@@ -13,10 +13,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Administration.CheatIncidents;
+using NoCTF.API.Endpoints.Administration.Teams;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.Application.Submissions.CheatIncidents;
 using NoCTF.Application.Teams.Moderation;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Submissions;
 
 namespace NoCTF.Tests.Unit.API;
@@ -30,6 +32,8 @@ public sealed class CheatIncidentEndpointTests
         Guid.Parse("019bf9b5-e4cc-711a-b231-562e32ad7287");
     private static readonly Guid ScoringEventId =
         Guid.Parse("019bf9b5-e4cc-711a-b231-562e32ad7288");
+    private static readonly Guid TeamId =
+        Guid.Parse("019bf9b5-e4cc-711a-b231-562e32ad7289");
     private const string SigningKey =
         "cheat-incident-tests-use-a-stable-32-byte-signing-key";
 
@@ -54,7 +58,7 @@ public sealed class CheatIncidentEndpointTests
     }
 
     [Test]
-    public async Task Judge_evidence_is_no_store_and_dismiss_is_allowed_while_confirm_is_forbidden()
+    public async Task Judge_evidence_is_no_store_and_both_adjudication_outcomes_are_allowed()
     {
         var authorizer = new TestAuthorizer { Access = TestAccess.Judge };
         var store = new RecordingStore();
@@ -76,11 +80,11 @@ public sealed class CheatIncidentEndpointTests
         await Assert.That(detail).IsNotNull();
         await Assert.That(detail!.SubmittedFlag).IsEqualTo("flag{protected-evidence}");
         await Assert.That(detail.CanDismiss).IsTrue();
-        await Assert.That(detail.CanConfirm).IsFalse();
+        await Assert.That(detail.CanConfirm).IsTrue();
         await Assert.That(dismissResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
         await Assert.That(store.DismissCalls).IsEqualTo(1);
-        await Assert.That(confirmResponse.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
-        await Assert.That(store.ConfirmCalls).IsEqualTo(0);
+        await Assert.That(confirmResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+        await Assert.That(store.ConfirmCalls).IsEqualTo(1);
     }
 
     [Test]
@@ -102,6 +106,35 @@ public sealed class CheatIncidentEndpointTests
         await Assert.That(correctResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
         await Assert.That(store.ConfirmCalls).IsEqualTo(1);
         await Assert.That(store.CorrectCalls).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Judge_can_manually_ban_a_team_but_observer_cannot()
+    {
+        var judgeAuthorizer = new TestAuthorizer { Access = TestAccess.Judge };
+        var judgeStore = new RecordingStore();
+        await using var judgeApp = await CreateApplicationAsync(judgeStore, judgeAuthorizer);
+        using var judgeClient = judgeApp.GetTestClient();
+
+        using var judgeResponse = await judgeClient.PostAsJsonAsync(
+            $"/api/v1/admin/competitions/{CompetitionId}/teams/{TeamId}/ban",
+            new { reason = "confirmed competition misconduct", announcePublicly = false });
+
+        await Assert.That(judgeResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+        await Assert.That(judgeStore.TeamModerationCalls).IsEqualTo(1);
+        await Assert.That(judgeStore.LastTeamModeration?.ActorId).IsEqualTo(ActorId);
+
+        var observerAuthorizer = new TestAuthorizer { Access = TestAccess.Observer };
+        var observerStore = new RecordingStore();
+        await using var observerApp = await CreateApplicationAsync(observerStore, observerAuthorizer);
+        using var observerClient = observerApp.GetTestClient();
+
+        using var observerResponse = await observerClient.PostAsJsonAsync(
+            $"/api/v1/admin/competitions/{CompetitionId}/teams/{TeamId}/ban",
+            new { reason = "observer must not ban teams", announcePublicly = false });
+
+        await Assert.That(observerResponse.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
+        await Assert.That(observerStore.TeamModerationCalls).IsEqualTo(0);
     }
 
     private static string ListUri()
@@ -128,7 +161,8 @@ public sealed class CheatIncidentEndpointTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(ListCheatIncidentsEndpoint).Assembly];
             options.Filter = type => type.Namespace
-                == typeof(ListCheatIncidentsEndpoint).Namespace;
+                    == typeof(ListCheatIncidentsEndpoint).Namespace
+                || type == typeof(BanTeamEndpoint);
         });
         builder.Services.SwaggerDocument();
         builder.Services
@@ -142,9 +176,11 @@ public sealed class CheatIncidentEndpointTests
                 _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton<ICheatIncidentStore>(store);
+        builder.Services.AddSingleton<ITeamModerationStore>(store);
         builder.Services.AddScoped<ListCheatIncidents>();
         builder.Services.AddScoped<AccessCheatIncident>();
         builder.Services.AddScoped<ResolveCheatIncident>();
+        builder.Services.AddScoped<ModerateTeam>();
         builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(authorizer);
         builder.Services.AddSingleton<SignedKeysetCursor>();
         builder.Services.AddSingleton<IUserContext>(new ActorUserContext());
@@ -158,7 +194,7 @@ public sealed class CheatIncidentEndpointTests
         return app;
     }
 
-    private sealed class RecordingStore : ICheatIncidentStore
+    private sealed class RecordingStore : ICheatIncidentStore, ITeamModerationStore
     {
         private static readonly DateTimeOffset DetectedAt =
             DateTimeOffset.Parse("2026-08-01T12:00:00Z");
@@ -167,6 +203,8 @@ public sealed class CheatIncidentEndpointTests
         public int DismissCalls { get; private set; }
         public int ConfirmCalls { get; private set; }
         public int CorrectCalls { get; private set; }
+        public int TeamModerationCalls { get; private set; }
+        public TeamModerationCommand? LastTeamModeration { get; private set; }
 
         public Task<CheatIncidentPage?> ListAsync(
             CheatIncidentQuery query,
@@ -254,6 +292,20 @@ public sealed class CheatIncidentEndpointTests
         {
             CorrectCalls++;
             return Task.FromResult(new CheatIncidentResolutionResult());
+        }
+
+        public Task<CompetitionStatus?> GetCompetitionStatusAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<CompetitionStatus?>(CompetitionStatus.Running);
+
+        public Task<TeamModerationStoreResult> ApplyAsync(
+            TeamModerationCommand command,
+            CancellationToken cancellationToken)
+        {
+            TeamModerationCalls++;
+            LastTeamModeration = command;
+            return Task.FromResult(new TeamModerationStoreResult());
         }
     }
 

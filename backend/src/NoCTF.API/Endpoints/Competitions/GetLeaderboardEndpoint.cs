@@ -46,7 +46,8 @@ public sealed record LeaderboardEntryResponse(
 public sealed record LeaderboardChallengeInfoResponse(
     Guid CompetitionChallengeId,
     string Title,
-    string Direction);
+    string Direction,
+    long? CurrentScore);
 
 public sealed record LeaderboardProtocolResponse(
     Guid CompetitionId,

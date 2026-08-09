@@ -54,6 +54,8 @@ internal static partial class NotificationProtocolMapper
 public sealed class ListNotificationsRequest
 {
     [QueryParam]
+    public Guid? CompetitionId { get; set; }
+    [QueryParam]
     public string? Cursor { get; set; }
     [QueryParam]
     public int Limit { get; set; } = 50;
@@ -76,7 +78,8 @@ public sealed record NotificationResponse(
     EntityReferenceKind? RelatedType,
     Guid? RelatedId,
     Guid? ReplyToId,
-    DateTimeOffset SentAt);
+    DateTimeOffset SentAt,
+    string? SourceDisplayName);
 
 public sealed record NotificationListResponse(
     IReadOnlyList<NotificationResponse> Items,
@@ -110,7 +113,7 @@ public sealed class ListNotificationsEndpoint(
         if (!cursors.TryDecode(
                 request.Cursor,
                 CursorEndpoint,
-                user.UserId.ToString("N"),
+                CursorScope(user.UserId, request.CompetitionId),
                 out var position))
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -122,6 +125,7 @@ public sealed class ListNotificationsEndpoint(
 
         var items = await list.ExecuteAsync(
             user.UserId,
+            request.CompetitionId,
             position?.CreatedAt,
             position?.Id,
             request.Limit,
@@ -137,13 +141,17 @@ public sealed class ListNotificationsEndpoint(
             item.RelatedType,
             item.RelatedId,
             item.ReplyToId,
-            item.SentAt)).ToArray();
+            item.SentAt,
+            item.SourceDisplayName)).ToArray();
         var next = items.Count == request.Limit
             ? cursors.Encode(
                 CursorEndpoint,
-                user.UserId.ToString("N"),
+                CursorScope(user.UserId, request.CompetitionId),
                 new(items[^1].SentAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new NotificationListResponse(response, next));
     }
+
+    private static string CursorScope(Guid userId, Guid? competitionId) =>
+        string.Join('|', userId.ToString("N"), competitionId?.ToString("N") ?? "all");
 }

@@ -157,6 +157,20 @@ export function notificationCompetitionId(
   return typeof content.competitionId === 'string' ? content.competitionId : null
 }
 
+function notificationContentId(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+  key: string,
+): string | null {
+  const value = notificationContent(notification)[key]
+  return typeof value === 'string' && value.length > 0 ? value : null
+}
+
+export function notificationThreadRootId(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+): string | null {
+  return notificationContentId(notification, 'questionId') ?? notification.id ?? null
+}
+
 export function notificationTargetPath(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
@@ -164,9 +178,85 @@ export function notificationTargetPath(
   if (!competitionId)
     return '/notifications'
 
-  return notification.kind === 'CheatIncidentDetected'
-    ? `/admin/competitions/${competitionId}/cheats`
-    : `/competitions/${competitionId}`
+  const challengeId = notificationContentId(notification, 'competitionChallengeId')
+  const questionId = notificationContentId(notification, 'questionId')
+  const scoringEventId = notificationContentId(notification, 'scoringEventId')
+  switch (notification.kind) {
+    case 'BloodAwarded':
+    case 'ChallengePublished':
+    case 'HintPublished':
+      return challengeId
+        ? `/competitions/${competitionId}/challenges/${challengeId}`
+        : `/competitions/${competitionId}/challenges`
+    case 'QuestionOpened':
+    case 'Message':
+    case 'QuestionStatusChanged':
+      return questionId
+        ? `/competitions/${competitionId}/questions?question=${questionId}`
+        : `/competitions/${competitionId}/questions`
+    case 'TeamBanned':
+    case 'TeamBanCorrected':
+      return `/competitions/${competitionId}/my/team#ban-appeal`
+    case 'CheatIncidentDetected':
+      return scoringEventId
+        ? `/admin/competitions/${competitionId}/cheats?incident=${scoringEventId}`
+        : `/admin/competitions/${competitionId}/cheats`
+    case 'SubmissionEvaluated':
+      return `/competitions/${competitionId}/my/submissions`
+    case 'RuntimeStateChanged':
+      return challengeId
+        ? `/competitions/${competitionId}/challenges/${challengeId}`
+        : `/competitions/${competitionId}/challenges`
+    case 'TeamRegistrationChanged':
+      return `/competitions/${competitionId}/my/team`
+    case 'CompetitionAnnouncement':
+      return `/competitions/${competitionId}/notifications?notification=${notification.id ?? ''}`
+    default:
+      return `/competitions/${competitionId}/events?kind=${notification.kind}`
+  }
+}
+
+export function notificationTitle(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+): string {
+  const payload = notificationContent(notification)
+  if (notification.kind === 'CompetitionAnnouncement')
+    return typeof payload.title === 'string' ? payload.title : '赛事公告'
+  if (notification.kind === 'QuestionOpened' || notification.kind === 'Message' || notification.kind === 'QuestionStatusChanged')
+    return typeof payload.title === 'string' ? payload.title : notificationText(notification)
+  return notificationText(notification)
+}
+
+export function notificationBody(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+): string | null {
+  const payload = notificationContent(notification)
+  for (const key of ['body', 'reason', 'detail', 'message']) {
+    const value = payload[key]
+    if (typeof value === 'string' && value.trim().length > 0)
+      return value
+  }
+  return null
+}
+
+export function notificationActionLabel(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+): string {
+  switch (notification.kind) {
+    case 'BloodAwarded':
+    case 'ChallengePublished':
+    case 'HintPublished':
+    case 'RuntimeStateChanged': return '查看题目'
+    case 'QuestionOpened':
+    case 'Message':
+    case 'QuestionStatusChanged': return '查看咨询'
+    case 'TeamBanned':
+    case 'TeamBanCorrected': return '查看封禁与申诉'
+    case 'CheatIncidentDetected': return '查看作弊事件'
+    case 'SubmissionEvaluated': return '查看提交'
+    case 'TeamRegistrationChanged': return '查看我的队伍'
+    default: return '查看比赛动态'
+  }
 }
 
 /** 通知文案(NoCTF.Domain.Notifications.NotificationKind),content 为松散 JSON。 */
@@ -186,8 +276,8 @@ export function notificationText(
     CompetitionLifecycleChanged: `竞赛${title}的生命周期已变更`, TeamRegistrationChanged: `你的队伍${team}报名状态已变更`, SubmissionEvaluated: `你在${challenge}的提交已完成评测`,
     RuntimeStateChanged: `${challenge}的运行环境状态已变更`, StartGateFailed: `竞赛${title}启动检查未通过`, ManagementFailure: `竞赛${title}出现管理侧故障`,
     BloodAwarded: `恭喜,你在${challenge}拿下了血榜名次`, ChallengePublished: `竞赛${title}发布了新题目${challenge}`, HintPublished: `${challenge}发布了新提示`,
-    TeamBanned: `你的队伍${team}已被封禁`, CompetitionQuestionOpened: `竞赛${title}有新的咨询`, CompetitionQuestionReplied: '你的咨询已有新回复',
-    CompetitionQuestionStatusChanged: '你的咨询状态已变更', CheatIncidentDetected: '检测到疑似作弊行为', TeamBanCorrected: '队伍封禁已被纠正', DataExportReady: '数据导出已就绪', DataExportFailed: '数据导出失败',
+    TeamBanned: `你的队伍${team}已被封禁`, QuestionOpened: `竞赛${title}有新的咨询`, Message: '你的咨询已有新回复',
+    QuestionStatusChanged: '你的咨询状态已变更', CheatIncidentDetected: '检测到疑似作弊行为', TeamBanCorrected: '队伍封禁已被纠正', DataExportReady: '数据导出已就绪', DataExportFailed: '数据导出失败',
     UserAccountLifecycleChanged: '用户账号状态已变更', CompetitionAnnouncement: announcement,
   }
   return templates[String(notification.kind)] ?? '你有一条新通知'

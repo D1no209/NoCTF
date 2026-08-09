@@ -261,11 +261,14 @@ public sealed class CtfLeaderboardProjectorTests
             JsonSerializer.Serialize(new CtfConfiguration(1, new(100, 0, 10), [])),
             start);
 
-        var rows = new CtfLeaderboardProjector().Project(input).Entries;
+        var projection = new LeaderboardProjectionEngine(
+            new LeaderboardProjectorCatalog()).Project(input);
+        var rows = projection.Entries;
 
         await Assert.That(rows.Single(row => row.TeamId == teams[0]).Score).IsEqualTo(105);
         await Assert.That(rows.Single(row => row.TeamId == teams[1]).Score).IsEqualTo(110);
         await Assert.That(rows.Single(row => row.TeamId == teams[2]).Score).IsEqualTo(70);
+        await Assert.That(projection.Challenges.Single().CurrentScore).IsEqualTo(70);
 
         LeaderboardSubmissionFact Fact(Guid teamId, DateTimeOffset at) => new(
             Guid.NewGuid(), teamId, challengeId, SubmissionKind.Flag, at,

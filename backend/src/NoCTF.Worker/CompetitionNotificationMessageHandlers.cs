@@ -217,7 +217,7 @@ public static class CompetitionNotificationMessageHandlers
                 message.TeamId,
                 message.TeamName,
                 message.CorrectedAt),
-            requiredTeamId: null,
+            requiredTeamId: message.TeamId,
             ct);
 
     public static Task Handle(

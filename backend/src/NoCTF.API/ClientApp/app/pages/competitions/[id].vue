@@ -45,6 +45,7 @@ const tabs = computed(() => {
     ...(challengesVisible ? [{ to: `${base}/challenges`, label: '题目' }] : []),
     { to: `${base}/leaderboard`, label: '记分板' },
     { to: `${base}/teams`, label: '队伍' },
+    { to: `${base}/notifications`, label: '公告/通知' },
     { to: `${base}/events`, label: '动态' },
     { to: `${base}/questions`, label: '咨询' },
     { to: `${base}/my/team`, label: '我的队伍' },

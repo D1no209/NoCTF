@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Notifications;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
+using NoCTF.Domain.Teams;
 
 namespace NoCTF.Infrastructure.Notifications;
 
@@ -15,27 +17,39 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         int limit,
         CancellationToken ct)
     {
-        var query = VisibleTo(userId);
+        var query = await VisibleToAsync(userId, ct);
+        return await ListPageAsync(query, beforeCreatedAt, beforeId, limit, ct);
+    }
+
+    public async Task<IReadOnlyList<NotificationView>> ListCompetitionAsync(
+        Guid userId,
+        Guid competitionId,
+        DateTimeOffset? beforeCreatedAt,
+        Guid? beforeId,
+        int limit,
+        CancellationToken ct)
+    {
+        var query = (await VisibleToAsync(userId, ct)).Where(notification =>
+            notification.RelatedType == EntityReferenceKind.Competition
+            && notification.RelatedId == competitionId);
+        return await ListPageAsync(query, beforeCreatedAt, beforeId, limit, ct);
+    }
+
+    private async Task<IReadOnlyList<NotificationView>> ListPageAsync(
+        IQueryable<Notification> query,
+        DateTimeOffset? beforeCreatedAt,
+        Guid? beforeId,
+        int limit,
+        CancellationToken ct)
+    {
         if (beforeCreatedAt is { } createdAt && beforeId is { } id)
             query = query.Where(notification =>
                 notification.SentAt < createdAt
                 || notification.SentAt == createdAt && notification.Id.CompareTo(id) < 0);
-        return await query
+        return await Project(query
             .OrderByDescending(notification => notification.SentAt)
             .ThenByDescending(notification => notification.Id)
-            .Take(limit)
-            .Select(notification => new NotificationView(
-                notification.Id,
-                notification.SourceType,
-                notification.SourceId,
-                notification.TargetType,
-                notification.TargetId,
-                notification.Kind,
-                notification.ContentJson,
-                notification.RelatedType,
-                notification.RelatedId,
-                notification.ReplyToId,
-                notification.SentAt))
+            .Take(limit))
             .ToListAsync(ct);
     }
 
@@ -44,7 +58,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         DateTimeOffset now,
         CancellationToken ct)
     {
-        var checkpoint = await VisibleTo(userId)
+        var checkpoint = await (await VisibleToAsync(userId, ct))
             .OrderByDescending(notification => notification.SentAt)
             .ThenByDescending(notification => notification.Id)
             .Select(notification => new KeysetNotificationPosition(
@@ -59,26 +73,14 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         KeysetNotificationPosition position,
         int limit,
         CancellationToken ct) =>
-        await VisibleTo(userId)
+        await Project((await VisibleToAsync(userId, ct))
             .Where(notification =>
                 notification.SentAt > position.CreatedAt
                     || notification.SentAt == position.CreatedAt
                     && notification.Id.CompareTo(position.Id) > 0)
             .OrderBy(notification => notification.SentAt)
             .ThenBy(notification => notification.Id)
-            .Take(limit)
-            .Select(notification => new NotificationView(
-                notification.Id,
-                notification.SourceType,
-                notification.SourceId,
-                notification.TargetType,
-                notification.TargetId,
-                notification.Kind,
-                notification.ContentJson,
-                notification.RelatedType,
-                notification.RelatedId,
-                notification.ReplyToId,
-                notification.SentAt))
+            .Take(limit))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<NotificationView>?> ReadThreadAsync(
@@ -86,11 +88,34 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         Guid notificationId,
         CancellationToken ct)
     {
-        var authorizedRoot = await VisibleTo(userId)
+        var authorizedRoot = await (await VisibleToAsync(userId, ct))
             .AnyAsync(notification => notification.Id == notificationId, ct);
         if (!authorizedRoot)
             return null;
-        return await db.Notifications.FromSqlInterpolated($$"""
+        IQueryable<Notification> thread;
+        if (!db.Database.IsRelational())
+        {
+            var notifications = await db.Notifications.AsNoTracking().ToListAsync(ct);
+            var threadIds = new HashSet<Guid> { notificationId };
+            var changed = true;
+            while (changed)
+            {
+                changed = false;
+                foreach (var notification in notifications)
+                {
+                    if (notification.ReplyToId is not { } parentId
+                        || !threadIds.Contains(parentId)
+                        || !threadIds.Add(notification.Id))
+                        continue;
+                    changed = true;
+                }
+            }
+            thread = db.Notifications.AsNoTracking()
+                .Where(notification => threadIds.Contains(notification.Id));
+        }
+        else
+        {
+            thread = db.Notifications.FromSqlInterpolated($$"""
             WITH RECURSIVE thread AS (
                 SELECT n.* FROM notifications AS n WHERE n.id = {{notificationId}}
                 UNION ALL
@@ -98,10 +123,16 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 JOIN thread AS parent ON child.reply_to_id = parent.id
             )
             SELECT DISTINCT * FROM thread
-            """).AsNoTracking()
+            """).AsNoTracking();
+        }
+        thread = thread
             .OrderBy(notification => notification.SentAt)
-            .ThenBy(notification => notification.Id)
-            .Select(notification => new NotificationView(
+            .ThenBy(notification => notification.Id);
+        return await Project(thread).ToListAsync(ct);
+    }
+
+    private IQueryable<NotificationView> Project(IQueryable<Notification> query) =>
+        query.Select(notification => new NotificationView(
                 notification.Id,
                 notification.SourceType,
                 notification.SourceId,
@@ -112,12 +143,21 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 notification.RelatedType,
                 notification.RelatedId,
                 notification.ReplyToId,
-                notification.SentAt))
-            .ToListAsync(ct);
-    }
+                notification.SentAt,
+                notification.SourceId == null
+                    ? null
+                    : db.Users.IgnoreQueryFilters()
+                        .Where(user => user.Id == notification.SourceId)
+                        .Select(user => user.UserName)
+                        .FirstOrDefault()));
 
-    private IQueryable<Notification> VisibleTo(Guid userId) =>
-        db.Notifications.FromSqlInterpolated($$"""
+    private async Task<IQueryable<Notification>> VisibleToAsync(
+        Guid userId,
+        CancellationToken ct)
+    {
+        if (!db.Database.IsRelational())
+            return await VisibleToInMemoryAsync(userId, ct);
+        return db.Notifications.FromSqlInterpolated($$"""
             WITH RECURSIVE directly_visible AS (
                 SELECT n.*
                 FROM notifications AS n
@@ -163,4 +203,88 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             )
             SELECT DISTINCT * FROM thread
             """).AsNoTracking();
+    }
+
+    private async Task<IQueryable<Notification>> VisibleToInMemoryAsync(
+        Guid userId,
+        CancellationToken ct)
+    {
+        var notifications = await db.Notifications.AsNoTracking().ToListAsync(ct);
+        var competitions = (await db.Competitions.AsNoTracking().ToListAsync(ct))
+            .ToDictionary(competition => competition.Id);
+        var teams = await db.Teams.AsNoTracking().ToListAsync(ct);
+        var user = await db.Users.IgnoreQueryFilters().AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.Id == userId, ct);
+
+        bool IsDirectlyVisible(Notification notification) => notification.TargetType switch
+        {
+            NotificationTargetType.User => notification.TargetId == userId,
+            NotificationTargetType.CompetitionCollaborators =>
+                competitions.TryGetValue(notification.TargetId, out var competition)
+                && competition.DeletedAt is null
+                && (competition.OwnerId == userId
+                    || competition.ManagerIds.Contains(userId)
+                    || competition.JudgeIds.Contains(userId)
+                    || competition.ObserverIds.Contains(userId)),
+            NotificationTargetType.CompetitionParticipants => teams.Any(team =>
+                team.CompetitionId == notification.TargetId
+                && team.DeletedAt is null
+                && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                && !team.IsBanned
+                && team.MemberIds.Contains(userId)),
+            NotificationTargetType.TeamMembers => teams.Any(team =>
+                team.Id == notification.TargetId
+                && team.DeletedAt is null
+                && team.MemberIds.Contains(userId)),
+            NotificationTargetType.PlatformAdministrators => user is
+            {
+                Kind: UserKind.Human,
+                Role: UserRole.Administrator,
+                AccountStatus: UserAccountStatus.Active
+            },
+            _ => false
+        };
+
+        var visibleIds = notifications
+            .Where(notification => IsDirectlyVisible(notification))
+            .Select(notification => notification.Id)
+            .ToHashSet();
+        var participatedIds = notifications
+            .Where(notification => notification.SourceType == NotificationSourceType.User
+                && notification.SourceId == userId)
+            .Select(notification => notification.Id)
+            .ToHashSet();
+
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var notification in notifications)
+            {
+                if (!participatedIds.Contains(notification.Id)
+                    || notification.ReplyToId is not { } parentId
+                    || !participatedIds.Add(parentId))
+                    continue;
+                changed = true;
+            }
+        }
+        visibleIds.UnionWith(participatedIds);
+
+        changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var notification in notifications)
+            {
+                if (notification.ReplyToId is not { } parentId
+                    || !visibleIds.Contains(parentId)
+                    || !visibleIds.Add(notification.Id))
+                    continue;
+                changed = true;
+            }
+        }
+
+        return db.Notifications.AsNoTracking()
+            .Where(notification => visibleIds.Contains(notification.Id));
+    }
 }

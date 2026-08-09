@@ -8,6 +8,9 @@ describe('participant challenge progress', () => {
 
     expect(page).toContain('current.solveCount += 1')
     expect(page).toContain('current.solvedByMyTeam = true')
+    expect(page).toContain('challenge.currentScore')
+    expect(page).toContain('本队结算')
+    expect(page).toContain('bloodRankLabel')
     expect(page).toContain('支队伍已解出')
     expect(page).toContain('已解出')
     expect(page).toContain('<Flag')

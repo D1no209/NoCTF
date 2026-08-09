@@ -36,7 +36,7 @@ public sealed class ConfirmCheatIncidentEndpoint(
         {
             summary.Summary = "Confirms one incident and bans its source team.";
             summary.Description =
-                "Administrator, owner, and manager only. The public competition notification contains no Flag or private evidence.";
+                "Administrator, owner, manager, and judge only. The public competition notification contains no Flag or private evidence.";
         });
     }
 
@@ -46,7 +46,7 @@ public sealed class ConfirmCheatIncidentEndpoint(
             CancellationToken cancellationToken)
     {
         var competitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanModerateAsync(user.UserId, competitionId, cancellationToken))
+        if (!await authorizer.CanJudgeAsync(user.UserId, competitionId, cancellationToken))
             return TypedResults.Forbid();
         var result = await resolve.ConfirmAndBanAsync(new(
             competitionId,

@@ -46,8 +46,6 @@ async function loadList() {
   questions.value = data.items ?? []
 }
 
-onMounted(loadList)
-
 // 新建
 const createOpen = ref(false)
 const createSubject = ref<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode>('Challenge')
@@ -132,6 +130,12 @@ async function select(id: string) {
   }
   detail.value = data
 }
+
+onMounted(async () => {
+  await loadList()
+  const questionId = typeof route.query.question === 'string' ? route.query.question : null
+  if (questionId) await select(questionId)
+})
 
 // 追加消息
 const reply = ref('')

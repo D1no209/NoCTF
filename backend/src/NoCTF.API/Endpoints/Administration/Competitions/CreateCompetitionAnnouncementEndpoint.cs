@@ -82,7 +82,8 @@ public sealed class CreateCompetitionAnnouncementEndpoint(
             item.RelatedType,
             item.RelatedId,
             item.ReplyToId,
-            item.SentAt);
+            item.SentAt,
+            item.SourceDisplayName);
         return TypedResults.Created($"/notifications/{item.Id}", response);
     }
 }

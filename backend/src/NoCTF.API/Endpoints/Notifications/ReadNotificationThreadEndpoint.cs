@@ -42,7 +42,8 @@ public sealed class ReadNotificationThreadEndpoint(
             item.RelatedType,
             item.RelatedId,
             item.ReplyToId,
-            item.SentAt)).ToArray();
+            item.SentAt,
+            item.SourceDisplayName)).ToArray();
         return TypedResults.Ok(new NotificationListResponse(response, null));
     }
 }

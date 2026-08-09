@@ -4,7 +4,6 @@ import { toast } from 'vue-sonner'
 import {
   adminCreateCompetitionAnnouncement,
   adminGetCompetition,
-  adminListCheatIncidents,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience,
@@ -25,6 +24,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 
 const canWrite = computed(() => role.value === 'owner' || role.value === 'manager')
+const canJudge = computed(() => role.value !== 'observer')
 const canManagePermissions = computed(() => role.value === 'owner')
 const canAnnounce = computed(() => role.value !== 'observer')
 
@@ -57,13 +57,14 @@ async function resolveRole() {
     role.value = 'owner'
     return
   }
-  const { data } = await adminListCheatIncidents({
-    path: { competitionId },
-    query: { from: '1970-01-01T00:00:00Z', to: '2999-12-31T23:59:59Z', limit: 1 },
-  }).catch(() => ({ data: undefined }))
-  if (data?.canConfirm) role.value = 'manager'
-  else if (data?.canDismiss) role.value = 'judge'
-  else role.value = 'observer'
+  const protocolRole = competition.value?.administrationRole
+  role.value = protocolRole === 'Manager'
+    ? 'manager'
+    : protocolRole === 'Judge'
+      ? 'judge'
+      : protocolRole === 'Owner'
+        ? 'owner'
+        : 'observer'
 }
 
 async function publishAnnouncement() {
@@ -110,6 +111,7 @@ provide(CompetitionAdminKey, {
   competition,
   role,
   canWrite,
+  canJudge,
   canManagePermissions,
   refresh,
 })

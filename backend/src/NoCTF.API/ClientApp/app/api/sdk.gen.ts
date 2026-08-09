@@ -2435,7 +2435,7 @@ export const adminValidateCompetitionStart = <ThrowOnError extends boolean = fal
 /**
  * Confirms one incident and bans its source team.
  *
- * Administrator, owner, and manager only. The public competition notification contains no Flag or private evidence.
+ * Administrator, owner, manager, and judge only. The public competition notification contains no Flag or private evidence.
  */
 export const adminConfirmCheatIncident = <ThrowOnError extends boolean = false>(options: Options<AdminConfirmCheatIncidentData, ThrowOnError>): RequestResult<AdminConfirmCheatIncidentResponses, AdminConfirmCheatIncidentErrors, ThrowOnError> => (options.client ?? client).post<AdminConfirmCheatIncidentResponses, AdminConfirmCheatIncidentErrors, ThrowOnError>({
     security: [{

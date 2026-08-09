@@ -52,6 +52,18 @@ public sealed class NotificationReaderPersistenceTests
                     10,
                     cancellationToken)).Select(item => item.Id))
                     .Contains(ids.ParticipantAnnouncementId);
+                var competitionNotifications = await reader.ListCompetitionAsync(
+                    ids.FormerManagerId,
+                    ids.CompetitionId,
+                    null,
+                    null,
+                    10,
+                    cancellationToken);
+                await Assert.That(competitionNotifications.Select(item => item.Id))
+                    .IsEquivalentTo([ids.RootId, ids.FormerReplyId, ids.OwnerReplyId]);
+                await Assert.That(competitionNotifications.Single(
+                    item => item.Id == ids.RootId).SourceDisplayName)
+                    .IsEqualTo("notification-asker");
                 await Assert.That(await reader.ListAsync(
                     ids.NewParticipantId,
                     null,
