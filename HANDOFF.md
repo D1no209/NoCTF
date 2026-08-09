@@ -213,6 +213,33 @@
   Dockerfile、Compose 覆盖、脚本和部署日志均已删除。清理 16.28 GB BuildKit 缓存后根分区占用为
   60%，剩余约 17 GB；未删除题目镜像、数据卷、数据库、Redis、上传文件或 HTTPS 配置。
 
+## 2026-08-09 管理操作按钮与生产卡死实例修复
+
+- `ce2678e3`：修复管理端运行时终止确认按钮的目标丢失。普通终止和强制终结原先使用
+  `AlertDialogAction`，该组件会先关闭受控弹窗并清空当前 Runtime，再执行页面点击处理函数；处理函数
+  因读到空目标而直接返回，所以不会发出 API 请求、不会显示结果。确认按钮改为普通破坏性 `Button`，
+  仅由成功分支显式关闭弹窗，取消按钮仍保留 AlertDialog 语义。
+- 队伍解封改为显式二次确认弹窗，确认后只调用生成 SDK `adminUnbanTeam`，并在成功或失败时给出明确
+  toast；“纠正封禁”的原因输入与后端契约对齐为 8–512 字符，显示实时长度并在无效时禁用提交。
+  新增 Bun 接线回归测试，防止再次把会自动关闭的 Action 组件用于异步提交目标，也覆盖解封确认和
+  纠正原因约束。未修改 HTTP/OpenAPI 契约、生成 SDK、数据模型或 migration。
+- 平台预发布版本由 `0.1.0-alpha.5` 递增为 `0.1.0-alpha.6`。
+- 生产比赛 `019fe148-36a9-7581-a1f8-eec98c768ccb` 的旧 Runtime
+  `019fe218-1e46-7e98-90d7-a2a455b69d8e` 经只读检查确认无 Docker 资源且无 Redis capacity claim；
+  原始 Provision 死信明确记录旧版 `security.capAdd = null` 引发的 `ArgumentNullException`，生产当前
+  版本已经包含该根因修复。随后通过现有管理员强制终结接口重新触发 Runner 身份清理：Runner 回写
+  `ResourcesAbsent`，旧实例进入 `Stopped`，不可变比赛事件同时记录 Requested/Completed；替代 Runtime
+  `019fe25a-d206-7c98-9e3c-3032cfe78c28` 自动派发并进入 `Running`，容器
+  `noctf-019fe25ad2067c989e3c3032cfe78c28` 正常运行，Docker 映射为 `32769 -> 9999`。没有直接修改
+  数据库、Redis 或 Docker 状态。
+- 验证：先运行新增回归测试得到 2/2 预期失败，修复后 `bun test` 11/11、`bun run typecheck`、
+  `bun run generate` 通过；`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；
+  TUnit 直接运行 773 项，622 通过、151 个因本机 Docker/外部集群不可用按设计跳过、0 失败；
+  `git diff --check` 通过。内置浏览器能导航到生产 URL，但页面结构读取仍发生超时，因此修复后的
+  实际页面点击验收需在部署后完成。
+- 本轮仅创建本地功能提交与本 HANDOFF 提交，未 push、未部署 `0.1.0-alpha.6`；生产仍运行
+  `0.1.0-alpha.5`，但指定卡死实例已通过线上现有正式接口恢复。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
