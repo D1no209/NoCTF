@@ -409,6 +409,32 @@
   因此浏览器不能验收新配置控件；部署获得明确授权后，应使用可丢弃 CTF/AWD 比赛验证保存 Header、
   新 Flag 前缀与旧 Flag 不变，并检查浏览器控制台无新增错误。
 
+## 2026-08-10 Alpha.9–Alpha.16 生产部署
+
+- 用户明确授权后，Alpha.9–Alpha.16 的 10 个提交已从 `dc3772f4` 无冲突快进推送至远程
+  `main`，功能/文档部署基线为 `91dd4434`。生产 `/root/NoCTF` 通过带先决提交
+  `dc3772f4` 的增量 Git bundle 快进到同一提交；既有未跟踪
+  `deploy/docker-compose.prod.yml`、根目录 `.env`、HTTPS 证书、PostgreSQL/Redis/上传卷及题目
+  容器均未改写。
+- 从独立干净 worktree 构建并核对的 Alpha.16 镜像为：API/Migration
+  `sha256:db5d41bf47e78acfd25d11a0908a9468acfd08211e311dfc766fdd0eb8a29e77`、Worker
+  `sha256:9abbb72b0954fe807400ca99ce517128aa8a274e3f52b6be7fc2f6ba73445277`、Runner
+  `sha256:b5c6ebef8e02cac70eb2007b1f614d166c8b9660cb558998e9a5c2e606156952`，均为
+  `linux/amd64`。681,460,736 字节镜像归档和 66,318 字节 Git bundle 的本地/服务器 SHA-256
+  完全一致后才加载；旧四类镜像保留 `rollback-dc3772f4` 标签，没有覆盖回滚入口。
+- 差异不含 migration/model snapshot；新 Migration 容器退出码为 0，并明确报告数据库已是最新。
+  随后使用生产 `.env` 和既有双 Compose 文件以 `--no-build` 重建 API、Worker、Runner。稳定后 API、
+  Runner 均为 healthy，Worker 正常运行，三者 restart count 均为 0；镜像内程序集均包含
+  `0.1.0-alpha.16`。
+- 外网 HTTPS `/` 与 `/health` 返回 200。浏览器式 `Accept: text/html` 回归确认
+  `/verify-email`、`/reset-password` 及对应 `/auth/*` 规范路由均返回 SPA 入口 200；不携带 HTML
+  Accept 的通用 curl 会按 API/静态资源语义得到 404，这不是浏览器路由故障。切换后 API、Worker、
+  Runner 日志未发现 `fail:`、`crit:`、Fatal、Unhandled、OutOfMemory 或
+  `ArgumentNullException`；Warning 仅为既有 DataProtection 临时密钥和 Hosting 端口覆盖提示。
+- 本次没有为验收创建、处置或修改真实比赛、作弊事件、队伍、Flag 或 Runtime。动态 Flag Header、
+  正确 Flag 自动停止容器和作弊封禁公告等有状态流程仍应只在可丢弃比赛数据上补浏览器验收；构建前
+  的完整后端、真实依赖集成和 ClientApp 门禁结果见上方 Alpha.9–Alpha.16 两节。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
