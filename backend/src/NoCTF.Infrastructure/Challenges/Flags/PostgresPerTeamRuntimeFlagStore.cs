@@ -2,6 +2,8 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Domain.Challenges;
+using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.GameModes.Flags;
 
 namespace NoCTF.Infrastructure.Challenges.Flags;
 
@@ -35,22 +37,39 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
         if (existing is not null)
             return existing.Flag;
 
-        var secret = await db.CompetitionChallenges.AsNoTracking()
+        var scope = await db.CompetitionChallenges.AsNoTracking()
             .Where(challenge => challenge.Id == competitionChallengeId
                 && challenge.CompetitionId == competitionId)
             .Join(
                 db.Competitions.AsNoTracking(),
                 challenge => challenge.CompetitionId,
                 competition => competition.Id,
-                (_, competition) => competition.FlagDerivationSecret)
+                (challenge, competition) => new { Challenge = challenge, Competition = competition })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                target => target.Challenge.ChallengeId,
+                challenge => challenge.Id,
+                (target, challenge) => new
+                {
+                    target.Challenge.ChallengeId,
+                    target.Competition.FlagDerivationSecret,
+                    target.Competition.ConfigurationJson,
+                    challenge.DefinitionJson
+                })
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException(
                 "The competition challenge does not belong to the competition.");
-        var flag = PerTeamRuntimeFlagDerivation.Derive(
-            secret,
-            competitionId,
-            competitionChallengeId,
-            teamId);
+        var template = CtfFlagTemplateResolver.Resolve(
+            scope.ConfigurationJson,
+            scope.DefinitionJson);
+        var flag = PerTeamFlagGenerator.Generate(
+            template,
+            new(
+                scope.FlagDerivationSecret,
+                competitionId,
+                scope.ChallengeId,
+                competitionChallengeId,
+                teamId));
         db.ChallengeFlags.Add(new ChallengeFlag
         {
             Id = Guid.CreateVersion7(now),

@@ -1,6 +1,7 @@
 using NoCTF.GameModes.Ctf.Scoring;
 using DynamicExpresso.Exceptions;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.GameModes.Flags;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
 
@@ -24,6 +25,7 @@ public static class CtfConfigurationValidator
             if (reward.Policy != BloodRewardPolicy.FixedPoints && reward.Value > 100)
                 errors.Add("Blood reward percentages cannot exceed 100.");
         }
+        ValidateFlagTemplate(configuration.FlagTemplate, errors);
         ValidateExpression(configuration.ScoreExpression, configuration.DefaultPoints, eligibleTeamCount, errors);
         return errors;
     }
@@ -54,6 +56,12 @@ public static class CtfConfigurationValidator
             }
         }
         ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
+        ValidateFlagTemplate(configuration.FlagTemplate, errors);
+        if (configuration.FlagTemplate is not null
+            && configuration.Runtime?.FlagSource != RuntimeFlagSource.PerTeam)
+        {
+            errors.Add("FlagTemplate requires a PerTeam runtime FlagSource.");
+        }
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
             errors.Add("CTF runtimes must use PerTeam allocation.");
@@ -83,6 +91,14 @@ public static class CtfConfigurationValidator
     {
         if (maxAttempts is <= 0)
             errors.Add("MaxFlagAttempts must be positive when configured.");
+    }
+
+    private static void ValidateFlagTemplate(
+        PerTeamFlagTemplate? template,
+        ICollection<string> errors)
+    {
+        if (template is not null && !PerTeamFlagGenerator.IsValidTemplate(template))
+            errors.Add("FlagTemplate is invalid.");
     }
 
     public static IReadOnlyList<string> ValidatePoints(CtfPointConfiguration points)

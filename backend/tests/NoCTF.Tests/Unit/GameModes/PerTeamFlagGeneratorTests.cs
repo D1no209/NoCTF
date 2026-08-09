@@ -1,5 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Flags;
 
 namespace NoCTF.Tests.Unit.GameModes;
@@ -72,5 +75,80 @@ public sealed class PerTeamFlagGeneratorTests
             new(new byte[32], Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
 
         await Assert.That(action).Throws<FormatException>();
+    }
+
+    [Test]
+    public async Task Ctf_challenge_template_overrides_competition_dynamic_flag_default()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var competition = new CtfConfiguration(
+            CtfConfiguration.CurrentSchemaVersion,
+            new(500, 100, 10),
+            [],
+            FlagTemplate: new("competition", "[TEAMHASH]", false));
+        var inherited = new CtfChallengeConfiguration(
+            CtfChallengeConfiguration.CurrentSchemaVersion,
+            null,
+            null);
+        var overridden = inherited with
+        {
+            FlagTemplate = new("challenge", "[TEAMHASH]", false)
+        };
+
+        var inheritedTemplate = CtfFlagTemplateResolver.Resolve(
+            JsonSerializer.Serialize(competition, options),
+            JsonSerializer.Serialize(inherited, options));
+        var overriddenTemplate = CtfFlagTemplateResolver.Resolve(
+            JsonSerializer.Serialize(competition, options),
+            JsonSerializer.Serialize(overridden, options));
+
+        await Assert.That(inheritedTemplate.Header).IsEqualTo("competition");
+        await Assert.That(overriddenTemplate.Header).IsEqualTo("challenge");
+    }
+
+    [Test]
+    public async Task Awd_challenge_template_overrides_competition_dynamic_flag_default()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var competition = AwdConfiguration.Default with
+        {
+            FlagTemplate = new("competition", "[TEAMHASH]", false)
+        };
+        var inherited = new AwdChallengeConfiguration(
+            AwdChallengeConfiguration.CurrentSchemaVersion);
+        var overridden = inherited with
+        {
+            FlagTemplate = new("challenge", "[TEAMHASH]", false)
+        };
+
+        var inheritedTemplate = AwdFlagTemplateResolver.Resolve(
+            JsonSerializer.Serialize(competition, options),
+            JsonSerializer.Serialize(inherited, options));
+        var overriddenTemplate = AwdFlagTemplateResolver.Resolve(
+            JsonSerializer.Serialize(competition, options),
+            JsonSerializer.Serialize(overridden, options));
+
+        await Assert.That(inheritedTemplate.Header).IsEqualTo("competition");
+        await Assert.That(overriddenTemplate.Header).IsEqualTo("challenge");
+    }
+
+    [Test]
+    public async Task Ctf_rejects_invalid_or_static_runtime_template_overrides()
+    {
+        var invalidCompetition = new CtfConfiguration(
+            CtfConfiguration.CurrentSchemaVersion,
+            new(500, 100, 10),
+            [],
+            FlagTemplate: new("flag", "[UNKNOWN]", false));
+        var staticChallenge = new CtfChallengeConfiguration(
+            CtfChallengeConfiguration.CurrentSchemaVersion,
+            null,
+            null,
+            FlagTemplate: new("flag", "[TEAMHASH]", false));
+
+        await Assert.That(CtfConfigurationValidator.Validate(invalidCompetition))
+            .Contains("FlagTemplate is invalid.");
+        await Assert.That(CtfConfigurationValidator.Validate(staticChallenge))
+            .Contains("FlagTemplate requires a PerTeam runtime FlagSource.");
     }
 }

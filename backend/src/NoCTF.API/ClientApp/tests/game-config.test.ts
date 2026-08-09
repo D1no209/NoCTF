@@ -2,6 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   BLOOD_REWARD_POLICIES,
   BloodRewardPolicy,
+  FlagSource,
+  competitionConfigFields,
+  emptyFlagTemplate,
   emptyDefinition,
   emptyRuntimeTemplate,
   serializeDefinition,
@@ -29,5 +32,30 @@ describe('container port drafts', () => {
 
     expect(json.runtime.definition.portMappings).toEqual({ 8080: 0 })
     expect(json.runtime.definition.internalPorts).toEqual([9090])
+  })
+})
+
+describe('dynamic flag templates', () => {
+  test('exposes the CTF competition dynamic flag header with the stable team hash default', () => {
+    expect(emptyFlagTemplate()).toEqual({
+      header: 'flag',
+      bodyTemplate: '[TEAMHASH]',
+      leetLiteralText: false,
+    })
+    expect(competitionConfigFields('Ctf').some(field => field.key === 'flagTemplate')).toBeTrue()
+  })
+
+  test('serializes a CTF challenge override only for per-team runtime flags', () => {
+    const model = emptyDefinition('Ctf')
+    model.runtime = emptyRuntimeTemplate('Ctf')
+    model.runtime.flagSource = FlagSource.PerTeam
+    model.flagTemplate = { header: 'NOCTF', bodyTemplate: '[TEAMHASH]', leetLiteralText: false }
+
+    const dynamic = JSON.parse(serializeDefinition('Ctf', model))
+    expect(dynamic.flagTemplate.header).toBe('NOCTF')
+
+    model.runtime.flagSource = FlagSource.Static
+    const staticDefinition = JSON.parse(serializeDefinition('Ctf', model))
+    expect(staticDefinition.flagTemplate).toBeUndefined()
   })
 })

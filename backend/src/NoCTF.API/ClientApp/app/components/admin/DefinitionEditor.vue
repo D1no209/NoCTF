@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DefinitionModel, GameModeValue } from '~/utils/game-config'
 import {
+  FlagSource,
   emptyFlagTemplate,
   emptyRunnerJob,
   emptyRuntimeTemplate,
@@ -199,6 +200,28 @@ const isCompose = computed(() => model.value?.runtime?.definition.kind === 'comp
         <FieldDescription v-else>未配置时使用竞赛级 Flag 模板或平台默认。</FieldDescription>
       </FieldSet>
     </template>
+
+    <FieldSet
+      v-if="mode === 'Ctf' && model.runtime?.flagSource === FlagSource.PerTeam"
+      class="rounded-md border p-4"
+    >
+      <FieldLegend class="px-1 text-sm font-medium">动态 Flag 模板覆盖</FieldLegend>
+      <Field orientation="horizontal">
+        <Switch
+          id="def-has-ctf-flag-template"
+          :model-value="model.flagTemplate !== null"
+          :disabled="disabled"
+          @update:model-value="toggleFlagTemplate($event === true)"
+        />
+        <FieldLabel for="def-has-ctf-flag-template" class="font-normal">
+          为本题覆盖竞赛级动态 Flag 模板
+        </FieldLabel>
+      </Field>
+      <FlagTemplateEditor v-if="model.flagTemplate" :template="model.flagTemplate" :disabled="disabled" />
+      <FieldDescription v-else>
+        未配置时使用竞赛级模板；只影响今后生成的每队容器 Flag。
+      </FieldDescription>
+    </FieldSet>
 
     <template v-if="mode === 'Awdp'">
       <FieldSet class="rounded-md border p-4">
