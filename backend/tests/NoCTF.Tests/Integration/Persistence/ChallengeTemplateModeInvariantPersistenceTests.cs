@@ -37,6 +37,38 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             var fixture = await SeedAsync(options, cancellationToken);
             var changedAt = fixture.Now.AddMinutes(1);
 
+            var unchanged = await UpdateAsync(
+                options,
+                new(
+                    fixture.ChallengeId,
+                    fixture.OwnerId,
+                    false,
+                    GameMode.Ctf,
+                    ChallengeVisibility.Private,
+                    "Original title",
+                    "Original description",
+                    "Web",
+                    """{ "schemaVersion": 1 }""",
+                    0,
+                    changedAt),
+                cancellationToken);
+            await Assert.That(unchanged.State)
+                .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
+            await Assert.That(unchanged.Template!.Revision).IsEqualTo(0);
+            await Assert.That(unchanged.Template.UpdatedAt).IsEqualTo(fixture.Now);
+            await AssertTemplateAsync(
+                options,
+                fixture.ChallengeId,
+                GameMode.Ctf,
+                ChallengeVisibility.Private,
+                "Original title",
+                "Original description",
+                "Web",
+                """{"schemaVersion":1}""",
+                0,
+                fixture.Now,
+                cancellationToken);
+
             var blocked = await UpdateAsync(
                 options,
                 Command(

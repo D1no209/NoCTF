@@ -8,6 +8,7 @@ import {
   stopRuntimeEndpoint,
 } from '~/api'
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '~/api'
+import { normalizePlayerRuntime, shouldPollPlayerRuntime } from '~/utils/player-runtime'
 
 type Runtime = NoCtfapiEndpointsRuntimeRuntimeResponse
 
@@ -25,29 +26,35 @@ const runtime = ref<Runtime | null>(null)
 const loading = ref(true)
 const acting = ref(false)
 const extendMinutes = ref(30)
-
-const TRANSITIONAL: string[] = [RuntimeState.Queued, RuntimeState.Provisioning, RuntimeState.Stopping]
+const now = ref(Date.now())
 
 async function load(): Promise<void> {
   const { data, error } = await getRuntimeEndpoint({
     path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
   })
-  runtime.value = error || !data ? null : data
+  runtime.value = error || !data ? null : normalizePlayerRuntime(data)
 }
 
 onMounted(async () => {
   await load()
   loading.value = false
-  // 初始加载时若处于过渡态,继续轮询直到稳定
-  if (runtime.value && TRANSITIONAL.includes(runtime.value.state ?? '')) startPolling()
+  if (shouldPollPlayerRuntime(runtime.value, now.value)) startPolling()
 })
 
 const { polling, timedOut, start: startPolling } = usePolling(
   async () => {
     await load()
-    return !runtime.value || !TRANSITIONAL.includes(runtime.value.state ?? '')
+    return !shouldPollPlayerRuntime(runtime.value, now.value)
   },
   { interval: 2000, timeout: 120_000 },
+)
+
+watch(
+  () => shouldPollPlayerRuntime(runtime.value, now.value),
+  (needsPolling) => {
+    if (needsPolling && runtime.value?.state === RuntimeState.Running && !polling.value)
+      startPolling()
+  },
 )
 
 async function act(action: () => Promise<{ error?: unknown }>, failMessage: string) {
@@ -81,7 +88,6 @@ const extend = () =>
   )
 
 // TTL 倒计时
-const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   timer = setInterval(() => {

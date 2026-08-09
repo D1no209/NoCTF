@@ -4,6 +4,8 @@ using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Challenges;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace NoCTF.Infrastructure.Challenges.Bank;
 
@@ -109,6 +111,14 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
         if (entity.Revision != command.ExpectedRevision)
             return new(ChallengeTemplateWriteState.RevisionConflict);
+        if (HasSameEditableContent(entity, command))
+        {
+            var unchanged = await Project(db.Challenges.AsNoTracking()
+                    .Where(challenge => challenge.Id == entity.Id))
+                .SingleAsync(ct);
+            await transaction.CommitAsync(ct);
+            return new(ChallengeTemplateWriteState.Succeeded, unchanged);
+        }
         if (entity.Mode != command.Mode
             && await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(item =>
@@ -334,6 +344,30 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         return true;
+    }
+
+    private static bool HasSameEditableContent(
+        Challenge entity,
+        UpdateChallengeTemplateCommand command) =>
+        entity.Mode == command.Mode
+        && entity.Visibility == command.Visibility
+        && string.Equals(entity.Title, command.Title, StringComparison.Ordinal)
+        && string.Equals(entity.Description, command.Description, StringComparison.Ordinal)
+        && string.Equals(entity.Direction, command.Direction, StringComparison.Ordinal)
+        && JsonEquals(entity.DefinitionJson, command.DefinitionJson);
+
+    private static bool JsonEquals(string current, string updated)
+    {
+        if (string.Equals(current, updated, StringComparison.Ordinal))
+            return true;
+        try
+        {
+            return JsonNode.DeepEquals(JsonNode.Parse(current), JsonNode.Parse(updated));
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static IQueryable<Challenge> Authorized(
