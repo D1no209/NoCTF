@@ -187,6 +187,32 @@
 - 本轮只创建本地功能提交与本 HANDOFF 提交，未 push、未部署；生产仍运行
   `0.1.0-alpha.3`，等待新的明确授权。
 
+## 2026-08-09 Alpha.5 生产同步与 Runner 启动热修
+
+- 远程 `main` 在部署开始后由协作者继续前进至 `c7cd766d`（`feat: simplify leaderboard and
+  refresh client UI`）。本地分支和生产服务器均以 fast-forward 同步该提交；它以
+  `fbb9cf13` 为直接祖先，因此没有冲突，也没有覆盖协作者修改。生产既有未跟踪
+  `deploy/docker-compose.prod.yml` 始终保留且未改写。
+- 首次 `0.1.0-alpha.4` 切换成功并执行 EF migration
+  `20260808173522_AllowTeamRegistrationWhileRunning`，但上线日志验收发现 Runner 的 Wolverine
+  codegen 无法解析 `RuntimeStopped` 回写处理器所需的 `ICompetitionEventRecorder`。健康端点仍为
+  200，但运行时停止和强制终结回执存在失败风险，因此没有把该状态视为部署完成。
+- `b2e5561d`：Standalone Runner 现在显式注册真实的 scoped `CompetitionEventStore` 作为
+  `ICompetitionEventRecorder`，确保运行时回写继续写入 PostgreSQL 不可变比赛事件，而不是丢弃事件
+  或使用空实现。新增宿主注册回归测试，并将平台预发布版本递增为 `0.1.0-alpha.5`。
+- 本地验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；
+  `CompetitionEventRegistrationTests` 2/2 通过；`git diff --check` 通过。本热修未修改 HTTP/OpenAPI
+  契约、生成 SDK、数据模型或 migration。
+- `b2e5561d` 已推送至远程 `main` 并部署。Migration 容器退出码为 0，迁移历史最新记录为
+  `20260808173522_AllowTeamRegistrationWhileRunning`；API、Worker、Runner 程序集均确认
+  `0.1.0-alpha.5`，API、Runner、PostgreSQL、Redis 健康，Worker 正常运行。HTTPS `/`、`/health`、
+  `/competitions`、`/admin/competitions` 返回 200；新强制终结路由未认证请求返回 401。等待 Wolverine
+  完成启动编译后，API、Worker、Runner 的 `fail:`、`crit:`、未处理异常、Fatal 和
+  `UnResolvableVariableException` 计数均为 0。
+- Runner 构建继续复用线上同版本 Kompose `v1.38.0` 工具层，避免 GitHub Release 下载卡住；临时
+  Dockerfile、Compose 覆盖、脚本和部署日志均已删除。清理 16.28 GB BuildKit 缓存后根分区占用为
+  60%，剩余约 17 GB；未删除题目镜像、数据卷、数据库、Redis、上传文件或 HTTPS 配置。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
