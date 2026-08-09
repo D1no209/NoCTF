@@ -12,6 +12,7 @@ public sealed class BanTeamRequest
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
     public string Reason { get; set; } = string.Empty;
+    public bool AnnouncePublicly { get; set; }
 }
 
 public sealed class BanTeamValidator : Validator<BanTeamRequest>
@@ -56,7 +57,8 @@ public sealed class BanTeamEndpoint(
             userContext.UserId,
             true,
             request.Reason,
-            DateTimeOffset.UtcNow), cancellationToken);
+            DateTimeOffset.UtcNow,
+            request.AnnouncePublicly), cancellationToken);
         if (!result.Succeeded)
         {
             var statusCode = result.FailureCode == TeamModerationFailure.CompetitionFinished

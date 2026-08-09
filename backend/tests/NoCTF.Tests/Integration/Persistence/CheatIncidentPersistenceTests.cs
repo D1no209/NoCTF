@@ -112,7 +112,9 @@ public sealed class CheatIncidentPersistenceTests
                 item => item.Id == fixture.SourceTeamId,
                 cancellationToken);
             await Assert.That(bannedTeam.IsBanned).IsTrue();
-            await Assert.That(outbox.Published.OfType<TeamBanned>()).Count().IsEqualTo(1);
+            var teamBanned = outbox.Published.OfType<TeamBanned>().Single();
+            await Assert.That(teamBanned.AnnouncementKind)
+                .IsEqualTo(TeamBanAnnouncementKind.ConfirmedCheating);
 
             var corrected = await store.CorrectAndUnbanAsync(new(
                 fixture.CompetitionId,

@@ -33,6 +33,15 @@ public sealed record TeamBannedPayload(
     string TeamName,
     DateTimeOffset BannedAt);
 
+public sealed record TeamBanAnnouncementPayload(
+    Guid CompetitionId,
+    Guid TeamId,
+    string TeamName,
+    TeamBanAnnouncementKind Kind,
+    string Title,
+    string Body,
+    DateTimeOffset BannedAt);
+
 public sealed record TeamBanCorrectedPayload(
     Guid CompetitionId,
     Guid TeamId,

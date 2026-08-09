@@ -45,7 +45,14 @@ public sealed record TeamBanned(
     Guid CompetitionId,
     Guid TeamId,
     string TeamName,
-    DateTimeOffset BannedAt);
+    DateTimeOffset BannedAt,
+    TeamBanAnnouncementKind? AnnouncementKind = null);
+
+public enum TeamBanAnnouncementKind : short
+{
+    RuleViolation,
+    ConfirmedCheating
+}
 
 public sealed record TeamBanCorrected(
     Guid CompetitionId,

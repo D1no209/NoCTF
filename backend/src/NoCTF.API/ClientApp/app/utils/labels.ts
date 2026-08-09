@@ -165,13 +165,18 @@ export function notificationText(
   const title = typeof payload.competitionTitle === 'string' ? `「${payload.competitionTitle}」` : ''
   const team = typeof payload.teamName === 'string' ? `「${payload.teamName}」` : ''
   const challenge = typeof payload.challengeTitle === 'string' ? `「${payload.challengeTitle}」` : ''
+  const announcementTitle = typeof payload.title === 'string' ? payload.title : '赛事公告'
+  const announcementBody = typeof payload.body === 'string' ? payload.body : ''
+  const announcement = announcementBody
+    ? `${announcementTitle}：${announcementBody}`
+    : announcementTitle
   const templates: Record<string, string> = {
     CompetitionLifecycleChanged: `竞赛${title}的生命周期已变更`, TeamRegistrationChanged: `你的队伍${team}报名状态已变更`, SubmissionEvaluated: `你在${challenge}的提交已完成评测`,
     RuntimeStateChanged: `${challenge}的运行环境状态已变更`, StartGateFailed: `竞赛${title}启动检查未通过`, ManagementFailure: `竞赛${title}出现管理侧故障`,
     BloodAwarded: `恭喜,你在${challenge}拿下了血榜名次`, ChallengePublished: `竞赛${title}发布了新题目${challenge}`, HintPublished: `${challenge}发布了新提示`,
     TeamBanned: `你的队伍${team}已被封禁`, CompetitionQuestionOpened: `竞赛${title}有新的咨询`, CompetitionQuestionReplied: '你的咨询已有新回复',
     CompetitionQuestionStatusChanged: '你的咨询状态已变更', CheatIncidentDetected: '检测到疑似作弊行为', TeamBanCorrected: '队伍封禁已被纠正', DataExportReady: '数据导出已就绪', DataExportFailed: '数据导出失败',
-    UserAccountLifecycleChanged: '用户账号状态已变更',
+    UserAccountLifecycleChanged: '用户账号状态已变更', CompetitionAnnouncement: announcement,
   }
   return templates[String(notification.kind)] ?? '你有一条新通知'
 }

@@ -9,7 +9,8 @@ public sealed record TeamModerationCommand(
     Guid ActorId,
     bool Ban,
     string? Reason,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    bool AnnouncePublicly = false);
 
 public enum TeamModerationFailure
 {

@@ -37,4 +37,13 @@ describe('competition announcement access', () => {
     expect(page).toContain("('Participants')")
     expect(endpoint).toContain('authorizer.CanJudgeAsync(')
   })
+
+  test('renders both the announcement title and its public body', async () => {
+    const labels = await Bun.file(
+      new URL('../app/utils/labels.ts', import.meta.url),
+    ).text()
+
+    expect(labels).toContain("const announcementBody = typeof payload.body === 'string'")
+    expect(labels).toContain('`${announcementTitle}：${announcementBody}`')
+  })
 })
