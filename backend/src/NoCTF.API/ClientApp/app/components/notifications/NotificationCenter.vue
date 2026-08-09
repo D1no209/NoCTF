@@ -109,7 +109,10 @@ onMounted(async () => {
 
 watch(() => route.query.notification, () => void openFromRoute())
 
-const actionPath = computed(() => selected.value ? notificationTargetPath(selected.value) : null)
+const actionTarget = computed(() =>
+  thread.value.find(item => item.kind === 'QuestionOpened') ?? selected.value,
+)
+const actionPath = computed(() => actionTarget.value ? notificationTargetPath(actionTarget.value) : null)
 const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncement' && actionPath.value !== null)
 </script>
 

@@ -41,7 +41,12 @@ public enum CompetitionQuestionEntryKindCode
 public enum CompetitionQuestionParticipantRoleCode
 {
     Asker,
-    Handler
+    Handler,
+    Participant,
+    Judge,
+    ChallengeOwner,
+    CompetitionManager,
+    PlatformAdministrator
 }
 
 public sealed record CompetitionQuestionEntryResponse(
@@ -66,10 +71,15 @@ public sealed record CompetitionQuestionResponse(
     string? TeamDisplayName,
     Guid? SubmissionId,
     CompetitionQuestionSubjectCode Subject,
+    string? ChallengeTitle,
     string Title,
     string Body,
     CompetitionQuestionStatusCode Status,
     CompetitionQuestionAccessCode Access,
+    string LastActorDisplayName,
+    CompetitionQuestionParticipantRoleCode LastActorRole,
+    int ParticipantMessagesRemaining,
+    int MaxParticipantMessagesBeforeHandlerReply,
     int Revision,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
@@ -94,14 +104,21 @@ internal static class CompetitionQuestionResponseMapper
             source.TeamDisplayName,
             source.SubmissionId,
             ToSubject(source.Subject),
+            source.ChallengeTitle,
             source.Title,
             source.Body,
             ToStatus(source.Status),
             (CompetitionQuestionAccessCode)source.Access,
+            source.LastActorDisplayName,
+            (CompetitionQuestionParticipantRoleCode)source.LastActorRole,
+            source.ParticipantMessagesRemaining,
+            source.MaxParticipantMessagesBeforeHandlerReply,
             source.Revision,
             source.CreatedAt,
             source.UpdatedAt,
-            CanReply: asker && source.Status != CompetitionQuestionStatus.Closed
+            CanReply: asker
+                && source.Status != CompetitionQuestionStatus.Closed
+                && source.ParticipantMessagesRemaining > 0
                 || handler && source.Status is CompetitionQuestionStatus.Pending
                     or CompetitionQuestionStatus.Replied,
             CanResolve: asker && source.Status == CompetitionQuestionStatus.Replied

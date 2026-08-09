@@ -52,7 +52,11 @@ public enum CompetitionEventKind : short
     TeamBanCorrectionPublished,
     RuntimeForceTerminationRequested,
     RuntimeForceTerminationCompleted,
-    RuntimeForceTerminationFailed
+    RuntimeForceTerminationFailed,
+    AnnouncementPublished,
+    QuestionOpened,
+    QuestionReplied,
+    QuestionStatusChanged
 }
 
 public enum CompetitionEventLevel : short

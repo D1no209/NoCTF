@@ -15,7 +15,10 @@ public sealed record CreateCompetitionCommand(
     int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId,
     DateTimeOffset CreatedAt,
-    bool AllowTeamRegistrationWhileRunning = false);
+    bool AllowTeamRegistrationWhileRunning = false,
+    int MaxActiveQuestionsPerTeam = 5,
+    int MaxParticipantMessagesBeforeHandlerReply = 3,
+    bool AllowChallengeOwnersToHandleQuestions = true);
 
 public sealed record CompetitionView(
     Guid Id,
@@ -32,7 +35,10 @@ public sealed record CompetitionView(
     CompetitionLeaderboardVisibility LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal,
     DateTimeOffset? LeaderboardVisibilityStartsAt = null,
     bool AllowTeamRegistrationWhileRunning = false,
-    DateTimeOffset? DeletedAt = null);
+    DateTimeOffset? DeletedAt = null,
+    int MaxActiveQuestionsPerTeam = 5,
+    int MaxParticipantMessagesBeforeHandlerReply = 3,
+    bool AllowChallengeOwnersToHandleQuestions = true);
 
 public enum CompetitionCreationState
 {
@@ -73,7 +79,10 @@ public sealed record UpdateCompetitionCommand(
     int MaxConcurrentRuntimeInstancesPerTeam,
     Guid ActorId,
     DateTimeOffset UpdatedAt,
-    bool AllowTeamRegistrationWhileRunning = false);
+    bool AllowTeamRegistrationWhileRunning = false,
+    int MaxActiveQuestionsPerTeam = 5,
+    int MaxParticipantMessagesBeforeHandlerReply = 3,
+    bool AllowChallengeOwnersToHandleQuestions = true);
 
 public interface ICompetitionManagementStore
 {
@@ -125,6 +134,13 @@ public sealed class CreateCompetition(ICompetitionManagementStore store)
                 CompetitionCreationState.InvalidRequest,
                 Detail: "MaxTeamMembers must be greater than zero."));
         }
+        if (command.MaxActiveQuestionsPerTeam < 1
+            || command.MaxParticipantMessagesBeforeHandlerReply < 1)
+        {
+            return Task.FromResult(new CompetitionCreationResult(
+                CompetitionCreationState.InvalidRequest,
+                Detail: "Competition question limits must be greater than zero."));
+        }
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
         {
@@ -169,6 +185,11 @@ public sealed class UpdateCompetition(ICompetitionManagementStore store)
             return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
                 CompetitionManagementFailureCode.InvalidTeamSize,
                 "MaxTeamMembers must be greater than zero.");
+        if (command.MaxActiveQuestionsPerTeam < 1
+            || command.MaxParticipantMessagesBeforeHandlerReply < 1)
+            return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
+                CompetitionManagementFailureCode.InvalidTeamSize,
+                "Competition question limits must be greater than zero.");
         var schedule = CompetitionLifecyclePolicy.ValidateSchedule(command.StartTime, command.EndTime);
         if (!schedule.Succeeded)
             return OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(

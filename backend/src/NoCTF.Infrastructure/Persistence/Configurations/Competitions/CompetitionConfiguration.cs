@@ -19,6 +19,11 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(competition => competition.Status).HasConversion<short>();
         builder.Property(competition => competition.LeaderboardVisibility).HasConversion<short>();
         builder.Property(competition => competition.FrozenLeaderboardSnapshotJson).HasColumnType("jsonb");
+        // Schema defaults preserve the documented cross-mode question policy when an existing
+        // competition row is upgraded; Data Annotations cannot express database defaults.
+        builder.Property(competition => competition.MaxActiveQuestionsPerTeam).HasDefaultValue(5);
+        builder.Property(competition => competition.MaxParticipantMessagesBeforeHandlerReply).HasDefaultValue(3);
+        builder.Property(competition => competition.AllowChallengeOwnersToHandleQuestions).HasDefaultValue(true);
         builder.HasQueryFilter(competition => competition.DeletedAt == null);
         builder.HasIndex(competition => new { competition.Status, competition.StartAt });
         builder.HasIndex(competition => new
@@ -49,6 +54,9 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
             table.HasCheckConstraint(
                 "ck_competitions_flag_secret_length",
                 "octet_length(flag_derivation_secret) = 32");
+            table.HasCheckConstraint(
+                "ck_competitions_question_limits",
+                "max_active_questions_per_team > 0 AND max_participant_messages_before_handler_reply > 0");
             table.HasCheckConstraint(
                 "ck_competitions_leaderboard_visibility_state",
                 "leaderboard_visibility BETWEEN 0 AND 2 AND "

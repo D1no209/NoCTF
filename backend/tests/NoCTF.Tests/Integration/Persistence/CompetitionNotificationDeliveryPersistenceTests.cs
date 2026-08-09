@@ -4,10 +4,12 @@ using NoCTF.Application.Notifications;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Permissions;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Visibility;
 using NoCTF.Infrastructure.Notifications;
 using NoCTF.Infrastructure.Persistence;
@@ -20,6 +22,70 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("CompetitionNotificationDelivery")]
 public sealed class CompetitionNotificationDeliveryPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Announcement_writes_notification_and_permanent_event_without_copying_body(
+        CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_announcement_event")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            var competitionId = Guid.CreateVersion7();
+            var ownerId = Guid.CreateVersion7();
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(ct);
+            db.Users.Add(Human(ownerId, "announcement-owner", UserRole.Organizer, now));
+            db.Competitions.Add(new Competition
+            {
+                Id = competitionId,
+                OwnerId = ownerId,
+                Title = "Announcement competition",
+                Mode = GameMode.Ctf,
+                ConfigurationUpdatedAt = now,
+                FlagDerivationSecret = new byte[32],
+                StartAt = now.AddHours(-1),
+                EndAt = now.AddHours(1),
+                Status = CompetitionStatus.Running,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            await db.SaveChangesAsync(ct);
+
+            var outbox = new RecordingOutbox();
+            var delivery = new CompetitionNotificationDelivery(
+                db,
+                new CompetitionEventStore(db, outbox));
+            var published = await delivery.PublishAsync(new(
+                competitionId,
+                ownerId,
+                "比赛环境维护通知",
+                "本段完整公告正文只保存在通知内容中。",
+                CompetitionAnnouncementAudience.Participants,
+                now), ct);
+
+            await Assert.That(published).IsNotNull();
+            var notification = await db.Notifications.AsNoTracking().SingleAsync(ct);
+            await Assert.That(notification.ContentJson).Contains("完整公告正文");
+            var permanentEvent = await db.CompetitionEvents.AsNoTracking().SingleAsync(ct);
+            await Assert.That(permanentEvent.Kind)
+                .IsEqualTo(CompetitionEventKind.AnnouncementPublished);
+            await Assert.That(permanentEvent.Visibility)
+                .IsEqualTo(CompetitionEventVisibility.Public);
+            await Assert.That(permanentEvent.PayloadJson)
+                .DoesNotContain("完整公告正文");
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Foreign_flag_detection_notifies_only_evidence_readers_and_is_idempotent(
@@ -546,4 +612,24 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             IsBanned = isBanned,
             BannedAt = isBanned ? now : null
         };
+
+    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    {
+        public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
+        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
+            ValueTask.CompletedTask;
+        public ValueTask PublishToRunnerPoolAsync<T>(T message)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
+            ValueTask.CompletedTask;
+        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
+            ValueTask.CompletedTask;
+        public ValueTask PublishToRunnerNodeAsync<T>(T message)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
+            ValueTask.CompletedTask;
+        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
+            ValueTask.CompletedTask;
+        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+    }
 }

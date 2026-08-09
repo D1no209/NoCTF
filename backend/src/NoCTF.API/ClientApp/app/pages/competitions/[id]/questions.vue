@@ -10,9 +10,15 @@ import {
 } from '~/api'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode,
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode,
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse,
 } from '~/api'
+import {
+  competitionQuestionErrorMessage,
+  competitionQuestionRoleLabel,
+  isCompetitionQuestionHandlerRole,
+} from '~/lib/competition-question'
 import {
   maximumQuestionBodyLength,
   maximumQuestionTitleLength,
@@ -26,7 +32,9 @@ definePageMeta({ middleware: 'auth' })
 type Question = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 const route = useRoute()
+const router = useRouter()
 const competitionId = route.params.id as string
+const { markRead, unreadCount } = useCompetitionQuestionReadState(competitionId)
 
 // 列表
 const questions = ref<Question[]>([])
@@ -34,16 +42,34 @@ const loading = ref(true)
 const listError = ref<string | null>(null)
 
 async function loadList() {
-  const { data, error } = await listCompetitionQuestions({
-    path: { competitionId },
-    query: { limit: 100 },
-  })
-  loading.value = false
-  if (error || !data) {
-    listError.value = parseApiError(error, '加载咨询列表失败').message
-    return
+  loading.value = true
+  listError.value = null
+  try {
+    const { data, error } = await listCompetitionQuestions({
+      path: { competitionId },
+      query: { limit: 100 },
+    })
+    if (error || !data) {
+      listError.value = parseApiError(error, '加载咨询列表失败').message
+      return
+    }
+    questions.value = data.items ?? []
   }
-  questions.value = data.items ?? []
+  catch (error) {
+    listError.value = parseApiError(error, '加载咨询列表失败').message
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function upsertQuestion(question: Question) {
+  const index = questions.value.findIndex(item => item.id === question.id)
+  if (index === -1) questions.value.unshift(question)
+  else questions.value.splice(index, 1, question)
+  questions.value.sort((left, right) =>
+    new Date(right.updatedAt ?? 0).getTime() - new Date(left.updatedAt ?? 0).getTime(),
+  )
 }
 
 // 新建
@@ -87,7 +113,7 @@ async function submitCreate() {
       },
     })
     if (error || !data) {
-      createError.value = parseApiError(error, '提交咨询失败').message
+      createError.value = competitionQuestionErrorMessage(error, '提交咨询失败')
       toast.error(createError.value)
       return
     }
@@ -96,11 +122,11 @@ async function submitCreate() {
     createTitle.value = ''
     createBody.value = ''
     createError.value = null
-    await loadList()
+    upsertQuestion(data)
     await select(data.id!)
   }
   catch (error) {
-    createError.value = parseApiError(error, '提交咨询失败').message
+    createError.value = competitionQuestionErrorMessage(error, '提交咨询失败')
     toast.error(createError.value)
   }
   finally {
@@ -119,62 +145,103 @@ const selectedId = ref<string | null>(null)
 const detail = ref<Question | null>(null)
 const detailLoading = ref(false)
 
-async function select(id: string) {
+async function select(id: string, syncRoute = true) {
+  if (detailLoading.value && selectedId.value === id) return
   selectedId.value = id
   detailLoading.value = true
-  const { data, error } = await getCompetitionQuestion({ path: { competitionId, questionId: id } })
-  detailLoading.value = false
-  if (error || !data) {
-    toast.error(parseApiError(error, '加载咨询详情失败').message)
-    return
+  try {
+    const { data, error } = await getCompetitionQuestion({ path: { competitionId, questionId: id } })
+    if (error || !data) {
+      toast.error(parseApiError(error, '加载咨询详情失败').message)
+      return
+    }
+    detail.value = data
+    upsertQuestion(data)
+    markRead(data)
+    if (syncRoute && route.query.question !== id) {
+      await router.replace({ query: { ...route.query, question: id } })
+    }
   }
-  detail.value = data
+  catch (error) {
+    toast.error(parseApiError(error, '加载咨询详情失败').message)
+  }
+  finally {
+    detailLoading.value = false
+  }
 }
 
 onMounted(async () => {
   await loadList()
   const questionId = typeof route.query.question === 'string' ? route.query.question : null
-  if (questionId) await select(questionId)
+  if (questionId) await select(questionId, false)
+})
+
+watch(() => route.query.question, async (value) => {
+  const questionId = typeof value === 'string' ? value : null
+  if (questionId && questionId !== selectedId.value)
+    await select(questionId, false)
 })
 
 // 追加消息
 const reply = ref('')
 const replyPending = ref(false)
+const replyError = ref<string | null>(null)
 
 async function submitReply() {
-  if (!reply.value.trim() || !detail.value) return
+  if (replyPending.value || !reply.value.trim() || !detail.value?.canReply) return
+  replyError.value = null
   replyPending.value = true
-  const { data, error } = await addCompetitionQuestionMessage({
-    path: { competitionId, questionId: detail.value.id! },
-    body: { body: reply.value.trim(), expectedRevision: detail.value.revision ?? 0 },
-  })
-  replyPending.value = false
-  if (error || !data) {
-    toast.error(parseApiError(error, '发送失败').message)
-    return
+  try {
+    const { data, error } = await addCompetitionQuestionMessage({
+      path: { competitionId, questionId: detail.value.id! },
+      body: { body: reply.value.trim(), expectedRevision: detail.value.revision ?? 0 },
+    })
+    if (error || !data) {
+      replyError.value = competitionQuestionErrorMessage(error, '发送失败')
+      toast.error(replyError.value)
+      return
+    }
+    detail.value = data
+    upsertQuestion(data)
+    markRead(data)
+    reply.value = ''
+    toast.success('消息已发送')
   }
-  detail.value = data
-  reply.value = ''
+  catch (error) {
+    replyError.value = competitionQuestionErrorMessage(error, '发送失败')
+    toast.error(replyError.value)
+  }
+  finally {
+    replyPending.value = false
+  }
 }
 
 // 状态流转(解决 / 关闭)
 const statusPending = ref(false)
 
 async function changeStatus(status: 'Resolved' | 'Closed') {
-  if (!detail.value) return
+  if (!detail.value || statusPending.value) return
   statusPending.value = true
-  const { data, error } = await changeCompetitionQuestionStatus({
-    path: { competitionId, questionId: detail.value.id! },
-    body: { status, expectedRevision: detail.value.revision ?? 0 },
-  })
-  statusPending.value = false
-  if (error || !data) {
-    toast.error(parseApiError(error, '状态更新失败').message)
-    return
+  try {
+    const { data, error } = await changeCompetitionQuestionStatus({
+      path: { competitionId, questionId: detail.value.id! },
+      body: { status, expectedRevision: detail.value.revision ?? 0 },
+    })
+    if (error || !data) {
+      toast.error(competitionQuestionErrorMessage(error, '状态更新失败'))
+      return
+    }
+    detail.value = data
+    upsertQuestion(data)
+    markRead(data)
+    toast.success(status === 'Resolved' ? '咨询已标记为已解决' : '咨询已关闭')
   }
-  detail.value = data
-  toast.success(status === 'Resolved' ? '咨询已标记为已解决' : '咨询已关闭')
-  void loadList()
+  catch (error) {
+    toast.error(competitionQuestionErrorMessage(error, '状态更新失败'))
+  }
+  finally {
+    statusPending.value = false
+  }
 }
 
 const statusVariant = (status?: string) =>
@@ -185,6 +252,15 @@ const statusVariant = (status?: string) =>
       : ('outline' as const)
 const statusLabel = (status?: string) =>
   ({ Pending: '待回复', Replied: '已回复', Resolved: '已解决', Closed: '已关闭' })[status ?? ''] ?? status
+const roleLabel = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
+  role ? competitionQuestionRoleLabel[role] : '未知角色'
+const isHandlerRole = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
+  isCompetitionQuestionHandlerRole(role)
+const participantLimitReached = computed(() =>
+  detail.value?.access === 'Asker'
+  && detail.value.status !== 'Closed'
+  && (detail.value.participantMessagesRemaining ?? 0) <= 0,
+)
 </script>
 
 <template>
@@ -199,7 +275,7 @@ const statusLabel = (status?: string) =>
           <DialogContent class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>发起咨询</DialogTitle>
-              <DialogDescription>向主办方提问,回复后可选择公开给所有选手</DialogDescription>
+              <DialogDescription>咨询内容默认仅本队与有权工作人员可见；需要公开的信息将通过 Hint 或比赛公告发布。</DialogDescription>
             </DialogHeader>
             <form @submit.prevent>
               <FieldGroup>
@@ -287,11 +363,19 @@ const statusLabel = (status?: string) =>
             @click="select(q.id!)"
           >
             <div class="flex items-center justify-between gap-2">
-              <span class="truncate text-sm font-medium">{{ q.title }}</span>
-              <Badge :variant="statusVariant(q.status)">{{ statusLabel(q.status) }}</Badge>
+              <span class="min-w-0 truncate text-sm font-medium">{{ q.title }}</span>
+              <div class="flex shrink-0 items-center gap-1.5">
+                <Badge v-if="unreadCount(q) > 0" variant="destructive">
+                  {{ unreadCount(q) }} 未读
+                </Badge>
+                <Badge :variant="statusVariant(q.status)">{{ statusLabel(q.status) }}</Badge>
+              </div>
             </div>
             <p class="mt-1 text-xs text-muted-foreground">
-              {{ q.subject === 'Challenge' ? '题目' : '平台' }} · {{ formatDateTime(q.updatedAt) }}
+              {{ q.subject === 'Challenge' ? `题目 · ${q.challengeTitle ?? '未知题目'}` : '平台 / 赛事' }}
+            </p>
+            <p class="mt-1 truncate text-xs text-muted-foreground">
+              最近由 {{ roleLabel(q.lastActorRole) }} {{ q.lastActorDisplayName }} 更新 · {{ formatDateTime(q.updatedAt) }}
             </p>
           </button>
         </li>
@@ -311,7 +395,10 @@ const statusLabel = (status?: string) =>
             <CardTitle class="text-base">{{ detail.title }}</CardTitle>
             <Badge :variant="statusVariant(detail.status)">{{ statusLabel(detail.status) }}</Badge>
           </div>
-          <CardDescription>{{ detail.body }}</CardDescription>
+          <CardDescription>
+            {{ detail.subject === 'Challenge' ? `题目咨询 · ${detail.challengeTitle ?? '未知题目'}` : '平台 / 赛事咨询' }}
+            · {{ detail.teamDisplayName ?? detail.askerDisplayName }}
+          </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-4">
           <Separator />
@@ -319,20 +406,23 @@ const statusLabel = (status?: string) =>
             <li v-for="entry in detail.entries ?? []" :key="entry.id" class="flex flex-col gap-1">
               <template v-if="entry.kind === 'Message'">
                 <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge :variant="entry.actorRole === 'Handler' ? 'default' : 'secondary'">
-                    {{ entry.actorRole === 'Handler' ? '主办方' : '我' }}
+                  <Badge :variant="isHandlerRole(entry.actorRole) ? 'default' : 'secondary'">
+                    {{ roleLabel(entry.actorRole) }}
                   </Badge>
                   <span>{{ entry.actorDisplayName }}</span>
                   <span>{{ formatDateTime(entry.createdAt) }}</span>
                 </div>
-                <p class="rounded-md bg-muted px-3 py-2 text-sm whitespace-pre-line">{{ entry.body }}</p>
+                <p
+                  class="rounded-md border px-3 py-2 text-sm whitespace-pre-line"
+                  :class="isHandlerRole(entry.actorRole) ? 'border-primary/20 bg-primary/5' : 'border-border bg-muted'"
+                >
+                  {{ entry.body }}
+                </p>
               </template>
               <p v-else-if="entry.kind === 'StatusTransition'" class="text-xs text-muted-foreground">
                 状态变更:{{ statusLabel(entry.fromStatus ?? undefined) }} → {{ statusLabel(entry.toStatus ?? undefined) }}
+                · {{ roleLabel(entry.actorRole) }} {{ entry.actorDisplayName }}
                 · {{ formatDateTime(entry.createdAt) }}
-              </p>
-              <p v-else class="text-xs text-muted-foreground">
-                该回复已公开 · {{ formatDateTime(entry.createdAt) }}
               </p>
             </li>
           </ul>
@@ -343,8 +433,14 @@ const statusLabel = (status?: string) =>
               <FieldGroup>
                 <Field>
                   <FieldLabel for="q-reply">追加消息</FieldLabel>
-                  <Textarea id="q-reply" v-model="reply" rows="3" required />
+                  <Textarea id="q-reply" v-model="reply" rows="5" required @input="replyError = null" />
+                  <FieldDescription v-if="detail.access === 'Asker'">
+                    本轮还可连续发送 {{ detail.participantMessagesRemaining ?? 0 }} / {{ detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }} 条；工作人员回复后重置。
+                    <span v-if="detail.status === 'Resolved'">继续追问会将咨询重新设为待处理。</span>
+                  </FieldDescription>
+                  <FieldDescription v-else>工作人员回复不受连续消息额度限制。</FieldDescription>
                 </Field>
+                <p v-if="replyError" role="alert" class="text-sm text-destructive">{{ replyError }}</p>
                 <div class="flex flex-wrap items-center gap-2">
                   <Button type="submit" :disabled="replyPending || !reply.trim()">
                     <Spinner v-if="replyPending" data-icon="inline-start" />
@@ -372,7 +468,13 @@ const statusLabel = (status?: string) =>
               </FieldGroup>
             </form>
           </template>
-          <p v-else class="text-sm text-muted-foreground">该咨询已{{ statusLabel(detail.status) }},无法继续回复。</p>
+          <Alert v-else-if="participantLimitReached">
+            <AlertDescription>
+              工作人员回复前最多连续发送 {{ detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }} 条消息，请等待回复；历史内容仍会完整保留。
+            </AlertDescription>
+          </Alert>
+          <p v-else-if="detail.access === 'Observer'" class="text-sm text-muted-foreground">你对该咨询只有只读权限。</p>
+          <p v-else class="text-sm text-muted-foreground">该咨询已{{ statusLabel(detail.status) }}，无法继续回复。</p>
         </CardContent>
       </Card>
     </div>

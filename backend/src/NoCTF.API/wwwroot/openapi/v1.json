@@ -3053,6 +3053,16 @@
               }
             }
           },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found"
           },
@@ -13071,6 +13081,17 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAdministrationRoleProtocol"
               }
             ]
+          },
+          "maxActiveQuestionsPerTeam": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxParticipantMessagesBeforeHandlerReply": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "allowChallengeOwnersToHandleQuestions": {
+            "type": "boolean"
           }
         }
       },
@@ -13447,7 +13468,11 @@
           "TeamBanCorrectionPublished",
           "RuntimeForceTerminationRequested",
           "RuntimeForceTerminationCompleted",
-          "RuntimeForceTerminationFailed"
+          "RuntimeForceTerminationFailed",
+          "AnnouncementPublished",
+          "QuestionOpened",
+          "QuestionReplied",
+          "QuestionStatusChanged"
         ],
         "enum": [
           "CompetitionCreated",
@@ -13495,7 +13520,11 @@
           "TeamBanCorrectionPublished",
           "RuntimeForceTerminationRequested",
           "RuntimeForceTerminationCompleted",
-          "RuntimeForceTerminationFailed"
+          "RuntimeForceTerminationFailed",
+          "AnnouncementPublished",
+          "QuestionOpened",
+          "QuestionReplied",
+          "QuestionStatusChanged"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {
@@ -14003,6 +14032,10 @@
           "subject": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionSubjectCode"
           },
+          "challengeTitle": {
+            "type": "string",
+            "nullable": true
+          },
           "title": {
             "type": "string"
           },
@@ -14014,6 +14047,20 @@
           },
           "access": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionAccessCode"
+          },
+          "lastActorDisplayName": {
+            "type": "string"
+          },
+          "lastActorRole": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode"
+          },
+          "participantMessagesRemaining": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxParticipantMessagesBeforeHandlerReply": {
+            "type": "integer",
+            "format": "int32"
           },
           "revision": {
             "type": "integer",
@@ -14086,6 +14133,28 @@
           "Handler"
         ]
       },
+      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Asker",
+          "Handler",
+          "Participant",
+          "Judge",
+          "ChallengeOwner",
+          "CompetitionManager",
+          "PlatformAdministrator"
+        ],
+        "enum": [
+          "Asker",
+          "Handler",
+          "Participant",
+          "Judge",
+          "ChallengeOwner",
+          "CompetitionManager",
+          "PlatformAdministrator"
+        ]
+      },
       "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionEntryResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -14151,18 +14220,6 @@
           "StatusTransition"
         ]
       },
-      "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "Asker",
-          "Handler"
-        ],
-        "enum": [
-          "Asker",
-          "Handler"
-        ]
-      },
       "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionFailureResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -14177,6 +14234,11 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
               }
             ]
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -14186,8 +14248,11 @@
         "x-enumNames": [
           "InvalidRequest",
           "SpamRejected",
-          "LifecycleConflict",
+          "CompetitionNotAcceptingQuestions",
           "TeamNotEligible",
+          "InvalidChallengeReference",
+          "TeamActiveQuestionLimitReached",
+          "ParticipantMessageLimitReached",
           "RevisionConflict",
           "InvalidTransition",
           "QuestionClosed"
@@ -14195,8 +14260,11 @@
         "enum": [
           "InvalidRequest",
           "SpamRejected",
-          "LifecycleConflict",
+          "CompetitionNotAcceptingQuestions",
           "TeamNotEligible",
+          "InvalidChallengeReference",
+          "TeamActiveQuestionLimitReached",
+          "ParticipantMessageLimitReached",
           "RevisionConflict",
           "InvalidTransition",
           "QuestionClosed"
@@ -16504,6 +16572,21 @@
             "type": "integer",
             "format": "int32",
             "nullable": false
+          },
+          "maxActiveQuestionsPerTeam": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          },
+          "maxParticipantMessagesBeforeHandlerReply": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          },
+          "allowChallengeOwnersToHandleQuestions": {
+            "type": "boolean"
           }
         }
       },
@@ -16775,6 +16858,21 @@
             "type": "integer",
             "format": "int32",
             "nullable": false
+          },
+          "maxActiveQuestionsPerTeam": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          },
+          "maxParticipantMessagesBeforeHandlerReply": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0.0,
+            "exclusiveMinimum": true
+          },
+          "allowChallengeOwnersToHandleQuestions": {
+            "type": "boolean"
           }
         }
       },

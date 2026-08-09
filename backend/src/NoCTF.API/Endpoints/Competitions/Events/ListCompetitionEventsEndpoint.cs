@@ -37,7 +37,8 @@ public enum CompetitionEventKindProtocol
     CheatIncidentCorrected, ProtectedCompetitionExportCreated, TeamBanAppealSubmitted,
     TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished,
     RuntimeForceTerminationRequested, RuntimeForceTerminationCompleted,
-    RuntimeForceTerminationFailed
+    RuntimeForceTerminationFailed, AnnouncementPublished, QuestionOpened,
+    QuestionReplied, QuestionStatusChanged
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]

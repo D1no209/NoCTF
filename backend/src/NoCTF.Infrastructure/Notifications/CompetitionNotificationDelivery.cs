@@ -2,16 +2,22 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Notifications;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Notifications;
 
 public sealed class CompetitionNotificationDelivery(
-    NoCtfDbContext db)
+    NoCtfDbContext db,
+    ICompetitionEventRecorder? eventRecorder = null)
+    : ICompetitionAnnouncementPublisher
 {
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
 
     public async Task DeliverAsync<TPayload>(
         Guid competitionId,
@@ -102,41 +108,45 @@ public sealed class CompetitionNotificationDelivery(
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<NotificationView?> CreateAnnouncementAsync(
-        Guid competitionId,
-        Guid sourceUserId,
-        string title,
-        string body,
-        bool participants,
-        DateTimeOffset sentAt,
+    public async Task<NotificationView?> PublishAsync(
+        PublishCompetitionAnnouncementCommand command,
         CancellationToken ct)
     {
         var exists = await db.Competitions.AsNoTracking()
-            .AnyAsync(competition => competition.Id == competitionId, ct);
+            .AnyAsync(competition => competition.Id == command.CompetitionId, ct);
         if (!exists)
             return null;
         var notification = new Notification
         {
-            Id = Guid.CreateVersion7(sentAt),
+            Id = Guid.CreateVersion7(command.PublishedAt),
             SourceType = NotificationSourceType.User,
-            SourceId = sourceUserId,
-            TargetType = participants
+            SourceId = command.ActorUserId,
+            TargetType = command.Audience == CompetitionAnnouncementAudience.Participants
                 ? NotificationTargetType.CompetitionParticipants
                 : NotificationTargetType.CompetitionCollaborators,
-            TargetId = competitionId,
+            TargetId = command.CompetitionId,
             Kind = NotificationKind.CompetitionAnnouncement,
             ContentJson = JsonSerializer.Serialize(new
             {
                 schemaVersion = 1,
-                subject = title,
-                title,
-                body
+                subject = command.Title,
+                title = command.Title,
+                body = command.Body
             }, JsonOptions),
             RelatedType = EntityReferenceKind.Competition,
-            RelatedId = competitionId,
-            SentAt = sentAt
+            RelatedId = command.CompetitionId,
+            SentAt = command.PublishedAt
         };
         db.Notifications.Add(notification);
+        await events.RecordAsync(new(
+            command.CompetitionId,
+            CompetitionEventKind.AnnouncementPublished,
+            CompetitionEventLevel.Information,
+            command.Audience == CompetitionAnnouncementAudience.Participants
+                ? CompetitionEventVisibility.Public
+                : CompetitionEventVisibility.Staff,
+            command.PublishedAt,
+            ActorUserId: command.ActorUserId), ct);
         await db.SaveChangesAsync(ct);
         return new(
             notification.Id,

@@ -59,6 +59,11 @@ public sealed class CompetitionManagementStore(
             AllowTeamRegistrationWhileRunning = command.AllowTeamRegistrationWhileRunning,
             MaxTeamMembers = command.MaxTeamMembers,
             MaxConcurrentRuntimeInstancesPerTeam = command.MaxConcurrentRuntimeInstancesPerTeam,
+            MaxActiveQuestionsPerTeam = command.MaxActiveQuestionsPerTeam,
+            MaxParticipantMessagesBeforeHandlerReply =
+                command.MaxParticipantMessagesBeforeHandlerReply,
+            AllowChallengeOwnersToHandleQuestions =
+                command.AllowChallengeOwnersToHandleQuestions,
             CreatedAt = command.CreatedAt,
             UpdatedAt = command.CreatedAt,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
@@ -124,6 +129,11 @@ public sealed class CompetitionManagementStore(
         competition.MaxTeamMembers = command.MaxTeamMembers;
         competition.MaxConcurrentRuntimeInstancesPerTeam =
             command.MaxConcurrentRuntimeInstancesPerTeam;
+        competition.MaxActiveQuestionsPerTeam = command.MaxActiveQuestionsPerTeam;
+        competition.MaxParticipantMessagesBeforeHandlerReply =
+            command.MaxParticipantMessagesBeforeHandlerReply;
+        competition.AllowChallengeOwnersToHandleQuestions =
+            command.AllowChallengeOwnersToHandleQuestions;
         competition.UpdatedAt = command.UpdatedAt;
         await events.RecordAsync(new(
             competition.Id,
@@ -196,7 +206,10 @@ public sealed class CompetitionManagementStore(
             x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
             x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt,
             x.AllowTeamRegistrationWhileRunning,
-            x.DeletedAt));
+            x.DeletedAt,
+            x.MaxActiveQuestionsPerTeam,
+            x.MaxParticipantMessagesBeforeHandlerReply,
+            x.AllowChallengeOwnersToHandleQuestions));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
@@ -204,5 +217,8 @@ public sealed class CompetitionManagementStore(
             x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
             x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt,
             x.AllowTeamRegistrationWhileRunning,
-            x.DeletedAt);
+            x.DeletedAt,
+            x.MaxActiveQuestionsPerTeam,
+            x.MaxParticipantMessagesBeforeHandlerReply,
+            x.AllowChallengeOwnersToHandleQuestions);
 }

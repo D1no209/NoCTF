@@ -40,6 +40,17 @@ describe('notificationTargetPath', () => {
     expect(notificationThreadRootId(item)).toBe('question-1')
   })
 
+  test('routes an immutable question root using its related competition metadata', () => {
+    const root: NoCtfapiEndpointsNotificationsNotificationResponse = {
+      id: 'question-1',
+      kind: 'QuestionOpened',
+      relatedId: 'competition-1',
+      content: { title: 'private question' },
+    }
+    expect(notificationTargetPath(root))
+      .toBe('/competitions/competition-1/questions?question=question-1')
+  })
+
   test('routes bans and corrections to the ban and appeal section', () => {
     expect(notificationTargetPath(notification('TeamBanned', 'competition-1', {
       teamId: 'team-1',
@@ -67,7 +78,7 @@ describe('notificationTargetPath', () => {
 
     expect(component).toContain('readNotificationThreadEndpoint({')
     expect(component).toContain('competitionId: props.competitionId')
-    expect(component).toContain('notificationTargetPath(selected.value)')
+    expect(component).toContain('notificationTargetPath(actionTarget.value)')
     expect(component).toContain('sourceLabel(selected)')
     expect(component).toContain('notificationBody(selected)')
     expect(competitionPage).toContain(':competition-id="competitionId"')

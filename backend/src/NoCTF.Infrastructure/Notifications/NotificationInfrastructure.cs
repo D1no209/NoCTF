@@ -16,6 +16,9 @@ internal static class NotificationInfrastructure
         services.AddScoped<ReadNotificationFeed>();
         services.AddScoped<CompetitionNotificationAudienceResolver>();
         services.AddScoped<CompetitionNotificationDelivery>();
+        services.AddScoped<ICompetitionAnnouncementPublisher>(provider =>
+            provider.GetRequiredService<CompetitionNotificationDelivery>());
+        services.AddScoped<PublishCompetitionAnnouncement>();
         if (!development)
         {
             services.AddSingleton<ILeaderboardRefreshPublisher, RedisLeaderboardRefreshPublisher>();

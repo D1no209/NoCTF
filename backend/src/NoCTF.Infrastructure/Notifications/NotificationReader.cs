@@ -96,7 +96,16 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         if (!db.Database.IsRelational())
         {
             var notifications = await db.Notifications.AsNoTracking().ToListAsync(ct);
-            var threadIds = new HashSet<Guid> { notificationId };
+            var byId = notifications.ToDictionary(notification => notification.Id);
+            var rootId = notificationId;
+            var ancestors = new HashSet<Guid> { rootId };
+            while (byId.TryGetValue(rootId, out var current)
+                && current.ReplyToId is { } parentId
+                && ancestors.Add(parentId))
+            {
+                rootId = parentId;
+            }
+            var threadIds = new HashSet<Guid> { rootId };
             var changed = true;
             while (changed)
             {
@@ -116,8 +125,17 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         else
         {
             thread = db.Notifications.FromSqlInterpolated($$"""
-            WITH RECURSIVE thread AS (
+            WITH RECURSIVE ancestors AS (
                 SELECT n.* FROM notifications AS n WHERE n.id = {{notificationId}}
+                UNION ALL
+                SELECT parent.* FROM notifications AS parent
+                JOIN ancestors AS child ON child.reply_to_id = parent.id
+            ), root AS (
+                SELECT * FROM ancestors
+                ORDER BY (reply_to_id IS NULL) DESC, sent_at, id
+                LIMIT 1
+            ), thread AS (
+                SELECT * FROM root
                 UNION ALL
                 SELECT child.* FROM notifications AS child
                 JOIN thread AS parent ON child.reply_to_id = parent.id

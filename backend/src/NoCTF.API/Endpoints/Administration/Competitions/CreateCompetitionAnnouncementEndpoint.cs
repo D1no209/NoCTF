@@ -5,7 +5,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Notifications;
 using NoCTF.API.Security;
-using NoCTF.Infrastructure.Notifications;
+using NoCTF.Application.Notifications;
 using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
@@ -36,7 +36,7 @@ public sealed class CreateCompetitionAnnouncementValidator
 }
 
 public sealed class CreateCompetitionAnnouncementEndpoint(
-    CompetitionNotificationDelivery notifications,
+    PublishCompetitionAnnouncement publish,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
     : Endpoint<CreateCompetitionAnnouncementRequest,
@@ -61,14 +61,15 @@ public sealed class CreateCompetitionAnnouncementEndpoint(
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanJudgeAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
-        var item = await notifications.CreateAnnouncementAsync(
+        var item = await publish.ExecuteAsync(new(
             competitionId,
             user.UserId,
-            request.Title!.Trim(),
-            request.Body!.Trim(),
-            request.Audience == AnnouncementAudience.Participants,
-            DateTimeOffset.UtcNow,
-            ct);
+            request.Title!,
+            request.Body!,
+            request.Audience == AnnouncementAudience.Participants
+                ? CompetitionAnnouncementAudience.Participants
+                : CompetitionAnnouncementAudience.Collaborators,
+            DateTimeOffset.UtcNow), ct);
         if (item is null)
             return TypedResults.NotFound();
         var response = new NotificationResponse(

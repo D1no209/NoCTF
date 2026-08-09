@@ -81,7 +81,10 @@ public sealed record CompetitionResponse(
     Guid OwnerId,
     LeaderboardVisibilityProtocol LeaderboardVisibility,
     DateTimeOffset? DeletedAt,
-    CompetitionAdministrationRoleProtocol? AdministrationRole = null);
+    CompetitionAdministrationRoleProtocol? AdministrationRole = null,
+    int MaxActiveQuestionsPerTeam = 5,
+    int MaxParticipantMessagesBeforeHandlerReply = 3,
+    bool AllowChallengeOwnersToHandleQuestions = true);
 
 internal static class CompetitionMapper
 {
@@ -105,7 +108,11 @@ internal static class CompetitionMapper
                     view.LeaderboardVisibility,
                     view.LeaderboardVisibilityStartsAt,
                     DateTimeOffset.UtcNow)),
-            view.DeletedAt);
+            view.DeletedAt,
+            AdministrationRole: null,
+            view.MaxActiveQuestionsPerTeam,
+            view.MaxParticipantMessagesBeforeHandlerReply,
+            view.AllowChallengeOwnersToHandleQuestions);
 }
 
 public sealed class GetCompetitionRequest { public Guid CompetitionId { get; set; } }

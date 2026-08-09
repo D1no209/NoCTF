@@ -9,5 +9,10 @@ public enum CompetitionQuestionEntryKind : short
 public enum CompetitionQuestionParticipantRole : short
 {
     Asker,
-    Handler
+    Handler,
+    Participant,
+    Judge,
+    ChallengeOwner,
+    CompetitionManager,
+    PlatformAdministrator
 }

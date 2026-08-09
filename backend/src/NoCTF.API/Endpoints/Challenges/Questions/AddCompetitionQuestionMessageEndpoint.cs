@@ -75,7 +75,9 @@ public sealed class AddCompetitionQuestionMessageEndpoint(
             CompetitionQuestionFailure.Forbidden => TypedResults.Forbid(),
             CompetitionQuestionFailure.RevisionConflict
                 or CompetitionQuestionFailure.InvalidTransition
-                or CompetitionQuestionFailure.QuestionClosed => TypedResults.Conflict(
+                or CompetitionQuestionFailure.QuestionClosed
+                or CompetitionQuestionFailure.TeamActiveQuestionLimitReached
+                or CompetitionQuestionFailure.ParticipantMessageLimitReached => TypedResults.Conflict(
                     CompetitionQuestionFailureMapper.ToResponse(result)),
             CompetitionQuestionFailure.InvalidRequest
                 or CompetitionQuestionFailure.SpamRejected => TypedResults.Problem(
