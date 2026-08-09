@@ -265,6 +265,27 @@
   峰值 70% 降至 63%，剩余约 15 GB。数据库、Redis、数据卷、题目镜像、上传文件和 HTTPS 配置均
   保持原状。
 
+## 2026-08-09 到期环境界面收敛与题目无变化保存修正
+
+- `5adf9926`：参赛者端题目运行环境卡片不再把最新一条 `Stopped` 历史实例显示为仍在运行；该状态
+  会归一化为“尚未启动”界面。对于到期但后端尚未完成清理的 `Running` 实例，页面会在到期时自动
+  开始轮询，并持续经过 `Stopping` 直到后端返回终态，避免停留在“运行中 / 已到期”。`Failed` 等
+  需要用户感知的终态仍按原语义展示，没有被错误隐藏。
+- 题库模板更新改为后端强制无变化幂等：在 expected revision 校验通过后，比较模式、可见性、标题、
+  描述、方向和 Definition JSON；JSON 按结构语义比较，因此仅空白、缩进或属性顺序变化不会产生新
+  修订。全部内容相同时直接返回当前投影，不写数据库、不递增 Revision、不更新 UpdatedAt；任一真实
+  内容变化仍沿用原有事务、活动比赛模式约束和修订递增流程。过期 expected revision 仍返回冲突，
+  不会被无变化判断绕过。
+- 平台预发布版本由 `0.1.0-alpha.6` 递增为 `0.1.0-alpha.7`。本轮未修改 HTTP/OpenAPI 契约、
+  生成 SDK、数据模型或 migration。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；TUnit 共 773 项，
+  622 通过、151 项因本机 Docker/Kubernetes/Libvirt 条件未满足而按设计跳过、0 失败。新增的真实
+  PostgreSQL 题目无变化持久化断言包含在 Docker 跳过范围，已成功编译但本机未执行；它验证不同 JSON
+  格式不会改变持久化 Revision 与 UpdatedAt。`bun test` 13/13、`bun run typecheck`、
+  `bun run generate`、`git diff --check` 通过；Nuxt 生产构建只保留既有 chunk/Nitro 第三方警告。
+- 本轮只创建本地功能提交与本 HANDOFF 提交，未 push、未部署；生产仍运行
+  `0.1.0-alpha.6`，等待新的明确授权后再进行生产浏览器验收。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
