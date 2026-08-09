@@ -37,9 +37,12 @@ provide(competitionContextKey, { competition, loading, error, refresh })
 
 const tabs = computed(() => {
   const base = `/competitions/${competitionId.value}`
+  const challengesVisible = competition.value?.status === CompetitionStatus.Running
+    || competition.value?.status === CompetitionStatus.Paused
+    || competition.value?.status === CompetitionStatus.Finished
   return [
     { to: base, label: '概览', exact: true },
-    { to: `${base}/challenges`, label: '题目' },
+    ...(challengesVisible ? [{ to: `${base}/challenges`, label: '题目' }] : []),
     { to: `${base}/leaderboard`, label: '记分板' },
     { to: `${base}/teams`, label: '队伍' },
     { to: `${base}/events`, label: '动态' },

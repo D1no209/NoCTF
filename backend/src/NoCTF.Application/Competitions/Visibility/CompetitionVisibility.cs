@@ -4,6 +4,7 @@ using NoCTF.Domain.Competitions;
 namespace NoCTF.Application.Competitions.Visibility;
 
 public sealed record CompetitionVisibilityAccessDecision(
+    CompetitionStatus CompetitionStatus,
     CompetitionLeaderboardVisibility Visibility,
     LeaderboardDataScope DataScope,
     int VisibilityRevision,

@@ -201,6 +201,7 @@ public sealed class LeaderboardEndpointTests
             Task.FromResult<CompetitionVisibilityAccessDecision?>(
                 requestedCompetitionId == competitionId
                     ? new(
+                        NoCTF.Domain.Competitions.CompetitionStatus.Running,
                         visibility,
                         dataScope,
                         0,

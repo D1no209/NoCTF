@@ -102,7 +102,9 @@ public sealed class GetChallengeEndpoint(
             competitionId,
             DateTimeOffset.UtcNow,
             ct);
-        if (visibility is null)
+        if (visibility is null
+            || !ParticipantChallengeVisibilityPolicy.CanView(
+                visibility.CompetitionStatus))
             return TypedResults.NotFound();
         var item = await get.ExecuteAsync(
             competitionId,

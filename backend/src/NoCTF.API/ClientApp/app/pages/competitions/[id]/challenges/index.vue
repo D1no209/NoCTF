@@ -1,19 +1,55 @@
 <script setup lang="ts">
-import { listChallengesEndpoint } from '~/api'
-import type { NoCtfapiEndpointsChallengesChallengeResponse } from '~/api'
+import { Flag, Users } from '@lucide/vue'
+import { getLeaderboardEndpoint, getMyTeamEndpoint, listChallengesEndpoint } from '~/api'
+import type {
+  NoCtfapiEndpointsChallengesChallengeResponse,
+  NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
+} from '~/api'
+import { normalizeChallengeKey } from '~/components/leaderboard/types'
 
 type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
 
 const route = useRoute()
 const competitionId = route.params.id as string
+const { isLoggedIn } = useAuth()
 
 const items = ref<Challenge[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const dataScope = ref<string>(LeaderboardDataScope.Live)
+const leaderboard = ref<NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null>(null)
+const myTeamId = ref<string | null>(null)
+
+async function loadLeaderboard(): Promise<boolean> {
+  const { data, error: err, response } = await getLeaderboardEndpoint({
+    path: { competitionId },
+  })
+  if (err) return true
+  if (response?.status === 202) return false
+  leaderboard.value = data as NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse
+  return true
+}
+
+async function loadMyTeam(): Promise<void> {
+  if (!isLoggedIn.value) {
+    myTeamId.value = null
+    return
+  }
+  const { data, error: err } = await getMyTeamEndpoint({ path: { competitionId } })
+  myTeamId.value = err ? null : data?.id ?? null
+}
+
+const { start: startLeaderboardPolling, stop: stopLeaderboardPolling } = usePolling(
+  loadLeaderboard,
+  { interval: 2000, timeout: 60_000 },
+)
 
 onMounted(async () => {
-  const { data, error: err } = await listChallengesEndpoint({ path: { competitionId } })
+  const [{ data, error: err }, leaderboardReady] = await Promise.all([
+    listChallengesEndpoint({ path: { competitionId } }),
+    loadLeaderboard(),
+    loadMyTeam(),
+  ])
   loading.value = false
   if (err || !data) {
     error.value = parseApiError(err, '加载题目失败').message
@@ -21,7 +57,53 @@ onMounted(async () => {
   }
   items.value = (data.items ?? []).filter((c) => c.isPublished)
   dataScope.value = data.dataScope ?? LeaderboardDataScope.Live
+  if (!leaderboardReady) startLeaderboardPolling()
 })
+
+watch(isLoggedIn, () => void loadMyTeam())
+
+let unwatchCompetition: (() => void) | null = null
+onMounted(() => {
+  unwatchCompetition = watchCompetition(competitionId, {
+    leaderboardRefreshed: () => void loadLeaderboard(),
+  })
+})
+onBeforeUnmount(() => {
+  unwatchCompetition?.()
+  unwatchCompetition = null
+  stopLeaderboardPolling()
+})
+
+interface ChallengeProgress {
+  solveCount: number
+  solvedByMyTeam: boolean
+}
+
+const progressByChallenge = computed(() => {
+  const progress = new Map<string, ChallengeProgress>()
+  if (leaderboard.value?.dataScope === LeaderboardDataScope.Hidden)
+    return progress
+
+  for (const entry of leaderboard.value?.entries ?? []) {
+    for (const cell of entry.cells ?? []) {
+      const key = normalizeChallengeKey(cell.competitionChallengeId)
+      if (!key) continue
+      const current = progress.get(key) ?? { solveCount: 0, solvedByMyTeam: false }
+      current.solveCount += 1
+      if (entry.teamId && entry.teamId === myTeamId.value)
+        current.solvedByMyTeam = true
+      progress.set(key, current)
+    }
+  }
+  return progress
+})
+
+function progressFor(challengeId?: string): ChallengeProgress | null {
+  if (!leaderboard.value || leaderboard.value.dataScope === LeaderboardDataScope.Hidden)
+    return null
+  return progressByChallenge.value.get(normalizeChallengeKey(challengeId))
+    ?? { solveCount: 0, solvedByMyTeam: false }
+}
 
 const groups = computed(() => {
   const map = new Map<string, Challenge[]>()
@@ -75,7 +157,15 @@ const groups = computed(() => {
           :to="`/competitions/${competitionId}/challenges/${challenge.id}`"
           class="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <Card class="h-full transition-all duration-300 group-hover:-translate-y-1 group-hover:border-primary/50 group-hover:shadow-lg">
+          <Card
+            class="relative h-full overflow-hidden transition-[transform,border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg"
+            :class="progressFor(challenge.id)?.solvedByMyTeam ? 'border-primary/50 bg-primary/5' : ''"
+          >
+            <Flag
+              v-if="progressFor(challenge.id)?.solvedByMyTeam"
+              aria-hidden="true"
+              class="pointer-events-none absolute -right-2 -bottom-2 size-20 -rotate-12 text-primary/10"
+            />
             <CardHeader>
               <div class="flex items-start justify-between gap-2">
                 <CardTitle class="text-base leading-snug group-hover:text-primary">
@@ -86,12 +176,27 @@ const groups = computed(() => {
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent>
-              <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary">
-                分数隐藏
-              </Badge>
-              <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
-                {{ challenge.baseScore }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
+            <CardContent class="relative flex items-end justify-between gap-3">
+              <div class="flex flex-col items-start gap-2">
+                <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary">
+                  分数隐藏
+                </Badge>
+                <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
+                  {{ challenge.baseScore }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
+                </span>
+                <Badge v-if="progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
+                  <Flag class="size-3" />
+                  已解出
+                </Badge>
+              </div>
+              <span
+                v-if="progressFor(challenge.id)"
+                class="flex items-center gap-1 text-xs text-muted-foreground"
+                :aria-label="`${progressFor(challenge.id)?.solveCount ?? 0} 支队伍已解出`"
+              >
+                <Users class="size-3.5" aria-hidden="true" />
+                <span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.solveCount ?? 0 }}</span>
+                <span>解出</span>
               </span>
             </CardContent>
           </Card>

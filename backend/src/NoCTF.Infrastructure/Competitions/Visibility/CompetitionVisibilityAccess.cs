@@ -56,6 +56,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             now);
         var scope = DataScope(identity?.Kind, isCollaborator, visibility);
         return new(
+            competition.Status,
             visibility,
             scope,
             competition.LeaderboardVisibilityRevision,

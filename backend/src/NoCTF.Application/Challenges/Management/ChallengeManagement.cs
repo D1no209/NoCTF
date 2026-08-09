@@ -58,6 +58,14 @@ public sealed record ChallengeMutationResult(
 
 public sealed record ChallengeCompetitionContext(GameMode Mode, CompetitionStatus Status);
 
+public static class ParticipantChallengeVisibilityPolicy
+{
+    public static bool CanView(CompetitionStatus status) =>
+        status is CompetitionStatus.Running
+            or CompetitionStatus.Paused
+            or CompetitionStatus.Finished;
+}
+
 public interface IChallengeManagementStore
 {
     Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken cancellationToken);
