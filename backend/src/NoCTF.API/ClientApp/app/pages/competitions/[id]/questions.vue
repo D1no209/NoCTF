@@ -10,8 +10,16 @@ import {
 } from '~/api'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode,
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse,
 } from '~/api'
+import {
+  maximumQuestionBodyLength,
+  maximumQuestionTitleLength,
+  minimumQuestionBodyLength,
+  minimumQuestionTitleLength,
+  validateCompetitionQuestionDraft,
+} from '~/lib/participant-form-validation'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -42,11 +50,12 @@ onMounted(loadList)
 
 // 新建
 const createOpen = ref(false)
-const createSubject = ref<'Challenge' | 'Platform'>('Challenge')
+const createSubject = ref<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode>('Challenge')
 const createChallengeId = ref<string>('none')
 const createTitle = ref('')
 const createBody = ref('')
 const createPending = ref(false)
+const createError = ref<string | null>(null)
 const challenges = ref<NoCtfapiEndpointsChallengesChallengeResponse[]>([])
 
 watch(createOpen, async (open) => {
@@ -56,31 +65,55 @@ watch(createOpen, async (open) => {
 })
 
 async function submitCreate() {
-  if (!createTitle.value.trim() || !createBody.value.trim()) return
-  createPending.value = true
-  const { data, error } = await createCompetitionQuestion({
-    path: { competitionId },
-    body: {
-      subject: createSubject.value,
-      competitionChallengeId:
-        createSubject.value === 'Challenge' && createChallengeId.value !== 'none'
-          ? createChallengeId.value
-          : null,
-      title: createTitle.value.trim(),
-      body: createBody.value.trim(),
-    },
+  if (createPending.value) return
+  createError.value = validateCompetitionQuestionDraft({
+    requiresChallenge: createSubject.value === 'Challenge',
+    challengeId: createChallengeId.value === 'none' ? null : createChallengeId.value,
+    title: createTitle.value,
+    body: createBody.value,
   })
-  createPending.value = false
-  if (error || !data) {
-    toast.error(parseApiError(error, '提交咨询失败').message)
-    return
+  if (createError.value) return
+
+  createPending.value = true
+  try {
+    const { data, error } = await createCompetitionQuestion({
+      path: { competitionId },
+      body: {
+        subject: createSubject.value,
+        competitionChallengeId:
+          createSubject.value === 'Challenge' && createChallengeId.value !== 'none'
+            ? createChallengeId.value
+            : null,
+        title: createTitle.value.trim(),
+        body: createBody.value.trim(),
+      },
+    })
+    if (error || !data) {
+      createError.value = parseApiError(error, '提交咨询失败').message
+      toast.error(createError.value)
+      return
+    }
+    toast.success('咨询已提交')
+    createOpen.value = false
+    createTitle.value = ''
+    createBody.value = ''
+    createError.value = null
+    await loadList()
+    await select(data.id!)
   }
-  toast.success('咨询已提交')
-  createOpen.value = false
-  createTitle.value = ''
-  createBody.value = ''
-  await loadList()
-  select(data.id!)
+  catch (error) {
+    createError.value = parseApiError(error, '提交咨询失败').message
+    toast.error(createError.value)
+  }
+  finally {
+    createPending.value = false
+  }
+}
+
+function setCreateOpen(open: boolean) {
+  if (createPending.value) return
+  createOpen.value = open
+  if (!open) createError.value = null
 }
 
 // 详情
@@ -155,16 +188,16 @@ const statusLabel = (status?: string) =>
     <div class="flex flex-col gap-4 lg:col-span-2">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">咨询问答</h2>
-        <Dialog v-model:open="createOpen">
+        <Dialog :open="createOpen" @update:open="setCreateOpen">
           <DialogTrigger as-child>
             <Button size="sm">发起咨询</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>发起咨询</DialogTitle>
               <DialogDescription>向主办方提问,回复后可选择公开给所有选手</DialogDescription>
             </DialogHeader>
-            <form @submit.prevent="submitCreate">
+            <form @submit.prevent>
               <FieldGroup>
                 <Field>
                   <FieldLabel>类型</FieldLabel>
@@ -179,7 +212,7 @@ const statusLabel = (status?: string) =>
                   </Select>
                 </Field>
                 <Field v-if="createSubject === 'Challenge'">
-                  <FieldLabel>关联题目(可选)</FieldLabel>
+                  <FieldLabel>关联题目(必选)</FieldLabel>
                   <Select v-model="createChallengeId">
                     <SelectTrigger><SelectValue placeholder="不关联题目" /></SelectTrigger>
                     <SelectContent>
@@ -194,14 +227,33 @@ const statusLabel = (status?: string) =>
                 </Field>
                 <Field>
                   <FieldLabel for="q-title">标题</FieldLabel>
-                  <Input id="q-title" v-model="createTitle" required maxlength="128" />
+                  <Input
+                    id="q-title"
+                    v-model="createTitle"
+                    required
+                    :minlength="minimumQuestionTitleLength"
+                    :maxlength="maximumQuestionTitleLength"
+                    @input="createError = null"
+                  />
                 </Field>
                 <Field>
                   <FieldLabel for="q-body">内容</FieldLabel>
-                  <Textarea id="q-body" v-model="createBody" rows="5" required />
+                  <Textarea
+                    id="q-body"
+                    v-model="createBody"
+                    class="min-h-44"
+                    rows="10"
+                    required
+                    :minlength="minimumQuestionBodyLength"
+                    :maxlength="maximumQuestionBodyLength"
+                    @input="createError = null"
+                  />
                 </Field>
+                <p v-if="createError" role="alert" class="text-sm text-destructive">
+                  {{ createError }}
+                </p>
                 <Field>
-                  <Button type="submit" class="w-full" :disabled="createPending">
+                  <Button type="button" class="w-full" :disabled="createPending" @click="submitCreate">
                     <Spinner v-if="createPending" data-icon="inline-start" />
                     提交
                   </Button>

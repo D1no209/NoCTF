@@ -16,6 +16,11 @@ import type {
   NoCtfapiEndpointsTeamsMyTeamBanCaseResponse,
   NoCtfapiEndpointsTeamsTeamResponse,
 } from '~/api'
+import {
+  maximumAppealStatementLength,
+  minimumAppealStatementLength,
+  validateAppealStatement,
+} from '~/lib/participant-form-validation'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -176,6 +181,7 @@ const banCase = ref<NoCtfapiEndpointsTeamsMyTeamBanCaseResponse | null>(null)
 const appealOpen = ref(false)
 const appealStatement = ref('')
 const appealPending = ref(false)
+const appealError = ref<string | null>(null)
 
 async function loadBanCase() {
   const { data, error } = await getMyTeamBanCase({ path: { competitionId } })
@@ -194,21 +200,40 @@ const appealStatusLabel = (status?: string) =>
   ({ Submitted: '申诉中', Upheld: '已驳回', Accepted: '已通过' } as Record<string, string>)[String(status)] ?? '未知'
 
 async function submitAppeal() {
-  if (!appealStatement.value.trim()) return
+  if (appealPending.value) return
+  appealError.value = validateAppealStatement(appealStatement.value)
+  if (appealError.value) return
+
   appealPending.value = true
-  const { error } = await submitTeamBanAppeal({
-    path: { competitionId },
-    body: { statement: appealStatement.value.trim() },
-  })
-  appealPending.value = false
-  if (error) {
-    toast.error(parseApiError(error, '提交申诉失败').message)
-    return
+  try {
+    const { error } = await submitTeamBanAppeal({
+      path: { competitionId },
+      body: { statement: appealStatement.value.trim() },
+    })
+    if (error) {
+      appealError.value = parseApiError(error, '提交申诉失败').message
+      toast.error(appealError.value)
+      return
+    }
+    toast.success('申诉已提交')
+    appealOpen.value = false
+    appealStatement.value = ''
+    appealError.value = null
+    await loadBanCase()
   }
-  toast.success('申诉已提交')
-  appealOpen.value = false
-  appealStatement.value = ''
-  await loadBanCase()
+  catch (error) {
+    appealError.value = parseApiError(error, '提交申诉失败').message
+    toast.error(appealError.value)
+  }
+  finally {
+    appealPending.value = false
+  }
+}
+
+function setAppealOpen(open: boolean) {
+  if (appealPending.value) return
+  appealOpen.value = open
+  if (!open) appealError.value = null
 }
 </script>
 
@@ -284,23 +309,38 @@ async function submitAppeal() {
             </Alert>
           </template>
           <div v-if="banCase?.canAppeal !== false">
-            <Dialog v-model:open="appealOpen">
+            <Dialog :open="appealOpen" @update:open="setAppealOpen">
               <DialogTrigger as-child>
                 <Button variant="outline">提交封禁申诉</Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent class="sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle>封禁申诉</DialogTitle>
                   <DialogDescription>向主办方陈述申诉理由,请客观描述事实</DialogDescription>
                 </DialogHeader>
-                <form @submit.prevent="submitAppeal">
+                <form @submit.prevent>
                   <FieldGroup>
                     <Field>
                       <FieldLabel for="appeal-statement">申诉陈述</FieldLabel>
-                      <Textarea id="appeal-statement" v-model="appealStatement" rows="6" required />
+                      <Textarea
+                        id="appeal-statement"
+                        v-model="appealStatement"
+                        rows="8"
+                        :minlength="minimumAppealStatementLength"
+                        :maxlength="maximumAppealStatementLength"
+                        aria-describedby="appeal-requirement appeal-error"
+                        required
+                        @input="appealError = null"
+                      />
+                      <p id="appeal-requirement" class="text-xs text-muted-foreground">
+                        需要 {{ minimumAppealStatementLength }}–{{ maximumAppealStatementLength }} 个字符。
+                      </p>
+                      <p v-if="appealError" id="appeal-error" role="alert" class="text-sm text-destructive">
+                        {{ appealError }}
+                      </p>
                     </Field>
                     <Field>
-                      <Button type="submit" class="w-full" :disabled="appealPending">
+                      <Button type="button" class="w-full" :disabled="appealPending" @click="submitAppeal">
                         <Spinner v-if="appealPending" data-icon="inline-start" />
                         提交申诉
                       </Button>
