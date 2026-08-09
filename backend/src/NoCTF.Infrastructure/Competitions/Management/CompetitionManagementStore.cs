@@ -195,12 +195,14 @@ public sealed class CompetitionManagementStore(
             x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
             x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
             x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt,
-            x.AllowTeamRegistrationWhileRunning));
+            x.AllowTeamRegistrationWhileRunning,
+            x.DeletedAt));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
             x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
             x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
             x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt,
-            x.AllowTeamRegistrationWhileRunning);
+            x.AllowTeamRegistrationWhileRunning,
+            x.DeletedAt);
 }

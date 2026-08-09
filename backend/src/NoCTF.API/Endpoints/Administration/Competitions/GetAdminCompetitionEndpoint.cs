@@ -30,6 +30,7 @@ public sealed class GetAdminCompetitionEndpoint(
             Route<Guid>("competitionId"),
             user.UserId,
             user.IsAdministrator,
+            includeDeleted: true,
             ct: ct);
         return view is null
             ? TypedResults.NotFound()

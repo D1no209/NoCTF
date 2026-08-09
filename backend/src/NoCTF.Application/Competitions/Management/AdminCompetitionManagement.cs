@@ -39,6 +39,7 @@ public interface IAdminCompetitionStore
     Task<IReadOnlyList<CompetitionView>> ListAsync(
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken cancellationToken);
     Task<CompetitionView?> FindAsync(
         Guid competitionId,
@@ -71,8 +72,9 @@ public sealed class ListAdminCompetitions(IAdminCompetitionStore store)
     public Task<IReadOnlyList<CompetitionView>> ExecuteAsync(
         Guid actorId,
         bool isAdministrator,
+        bool includeDeleted,
         CancellationToken ct = default) =>
-        store.ListAsync(actorId, isAdministrator, ct);
+        store.ListAsync(actorId, isAdministrator, includeDeleted, ct);
 }
 
 public sealed class GetAdminCompetition(IAdminCompetitionStore store)

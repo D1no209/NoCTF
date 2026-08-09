@@ -2068,7 +2068,7 @@ export const adminCreateCompetitionAnnouncement = <ThrowOnError extends boolean 
  *
  * Resource permissions, not the /admin path alone, determine visibility.
  */
-export const adminListCompetitions = <ThrowOnError extends boolean = false>(options?: Options<AdminListCompetitionsData, ThrowOnError>): RequestResult<AdminListCompetitionsResponses, AdminListCompetitionsErrors, ThrowOnError> => (options?.client ?? client).get<AdminListCompetitionsResponses, AdminListCompetitionsErrors, ThrowOnError>({
+export const adminListCompetitions = <ThrowOnError extends boolean = false>(options: Options<AdminListCompetitionsData, ThrowOnError>): RequestResult<AdminListCompetitionsResponses, AdminListCompetitionsErrors, ThrowOnError> => (options.client ?? client).get<AdminListCompetitionsResponses, AdminListCompetitionsErrors, ThrowOnError>({
     security: [{
             key: 'Bearer',
             scheme: 'bearer',

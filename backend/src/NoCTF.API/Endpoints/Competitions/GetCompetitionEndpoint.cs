@@ -70,7 +70,8 @@ public sealed record CompetitionResponse(
     int MaxTeamMembers,
     int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId,
-    LeaderboardVisibilityProtocol LeaderboardVisibility);
+    LeaderboardVisibilityProtocol LeaderboardVisibility,
+    DateTimeOffset? DeletedAt);
 
 internal static class CompetitionMapper
 {
@@ -93,7 +94,8 @@ internal static class CompetitionMapper
                     view.Status,
                     view.LeaderboardVisibility,
                     view.LeaderboardVisibilityStartsAt,
-                    DateTimeOffset.UtcNow)));
+                    DateTimeOffset.UtcNow)),
+            view.DeletedAt);
 }
 
 public sealed class GetCompetitionRequest { public Guid CompetitionId { get; set; } }

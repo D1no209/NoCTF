@@ -31,7 +31,8 @@ public sealed record CompetitionView(
     Guid OwnerId,
     CompetitionLeaderboardVisibility LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal,
     DateTimeOffset? LeaderboardVisibilityStartsAt = null,
-    bool AllowTeamRegistrationWhileRunning = false);
+    bool AllowTeamRegistrationWhileRunning = false,
+    DateTimeOffset? DeletedAt = null);
 
 public enum CompetitionCreationState
 {

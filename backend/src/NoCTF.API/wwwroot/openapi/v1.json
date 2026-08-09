@@ -7707,6 +7707,16 @@
         "summary": "Lists competitions visible to the current administrator.",
         "description": "Resource permissions, not the /admin path alone, determine visibility.",
         "operationId": "AdminListCompetitions",
+        "parameters": [
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -13035,6 +13045,11 @@
           },
           "leaderboardVisibility": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -16600,6 +16615,10 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsListAdminCompetitionsRequest": {
+        "type": "object",
+        "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse": {
         "type": "object",

@@ -343,6 +343,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     maxConcurrentRuntimeInstancesPerTeam?: number;
     ownerId?: string;
     leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
+    deletedAt?: string | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
@@ -1245,6 +1246,10 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsRes
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionListResponse = {
     items?: Array<NoCtfapiEndpointsCompetitionsCompetitionResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsListAdminCompetitionsRequest = {
+    [key: string]: never;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionCandidateListResponse = {
@@ -5823,7 +5828,9 @@ export type AdminCreateCompetitionAnnouncementResponse = AdminCreateCompetitionA
 export type AdminListCompetitionsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query: {
+        includeDeleted: boolean;
+    };
     url: '/api/v1/admin/competitions';
 };
 

@@ -14,8 +14,13 @@ public sealed class AdminCompetitionStore(
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(
         Guid actorId,
         bool isAdministrator,
-        CancellationToken ct) =>
-        await Authorized(db.Competitions.AsNoTracking(), actorId, isAdministrator)
+        bool includeDeleted,
+        CancellationToken ct)
+    {
+        var source = includeDeleted
+            ? db.Competitions.IgnoreQueryFilters().AsNoTracking()
+            : db.Competitions.AsNoTracking();
+        return await Authorized(source, actorId, isAdministrator)
             .OrderByDescending(competition => competition.StartAt)
             .ThenBy(competition => competition.Id)
             .Select(competition => new CompetitionView(
@@ -25,8 +30,10 @@ public sealed class AdminCompetitionStore(
                 competition.MaxTeamMembers,
                 competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId,
                 competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt,
-                competition.AllowTeamRegistrationWhileRunning))
+                competition.AllowTeamRegistrationWhileRunning,
+                competition.DeletedAt))
             .ToListAsync(ct);
+    }
 
     public Task<CompetitionView?> FindAsync(
         Guid competitionId,
@@ -47,7 +54,8 @@ public sealed class AdminCompetitionStore(
                 competition.MaxTeamMembers,
                 competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId,
                 competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt,
-                competition.AllowTeamRegistrationWhileRunning))
+                competition.AllowTeamRegistrationWhileRunning,
+                competition.DeletedAt))
             .SingleOrDefaultAsync(ct);
     }
 
@@ -225,6 +233,7 @@ public sealed class AdminCompetitionStore(
             competition.MaxTeamMembers,
             competition.MaxConcurrentRuntimeInstancesPerTeam, competition.OwnerId,
             competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt,
-            competition.AllowTeamRegistrationWhileRunning);
+            competition.AllowTeamRegistrationWhileRunning,
+            competition.DeletedAt);
 
 }
