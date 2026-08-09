@@ -22,6 +22,9 @@ const teamRegistrationAutoApprove = ref(false)
 const allowTeamRegistrationWhileRunning = ref(false)
 const maxTeamMembers = ref(1)
 const maxConcurrentRuntimeInstancesPerTeam = ref(1)
+const maxActiveQuestionsPerTeam = ref(5)
+const maxParticipantMessagesBeforeHandlerReply = ref(3)
+const allowChallengeOwnersToHandleQuestions = ref(true)
 const savingMeta = ref(false)
 const metaError = ref<string | null>(null)
 
@@ -35,6 +38,9 @@ watch(competition, (c) => {
   allowTeamRegistrationWhileRunning.value = c.allowTeamRegistrationWhileRunning ?? false
   maxTeamMembers.value = c.maxTeamMembers ?? 1
   maxConcurrentRuntimeInstancesPerTeam.value = c.maxConcurrentRuntimeInstancesPerTeam ?? 1
+  maxActiveQuestionsPerTeam.value = c.maxActiveQuestionsPerTeam ?? 5
+  maxParticipantMessagesBeforeHandlerReply.value = c.maxParticipantMessagesBeforeHandlerReply ?? 3
+  allowChallengeOwnersToHandleQuestions.value = c.allowChallengeOwnersToHandleQuestions ?? true
 }, { immediate: true })
 
 async function saveMeta() {
@@ -58,6 +64,9 @@ async function saveMeta() {
         allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
         maxTeamMembers: maxTeamMembers.value,
         maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
+        maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
+        maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
+        allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
       },
     })
     if (error) throw error
@@ -157,6 +166,25 @@ onMounted(loadConfig)
               <div class="grid gap-1.5 leading-none">
                 <FieldLabel for="c-allow-running-registration" class="font-normal">比赛进行中仍允许创建队伍</FieldLabel>
                 <FieldDescription>关闭时，比赛进入 Running 后停止接收新队伍与重新报名。</FieldDescription>
+              </div>
+            </Field>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel for="c-max-active-questions">每队活跃咨询上限</FieldLabel>
+                <Input id="c-max-active-questions" v-model.number="maxActiveQuestionsPerTeam" type="number" min="1" :readonly="!canWrite" required />
+                <FieldDescription>待处理与已回复的咨询计入上限。</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel for="c-max-participant-messages">连续补充消息上限</FieldLabel>
+                <Input id="c-max-participant-messages" v-model.number="maxParticipantMessagesBeforeHandlerReply" type="number" min="1" :readonly="!canWrite" required />
+                <FieldDescription>初始提问计入额度；工作人员回复后重置。</FieldDescription>
+              </Field>
+            </div>
+            <Field orientation="horizontal">
+              <Checkbox id="c-allow-challenge-owner-questions" v-model="allowChallengeOwnersToHandleQuestions" :disabled="!canWrite" />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="c-allow-challenge-owner-questions" class="font-normal">允许题目所有者处理关联咨询</FieldLabel>
+                <FieldDescription>仅限其拥有或协作的题目；不会授予 Flag、Token 或平台密钥权限。</FieldDescription>
               </div>
             </Field>
             <Field v-if="canWrite">

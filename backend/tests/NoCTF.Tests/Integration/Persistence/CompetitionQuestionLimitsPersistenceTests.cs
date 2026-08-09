@@ -1,0 +1,535 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using NoCTF.Application.Challenges.Questions;
+using NoCTF.Application.Messaging;
+using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Challenges.Questions;
+using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Identity;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Challenges.Questions;
+using NoCTF.Infrastructure.Competitions.Events;
+using NoCTF.Infrastructure.Persistence;
+using Testcontainers.PostgreSql;
+
+namespace NoCTF.Tests.Integration.Persistence;
+
+[Category("Integration")]
+[Category("CompetitionQuestions")]
+public sealed class CompetitionQuestionLimitsPersistenceTests
+{
+    [Test]
+    [Timeout(300_000)]
+    public Task Creation_validates_references_and_handler_scope(CancellationToken ct) =>
+        RunAsync(async fixture =>
+        {
+            await using var db = fixture.CreateDbContext();
+            var store = CreateStore(db);
+
+            var platform = await store.CreateAsync(Command(
+                fixture,
+                fixture.MemberOneId,
+                CompetitionQuestionSubject.Platform,
+                null,
+                "赛事流程咨询",
+                "请问本场比赛的暂停规则是什么？",
+                0), ct);
+            await Assert.That(platform.Failure).IsNull();
+
+            var platformWithChallenge = await store.CreateAsync(Command(
+                fixture,
+                fixture.MemberOneId,
+                CompetitionQuestionSubject.Platform,
+                fixture.PublishedBindingId,
+                "错误的平台引用",
+                "平台咨询不应携带比赛题目引用。",
+                1), ct);
+            await Assert.That(platformWithChallenge.Failure)
+                .IsEqualTo(CompetitionQuestionFailure.InvalidChallengeReference);
+
+            foreach (var challengeId in new Guid?[]
+                     {
+                         null,
+                         Guid.NewGuid(),
+                         fixture.UnpublishedBindingId,
+                         fixture.OtherCompetitionBindingId
+                     })
+            {
+                var rejected = await store.CreateAsync(Command(
+                    fixture,
+                    fixture.MemberOneId,
+                    CompetitionQuestionSubject.Challenge,
+                    challengeId,
+                    $"无效题目引用 {challengeId}",
+                    "关联题目必须已发布且属于当前比赛。",
+                    2), ct);
+                await Assert.That(rejected.Failure)
+                    .IsEqualTo(CompetitionQuestionFailure.InvalidChallengeReference);
+            }
+
+            var challenge = await store.CreateAsync(Command(
+                fixture,
+                fixture.MemberOneId,
+                CompetitionQuestionSubject.Challenge,
+                fixture.PublishedBindingId,
+                "题目环境咨询",
+                "题目环境启动后无法连接公开端口。",
+                3), ct);
+            await Assert.That(challenge.Failure).IsNull();
+            var questionId = challenge.Question!.Id;
+
+            await Assert.That((await store.FindAsync(
+                fixture.CompetitionId,
+                questionId,
+                fixture.JudgeId,
+                ct))!.Access).IsEqualTo(CompetitionQuestionAccess.Handler);
+            await Assert.That((await store.FindAsync(
+                fixture.CompetitionId,
+                questionId,
+                fixture.ObserverId,
+                ct))!.Access).IsEqualTo(CompetitionQuestionAccess.Observer);
+            await Assert.That((await store.FindAsync(
+                fixture.CompetitionId,
+                questionId,
+                fixture.ChallengeOwnerId,
+                ct))!.Access).IsEqualTo(CompetitionQuestionAccess.Handler);
+            await Assert.That(await store.FindAsync(
+                fixture.CompetitionId,
+                questionId,
+                fixture.OtherChallengeOwnerId,
+                ct)).IsNull();
+            await Assert.That(await store.FindAsync(
+                fixture.CompetitionId,
+                platform.Question!.Id,
+                fixture.ChallengeOwnerId,
+                ct)).IsNull();
+
+            var competition = await db.Competitions.SingleAsync(
+                candidate => candidate.Id == fixture.CompetitionId,
+                ct);
+            competition.AllowChallengeOwnersToHandleQuestions = false;
+            await db.SaveChangesAsync(ct);
+            db.ChangeTracker.Clear();
+            await Assert.That(await store.FindAsync(
+                fixture.CompetitionId,
+                questionId,
+                fixture.ChallengeOwnerId,
+                ct)).IsNull();
+
+            var observerReply = await store.AddMessageAsync(new(
+                fixture.CompetitionId,
+                questionId,
+                fixture.ObserverId,
+                "观察员只能读取，不能回复咨询。",
+                0,
+                fixture.Now.AddMinutes(10)), ct);
+            await Assert.That(observerReply.Failure)
+                .IsEqualTo(CompetitionQuestionFailure.Forbidden);
+
+            var judgeReply = await store.AddMessageAsync(new(
+                fixture.CompetitionId,
+                questionId,
+                fixture.JudgeId,
+                "裁判已确认题目服务正在恢复。",
+                0,
+                fixture.Now.AddMinutes(11)), ct);
+            await Assert.That(judgeReply.Failure).IsNull();
+            await Assert.That(judgeReply.Question!.Entries.Last().ActorRole)
+                .IsEqualTo(CompetitionQuestionParticipantRole.Judge);
+
+            var teammateView = await store.FindAsync(
+                fixture.CompetitionId,
+                questionId,
+                fixture.MemberTwoId,
+                ct);
+            await Assert.That(teammateView!.Access).IsEqualTo(CompetitionQuestionAccess.Asker);
+        }, ct);
+
+    [Test]
+    [Timeout(300_000)]
+    public Task Active_and_message_limits_follow_ticket_state(CancellationToken ct) =>
+        RunAsync(async fixture =>
+        {
+            await using var db = fixture.CreateDbContext();
+            var store = CreateStore(db);
+            var questions = new List<CompetitionQuestionView>();
+            for (var index = 0; index < 5; index++)
+            {
+                var created = await store.CreateAsync(Command(
+                    fixture,
+                    fixture.MemberOneId,
+                    CompetitionQuestionSubject.Platform,
+                    null,
+                    $"平台咨询 {index + 1}",
+                    $"这是第 {index + 1} 个仍在处理中的平台咨询。",
+                    index), ct);
+                await Assert.That(created.Failure).IsNull();
+                questions.Add(created.Question!);
+                db.ChangeTracker.Clear();
+            }
+
+            var sixth = await store.CreateAsync(Command(
+                fixture,
+                fixture.MemberTwoId,
+                CompetitionQuestionSubject.Platform,
+                null,
+                "第六个咨询",
+                "该咨询必须被队伍共享的活跃上限拒绝。",
+                6), ct);
+            await Assert.That(sixth.Failure)
+                .IsEqualTo(CompetitionQuestionFailure.TeamActiveQuestionLimitReached);
+            await Assert.That(sixth.Limit).IsEqualTo(5);
+
+            var resolved = await store.ChangeStatusAsync(new(
+                fixture.CompetitionId,
+                questions[0].Id,
+                fixture.ManagerId,
+                CompetitionQuestionStatus.Resolved,
+                questions[0].Revision,
+                fixture.Now.AddMinutes(20)), ct);
+            await Assert.That(resolved.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            var closed = await store.ChangeStatusAsync(new(
+                fixture.CompetitionId,
+                questions[1].Id,
+                fixture.ManagerId,
+                CompetitionQuestionStatus.Closed,
+                questions[1].Revision,
+                fixture.Now.AddMinutes(21)), ct);
+            await Assert.That(closed.Failure).IsNull();
+            db.ChangeTracker.Clear();
+
+            for (var index = 0; index < 2; index++)
+            {
+                var replacement = await store.CreateAsync(Command(
+                    fixture,
+                    fixture.MemberOneId,
+                    CompetitionQuestionSubject.Platform,
+                    null,
+                    $"替代咨询 {index + 1}",
+                    "已解决和已关闭咨询不计入活跃数量。",
+                    30 + index), ct);
+                await Assert.That(replacement.Failure).IsNull();
+                db.ChangeTracker.Clear();
+            }
+
+            var blockedReopen = await store.AddMessageAsync(new(
+                fixture.CompetitionId,
+                resolved.Question!.Id,
+                fixture.MemberTwoId,
+                "重新追问会再次占用一个活跃咨询名额。",
+                resolved.Question.Revision,
+                fixture.Now.AddMinutes(40)), ct);
+            await Assert.That(blockedReopen.Failure)
+                .IsEqualTo(CompetitionQuestionFailure.TeamActiveQuestionLimitReached);
+
+            var released = await store.ChangeStatusAsync(new(
+                fixture.CompetitionId,
+                questions[2].Id,
+                fixture.ManagerId,
+                CompetitionQuestionStatus.Closed,
+                questions[2].Revision,
+                fixture.Now.AddMinutes(41)), ct);
+            await Assert.That(released.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            var reopened = await store.AddMessageAsync(new(
+                fixture.CompetitionId,
+                resolved.Question.Id,
+                fixture.MemberTwoId,
+                "现在已有空余活跃名额，允许继续追问。",
+                resolved.Question.Revision,
+                fixture.Now.AddMinutes(42)), ct);
+            await Assert.That(reopened.Failure).IsNull();
+            db.ChangeTracker.Clear();
+
+            var thirdParticipantMessage = await store.AddMessageAsync(new(
+                fixture.CompetitionId,
+                reopened.Question!.Id,
+                fixture.MemberOneId,
+                "这是工作人员回复前的第三条队伍消息。",
+                reopened.Question.Revision,
+                fixture.Now.AddMinutes(43)), ct);
+            await Assert.That(thirdParticipantMessage.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            var fourthParticipantMessage = await store.AddMessageAsync(new(
+                fixture.CompetitionId,
+                thirdParticipantMessage.Question!.Id,
+                fixture.MemberTwoId,
+                "第四条消息必须等待工作人员回复。",
+                thirdParticipantMessage.Question.Revision,
+                fixture.Now.AddMinutes(44)), ct);
+            await Assert.That(fourthParticipantMessage.Failure)
+                .IsEqualTo(CompetitionQuestionFailure.ParticipantMessageLimitReached);
+            await Assert.That(fourthParticipantMessage.Limit).IsEqualTo(3);
+
+            var handlerReply = await store.AddMessageAsync(new(
+                fixture.CompetitionId,
+                thirdParticipantMessage.Question.Id,
+                fixture.ManagerId,
+                "工作人员回复后，队伍连续发送额度已经重置。",
+                thirdParticipantMessage.Question.Revision,
+                fixture.Now.AddMinutes(45)), ct);
+            await Assert.That(handlerReply.Failure).IsNull();
+            db.ChangeTracker.Clear();
+            var afterReset = await store.AddMessageAsync(new(
+                fixture.CompetitionId,
+                handlerReply.Question!.Id,
+                fixture.MemberTwoId,
+                "额度重置后允许继续补充消息。",
+                handlerReply.Question.Revision,
+                fixture.Now.AddMinutes(46)), ct);
+            await Assert.That(afterReset.Failure).IsNull();
+            await Assert.That(afterReset.Question!.ParticipantMessagesRemaining).IsEqualTo(2);
+        }, ct);
+
+    [Test]
+    [Timeout(300_000)]
+    public Task Team_lock_prevents_concurrent_members_from_exceeding_limits(
+        CancellationToken ct) => RunAsync(async fixture =>
+    {
+        await using (var setup = fixture.CreateDbContext())
+        {
+            var competition = await setup.Competitions.SingleAsync(
+                item => item.Id == fixture.CompetitionId,
+                ct);
+            competition.MaxActiveQuestionsPerTeam = 1;
+            await setup.SaveChangesAsync(ct);
+        }
+
+        async Task<CompetitionQuestionMutationResult> CreateAsync(
+            Guid actorId,
+            string suffix)
+        {
+            await using var db = fixture.CreateDbContext();
+            return await CreateStore(db).CreateAsync(Command(
+                fixture,
+                actorId,
+                CompetitionQuestionSubject.Platform,
+                null,
+                $"并发咨询 {suffix}",
+                $"来自不同队员的并发创建请求 {suffix}。",
+                60), ct);
+        }
+
+        var results = await Task.WhenAll(
+            CreateAsync(fixture.MemberOneId, "A"),
+            CreateAsync(fixture.MemberTwoId, "B"));
+        await Assert.That(results.Count(result => result.Failure is null)).IsEqualTo(1);
+        await Assert.That(results.Count(result =>
+                result.Failure == CompetitionQuestionFailure.TeamActiveQuestionLimitReached))
+            .IsEqualTo(1);
+    }, ct);
+
+    private static CreateCompetitionQuestionCommand Command(
+        Fixture fixture,
+        Guid actorId,
+        CompetitionQuestionSubject subject,
+        Guid? challengeId,
+        string title,
+        string body,
+        int minuteOffset) =>
+        new(
+            fixture.CompetitionId,
+            subject,
+            challengeId,
+            null,
+            actorId,
+            title,
+            body,
+            fixture.Now.AddMinutes(minuteOffset));
+
+    private static CompetitionQuestionStore CreateStore(NoCtfDbContext db)
+    {
+        var outbox = new RecordingOutbox();
+        return new(
+            db,
+            outbox,
+            new CompetitionEventStore(db, outbox),
+            NullLogger<CompetitionQuestionStore>.Instance);
+    }
+
+    private static async Task RunAsync(
+        Func<Fixture, Task> test,
+        CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_question_limits")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(ct);
+            var fixture = new Fixture(postgres.GetConnectionString());
+            await fixture.InitializeAsync(ct);
+            await test(fixture);
+        });
+    }
+
+    private sealed class Fixture(string connectionString)
+    {
+        public DateTimeOffset Now { get; } = DateTimeOffset.UtcNow;
+        public Guid CompetitionId { get; } = Guid.CreateVersion7();
+        public Guid OtherCompetitionId { get; } = Guid.CreateVersion7();
+        public Guid PublishedBindingId { get; } = Guid.CreateVersion7();
+        public Guid UnpublishedBindingId { get; } = Guid.CreateVersion7();
+        public Guid OtherCompetitionBindingId { get; } = Guid.CreateVersion7();
+        public Guid OwnerId { get; } = Guid.CreateVersion7();
+        public Guid ManagerId { get; } = Guid.CreateVersion7();
+        public Guid JudgeId { get; } = Guid.CreateVersion7();
+        public Guid ObserverId { get; } = Guid.CreateVersion7();
+        public Guid ChallengeOwnerId { get; } = Guid.CreateVersion7();
+        public Guid OtherChallengeOwnerId { get; } = Guid.CreateVersion7();
+        public Guid MemberOneId { get; } = Guid.CreateVersion7();
+        public Guid MemberTwoId { get; } = Guid.CreateVersion7();
+        public Guid OtherMemberId { get; } = Guid.CreateVersion7();
+        private Guid TeamId { get; } = Guid.CreateVersion7();
+
+        public NoCtfDbContext CreateDbContext() => new(
+            new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(connectionString)
+                .UseSnakeCaseNamingConvention()
+                .Options);
+
+        public async Task InitializeAsync(CancellationToken ct)
+        {
+            await using var db = CreateDbContext();
+            await db.Database.MigrateAsync(ct);
+            db.Users.AddRange(
+                User(OwnerId, "owner", UserRole.Organizer),
+                User(ManagerId, "manager", UserRole.Organizer),
+                User(JudgeId, "judge", UserRole.Organizer),
+                User(ObserverId, "observer", UserRole.Organizer),
+                User(ChallengeOwnerId, "challenge-owner", UserRole.Organizer),
+                User(OtherChallengeOwnerId, "other-owner", UserRole.Organizer),
+                User(MemberOneId, "member-one", UserRole.User),
+                User(MemberTwoId, "member-two", UserRole.User),
+                User(OtherMemberId, "other-member", UserRole.User));
+            db.Competitions.AddRange(
+                Competition(CompetitionId, OwnerId, "Question competition"),
+                Competition(OtherCompetitionId, OtherChallengeOwnerId, "Other competition"));
+            var publishedTemplateId = Guid.CreateVersion7();
+            var unpublishedTemplateId = Guid.CreateVersion7();
+            var otherTemplateId = Guid.CreateVersion7();
+            db.Challenges.AddRange(
+                Challenge(publishedTemplateId, ChallengeOwnerId, "Published challenge"),
+                Challenge(unpublishedTemplateId, ChallengeOwnerId, "Unpublished challenge"),
+                Challenge(otherTemplateId, OtherChallengeOwnerId, "Other challenge"));
+            db.CompetitionChallenges.AddRange(
+                Binding(PublishedBindingId, CompetitionId, publishedTemplateId, true, 1),
+                Binding(UnpublishedBindingId, CompetitionId, unpublishedTemplateId, false, 2),
+                Binding(OtherCompetitionBindingId, OtherCompetitionId, otherTemplateId, true, 1));
+            db.Teams.AddRange(
+                Team(TeamId, CompetitionId, "Question team", MemberOneId, [MemberOneId, MemberTwoId]),
+                Team(Guid.CreateVersion7(), CompetitionId, "Other team", OtherMemberId, [OtherMemberId]));
+            await db.SaveChangesAsync(ct);
+        }
+
+        private User User(Guid id, string name, UserRole role) => new()
+        {
+            Id = id,
+            UserName = name,
+            NormalizedUserName = name.ToUpperInvariant(),
+            Email = $"{name}@example.test",
+            NormalizedEmail = $"{name.ToUpperInvariant()}@EXAMPLE.TEST",
+            PasswordHash = "test",
+            Kind = UserKind.Human,
+            Role = role,
+            AccountStatus = UserAccountStatus.Active,
+            EmailVerifiedAt = Now,
+            CreatedAt = Now,
+            UpdatedAt = Now
+        };
+
+        private Competition Competition(Guid id, Guid ownerId, string title) => new()
+        {
+            Id = id,
+            OwnerId = ownerId,
+            ManagerIds = id == CompetitionId ? [ManagerId] : [],
+            JudgeIds = id == CompetitionId ? [JudgeId] : [],
+            ObserverIds = id == CompetitionId ? [ObserverId] : [],
+            Title = title,
+            Mode = GameMode.Ctf,
+            ConfigurationJson = """{"schemaVersion":1}""",
+            ConfigurationUpdatedAt = Now,
+            FlagDerivationSecret = new byte[32],
+            StartAt = Now.AddHours(-1),
+            EndAt = Now.AddHours(2),
+            Status = CompetitionStatus.Running,
+            MaxActiveQuestionsPerTeam = 5,
+            MaxParticipantMessagesBeforeHandlerReply = 3,
+            AllowChallengeOwnersToHandleQuestions = true,
+            CreatedAt = Now,
+            UpdatedAt = Now
+        };
+
+        private Challenge Challenge(Guid id, Guid ownerId, string title) => new()
+        {
+            Id = id,
+            OwnerId = ownerId,
+            Mode = GameMode.Ctf,
+            Visibility = ChallengeVisibility.Private,
+            Title = title,
+            Direction = "Web",
+            DefinitionJson = """{"schemaVersion":1}""",
+            CreatedAt = Now,
+            UpdatedAt = Now
+        };
+
+        private CompetitionChallenge Binding(
+            Guid id,
+            Guid competitionId,
+            Guid challengeId,
+            bool published,
+            int order) => new()
+        {
+            Id = id,
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            BaseScore = 500,
+            Order = order,
+            IsPublished = published,
+            RulesJson = """{"schemaVersion":1}""",
+            UpdatedAt = Now
+        };
+
+        private static Team Team(
+            Guid id,
+            Guid competitionId,
+            string name,
+            Guid captainId,
+            Guid[] members) => new()
+        {
+            Id = id,
+            CompetitionId = competitionId,
+            Name = name,
+            NormalizedName = name.ToUpperInvariant(),
+            CaptainId = captainId,
+            MemberIds = members,
+            InvitationToken = Guid.NewGuid().ToString("N"),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegisteredAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    private sealed class RecordingOutbox : ITransactionalMessageOutbox
+    {
+        public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
+        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
+            ValueTask.CompletedTask;
+        public ValueTask PublishToRunnerPoolAsync<T>(T message)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
+            ValueTask.CompletedTask;
+        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
+            ValueTask.CompletedTask;
+        public ValueTask PublishToRunnerNodeAsync<T>(T message)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
+            ValueTask.CompletedTask;
+        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
+            where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
+            ValueTask.CompletedTask;
+        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+    }
+}

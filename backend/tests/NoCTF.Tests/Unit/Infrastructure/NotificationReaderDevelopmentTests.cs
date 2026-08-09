@@ -91,6 +91,7 @@ public sealed class NotificationReaderDevelopmentTests
             10,
             CancellationToken.None);
         var thread = await reader.ReadThreadAsync(ownerId, rootId, CancellationToken.None);
+        var threadFromReply = await reader.ReadThreadAsync(ownerId, replyId, CancellationToken.None);
 
         await Assert.That(list.Select(item => item.Id))
             .IsEquivalentTo([rootId, replyId]);
@@ -98,6 +99,9 @@ public sealed class NotificationReaderDevelopmentTests
             .IsEqualTo("development-owner");
         await Assert.That(thread).IsNotNull();
         await Assert.That(thread!.Select(item => item.Id))
+            .IsEquivalentTo([rootId, replyId]);
+        await Assert.That(threadFromReply).IsNotNull();
+        await Assert.That(threadFromReply!.Select(item => item.Id))
             .IsEquivalentTo([rootId, replyId]);
     }
 }

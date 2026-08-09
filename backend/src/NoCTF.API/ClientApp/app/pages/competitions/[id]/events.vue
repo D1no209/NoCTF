@@ -16,7 +16,8 @@ const kindOptions = [
   { value: 'CompetitionLifecycleChanged', label: '比赛状态' },
   { value: 'AnnouncementPublished', label: '公告' }, { value: 'ChallengePublished', label: '题目发布' }, { value: 'HintPublished', label: '提示发布' },
   { value: 'FirstBloodAwarded', label: '一血' }, { value: 'SecondBloodAwarded', label: '二血' }, { value: 'ThirdBloodAwarded', label: '三血' },
-  { value: 'SubmissionEvaluated', label: '提交评测' }, { value: 'TeamRegistered', label: '队伍报名' }, { value: 'TeamBanned', label: '队伍封禁' }, { value: 'QuestionReplied', label: '咨询回复' },
+  { value: 'SubmissionEvaluated', label: '提交评测' }, { value: 'TeamRegistered', label: '队伍报名' }, { value: 'TeamBanned', label: '队伍封禁' },
+  { value: 'QuestionOpened', label: '咨询创建' }, { value: 'QuestionReplied', label: '咨询回复' }, { value: 'QuestionStatusChanged', label: '咨询状态' },
 ]
 
 const { items, loading, error, hasMore, initialized, loadMore, reset } =

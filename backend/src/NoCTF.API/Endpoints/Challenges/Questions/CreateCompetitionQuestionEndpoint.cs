@@ -31,16 +31,6 @@ public sealed class CreateCompetitionQuestionValidator
             .NotEmpty()
             .MinimumLength(CompetitionQuestionRules.MinimumBodyLength)
             .MaximumLength(CompetitionQuestionRules.MaximumBodyLength);
-        RuleFor(request => request)
-            .Must(request => request.Subject switch
-            {
-                CompetitionQuestionSubjectCode.Challenge =>
-                    request.CompetitionChallengeId is not null,
-                CompetitionQuestionSubjectCode.Platform =>
-                    request.CompetitionChallengeId is null,
-                _ => true
-            })
-            .WithMessage("CompetitionChallengeId must be supplied only for Challenge questions.");
     }
 }
 
@@ -49,8 +39,11 @@ public enum CompetitionQuestionFailureCode
 {
     InvalidRequest,
     SpamRejected,
-    LifecycleConflict,
+    CompetitionNotAcceptingQuestions,
     TeamNotEligible,
+    InvalidChallengeReference,
+    TeamActiveQuestionLimitReached,
+    ParticipantMessageLimitReached,
     RevisionConflict,
     InvalidTransition,
     QuestionClosed
@@ -58,7 +51,8 @@ public enum CompetitionQuestionFailureCode
 
 public sealed record CompetitionQuestionFailureResponse(
     CompetitionQuestionFailureCode Code,
-    CompetitionQuestionResponse? Current);
+    CompetitionQuestionResponse? Current,
+    int? Limit);
 
 internal static class CompetitionQuestionFailureMapper
 {
@@ -66,15 +60,23 @@ internal static class CompetitionQuestionFailureMapper
         CompetitionQuestionMutationResult result) =>
         new(ToCode(result.Failure!.Value), result.Question is null
             ? null
-            : CompetitionQuestionResponseMapper.ToResponse(result.Question));
+            : CompetitionQuestionResponseMapper.ToResponse(result.Question),
+            result.Limit);
 
     public static CompetitionQuestionFailureCode ToCode(CompetitionQuestionFailure failure) =>
         failure switch
         {
             CompetitionQuestionFailure.InvalidRequest => CompetitionQuestionFailureCode.InvalidRequest,
             CompetitionQuestionFailure.SpamRejected => CompetitionQuestionFailureCode.SpamRejected,
-            CompetitionQuestionFailure.LifecycleConflict => CompetitionQuestionFailureCode.LifecycleConflict,
+            CompetitionQuestionFailure.CompetitionNotAcceptingQuestions =>
+                CompetitionQuestionFailureCode.CompetitionNotAcceptingQuestions,
             CompetitionQuestionFailure.TeamNotEligible => CompetitionQuestionFailureCode.TeamNotEligible,
+            CompetitionQuestionFailure.InvalidChallengeReference =>
+                CompetitionQuestionFailureCode.InvalidChallengeReference,
+            CompetitionQuestionFailure.TeamActiveQuestionLimitReached =>
+                CompetitionQuestionFailureCode.TeamActiveQuestionLimitReached,
+            CompetitionQuestionFailure.ParticipantMessageLimitReached =>
+                CompetitionQuestionFailureCode.ParticipantMessageLimitReached,
             CompetitionQuestionFailure.RevisionConflict => CompetitionQuestionFailureCode.RevisionConflict,
             CompetitionQuestionFailure.InvalidTransition => CompetitionQuestionFailureCode.InvalidTransition,
             CompetitionQuestionFailure.QuestionClosed => CompetitionQuestionFailureCode.QuestionClosed,
@@ -86,8 +88,9 @@ public sealed class CreateCompetitionQuestionEndpoint(
     CreateCompetitionQuestion create,
     IUserContext user)
     : Endpoint<CreateCompetitionQuestionRequest, Results<
-        Created<CompetitionQuestionResponse>,
+        CreatedAtRoute<CompetitionQuestionResponse>,
         Conflict<CompetitionQuestionFailureResponse>,
+        UnprocessableEntity<CompetitionQuestionFailureResponse>,
         NotFound,
         ForbidHttpResult,
         ProblemHttpResult>>
@@ -107,8 +110,9 @@ public sealed class CreateCompetitionQuestionEndpoint(
     }
 
     public override async Task<Results<
-        Created<CompetitionQuestionResponse>,
+        CreatedAtRoute<CompetitionQuestionResponse>,
         Conflict<CompetitionQuestionFailureResponse>,
+        UnprocessableEntity<CompetitionQuestionFailureResponse>,
         NotFound,
         ForbidHttpResult,
         ProblemHttpResult>> ExecuteAsync(
@@ -129,16 +133,23 @@ public sealed class CreateCompetitionQuestionEndpoint(
             DateTimeOffset.UtcNow), ct);
         return result.Failure switch
         {
-            null => TypedResults.Created(
-                $"/api/v1/competitions/{competitionId}/questions/{result.Question!.Id}",
-                CompetitionQuestionResponseMapper.ToResponse(result.Question)),
+            null => TypedResults.CreatedAtRoute(
+                CompetitionQuestionResponseMapper.ToResponse(result.Question!),
+                "GetCompetitionQuestion",
+                new
+                {
+                    competitionId,
+                    questionId = result.Question!.Id
+                }),
             CompetitionQuestionFailure.NotFound
-                or CompetitionQuestionFailure.ChallengeNotFound
                 or CompetitionQuestionFailure.SubmissionNotFound => TypedResults.NotFound(),
             CompetitionQuestionFailure.Forbidden => TypedResults.Forbid(),
-            CompetitionQuestionFailure.LifecycleConflict
-                or CompetitionQuestionFailure.TeamNotEligible => TypedResults.Conflict(
+            CompetitionQuestionFailure.CompetitionNotAcceptingQuestions
+                or CompetitionQuestionFailure.TeamNotEligible
+                or CompetitionQuestionFailure.TeamActiveQuestionLimitReached => TypedResults.Conflict(
                     CompetitionQuestionFailureMapper.ToResponse(result)),
+            CompetitionQuestionFailure.InvalidChallengeReference => TypedResults.UnprocessableEntity(
+                CompetitionQuestionFailureMapper.ToResponse(result)),
             CompetitionQuestionFailure.InvalidRequest
                 or CompetitionQuestionFailure.SpamRejected => TypedResults.Problem(
                     statusCode: StatusCodes.Status400BadRequest,

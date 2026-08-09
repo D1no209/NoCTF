@@ -16,6 +16,9 @@ const teamRegistrationAutoApprove = ref(false)
 const allowTeamRegistrationWhileRunning = ref(false)
 const maxTeamMembers = ref(5)
 const maxConcurrentRuntimeInstancesPerTeam = ref(1)
+const maxActiveQuestionsPerTeam = ref(5)
+const maxParticipantMessagesBeforeHandlerReply = ref(3)
+const allowChallengeOwnersToHandleQuestions = ref(true)
 const error = ref<string | null>(null)
 const pending = ref(false)
 
@@ -48,6 +51,9 @@ async function submit() {
         allowTeamRegistrationWhileRunning: allowTeamRegistrationWhileRunning.value,
         maxTeamMembers: maxTeamMembers.value,
         maxConcurrentRuntimeInstancesPerTeam: maxConcurrentRuntimeInstancesPerTeam.value,
+        maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
+        maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
+        allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
       },
     })
     if (e || !data) throw e
@@ -133,6 +139,25 @@ async function submit() {
               <div class="grid gap-1.5 leading-none">
                 <FieldLabel for="allow-running-registration" class="font-normal">比赛进行中仍允许创建队伍</FieldLabel>
                 <FieldDescription>关闭时，比赛进入 Running 后停止接收新队伍与重新报名。</FieldDescription>
+              </div>
+            </Field>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel for="max-active-questions">每队活跃咨询上限</FieldLabel>
+                <Input id="max-active-questions" v-model.number="maxActiveQuestionsPerTeam" type="number" min="1" required />
+                <FieldDescription>待处理与已回复的咨询计入上限。</FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel for="max-participant-messages">连续补充消息上限</FieldLabel>
+                <Input id="max-participant-messages" v-model.number="maxParticipantMessagesBeforeHandlerReply" type="number" min="1" required />
+                <FieldDescription>初始提问计入额度；工作人员回复后重置。</FieldDescription>
+              </Field>
+            </div>
+            <Field orientation="horizontal">
+              <Checkbox id="allow-challenge-owner-questions" v-model="allowChallengeOwnersToHandleQuestions" />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="allow-challenge-owner-questions" class="font-normal">允许题目所有者处理关联咨询</FieldLabel>
+                <FieldDescription>仅限其拥有或协作的题目；不会授予 Flag、Token 或平台密钥权限。</FieldDescription>
               </div>
             </Field>
             <Field>

@@ -1,13 +1,16 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application.Challenges.Questions;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Challenges.Questions;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Notifications;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
@@ -102,7 +105,11 @@ public sealed class CompetitionQuestionPersistenceTests
 
             await using var db = new NoCtfDbContext(options);
             var outbox = new RecordingOutbox();
-            var store = new CompetitionQuestionStore(db, outbox);
+            var store = new CompetitionQuestionStore(
+                db,
+                outbox,
+                new CompetitionEventStore(db, outbox),
+                NullLogger<CompetitionQuestionStore>.Instance);
             var created = await store.CreateAsync(new(
                 ids.CompetitionId,
                 CompetitionQuestionSubject.Challenge,
@@ -133,6 +140,11 @@ public sealed class CompetitionQuestionPersistenceTests
                 created.Question.Id,
                 ids.ObserverId,
                 ct);
+            var administratorView = await store.FindAsync(
+                ids.CompetitionId,
+                created.Question.Id,
+                ids.AdministratorId,
+                ct);
             var authorView = await store.FindAsync(
                 ids.CompetitionId,
                 created.Question.Id,
@@ -144,6 +156,7 @@ public sealed class CompetitionQuestionPersistenceTests
                 ids.OtherParticipantId,
                 ct);
             await Assert.That(observerView!.Access).IsEqualTo(CompetitionQuestionAccess.Observer);
+            await Assert.That(administratorView!.Access).IsEqualTo(CompetitionQuestionAccess.Handler);
             await Assert.That(authorView!.Access).IsEqualTo(CompetitionQuestionAccess.Handler);
             await Assert.That(hiddenView).IsNull();
             db.ChangeTracker.Clear();
@@ -159,7 +172,12 @@ public sealed class CompetitionQuestionPersistenceTests
                 .IsEqualTo(CompetitionQuestionStatus.Replied);
             await Assert.That(replied.Question.Entries).Count().IsEqualTo(2);
             var replyEntry = replied.Question.Entries.Single(entry =>
-                entry.Kind == CompetitionQuestionEntryKind.Message);
+                entry.Kind == CompetitionQuestionEntryKind.Message
+                && entry.Body == "Use the HTTP service port, not the internal metrics port.");
+            await Assert.That(replyEntry.ActorRole)
+                .IsEqualTo(CompetitionQuestionParticipantRole.ChallengeOwner);
+            await Assert.That(replied.Question.Entries[0].Body)
+                .IsEqualTo("The documented command exits before the health check.");
             var replyNotification = outbox.Messages
                 .OfType<DeliverCompetitionQuestionNotification>()
                 .Last();
@@ -257,6 +275,21 @@ public sealed class CompetitionQuestionPersistenceTests
                 .ToArrayAsync(ct);
             await Assert.That(notificationPayloads.All(payload =>
                 !payload.Contains("health check", StringComparison.Ordinal))).IsTrue();
+
+            var permanentEvents = await db.CompetitionEvents.AsNoTracking()
+                .Where(@event => @event.CompetitionId == ids.CompetitionId)
+                .ToArrayAsync(ct);
+            await Assert.That(permanentEvents.Select(@event => @event.Kind))
+                .Contains(CompetitionEventKind.QuestionOpened);
+            await Assert.That(permanentEvents.Select(@event => @event.Kind))
+                .Contains(CompetitionEventKind.QuestionReplied);
+            await Assert.That(permanentEvents.Select(@event => @event.Kind))
+                .Contains(CompetitionEventKind.QuestionStatusChanged);
+            await Assert.That(permanentEvents.All(@event =>
+                @event.Visibility == CompetitionEventVisibility.Staff
+                && !@event.PayloadJson.Contains("health check", StringComparison.Ordinal)
+                && !@event.PayloadJson.Contains("runtime reset", StringComparison.Ordinal)))
+                .IsTrue();
         });
     }
 

@@ -174,12 +174,17 @@ export function notificationThreadRootId(
 export function notificationTargetPath(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
+  const isQuestionActivity = notification.kind === 'QuestionOpened'
+    || notification.kind === 'Message'
+    || notification.kind === 'QuestionStatusChanged'
   const competitionId = notificationCompetitionId(notification)
+    ?? (isQuestionActivity ? notification.relatedId ?? null : null)
   if (!competitionId)
     return '/notifications'
 
   const challengeId = notificationContentId(notification, 'competitionChallengeId')
   const questionId = notificationContentId(notification, 'questionId')
+    ?? (notification.kind === 'QuestionOpened' ? notification.id ?? null : null)
   const scoringEventId = notificationContentId(notification, 'scoringEventId')
   switch (notification.kind) {
     case 'BloodAwarded':

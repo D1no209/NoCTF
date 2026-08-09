@@ -41,6 +41,9 @@ public sealed class Competition
     public bool AllowTeamRegistrationWhileRunning { get; set; }
     public int MaxTeamMembers { get; set; } = 5;
     public int MaxConcurrentRuntimeInstancesPerTeam { get; set; }
+    public int MaxActiveQuestionsPerTeam { get; set; } = 5;
+    public int MaxParticipantMessagesBeforeHandlerReply { get; set; } = 3;
+    public bool AllowChallengeOwnersToHandleQuestions { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }

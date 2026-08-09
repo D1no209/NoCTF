@@ -45,6 +45,10 @@ public sealed class NotificationReaderPersistenceTests
                     ids.FormerManagerId,
                     ids.RootId,
                     cancellationToken)).Count().IsEqualTo(3);
+                await Assert.That(await reader.ReadThreadAsync(
+                    ids.FormerManagerId,
+                    ids.OwnerReplyId,
+                    cancellationToken)).Count().IsEqualTo(3);
                 await Assert.That((await reader.ListAsync(
                     ids.FormerParticipantId,
                     null,

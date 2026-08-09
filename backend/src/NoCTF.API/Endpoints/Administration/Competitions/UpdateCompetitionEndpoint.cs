@@ -19,6 +19,9 @@ public sealed class UpdateCompetitionRequest
     public bool AllowTeamRegistrationWhileRunning { get; set; }
     public int MaxTeamMembers { get; set; }
     public int? MaxConcurrentRuntimeInstancesPerTeam { get; set; }
+    public int MaxActiveQuestionsPerTeam { get; set; } = 5;
+    public int MaxParticipantMessagesBeforeHandlerReply { get; set; } = 3;
+    public bool AllowChallengeOwnersToHandleQuestions { get; set; } = true;
 }
 
 public sealed class UpdateCompetitionValidator : Validator<UpdateCompetitionRequest>
@@ -29,6 +32,8 @@ public sealed class UpdateCompetitionValidator : Validator<UpdateCompetitionRequ
         RuleFor(request => request.EndTime).GreaterThan(request => request.StartTime);
         RuleFor(request => request.MaxTeamMembers).GreaterThan(0);
         RuleFor(request => request.MaxConcurrentRuntimeInstancesPerTeam).NotNull();
+        RuleFor(request => request.MaxActiveQuestionsPerTeam).GreaterThan(0);
+        RuleFor(request => request.MaxParticipantMessagesBeforeHandlerReply).GreaterThan(0);
     }
 }
 
@@ -72,7 +77,10 @@ public sealed class UpdateCompetitionEndpoint(
             request.MaxConcurrentRuntimeInstancesPerTeam!.Value,
             user.UserId,
             DateTimeOffset.UtcNow,
-            request.AllowTeamRegistrationWhileRunning), ct);
+            request.AllowTeamRegistrationWhileRunning,
+            request.MaxActiveQuestionsPerTeam,
+            request.MaxParticipantMessagesBeforeHandlerReply,
+            request.AllowChallengeOwnersToHandleQuestions), ct);
         if (result.FailureCode == CompetitionManagementFailureCode.CompetitionNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)

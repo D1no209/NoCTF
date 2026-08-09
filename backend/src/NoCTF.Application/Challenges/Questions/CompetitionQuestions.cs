@@ -1,5 +1,6 @@
 using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions;
+using Microsoft.Extensions.Logging;
 
 namespace NoCTF.Application.Challenges.Questions;
 
@@ -16,14 +17,23 @@ public enum CompetitionQuestionFailure : short
     SpamRejected,
     NotFound,
     Forbidden,
-    LifecycleConflict,
+    CompetitionNotAcceptingQuestions,
     TeamNotEligible,
-    ChallengeNotFound,
+    InvalidChallengeReference,
     SubmissionNotFound,
+    TeamActiveQuestionLimitReached,
+    ParticipantMessageLimitReached,
     RevisionConflict,
     InvalidTransition,
     QuestionClosed,
     EntryNotFound
+}
+
+public enum CompetitionQuestionChallengeReferenceState : short
+{
+    Missing,
+    Valid,
+    Invalid
 }
 
 public sealed record CompetitionQuestionCreationContext(
@@ -31,8 +41,10 @@ public sealed record CompetitionQuestionCreationContext(
     CompetitionStatus CompetitionStatus,
     bool HasApprovedTeam,
     CompetitionQuestionSubject Subject,
-    bool HasValidChallenge,
-    bool HasValidSubmission);
+    CompetitionQuestionChallengeReferenceState ChallengeReference,
+    bool HasValidSubmission,
+    int ActiveQuestionCount,
+    int MaxActiveQuestionsPerTeam);
 
 public sealed record CompetitionQuestionEntryView(
     Guid Id,
@@ -56,10 +68,15 @@ public sealed record CompetitionQuestionView(
     string? TeamDisplayName,
     Guid? SubmissionId,
     CompetitionQuestionSubject Subject,
+    string? ChallengeTitle,
     string Title,
     string Body,
     CompetitionQuestionStatus Status,
     CompetitionQuestionAccess Access,
+    string LastActorDisplayName,
+    CompetitionQuestionParticipantRole LastActorRole,
+    int ParticipantMessagesRemaining,
+    int MaxParticipantMessagesBeforeHandlerReply,
     int Revision,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
@@ -67,7 +84,8 @@ public sealed record CompetitionQuestionView(
 
 public sealed record CompetitionQuestionMutationResult(
     CompetitionQuestionView? Question,
-    CompetitionQuestionFailure? Failure = null);
+    CompetitionQuestionFailure? Failure = null,
+    int? Limit = null);
 
 public sealed record CreateCompetitionQuestionCommand(
     Guid CompetitionId,
@@ -143,17 +161,28 @@ public static class CompetitionQuestionRules
         if (!context.IsHuman)
             return CompetitionQuestionFailure.Forbidden;
         if (context.CompetitionStatus is not (CompetitionStatus.Running or CompetitionStatus.Paused))
-            return CompetitionQuestionFailure.LifecycleConflict;
+            return CompetitionQuestionFailure.CompetitionNotAcceptingQuestions;
         if (!context.HasApprovedTeam)
             return CompetitionQuestionFailure.TeamNotEligible;
-        if (context.Subject == CompetitionQuestionSubject.Challenge && !context.HasValidChallenge)
-            return CompetitionQuestionFailure.ChallengeNotFound;
-        if (context.Subject == CompetitionQuestionSubject.Platform && context.HasValidChallenge)
-            return CompetitionQuestionFailure.InvalidRequest;
+        if (context.Subject == CompetitionQuestionSubject.Challenge
+            && context.ChallengeReference != CompetitionQuestionChallengeReferenceState.Valid)
+            return CompetitionQuestionFailure.InvalidChallengeReference;
+        if (context.Subject == CompetitionQuestionSubject.Platform
+            && context.ChallengeReference != CompetitionQuestionChallengeReferenceState.Missing)
+            return CompetitionQuestionFailure.InvalidChallengeReference;
         if (!context.HasValidSubmission)
             return CompetitionQuestionFailure.SubmissionNotFound;
+        if (context.ActiveQuestionCount >= context.MaxActiveQuestionsPerTeam)
+            return CompetitionQuestionFailure.TeamActiveQuestionLimitReached;
         return null;
     }
+
+    public static CompetitionQuestionFailure? ValidateParticipantMessageLimit(
+        int participantMessagesSinceHandlerReply,
+        int maximumMessages) =>
+        participantMessagesSinceHandlerReply >= maximumMessages
+            ? CompetitionQuestionFailure.ParticipantMessageLimitReached
+            : null;
 
     public static CompetitionQuestionFailure? ValidateText(string title, string body)
     {
@@ -183,14 +212,14 @@ public static class CompetitionQuestionRules
     public static CompetitionQuestionStatus? StatusAfterMessage(
         CompetitionQuestionStatus current,
         CompetitionQuestionParticipantRole actor) =>
-        (current, actor) switch
+        (current, IsHandler(actor), IsParticipant(actor)) switch
         {
-            (CompetitionQuestionStatus.Closed, _) => null,
+            (CompetitionQuestionStatus.Closed, _, _) => null,
             (CompetitionQuestionStatus.Pending or CompetitionQuestionStatus.Replied,
-                CompetitionQuestionParticipantRole.Handler) => CompetitionQuestionStatus.Replied,
+                true, _) => CompetitionQuestionStatus.Replied,
             (CompetitionQuestionStatus.Replied or CompetitionQuestionStatus.Resolved,
-                CompetitionQuestionParticipantRole.Asker) => CompetitionQuestionStatus.Pending,
-            (CompetitionQuestionStatus.Pending, CompetitionQuestionParticipantRole.Asker) =>
+                _, true) => CompetitionQuestionStatus.Pending,
+            (CompetitionQuestionStatus.Pending, _, true) =>
                 CompetitionQuestionStatus.Pending,
             _ => null
         };
@@ -202,21 +231,34 @@ public static class CompetitionQuestionRules
     {
         if (current == target || current == CompetitionQuestionStatus.Closed)
             return false;
-        return actor switch
+        if (IsParticipant(actor))
         {
-            CompetitionQuestionParticipantRole.Asker =>
-                current == CompetitionQuestionStatus.Replied
-                && target == CompetitionQuestionStatus.Resolved,
-            CompetitionQuestionParticipantRole.Handler => target switch
+            return current == CompetitionQuestionStatus.Replied
+                && target == CompetitionQuestionStatus.Resolved;
+        }
+        if (IsHandler(actor))
+        {
+            return target switch
             {
                 CompetitionQuestionStatus.Resolved =>
                     current is CompetitionQuestionStatus.Pending or CompetitionQuestionStatus.Replied,
                 CompetitionQuestionStatus.Closed => true,
                 _ => false
-            },
-            _ => false
-        };
+            };
+        }
+        return false;
     }
+
+    public static bool IsParticipant(CompetitionQuestionParticipantRole role) =>
+        role is CompetitionQuestionParticipantRole.Asker
+            or CompetitionQuestionParticipantRole.Participant;
+
+    public static bool IsHandler(CompetitionQuestionParticipantRole role) =>
+        role is CompetitionQuestionParticipantRole.Handler
+            or CompetitionQuestionParticipantRole.Judge
+            or CompetitionQuestionParticipantRole.ChallengeOwner
+            or CompetitionQuestionParticipantRole.CompetitionManager
+            or CompetitionQuestionParticipantRole.PlatformAdministrator;
 
     public static int NormalizeLimit(int limit) => Math.Clamp(limit, 1, MaximumListLimit);
 
@@ -237,7 +279,9 @@ public static class CompetitionQuestionRules
     }
 }
 
-public sealed class CreateCompetitionQuestion(ICompetitionQuestionStore store)
+public sealed class CreateCompetitionQuestion(
+    ICompetitionQuestionStore store,
+    ILogger<CreateCompetitionQuestion> logger)
 {
     public Task<CompetitionQuestionMutationResult> ExecuteAsync(
         CreateCompetitionQuestionCommand command,
@@ -246,18 +290,35 @@ public sealed class CreateCompetitionQuestion(ICompetitionQuestionStore store)
         if (!Enum.IsDefined(command.Subject)
             || command.CompetitionId == Guid.Empty
             || command.ActorUserId == Guid.Empty)
+        {
+            LogFailure(CompetitionQuestionFailure.InvalidRequest, command);
             return Task.FromResult(new CompetitionQuestionMutationResult(
                 null,
                 CompetitionQuestionFailure.InvalidRequest));
+        }
         var textFailure = CompetitionQuestionRules.ValidateText(command.Title, command.Body);
         if (textFailure is not null)
+        {
+            LogFailure(textFailure.Value, command);
             return Task.FromResult(new CompetitionQuestionMutationResult(null, textFailure));
+        }
         return store.CreateAsync(command with
         {
             Title = command.Title.Trim(),
             Body = command.Body.Trim()
         }, ct);
     }
+
+    private void LogFailure(
+        CompetitionQuestionFailure failure,
+        CreateCompetitionQuestionCommand command) =>
+        logger.LogWarning(
+            "Competition question mutation rejected. failureCode={FailureCode} competitionId={CompetitionId} questionId={QuestionId} teamId={TeamId} userId={UserId}",
+            failure,
+            command.CompetitionId,
+            null,
+            null,
+            command.ActorUserId);
 }
 
 public sealed class ListCompetitionQuestions(ICompetitionQuestionStore store)
@@ -281,21 +342,40 @@ public sealed class GetCompetitionQuestion(ICompetitionQuestionStore store)
         store.FindAsync(competitionId, questionId, actorUserId, ct);
 }
 
-public sealed class AddCompetitionQuestionMessage(ICompetitionQuestionStore store)
+public sealed class AddCompetitionQuestionMessage(
+    ICompetitionQuestionStore store,
+    ILogger<AddCompetitionQuestionMessage> logger)
 {
     public Task<CompetitionQuestionMutationResult> ExecuteAsync(
         AddCompetitionQuestionMessageCommand command,
         CancellationToken ct = default)
     {
         if (command.ExpectedRevision < 0)
+        {
+            LogFailure(CompetitionQuestionFailure.InvalidRequest, command);
             return Task.FromResult(new CompetitionQuestionMutationResult(
                 null,
                 CompetitionQuestionFailure.InvalidRequest));
+        }
         var failure = CompetitionQuestionRules.ValidateMessage(command.Body);
         if (failure is not null)
+        {
+            LogFailure(failure.Value, command);
             return Task.FromResult(new CompetitionQuestionMutationResult(null, failure));
+        }
         return store.AddMessageAsync(command with { Body = command.Body.Trim() }, ct);
     }
+
+    private void LogFailure(
+        CompetitionQuestionFailure failure,
+        AddCompetitionQuestionMessageCommand command) =>
+        logger.LogWarning(
+            "Competition question mutation rejected. failureCode={FailureCode} competitionId={CompetitionId} questionId={QuestionId} teamId={TeamId} userId={UserId}",
+            failure,
+            command.CompetitionId,
+            command.QuestionId,
+            null,
+            command.ActorUserId);
 }
 
 public sealed class ChangeCompetitionQuestionStatus(ICompetitionQuestionStore store)

@@ -17,8 +17,10 @@ public sealed class CompetitionQuestionRulesTests
             CompetitionStatus: status,
             HasApprovedTeam: true,
             Subject: CompetitionQuestionSubject.Challenge,
-            HasValidChallenge: true,
-            HasValidSubmission: true));
+            ChallengeReference: CompetitionQuestionChallengeReferenceState.Valid,
+            HasValidSubmission: true,
+            ActiveQuestionCount: 0,
+            MaxActiveQuestionsPerTeam: 5));
 
         await Assert.That(result).IsNull();
     }
@@ -34,11 +36,13 @@ public sealed class CompetitionQuestionRulesTests
             status,
             true,
             CompetitionQuestionSubject.Platform,
+            CompetitionQuestionChallengeReferenceState.Missing,
             true,
-            true));
+            0,
+            5));
 
         await Assert.That(result)
-            .IsEqualTo(CompetitionQuestionFailure.LifecycleConflict);
+            .IsEqualTo(CompetitionQuestionFailure.CompetitionNotAcceptingQuestions);
     }
 
     [Test]
@@ -49,19 +53,60 @@ public sealed class CompetitionQuestionRulesTests
             CompetitionStatus.Running,
             true,
             CompetitionQuestionSubject.Challenge,
-            false,
-            true));
+            CompetitionQuestionChallengeReferenceState.Missing,
+            true,
+            0,
+            5));
         var platformFailure = CompetitionQuestionRules.ValidateCreation(new(
             true,
             CompetitionStatus.Running,
             true,
             CompetitionQuestionSubject.Platform,
-            false,
-            true));
+            CompetitionQuestionChallengeReferenceState.Missing,
+            true,
+            0,
+            5));
+        var platformWithChallengeFailure = CompetitionQuestionRules.ValidateCreation(new(
+            true,
+            CompetitionStatus.Running,
+            true,
+            CompetitionQuestionSubject.Platform,
+            CompetitionQuestionChallengeReferenceState.Valid,
+            true,
+            0,
+            5));
 
         await Assert.That(challengeFailure)
-            .IsEqualTo(CompetitionQuestionFailure.ChallengeNotFound);
+            .IsEqualTo(CompetitionQuestionFailure.InvalidChallengeReference);
         await Assert.That(platformFailure).IsNull();
+        await Assert.That(platformWithChallengeFailure)
+            .IsEqualTo(CompetitionQuestionFailure.InvalidChallengeReference);
+    }
+
+    [Test]
+    public async Task Creation_EnforcesTeamActiveQuestionLimit()
+    {
+        var result = CompetitionQuestionRules.ValidateCreation(new(
+            true,
+            CompetitionStatus.Running,
+            true,
+            CompetitionQuestionSubject.Platform,
+            CompetitionQuestionChallengeReferenceState.Missing,
+            true,
+            5,
+            5));
+
+        await Assert.That(result)
+            .IsEqualTo(CompetitionQuestionFailure.TeamActiveQuestionLimitReached);
+    }
+
+    [Test]
+    public async Task ParticipantMessageLimit_CountsInitialQuestion()
+    {
+        await Assert.That(CompetitionQuestionRules.ValidateParticipantMessageLimit(2, 3))
+            .IsNull();
+        await Assert.That(CompetitionQuestionRules.ValidateParticipantMessageLimit(3, 3))
+            .IsEqualTo(CompetitionQuestionFailure.ParticipantMessageLimitReached);
     }
 
     [Test]

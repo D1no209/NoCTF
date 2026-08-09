@@ -346,6 +346,9 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     deletedAt?: string | null;
     administrationRole?: NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol | null;
+    maxActiveQuestionsPerTeam?: number;
+    maxParticipantMessagesBeforeHandlerReply?: number;
+    allowChallengeOwnersToHandleQuestions?: boolean;
 };
 
 export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
@@ -435,7 +438,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'SubmissionReceived' | 'SubmissionEvaluated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedSubmissionFlagAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'ProtectedCompetitionExportCreated' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'SubmissionReceived' | 'SubmissionEvaluated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedSubmissionFlagAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'ProtectedCompetitionExportCreated' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -557,10 +560,15 @@ export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse = {
     teamDisplayName?: string | null;
     submissionId?: string | null;
     subject?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode;
+    challengeTitle?: string | null;
     title?: string;
     body?: string;
     status?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode;
     access?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode;
+    lastActorDisplayName?: string;
+    lastActorRole?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode;
+    participantMessagesRemaining?: number;
+    maxParticipantMessagesBeforeHandlerReply?: number;
     revision?: number;
     createdAt?: string;
     updatedAt?: string;
@@ -575,6 +583,8 @@ export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode =
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode = 'Pending' | 'Replied' | 'Resolved' | 'Closed';
 
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode = 'Asker' | 'Observer' | 'Handler';
+
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode = 'Asker' | 'Handler' | 'Participant' | 'Judge' | 'ChallengeOwner' | 'CompetitionManager' | 'PlatformAdministrator';
 
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryResponse = {
     id?: string;
@@ -591,14 +601,13 @@ export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryResponse
 
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionEntryKindCode = 'Message' | 'StatusTransition';
 
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode = 'Asker' | 'Handler';
-
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse = {
     code?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode;
     current?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse | null;
+    limit?: number | null;
 };
 
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode = 'InvalidRequest' | 'SpamRejected' | 'LifecycleConflict' | 'TeamNotEligible' | 'RevisionConflict' | 'InvalidTransition' | 'QuestionClosed';
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode = 'InvalidRequest' | 'SpamRejected' | 'CompetitionNotAcceptingQuestions' | 'TeamNotEligible' | 'InvalidChallengeReference' | 'TeamActiveQuestionLimitReached' | 'ParticipantMessageLimitReached' | 'RevisionConflict' | 'InvalidTransition' | 'QuestionClosed';
 
 export type NoCtfapiEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest = {
     body: string;
@@ -1208,6 +1217,9 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest 
     allowTeamRegistrationWhileRunning?: boolean;
     maxTeamMembers?: number;
     maxConcurrentRuntimeInstancesPerTeam: number;
+    maxActiveQuestionsPerTeam?: number;
+    maxParticipantMessagesBeforeHandlerReply?: number;
+    allowChallengeOwnersToHandleQuestions?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsGenerateMissingFlagsResponse = {
@@ -1288,6 +1300,9 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest 
     allowTeamRegistrationWhileRunning?: boolean;
     maxTeamMembers?: number;
     maxConcurrentRuntimeInstancesPerTeam: number;
+    maxActiveQuestionsPerTeam?: number;
+    maxParticipantMessagesBeforeHandlerReply?: number;
+    allowChallengeOwnersToHandleQuestions?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityFailureResponse = {
@@ -3382,6 +3397,7 @@ export type CreateCompetitionQuestionErrors = {
      */
     404: unknown;
     409: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse;
+    422: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse;
 };
 
 export type CreateCompetitionQuestionError = CreateCompetitionQuestionErrors[keyof CreateCompetitionQuestionErrors];
