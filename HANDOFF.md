@@ -309,6 +309,32 @@
   当前没有仓库级 ESLint 配置或 lint script，因此没有伪造 lint 结果。Nuxt 构建只保留既有
   chunk/Nitro 第三方警告。生产浏览器只做非破坏性页面验收，不会为验证按钮处置真实作弊证据。
 
+## 2026-08-09 Alpha.8 到期环境、题目修订与作弊处置生产部署
+
+- 用户明确授权后，`5adf9926`、`24e961c7`、`ac46286c` 与 `810630c1` 已从生产基线
+  `865af7fd` 无冲突快进推送至远程 `main`；生产 `/root/NoCTF` 通过带先决提交校验的增量 Git
+  bundle 快进到 `810630c1`。既有未跟踪 `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、
+  PostgreSQL/Redis/上传卷及题目容器均未改写。
+- 从干净 worktree 构建的 API/新前端镜像为
+  `sha256:d5a558116c0456e596f02bb9b4646f592b5e31948f9f6ca3c1ad46c153b89a55`，OCI revision 为
+  `810630c17ac5a842d5fe2b995aa7be796fbcbaf3`、version 为 `0.1.0-alpha.8`。镜像压缩包与 Git
+  bundle 均在本地和服务器端核对 SHA-256 一致后才加载。差异不包含 migration/model snapshot，
+  Compose 静态配置通过，因此只以保留旧镜像回滚标签的方式重建 `deploy-backend-1`；Worker、Runner、
+  PostgreSQL 和 Redis 的镜像及启动时间均未改变。
+- 新 API 第 3 次健康轮询进入 healthy，restart count 为 0；程序集版本为 `0.1.0-alpha.8`，部署后的
+  Nuxt chunk 已确认包含“理由至少需要 8 个字符”新交互。HTTPS `/`、`/health`、
+  `/admin/competitions` 与目标比赛 `/cheats` 的浏览器式 HTML 请求均返回 200。新容器启动后的
+  `fail:`、`crit:`、Fatal、Unhandled、Exception 计数均为 0；仅保留既有临时 DataProtection key
+  与 Hosting 端口覆盖警告。
+- 内置浏览器导航再次超时并重置连接；Chrome 正在运行，但当前配置未安装 ChatGPT 浏览器扩展，
+  因而没有伪造自动点击结果，也没有创建或处置任何真实作弊事件。交互行为由新版 ClientApp 22/22
+  测试、类型检查、生产静态生成、镜像内产物指纹和生产 HTTPS 路由共同验收；后续可由管理员在有
+  可丢弃测试事件时补一次人工点击检查。
+- 已删除服务器端 265 MB 传输目录；旧 API 镜像已无标签且未被任何容器引用，Docker 已自动清除。
+  根分区最终为 66% 使用、约 14 GB 可用。没有执行广域 Docker prune，也未删除数据库、Redis、上传
+  文件、题目镜像、运行时容器或任何业务数据。本部署文档提交只需同步生产 checkout，无需再次迁移
+  或重建服务。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
