@@ -150,7 +150,7 @@ public sealed class ListCheatIncidentsEndpoint(
             user.UserId,
             competitionId,
             cancellationToken);
-        var canConfirm = await authorizer.CanModerateAsync(
+        var canConfirm = await authorizer.CanJudgeAsync(
             user.UserId,
             competitionId,
             cancellationToken);

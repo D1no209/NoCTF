@@ -36,6 +36,15 @@ public enum LeaderboardVisibilityProtocol
     Blackout
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionAdministrationRoleProtocol>))]
+public enum CompetitionAdministrationRoleProtocol
+{
+    Owner,
+    Manager,
+    Judge,
+    Observer
+}
+
 [Mapper]
 public static partial class CompetitionProtocolMapper
 {
@@ -71,7 +80,8 @@ public sealed record CompetitionResponse(
     int MaxConcurrentRuntimeInstancesPerTeam,
     Guid OwnerId,
     LeaderboardVisibilityProtocol LeaderboardVisibility,
-    DateTimeOffset? DeletedAt);
+    DateTimeOffset? DeletedAt,
+    CompetitionAdministrationRoleProtocol? AdministrationRole = null);
 
 internal static class CompetitionMapper
 {

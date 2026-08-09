@@ -49,7 +49,7 @@ public sealed class BanTeamEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         request.TeamId = Route<Guid>("teamId");
-        if (!await authorizer.CanModerateAsync(userContext.UserId, request.CompetitionId, cancellationToken))
+        if (!await authorizer.CanJudgeAsync(userContext.UserId, request.CompetitionId, cancellationToken))
             return TypedResults.Forbid();
         var result = await moderate.ExecuteAsync(new(
             request.CompetitionId,

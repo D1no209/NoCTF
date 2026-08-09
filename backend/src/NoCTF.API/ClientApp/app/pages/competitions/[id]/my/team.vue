@@ -289,7 +289,7 @@ function setAppealOpen(open: boolean) {
         </CardContent>
       </Card>
 
-      <Card v-if="team.isBanned">
+      <Card v-if="team.isBanned" id="ban-appeal" class="scroll-mt-24">
         <CardHeader>
           <CardTitle class="text-base">封禁处理</CardTitle>
           <CardDescription>你的队伍当前处于封禁状态,可提交申诉说明情况</CardDescription>

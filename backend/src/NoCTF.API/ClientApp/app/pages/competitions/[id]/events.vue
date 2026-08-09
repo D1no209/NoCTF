@@ -8,10 +8,12 @@ const route = useRoute()
 const competitionId = route.params.id as string
 const ctx = inject(competitionContextKey)!
 
-const kind = ref<string>('all')
+const initialKind = typeof route.query.kind === 'string' ? route.query.kind : 'all'
+const kind = ref<string>(initialKind)
 
 const kindOptions = [
   { value: 'all', label: '全部动态' },
+  { value: 'CompetitionLifecycleChanged', label: '比赛状态' },
   { value: 'AnnouncementPublished', label: '公告' }, { value: 'ChallengePublished', label: '题目发布' }, { value: 'HintPublished', label: '提示发布' },
   { value: 'FirstBloodAwarded', label: '一血' }, { value: 'SecondBloodAwarded', label: '二血' }, { value: 'ThirdBloodAwarded', label: '三血' },
   { value: 'SubmissionEvaluated', label: '提交评测' }, { value: 'TeamRegistered', label: '队伍报名' }, { value: 'TeamBanned', label: '队伍封禁' }, { value: 'QuestionReplied', label: '咨询回复' },

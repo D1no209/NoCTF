@@ -94,7 +94,7 @@ public sealed class GetCheatIncidentEndpoint(
             cancellationToken);
         if (detail is null)
             return TypedResults.NotFound();
-        var canConfirm = await authorizer.CanModerateAsync(
+        var canConfirm = await authorizer.CanJudgeAsync(
             user.UserId,
             request.CompetitionId,
             cancellationToken);

@@ -215,5 +215,7 @@ describe('cheat incident page wiring', () => {
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')
     expect(page).toContain('onReconnected: () => void refreshLatest()')
     expect(page).toContain('unwatchCompetition?.()')
+    expect(page).toContain('v-if="detail.canConfirm || detail.canDismiss || detail.canCorrect"')
+    expect(page).not.toContain('v-if="canWrite && (detail.canConfirm || detail.canDismiss || detail.canCorrect)"')
   })
 })

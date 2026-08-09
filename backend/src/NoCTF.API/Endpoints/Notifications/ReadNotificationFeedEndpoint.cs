@@ -103,7 +103,8 @@ public sealed class ReadNotificationFeedEndpoint(
                 item.RelatedType,
                 item.RelatedId,
                 item.ReplyToId,
-                item.SentAt)).ToArray(),
+                item.SentAt,
+                item.SourceDisplayName)).ToArray(),
             Encode(cursorScope, next)));
     }
 

@@ -1725,6 +1725,15 @@
         "operationId": "ListNotificationsEndpoint",
         "parameters": [
           {
+            "name": "competitionId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
             "name": "cursor",
             "in": "query",
             "schema": {
@@ -8884,7 +8893,7 @@
           "Admin"
         ],
         "summary": "Confirms one incident and bans its source team.",
-        "description": "Administrator, owner, and manager only. The public competition notification contains no Flag or private evidence.",
+        "description": "Administrator, owner, manager, and judge only. The public competition notification contains no Flag or private evidence.",
         "operationId": "AdminConfirmCheatIncident",
         "parameters": [
           {
@@ -12777,6 +12786,10 @@
           "sentAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "sourceDisplayName": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -13050,6 +13063,14 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "administrationRole": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionAdministrationRoleProtocol"
+              }
+            ]
           }
         }
       },
@@ -13101,6 +13122,22 @@
           "Normal",
           "Frozen",
           "Blackout"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsCompetitionAdministrationRoleProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Owner",
+          "Manager",
+          "Judge",
+          "Observer"
+        ],
+        "enum": [
+          "Owner",
+          "Manager",
+          "Judge",
+          "Observer"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsGetCompetitionRequest": {
@@ -13254,6 +13291,11 @@
           },
           "direction": {
             "type": "string"
+          },
+          "currentScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },

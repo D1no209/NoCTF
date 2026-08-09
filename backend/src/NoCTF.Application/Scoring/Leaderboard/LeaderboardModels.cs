@@ -29,7 +29,8 @@ public sealed record LeaderboardCellFact(
 public sealed record LeaderboardChallengeInfo(
     Guid CompetitionChallengeId,
     string Title,
-    string Direction);
+    string Direction,
+    long? CurrentScore);
 
 public sealed record LeaderboardEntry(
     int Rank,

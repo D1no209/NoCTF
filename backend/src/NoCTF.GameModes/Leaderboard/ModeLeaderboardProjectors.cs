@@ -29,11 +29,14 @@ internal static class CtfLeaderboardProjection
 
     public static GameModeLeaderboardProjection Project(LeaderboardProjectionInput input)
     {
-        var (entries, cells) = ProjectCore(input);
-        return new(entries, cells);
+        var (entries, cells, currentScores) = ProjectCore(input);
+        return new(entries, cells, currentScores);
     }
 
-    private static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells)
+    private static (
+        IReadOnlyList<LeaderboardEntry> Entries,
+        IReadOnlyList<LeaderboardCellFact> Cells,
+        IReadOnlyDictionary<Guid, long> CurrentScores)
         ProjectCore(LeaderboardProjectionInput input)
     {
         var validTeams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
@@ -55,6 +58,23 @@ internal static class CtfLeaderboardProjection
         var currentSolveCounts = solves
             .GroupBy(solve => solve.CompetitionChallengeId!.Value)
             .ToDictionary(group => group.Key, group => group.Count());
+        var currentScores = challenges.ToDictionary(
+            pair => pair.Key,
+            pair =>
+            {
+                var configuration = ParseChallenge(pair.Value.ConfigurationJson);
+                var points = configuration.Points ?? defaults.DefaultPoints;
+                var expression = configuration.ScoreExpression
+                    ?? defaults.ScoreExpression
+                    ?? DefaultScoreExpression;
+                var solveCount = Math.Max(1, currentSolveCounts.GetValueOrDefault(pair.Key));
+                return ScoreExpression.Evaluate(expression, new(
+                    points.InitialPoints,
+                    points.MinimumPoints,
+                    solveCount,
+                    validTeams.Count,
+                    points.DecayFactor));
+            });
 
         var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points, int SolveOrdinal)>>();
         var solveNumber = new Dictionary<Guid, int>();
@@ -152,7 +172,7 @@ internal static class CtfLeaderboardProjection
                 item.Fact.ReceivedAt,
                 string.IsNullOrWhiteSpace(item.Fact.SubmitterName) ? null : item.Fact.SubmitterName)))
             .ToList());
-        return (entries, cells);
+        return (entries, cells, currentScores);
     }
 
     private static long BloodRewardAt(

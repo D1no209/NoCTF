@@ -19,7 +19,7 @@ import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
 
-const { competitionId, canWrite } = useCompetitionAdmin()
+const { competitionId, canJudge, canWrite } = useCompetitionAdmin()
 
 const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
 const loading = ref(true)
@@ -200,7 +200,7 @@ onMounted(() => {
             <TableHead class="w-28">注册状态</TableHead>
             <TableHead class="w-28">封禁状态</TableHead>
             <TableHead class="w-44">注册时间</TableHead>
-            <TableHead v-if="canWrite" class="w-64 text-right">操作</TableHead>
+            <TableHead v-if="canWrite || canJudge" class="w-64 text-right">操作</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -217,16 +217,16 @@ onMounted(() => {
               <span v-else class="text-muted-foreground">—</span>
             </TableCell>
             <TableCell>{{ adminFormatDateTime(t.registeredAt) }}</TableCell>
-            <TableCell v-if="canWrite" class="text-right">
+            <TableCell v-if="canWrite || canJudge" class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
-                <template v-if="t.registrationStatus === 'Pending'">
+                <template v-if="canWrite && t.registrationStatus === 'Pending'">
                   <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">通过</Button>
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">拒绝</Button>
                 </template>
-                <template v-if="!t.isBanned">
+                <template v-if="canJudge && !t.isBanned">
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="openBan(t, 'ban')">封禁</Button>
                 </template>
-                <template v-else>
+                <template v-else-if="canWrite">
                   <Button type="button" variant="outline" size="sm" :disabled="pendingId === t.id" @click.stop="openUnban(t)">解封</Button>
                   <Button type="button" variant="ghost" size="sm" :disabled="pendingId === t.id" @click.stop="openBan(t, 'correct')">纠正封禁</Button>
                 </template>

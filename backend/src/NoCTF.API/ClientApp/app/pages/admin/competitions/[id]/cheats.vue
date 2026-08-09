@@ -21,7 +21,8 @@ import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
 
-const { competitionId, canWrite } = useCompetitionAdmin()
+const { competitionId } = useCompetitionAdmin()
+const route = useRoute()
 
 // ---- Filters + list ----
 type CheatIncidentStatus = NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol
@@ -157,6 +158,8 @@ let unwatchCompetition: (() => void) | null = null
 
 onMounted(() => {
   void refreshLatest()
+  const incidentId = typeof route.query.incident === 'string' ? route.query.incident : null
+  if (incidentId) void openDetail(incidentId)
   unwatchCompetition = watchCompetition(competitionId, {
     competitionEventChanged: () => void refreshLatest(),
     onReconnected: () => void refreshLatest(),
@@ -289,7 +292,7 @@ onBeforeUnmount(() => {
               {{ detail.submittedFlag }}
             </div>
           </div>
-          <div v-if="canWrite && (detail.canConfirm || detail.canDismiss || detail.canCorrect)" class="flex flex-wrap gap-2 pt-2">
+          <div v-if="detail.canConfirm || detail.canDismiss || detail.canCorrect" class="flex flex-wrap gap-2 pt-2">
             <Button v-if="detail.canConfirm" variant="destructive" size="sm" @click="openAction('confirm')">
               确认作弊(封禁)
             </Button>

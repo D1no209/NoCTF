@@ -288,6 +288,7 @@ export type NoCtfapiEndpointsNotificationsNotificationResponse = {
     relatedId?: string | null;
     replyToId?: string | null;
     sentAt?: string;
+    sourceDisplayName?: string | null;
 };
 
 export type NoCtfDomainNotificationsNotificationSourceType = 0 | 1 | 2 | 3 | 4;
@@ -344,6 +345,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     ownerId?: string;
     leaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     deletedAt?: string | null;
+    administrationRole?: NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
@@ -351,6 +353,8 @@ export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awd
 export type NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol = 'Draft' | 'Visible' | 'Published' | 'Running' | 'Paused' | 'Finished';
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol = 'Normal' | 'Frozen' | 'Blackout';
+
+export type NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol = 'Owner' | 'Manager' | 'Judge' | 'Observer';
 
 export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
     [key: string]: never;
@@ -394,6 +398,7 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse = {
     competitionChallengeId?: string;
     title?: string;
     direction?: string;
+    currentScore?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';
@@ -2631,6 +2636,7 @@ export type ListNotificationsEndpointData = {
     body?: never;
     path?: never;
     query: {
+        competitionId?: string | null;
         cursor?: string | null;
         limit: number;
     };

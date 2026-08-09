@@ -5,7 +5,7 @@ import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
 } from '~/api'
-import { normalizeChallengeKey } from '~/components/leaderboard/types'
+import { bloodRankLabel, normalizeChallengeKey } from '~/components/leaderboard/types'
 
 type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
 
@@ -77,6 +77,8 @@ onBeforeUnmount(() => {
 interface ChallengeProgress {
   solveCount: number
   solvedByMyTeam: boolean
+  myScore: number | null
+  bloodRank: string | null
 }
 
 const progressByChallenge = computed(() => {
@@ -88,10 +90,18 @@ const progressByChallenge = computed(() => {
     for (const cell of entry.cells ?? []) {
       const key = normalizeChallengeKey(cell.competitionChallengeId)
       if (!key) continue
-      const current = progress.get(key) ?? { solveCount: 0, solvedByMyTeam: false }
+      const current = progress.get(key) ?? {
+        solveCount: 0,
+        solvedByMyTeam: false,
+        myScore: null,
+        bloodRank: null,
+      }
       current.solveCount += 1
-      if (entry.teamId && entry.teamId === myTeamId.value)
+      if (entry.teamId && entry.teamId === myTeamId.value) {
         current.solvedByMyTeam = true
+        current.myScore = cell.score ?? null
+        current.bloodRank = cell.bloodRank ?? null
+      }
       progress.set(key, current)
     }
   }
@@ -102,7 +112,21 @@ function progressFor(challengeId?: string): ChallengeProgress | null {
   if (!leaderboard.value || leaderboard.value.dataScope === LeaderboardDataScope.Hidden)
     return null
   return progressByChallenge.value.get(normalizeChallengeKey(challengeId))
-    ?? { solveCount: 0, solvedByMyTeam: false }
+    ?? { solveCount: 0, solvedByMyTeam: false, myScore: null, bloodRank: null }
+}
+
+const currentScoreByChallenge = computed(() => new Map(
+  (leaderboard.value?.challenges ?? []).map(challenge => [
+    normalizeChallengeKey(challenge.competitionChallengeId),
+    challenge.currentScore,
+  ]),
+))
+
+function currentScoreFor(challenge: Challenge): number | null {
+  if (!leaderboard.value || leaderboard.value.dataScope === LeaderboardDataScope.Hidden)
+    return challenge.baseScore ?? null
+  const score = currentScoreByChallenge.value.get(normalizeChallengeKey(challenge.id))
+  return score ?? challenge.baseScore ?? null
 }
 
 const groups = computed(() => {
@@ -178,16 +202,25 @@ const groups = computed(() => {
             </CardHeader>
             <CardContent class="relative flex items-end justify-between gap-3">
               <div class="flex flex-col items-start gap-2">
-                <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary">
+                <Badge v-if="currentScoreFor(challenge) === null" variant="secondary">
                   分数隐藏
                 </Badge>
                 <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
-                  {{ challenge.baseScore }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
+                  {{ currentScoreFor(challenge) }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
                 </span>
+                <span v-if="currentScoreFor(challenge) !== null" class="text-xs text-muted-foreground">当前动态分值</span>
                 <Badge v-if="progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
                   <Flag class="size-3" />
-                  已解出
+                  {{ progressFor(challenge.id)?.bloodRank
+                    ? bloodRankLabel[String(progressFor(challenge.id)?.bloodRank)]
+                    : '已解出' }}
                 </Badge>
+                <span
+                  v-if="progressFor(challenge.id)?.myScore !== null"
+                  class="text-xs text-muted-foreground"
+                >
+                  本队结算 {{ progressFor(challenge.id)?.myScore }} pts
+                </span>
               </div>
               <span
                 v-if="progressFor(challenge.id)"
