@@ -32,10 +32,14 @@ public static class ServiceRegistration
         this IServiceCollection services,
         IConfiguration configuration,
         bool includeInfrastructure,
-        bool development = false)
+        bool development = false,
+        IReadOnlyCollection<System.Reflection.Assembly>? endpointAssemblies = null)
     {
         services.AddProblemDetails();
-        services.AddFastEndpoints();
+        if (endpointAssemblies is null)
+            services.AddFastEndpoints();
+        else
+            services.AddFastEndpoints(options => options.Assemblies = endpointAssemblies);
         services.SwaggerDocument(options =>
         {
             options.EnableJWTBearerAuth = false;
@@ -106,6 +110,8 @@ public static class ServiceRegistration
             services.AddSingleton<IBackendMessagePublisher, SwaggerBackendMessagePublisher>();
             services.AddScoped<ILeaderboardCache, SwaggerLeaderboardCache>();
             services.AddSingleton<IObjectStorage, SwaggerObjectStorage>();
+            services.AddScoped<IManagedFileUploadRegistry, SwaggerManagedFileUploadRegistry>();
+            services.AddScoped<ManagedFileUploads>();
             services.AddSingleton<IAvatarImageProcessor, SwaggerAvatarImageProcessor>();
             services.AddScoped<IPasswordResetStore, SwaggerPasswordResetStore>();
             services.AddScoped<RequestPasswordReset>();

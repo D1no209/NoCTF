@@ -6,6 +6,7 @@
 
 - Durable Inbox/Outbox；
 - API、Worker、Runner 的 durable queue；
+- Host 只是上述角色的组合边界；同进程角色之间仍走相同 durable queue，不存在旁路内存总线；
 - Scheduled Message；
 - Dead Letter。
 

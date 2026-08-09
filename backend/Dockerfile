@@ -20,9 +20,11 @@ WORKDIR /src/backend
 RUN dotnet restore src/NoCTF.API/NoCTF.API.csproj
 RUN dotnet restore src/NoCTF.Worker/NoCTF.Worker.csproj
 RUN dotnet restore src/NoCTF.Runner/NoCTF.Runner.csproj
+RUN dotnet restore src/NoCTF.Host/NoCTF.Host.csproj
 RUN dotnet publish src/NoCTF.API/NoCTF.API.csproj -c Release -o /app/api /p:BuildSpaOnPublish=false
 RUN dotnet publish src/NoCTF.Worker/NoCTF.Worker.csproj -c Release -o /app/worker
 RUN dotnet publish src/NoCTF.Runner/NoCTF.Runner.csproj -c Release -o /app/runner
+RUN dotnet publish src/NoCTF.Host/NoCTF.Host.csproj -c Release -o /app/host /p:BuildSpaOnPublish=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 RUN apt-get update \
@@ -54,3 +56,15 @@ COPY --from=kompose-cli /usr/local/bin/kompose /usr/local/bin/kompose
 USER 1654
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "NoCTF.Runner.dll"]
+
+FROM runtime AS host
+WORKDIR /app
+COPY --from=build /app/host .
+COPY --from=frontend-build /src/ClientApp/.output/public ./wwwroot
+COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
+COPY --from=kompose-cli /usr/local/bin/kompose /usr/local/bin/kompose
+RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
+USER 1654
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "NoCTF.Host.dll"]

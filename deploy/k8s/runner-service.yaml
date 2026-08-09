@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: runner-headless
+  namespace: noctf
+  labels:
+    app: runner
+    app.kubernetes.io/part-of: noctf
+spec:
+  clusterIP: None
+  selector:
+    app: runner
+  ports:
+    - name: health
+      port: 8080
+      targetPort: 8080

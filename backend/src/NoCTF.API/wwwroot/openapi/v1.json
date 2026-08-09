@@ -15544,12 +15544,14 @@
         "x-enumNames": [
           "Api",
           "Worker",
-          "Runner"
+          "Runner",
+          "Host"
         ],
         "enum": [
           "Api",
           "Worker",
-          "Runner"
+          "Runner",
+          "Host"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformDeadLetterResponse": {

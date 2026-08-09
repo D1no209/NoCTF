@@ -9,7 +9,8 @@ public enum PlatformLogService : short
 {
     Api,
     Worker,
-    Runner
+    Runner,
+    Host
 }
 
 public enum PlatformLogLevel : short

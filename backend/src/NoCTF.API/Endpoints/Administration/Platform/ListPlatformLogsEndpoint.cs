@@ -15,7 +15,7 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 public enum PlatformLogLevelProtocol { Trace, Debug, Information, Warning, Error, Critical }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformLogServiceProtocol>))]
-public enum PlatformLogServiceProtocol { Api, Worker, Runner }
+public enum PlatformLogServiceProtocol { Api, Worker, Runner, Host }
 
 public sealed class ListPlatformLogsRequest
 {

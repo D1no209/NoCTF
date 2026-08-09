@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <SpaRoot>../NoCTF.API/ClientApp/</SpaRoot>
+    <BuildSpaOnPublish Condition="'$(BuildSpaOnPublish)' == ''">true</BuildSpaOnPublish>
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../NoCTF.API/NoCTF.API.csproj" />
+    <ProjectReference Include="../NoCTF.Hosting/NoCTF.Hosting.csproj" />
+    <ProjectReference Include="../NoCTF.Worker/NoCTF.Worker.csproj" />
+    <ProjectReference Include="../NoCTF.Runner/NoCTF.Runner.csproj" />
+  </ItemGroup>
+  <Target Name="PublishRunNuxt"
+          AfterTargets="ComputeFilesToPublish"
+          Condition="'$(BuildSpaOnPublish)' == 'true'">
+    <Exec WorkingDirectory="$(SpaRoot)" Command="bun install --frozen-lockfile" />
+    <Exec WorkingDirectory="$(SpaRoot)" Command="bun run generate" />
+    <ItemGroup>
+      <ClientAppFiles Include="$(SpaRoot).output/public/**" />
+      <ResolvedFileToPublish Include="@(ClientAppFiles->'%(FullPath)')"
+                             Exclude="@(ResolvedFileToPublish)">
+        <RelativePath>wwwroot/%(RecursiveDir)%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+        <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+</Project>

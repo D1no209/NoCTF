@@ -23,7 +23,6 @@ data:
   Storage__PublicBaseUrl: "https://minio.noctf.local"
   Runner__Provider: "Kubernetes"
   Runner__Pool: "kubernetes"
-  Runner__Id: "kubernetes-runner-1"
   Runner__Capacity__MemoryBytes: "4294967296"
   Runner__Capacity__NanoCpus: "2000000000"
   Runner__Capacity__PidsLimit: "2048"

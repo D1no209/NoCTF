@@ -3,6 +3,7 @@
     <ProjectReference Include="../NoCTF.Application/NoCTF.Application.csproj" />
     <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
     <ProjectReference Include="../NoCTF.Infrastructure/NoCTF.Infrastructure.csproj" />
+    <ProjectReference Include="../NoCTF.Hosting/NoCTF.Hosting.csproj" />
     <ProjectReference Include="../NoCTF.Runtime.Docker/NoCTF.Runtime.Docker.csproj" />
     <ProjectReference Include="../NoCTF.Runtime.Kubernetes/NoCTF.Runtime.Kubernetes.csproj" />
     <ProjectReference Include="../NoCTF.Runtime.Libvirt/NoCTF.Runtime.Libvirt.csproj" />

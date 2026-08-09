@@ -17,3 +17,15 @@ internal sealed class SwaggerObjectStorage : IObjectStorage
         throw new NotSupportedException();
     public Task DeleteAsync(string objectKey, CancellationToken cancellationToken) => Task.CompletedTask;
 }
+
+internal sealed class SwaggerManagedFileUploadRegistry : IManagedFileUploadRegistry
+{
+    public Task RegisterAsync(
+        Guid fileId,
+        StoredObject metadata,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task AbandonAsync(Guid fileId, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+}
