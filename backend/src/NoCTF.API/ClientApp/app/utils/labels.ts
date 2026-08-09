@@ -157,6 +157,18 @@ export function notificationCompetitionId(
   return typeof content.competitionId === 'string' ? content.competitionId : null
 }
 
+export function notificationTargetPath(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+): string {
+  const competitionId = notificationCompetitionId(notification)
+  if (!competitionId)
+    return '/notifications'
+
+  return notification.kind === 'CheatIncidentDetected'
+    ? `/admin/competitions/${competitionId}/cheats`
+    : `/competitions/${competitionId}`
+}
+
 /** 通知文案(NoCTF.Domain.Notifications.NotificationKind),content 为松散 JSON。 */
 export function notificationText(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,

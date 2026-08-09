@@ -12,6 +12,10 @@ import type {
 import type { CheatIncidentResolutionRequest } from '~/composables/useCheatIncidentResolution'
 import { useCheatIncidentResolution } from '~/composables/useCheatIncidentResolution'
 import { watchCompetition } from '~/composables/useCompetitionHub'
+import {
+  defaultCheatIncidentQueryRange,
+  resolveCheatIncidentQueryRange,
+} from '~/lib/cheat-incident-query-range'
 import { createLatestPageRefresh } from '~/lib/latest-page-refresh'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
@@ -20,9 +24,15 @@ definePageMeta({ middleware: 'auth' })
 const { competitionId, canWrite } = useCompetitionAdmin()
 
 // ---- Filters + list ----
-const filterStatus = ref('')
+type CheatIncidentStatus = NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol
+type CheatIncidentStatusFilter = 'All' | CheatIncidentStatus
+
+const filterStatus = ref<CheatIncidentStatusFilter>('All')
 const filterFrom = ref('')
 const filterTo = ref('')
+const filterError = ref<string | null>(null)
+const appliedStatus = ref<CheatIncidentStatusFilter>('All')
+const appliedRange = ref(defaultCheatIncidentQueryRange())
 const pendingCount = ref<number | null>(null)
 
 const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
@@ -31,9 +41,9 @@ const { items, loading, error: listError, hasMore, loadMore, reset, initialized 
   const { data, error } = await adminListCheatIncidents({
     path: { competitionId },
     query: {
-      status: filterStatus.value === '' ? null : filterStatus.value as NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol,
-      from: localInputToIso(filterFrom.value) ?? '1970-01-01T00:00:00Z',
-      to: localInputToIso(filterTo.value) ?? '2999-12-31T23:59:59Z',
+      status: appliedStatus.value === 'All' ? null : appliedStatus.value,
+      from: appliedRange.value.from,
+      to: appliedRange.value.to,
       cursor,
       limit: 30,
     },
@@ -46,6 +56,15 @@ const { items, loading, error: listError, hasMore, loadMore, reset, initialized 
 const { loadNextPage, refreshLatest } = createLatestPageRefresh({ loadMore, reset })
 
 function applyFilters() {
+  const resolved = resolveCheatIncidentQueryRange(filterFrom.value, filterTo.value)
+  if (!resolved.range) {
+    filterError.value = resolved.error
+    return
+  }
+
+  filterError.value = null
+  appliedStatus.value = filterStatus.value
+  appliedRange.value = resolved.range
   void refreshLatest()
 }
 
@@ -159,6 +178,7 @@ onBeforeUnmount(() => {
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
+            <SelectItem value="All">全部</SelectItem>
             <SelectItem value="Pending">待处理</SelectItem>
             <SelectItem value="Confirmed">已确认</SelectItem>
             <SelectItem value="Dismissed">已驳回</SelectItem>
@@ -176,8 +196,12 @@ onBeforeUnmount(() => {
       </Badge>
     </div>
 
-    <Alert v-if="listError" variant="destructive">
-      <AlertDescription>{{ listError.message }}</AlertDescription>
+    <p class="text-xs text-muted-foreground">
+      时间全部留空时查询最近 31 天；手动筛选时需同时填写起止时间，范围最长 31 天。
+    </p>
+
+    <Alert v-if="filterError || listError" variant="destructive">
+      <AlertDescription>{{ filterError ?? listError?.message }}</AlertDescription>
     </Alert>
 
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
