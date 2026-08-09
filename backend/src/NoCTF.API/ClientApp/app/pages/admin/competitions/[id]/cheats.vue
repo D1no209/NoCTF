@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import {
-  adminConfirmCheatIncident,
-  adminCorrectCheatIncident,
-  adminDismissCheatIncident,
   adminGetCheatIncident,
   adminListCheatIncidents,
 } from '~/api'
@@ -12,6 +9,8 @@ import type {
   NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemResponse,
   NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol,
 } from '~/api'
+import type { CheatIncidentResolutionRequest } from '~/composables/useCheatIncidentResolution'
+import { useCheatIncidentResolution } from '~/composables/useCheatIncidentResolution'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
@@ -66,45 +65,71 @@ async function openDetail(scoringEventId?: string) {
 }
 
 // ---- Actions ----
-const actionDialog = ref<{ mode: 'confirm' | 'dismiss' | 'correct'; scoringEventId: string } | null>(null)
-const actionReason = ref('')
-const actionPending = ref(false)
-
 const ActionMeta = {
-  confirm: { title: '确认作弊', description: '确认该事件为作弊,将封禁来源队伍。' },
-  dismiss: { title: '驳回事件', description: '驳回该作弊事件,不产生封禁。' },
-  correct: { title: '纠正事件', description: '将此前确认的作弊标记为误判并解除相关封禁。' },
+  confirm: { title: '确认作弊并封禁', description: '确认该事件为作弊，并立即封禁来源队伍。' },
+  dismiss: { title: '驳回作弊事件', description: '驳回该作弊事件，不产生封禁。' },
+  correct: { title: '纠正作弊事件', description: '将此前确认的作弊标记为误判并解除相关封禁。' },
 } as const
 
-function openAction(mode: 'confirm' | 'dismiss' | 'correct', scoringEventId?: string) {
-  if (!scoringEventId) return
-  actionDialog.value = { mode, scoringEventId }
-  actionReason.value = ''
+const SuccessMessage = {
+  confirm: '已确认作弊并封禁来源队伍',
+  dismiss: '已驳回作弊事件',
+  correct: '已纠正作弊事件并解除相关封禁',
+} as const
+
+async function refreshResolvedIncident(request: CheatIncidentResolutionRequest) {
+  if (detailOpen.value)
+    await openDetail(request.scoringEventId)
+
+  reset()
+  await loadMore()
 }
 
-async function submitAction() {
-  const ctx = actionDialog.value
-  if (!ctx || !actionReason.value.trim()) return
-  actionPending.value = true
-  try {
-    const path = { competitionId, scoringEventId: ctx.scoringEventId }
-    const body = { reason: actionReason.value.trim() }
-    const { error } =
-      ctx.mode === 'confirm' ? await adminConfirmCheatIncident({ path, body })
-        : ctx.mode === 'dismiss' ? await adminDismissCheatIncident({ path, body })
-          : await adminCorrectCheatIncident({ path, body })
-    if (error) throw error
-    toast.success('操作成功')
-    actionDialog.value = null
-    applyFilters()
-    if (detailOpen.value && detail.value?.scoringEventId) await openDetail(detail.value.scoringEventId)
-  }
-  catch (e) {
-    toast.error(parseApiError(e).message)
-  }
-  finally {
-    actionPending.value = false
-  }
+const {
+  action: resolutionAction,
+  begin: beginResolution,
+  canSubmit: canSubmitResolution,
+  error: resolutionError,
+  isOpen: resolutionOpen,
+  isSubmitting: resolutionPending,
+  reason: resolutionReason,
+  remainingCharacters,
+  setOpen: setResolutionOpen,
+  submit: submitResolution,
+  target: resolutionTarget,
+} = useCheatIncidentResolution({
+  competitionId,
+  readError: error => parseApiError(error).message,
+  onSuccess: (request) => {
+    toast.success(SuccessMessage[request.action])
+    void refreshResolvedIncident(request)
+  },
+})
+
+const resolutionTargetLabel = computed(() => resolutionTarget.value?.sourceTeamName
+  ?? resolutionTarget.value?.sourceTeamId
+  ?? '未知队伍')
+
+function openAction(mode: 'confirm' | 'dismiss' | 'correct') {
+  const current = detail.value
+  if (!current?.scoringEventId)
+    return
+
+  beginResolution(mode, {
+    scoringEventId: current.scoringEventId,
+    sourceTeamId: current.sourceTeamId,
+    sourceTeamName: current.sourceTeamName,
+  })
+}
+
+async function handleResolutionSubmit() {
+  const succeeded = await submitResolution()
+  if (!succeeded && resolutionError.value)
+    toast.error(resolutionError.value)
+}
+
+function handleResolutionOpen(value: boolean) {
+  setResolutionOpen(value)
 }
 
 onMounted(() => void loadMore())
@@ -222,13 +247,13 @@ onMounted(() => void loadMore())
             </div>
           </div>
           <div v-if="canWrite && (detail.canConfirm || detail.canDismiss || detail.canCorrect)" class="flex flex-wrap gap-2 pt-2">
-            <Button v-if="detail.canConfirm" variant="destructive" size="sm" @click="openAction('confirm', detail!.scoringEventId)">
+            <Button v-if="detail.canConfirm" variant="destructive" size="sm" @click="openAction('confirm')">
               确认作弊(封禁)
             </Button>
-            <Button v-if="detail.canDismiss" variant="outline" size="sm" @click="openAction('dismiss', detail!.scoringEventId)">
+            <Button v-if="detail.canDismiss" variant="outline" size="sm" @click="openAction('dismiss')">
               驳回
             </Button>
-            <Button v-if="detail.canCorrect" variant="outline" size="sm" @click="openAction('correct', detail!.scoringEventId)">
+            <Button v-if="detail.canCorrect" variant="outline" size="sm" @click="openAction('correct')">
               纠正(解封)
             </Button>
           </div>
@@ -236,27 +261,53 @@ onMounted(() => void loadMore())
       </SheetContent>
     </Sheet>
 
-    <AlertDialog :open="actionDialog !== null" @update:open="(v) => { if (!v) actionDialog = null }">
+    <AlertDialog :open="resolutionOpen" @update:open="handleResolutionOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ actionDialog ? ActionMeta[actionDialog.mode].title : '' }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ resolutionAction ? ActionMeta[resolutionAction].title : '' }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ actionDialog ? ActionMeta[actionDialog.mode].description : '' }}必须填写理由(记入审计)。
+            {{ resolutionAction ? ActionMeta[resolutionAction].description : '' }}
+            影响对象：{{ resolutionTargetLabel }}。理由会记入比赛事件和审计记录。
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div class="px-1 pb-2">
-          <Textarea v-model="actionReason" placeholder="理由" aria-label="理由" />
+        <div class="grid gap-2 px-1 pb-2">
+          <Textarea
+            v-model="resolutionReason"
+            placeholder="请输入至少 8 个字符的处置理由"
+            aria-label="处置理由"
+            aria-describedby="cheat-resolution-reason-help"
+            :aria-invalid="remainingCharacters > 0"
+            :disabled="resolutionPending"
+          />
+          <p
+            id="cheat-resolution-reason-help"
+            class="text-xs"
+            :class="remainingCharacters > 0 ? 'text-destructive' : 'text-muted-foreground'"
+          >
+            <template v-if="remainingCharacters > 0">
+              理由至少需要 8 个字符，还需 {{ remainingCharacters }} 个字符。
+            </template>
+            <template v-else>
+              理由长度符合要求。
+            </template>
+          </p>
+          <p v-if="resolutionError" role="alert" class="text-destructive text-sm">
+            {{ resolutionError }}
+          </p>
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction
-            :variant="actionDialog?.mode === 'confirm' ? 'destructive' : 'default'"
-            :disabled="actionPending || !actionReason.trim()"
-            @click="submitAction"
+          <AlertDialogCancel :disabled="resolutionPending">
+            取消
+          </AlertDialogCancel>
+          <Button
+            type="button"
+            :variant="resolutionAction === 'confirm' ? 'destructive' : 'default'"
+            :disabled="!canSubmitResolution"
+            @click="handleResolutionSubmit"
           >
-            <Spinner v-if="actionPending" data-icon="inline-start" />
-            确认
-          </AlertDialogAction>
+            <Spinner v-if="resolutionPending" data-icon="inline-start" />
+            {{ resolutionPending ? '提交中' : (resolutionAction ? ActionMeta[resolutionAction].title : '确认') }}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
