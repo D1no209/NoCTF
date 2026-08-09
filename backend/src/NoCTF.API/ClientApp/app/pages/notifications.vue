@@ -5,6 +5,7 @@ import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '~/api'
 definePageMeta({ middleware: 'auth' })
 
 type Notification = NoCtfapiEndpointsNotificationsNotificationResponse
+const { markAllRead } = useNotificationUnread()
 
 const { items, loading, error, hasMore, initialized, loadMore } =
   useCursorPagination<Notification>(async (cursor) => {
@@ -15,7 +16,10 @@ const { items, loading, error, hasMore, initialized, loadMore } =
     return { items: data.items, nextCursor: data.nextCursor }
   })
 
-onMounted(loadMore)
+onMounted(async () => {
+  await loadMore()
+  markAllRead(items.value[0]?.id)
+})
 </script>
 
 <template>

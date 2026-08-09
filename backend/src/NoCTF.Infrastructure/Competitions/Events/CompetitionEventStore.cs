@@ -327,11 +327,7 @@ public sealed class CompetitionEventStore(
         CancellationToken cancellationToken)
     {
         var userIds = events
-            .SelectMany(item => new[]
-            {
-                item.ActorUserId,
-                item.RelatedType == EntityReferenceKind.User ? item.RelatedId : null
-            })
+            .SelectMany(item => new[] { item.ActorUserId, item.RelatedUserId })
             .Where(item => item != null)
             .Select(item => item!.Value)
             .Distinct()
@@ -340,13 +336,7 @@ public sealed class CompetitionEventStore(
             .Where(user => userIds.Contains(user.Id))
             .ToDictionaryAsync(user => user.Id, user => user.UserName, cancellationToken);
         var teamIds = events
-            .Where(item => item.SubjectType == EntityReferenceKind.Team
-                || item.RelatedType == EntityReferenceKind.Team)
-            .SelectMany(item => new[]
-            {
-                item.SubjectType == EntityReferenceKind.Team ? item.SubjectId : (Guid?)null,
-                item.RelatedType == EntityReferenceKind.Team ? item.RelatedId : null
-            })
+            .Select(item => item.TeamId)
             .Where(item => item is not null)
             .Select(item => item!.Value)
             .Distinct()
@@ -355,13 +345,7 @@ public sealed class CompetitionEventStore(
             .Where(team => teamIds.Contains(team.Id))
             .ToDictionaryAsync(team => team.Id, team => team.Name, cancellationToken);
         var challengeIds = events
-            .Where(item => item.SubjectType == EntityReferenceKind.CompetitionChallenge
-                || item.RelatedType == EntityReferenceKind.CompetitionChallenge)
-            .SelectMany(item => new[]
-            {
-                item.SubjectType == EntityReferenceKind.CompetitionChallenge ? item.SubjectId : (Guid?)null,
-                item.RelatedType == EntityReferenceKind.CompetitionChallenge ? item.RelatedId : null
-            })
+            .Select(item => item.CompetitionChallengeId)
             .Where(item => item is not null)
             .Select(item => item!.Value)
             .Distinct()
@@ -385,9 +369,9 @@ public sealed class CompetitionEventStore(
         return events.Select(item =>
         {
             var payload = ParseLegacyPayload(item.PayloadJson);
-            var relatedUserId = ReferenceId(item, EntityReferenceKind.User);
-            var teamId = ReferenceId(item, EntityReferenceKind.Team);
-            var challengeId = ReferenceId(item, EntityReferenceKind.CompetitionChallenge);
+            var relatedUserId = item.RelatedUserId;
+            var teamId = item.TeamId;
+            var challengeId = item.CompetitionChallengeId;
             return new CompetitionEventView(
             item.Id,
             item.CompetitionId,
@@ -402,11 +386,11 @@ public sealed class CompetitionEventStore(
             Resolve(teams, teamId),
             challengeId,
             Resolve(challenges, challengeId),
-            ReferenceId(item, EntityReferenceKind.ChallengeHint),
-            ReferenceId(item, EntityReferenceKind.RuntimeInstance),
-            ReferenceId(item, EntityReferenceKind.Submission),
-            ReferenceId(item, EntityReferenceKind.ScoringEvent),
-            ReferenceId(item, EntityReferenceKind.Notification),
+            item.HintId,
+            item.RuntimeInstanceId,
+            item.SubmissionId,
+            item.ScoringEventId,
+            item.QuestionId,
             item.ParentEventId,
             payload.CompetitionStatus,
             payload.LeaderboardVisibility,
@@ -493,9 +477,6 @@ public sealed class CompetitionEventStore(
         id is Guid value && (subject.Type != type || subject.Id != value)
             ? (type, value)
             : null;
-
-    private static Guid? ReferenceId(CompetitionEvent item, EntityReferenceKind type) =>
-        item.SubjectType == type ? item.SubjectId : item.RelatedType == type ? item.RelatedId : null;
 
     private static LegacyEventPayload ParseLegacyPayload(string json)
     {

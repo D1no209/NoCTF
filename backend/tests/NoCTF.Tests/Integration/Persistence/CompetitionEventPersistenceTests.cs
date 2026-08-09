@@ -182,8 +182,13 @@ public sealed class CompetitionEventPersistenceTests
             await Assert.That(teamA.ViewerTeamId).IsEqualTo(ids.TeamAId);
             await Assert.That(teamA.Items!).Count().IsEqualTo(3);
             await Assert.That(teamA.Items!.Any(item => item.TeamId == ids.TeamBId)).IsFalse();
-            await Assert.That(teamA.Items!.Single(item => item.TeamId == ids.TeamAId).TeamDisplayName)
+            var submissionEvent = teamA.Items!.Single(item => item.TeamId == ids.TeamAId);
+            await Assert.That(submissionEvent.TeamDisplayName)
                 .IsEqualTo("Team A");
+            await Assert.That(submissionEvent.CompetitionChallengeId)
+                .IsEqualTo(ids.CompetitionChallengeId);
+            await Assert.That(submissionEvent.ChallengeTitle)
+                .IsEqualTo("Event challenge");
 
             var observer = await store.QueryAsync(Query(ids, ids.ObserverId, now), ct);
             await Assert.That(observer.AccessLevel).IsEqualTo(CompetitionEventAccessLevel.Staff);
