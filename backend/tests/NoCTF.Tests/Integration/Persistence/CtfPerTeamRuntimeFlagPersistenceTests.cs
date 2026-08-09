@@ -72,6 +72,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                     && flag.SpecificationKind == SpecificationKind.RuntimeDefinition
                     && flag.SpecificationId == fixture.StartChallengeId,
                 cancellationToken);
+            await Assert.That(initialFlag.Flag).StartsWith("challenge{");
 
             var dispatch = outbox.Published.OfType<DispatchRuntime>().Single();
             await BackendMessageHandlers.Handle(
@@ -105,11 +106,72 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                         && flag.SpecificationKind == SpecificationKind.RuntimeDefinition,
                     cancellationToken))
                 .IsTrue();
+            var batchFlag = await db.ChallengeFlags.AsNoTracking().SingleAsync(
+                flag => flag.CompetitionChallengeId == fixture.BatchChallengeId
+                    && flag.TeamId == fixture.TeamId
+                    && flag.SpecificationKind == SpecificationKind.RuntimeDefinition,
+                cancellationToken);
+            await Assert.That(batchFlag.Flag).StartsWith("competition{");
             await Assert.That(await db.ChallengeFlags.AsNoTracking().AnyAsync(
                     flag => flag.CompetitionChallengeId == fixture.StaticChallengeId
                         && flag.TeamId == fixture.TeamId,
                     cancellationToken))
                 .IsFalse();
+
+            var competition = await db.Competitions.SingleAsync(
+                item => item.Id == fixture.CompetitionId,
+                cancellationToken);
+            competition.ConfigurationJson = JsonSerializer.Serialize(
+                new CtfConfiguration(
+                    CtfConfiguration.CurrentSchemaVersion,
+                    new(500, 100, 10),
+                    [],
+                    FlagTemplate: new("changed", "[TEAMHASH]", false)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            competition.ConfigurationRevision++;
+            var futureUserId = Guid.CreateVersion7();
+            var futureTeamId = Guid.CreateVersion7();
+            db.Users.Add(new User
+            {
+                Id = futureUserId,
+                UserName = "future-player",
+                NormalizedUserName = "FUTURE-PLAYER",
+                Email = "future-player@example.test",
+                NormalizedEmail = "FUTURE-PLAYER@EXAMPLE.TEST",
+                PasswordHash = "test",
+                CreatedAt = fixture.Now.AddSeconds(2),
+                UpdatedAt = fixture.Now.AddSeconds(2)
+            });
+            db.Teams.Add(new Team
+            {
+                Id = futureTeamId,
+                CompetitionId = fixture.CompetitionId,
+                Name = "Future",
+                NormalizedName = "FUTURE",
+                CaptainId = futureUserId,
+                MemberIds = [futureUserId],
+                InvitationToken = new string('b', 32),
+                RegistrationStatus = TeamRegistrationStatus.Approved,
+                RegisteredAt = fixture.Now.AddSeconds(2)
+            });
+            await db.SaveChangesAsync(cancellationToken);
+
+            var existingAfterConfigurationChange = await runtimeFlags.EnsureAsync(
+                fixture.CompetitionId,
+                fixture.BatchChallengeId,
+                fixture.TeamId,
+                fixture.Now.AddSeconds(2),
+                cancellationToken);
+            var futureFlag = await runtimeFlags.EnsureAsync(
+                fixture.CompetitionId,
+                fixture.BatchChallengeId,
+                futureTeamId,
+                fixture.Now.AddSeconds(2),
+                cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+
+            await Assert.That(existingAfterConfigurationChange).IsEqualTo(batchFlag.Flag);
+            await Assert.That(futureFlag).StartsWith("changed{");
 
             var reset = await runtimes.MutatePlayerRuntimeAsync(
                 new(
@@ -312,7 +374,14 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
+            ConfigurationUpdatedAt = now,
+            ConfigurationJson = JsonSerializer.Serialize(
+                new CtfConfiguration(
+                    CtfConfiguration.CurrentSchemaVersion,
+                    new(500, 100, 10),
+                    [],
+                    FlagTemplate: new("competition", "[TEAMHASH]", false)),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web))
         });
         db.Teams.Add(new Team
         {
@@ -354,6 +423,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             "Start",
             1,
             RuntimeConfiguration(perTeamRuntime),
+            new("challenge", "[TEAMHASH]", false),
             now);
         AddChallenge(
             db,
@@ -363,6 +433,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             "Batch",
             2,
             RuntimeConfiguration(perTeamRuntime),
+            null,
             now);
         AddChallenge(
             db,
@@ -372,6 +443,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             "Static",
             3,
             RuntimeConfiguration(staticRuntime),
+            null,
             now);
         await db.SaveChangesAsync(cancellationToken);
         return new(
@@ -392,6 +464,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
         string title,
         int order,
         string configurationJson,
+        NoCTF.GameModes.Flags.PerTeamFlagTemplate? flagTemplate,
         DateTimeOffset now)
     {
         var challengeId = Guid.CreateVersion7(now);
@@ -401,7 +474,11 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             OwnerId = ownerId,
             Mode = GameMode.Ctf,
             Title = title,
-            DefinitionJson = configurationJson,
+            DefinitionJson = flagTemplate is null
+                ? configurationJson
+                : RuntimeConfiguration(
+                    CtfConfigurationUpgrader.ParseChallenge(configurationJson).Runtime!,
+                    flagTemplate),
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -422,13 +499,16 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
         });
     }
 
-    private static string RuntimeConfiguration(ChallengeRuntimeTemplate runtime) =>
+    private static string RuntimeConfiguration(
+        ChallengeRuntimeTemplate runtime,
+        NoCTF.GameModes.Flags.PerTeamFlagTemplate? flagTemplate = null) =>
         JsonSerializer.Serialize(
             new CtfChallengeConfiguration(
                 CtfChallengeConfiguration.CurrentSchemaVersion,
                 null,
                 null,
-                Runtime: runtime),
+                Runtime: runtime,
+                FlagTemplate: flagTemplate),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
     private sealed record Fixture(

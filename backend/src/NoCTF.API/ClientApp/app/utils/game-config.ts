@@ -189,7 +189,7 @@ export function emptyRunnerJob(): RunnerJobModel {
 }
 
 export function emptyFlagTemplate(): FlagTemplateModel {
-  return { header: 'flag', bodyTemplate: '[RANDOM:32]', leetLiteralText: false }
+  return { header: 'flag', bodyTemplate: '[TEAMHASH]', leetLiteralText: false }
 }
 
 export function emptyDefinition(mode: GameModeValue): DefinitionModel {
@@ -506,6 +506,15 @@ function serializeRunnerJob(job: RunnerJobModel): JsonObject {
 export function serializeDefinition(mode: GameModeValue, model: DefinitionModel): string {
   const obj: JsonObject = { schemaVersion: DEFINITION_SCHEMA_VERSION[mode] }
   if (model.runtime) obj.runtime = serializeRuntimeTemplate(model.runtime)
+  if (mode === 'Ctf'
+    && model.runtime?.flagSource === FlagSource.PerTeam
+    && model.flagTemplate) {
+    obj.flagTemplate = {
+      header: model.flagTemplate.header,
+      bodyTemplate: model.flagTemplate.bodyTemplate,
+      leetLiteralText: model.flagTemplate.leetLiteralText,
+    }
+  }
   if (mode === 'Awd') {
     if (model.checker) {
       const checker: JsonObject = { job: serializeRunnerJob(model.checker.job) }
@@ -598,6 +607,7 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'bloodRewards', label: '血榜奖励', type: 'bloodRewards', defaultValue: [], description: '前三个解题队伍的额外奖励,最多 3 条' },
         { key: 'scoreExpression', label: '自定义计分表达式', type: 'text', description: '可选;变量:initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayParameter' },
         { key: 'wrongSubmissionPenalty', label: '错误提交扣分', type: 'int', min: 0, defaultValue: 0 },
+        { key: 'flagTemplate', label: '动态 Flag 模板', type: 'flagTemplate', description: '仅用于系统今后生成的每队容器 Flag；手工或静态 Flag 不受影响' },
       ]
     case 'Awd':
       return [

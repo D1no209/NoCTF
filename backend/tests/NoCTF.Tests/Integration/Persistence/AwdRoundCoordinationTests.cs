@@ -68,6 +68,7 @@ public sealed class AwdRoundCoordinationTests
             var flag = await db.ChallengeFlags.AsNoTracking().SingleAsync(cancellationToken);
             await Assert.That(flag.TeamId).IsEqualTo(fixture.TeamId);
             await Assert.That(flag.SpecificationId).IsEqualTo(generate.Round.Value);
+            await Assert.That(flag.Flag).StartsWith("competition{");
             var injection = outbox.RunnerNodeMessages.OfType<InjectAwdFlag>().Single();
             await Assert.That(injection.RuntimeInstanceId).IsEqualTo(fixture.RuntimeId);
             await Assert.That(injection.ChallengeFlagId).IsEqualTo(flag.Id);
@@ -270,7 +271,8 @@ public sealed class AwdRoundCoordinationTests
                 AwdConfiguration.Default with
                 {
                     HardeningDurationSeconds = 600,
-                    RoundDurationSeconds = 300
+                    RoundDurationSeconds = 300,
+                    FlagTemplate = new("competition", "[TEAMHASH]", false)
                 },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             RunningSince = now.AddMinutes(-12),

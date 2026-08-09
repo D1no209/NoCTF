@@ -27,6 +27,11 @@ FlagInjection:
 
 FixedPerAttack 使用 AttackPoints；SplitVictimDefensePool 忽略 AttackPoints。两者都使用 VictimDefensePoolPoints。覆盖值 0 是显式 0，只有 null 继承。AWD 不使用 EvaluationDispatchMode/最大提交次数；Flag 接入总是 Automatic。
 
+Competition 的可选 `FlagTemplate` 是动态轮换 Flag 的竞赛默认；Challenge.DefinitionJson 的可选
+`FlagTemplate` 优先覆盖，未配置时使用平台默认 `flag{[TEAMHASH]}`。模板变更只影响后续尚未生成的
+“队伍×题目×轮次”Flag；已经持久化的当轮事实保持原值并继续有效。静态和管理员手工 Flag 不读取
+该模板。
+
 Challenge 当前 schemaVersion 为 4，不提供旧 schema 兼容层。Challenge 不声明 Docker/Kubernetes Provider 或 RunnerPool。Checker 与长期 Runtime 由平台放入同一内部网络；平台只注入 `NOCTF_TARGET_HOST`。Container 使用固定 `target` DNS，Compose 使用 `TargetServiceName` 对应的服务 DNS。Checker 自己知道服务端口，不配置 Target URL 或 TargetPort，也不复用仅属于 KoH 的 `ControlCheckUrlBinding`。
 
 ## 时钟与加固期

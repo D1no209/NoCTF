@@ -133,7 +133,7 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         new HashSet<string>(
             mode switch
             {
-                GameMode.Ctf => ["runtime"],
+                GameMode.Ctf => ["runtime", "flagTemplate"],
                 GameMode.Awd => ["runtime", "checker", "flagInjection", "flagTemplate"],
                 GameMode.Awdp =>
                 [

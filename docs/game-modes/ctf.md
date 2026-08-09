@@ -25,6 +25,11 @@ Runtime.FlagSource：Static 或 PerTeam。OVA 只能 Static；Container PerTeam 
 `FlagEnvironmentVariableName`，Compose PerTeam 使用
 `FlagEnvironmentVariables[serviceName]`，在创建时注入固定队伍 Flag。
 
+Competition 可用 `FlagTemplate` 配置动态 Flag 的默认 Header、BodyTemplate 与字面文本 leet；
+Challenge.DefinitionJson 可在 `Runtime.FlagSource=PerTeam` 时用同名字段覆盖。优先级为题目模板、
+竞赛默认、平台默认 `flag{[TEAMHASH]}`。该配置只在缺失的每队容器 Flag 首次生成时读取：已经持久化的
+Flag 不轮换，Reset/重启继续复用原值；静态题和管理员维护的手工 Flag 完全不受影响。
+
 ## Flag 与附件
 
 一题可有多个正确 Flag。模板级静态 Flag 用 ChallengeId；比赛/团队 Runtime Flag 用 CompetitionChallengeId。任一符合 scope、Team、Specification 与 ReceivedAt 时间窗的 Flag 可正确。

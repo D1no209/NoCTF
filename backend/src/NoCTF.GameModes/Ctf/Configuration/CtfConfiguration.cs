@@ -1,4 +1,5 @@
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.GameModes.Flags;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
 
@@ -18,7 +19,8 @@ public sealed record CtfConfiguration(
     CtfPointConfiguration DefaultPoints,
     IReadOnlyList<BloodReward> BloodRewards,
     string? ScoreExpression = null,
-    long WrongSubmissionPenalty = 0)
+    long WrongSubmissionPenalty = 0,
+    PerTeamFlagTemplate? FlagTemplate = null)
 {
     public const int CurrentSchemaVersion = 1;
 }
@@ -30,7 +32,8 @@ public sealed record CtfChallengeConfiguration(
     int? MaxFlagAttempts = null,
     ChallengeRuntimeTemplate? Runtime = null,
     string? ScoreExpression = null,
-    long? WrongSubmissionPenalty = null)
+    long? WrongSubmissionPenalty = null,
+    PerTeamFlagTemplate? FlagTemplate = null)
 {
     public const int CurrentSchemaVersion = 1;
 }

@@ -136,7 +136,9 @@ public sealed class PostgresAwdRoundCoordinator(
             })
             .ToListAsync(cancellationToken);
         var runtimeByTeam = runtimes.ToDictionary(instance => instance.TeamId);
-        var template = ResolveTemplate(target.Template.DefinitionJson);
+        var template = AwdFlagTemplateResolver.Resolve(
+            target.Competition.ConfigurationJson,
+            target.Template.DefinitionJson);
         var candidates = existingFlags.Select(flag => flag.Flag).ToHashSet(StringComparer.Ordinal);
         foreach (var teamId in missing)
         {
@@ -422,12 +424,6 @@ public sealed class PostgresAwdRoundCoordinator(
         if (runningSince is DateTimeOffset startedAt && now > startedAt)
             effective += now - startedAt;
         return effective;
-    }
-
-    private static PerTeamFlagTemplate ResolveTemplate(string definitionJson)
-    {
-        var challenge = AwdConfigurationUpgrader.ParseChallenge(definitionJson);
-        return challenge.FlagTemplate ?? PerTeamFlagTemplate.Default;
     }
 
     private static string GenerateCandidate(
