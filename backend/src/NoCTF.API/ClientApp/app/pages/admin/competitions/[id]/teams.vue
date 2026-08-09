@@ -35,18 +35,48 @@ async function load() {
   loading.value = false
 }
 
-async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'approve' | 'reject' | 'unban') {
+async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'approve' | 'reject') {
   if (!team.id) return
   pendingId.value = team.id
   try {
     const path = { competitionId, teamId: team.id }
-    const { error } =
-      action === 'approve' ? await adminApproveTeam({ path })
-        : action === 'reject' ? await adminRejectTeam({ path })
-          : await adminUnbanTeam({ path })
+    const { error } = action === 'approve'
+      ? await adminApproveTeam({ path })
+      : await adminRejectTeam({ path })
     if (error) throw error
     toast.success('操作成功')
     await load()
+  }
+  catch (e) {
+    toast.error(parseApiError(e).message)
+  }
+  finally {
+    pendingId.value = null
+  }
+}
+
+// ---- Unban with explicit confirmation ----
+const unbanDialog = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
+
+function openUnban(team: NoCtfapiEndpointsTeamsTeamResponse) {
+  unbanDialog.value = team
+}
+
+async function submitUnban() {
+  const team = unbanDialog.value
+  if (!team?.id) {
+    toast.error('队伍标识缺失，请刷新后重试')
+    return
+  }
+  pendingId.value = team.id
+  try {
+    const { error } = await adminUnbanTeam({
+      path: { competitionId, teamId: team.id },
+    })
+    if (error) throw error
+    toast.success(`已解除「${team.name ?? '该队伍'}」的封禁`)
+    unbanDialog.value = null
+    await Promise.all([load(), loadAppeals()])
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -60,6 +90,10 @@ async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'a
 const banDialog = ref<{ team: NoCtfapiEndpointsTeamsTeamResponse; mode: 'ban' | 'correct' } | null>(null)
 const banReason = ref('')
 const banPending = ref(false)
+const banReasonValid = computed(() => {
+  const length = banReason.value.trim().length
+  return length <= 512 && (banDialog.value?.mode === 'correct' ? length >= 8 : length > 0)
+})
 
 function openBan(team: NoCtfapiEndpointsTeamsTeamResponse, mode: 'ban' | 'correct') {
   banDialog.value = { team, mode }
@@ -68,8 +102,7 @@ function openBan(team: NoCtfapiEndpointsTeamsTeamResponse, mode: 'ban' | 'correc
 
 async function submitBan() {
   const ctx = banDialog.value
-  if (!ctx?.team.id) return
-  if (!banReason.value.trim()) return
+  if (!ctx?.team.id || !banReasonValid.value) return
   banPending.value = true
   try {
     const path = { competitionId, teamId: ctx.team.id }
@@ -186,8 +219,8 @@ onMounted(() => {
                   <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="openBan(t, 'ban')">封禁</Button>
                 </template>
                 <template v-else>
-                  <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'unban')">解封</Button>
-                  <Button variant="ghost" size="sm" :disabled="pendingId === t.id" @click="openBan(t, 'correct')">纠正封禁</Button>
+                  <Button type="button" variant="outline" size="sm" :disabled="pendingId === t.id" @click.stop="openUnban(t)">解封</Button>
+                  <Button type="button" variant="ghost" size="sm" :disabled="pendingId === t.id" @click.stop="openBan(t, 'correct')">纠正封禁</Button>
                 </template>
               </div>
             </TableCell>
@@ -236,6 +269,28 @@ onMounted(() => {
       </div>
     </div>
 
+    <Dialog :open="unbanDialog !== null" @update:open="(v) => { if (!v && pendingId === null) unbanDialog = null }">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>解除队伍封禁？</DialogTitle>
+          <DialogDescription>
+            将立即恢复「{{ unbanDialog?.name }}」的参赛资格、历史计分资格和正常运行时生命周期。
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" :disabled="pendingId !== null" @click="unbanDialog = null">取消</Button>
+          <Button
+            type="button"
+            :disabled="pendingId !== null"
+            @click="submitUnban"
+          >
+            <Spinner v-if="pendingId === unbanDialog?.id" data-icon="inline-start" />
+            确认解封
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <Dialog :open="banDialog !== null" @update:open="(v) => { if (!v) banDialog = null }">
       <DialogContent>
         <DialogHeader>
@@ -250,12 +305,18 @@ onMounted(() => {
         <FieldGroup>
           <Field>
             <FieldLabel for="ban-reason">原因</FieldLabel>
-            <Textarea id="ban-reason" v-model="banReason" required />
+            <Textarea id="ban-reason" v-model="banReason" maxlength="512" required />
+            <FieldDescription v-if="banDialog?.mode === 'correct'">
+              至少 8 个字符；当前 {{ banReason.trim().length }}/512。
+            </FieldDescription>
+            <FieldDescription v-else>
+              当前 {{ banReason.trim().length }}/512。
+            </FieldDescription>
           </Field>
         </FieldGroup>
         <DialogFooter>
           <Button variant="outline" @click="banDialog = null">取消</Button>
-          <Button :disabled="banPending || !banReason.trim()" @click="submitBan">
+          <Button type="button" :disabled="banPending || !banReasonValid" @click="submitBan">
             <Spinner v-if="banPending" data-icon="inline-start" />
             确认
           </Button>

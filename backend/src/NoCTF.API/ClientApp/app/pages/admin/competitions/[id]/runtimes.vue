@@ -462,10 +462,15 @@ onMounted(() => {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel :disabled="terminatePending">取消</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" :disabled="terminatePending" @click="submitTermination">
+          <Button
+            type="button"
+            variant="destructive"
+            :disabled="terminatePending"
+            @click="submitTermination"
+          >
             <Spinner v-if="terminatePending" data-icon="inline-start" />
             确认终止
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -502,14 +507,15 @@ onMounted(() => {
         </FieldGroup>
         <AlertDialogFooter>
           <AlertDialogCancel :disabled="forceTerminatePending">取消</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
+            type="button"
             variant="destructive"
             :disabled="forceTerminatePending || !forceTerminateConfirmed || forceTerminateReason.trim().length < 8"
             @click="submitForceTermination"
           >
             <Spinner v-if="forceTerminatePending" data-icon="inline-start" />
             确认强制终结
-          </AlertDialogAction>
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
