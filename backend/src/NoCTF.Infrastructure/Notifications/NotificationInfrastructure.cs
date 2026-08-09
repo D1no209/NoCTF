@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NoCTF.Application.Notifications;
 using NoCTF.Infrastructure.Competitions.Permissions;
 
@@ -24,6 +25,26 @@ internal static class NotificationInfrastructure
             services.AddSingleton<ILeaderboardRefreshPublisher, RedisLeaderboardRefreshPublisher>();
             services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
         }
+        else
+        {
+            services.TryAddSingleton<ILeaderboardRefreshPublisher, NullLeaderboardRefreshPublisher>();
+            services.TryAddSingleton<ISubmissionResultNotification, NullSubmissionResultNotification>();
+        }
         return services;
     }
+}
+
+internal sealed class NullLeaderboardRefreshPublisher : ILeaderboardRefreshPublisher
+{
+    public Task PublishAsync(
+        Guid competitionId,
+        DateTimeOffset generatedAt,
+        CancellationToken cancellationToken) => Task.CompletedTask;
+}
+
+internal sealed class NullSubmissionResultNotification : ISubmissionResultNotification
+{
+    public Task PublishAsync(
+        SubmissionResultNotification notification,
+        CancellationToken cancellationToken) => Task.CompletedTask;
 }

@@ -25,7 +25,8 @@
 ## 强制边界
 
 - 只支持 `Ctf`、`Awd`、`Awdp`、`Koh`。不存在 `Penetration` GameMode、多阶段题或静态容器群题型。
-- 只有 `NoCTF.API`、`NoCTF.Worker`、`NoCTF.Runner` 三种独立进程；不提供单进程模式。
+- `Api`、`Worker`、`Runner` 是三个可组合角色；既可使用三个兼容独立入口，也可通过
+  `NoCTF.Host` 以任意非空组合运行，缺省为单进程全合一。
 - PostgreSQL 是业务事实源；Redis 是可丢失的缓存、限流、SignalR backplane 与 Runner 心跳存储。
 - Wolverine PostgreSQL persistence 承载 Inbox、Outbox、Scheduled Message 与 Dead Letter。业务任务不得使用进程内 Channel。
 - Submission/ScoringEvent 不保存分值、分差或累计分。排行榜始终用当前配置从事实重新投影。

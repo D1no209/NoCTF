@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: runner
   namespace: noctf
@@ -7,6 +7,8 @@ metadata:
     app: runner
     app.kubernetes.io/part-of: noctf
 spec:
+  serviceName: runner-headless
+  podManagementPolicy: Parallel
   replicas: 1
   selector:
     matchLabels:
@@ -39,6 +41,10 @@ spec:
             - configMapRef:
                 name: noctf-config
           env:
+            - name: Runner__Id
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:

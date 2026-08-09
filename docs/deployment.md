@@ -1,24 +1,33 @@
 # 部署边界
 
-## 必需组件
+## 必需角色与组件
 
 ```text
-NoCTF.API       >=1
-NoCTF.Worker    >=1，可水平扩展
-NoCTF.Runner    >=1，可按 Pool/Provider 扩展
+Api role        >=1，可水平扩展
+Worker role     >=1，可水平扩展
+Runner role     >=1，可按 Pool/Provider 扩展
 PostgreSQL
 Redis
 S3-compatible object storage（LocalFileSystem 仅非 HA）
 Frontend/reverse proxy
 ```
 
-不支持单进程部署。API 不运行 Worker/Runner 业务 HostedService。
+三个角色可以分别运行在兼容入口中，也可以由 `NoCTF.Host` 以任意非空组合承载。
+`NoCTF.Host` 缺省启用全部角色；使用 `Hosting__Roles__0=Api`、
+`Hosting__Roles__1=Worker`、`Hosting__Roles__2=Runner` 明确配置。角色集合在进程启动后
+不可热切换。
+
+仓库提供同等受支持的本地样例：`deploy/docker-compose.yml` 为独立进程，
+`deploy/docker-compose.single.yml` 为全合一。生产环境可按负载运行单 API、N Worker、N Runner，
+或组合 API+Worker/Worker+Runner 等；N 表示多个进程或容器，不是在一个进程中重复注册角色。
 
 ## 进程权限
 
 - API：业务 DB、Wolverine Outbox、Redis、ObjectStorage、公开/内部 HTTP；无 Docker/Kubernetes/Libvirt 权限。
 - Worker：业务 DB、Wolverine queues、Redis、ObjectStorage；无宿主 Runtime socket。
 - Runner：所需业务表和 Wolverine runner queues、Redis heartbeat、内部 archive 读取 API，以及特定 Provider 权限；数据库 role 不授予 User/认证配置写权限，也不需要对象存储通用凭据。
+- Host：权限是其全部启用角色权限的并集。包含 Runner 的组合进程必须获得 Provider 权限，
+  因此全合一适合本地或受控小型部署；需要最小权限隔离时应拆分角色。
 
 Runner 管理端口只在内部网络。Checker callback API 可达，但严格 JWT audience/permission。
 
@@ -53,12 +62,15 @@ membership；heartbeat 过期的节点不会收到新审计，节点以相同 Ru
 `Runner__Provider` 必须与该 Pool 的 Runtime 配置一致。不要通过复用 RunnerId 把同一
 Docker/Kubernetes 节点或 Libvirt node CIDR 同时交给两个宿主。
 
-每个 Runner 节点必须配置 `Runner__Capacity__MemoryBytes`、
+每个 Runner 节点必须配置稳定唯一的 `Runner__Id`、`Runner__Capacity__MemoryBytes`、
 `Runner__Capacity__NanoCpus`、`Runner__Capacity__PidsLimit`、
 `Runner__Heartbeat__IntervalSeconds` 和 `Runner__Heartbeat__TtlSeconds`。所有容量值和心跳周期
 必须为正，TTL 必须大于刷新周期。Runner 只刷新已初始化的可用容量，不会覆盖已扣减值；
 Redis 容量状态丢失且 PostgreSQL 仍有该节点活跃 assignment 时，节点保持离线，直到
 assignment 收敛后才从部署配置重建容量。
+
+Kubernetes 清单使用 StatefulSet Pod 名作为 RunnerId，使副本扩缩容和重启保持稳定身份。
+其他编排环境也必须为每个 Runner 副本提供唯一且可恢复的 RunnerId；不得让多个活动副本共享身份。
 
 `Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
 kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。

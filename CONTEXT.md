@@ -37,12 +37,12 @@ an independent source of requirements.
 
 ## Architecture vocabulary
 
-- Production has three independent processes: `NoCTF.API`, horizontally scalable `NoCTF.Worker`,
-  and one or more `NoCTF.Runner` nodes.
+- Production has three roles: `Api`, `Worker`, and `Runner`. They may run independently or in
+  any non-empty combination in `NoCTF.Host`; Worker and Runner roles remain horizontally scalable.
 - PostgreSQL is the only business source of truth and also stores Wolverine inboxes, outboxes,
   schedules, queues, and dead letters.
-- Business work is durable Wolverine messaging. In-process Channels, fire-and-forget tasks, and a
-  supported single-process hosting mode are not part of the target architecture.
+- Business work is durable Wolverine messaging even when roles share a process. In-process Channels
+  and fire-and-forget tasks are not part of the target architecture.
 - Domain does not depend on EF Core, HTTP, Redis, Wolverine, or provider SDKs. Application use cases
   expose capability-oriented interfaces; Infrastructure implements them.
 - CTF, AWD, AWDP, and KoH are built-in modes. Penetration is ordinary CTF content, not a mode, and

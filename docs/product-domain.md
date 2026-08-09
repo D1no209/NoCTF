@@ -9,7 +9,7 @@ NoCTF 是面向团队的竞赛平台，正式支持四种且仅四种模式：
 - `Awdp`：Break Flag 与独立 Fix archive 判定。
 - `Koh`：共享 Hill Runtime，通过平台轮询返回的队伍 Control Flag 判定控制权。
 
-Penetration 是普通 CTF 内容，不是模式。平台不实现多阶段题、插件拥有的模式、静态容器群题型或单进程部署。
+Penetration 是普通 CTF 内容，不是模式。平台不实现多阶段题、插件拥有的模式或静态容器群题型；进程拓扑不改变产品领域模型。
 
 ## 聚合与身份
 

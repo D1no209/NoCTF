@@ -966,7 +966,7 @@ export type NoCtfapiEndpointsAdministrationPlatformExportPlatformLogsRequest = {
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol = 'Trace' | 'Debug' | 'Information' | 'Warning' | 'Error' | 'Critical';
 
-export type NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol = 'Api' | 'Worker' | 'Runner';
+export type NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol = 'Api' | 'Worker' | 'Runner' | 'Host';
 
 export type NoCtfapiEndpointsAdministrationPlatformDeadLetterResponse = {
     messageId?: string;

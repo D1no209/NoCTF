@@ -65,6 +65,7 @@ kubectl create secret tls noctf-tls --namespace noctf --cert=tls.crt --key=tls.k
 docker build -f backend/Dockerfile --target api -t noctf-backend:latest .
 docker build -f backend/Dockerfile --target worker -t noctf-worker:latest .
 docker build -f backend/Dockerfile --target runner -t noctf-runner:latest .
+docker build -f backend/Dockerfile --target host -t noctf-host:latest .
 ```
 
 For local clusters (kind/minikube), load images:
@@ -113,11 +114,12 @@ kubectl apply -f minio-init-job.yaml
 kubectl apply -f migration-job.yaml
 kubectl wait --for=condition=complete job/noctf-db-migrate -n noctf --timeout=300s
 
-# 6. The three independent application processes
+# 6. The distributed application-role topology
 kubectl apply -f backend-deployment.yaml
 kubectl apply -f backend-service.yaml
 kubectl apply -f worker-deployment.yaml
 kubectl apply -f runner-rbac.yaml
+kubectl apply -f runner-service.yaml
 kubectl apply -f runner-deployment.yaml
 
 # 7. Networking
@@ -139,7 +141,8 @@ kubectl get ingress -n noctf
 
 ## Kubernetes Runner
 
-The default manifests run the Runner in `noctf` and grant its ServiceAccount a
+The default manifests run the Runner as a StatefulSet in `noctf`, use the stable Pod name as
+`Runner__Id`, and grant its ServiceAccount a
 namespace-scoped Role in the shared `runtime` namespace. Each Compose runtime gets
 immutable `rt-*` resources, a headless DNS Service, a NetworkPolicy, Deployments,
 and platform-owned dynamic NodePort Services. Challenge definitions cannot create
@@ -181,6 +184,15 @@ CoreDNS Pod selector and the configured kube-dns ClusterIP `/32`; the explicit
 Service address is required because Service NAT and NetworkPolicy evaluation
 order is dataplane-dependent.
 
+Scale a Pool with `kubectl scale statefulset/runner -n noctf --replicas=N`. Each ordinal has a
+stable distinct RunnerId. Do not replace this with a Deployment whose replicas share a configured
+RunnerId.
+
+For a composable topology, deploy the `host` image and set indexed `Hosting__Roles__*` values to any
+non-empty subset of `Api`, `Worker`, and `Runner`. The Pod ServiceAccount, network policy, secrets,
+volumes, and egress must be the union required by its roles. A Host containing Runner should use the
+Runner StatefulSet identity pattern; a Host without Runner can use an ordinary Deployment.
+
 Smoke test:
 
 ```bash
@@ -220,6 +232,8 @@ The `networkpolicy.yaml` enforces a default-deny posture:
 - Backend can reach PostgreSQL (5432), Redis (6379), and MinIO (9000)
 - Worker can reach PostgreSQL (5432), Redis (6379), and MinIO (9000)
 - Runner can reach PostgreSQL (5432), Redis (6379), and the Kubernetes API
+- A composable Host needs the union of its selected role policies; do not grant Runner RBAC to an
+  API/Worker-only Host
 - Backend accepts traffic only from the ingress-nginx namespace and serves both API and SPA static files
 - Runtime workloads are isolated by the baseline and per-Runtime policies in the `runtime` namespace
 - DNS (port 53) egress is allowed for all pods

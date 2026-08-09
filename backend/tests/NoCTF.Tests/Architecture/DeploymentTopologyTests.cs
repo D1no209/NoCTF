@@ -5,13 +5,14 @@ public sealed class DeploymentTopologyTests
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     [Test]
-    public async Task Deployment_manifests_host_the_three_production_processes_without_legacy_runner_http_configuration()
+    public async Task Deployment_manifests_support_composable_and_legacy_process_topologies()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
         var compose = await ReadAsync("deploy", "docker-compose.yml");
-        var workerProgram = await ReadAsync("backend", "src", "NoCTF.Worker", "Program.cs");
-        var apiProgram = await ReadAsync("backend", "src", "NoCTF.API", "Program.cs");
-        var runnerProgram = await ReadAsync("backend", "src", "NoCTF.Runner", "Program.cs");
+        var singleCompose = await ReadAsync("deploy", "docker-compose.single.yml");
+        var hostProgram = await ReadAsync("backend", "src", "NoCTF.Host", "Program.cs");
+        var roleModel = await ReadAsync("backend", "src", "NoCTF.Hosting", "HostRoles.cs");
+        var routing = await ReadAsync("backend", "src", "NoCTF.Hosting", "MessageRouting.cs");
         var workerDeployment = Path.Combine(
             RepositoryRoot,
             "deploy",
@@ -26,26 +27,25 @@ public sealed class DeploymentTopologyTests
         await Assert.That(dockerfile).Contains("FROM runtime AS api");
         await Assert.That(dockerfile).Contains("FROM runtime AS worker");
         await Assert.That(dockerfile).Contains("FROM runtime AS runner");
+        await Assert.That(dockerfile).Contains("FROM runtime AS host");
+        await Assert.That(dockerfile).Contains("NoCTF.Host.dll");
         await Assert.That(compose).Contains("  worker:");
+        await Assert.That(singleCompose).Contains("  noctf:");
+        await Assert.That(singleCompose).Contains("target: host");
+        await Assert.That(singleCompose).Contains("Hosting__Roles__0: Api");
         await Assert.That(compose).Contains("GET /health HTTP/1.1");
         await Assert.That(compose).Contains("GET /health/ready HTTP/1.1");
         await Assert.That(compose).Contains("[[ \"$$status\" == *\" 200 \"* ]]");
         await Assert.That(File.Exists(workerDeployment)).IsTrue();
-        await Assert.That(workerProgram)
-            .Contains("options.Discovery.IncludeType(typeof(BackendMessageHandlers));");
-        await Assert.That(workerProgram)
-            .Contains("options.PublishMessage<InvalidateLeaderboard>().ToPostgresqlQueue(\"noctf-worker\");");
-        await Assert.That(workerProgram)
-            .Contains("options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue(\"noctf-worker\");");
-        foreach (var program in new[] { apiProgram, workerProgram, runnerProgram })
-        {
-            await Assert.That(program)
-                .Contains("options.PublishMessage<CompetitionEventCommitted>()");
-            await Assert.That(program)
-                .Contains(".ToPostgresqlQueue(\"noctf-worker\");");
-        }
-        await Assert.That(workerProgram)
-            .Contains("options.Discovery.IncludeType(typeof(CompetitionEventMessageHandlers));");
+        await Assert.That(roleModel).Contains("public enum HostRole");
+        await Assert.That(roleModel).Contains("HostRole.Api, HostRole.Worker, HostRole.Runner");
+        await Assert.That(hostProgram).Contains("HostRoles.FromConfiguration");
+        await Assert.That(hostProgram).Contains("ConfigureNoCtfWorkerMessaging");
+        await Assert.That(hostProgram).Contains("ConfigureNoCtfRunnerMessaging");
+        await Assert.That(routing)
+            .Contains("PublishMessage<CompetitionEventCommitted>()");
+        await Assert.That(routing)
+            .Contains("ToPostgresqlQueue(\"noctf-worker\")");
         foreach (var runnerAvailabilitySetting in new[]
                  {
                      "Runner__Capacity__MemoryBytes",

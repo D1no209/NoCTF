@@ -15,20 +15,19 @@ and Nuxt 4. The current product and architecture contract lives in
 - Stable-resource GitOps workflows through ordinary Organizer Bot identities and existing management APIs.
 
 Penetration content is ordinary CTF content, not a separate game mode. Dynamic game-mode
-plugins, in-process business queues, and a supported single-process production mode are
-not part of the target architecture.
+plugins and in-process business queues are not part of the target architecture.
 
 ## Architecture
 
-Production uses three independent processes:
+The three production roles can run in one composable host or as independent processes:
 
 ```mermaid
 flowchart LR
-    Browser["Browser / API client"] --> API["NoCTF.API"]
+    Browser["Browser / API client"] --> API["Api role"]
     API --> PostgreSQL[("PostgreSQL")]
     API --> Redis[("Redis")]
-    PostgreSQL --> Worker["NoCTF.Worker"]
-    PostgreSQL --> Runner["NoCTF.Runner"]
+    PostgreSQL --> Worker["Worker role"]
+    PostgreSQL --> Runner["Runner role"]
     Worker --> Redis
     Runner --> Redis
     Runner --> Providers["Docker / Kubernetes / Libvirt"]
@@ -37,6 +36,8 @@ flowchart LR
 - `NoCTF.API` owns HTTP, authentication, authorization, and SignalR.
 - `NoCTF.Worker` owns durable business processing and leaderboard projection.
 - `NoCTF.Runner` owns provider operations and checker/patch execution.
+- `NoCTF.Host` enables any non-empty combination of `Api`, `Worker`, and `Runner` and
+  defaults to all three. Combined roles still communicate through durable PostgreSQL queues.
 - PostgreSQL is the business source of truth and Wolverine persistence store.
 - Redis holds replaceable caches, rate limits, the SignalR backplane, subscriptions, and Runner presence/capacity.
 
@@ -54,14 +55,20 @@ not add an HAProxy or ingress-proxy layer for Docker runtimes.
 
 ## Local Docker Compose
 
-The checked-in Compose stack is for local development and validation, not a production
-deployment template.
+The checked-in Compose stacks are for local development and validation, not production
+deployment templates. Choose either the distributed topology:
 
 ```bash
 cp .env.example .env
 # Set POSTGRES_PASSWORD, JWT_SECRET, SEED_ADMIN_PASSWORD,
 # EMAIL_VERIFICATION_ENCRYPTION_KEY, and other local values.
 docker compose --env-file .env -f deploy/docker-compose.yml up --build --wait
+```
+
+or the single-process topology:
+
+```bash
+docker compose --env-file .env -f deploy/docker-compose.single.yml up --build --wait
 ```
 
 Verify the API and open the bundled frontend:
@@ -87,6 +94,8 @@ backend/
     NoCTF.API/             HTTP, auth, SignalR, and the ClientApp Nuxt SPA
     NoCTF.Worker/          durable application processing
     NoCTF.Runner/          runtime-provider execution
+    NoCTF.Hosting/         shared role and durable-messaging composition
+    NoCTF.Host/            configurable unified process
     NoCTF.Domain/          domain model and policies
     NoCTF.Application/     capability-oriented use cases
     NoCTF.Infrastructure/  persistence and infrastructure adapters

@@ -16,7 +16,9 @@ type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
 const LEVEL_LABELS: Record<string, string> = {
   Trace: '跟踪', Debug: '调试', Information: '信息', Warning: '警告', Error: '错误', Critical: '严重',
 }
-const SERVICE_LABELS: Record<string, string> = { Api: 'API', Worker: 'Worker', Runner: 'Runner' }
+const SERVICE_LABELS: Record<string, string> = {
+  Api: 'API', Worker: 'Worker', Runner: 'Runner', Host: 'Host',
+}
 const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Critical'] as const
 const levelOrdinal = (level?: string | number) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
 const LIVE_LIMIT = 200
@@ -163,6 +165,7 @@ onMounted(() => {
               <SelectItem value="Api">API</SelectItem>
               <SelectItem value="Worker">Worker</SelectItem>
               <SelectItem value="Runner">Runner</SelectItem>
+              <SelectItem value="Host">Host</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>

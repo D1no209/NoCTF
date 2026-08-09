@@ -1,6 +1,6 @@
 # 系统架构
 
-## 进程拓扑
+## 角色与进程拓扑
 
 ```text
 Browser/Client
@@ -17,13 +17,25 @@ NoCTF.API  ---- Redis (cache/rate limit/SignalR/heartbeat)
                          Docker / Kubernetes / Libvirt
 ```
 
-只支持三个独立进程：
+平台包含三个运行角色：
 
 - `NoCTF.API`：FastEndpoints、认证、授权、接入事务、REST、SignalR、内部 Checker callback。
 - `NoCTF.Worker`：Submission 普通判定、生命周期、轮次、Flag、排行榜投影、通知与清理。
 - `NoCTF.Runner`：Wolverine durable consumer；执行 Docker、Compose/Kompose、Kubernetes、Libvirt/OVA、Checker 和 Patch。
 
-Worker 与 Runner 可多副本。不存在 API 内 HostedService 业务消费者或单进程组合模式。
+角色可由兼容入口 `NoCTF.API`、`NoCTF.Worker`、`NoCTF.Runner` 分别承载，也可由
+`NoCTF.Host` 承载任意非空组合。统一宿主读取 `Hosting:Roles` 枚举数组，缺省启用
+`Api`、`Worker`、`Runner`；配置只在启动时解析，切换通过重启或滚动发布完成。
+
+常见拓扑包括：
+
+- 单进程：一个 Host 同时承载全部角色。
+- 标准分布式：一个或多个 API、N 个 Worker、按 Pool 部署 N 个 Runner。
+- 混合：API+Worker 与独立 Runner，或 API+Runner 与独立 Worker。
+
+Worker、Runner 与 API 均可多副本。每个进程中的每种角色至多一份，每个 Runner 进程
+只拥有一个稳定唯一 RunnerId。组合部署仍通过 PostgreSQL/Wolverine durable queue 传递业务
+工作，不使用内存 Channel 或 fire-and-forget 代替持久投递。
 
 ## 数据依赖
 
@@ -35,7 +47,7 @@ Worker 与 Runner 可多副本。不存在 API 内 HostedService 业务消费者
 ## 依赖方向
 
 ```text
-Domain <- Application <- API / Worker / Runner
+Domain <- Application <- API / Worker / Runner / Host
                        <- Infrastructure
 ```
 

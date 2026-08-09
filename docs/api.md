@@ -389,7 +389,7 @@ Dead Letter DTO 只返回投递元数据，省略消息 body、异常正文和 a
 delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作
 DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
 
-平台运行日志使用每日 Redis Stream 分片聚合 API、Worker、Runner 的结构化诊断日志，并通过
+平台运行日志使用每日 Redis Stream 分片聚合 API、Worker、Runner、Host 的结构化诊断日志，并通过
 管理员专用 SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。每个 UTC 日分片精确保留最多
 50,000 条，保留 14 天后由 Redis TTL 删除，不自动归档。历史查询默认从 Warning 开始，使用
 与筛选条件绑定的签名游标，支持按服务、最低级别、UTC 时间、Category、Competition、

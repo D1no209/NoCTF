@@ -79,4 +79,4 @@ dotnet ef database update
 
 ## 文档同步
 
-修改领域契约必须同时更新 docs、OpenAPI 和测试。不得以代码现状为理由修改文档来恢复已废弃 Penetration、单进程、RuntimeOperation、Artifact、TeamMember 或 Collaborator 表。
+修改领域契约必须同时更新 docs、OpenAPI 和测试。不得以代码现状为理由恢复已废弃的 Penetration 模式、RuntimeOperation、Artifact、TeamMember 或 Collaborator 表。

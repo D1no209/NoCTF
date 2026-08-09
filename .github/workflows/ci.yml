@@ -74,6 +74,15 @@ jobs:
           test -f artifacts/api/wwwroot/index.html
           test -f artifacts/api/wwwroot/200.html
           test -f artifacts/api/wwwroot/404.html
+          dotnet publish backend/src/NoCTF.Host/NoCTF.Host.csproj --configuration Release --no-build --no-restore --output artifacts/host
+          test -f artifacts/host/NoCTF.Host.dll
+          test -f artifacts/host/wwwroot/index.html
+          test -f artifacts/host/wwwroot/200.html
+          test -f artifacts/host/wwwroot/404.html
+          dotnet publish backend/src/NoCTF.Worker/NoCTF.Worker.csproj --configuration Release --no-build --no-restore --output artifacts/worker
+          test -f artifacts/worker/NoCTF.Worker.dll
+          dotnet publish backend/src/NoCTF.Runner/NoCTF.Runner.csproj --configuration Release --no-build --no-restore --output artifacts/runner
+          test -f artifacts/runner/NoCTF.Runner.dll
 
       - name: Test backend
         env:
@@ -107,7 +116,9 @@ jobs:
           RUNNER_API_KEY: ci-runner-api-key-value-123456789
           MINIO_ROOT_PASSWORD: ci-minio-password-123456
           LOCAL_STORAGE_URL_SIGNING_KEY: ci-local-storage-signing-key-with-at-least-32-characters
-        run: docker compose -f deploy/docker-compose.yml config -q
+        run: |
+          docker compose -f deploy/docker-compose.yml config -q
+          docker compose -f deploy/docker-compose.single.yml config -q
 
       - name: Rehearse PostgreSQL, Wolverine, and object recovery
         shell: bash

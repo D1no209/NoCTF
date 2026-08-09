@@ -49,7 +49,7 @@ database 创建 schema/table 并向空 bucket Put/Head/Get/List。生产环境�
 
 ## 创建恢复点
 
-1. 停止所有 API、Worker、Runner 和 migration job，等待当前事务与 Provider 操作结束。
+1. 停止所有承载 Api、Worker、Runner 角色的进程和 migration job，等待当前事务与 Provider 操作结束。
 2. 确认没有人工客户端或其他写入者连接数据库。工具也会在备份前后检查其他 PostgreSQL client
    connection；发现任意连接即失败并删除未完成产物。
 3. 运行备份：
@@ -83,7 +83,7 @@ SHA-256。manifest 不含数据库/S3 地址和凭据。
 
 ## 隔离恢复
 
-1. 创建全新的 PostgreSQL 16 database 与全新的空 bucket。保持 API、Worker、Runner 停止。
+1. 创建全新的 PostgreSQL 16 database 与全新的空 bucket。保持所有 Api、Worker、Runner 角色停止。
 2. 恢复与 manifest 的 `secretSetId` 对应的外部 Secret 集。不要先运行 EF migration；目标数据库
    必须为空。
 3. 运行恢复，目标 database 和 bucket 名必须与 manifest 一致：
@@ -117,7 +117,7 @@ docker run --rm \
    数量和关键附件。记录备份时间、开始/完成时间、操作者和验证结果。
 5. 先用备份时相同的应用版本验收，再按正常 migration 流程升级。验收通过前不得让新旧环境同时
    消费同一队列或操作同一 Runtime provider。
-6. 启动 API，再启动 Worker，最后启动各 Runner Pool。Wolverine 会按持久化状态恢复租约和投递；
+6. 先启动包含 Api 的宿主，再启动包含 Worker 的宿主，最后启动各 Runner Pool；全合一部署只需启动 Host。Wolverine 会按持久化状态恢复租约和投递；
    所有外部副作用仍必须依赖既有幂等与 ProcessingVersion 栅栏。
 
 ## 自动恢复演练
