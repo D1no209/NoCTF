@@ -286,6 +286,29 @@
 - 本轮只创建本地功能提交与本 HANDOFF 提交，未 push、未部署；生产仍运行
   `0.1.0-alpha.6`，等待新的明确授权后再进行生产浏览器验收。
 
+## 2026-08-09 新前端作弊事件处置链路修复
+
+- `ac46286c`：将作弊详情的“驳回”“确认作弊并封禁”和“纠正”统一收口到单一处置状态机。
+  根因与此前运行时终止按钮相同：确认按钮使用 `AlertDialogAction` 时会先关闭受控弹窗并清空目标，
+  异步处理容易表现为无反应；同时原页面只校验非空，既未与后端 8 字符约束对齐，也没有行内反馈。
+  现在异步提交改用普通 `Button`，只有 SDK 成功后才显式清理弹窗状态，失败会保留已输入理由与目标。
+- 二次确认会明确显示操作类型、来源队伍和审计影响；理由不足 8 个字符时实时显示仍缺字符数并禁用
+  提交。提交期间显示 loading、锁定取消/关闭并通过同步 pending fence 阻止重复请求。成功提示使用
+  提交前捕获的强类型 action，不再依赖随后被清空的状态；随后重新读取当前作弊详情和列表，来源
+  队伍封禁状态与事件处置状态均由后端事实刷新。队伍管理页没有跨路由客户端缓存，进入时会重新
+  读取，因此无需维护第二份本地队伍状态。
+- 所有请求继续只调用 OpenAPI 生成 SDK `adminDismissCheatIncident`、`adminConfirmCheatIncident` 和
+  `adminCorrectCheatIncident`；没有手写 URL、端点、DTO、枚举或本地成功状态，也未修改生成 SDK、
+  HTTP/OpenAPI 契约、数据模型或 migration。平台预发布版本由 `0.1.0-alpha.7` 递增为
+  `0.1.0-alpha.8`。
+- 新增 9 项 Bun 行为/接线回归，覆盖两类弹窗打开、短理由零请求、dismiss/confirm 单次 SDK 分派与
+  参数、pending 防重复、成功清理及刷新、失败保留、取消/重开。顺带将既有管理操作源码断言改为
+  CRLF/LF 均可运行，避免干净 Windows worktree 的换行差异造成伪失败。
+- 验证：ClientApp `bun test` 22/22 通过；`bun run typecheck`、`bun run generate` 通过；
+  `dotnet build backend/NoCTF.slnx -m:1` 为 0 警告/0 错误；`git diff --check` 通过。ClientApp
+  当前没有仓库级 ESLint 配置或 lint script，因此没有伪造 lint 结果。Nuxt 构建只保留既有
+  chunk/Nitro 第三方警告。生产浏览器只做非破坏性页面验收，不会为验证按钮处置真实作弊证据。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
