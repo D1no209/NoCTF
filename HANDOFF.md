@@ -240,6 +240,31 @@
 - 本轮仅创建本地功能提交与本 HANDOFF 提交，未 push、未部署 `0.1.0-alpha.6`；生产仍运行
   `0.1.0-alpha.5`，但指定卡死实例已通过线上现有正式接口恢复。
 
+## 2026-08-09 Alpha.6 管理操作修复生产部署
+
+- 用户明确授权后，`ce2678e3` 与 `1dc69909` 已快进推送至远程 `main`；生产服务器
+  `/root/NoCTF` 同步至 `1dc69909`，保留且未改写未跟踪的
+  `deploy/docker-compose.prod.yml`，完成 API、Worker、Runner 与 Migration 镜像构建和 Compose
+  滚动重建。本轮没有新的 migration、HTTP/OpenAPI 契约、生成 SDK 或数据模型变化。
+- GitHub Release 的 Kompose 下载再次长时间无进展；在服务切换前终止该构建，使用原生产 Runner
+  镜像中已验证的 Kompose `1.38.0` 工具层完成 Runner BuildKit 构建。没有修改仓库 Dockerfile；
+  临时 Dockerfile、Compose 覆盖、构建/部署日志与状态文件均已删除。
+- Migration 容器退出码为 0；API、Runner、PostgreSQL、Redis 均为 healthy，Worker 正常运行。
+  API、Worker、Runner 程序集全部包含 `0.1.0-alpha.6` 版本标记，管理员平台信息接口也返回
+  `0.1.0-alpha.6`。HTTPS `/`、`/health`、目标比赛的运行时管理页与队伍管理页均返回 200，管理员
+  登录及运行时列表接口返回 200。
+- 部署后旧卡死 Runtime `019fe218-1e46-7e98-90d7-a2a455b69d8e` 保持 `Stopped`；替代 Runtime
+  `019fe25a-d206-7c98-9e3c-3032cfe78c28` 保持 `Running`，Runner 仍为
+  `docker-runner-prod-1`，Docker 映射保持 `32769 -> 9999`，部署没有破坏题目容器。
+- 新容器启动后的 API、Worker、Runner 日志中 `fail:`、`crit:`、Fatal、未处理异常和 Exception
+  计数均为 0。现有 Warning 仅来自 ASP.NET DataProtection 临时密钥和 Hosting 端口覆盖提示；没有
+  新业务错误。内置浏览器在登录提交时两次中断，Chrome 扩展当前不可用，因此本次生产 UI 的
+  非破坏性弹窗点击没有形成额外验收证据；Bun 接线回归测试、生产静态页面、管理员认证和强类型
+  API 查询均已通过。
+- 已清理本次部署的全部临时文件、8.808 GB BuildKit 缓存及一个无引用中间镜像；根分区占用由构建
+  峰值 70% 降至 63%，剩余约 15 GB。数据库、Redis、数据卷、题目镜像、上传文件和 HTTPS 配置均
+  保持原状。
+
 ## 已落地的主要能力
 
 - `CompetitionEvent` 合并生命周期与排行榜可见性事实。
