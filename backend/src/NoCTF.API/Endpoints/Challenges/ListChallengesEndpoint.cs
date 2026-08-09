@@ -33,7 +33,9 @@ public sealed class ListChallengesEndpoint(
             competitionId,
             DateTimeOffset.UtcNow,
             ct);
-        if (visibility is null)
+        if (visibility is null
+            || !ParticipantChallengeVisibilityPolicy.CanView(
+                visibility.CompetitionStatus))
             return TypedResults.NotFound();
         var items = await list.ExecuteAsync(
             competitionId,

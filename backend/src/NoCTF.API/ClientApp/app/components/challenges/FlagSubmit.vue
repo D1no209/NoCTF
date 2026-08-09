@@ -27,6 +27,19 @@ const input = ref('')
 const submitting = ref(false)
 const tracked = ref<TrackedSubmission[]>([])
 const toasted = new Set<string>()
+const celebrating = ref(false)
+let celebrationTimer: ReturnType<typeof setTimeout> | undefined
+
+function celebrateCorrectFlag(): void {
+  celebrating.value = false
+  if (celebrationTimer) clearTimeout(celebrationTimer)
+  requestAnimationFrame(() => {
+    celebrating.value = true
+    celebrationTimer = setTimeout(() => {
+      celebrating.value = false
+    }, 650)
+  })
+}
 
 const { polling, timedOut, start: startPolling, stop: stopPolling } = usePolling(
   async () => {
@@ -58,7 +71,10 @@ async function refreshOne(id: string): Promise<void> {
   }
   if (wasPending && !isEvaluationPending(data.evaluationState) && !toasted.has(id)) {
     toasted.add(id)
-    if (data.result === ScoringResult.Correct) toast.success('提交评测完成:正确')
+    if (data.result === ScoringResult.Correct) {
+      toast.success('提交评测完成:正确')
+      celebrateCorrectFlag()
+    }
     else toast.error(`提交评测完成:${scoringResultLabel(data.result)}`)
     emit('evaluated')
   }
@@ -113,6 +129,7 @@ onMounted(() => {
 onUnmounted(() => {
   unwatch?.()
   stopPolling()
+  if (celebrationTimer) clearTimeout(celebrationTimer)
 })
 
 function resultVariant(result?: string | null) {
@@ -122,7 +139,18 @@ function resultVariant(result?: string | null) {
 </script>
 
 <template>
-  <Card>
+  <Card class="relative overflow-hidden">
+    <Transition name="flag-celebration">
+      <div
+        v-if="celebrating"
+        role="status"
+        aria-live="polite"
+        class="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-background/70"
+      >
+        <span class="sr-only">Flag 正确</span>
+        <span aria-hidden="true" class="flag-celebration-mark">🎉</span>
+      </div>
+    </Transition>
     <CardHeader>
       <CardTitle class="text-base">{{ title }}</CardTitle>
       <CardDescription v-if="description">{{ description }}</CardDescription>
@@ -182,3 +210,34 @@ function resultVariant(result?: string | null) {
     </CardContent>
   </Card>
 </template>
+
+<style scoped>
+.flag-celebration-mark {
+  font-size: 4rem;
+  animation: flag-celebration-mark 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.flag-celebration-leave-active {
+  transition: opacity 160ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.flag-celebration-leave-to {
+  opacity: 0;
+}
+
+@keyframes flag-celebration-mark {
+  0% { opacity: 0; transform: translateY(0.75rem) scale(0.72) rotate(-8deg); }
+  45% { opacity: 1; transform: translateY(0) scale(1.05) rotate(3deg); }
+  100% { opacity: 1; transform: translateY(-0.25rem) scale(1) rotate(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flag-celebration-mark {
+    animation: none;
+  }
+
+  .flag-celebration-leave-active {
+    transition: none;
+  }
+}
+</style>
