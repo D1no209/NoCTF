@@ -8,7 +8,7 @@ describe('administrator destructive action wiring', () => {
   test('keeps the runtime target alive until terminate requests are submitted', async () => {
     const page = await readPage('runtimes')
 
-    expect(page).toContain('<Button\n            type="button"\n            variant="destructive"')
+    expect(page).toMatch(/<Button\r?\n\s+type="button"\r?\n\s+variant="destructive"/)
     expect(page).not.toMatch(/<AlertDialogAction[\s\S]*?@click="submit(?:Force)?Termination"/)
   })
 
