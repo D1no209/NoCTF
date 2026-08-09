@@ -8,6 +8,52 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-10 Alpha.19 私有比赛咨询工单
+
+- `343f4ed7`：完成比赛咨询工单化并修复平台/赛事咨询必然失败的根因。创建上下文不再复用语义
+  含混的 `HasValidChallenge`，改用明确的 `Missing/Valid/Invalid` 题目引用状态：Platform 只能不带
+  `CompetitionChallengeId`，Challenge 必须引用本比赛已发布题目。稳定失败码覆盖比赛状态、队伍资格、
+  题目引用、队伍活跃咨询上限、选手连续消息上限、关闭状态和 revision 冲突，前端均提供中文反馈。
+- 咨询继续复用现有不可变 Notification、`reply_to_id`、`ContentJson` 和咨询投影，没有新增 conversation、
+  message、participant、read-state 或咨询业务表。初始提问、选手补充、工作人员多次回复和状态迁移组成
+  一个私有线程；Closed 后终止写入，Resolved 允许选手追问并原子重开为 Pending。正文不写入公开比赛
+  事件，永久事件仅保存 questionId、状态、操作人等必要元数据；失败 Warning 只记录 failureCode 及比赛、
+  咨询、队伍、用户标识，不记录正文、Token 或凭据。
+- 默认限制为每队 5 个 Pending/Replied 活跃咨询、工作人员回复前最多连续 3 条选手消息（初始提问计
+  1 条）。PostgreSQL 事务和 advisory lock 以队伍/咨询串行化检查，防止多名队员并发突破上限；
+  Handler 回复重置额度，Resolved 追问重新检查活跃上限。跨模式配置直接落在现有 `competitions`
+  表：`MaxActiveQuestionsPerTeam=5`、`MaxParticipantMessagesBeforeHandlerReply=3`、
+  `AllowChallengeOwnersToHandleQuestions=true`。唯一 migration
+  `20260809175649_ConfigureCompetitionQuestions` 由 EF CLI 生成，只增加这 3 列及正值约束，没有新表。
+- 权限边界：队伍成员共享本队线程；Judge、Manager、Owner 和平台 Administrator 可处理比赛咨询；
+  Observer 只读；题目所有者仅在配置允许时查看和回复自己题目的咨询，不能查看平台咨询或其他题目，
+  也不会因此获得 Flag、SMTP、Token 等受保护数据。保留既有题目所有者处理能力，因此配置默认值
+  采用 `true`；如产品后续要求 opt-in，可单独调整默认值而无需改表。
+- 比赛事件协议补齐 `AnnouncementPublished`、`QuestionOpened`、`QuestionReplied`、
+  `QuestionStatusChanged` 的 Domain/Application/Infrastructure/API/OpenAPI/前端筛选全链路。通知读取从
+  任意回复节点都会先追溯线程根再展开完整后续记录；全局通知详情和比赛咨询通知精确导航到
+  `/competitions/{competitionId}/questions?question={questionId}`，不会再只回比赛首页。
+- 参赛者咨询页改为左侧工单列表、右侧完整不可变线程，显示关联题目、状态、未读数、最后回复角色与
+  时间、角色区分和当前剩余额度。请求有 loading/重复提交保护，失败保留输入，成功即时追加并刷新；
+  达到上限后保留历史并明确提示等待工作人员，Resolved 明示追问会重新打开。未读状态复用浏览器
+  本地 read marker，不新增 read-state 表。管理端创建/配置页同步暴露三项强类型比赛配置。
+- OpenAPI 已从后端重新导出，`swagger.json`、`wwwroot/openapi/v1.json` 和 TypeScript SDK 由工具
+  重新生成；再次导出/生成后三项 SHA-256 保持不变，确认无手工 SDK 漂移。平台版本递增为
+  `0.1.0-alpha.19`。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；非 Integration
+  631/631；强制 Docker/Testcontainers Integration 158 通过、Kubernetes/Libvirt 外部环境 2 项按
+  设计跳过；ClientApp `bun test` 71/71、`bun run typecheck`、`bun run build` 全部通过；EF
+  `has-pending-model-changes` 无漂移；OpenAPI/SDK 幂等；`git diff --check` 通过。仓库仍无 lint
+  script/ESLint 配置，因此没有伪造 lint 结果。构建仅保留既有大 chunk、插件耗时和第三方
+  trailing-slash 警告。
+- Edge 一次性本地环境实际验收：Platform + 空题目引用创建成功并进入精确 question URL；初始消息
+  显示 2/3，补充两条后输入区改为等待工作人员；平台管理员回复显示正确角色并将选手额度重置为
+  3/3；Resolved 追问重开 Pending；通知详情展示从根到当前回复的完整线程，“查看咨询”精确跳回
+  question URL。浏览器控制台无新增咨询错误，仅观察到仓库既有 `Toaster` 组件解析 Warning。独立
+  PostgreSQL/Redis、测试账号/比赛和本地进程均已清理，未修改生产数据。
+- 本阶段只创建本地功能提交与本 HANDOFF 提交，尚未 push、尚未部署。下一步获得明确授权后再推送
+  并部署 Alpha.19，然后用可丢弃生产比赛复核角色权限、并发上限、精确通知和脱敏日志。
+
 ## 2026-08-08 生产部署与邮箱验证链接热修
 
 - `main@2056bdc1` 已在生产环境以全新 17 张业务表基线部署；Migration 退出码为 0，API、Runner、PostgreSQL、Redis 健康，Worker 正常运行，HTTPS 首页、`/health` 与 Nuxt 静态资源均返回 200。
