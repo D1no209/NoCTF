@@ -9,6 +9,7 @@ using NoCTF.Application.Submissions.Processing;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
@@ -28,6 +29,134 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class SubmissionProcessingLeaderboardRevisionPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Correct_ctf_flag_stops_the_matching_team_container_runtime(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_submission_runtime_stop")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var runtimeId = Guid.CreateVersion7();
+            await using (var arrange = new NoCtfDbContext(options))
+            {
+                arrange.RuntimeInstances.Add(new RuntimeInstance
+                {
+                    Id = runtimeId,
+                    CompetitionId = fixture.CompetitionId,
+                    CompetitionChallengeId = fixture.CompetitionChallengeId,
+                    TeamId = fixture.TeamIds[0],
+                    Purpose = RuntimePurpose.Player,
+                    Generation = 1,
+                    RuntimeKind = RuntimeKind.Container,
+                    RuntimeProvider = RuntimeProvider.Docker,
+                    RunnerId = "runner-1",
+                    RunnerPool = "default",
+                    State = RuntimeState.Running,
+                    ProviderReceiptJson = "{}",
+                    ProcessingVersion = 7,
+                    CreatedAt = fixture.Now,
+                    RunningAt = fixture.Now
+                });
+                await arrange.SaveChangesAsync(cancellationToken);
+            }
+
+            var evaluator = Substitute.For<ISubmissionEvaluator>();
+            evaluator.Evaluate(Arg.Any<SubmissionProcessingContext>())
+                .Returns(new ScoringEventDecision(
+                    ScoringEventKind.SubmissionEvaluation,
+                    ScoringResult.Correct,
+                    null,
+                    fixture.Now,
+                    "correct-container-stop-test"));
+            var evaluatorCatalog = Substitute.For<ISubmissionEvaluatorCatalog>();
+            evaluatorCatalog.Get(GameMode.Ctf).Returns(evaluator);
+            var admissionPolicy = Substitute.For<ISubmissionAdmissionModePolicy>();
+            admissionPolicy.GetRules(
+                    GameMode.Ctf,
+                    Arg.Any<string>(),
+                    Arg.Any<string>())
+                .Returns(new SubmissionAdmissionRules(
+                    AllowsFlag: true,
+                    AllowsFix: false,
+                    MaxFlagAttempts: null,
+                    MaxFixAttempts: null));
+            var placementPolicy = Substitute.For<IRuntimePlacementPolicy>();
+            var outbox = new RecordingOutbox();
+
+            await ProcessAsync(
+                options,
+                evaluatorCatalog,
+                admissionPolicy,
+                placementPolicy,
+                outbox,
+                fixture.SubmissionIds[0],
+                cancellationToken);
+
+            await using var verify = new NoCtfDbContext(options);
+            var runtime = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(instance => instance.Id == runtimeId, cancellationToken);
+            await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(runtime.ProcessingVersion).IsEqualTo(8);
+            var stop = outbox.Published.OfType<StopRuntime>().Single();
+            await Assert.That(stop.RuntimeInstanceId).IsEqualTo(runtimeId);
+            await Assert.That(stop.ProcessingVersion).IsEqualTo(8);
+            var runtimeEvents = await verify.CompetitionEvents.AsNoTracking()
+                .Where(@event =>
+                    @event.CompetitionId == fixture.CompetitionId
+                    && @event.Kind == CompetitionEventKind.RuntimeStateChanged)
+                .ToArrayAsync(cancellationToken);
+            var runtimeEvent = runtimeEvents.Single(
+                @event => @event.RuntimeInstanceId == runtimeId);
+            await Assert.That(runtimeEvent.SubmissionId)
+                .IsEqualTo(fixture.SubmissionIds[0]);
+            await Assert.That(runtimeEvent.RuntimeState)
+                .IsEqualTo(RuntimeState.Stopping);
+
+            long rejudgeVersion;
+            await using (var rejudge = new NoCtfDbContext(options))
+            {
+                var rejudgedSubmission = await rejudge.Submissions.SingleAsync(
+                    submission => submission.Id == fixture.SubmissionIds[0],
+                    cancellationToken);
+                rejudgedSubmission.EvaluationState = SubmissionEvaluationState.Queued;
+                rejudgedSubmission.ProcessingVersion = checked(
+                    rejudgedSubmission.ProcessingVersion + 1);
+                rejudgeVersion = rejudgedSubmission.ProcessingVersion;
+                var restartedRuntime = await rejudge.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == runtimeId,
+                    cancellationToken);
+                restartedRuntime.State = RuntimeState.Running;
+                await rejudge.SaveChangesAsync(cancellationToken);
+            }
+            await ProcessAsync(
+                options,
+                evaluatorCatalog,
+                admissionPolicy,
+                placementPolicy,
+                outbox,
+                fixture.SubmissionIds[0],
+                cancellationToken,
+                rejudgeVersion);
+
+            verify.ChangeTracker.Clear();
+            var runtimeAfterRejudge = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(instance => instance.Id == runtimeId, cancellationToken);
+            await Assert.That(runtimeAfterRejudge.State).IsEqualTo(RuntimeState.Running);
+            await Assert.That(outbox.Published.OfType<StopRuntime>()).Count().IsEqualTo(1);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Ctf_foreign_team_flag_persists_rejected_evidence_and_safe_outbox_message(
