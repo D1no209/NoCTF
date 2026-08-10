@@ -11,10 +11,9 @@ public sealed record AwdCheckerTokenRequest(
 
 public sealed record AwdpFixResultTokenRequest(
     string RunnerId,
-    Guid SubmissionId,
+    Guid GameplayFactId,
     Guid RuntimeInstanceId,
     int Generation,
-    long ProcessingVersion,
     long RuntimeProcessingVersion,
     DateTimeOffset Deadline,
     DateTimeOffset IssuedAt);
@@ -22,7 +21,7 @@ public sealed record AwdpFixResultTokenRequest(
 public interface IRunnerScoringTokenIssuer
 {
     string Issue(string runnerId, DateTimeOffset now);
-    string IssueFixArchiveRead(string runnerId, Guid uploadId, Guid submissionId, DateTimeOffset now);
+    string IssueFixArchiveRead(string runnerId, Guid uploadId, Guid gameplayFactId, DateTimeOffset now);
     string IssueAwdChecker(AwdCheckerTokenRequest request);
     string IssueAwdpFixResult(AwdpFixResultTokenRequest request);
 }

@@ -62,8 +62,7 @@ public sealed class RuntimeInstance
     public Guid CompetitionChallengeId { get; set; }
     public Guid? TeamId { get; set; }
     public RuntimePurpose Purpose { get; set; }
-    public Guid? SubmissionId { get; set; }
-    public long? SubmissionProcessingVersion { get; set; }
+    public Guid? GameplayFactId { get; set; }
     public int SourceCompetitionConfigurationRevision { get; set; }
     public int SourceCompetitionChallengeRevision { get; set; }
     public int SourceChallengeDefinitionRevision { get; set; }

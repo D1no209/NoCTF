@@ -1,6 +1,6 @@
 using System.Text.Json;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.GameModes.Registration;
 

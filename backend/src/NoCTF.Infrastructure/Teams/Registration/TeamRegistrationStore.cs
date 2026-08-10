@@ -79,8 +79,7 @@ public sealed class TeamRegistrationStore(
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
+            await LeaderboardDirty.MarkAsync(db, command.CompetitionId, ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
             return new(Map(team), null);
@@ -127,8 +126,7 @@ public sealed class TeamRegistrationStore(
                 TeamId: teamId,
                 TeamRegistrationStatus: status), ct);
             await db.SaveChangesAsync(ct);
-            await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+            await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         }
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -180,8 +178,7 @@ public sealed class TeamRegistrationStore(
                 TeamId: teamId,
                 TeamRegistrationStatus: TeamRegistrationStatus.Pending), ct);
             await db.SaveChangesAsync(ct);
-            await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+            await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         }
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -239,8 +236,7 @@ public sealed class TeamRegistrationStore(
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
+            await LeaderboardDirty.MarkAsync(db, command.CompetitionId, ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
         }
@@ -269,8 +265,7 @@ public sealed class TeamRegistrationStore(
             TeamId: teamId,
             TeamRegistrationStatus: entity.RegistrationStatus), ct);
         await db.SaveChangesAsync(ct);
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;

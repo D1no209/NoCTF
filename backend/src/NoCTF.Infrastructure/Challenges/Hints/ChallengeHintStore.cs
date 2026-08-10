@@ -4,7 +4,7 @@ using NoCTF.Application.Challenges.Hints;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Competitions.Events;
 
@@ -102,8 +102,7 @@ public sealed class ChallengeHintStore(
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
+            await LeaderboardDirty.MarkAsync(db, command.CompetitionId, ct);
             await QueueHintPublicationAsync(
                 command.CompetitionId,
                 challenge,
@@ -143,8 +142,7 @@ public sealed class ChallengeHintStore(
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return true;
@@ -173,8 +171,7 @@ public sealed class ChallengeHintStore(
         challenge!.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await QueueHintPublicationAsync(
             competitionId,
             challenge,
@@ -223,37 +220,38 @@ public sealed class ChallengeHintStore(
             item.PublishedAt <= now);
         if (hint is null)
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
-        var existing = await db.Submissions.AsNoTracking().Where(item =>
+        var existing = await db.GameplayFacts.AsNoTracking().Where(item =>
             item.CompetitionId == competitionId &&
             item.TeamId == teamId &&
-            item.Kind == SubmissionKind.HintUnlock &&
-            item.SubmittedFlag == hintId.ToString("D"))
-            .OrderByDescending(item => item.ReceivedAt)
+            item.Kind == GameplayFactKind.HintUnlock &&
+            item.ReferenceKind == GameplayFactReferenceKind.Hint &&
+            item.ReferenceId == hintId)
+            .OrderByDescending(item => item.OccurredAt)
             .Select(item => (Guid?)item.Id)
             .FirstOrDefaultAsync(ct);
         if (existing is Guid existingId)
             return HintUnlockAttempt.Success(new(existingId, false));
 
-        var submissionId = Guid.CreateVersion7(now);
-        db.Submissions.Add(new Submission
+        var gameplayFactId = Guid.CreateVersion7(now);
+        db.GameplayFacts.Add(new GameplayFact
         {
-            Id = submissionId,
+            Id = gameplayFactId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId.Value,
-            SubmittedByUserId = userId,
-            Kind = SubmissionKind.HintUnlock,
-            SubmittedFlag = hintId.ToString("D"),
-            ReceivedAt = now,
-            EvaluationState = SubmissionEvaluationState.Queued,
-            EvaluationUpdatedAt = now,
-            ProcessingVersion = 0
+            ActorUserId = userId,
+            Kind = GameplayFactKind.HintUnlock,
+            ReferenceKind = GameplayFactReferenceKind.Hint,
+            ReferenceId = hintId,
+            OccurredAt = now,
+            State = GameplayFactState.Queued,
+            UpdatedAt = now
         });
-        await outbox.PublishAsync(new EvaluateSubmission(submissionId, 0));
+        await outbox.PublishAsync(new EvaluateGameplayFact(gameplayFactId));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
-        return HintUnlockAttempt.Success(new(submissionId, true));
+        return HintUnlockAttempt.Success(new(gameplayFactId, true));
     }
 
     private async Task QueueHintPublicationAsync(

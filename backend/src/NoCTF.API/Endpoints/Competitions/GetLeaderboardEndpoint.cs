@@ -55,10 +55,6 @@ public sealed record LeaderboardProtocolResponse(
     IReadOnlyList<LeaderboardEntryResponse> Entries)
 {
     public IReadOnlyList<LeaderboardChallengeInfoResponse> Challenges { get; init; } = [];
-    public long SnapshotRevision { get; init; }
-    public long TargetRevision { get; init; }
-    public bool Stale { get; init; }
-    public DateTimeOffset? LastFailureAt { get; init; }
     public LeaderboardVisibilityProtocol Visibility { get; init; }
     public LeaderboardDataScopeProtocol DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }
@@ -67,7 +63,6 @@ public sealed record LeaderboardProtocolResponse(
 public sealed record LeaderboardProcessingProtocolResponse(
     Guid CompetitionId,
     LeaderboardProjectionStateProtocol State,
-    long TargetRevision,
     string StatusUrl);
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
@@ -155,8 +150,6 @@ public sealed class GetLeaderboardEndpoint(
             : await leaderboard.GetAsync(request.CompetitionId, cancellationToken);
         if (snapshot is not null)
         {
-            if (visibility.DataScope == LeaderboardDataScope.Live && snapshot.Stale)
-                await messages.ProjectLeaderboardAsync(request.CompetitionId, cancellationToken);
             return TypedResults.Ok(LeaderboardProtocolMapper.ToResponse(snapshot with
             {
                 Visibility = visibility.Visibility,
@@ -172,7 +165,7 @@ public sealed class GetLeaderboardEndpoint(
                 request.CompetitionId,
                 visibility.VisibilityRevision,
                 cancellationToken);
-            return Processing(request.CompetitionId, visibility.LeaderboardRevision);
+            return Processing(request.CompetitionId);
         }
         var status = await leaderboard.GetStatusAsync(request.CompetitionId, cancellationToken);
         if (status.LastFailureAt is not null)
@@ -181,24 +174,20 @@ public sealed class GetLeaderboardEndpoint(
                 title: "Leaderboard projection is unavailable.",
                 extensions: new Dictionary<string, object?>
                 {
-                    ["code"] = LeaderboardProblemCode.LeaderboardProjectionFailed,
-                    ["targetRevision"] = status.TargetRevision,
-                    ["lastFailureAt"] = status.LastFailureAt
+                    ["code"] = LeaderboardProblemCode.LeaderboardProjectionFailed
                 });
-        await messages.ProjectLeaderboardAsync(request.CompetitionId, cancellationToken);
-        return Processing(request.CompetitionId, status.TargetRevision);
+        await leaderboard.InvalidateAsync(request.CompetitionId, cancellationToken);
+        return Processing(request.CompetitionId);
     }
 
     private Accepted<LeaderboardProcessingProtocolResponse> Processing(
-        Guid competitionId,
-        long targetRevision)
+        Guid competitionId)
     {
         HttpContext.Response.Headers.RetryAfter = "2";
         var statusUrl = $"/api/v1/competitions/{competitionId}/leaderboard";
         return TypedResults.Accepted(statusUrl, LeaderboardProtocolMapper.ToResponse(new LeaderboardProcessingResponse(
             competitionId,
             LeaderboardProjectionState.Processing,
-            targetRevision,
             statusUrl)));
     }
 }

@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.GameplayFacts.Processing;
 using Wolverine;
 using Wolverine.Postgresql;
 
@@ -15,8 +15,9 @@ public static class MessageRouting
         IConfiguration configuration,
         HostRoles roles)
     {
-        options.PublishMessage<EvaluateSubmission>().ToPostgresqlQueue("noctf-worker");
-        options.PublishMessage<InvalidateLeaderboard>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<EvaluateGameplayFact>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<GameplayFactStateChanged>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<RefreshDirtyLeaderboards>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ProjectLeaderboard>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ApplyCompetitionVisibility>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<CleanupCompetitionRuntimes>().ToPostgresqlQueue("noctf-worker");
@@ -31,7 +32,8 @@ public static class MessageRouting
         options.PublishMessage<RecordKohObservation>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<DispatchRuntime>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<StopRuntime>().ToPostgresqlQueue("noctf-worker");
-        options.PublishMessage<DrainSubmissions>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<DrainGameplayFactEvaluation>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<DrainGameplayFactRejudge>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<SendEmailVerification>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<SendPasswordReset>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<SendPasswordChangedNotification>().ToPostgresqlQueue("noctf-worker");

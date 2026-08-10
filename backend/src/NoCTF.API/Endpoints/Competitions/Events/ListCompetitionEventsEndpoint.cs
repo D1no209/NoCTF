@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Endpoints.Runtime;
-using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.GameplayFacts;
 using NoCTF.API.Endpoints.Teams;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
@@ -15,7 +15,7 @@ using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Runtime;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
@@ -29,10 +29,10 @@ public enum CompetitionEventKindProtocol
     LeaderboardVisibilityChanged, ChallengeCreated, ChallengeUpdated, ChallengePublished,
     ChallengeUnpublished, ChallengeDeleted, HintPublished, HintUnlocked, TeamRegistered,
     TeamRegistrationChanged, TeamUpdated, TeamDeleted, TeamMemberJoined, TeamMemberRemoved,
-    TeamCaptainTransferred, TeamBanned, TeamUnbanned, SubmissionReceived, SubmissionEvaluated,
+    TeamCaptainTransferred, TeamBanned, TeamUnbanned, GameplayFactReceived, GameplayFactAdjudicated,
     ScoringRecorded, FirstBloodAwarded, SecondBloodAwarded, ThirdBloodAwarded, RuntimeCreated,
     RuntimeStateChanged, RuntimeExtended, RuntimeReset, RuntimePortAllocated,
-    ProtectedSubmissionFlagAccessed, CheatIncidentDetected,
+    ProtectedGameplayFactValueAccessed, CheatIncidentDetected,
     CheatIncidentConfirmed, CheatIncidentDismissed, CheatIncidentSuperseded,
     CheatIncidentCorrected, ProtectedCompetitionExportCreated, TeamBanAppealSubmitted,
     TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished,
@@ -50,8 +50,6 @@ public enum CompetitionEventVisibilityProtocol { Public, Team, Staff }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventAccessLevelProtocol>))]
 public enum CompetitionEventAccessLevelProtocol { Participant, Team, Staff }
 
-[JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoringEventKindProtocol>))]
-public enum ScoringEventKindProtocol { SubmissionEvaluation, AwdServiceStatus, HintUnlock, KohObservation, ManualAdjust }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionQuestionStatusProtocol>))]
 public enum CompetitionQuestionStatusProtocol { Pending, Replied, Resolved, Closed }
@@ -73,7 +71,6 @@ internal static partial class CompetitionEventProtocolMapper
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventLevelProtocol ToProtocol(CompetitionEventLevel value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventVisibilityProtocol ToProtocol(CompetitionEventVisibility value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventAccessLevelProtocol ToProtocol(CompetitionEventAccessLevel value);
-    [MapEnum(EnumMappingStrategy.ByName)] public static partial ScoringEventKindProtocol ToProtocol(ScoringEventKind value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionQuestionStatusProtocol ToProtocol(CompetitionQuestionStatus value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial RuntimeCleanupResultProtocol ToProtocol(RuntimeCleanupResult value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial CompetitionEventKind ToDomain(CompetitionEventKindProtocol value);
@@ -125,17 +122,15 @@ public sealed record CompetitionEventResponse(
     string? ChallengeTitle,
     Guid? HintId,
     Guid? RuntimeInstanceId,
-    Guid? SubmissionId,
-    Guid? ScoringEventId,
+    Guid? GameplayFactId,
     Guid? QuestionId,
     Guid? ParentEventId,
     CompetitionStatusProtocol? CompetitionStatus,
     LeaderboardVisibilityProtocol? LeaderboardVisibility,
     TeamRegistrationStatusProtocol? TeamRegistrationStatus,
-    SubmissionKindProtocol? SubmissionKind,
-    SubmissionEvaluationStateProtocol? SubmissionState,
-    ScoringEventKindProtocol? ScoringEventKind,
-    ScoringResultProtocol? ScoringResult,
+    GameplayFactKindProtocol? GameplayFactKind,
+    GameplayFactStateProtocol? GameplayFactState,
+    GameplayFactResultProtocol? GameplayFactResult,
     RuntimeStateProtocol? RuntimeState,
     RuntimeCleanupResultProtocol? RuntimeCleanupResult,
     CompetitionQuestionStatusProtocol? QuestionStatus,
@@ -148,7 +143,7 @@ public sealed record CompetitionEventListResponse(
     CompetitionEventAccessLevelProtocol AccessLevel,
     Guid? ViewerTeamId,
     bool CanExport,
-    bool CanAccessSubmissionFlags,
+    bool CanAccessGameplayFactValues,
     IReadOnlyList<CompetitionEventResponse> Items,
     string? NextCursor);
 
@@ -232,7 +227,7 @@ public sealed class ListCompetitionEventsEndpoint(
             CompetitionEventProtocolMapper.ToProtocol(result.AccessLevel.Value),
             result.ViewerTeamId,
             result.CanExport,
-            result.CanAccessSubmissionFlags,
+            result.CanAccessGameplayFactValues,
             result.Items.Select(Map).ToArray(),
             nextCursor));
     }
@@ -269,17 +264,15 @@ public sealed class ListCompetitionEventsEndpoint(
             item.ChallengeTitle,
             item.HintId,
             item.RuntimeInstanceId,
-            item.SubmissionId,
-            item.ScoringEventId,
+            item.GameplayFactId,
             item.QuestionId,
             item.ParentEventId,
             item.CompetitionStatus is null ? null : CompetitionProtocolMapper.ToProtocol(item.CompetitionStatus.Value),
             item.LeaderboardVisibility is null ? null : CompetitionProtocolMapper.ToProtocol(item.LeaderboardVisibility.Value),
             item.TeamRegistrationStatus is null ? null : TeamMapper.ToProtocol(item.TeamRegistrationStatus.Value),
-            item.SubmissionKind is null ? null : SubmissionMapper.ToProtocol(item.SubmissionKind.Value),
-            item.SubmissionState is null ? null : SubmissionMapper.ToProtocol(item.SubmissionState.Value),
-            item.ScoringEventKind is null ? null : CompetitionEventProtocolMapper.ToProtocol(item.ScoringEventKind.Value),
-            item.ScoringResult is null ? null : SubmissionMapper.ToProtocol(item.ScoringResult.Value),
+            item.GameplayFactKind is null ? null : GameplayFactMapper.ToProtocol(item.GameplayFactKind.Value),
+            item.GameplayFactState is null ? null : GameplayFactMapper.ToProtocol(item.GameplayFactState.Value),
+            item.GameplayFactResult is null ? null : GameplayFactMapper.ToProtocol(item.GameplayFactResult.Value),
             item.RuntimeState is null ? null : RuntimeProtocolMapper.ToProtocol(item.RuntimeState.Value),
             item.RuntimeCleanupResult is null
                 ? null

@@ -2,7 +2,7 @@ using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Runtime;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Shared;
 
@@ -27,17 +27,15 @@ public sealed record CompetitionEventDraft(
     Guid? CompetitionChallengeId = null,
     Guid? HintId = null,
     Guid? RuntimeInstanceId = null,
-    Guid? SubmissionId = null,
-    Guid? ScoringEventId = null,
+    Guid? GameplayFactId = null,
     Guid? QuestionId = null,
     Guid? ParentEventId = null,
     CompetitionStatus? CompetitionStatus = null,
     CompetitionLeaderboardVisibility? LeaderboardVisibility = null,
     TeamRegistrationStatus? TeamRegistrationStatus = null,
-    SubmissionKind? SubmissionKind = null,
-    SubmissionEvaluationState? SubmissionState = null,
-    ScoringEventKind? ScoringEventKind = null,
-    ScoringResult? ScoringResult = null,
+    GameplayFactKind? GameplayFactKind = null,
+    GameplayFactState? GameplayFactState = null,
+    GameplayFactResult? GameplayFactResult = null,
     RuntimeState? RuntimeState = null,
     RuntimeCleanupResult? RuntimeCleanupResult = null,
     CompetitionQuestionStatus? QuestionStatus = null,
@@ -109,17 +107,15 @@ public sealed record CompetitionEventView(
     string? ChallengeTitle,
     Guid? HintId,
     Guid? RuntimeInstanceId,
-    Guid? SubmissionId,
-    Guid? ScoringEventId,
+    Guid? GameplayFactId,
     Guid? QuestionId,
     Guid? ParentEventId,
     CompetitionStatus? CompetitionStatus,
     CompetitionLeaderboardVisibility? LeaderboardVisibility,
     TeamRegistrationStatus? TeamRegistrationStatus,
-    SubmissionKind? SubmissionKind,
-    SubmissionEvaluationState? SubmissionState,
-    ScoringEventKind? ScoringEventKind,
-    ScoringResult? ScoringResult,
+    GameplayFactKind? GameplayFactKind,
+    GameplayFactState? GameplayFactState,
+    GameplayFactResult? GameplayFactResult,
     RuntimeState? RuntimeState,
     RuntimeCleanupResult? RuntimeCleanupResult,
     CompetitionQuestionStatus? QuestionStatus,
@@ -141,7 +137,7 @@ public sealed record CompetitionEventPage(
     CompetitionEventAccessLevel? AccessLevel = null,
     Guid? ViewerTeamId = null,
     bool CanExport = false,
-    bool CanAccessSubmissionFlags = false,
+    bool CanAccessGameplayFactValues = false,
     IReadOnlyList<CompetitionEventView>? Items = null);
 
 public sealed record CompetitionEventExport(
@@ -152,22 +148,22 @@ public sealed record CompetitionEventExportResult(
     CompetitionEventReadState State,
     CompetitionEventExport? Export = null);
 
-public sealed record SubmissionFlagAccessCommand(
+public sealed record GameplayFactValueAccessCommand(
     Guid CompetitionId,
-    Guid SubmissionId,
+    Guid GameplayFactId,
     Guid ActorUserId,
     string Reason,
     DateTimeOffset AccessedAt);
 
-public sealed record SubmissionFlagAccessView(
-    Guid SubmissionId,
-    SubmissionKind SubmissionKind,
-    string SubmittedFlag,
+public sealed record GameplayFactValueAccessView(
+    Guid GameplayFactId,
+    GameplayFactKind GameplayFactKind,
+    string Value,
     DateTimeOffset AccessedAt);
 
-public sealed record SubmissionFlagAccessResult(
+public sealed record GameplayFactValueAccessResult(
     CompetitionEventReadState State,
-    SubmissionFlagAccessView? View = null);
+    GameplayFactValueAccessView? View = null);
 
 public interface ICompetitionEventStore
 {
@@ -179,8 +175,8 @@ public interface ICompetitionEventStore
         CompetitionEventQuery query,
         CancellationToken cancellationToken);
 
-    Task<SubmissionFlagAccessResult> AccessSubmissionFlagAsync(
-        SubmissionFlagAccessCommand command,
+    Task<GameplayFactValueAccessResult> AccessGameplayFactValueAsync(
+        GameplayFactValueAccessCommand command,
         CancellationToken cancellationToken);
 }
 
@@ -212,16 +208,16 @@ public sealed class ExportCompetitionEvents(ICompetitionEventStore store)
                 CompetitionEventReadState.InvalidQuery));
 }
 
-public sealed class AccessSubmissionFlag(ICompetitionEventStore store)
+public sealed class AccessGameplayFactValue(ICompetitionEventStore store)
 {
-    public Task<SubmissionFlagAccessResult> ExecuteAsync(
-        SubmissionFlagAccessCommand command,
+    public Task<GameplayFactValueAccessResult> ExecuteAsync(
+        GameplayFactValueAccessCommand command,
         CancellationToken cancellationToken = default)
     {
         var reason = command.Reason.Trim();
         return reason.Length is >= 8 and <= 512
-            ? store.AccessSubmissionFlagAsync(command with { Reason = reason }, cancellationToken)
-            : Task.FromResult(new SubmissionFlagAccessResult(
+            ? store.AccessGameplayFactValueAsync(command with { Reason = reason }, cancellationToken)
+            : Task.FromResult(new GameplayFactValueAccessResult(
                 CompetitionEventReadState.InvalidQuery));
     }
 }

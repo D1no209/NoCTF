@@ -1,6 +1,6 @@
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Configuration;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.GameModes.Awdp.Configuration;
 

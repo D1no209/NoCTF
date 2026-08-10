@@ -8,6 +8,7 @@ namespace NoCTF.Infrastructure.Caching;
 
 public static class NoCtfCacheNames
 {
+    public const string Leaderboards = "leaderboards";
     public const string ReadModels = "read-models";
     public const string LocalComputation = "local-computation";
 }
@@ -21,12 +22,9 @@ public static class CachingInfrastructure
     {
         services.AddNoCtfLocalComputationCaching(configuration);
 
-        var leaderboard = services.AddFusionCache()
+        var leaderboard = services.AddFusionCache(NoCtfCacheNames.Leaderboards)
             .WithOptions(options => options.CacheKeyPrefix = "noctf:leaderboard:")
-            .WithDefaultEntryOptions(options =>
-                options.Duration = TimeSpan.FromSeconds(Math.Max(
-                    5,
-                    configuration.GetValue("Leaderboard:CacheTtlSeconds", 60))));
+            .WithDefaultEntryOptions(options => options.Duration = TimeSpan.FromDays(3650));
         var readModels = services.AddFusionCache(NoCtfCacheNames.ReadModels)
             .WithOptions(options => options.CacheKeyPrefix = "noctf:read-models:")
             .WithDefaultEntryOptions(options =>

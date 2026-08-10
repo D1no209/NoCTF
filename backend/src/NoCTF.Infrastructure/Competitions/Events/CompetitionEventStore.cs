@@ -50,10 +50,9 @@ public sealed class CompetitionEventStore(
                 competitionStatus = draft.CompetitionStatus,
                 leaderboardVisibility = draft.LeaderboardVisibility,
                 teamRegistrationStatus = draft.TeamRegistrationStatus,
-                submissionKind = draft.SubmissionKind,
-                submissionState = draft.SubmissionState,
-                scoringEventKind = draft.ScoringEventKind,
-                scoringResult = draft.ScoringResult,
+                gameplayFactKind = draft.GameplayFactKind,
+                gameplayFactState = draft.GameplayFactState,
+                gameplayFactResult = draft.GameplayFactResult,
                 runtimeState = draft.RuntimeState,
                 runtimeCleanupResult = draft.RuntimeCleanupResult,
                 questionStatus = draft.QuestionStatus,
@@ -64,8 +63,7 @@ public sealed class CompetitionEventStore(
                 competitionChallengeId = draft.CompetitionChallengeId,
                 hintId = draft.HintId,
                 runtimeInstanceId = draft.RuntimeInstanceId,
-                submissionId = draft.SubmissionId,
-                scoringEventId = draft.ScoringEventId,
+                gameplayFactId = draft.GameplayFactId,
                 questionId = draft.QuestionId,
                 reason = SanitizeReason(draft.Reason)
             }, ExportJsonOptions),
@@ -97,7 +95,7 @@ public sealed class CompetitionEventStore(
             access.AccessLevel,
             access.TeamId,
             access.CanExport,
-            access.CanAccessSubmissionFlags,
+            access.CanAccessGameplayFactValues,
             await EnrichAsync(items, cancellationToken));
     }
 
@@ -135,8 +133,8 @@ public sealed class CompetitionEventStore(
             new CompetitionEventExport(stream, fileName));
     }
 
-    public async Task<SubmissionFlagAccessResult> AccessSubmissionFlagAsync(
-        SubmissionFlagAccessCommand command,
+    public async Task<GameplayFactValueAccessResult> AccessGameplayFactValueAsync(
+        GameplayFactValueAccessCommand command,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -146,51 +144,51 @@ public sealed class CompetitionEventStore(
             cancellationToken);
         if (access.State != CompetitionEventReadState.Available)
             return new(access.State);
-        if (!access.CanAccessSubmissionFlags)
+        if (!access.CanAccessGameplayFactValues)
             return new(CompetitionEventReadState.Forbidden);
 
-        var submission = await db.Submissions
+        var submission = await db.GameplayFacts
             .Where(item =>
                 item.CompetitionId == command.CompetitionId
-                && item.Id == command.SubmissionId
-                && item.SubmittedFlag != null)
+                && item.Id == command.GameplayFactId
+                && item.Value != null)
             .Select(item => new
             {
                 item.Id,
                 item.TeamId,
                 item.CompetitionChallengeId,
                 item.Kind,
-                SubmittedFlag = item.SubmittedFlag!
+                Value = item.Value!
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (submission is null)
             return new(CompetitionEventReadState.CompetitionNotFound);
 
         var safeReason = command.Reason.Replace(
-            submission.SubmittedFlag,
+            submission.Value,
             "[REDACTED]",
             StringComparison.Ordinal);
         await RecordAsync(new CompetitionEventDraft(
             command.CompetitionId,
-            CompetitionEventKind.ProtectedSubmissionFlagAccessed,
+            CompetitionEventKind.ProtectedGameplayFactValueAccessed,
             CompetitionEventLevel.Warning,
             CompetitionEventVisibility.Staff,
             command.AccessedAt,
             ActorUserId: command.ActorUserId,
             TeamId: submission.TeamId,
             CompetitionChallengeId: submission.CompetitionChallengeId,
-            SubmissionId: submission.Id,
-            SubmissionKind: submission.Kind,
+            GameplayFactId: submission.Id,
+            GameplayFactKind: submission.Kind,
             Reason: safeReason), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return new(
             CompetitionEventReadState.Available,
-            new SubmissionFlagAccessView(
+            new GameplayFactValueAccessView(
                 submission.Id,
                 submission.Kind,
-                submission.SubmittedFlag,
+                submission.Value,
                 command.AccessedAt));
     }
 
@@ -388,17 +386,15 @@ public sealed class CompetitionEventStore(
             Resolve(challenges, challengeId),
             item.HintId,
             item.RuntimeInstanceId,
-            item.SubmissionId,
-            item.ScoringEventId,
+            item.GameplayFactId,
             item.QuestionId,
             item.ParentEventId,
             payload.CompetitionStatus,
             payload.LeaderboardVisibility,
             payload.TeamRegistrationStatus,
-            payload.SubmissionKind,
-            payload.SubmissionState,
-            payload.ScoringEventKind,
-            payload.ScoringResult,
+            payload.GameplayFactKind,
+            payload.GameplayFactState,
+            payload.GameplayFactResult,
             payload.RuntimeState,
             payload.RuntimeCleanupResult,
             payload.QuestionStatus,
@@ -430,10 +426,8 @@ public sealed class CompetitionEventStore(
     {
         if (draft.SubjectType is { } explicitType && draft.SubjectId is { } explicitId)
             return (explicitType, explicitId);
-        if (draft.ScoringEventId is { } scoringEventId)
-            return (EntityReferenceKind.ScoringEvent, scoringEventId);
-        if (draft.SubmissionId is { } submissionId)
-            return (EntityReferenceKind.Submission, submissionId);
+        if (draft.GameplayFactId is { } gameplayFactId)
+            return (EntityReferenceKind.GameplayFact, gameplayFactId);
         if (draft.RuntimeInstanceId is { } runtimeId)
             return (EntityReferenceKind.RuntimeInstance, runtimeId);
         if (draft.HintId is { } hintId)
@@ -463,10 +457,9 @@ public sealed class CompetitionEventStore(
                 EntityReferenceKind.CompetitionChallenge,
                 draft.CompetitionChallengeId,
                 subject)
-            ?? Candidate(EntityReferenceKind.Submission, draft.SubmissionId, subject)
+            ?? Candidate(EntityReferenceKind.GameplayFact, draft.GameplayFactId, subject)
             ?? Candidate(EntityReferenceKind.RuntimeInstance, draft.RuntimeInstanceId, subject)
             ?? Candidate(EntityReferenceKind.ChallengeHint, draft.HintId, subject)
-            ?? Candidate(EntityReferenceKind.ScoringEvent, draft.ScoringEventId, subject)
             ?? Candidate(EntityReferenceKind.Notification, draft.QuestionId, subject);
     }
 
@@ -494,10 +487,9 @@ public sealed class CompetitionEventStore(
         CompetitionStatus? CompetitionStatus = null,
         CompetitionLeaderboardVisibility? LeaderboardVisibility = null,
         TeamRegistrationStatus? TeamRegistrationStatus = null,
-        NoCTF.Domain.Submissions.SubmissionKind? SubmissionKind = null,
-        NoCTF.Domain.Submissions.SubmissionEvaluationState? SubmissionState = null,
-        NoCTF.Domain.Submissions.ScoringEventKind? ScoringEventKind = null,
-        NoCTF.Domain.Submissions.ScoringResult? ScoringResult = null,
+        NoCTF.Domain.Gameplay.GameplayFactKind? GameplayFactKind = null,
+        NoCTF.Domain.Gameplay.GameplayFactState? GameplayFactState = null,
+        NoCTF.Domain.Gameplay.GameplayFactResult? GameplayFactResult = null,
         NoCTF.Domain.Runtime.RuntimeState? RuntimeState = null,
         NoCTF.Domain.Runtime.RuntimeCleanupResult? RuntimeCleanupResult = null,
         NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus? QuestionStatus = null,
@@ -510,5 +502,5 @@ public sealed class CompetitionEventStore(
         CompetitionEventAccessLevel? AccessLevel = null,
         Guid? TeamId = null,
         bool CanExport = false,
-        bool CanAccessSubmissionFlags = false);
+        bool CanAccessGameplayFactValues = false);
 }

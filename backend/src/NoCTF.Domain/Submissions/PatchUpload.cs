@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace NoCTF.Domain.Submissions;
+namespace NoCTF.Domain.Gameplay;
 
 public sealed class PatchUpload
 {
@@ -18,6 +18,4 @@ public sealed class PatchUpload
     [NotMapped] public long ByteLength => File.ByteLength;
     [NotMapped] public byte[] Sha256 => File.Sha256;
     public DateTimeOffset UploadedAt { get; set; }
-    public DateTimeOffset? ConsumedAt { get; set; }
-    public Guid? SubmissionId { get; set; }
 }

@@ -82,7 +82,7 @@ internal static class CompetitionInfrastructure
         services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
         services.AddScoped<ListCompetitionEvents>();
         services.AddScoped<ExportCompetitionEvents>();
-        services.AddScoped<AccessSubmissionFlag>();
+        services.AddScoped<AccessGameplayFactValue>();
         if (!development)
             services.AddSingleton<RedisCompetitionEventRefreshPublisher>();
         return services;

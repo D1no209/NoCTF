@@ -2,7 +2,7 @@ using NoCTF.Domain.Competitions;
 
 namespace NoCTF.GameModes.Registration;
 
-public sealed record GameModeDescriptor(GameMode Mode, int CurrentSchemaVersion, bool SupportsFixSubmissions);
+public sealed record GameModeDescriptor(GameMode Mode, int CurrentSchemaVersion, bool SupportsFixAttempts);
 
 /// <summary>Describes the four compile-time modes without runtime plugin discovery.</summary>
 public static class GameModeCatalog

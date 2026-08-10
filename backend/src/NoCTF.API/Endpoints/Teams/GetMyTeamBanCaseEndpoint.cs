@@ -13,7 +13,7 @@ public sealed class GetMyTeamBanCaseRequest
 
 public sealed record MyTeamBanAppealResponse(
     Guid Id,
-    Guid SubmittedByUserId,
+    Guid ActorUserId,
     string SubmittedByUserName,
     string Statement,
     DateTimeOffset SubmittedAt,
@@ -81,7 +81,7 @@ public sealed class GetMyTeamBanCaseEndpoint(
                 ? null
                 : new MyTeamBanAppealResponse(
                     banCase.Appeal.Id,
-                    banCase.Appeal.SubmittedByUserId,
+                    banCase.Appeal.ActorUserId,
                     banCase.Appeal.SubmittedByUserName,
                     banCase.Appeal.Statement,
                     banCase.Appeal.SubmittedAt,

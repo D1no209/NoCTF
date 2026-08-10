@@ -1,5 +1,5 @@
 using NoCTF.Application.Competitions.Lifecycle;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
 

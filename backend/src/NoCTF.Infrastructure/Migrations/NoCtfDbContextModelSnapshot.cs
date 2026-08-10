@@ -364,9 +364,9 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid[]")
                         .HasColumnName("judge_ids");
 
-                    b.Property<long>("LeaderboardRevision")
-                        .HasColumnType("bigint")
-                        .HasColumnName("leaderboard_revision");
+                    b.Property<bool>("LeaderboardDirty")
+                        .HasColumnType("boolean")
+                        .HasColumnName("leaderboard_dirty");
 
                     b.Property<short>("LeaderboardVisibility")
                         .HasColumnType("smallint")
@@ -686,6 +686,169 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasDatabaseName("ix_data_exports_requested_by_user_id_scope_competition_id_requ");
 
                     b.ToTable("data_exports", (string)null);
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<short?>("FailureCode")
+                        .HasColumnType("smallint")
+                        .HasColumnName("failure_code");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reference_id");
+
+                    b.Property<short?>("ReferenceKind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("reference_kind");
+
+                    b.Property<short?>("Result")
+                        .HasColumnType("smallint")
+                        .HasColumnName("result");
+
+                    b.Property<short>("State")
+                        .HasColumnType("smallint")
+                        .HasColumnName("state");
+
+                    b.Property<Guid?>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("text")
+                        .HasColumnName("value");
+
+                    b.Property<byte[]>("ValueSha256")
+                        .HasMaxLength(32)
+                        .HasColumnType("bytea")
+                        .HasColumnName("value_sha256");
+
+                    b.Property<Guid?>("VictimTeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("victim_team_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_gameplay_facts");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_gameplay_facts_actor_user_id");
+
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_gameplay_facts_competition_challenge_id");
+
+                    b.HasIndex("ReferenceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_gameplay_facts_reference_id")
+                        .HasFilter("reference_kind = 0");
+
+                    b.HasIndex("TeamId")
+                        .HasDatabaseName("ix_gameplay_facts_team_id");
+
+                    b.HasIndex("VictimTeamId")
+                        .HasDatabaseName("ix_gameplay_facts_victim_team_id");
+
+                    b.HasIndex("CompetitionId", "OccurredAt", "Id")
+                        .HasDatabaseName("ix_gameplay_facts_competition_id_occurred_at_id");
+
+                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "OccurredAt", "Id")
+                        .HasDatabaseName("ix_gameplay_facts_competition_id_team_id_competition_challenge");
+
+                    b.ToTable("gameplay_facts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_gameplay_facts_koh_team", "kind <> 6 OR (result = 9 AND team_id IS NOT NULL) OR (result IS DISTINCT FROM 9 AND team_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_gameplay_facts_reference", "(reference_kind IS NULL) = (reference_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_gameplay_facts_result", "result IS NULL OR (kind IN (0, 1) AND result IN (0, 1, 2, 3, 4)) OR (kind = 2 AND result IN (0, 1, 3, 4)) OR (kind = 3 AND result IN (2, 4, 5)) OR (kind = 4 AND result = 6) OR (kind = 5 AND result IN (7, 8)) OR (kind = 6 AND result IN (9, 10))");
+
+                            t.HasCheckConstraint("ck_gameplay_facts_shape", "(kind = 0 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NOT NULL AND octet_length(value_sha256) = 32 AND (reference_kind IS NULL OR reference_kind = 2)) OR (kind = 1 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NOT NULL AND octet_length(value_sha256) = 32 AND reference_kind IS NULL) OR (kind = 2 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NULL AND value_sha256 IS NULL AND reference_kind = 0) OR (kind = 3 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NULL AND value_sha256 IS NULL AND reference_kind = 1) OR (kind = 4 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value ~ '^-?(0|[1-9][0-9]*)$' AND value <> '0' AND value <> '-0' AND value::bigint BETWEEN -2147483648 AND 2147483647 AND value_sha256 IS NULL AND reference_kind IS NULL) OR (kind = 5 AND team_id IS NOT NULL AND actor_user_id IS NULL AND value IS NULL AND value_sha256 IS NULL AND reference_kind IS NULL AND victim_team_id IS NULL) OR (kind = 6 AND actor_user_id IS NULL AND value IS NULL AND value_sha256 IS NULL AND reference_kind IS NULL AND victim_team_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_gameplay_facts_state_result", "state <> 3 OR result IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_gameplay_facts_victim", "victim_team_id IS NULL OR kind = 0");
+                        });
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.PatchUpload", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("CompetitionChallengeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_challenge_id");
+
+                    b.Property<Guid>("CompetitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("competition_id");
+
+                    b.Property<Guid>("FileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("file_id");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("team_id");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_at");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("uploaded_by_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_patch_uploads");
+
+                    b.HasIndex("CompetitionChallengeId")
+                        .HasDatabaseName("ix_patch_uploads_competition_challenge_id");
+
+                    b.HasIndex("CompetitionId")
+                        .HasDatabaseName("ix_patch_uploads_competition_id");
+
+                    b.HasIndex("FileId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_patch_uploads_file_id");
+
+                    b.HasIndex("UploadedByUserId")
+                        .HasDatabaseName("ix_patch_uploads_uploaded_by_user_id");
+
+                    b.HasIndex("TeamId", "CompetitionChallengeId")
+                        .HasDatabaseName("ix_patch_uploads_team_id_competition_challenge_id");
+
+                    b.ToTable("patch_uploads", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Identity.AccountToken", b =>
@@ -1122,6 +1285,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("failure_code");
 
+                    b.Property<Guid?>("GameplayFactId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("gameplay_fact_id");
+
                     b.Property<int>("Generation")
                         .HasColumnType("integer")
                         .HasColumnName("generation");
@@ -1207,14 +1374,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("stopped_at");
 
-                    b.Property<Guid?>("SubmissionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("submission_id");
-
-                    b.Property<long?>("SubmissionProcessingVersion")
-                        .HasColumnType("bigint")
-                        .HasColumnName("submission_processing_version");
-
                     b.Property<Guid?>("TeamId")
                         .HasColumnType("uuid")
                         .HasColumnName("team_id");
@@ -1233,13 +1392,13 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("CompetitionId")
                         .HasDatabaseName("ix_runtime_instances_competition_id");
 
+                    b.HasIndex("GameplayFactId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_runtime_instances_gameplay_fact_id")
+                        .HasFilter("purpose = 1 AND gameplay_fact_id IS NOT NULL AND state IN (0, 1, 2, 3)");
+
                     b.HasIndex("ReplacesRuntimeInstanceId")
                         .HasDatabaseName("ix_runtime_instances_replaces_runtime_instance_id");
-
-                    b.HasIndex("SubmissionId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_runtime_instances_submission_id")
-                        .HasFilter("purpose = 1 AND submission_id IS NOT NULL AND state IN (0, 1, 2, 3)");
 
                     b.HasIndex("TeamId")
                         .HasDatabaseName("ix_runtime_instances_team_id");
@@ -1264,7 +1423,7 @@ namespace NoCTF.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_runtime_instances_awd_checker_target", "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
 
-                            t.HasCheckConstraint("ck_runtime_instances_awdp_submission", "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
+                            t.HasCheckConstraint("ck_runtime_instances_awdp_gameplay_fact", "(purpose = 1) = (gameplay_fact_id IS NOT NULL)");
 
                             t.HasCheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
 
@@ -1322,279 +1481,6 @@ namespace NoCTF.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_files_byte_length", "byte_length >= 0");
 
                             t.HasCheckConstraint("ck_files_sha256_length", "octet_length(sha256) = 32");
-                        });
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Submissions.PatchUpload", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("CompetitionChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_challenge_id");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_id");
-
-                    b.Property<DateTimeOffset?>("ConsumedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("consumed_at");
-
-                    b.Property<Guid>("FileId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("file_id");
-
-                    b.Property<Guid?>("SubmissionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("submission_id");
-
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("team_id");
-
-                    b.Property<DateTimeOffset>("UploadedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("uploaded_at");
-
-                    b.Property<Guid>("UploadedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("uploaded_by_user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_patch_uploads");
-
-                    b.HasIndex("CompetitionChallengeId")
-                        .HasDatabaseName("ix_patch_uploads_competition_challenge_id");
-
-                    b.HasIndex("CompetitionId")
-                        .HasDatabaseName("ix_patch_uploads_competition_id");
-
-                    b.HasIndex("FileId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_patch_uploads_file_id");
-
-                    b.HasIndex("SubmissionId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_patch_uploads_submission_id")
-                        .HasFilter("submission_id IS NOT NULL");
-
-                    b.HasIndex("UploadedByUserId")
-                        .HasDatabaseName("ix_patch_uploads_uploaded_by_user_id");
-
-                    b.HasIndex("TeamId", "CompetitionChallengeId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_patch_uploads_team_id_competition_challenge_id")
-                        .HasFilter("consumed_at IS NULL");
-
-                    b.ToTable("patch_uploads", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_patch_uploads_consumption", "(consumed_at IS NULL) = (submission_id IS NULL)");
-                        });
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Submissions.ScoringEvent", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("CompetitionChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_challenge_id");
-
-                    b.Property<int>("CompetitionChallengeRevision")
-                        .HasColumnType("integer")
-                        .HasColumnName("competition_challenge_revision");
-
-                    b.Property<int>("CompetitionConfigurationRevision")
-                        .HasColumnType("integer")
-                        .HasColumnName("competition_configuration_revision");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<short?>("FailureCode")
-                        .HasColumnType("smallint")
-                        .HasColumnName("failure_code");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<DateTimeOffset>("OccurredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_at");
-
-                    b.Property<long?>("ProcessingVersion")
-                        .HasColumnType("bigint")
-                        .HasColumnName("processing_version");
-
-                    b.Property<short>("Result")
-                        .HasColumnType("smallint")
-                        .HasColumnName("result");
-
-                    b.Property<Guid?>("SpecificationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("specification_id");
-
-                    b.Property<short?>("SpecificationKind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("specification_kind");
-
-                    b.Property<Guid?>("SubmissionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("submission_id");
-
-                    b.Property<Guid?>("TeamId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("team_id");
-
-                    b.Property<Guid?>("VictimTeamId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("victim_team_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_scoring_events");
-
-                    b.HasIndex("CompetitionChallengeId")
-                        .HasDatabaseName("ix_scoring_events_competition_challenge_id");
-
-                    b.HasIndex("SubmissionId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_scoring_events_submission_id")
-                        .HasFilter("submission_id IS NOT NULL AND deleted_at IS NULL");
-
-                    b.HasIndex("TeamId")
-                        .HasDatabaseName("ix_scoring_events_team_id");
-
-                    b.HasIndex("VictimTeamId")
-                        .HasDatabaseName("ix_scoring_events_victim_team_id");
-
-                    b.HasIndex("CompetitionId", "OccurredAt", "Id")
-                        .HasDatabaseName("ix_scoring_events_competition_id_occurred_at_id");
-
-                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "OccurredAt")
-                        .HasDatabaseName("ix_scoring_events_competition_id_team_id_competition_challenge");
-
-                    b.ToTable("scoring_events", (string)null);
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Submissions.Submission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("CompetitionChallengeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_challenge_id");
-
-                    b.Property<Guid>("CompetitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_id");
-
-                    b.Property<Guid?>("CurrentScoringEventId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("current_scoring_event_id");
-
-                    b.Property<Guid?>("EvaluationClaimId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("evaluation_claim_id");
-
-                    b.Property<short?>("EvaluationFailureCode")
-                        .HasColumnType("smallint")
-                        .HasColumnName("evaluation_failure_code");
-
-                    b.Property<byte[]>("EvaluationResultBodySha256")
-                        .HasMaxLength(32)
-                        .HasColumnType("bytea")
-                        .HasColumnName("evaluation_result_body_sha256");
-
-                    b.Property<short>("EvaluationState")
-                        .HasColumnType("smallint")
-                        .HasColumnName("evaluation_state");
-
-                    b.Property<DateTimeOffset>("EvaluationUpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("evaluation_updated_at");
-
-                    b.Property<short>("Kind")
-                        .HasColumnType("smallint")
-                        .HasColumnName("kind");
-
-                    b.Property<Guid?>("PatchUploadId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("patch_upload_id");
-
-                    b.Property<long>("ProcessingVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("processing_version");
-
-                    b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("received_at");
-
-                    b.Property<Guid>("SubmittedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("submitted_by_user_id");
-
-                    b.Property<string>("SubmittedFlag")
-                        .HasColumnType("text")
-                        .HasColumnName("submitted_flag");
-
-                    b.Property<byte[]>("SubmittedFlagSha256")
-                        .HasColumnType("bytea")
-                        .HasColumnName("submitted_flag_sha256");
-
-                    b.Property<Guid>("TeamId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("team_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_submissions");
-
-                    b.HasIndex("CompetitionChallengeId")
-                        .HasDatabaseName("ix_submissions_competition_challenge_id");
-
-                    b.HasIndex("CurrentScoringEventId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_submissions_current_scoring_event_id");
-
-                    b.HasIndex("PatchUploadId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_submissions_patch_upload_id");
-
-                    b.HasIndex("SubmittedByUserId")
-                        .HasDatabaseName("ix_submissions_submitted_by_user_id");
-
-                    b.HasIndex("TeamId")
-                        .HasDatabaseName("ix_submissions_team_id");
-
-                    b.HasIndex("CompetitionId", "ReceivedAt", "Id")
-                        .HasDatabaseName("ix_submissions_competition_id_received_at_id");
-
-                    b.HasIndex("CompetitionId", "TeamId", "CompetitionChallengeId", "Kind", "ReceivedAt", "Id")
-                        .HasDatabaseName("ix_submissions_competition_id_team_id_competition_challenge_id");
-
-                    b.ToTable("submissions", null, t =>
-                        {
-                            t.HasCheckConstraint("ck_submissions_payload", "(kind IN (0, 1) AND submitted_flag IS NOT NULL AND octet_length(submitted_flag_sha256) = 32 AND patch_upload_id IS NULL) OR (kind = 2 AND submitted_flag IS NULL AND submitted_flag_sha256 IS NULL AND patch_upload_id IS NOT NULL) OR (kind = 3 AND submitted_flag ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' AND submitted_flag_sha256 IS NULL AND patch_upload_id IS NULL) OR (kind = 4 AND submitted_flag ~ '^-?(0|[1-9][0-9]*)$' AND submitted_flag <> '0' AND submitted_flag <> '-0' AND submitted_flag::bigint BETWEEN -2147483648 AND 2147483647 AND submitted_flag_sha256 IS NULL AND patch_upload_id IS NULL)");
                         });
                 });
 
@@ -1869,6 +1755,81 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Navigation("File");
                 });
 
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_gameplay_facts_users_actor_user_id");
+
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_gameplay_facts_competition_challenges_competition_challenge");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_gameplay_facts_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_gameplay_facts_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("VictimTeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_gameplay_facts_teams_victim_team_id");
+                });
+
+            modelBuilder.Entity("NoCTF.Domain.Gameplay.PatchUpload", b =>
+                {
+                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionChallengeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_competition_challenges_competition_challenge_");
+
+                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
+                        .WithMany()
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_competitions_competition_id");
+
+                    b.HasOne("NoCTF.Domain.Storage.StoredFile", "File")
+                        .WithMany()
+                        .HasForeignKey("FileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_files_file_id");
+
+                    b.HasOne("NoCTF.Domain.Teams.Team", null)
+                        .WithMany()
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_teams_team_id");
+
+                    b.HasOne("NoCTF.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_patch_uploads_users_uploaded_by_user_id");
+
+                    b.Navigation("File");
+                });
+
             modelBuilder.Entity("NoCTF.Domain.Identity.AccountToken", b =>
                 {
                     b.HasOne("NoCTF.Domain.Identity.User", null)
@@ -1926,17 +1887,17 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_runtime_instances_competitions_competition_id");
 
+                    b.HasOne("NoCTF.Domain.Gameplay.GameplayFact", null)
+                        .WithMany()
+                        .HasForeignKey("GameplayFactId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_runtime_instances_gameplay_facts_gameplay_fact_id");
+
                     b.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
                         .WithMany()
                         .HasForeignKey("ReplacesRuntimeInstanceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_runtime_instances_runtime_instances_replaces_runtime_instan");
-
-                    b.HasOne("NoCTF.Domain.Submissions.Submission", null)
-                        .WithMany()
-                        .HasForeignKey("SubmissionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_runtime_instances_submissions_submission_id");
 
                     b.HasOne("NoCTF.Domain.Teams.Team", null)
                         .WithMany()
@@ -1975,125 +1936,6 @@ namespace NoCTF.Infrastructure.Migrations
                         });
 
                     b.Navigation("PublishedPorts");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Submissions.PatchUpload", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionChallengeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_patch_uploads_competition_challenges_competition_challenge_");
-
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_patch_uploads_competitions_competition_id");
-
-                    b.HasOne("NoCTF.Domain.Storage.StoredFile", "File")
-                        .WithMany()
-                        .HasForeignKey("FileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_patch_uploads_files_file_id");
-
-                    b.HasOne("NoCTF.Domain.Teams.Team", null)
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_patch_uploads_teams_team_id");
-
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("UploadedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_patch_uploads_users_uploaded_by_user_id");
-
-                    b.Navigation("File");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Submissions.ScoringEvent", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionChallengeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_scoring_events_competition_challenges_competition_challenge");
-
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_scoring_events_competitions_competition_id");
-
-                    b.HasOne("NoCTF.Domain.Submissions.Submission", "Submission")
-                        .WithMany()
-                        .HasForeignKey("SubmissionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_scoring_events_submissions_submission_id");
-
-                    b.HasOne("NoCTF.Domain.Teams.Team", null)
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_scoring_events_teams_team_id");
-
-                    b.HasOne("NoCTF.Domain.Teams.Team", null)
-                        .WithMany()
-                        .HasForeignKey("VictimTeamId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_scoring_events_teams_victim_team_id");
-
-                    b.Navigation("Submission");
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.Submissions.Submission", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Challenges.CompetitionChallenge", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionChallengeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_submissions_competition_challenges_competition_challenge_id");
-
-                    b.HasOne("NoCTF.Domain.Competitions.Competition", null)
-                        .WithMany()
-                        .HasForeignKey("CompetitionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_submissions_competitions_competition_id");
-
-                    b.HasOne("NoCTF.Domain.Submissions.ScoringEvent", null)
-                        .WithMany()
-                        .HasForeignKey("CurrentScoringEventId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_submissions_scoring_events_current_scoring_event_id");
-
-                    b.HasOne("NoCTF.Domain.Submissions.PatchUpload", null)
-                        .WithOne()
-                        .HasForeignKey("NoCTF.Domain.Submissions.Submission", "PatchUploadId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_submissions_patch_uploads_patch_upload_id");
-
-                    b.HasOne("NoCTF.Domain.Identity.User", null)
-                        .WithMany()
-                        .HasForeignKey("SubmittedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_submissions_users_submitted_by_user_id");
-
-                    b.HasOne("NoCTF.Domain.Teams.Team", null)
-                        .WithMany()
-                        .HasForeignKey("TeamId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_submissions_teams_team_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Teams.Team", b =>

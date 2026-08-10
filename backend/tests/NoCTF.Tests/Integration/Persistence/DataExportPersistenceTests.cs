@@ -16,7 +16,7 @@ using NoCTF.Domain.DataExports;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Shared;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Competitions.Events;
@@ -91,8 +91,7 @@ public sealed class DataExportPersistenceTests
                     await Assert.That(names).Contains("competition.ndjson");
                     await Assert.That(names).Contains("challenges.ndjson");
                     await Assert.That(names).Contains("teams.ndjson");
-                    await Assert.That(names).Contains("submissions.ndjson");
-                    await Assert.That(names).Contains("scoring-events.ndjson");
+                    await Assert.That(names).Contains("gameplay-facts.ndjson");
                     await Assert.That(names).Contains("cheat-incidents.ndjson");
                     await Assert.That(names).Contains("competition-events.ndjson");
 
@@ -100,13 +99,9 @@ public sealed class DataExportPersistenceTests
                         archive,
                         "challenges.ndjson",
                         cancellationToken);
-                    var submissions = await ReadEntryAsync(
+                    var gameplayFacts = await ReadEntryAsync(
                         archive,
-                        "submissions.ndjson",
-                        cancellationToken);
-                    var scoring = await ReadEntryAsync(
-                        archive,
-                        "scoring-events.ndjson",
+                        "gameplay-facts.ndjson",
                         cancellationToken);
                     var cheats = await ReadEntryAsync(
                         archive,
@@ -117,12 +112,11 @@ public sealed class DataExportPersistenceTests
                         "manifest.json",
                         cancellationToken);
                     await Assert.That(challenges).DoesNotContain(ids.ProtectedFlag);
-                    await Assert.That(submissions).DoesNotContain(ids.ProtectedFlag);
+                    await Assert.That(gameplayFacts).DoesNotContain(ids.ProtectedFlag);
                     await Assert.That(challenges).Contains(
                         Convert.ToHexString(SHA256.HashData(
                             Encoding.UTF8.GetBytes(ids.ProtectedFlag))));
-                    await Assert.That(scoring).Contains("ForeignTeamFlagDetected");
-                    await Assert.That(scoring).Contains("deletedAt");
+                    await Assert.That(gameplayFacts).Contains("ForeignTeamFlagDetected");
                     await Assert.That(cheats).Contains("resolutionHistory");
                     await Assert.That(manifest).Contains("noctf.competition-export/1");
                     await Assert.That(manifest).Contains("competition-events.ndjson");
@@ -157,12 +151,12 @@ public sealed class DataExportPersistenceTests
                         archive,
                         "challenges.ndjson",
                         cancellationToken);
-                    var submissions = await ReadEntryAsync(
+                    var gameplayFacts = await ReadEntryAsync(
                         archive,
-                        "submissions.ndjson",
+                        "gameplay-facts.ndjson",
                         cancellationToken);
                     await Assert.That(challenges).Contains(ids.ProtectedFlag);
-                    await Assert.That(submissions).Contains(ids.ProtectedFlag);
+                    await Assert.That(gameplayFacts).Contains(ids.ProtectedFlag);
                     var audit = await verify.CompetitionEvents.SingleAsync(
                         item => item.Kind
                             == CompetitionEventKind.ProtectedCompetitionExportCreated,
@@ -504,7 +498,6 @@ public sealed class DataExportPersistenceTests
             Guid.CreateVersion7(now.AddMilliseconds(7)),
             Guid.CreateVersion7(now.AddMilliseconds(8)),
             Guid.CreateVersion7(now.AddMilliseconds(9)),
-            Guid.CreateVersion7(now.AddMilliseconds(10)),
             "flag{complete-archive-secret}");
         await using var db = new NoCtfDbContext(options);
         await db.Database.MigrateAsync(cancellationToken);
@@ -574,34 +567,22 @@ public sealed class DataExportPersistenceTests
         db.Teams.AddRange(
             Team(ids.SourceTeamId, ids.CompetitionId, "Source", ids.MemberId, now),
             Team(ids.OwnerTeamId, ids.CompetitionId, "Owner", ids.OwnerId, now));
-        db.Submissions.Add(new Submission
+        db.GameplayFacts.Add(new GameplayFact
         {
-            Id = ids.SubmissionId,
+            Id = ids.GameplayFactId,
             CompetitionId = ids.CompetitionId,
             TeamId = ids.SourceTeamId,
             CompetitionChallengeId = ids.CompetitionChallengeId,
-            SubmittedByUserId = ids.MemberId,
-            Kind = SubmissionKind.Flag,
-            ReceivedAt = now,
-            SubmittedFlag = ids.ProtectedFlag,
-            SubmittedFlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(ids.ProtectedFlag)),
-            EvaluationState = SubmissionEvaluationState.Completed,
-            EvaluationUpdatedAt = now
-        });
-        db.ScoringEvents.Add(new ScoringEvent
-        {
-            Id = ids.ScoringEventId,
-            CompetitionId = ids.CompetitionId,
-            TeamId = ids.SourceTeamId,
-            VictimTeamId = ids.OwnerTeamId,
-            CompetitionChallengeId = ids.CompetitionChallengeId,
-            SubmissionId = ids.SubmissionId,
-            Kind = ScoringEventKind.SubmissionEvaluation,
-            Result = ScoringResult.Rejected,
-            FailureCode = ScoringFailureCode.ForeignTeamFlagDetected,
+            ActorUserId = ids.MemberId,
+            Kind = GameplayFactKind.FlagAttempt,
             OccurredAt = now,
-            CreatedAt = now,
-            DeletedAt = now.AddMinutes(7)
+            Value = ids.ProtectedFlag,
+            ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(ids.ProtectedFlag)),
+            State = GameplayFactState.Completed,
+            Result = GameplayFactResult.Rejected,
+            FailureCode = GameplayFactFailureCode.ForeignTeamFlagDetected,
+            VictimTeamId = ids.OwnerTeamId,
+            UpdatedAt = now
         });
         db.CompetitionEvents.AddRange(
             new CompetitionEvent
@@ -629,8 +610,8 @@ public sealed class DataExportPersistenceTests
                 Level = CompetitionEventLevel.Warning,
                 Visibility = CompetitionEventVisibility.Staff,
                 ActorUserId = ids.MemberId,
-                SubjectType = EntityReferenceKind.ScoringEvent,
-                SubjectId = ids.ScoringEventId,
+                SubjectType = EntityReferenceKind.GameplayFact,
+                SubjectId = ids.GameplayFactId,
                 RelatedType = EntityReferenceKind.Team,
                 RelatedId = ids.SourceTeamId,
                 OccurredAt = now
@@ -643,8 +624,8 @@ public sealed class DataExportPersistenceTests
                 Level = CompetitionEventLevel.Information,
                 Visibility = CompetitionEventVisibility.Staff,
                 ActorUserId = ids.AdministratorId,
-                SubjectType = EntityReferenceKind.ScoringEvent,
-                SubjectId = ids.ScoringEventId,
+                SubjectType = EntityReferenceKind.GameplayFact,
+                SubjectId = ids.GameplayFactId,
                 RelatedType = EntityReferenceKind.Team,
                 RelatedId = ids.SourceTeamId,
                 PayloadJson = JsonSerializer.Serialize(new
@@ -740,8 +721,7 @@ public sealed class DataExportPersistenceTests
         Guid ChallengeFlagId,
         Guid SourceTeamId,
         Guid OwnerTeamId,
-        Guid SubmissionId,
-        Guid ScoringEventId,
+        Guid GameplayFactId,
         string ProtectedFlag);
 
     private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider

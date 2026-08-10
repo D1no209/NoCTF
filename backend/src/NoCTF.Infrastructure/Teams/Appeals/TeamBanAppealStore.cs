@@ -373,11 +373,10 @@ public sealed class TeamBanAppealStore(
             correctedAt,
             TeamId: team.Id,
             ParentEventId: ban.Id), cancellationToken);
-        await LeaderboardRevision.IncrementAsync(
+        await LeaderboardDirty.MarkAsync(
             db,
             team.CompetitionId,
             cancellationToken);
-        await outbox.PublishAsync(new InvalidateLeaderboard(team.CompetitionId));
         await outbox.PublishAsync(new TeamBanCorrected(
             team.CompetitionId,
             team.Id,
@@ -526,7 +525,7 @@ public sealed class TeamBanAppealStore(
             ban.CompetitionId,
             team.Id,
             team.Name,
-            ban.ScoringEventId is null
+            ban.GameplayFactId is null
                 ? TeamBanSource.ManualModeration
                 : TeamBanSource.CheatIncident,
             ban.OccurredAt,

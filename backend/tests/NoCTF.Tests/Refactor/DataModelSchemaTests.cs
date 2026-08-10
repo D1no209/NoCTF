@@ -19,19 +19,18 @@ public sealed class DataModelSchemaTests
         "competitions",
         "data_exports",
         "files",
+        "gameplay_facts",
         "notifications",
         "patch_uploads",
         "platform_settings",
         "runtime_instances",
-        "scoring_events",
-        "submissions",
         "teams",
         "users"
     ];
 
     [Test]
     [Category("Integration")]
-    public async Task Initial_baseline_contains_exactly_the_seventeen_business_tables(
+    public async Task Initial_baseline_contains_exactly_the_sixteen_business_tables(
         CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>

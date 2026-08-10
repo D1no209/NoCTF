@@ -17,10 +17,9 @@ public enum PlatformUserDeletionReferenceCode
     ChallengeManager,
     TeamCaptain,
     TeamMember,
-    Submission,
+    GameplayFact,
     PatchUpload,
     Notification,
-    ScoringEvent,
     CompetitionEvent
 }
 

@@ -7,30 +7,30 @@ using NoCTF.API.SignalR.Hubs;
 
 namespace NoCTF.API.SignalR.Publishing;
 
-public sealed class RedisSubmissionResultRelay(
+public sealed class RedisGameplayFactStateRelay(
     IConnectionMultiplexer redis,
     IHubContext<CompetitionHub> hub,
-    ILogger<RedisSubmissionResultRelay> logger) : BackgroundService
+    ILogger<RedisGameplayFactStateRelay> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var subscriber = redis.GetSubscriber();
         await subscriber.SubscribeAsync(
-            RedisChannel.Literal(RedisSubmissionResultNotification.Channel),
+            RedisChannel.Literal(RedisGameplayFactStateChangedNotification.Channel),
             (channel, value) =>
             {
                 try
                 {
-                    var notification = JsonSerializer.Deserialize<SubmissionResultNotification>(value.ToString());
+                    var notification = JsonSerializer.Deserialize<GameplayFactStateChangedNotification>(value.ToString());
                     if (notification is null) return;
                     _ = hub.Clients.User(notification.UserId.ToString()).SendAsync(
-                        "submissionResult",
+                        "gameplayFactStateChanged",
                         notification.Result,
                         stoppingToken);
                 }
                 catch (JsonException exception)
                 {
-                    logger.LogWarning(exception, "Invalid submission result notification.");
+                    logger.LogWarning(exception, "Invalid gameplay fact state notification.");
                 }
             });
         await Task.Delay(Timeout.InfiniteTimeSpan, stoppingToken);

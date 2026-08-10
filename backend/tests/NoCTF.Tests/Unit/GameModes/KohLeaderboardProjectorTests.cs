@@ -1,7 +1,7 @@
 using System.Text.Json;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.GameModes.Leaderboard;
 
@@ -173,24 +173,15 @@ public sealed class KohLeaderboardProjectorTests
                 KohChallengeConfiguration.CurrentSchemaVersion,
                 ControlPointsPerInterval: item.Value))))
             .ToList();
-        var facts = observations.Select(observation => new LeaderboardSystemFact(
-            new ScoringEvent
-            {
-                Id = Guid.NewGuid(),
-                CompetitionId = competitionId,
-                CompetitionChallengeId = observation.ChallengeId,
-                TeamId = observation.TeamId,
-                Kind = ScoringEventKind.KohObservation,
-                Result = ScoringResult.Correct,
-                OccurredAt = observation.OccurredAt,
-                CreatedAt = observation.OccurredAt
-            }))
+        var facts = observations.Select(observation => new LeaderboardGameplayFact(
+            Guid.NewGuid(), observation.TeamId, observation.ChallengeId,
+            GameplayFactKind.KohControlObservation, observation.OccurredAt,
+            GameplayFactState.Completed, GameplayFactResult.Controlled, null))
             .ToList();
         return new(
             competitionId,
             GameMode.Koh,
             teams,
-            [],
             facts,
             challenges,
             JsonSerializer.Serialize(new KohConfiguration(

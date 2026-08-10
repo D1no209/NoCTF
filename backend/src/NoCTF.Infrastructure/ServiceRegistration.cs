@@ -11,7 +11,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Runtime;
 using NoCTF.Infrastructure.Scoring;
 using NoCTF.Infrastructure.Storage;
-using NoCTF.Infrastructure.Submissions;
+using NoCTF.Infrastructure.GameplayFacts;
 using NoCTF.Infrastructure.Teams;
 using NoCTF.Infrastructure.DataExports;
 using NoCTF.Infrastructure.Caching;

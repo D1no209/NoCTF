@@ -211,7 +211,7 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         await AssertSubmissionAsync(correctBreak, kind: 1, result: 0, failureCode: null);
 
-        var fixedSubmissionId = await SubmitFixAsync(
+        var fixedGameplayFactId = await SubmitFixAsync(
             playerClient,
             competitionId,
             competitionChallengeId,
@@ -220,7 +220,7 @@ public sealed class AwdpFullBoundaryTests
         var fixedSubmission = await PollCompletedSubmissionAsync(
             playerClient,
             competitionId,
-            fixedSubmissionId,
+            fixedGameplayFactId,
             TimeSpan.FromSeconds(90),
             cancellationToken);
         await AssertSubmissionAsync(fixedSubmission, kind: 2, result: 0, failureCode: null);
@@ -248,7 +248,7 @@ public sealed class AwdpFullBoundaryTests
             failedArchive,
             "failed.tar.gz",
             cancellationToken);
-        var failedSubmissionId = await SubmitFixAsync(
+        var failedGameplayFactId = await SubmitFixAsync(
             playerClient,
             competitionId,
             competitionChallengeId,
@@ -257,7 +257,7 @@ public sealed class AwdpFullBoundaryTests
         var failedSubmission = await PollCompletedSubmissionAsync(
             playerClient,
             competitionId,
-            failedSubmissionId,
+            failedGameplayFactId,
             TimeSpan.FromSeconds(90),
             cancellationToken);
         await AssertSubmissionAsync(failedSubmission, kind: 2, result: 1, failureCode: 25);
@@ -278,12 +278,12 @@ public sealed class AwdpFullBoundaryTests
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/submissions/{fixedSubmissionId}/rejudge",
+            $"/api/v1/admin/competitions/{competitionId}/submissions/{fixedGameplayFactId}/rejudge",
             HttpStatusCode.Accepted,
             cancellationToken);
         var rejudged = await PollJsonAsync(
             playerClient,
-            $"/api/v1/competitions/{competitionId}/submissions/{fixedSubmissionId}",
+            $"/api/v1/competitions/{competitionId}/submissions/{fixedGameplayFactId}",
             value => value.GetProperty("evaluationState").GetInt32() == 3
                 && value.GetProperty("processingVersion").GetInt64() > fixedProcessingVersion,
             TimeSpan.FromSeconds(90),
@@ -413,7 +413,7 @@ public sealed class AwdpFullBoundaryTests
             new { flag },
             HttpStatusCode.Accepted,
             cancellationToken);
-        return accepted.GetProperty("submissionId").GetGuid();
+        return accepted.GetProperty("gameplayFactId").GetGuid();
     }
 
     private static async Task<Guid> SubmitFixAsync(
@@ -430,7 +430,7 @@ public sealed class AwdpFullBoundaryTests
             new { patchUploadId },
             HttpStatusCode.Accepted,
             cancellationToken);
-        return accepted.GetProperty("submissionId").GetGuid();
+        return accepted.GetProperty("gameplayFactId").GetGuid();
     }
 
     private static async Task<Guid> UploadPatchAsync(
@@ -472,12 +472,12 @@ public sealed class AwdpFullBoundaryTests
     private static Task<JsonElement> PollCompletedSubmissionAsync(
         HttpClient client,
         Guid competitionId,
-        Guid submissionId,
+        Guid gameplayFactId,
         TimeSpan timeout,
         CancellationToken cancellationToken) =>
         PollJsonAsync(
             client,
-            $"/api/v1/competitions/{competitionId}/submissions/{submissionId}",
+            $"/api/v1/competitions/{competitionId}/submissions/{gameplayFactId}",
             value => value.GetProperty("evaluationState").GetInt32() == 3,
             timeout,
             cancellationToken);

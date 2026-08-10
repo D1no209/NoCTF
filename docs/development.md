@@ -19,29 +19,29 @@ NoCTF.Domain/
   Competitions/
   Challenges/
   Teams/
-  Submissions/
+  Gameplay/
   Runtime/
 
 NoCTF.Application/
   Competitions/Lifecycle/
   Competitions/Scoring/
-  Submissions/Intake/
-  Submissions/Evaluation/
-  Submissions/Rejudging/
+  GameplayFacts/Intake/
+  GameplayFacts/Processing/
+  GameplayFacts/Management/
   Flags/Generation/
   Flags/Matching/
   Runtime/Lifecycle/
 
 NoCTF.Infrastructure/
   Competitions/
-  Submissions/
+  GameplayFacts/
   Flags/
   Runtime/
   Storage/
   Messaging/
 ```
 
-接口和用例就近，不建横向 Ports/UseCaseAdapters/Services/Helpers 垃圾目录。Infrastructure 类型按业务职责命名，如 SubmissionStore，不统一加 Ef 前缀。
+接口和用例就近，不建横向 Ports/UseCaseAdapters/Services/Helpers 垃圾目录。Infrastructure 类型按业务职责命名，如 GameplayFactIntakeStore，不统一加 Ef 前缀。
 
 ## FastEndpoints
 
@@ -71,11 +71,11 @@ dotnet ef database update
 
 ## 消息
 
-业务写+Outbox 同事务。Handler 假设至少一次投递，以 ProcessingVersion/唯一约束/自然键幂等。禁止 fire-and-forget、业务 Channel、同步阻塞 async 或在数据库事务中调用外部 Provider。
+业务写+Outbox 同事务。Handler 假设至少一次投递；GameplayFact 依靠状态、唯一约束和自然键幂等，不引入事实 ProcessingVersion，Runtime 可继续使用自己的 ProcessingVersion。禁止 fire-and-forget、业务 Channel、同步阻塞 async 或在数据库事务中调用外部 Provider。
 
 ## 日志
 
-结构化日志包含 Competition/Challenge/Team/Submission/RuntimeInstance/Message Id。Flag 可记录；密码、任何 JWT/Token、InvitationToken、FlagDerivationSecret 不记录。异常不作为业务分支；Result/enum 表达预期失败。
+结构化日志包含 Competition/Challenge/Team/GameplayFact/RuntimeInstance/Message Id。受保护 Flag 访问必须有审计；密码、任何 JWT/Token、InvitationToken、FlagDerivationSecret 不记录。异常不作为业务分支；Result/enum 表达预期失败。
 
 ## 文档同步
 

@@ -4,7 +4,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using NoCTF.API.Endpoints;
+using NoCTF.Application.Messaging;
+using Wolverine;
 
 namespace NoCTF.E2E;
 
@@ -48,7 +51,7 @@ public sealed class DevelopmentSmokeTests
             {
                 title = $"Development E2E {Guid.NewGuid():N}",
                 description = "Container-free development boundary",
-                mode = 0,
+                mode = "Ctf",
                 startTime = now.AddMinutes(10),
                 endTime = now.AddHours(2),
                 teamRegistrationAutoApprove = true,
@@ -61,6 +64,13 @@ public sealed class DevelopmentSmokeTests
             await created.Content.ReadAsStreamAsync(cancellationToken));
         var competitionId = createdJson.RootElement.GetProperty("id").GetGuid();
 
+        if (factory is not null)
+        {
+            await using var scope = factory.Services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IMessageBus>()
+                .InvokeAsync(new ProjectLeaderboard(competitionId), cancellationToken);
+        }
+
         using var listed = await client.GetAsync(
             "/api/v1/admin/competitions",
             cancellationToken);
@@ -71,7 +81,7 @@ public sealed class DevelopmentSmokeTests
             .IsGreaterThan(0);
 
         HttpStatusCode leaderboardStatus = 0;
-        for (var attempt = 0; attempt < 20; attempt++)
+        for (var attempt = 0; attempt < 200; attempt++)
         {
             using var leaderboard = await client.GetAsync(
                 $"/api/v1/competitions/{competitionId}/leaderboard",

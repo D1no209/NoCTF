@@ -1,10 +1,10 @@
-using NoCTF.Application.Submissions.Status;
+using NoCTF.Application.GameplayFacts.Status;
 
 namespace NoCTF.Application.Notifications;
 
-public interface ISubmissionResultPublisher
+public interface IGameplayFactStatePublisher
 {
-    Task PublishAsync(Guid userId, SubmissionStatusView result, CancellationToken cancellationToken);
+    Task PublishAsync(Guid userId, GameplayFactStatusView result, CancellationToken cancellationToken);
 }
 
 public interface ILeaderboardPublisher

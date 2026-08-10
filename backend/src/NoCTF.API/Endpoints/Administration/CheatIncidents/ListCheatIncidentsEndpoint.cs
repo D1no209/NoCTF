@@ -3,13 +3,13 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.GameplayFacts;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.API.Serialization;
-using NoCTF.Application.Submissions.CheatIncidents;
+using NoCTF.Application.GameplayFacts.CheatIncidents;
 using NoCTF.Application.Teams.Moderation;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
 
@@ -63,19 +63,18 @@ public sealed class ListCheatIncidentsValidator : Validator<ListCheatIncidentsRe
 }
 
 public sealed record CheatIncidentListItemResponse(
-    Guid ScoringEventId,
-    Guid SubmissionId,
+    Guid GameplayFactId,
     Guid SourceTeamId,
     string SourceTeamName,
     Guid OwnerTeamId,
     string OwnerTeamName,
-    Guid SubmittedByUserId,
+    Guid ActorUserId,
     string SubmittedByUserName,
     Guid CompetitionChallengeId,
     string ChallengeTitle,
-    SubmissionKindProtocol SubmissionKind,
-    ScoringResultProtocol Result,
-    ScoringFailureCodeProtocol FailureCode,
+    GameplayFactKindProtocol GameplayFactKind,
+    GameplayFactResultProtocol Result,
+    GameplayFactFailureCodeProtocol FailureCode,
     CheatIncidentStatusProtocol Status,
     Guid? ResolvedByUserId,
     string? ResolvedByUserName,
@@ -158,7 +157,7 @@ public sealed class ListCheatIncidentsEndpoint(
             ? cursors.Encode(
                 CursorEndpoint,
                 filterKey,
-                new(result.Items[^1].DetectedAt, result.Items[^1].ScoringEventId))
+                new(result.Items[^1].DetectedAt, result.Items[^1].GameplayFactId))
             : null;
         return TypedResults.Ok(new CheatIncidentListResponse(
             result.Items.Select(Map).ToArray(),
@@ -183,19 +182,18 @@ public sealed class ListCheatIncidentsEndpoint(
             request.To.ToString("O", CultureInfo.InvariantCulture));
 
     private static CheatIncidentListItemResponse Map(CheatIncidentListItem item) => new(
-        item.ScoringEventId,
-        item.SubmissionId,
+        item.GameplayFactId,
         item.SourceTeamId,
         item.SourceTeamName,
         item.OwnerTeamId,
         item.OwnerTeamName,
-        item.SubmittedByUserId,
+        item.ActorUserId,
         item.SubmittedByUserName,
         item.CompetitionChallengeId,
         item.ChallengeTitle,
-        SubmissionMapper.ToProtocol(item.SubmissionKind),
-        SubmissionMapper.ToProtocol(item.Result),
-        SubmissionMapper.ToProtocol(item.FailureCode),
+        GameplayFactMapper.ToProtocol(item.GameplayFactKind),
+        GameplayFactMapper.ToProtocol(item.Result),
+        GameplayFactMapper.ToProtocol(item.FailureCode),
         CheatIncidentProtocolMapper.ToProtocol(item.Status),
         item.ResolvedByUserId,
         item.ResolvedByUserName,

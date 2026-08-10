@@ -23,7 +23,7 @@ public enum NotificationKindProtocol
     QuestionStatusChanged,
     CompetitionLifecycleChanged,
     TeamRegistrationChanged,
-    SubmissionEvaluated,
+    GameplayFactAdjudicated,
     RuntimeStateChanged,
     StartGateFailed,
     ManagementFailure,

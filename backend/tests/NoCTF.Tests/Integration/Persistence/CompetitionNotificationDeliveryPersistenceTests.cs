@@ -145,7 +145,6 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 Guid.CreateVersion7(),
                 Guid.CreateVersion7(),
                 Guid.CreateVersion7(),
-                Guid.CreateVersion7(),
                 participantId,
                 Guid.CreateVersion7(),
                 now);
@@ -166,7 +165,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(notifications.All(item =>
                 item.Kind == NotificationKind.CheatIncidentDetected
                 && item.TargetType == NotificationTargetType.User
-                && item.ContentJson.Contains($"cheat-incident:{message.SubmissionId:N}")
+                && item.ContentJson.Contains($"cheat-incident:{message.GameplayFactId:N}")
                 && !item.ContentJson.Contains("flag", StringComparison.OrdinalIgnoreCase)))
                 .IsTrue();
         });

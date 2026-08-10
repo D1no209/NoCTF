@@ -1,20 +1,26 @@
 namespace NoCTF.Application.Messaging;
 
-public sealed record EvaluateSubmission(Guid SubmissionId, long ProcessingVersion);
+public sealed record EvaluateGameplayFact(Guid GameplayFactId);
 
-public sealed record DrainSubmissions(
+public sealed record GameplayFactStateChanged(Guid GameplayFactId, NoCTF.Domain.Gameplay.GameplayFactState State);
+
+public sealed record DrainGameplayFactEvaluation(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     DateTimeOffset Cutoff,
-    bool Rejudge,
-    Guid? SubmissionId = null);
+    Guid? GameplayFactId = null);
+
+public sealed record DrainGameplayFactRejudge(
+    Guid CompetitionId,
+    Guid CompetitionChallengeId,
+    DateTimeOffset Cutoff,
+    Guid? GameplayFactId = null);
 
 public sealed record ForeignTeamFlagDetected(
     Guid CompetitionId,
-    Guid ScoringEventId,
-    Guid SubmissionId,
+    Guid GameplayFactId,
     Guid SourceTeamId,
     Guid OwnerTeamId,
-    Guid SubmittedByUserId,
+    Guid ActorUserId,
     Guid CompetitionChallengeId,
     DateTimeOffset DetectedAt);

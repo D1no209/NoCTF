@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using NoCTF.API.Composition;
-using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.GameplayFacts;
 using NoCTF.API.Security;
 
 namespace NoCTF.Tests.Unit.API;

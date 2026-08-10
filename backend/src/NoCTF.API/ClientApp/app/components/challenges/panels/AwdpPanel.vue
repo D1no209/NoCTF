@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { listSubmissionsEndpoint } from '~/api'
+import { listGameplayFactsEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
@@ -18,7 +18,7 @@ const breakChecked = ref(false)
 
 async function checkBreak() {
   if (!isLoggedIn.value) return
-  const { data, error } = await listSubmissionsEndpoint({
+  const { data, error } = await listGameplayFactsEndpoint({
     path: { competitionId: props.competition.id! },
     query: { limit: 200 },
   })
@@ -27,8 +27,8 @@ async function checkBreak() {
   breakSucceeded.value = (data.items ?? []).some(
     (s) =>
       s.competitionChallengeId === props.challenge.id
-      && s.kind === SubmissionKind.Break
-      && s.result === ScoringResult.Correct,
+      && s.kind === GameplayFactKind.BreakAttempt
+      && s.result === GameplayFactResult.Correct,
   )
 }
 

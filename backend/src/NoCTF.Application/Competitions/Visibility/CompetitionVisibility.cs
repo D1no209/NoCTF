@@ -7,8 +7,7 @@ public sealed record CompetitionVisibilityAccessDecision(
     CompetitionStatus CompetitionStatus,
     CompetitionLeaderboardVisibility Visibility,
     LeaderboardDataScope DataScope,
-    int VisibilityRevision,
-    long LeaderboardRevision);
+    int VisibilityRevision);
 
 public interface ICompetitionVisibilityAccess
 {

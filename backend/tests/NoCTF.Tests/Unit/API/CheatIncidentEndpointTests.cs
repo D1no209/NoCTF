@@ -16,10 +16,10 @@ using NoCTF.API.Endpoints.Administration.CheatIncidents;
 using NoCTF.API.Endpoints.Administration.Teams;
 using NoCTF.API.Pagination;
 using NoCTF.API.Security;
-using NoCTF.Application.Submissions.CheatIncidents;
+using NoCTF.Application.GameplayFacts.CheatIncidents;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -30,7 +30,7 @@ public sealed class CheatIncidentEndpointTests
         Guid.Parse("019bf9b5-e4cc-711a-b231-562e32ad7286");
     private static readonly Guid CompetitionId =
         Guid.Parse("019bf9b5-e4cc-711a-b231-562e32ad7287");
-    private static readonly Guid ScoringEventId =
+    private static readonly Guid GameplayFactId =
         Guid.Parse("019bf9b5-e4cc-711a-b231-562e32ad7288");
     private static readonly Guid TeamId =
         Guid.Parse("019bf9b5-e4cc-711a-b231-562e32ad7289");
@@ -52,7 +52,7 @@ public sealed class CheatIncidentEndpointTests
         await Assert.That(listResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(page).IsNotNull();
         await Assert.That(page!.Items).HasSingleItem();
-        await Assert.That(page.Items[0].GetType().GetProperty("SubmittedFlag")).IsNull();
+        await Assert.That(page.Items[0].GetType().GetProperty("Value")).IsNull();
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(store.DetailReads).IsEqualTo(0);
     }
@@ -78,7 +78,7 @@ public sealed class CheatIncidentEndpointTests
         await Assert.That(detailResponse.Headers.CacheControl?.NoStore).IsTrue();
         await Assert.That(detailResponse.Headers.CacheControl?.NoCache).IsTrue();
         await Assert.That(detail).IsNotNull();
-        await Assert.That(detail!.SubmittedFlag).IsEqualTo("flag{protected-evidence}");
+        await Assert.That(detail!.Value).IsEqualTo("flag{protected-evidence}");
         await Assert.That(detail.CanDismiss).IsTrue();
         await Assert.That(detail.CanConfirm).IsTrue();
         await Assert.That(dismissResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
@@ -146,7 +146,7 @@ public sealed class CheatIncidentEndpointTests
     }
 
     private static string DetailUri() =>
-        $"/api/v1/admin/competitions/{CompetitionId}/cheat-incidents/{ScoringEventId}";
+        $"/api/v1/admin/competitions/{CompetitionId}/cheat-incidents/{GameplayFactId}";
 
     private static async Task<WebApplication> CreateApplicationAsync(
         RecordingStore store,
@@ -211,8 +211,7 @@ public sealed class CheatIncidentEndpointTests
             CancellationToken cancellationToken) =>
             Task.FromResult<CheatIncidentPage?>(new([
                 new(
-                    ScoringEventId,
-                    Guid.CreateVersion7(),
+                    GameplayFactId,
                     Guid.CreateVersion7(),
                     "Source Team",
                     Guid.CreateVersion7(),
@@ -221,9 +220,9 @@ public sealed class CheatIncidentEndpointTests
                     "submitter",
                     Guid.CreateVersion7(),
                     "Challenge",
-                    SubmissionKind.Flag,
-                    ScoringResult.Rejected,
-                    ScoringFailureCode.ForeignTeamFlagDetected,
+                    GameplayFactKind.FlagAttempt,
+                    GameplayFactResult.Rejected,
+                    GameplayFactFailureCode.ForeignTeamFlagDetected,
                     CheatIncidentStatus.Pending,
                     null,
                     null,
@@ -243,8 +242,7 @@ public sealed class CheatIncidentEndpointTests
         {
             DetailReads++;
             return Task.FromResult<CheatIncidentDetail?>(new(
-                ScoringEventId,
-                Guid.CreateVersion7(),
+                GameplayFactId,
                 "flag{protected-evidence}",
                 Guid.CreateVersion7(),
                 "Source Team",
@@ -254,9 +252,9 @@ public sealed class CheatIncidentEndpointTests
                 "submitter",
                 Guid.CreateVersion7(),
                 "Challenge",
-                SubmissionKind.Flag,
-                ScoringResult.Rejected,
-                ScoringFailureCode.ForeignTeamFlagDetected,
+                GameplayFactKind.FlagAttempt,
+                GameplayFactResult.Rejected,
+                GameplayFactFailureCode.ForeignTeamFlagDetected,
                 CheatIncidentStatus.Pending,
                 null,
                 null,

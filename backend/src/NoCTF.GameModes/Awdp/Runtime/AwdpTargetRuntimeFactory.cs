@@ -6,14 +6,13 @@ namespace NoCTF.GameModes.Awdp.Runtime;
 public static class AwdpTargetRuntimeFactory
 {
     public static RuntimeInstance Create(
-        Guid submissionId,
+        Guid gameplayFactId,
         Guid competitionId,
         Guid competitionChallengeId,
         Guid runtimeInstanceId,
         ChallengeRuntimeTemplate template,
         RuntimePlacement placement,
         int generation,
-        long submissionProcessingVersion,
         int competitionConfigurationRevision,
         int competitionChallengeRevision,
         int challengeDefinitionRevision,
@@ -40,8 +39,7 @@ public static class AwdpTargetRuntimeFactory
             CompetitionChallengeId = competitionChallengeId,
             TeamId = null,
             Purpose = RuntimePurpose.AwdpTarget,
-            SubmissionId = submissionId,
-            SubmissionProcessingVersion = submissionProcessingVersion,
+            GameplayFactId = gameplayFactId,
             SourceCompetitionConfigurationRevision = competitionConfigurationRevision,
             SourceCompetitionChallengeRevision = competitionChallengeRevision,
             SourceChallengeDefinitionRevision = challengeDefinitionRevision,

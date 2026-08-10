@@ -88,7 +88,7 @@ Runtime Namespace 只放置 `rt-*` Runtime 资源；如确需平台资源，名�
 当前威胁模型信任办赛管理员、管理员维护的题目配置、Runner Pool 配置及平台托管镜像，
 不防御管理员内鬼。选手、题目业务容器及其网络输入仍是不可信边界。
 
-Runtime 网段与平台数据网隔离；默认拒绝横向访问和云元数据。Runner 仅允许必要 PostgreSQL/Redis/Provider/内部 API 流量；Patch archive 通过绑定单 Submission 的内部 API 读取，不开放对象存储通用网络/凭据。
+Runtime 网段与平台数据网隔离；默认拒绝横向访问和云元数据。Runner 仅允许必要 PostgreSQL/Redis/Provider/内部 API 流量；Patch archive 通过绑定单 GameplayFact/PatchUpload 的内部 API 读取，不开放对象存储通用网络/凭据。
 
 Docker 公开 Runtime 不把题目容器接入 `noctf-network`。每个 Runtime 使用独立的普通
 user-defined bridge network；题目 Container/Compose service 直接发布配置中声明的 TCP

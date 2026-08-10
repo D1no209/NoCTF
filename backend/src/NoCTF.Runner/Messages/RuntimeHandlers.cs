@@ -651,21 +651,19 @@ public static class RuntimeWriteBackHandler
         if (message.AwdCheckerTargetHost is not null)
             instance.NextCheckerDueAt = instance.RunningAt;
         if (instance.Purpose == RuntimePurpose.AwdpTarget
-            && instance.SubmissionId is Guid submissionId)
+            && instance.GameplayFactId is Guid gameplayFactId)
         {
-            var submission = await db.Submissions
-                .SingleOrDefaultAsync(item => item.Id == submissionId, cancellationToken);
+            var submission = await db.GameplayFacts
+                .SingleOrDefaultAsync(item => item.Id == gameplayFactId, cancellationToken);
             if (submission is null
-                || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
-                || submission.ProcessingVersion != instance.SubmissionProcessingVersion)
+                || submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Processing)
             {
                 if (submission is not null
-                    && submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
-                    && submission.ProcessingVersion == instance.SubmissionProcessingVersion)
+                    && submission.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing)
                 {
-                    submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
-                    submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
-                    submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+                    submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
+                    submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
+                    submission.UpdatedAt = DateTimeOffset.UtcNow;
                 }
                 instance.State = RuntimeState.Stopping;
                 instance.RunnerAssignmentReleaseToken = null;
@@ -685,7 +683,11 @@ public static class RuntimeWriteBackHandler
                 await outbox.FlushOutgoingMessagesAsync();
                 return;
             }
-            if (submission?.PatchUploadId is Guid patchUploadId)
+            if (submission is
+                {
+                    ReferenceKind: NoCTF.Domain.Gameplay.GameplayFactReferenceKind.PatchUpload,
+                    ReferenceId: Guid patchUploadId
+                })
             {
                 var deadline = instance.ExpiresAt
                     ?? DateTimeOffset.UtcNow.AddMinutes(15);
@@ -695,7 +697,6 @@ public static class RuntimeWriteBackHandler
                     patchUploadId,
                     instance.Id,
                     instance.Generation,
-                    instance.SubmissionProcessingVersion.Value,
                     instance.ProcessingVersion,
                     deadline,
                     instance.RunnerPool,
@@ -704,7 +705,6 @@ public static class RuntimeWriteBackHandler
                     submission.Id,
                     instance.Id,
                     instance.Generation,
-                    instance.SubmissionProcessingVersion.Value,
                     instance.ProcessingVersion,
                     deadline,
                     instance.RunnerPool,
@@ -768,6 +768,7 @@ public static class RuntimeWriteBackHandler
             message.FailureCode,
             db,
             events,
+            null,
             cancellationToken);
     }
 
@@ -798,6 +799,7 @@ public static class RuntimeWriteBackHandler
                 message.FailureCode,
                 db,
                 events,
+                outbox,
                 cancellationToken);
             return;
         }
@@ -832,24 +834,26 @@ public static class RuntimeWriteBackHandler
         RuntimeFailureCode failureCode,
         NoCtfDbContext db,
         ICompetitionEventRecorder events,
+        ITransactionalMessageOutbox? outbox,
         CancellationToken cancellationToken)
     {
         instance.State = RuntimeState.Failed;
         instance.FailureCode = failureCode;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         if (instance.Purpose == RuntimePurpose.AwdpTarget
-            && instance.SubmissionId is Guid submissionId)
+            && instance.GameplayFactId is Guid gameplayFactId)
         {
-            var submission = await db.Submissions.SingleOrDefaultAsync(
-                item => item.Id == submissionId,
+            var submission = await db.GameplayFacts.SingleOrDefaultAsync(
+                item => item.Id == gameplayFactId,
                 cancellationToken);
             if (submission is not null
-                && submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
-                && submission.ProcessingVersion == instance.SubmissionProcessingVersion)
+                && submission.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing)
             {
-                submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
-                submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
-                submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+                submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
+                submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
+                submission.UpdatedAt = DateTimeOffset.UtcNow;
+                if (outbox is not null)
+                    await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
             }
         }
         await RecordRuntimeStateAsync(
@@ -859,6 +863,8 @@ public static class RuntimeWriteBackHandler
             DateTimeOffset.UtcNow,
             cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        if (outbox is not null)
+            await outbox.FlushOutgoingMessagesAsync();
     }
 
     public static async Task Handle(
@@ -1083,7 +1089,7 @@ public static class RuntimeWriteBackHandler
             TeamId: instance.TeamId,
             CompetitionChallengeId: instance.CompetitionChallengeId,
             RuntimeInstanceId: instance.Id,
-            SubmissionId: instance.SubmissionId,
+            GameplayFactId: instance.GameplayFactId,
             RuntimeState: instance.State,
             RuntimeGeneration: instance.Generation),
             cancellationToken);
@@ -1144,7 +1150,7 @@ public static class RuntimeWriteBackHandler
                 TeamId: instance.TeamId,
                 CompetitionChallengeId: instance.CompetitionChallengeId,
                 RuntimeInstanceId: instance.Id,
-                SubmissionId: instance.SubmissionId,
+                GameplayFactId: instance.GameplayFactId,
                 RuntimeState: instance.State,
                 RuntimeGeneration: instance.Generation,
                 HostPort: mapping.HostPort), cancellationToken);

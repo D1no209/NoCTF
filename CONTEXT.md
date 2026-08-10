@@ -13,19 +13,20 @@ an independent source of requirements.
 - **Competition challenge** is one competition's use of a challenge template. It owns ordering,
   publication, base score, rules, revision, and hints; it never selects a Runtime provider or Runner
   pool.
-- **Submission** is the persisted input and processing state. `ManualAdjust` intentionally stores its
-  canonical signed Int32 delta as `SubmittedFlag`; there is no additional score column.
-- **Scoring event** is a persisted evaluation fact derived from a Submission or trusted system
-  observation. It never stores an accumulated score; ManualAdjust/HintUnlock are ordinary event kinds.
-- **Leaderboard projection** recomputes scores from PostgreSQL facts and current configuration.
-  Redis stores a replaceable snapshot and projection state; PostgreSQL remains the source of truth.
+- **Gameplay fact** is the single persisted objective behavior and current adjudication. Player,
+  administrator, AWD-service and KoH-observation facts share one row with one current result; old
+  adjudications and processing versions are not retained.
+- **Manual adjustment** is a completed administrator-created GameplayFact whose `Value` is a nonzero
+  canonical signed Int32. It never owns a score or delta column.
+- **Leaderboard projection** fully recomputes scores from PostgreSQL GameplayFacts and current
+  configuration. Every 15 seconds the Worker claims dirty competitions and atomically replaces the
+  stable snapshot in the named FusionCache; Redis is only FusionCache L2/backplane infrastructure.
 - **Leaderboard matrix** is the public projection of competition challenges as columns and teams as
   ranked rows. Each sparse cell is one team's current score contribution for one competition challenge
   plus its solve time, solver, and optional CTF blood rank; an absent cell has no public result.
 - **Manual score adjustment** always targets one team and one competition challenge. It changes that
   leaderboard cell and the team's total; there is no competition-wide or unscoped team adjustment.
-- **Team ban** is a moderation fact, not a Submission. Changing it advances the competition's
-  leaderboard revision.
+- **Team ban** is a moderation fact, not a GameplayFact. Changing it marks the competition leaderboard dirty.
 - **Fix attempt** is consumed only by a team-controlled failed validation. Platform, Runner, storage,
   and checker failures do not consume an attempt.
 - **Runtime instance** is the durable scheduling and lifecycle fact for one concrete generation. Its
@@ -56,8 +57,8 @@ an independent source of requirements.
 
 ## Persistence vocabulary
 
-- `competition_events` is the append-only fact stream for lifecycle, leaderboard visibility, runtime,
-  submission, scoring, and other competition facts. Lifecycle payloads carry `from`, `to`,
+- `competition_events` is the append-only audit stream for lifecycle, leaderboard visibility, runtime,
+  gameplay and other competition events. Lifecycle payloads carry `from`, `to`,
   `automatic`, and `reason`; no audit child tables exist.
 - `platform_settings` is the singleton `id=1` row for platform identity, logo FileId, email
   verification, password reset, and SMTP settings, all guarded by one optimistic `Revision`.

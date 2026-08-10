@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using NoCTF.Domain.Challenges;
 
-namespace NoCTF.Infrastructure.Persistence.Configurations.Submissions;
+namespace NoCTF.Infrastructure.Persistence.Configurations.GameplayFacts;
 
 internal sealed class ChallengeFlagConfiguration : IEntityTypeConfiguration<ChallengeFlag>
 {

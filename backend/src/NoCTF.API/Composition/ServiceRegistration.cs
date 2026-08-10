@@ -6,13 +6,13 @@ using Microsoft.AspNetCore.RateLimiting;
 using NoCTF.Application.Authentication.Login;
 using NoCTF.Application.Authentication.RefreshJwt;
 using NoCTF.Application.Authentication.Account;
-using NoCTF.Application.Submissions.PatchUploads;
-using NoCTF.Application.Submissions.Intake;
+using NoCTF.Application.GameplayFacts.PatchUploads;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Infrastructure;
 using NoCTF.API.OpenApi;
 using NoCTF.Application.Authentication.RefreshSession;
 using NoCTF.Application.Authentication.PasswordReset;
-using NoCTF.Application.Submissions.Status;
+using NoCTF.Application.GameplayFacts.Status;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Notifications;
@@ -84,17 +84,17 @@ public static class ServiceRegistration
         }
         else
         {
-            services.AddScoped<ISubmissionIntakeStore, SwaggerSubmissionStore>();
+            services.AddScoped<IGameplayFactIntakeStore, SwaggerGameplayFactStore>();
             services.AddScoped<IPatchUploadStore, SwaggerPatchUploadStore>();
             services.AddScoped<CreatePatchUpload>();
             services.AddScoped<IFixArchiveReader, SwaggerFixArchiveReader>();
-            services.AddScoped<ISubmissionStatusReader, SwaggerStatusReader>();
+            services.AddScoped<IGameplayFactStatusReader, SwaggerStatusReader>();
             services.AddScoped<IUserAuthenticationStore, SwaggerAuthenticationStore>();
             services.AddScoped<IAccessTokenVersionReader, SwaggerAccessTokenVersionReader>();
             services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();
             services.AddScoped<SubmitFlag>();
             services.AddScoped<SubmitFix>();
-            services.AddSingleton<ISubmissionAdmissionModePolicy, SwaggerSubmissionAdmissionModePolicy>();
+            services.AddSingleton<IGameplayFactAdmissionModePolicy, SwaggerGameplayFactAdmissionModePolicy>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
             services.AddScoped<GetCurrentUser>();
@@ -119,13 +119,13 @@ public static class ServiceRegistration
         }
         var redis = configuration.GetConnectionString("Redis");
         var signalR = services.AddSignalR();
-        services.AddScoped<ISubmissionResultPublisher, SignalRSubmissionResultPublisher>();
+        services.AddScoped<IGameplayFactStatePublisher, SignalRGameplayFactStatePublisher>();
         if (includeInfrastructure && development)
         {
             services.AddSingleton<ILeaderboardRefreshPublisher,
                 LocalLeaderboardRefreshPublisher>();
-            services.AddSingleton<ISubmissionResultNotification,
-                LocalSubmissionResultPublisher>();
+            services.AddSingleton<IGameplayFactStateChangedNotification,
+                LocalGameplayFactStatePublisher>();
         }
         services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
         services.AddScoped<ICompetitionLifecycleNotificationPublisher, SignalRCompetitionLifecyclePublisher>();
@@ -135,7 +135,7 @@ public static class ServiceRegistration
             && !string.IsNullOrWhiteSpace(redis))
         {
             signalR.AddStackExchangeRedis(redis);
-            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisSubmissionResultRelay>();
+            services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisGameplayFactStateRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisLeaderboardRefreshRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisPlatformLogRelay>();
             services.AddHostedService<NoCTF.API.SignalR.Publishing.RedisCompetitionEventRefreshRelay>();

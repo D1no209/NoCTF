@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import {
-  getSubmissionStatusEndpoint,
+  getGameplayFactStatusEndpoint,
   submitFixEndpoint,
   uploadPatchEndpoint,
 } from '~/api'
@@ -28,15 +28,15 @@ function onFileChange(event: Event) {
 
 const { start: startPolling, stop: stopPolling } = usePolling(
   async () => {
-    if (!submissionId.value) return true
-    const { data, error } = await getSubmissionStatusEndpoint({
-      path: { competitionId: props.competitionId, submissionId: submissionId.value },
+    if (!gameplayFactId.value) return true
+    const { data, error } = await getGameplayFactStatusEndpoint({
+      path: { competitionId: props.competitionId, gameplayFactId: gameplayFactId.value },
     })
     if (error || !data) return false
-    result.value = { state: data.evaluationState, result: data.result }
-    if (!isEvaluationPending(data.evaluationState)) {
-      if (data.result === ScoringResult.Correct) toast.success('Fix 评测完成:修复生效')
-      else toast.error(`Fix 评测完成:${scoringResultLabel(data.result)}`)
+    result.value = { state: data.state, result: data.result }
+    if (!isGameplayFactPending(data.state)) {
+      if (data.result === GameplayFactResult.Correct) toast.success('Fix 评测完成:修复生效')
+      else toast.error(`Fix 评测完成:${gameplayFactResultLabel(data.result)}`)
       emit('evaluated')
       return true
     }
@@ -45,13 +45,13 @@ const { start: startPolling, stop: stopPolling } = usePolling(
   { interval: 2000, timeout: 300_000 },
 )
 
-const submissionId = ref<string | null>(null)
+const gameplayFactId = ref<string | null>(null)
 
 async function submit() {
   if (!file.value || props.disabled) return
   pending.value = true
   result.value = null
-  submissionId.value = null
+  gameplayFactId.value = null
   try {
     stage.value = 'uploading'
     const { data: upload, error: uploadError } = await uploadPatchEndpoint({
@@ -67,12 +67,12 @@ async function submit() {
       path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
       body: { patchUploadId: upload.patchUploadId },
     })
-    if (submitError || !accepted?.submissionId) {
+    if (submitError || !accepted?.gameplayFactId) {
       toast.error(parseApiError(submitError, 'Fix 提交失败').message)
       return
     }
-    submissionId.value = accepted.submissionId
-    result.value = { state: EvaluationState.Pending, result: null }
+    gameplayFactId.value = accepted.gameplayFactId
+    result.value = { state: GameplayFactState.Pending, result: null }
     stage.value = 'evaluating'
     toast.success('Fix 已受理,等待评测')
     startPolling()
@@ -86,14 +86,14 @@ async function submit() {
 let unwatch: (() => void) | undefined
 onMounted(() => {
   unwatch = watchCompetition(props.competitionId, {
-    submissionResult: (payload) => {
-      const id = (payload as { submissionId?: unknown })?.submissionId
-      if (typeof id === 'string' && id === submissionId.value) {
-        void getSubmissionStatusEndpoint({
-          path: { competitionId: props.competitionId, submissionId: id },
+    gameplayFactStateChanged: (payload) => {
+      const id = (payload as { gameplayFactId?: unknown })?.gameplayFactId
+      if (typeof id === 'string' && id === gameplayFactId.value) {
+        void getGameplayFactStatusEndpoint({
+          path: { competitionId: props.competitionId, gameplayFactId: id },
         }).then(({ data }) => {
           if (!data) return
-          result.value = { state: data.evaluationState, result: data.result }
+          result.value = { state: data.state, result: data.result }
         })
       }
     },
@@ -139,11 +139,11 @@ onUnmounted(() => {
         </FieldGroup>
       </form>
 
-      <Alert v-if="result" class="mt-4" :variant="isEvaluationPending(result.state) ? 'default' : result.result === ScoringResult.Correct ? 'default' : 'destructive'">
+      <Alert v-if="result" class="mt-4" :variant="isGameplayFactPending(result.state) ? 'default' : result.result === GameplayFactResult.Correct ? 'default' : 'destructive'">
         <AlertDescription class="flex items-center gap-2">
-          <Spinner v-if="isEvaluationPending(result.state)" class="size-3" />
-          <span v-if="isEvaluationPending(result.state)">{{ evaluationStateLabel(result.state) }}…</span>
-          <span v-else>评测结果:<strong>{{ scoringResultLabel(result.result) }}</strong></span>
+          <Spinner v-if="isGameplayFactPending(result.state)" class="size-3" />
+          <span v-if="isGameplayFactPending(result.state)">{{ gameplayFactStateLabel(result.state) }}…</span>
+          <span v-else>评测结果:<strong>{{ gameplayFactResultLabel(result.result) }}</strong></span>
         </AlertDescription>
       </Alert>
     </CardContent>

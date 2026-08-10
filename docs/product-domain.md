@@ -31,7 +31,7 @@ PasswordHash。Bot 是否能密码登录由 UserKind 规则决定，而不是由
 - OwnerId、ManagerIds、JudgeIds、ObserverIds；
 - TeamRegistrationAutoApprove、MaxTeamMembers、MaxConcurrentRuntimeInstancesPerTeam；
 - 32-byte `FlagDerivationSecret`；
-- ConfigurationRevision、LeaderboardRevision；
+- ConfigurationRevision、LeaderboardDirty；
 - 生命周期审计。
 
 协作者直接存为三个互斥 UUID 数组，不存在 Collaborator 实体。Owner 不得同时出现在数组中。
@@ -48,13 +48,13 @@ Team 只属于一个 Competition。字段包含 `CaptainId` 与无顺序语义�
 
 `CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有 Order、IsPublished、BaseScore、Revision、Rules JSON 和 Hint。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Generation；下一次 Start/Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
 
-### Submission 与 ScoringEvent
+### GameplayFact
 
-Submission 是不可变输入事实，保存原始 Flag 或已消费 PatchUpload。ScoringEvent 是判定事实。一个 Submission 同时最多有一个未删除 ScoringEvent；重判通过软删除旧事件和插入新事件替换事实。两者都不保存分数。
+GameplayFact 是玩家、管理员或系统在比赛中的客观行为及其当前唯一判定。Flag/Break 保存原文和 Hash，Fix/Hint/AWD Round 使用多态 Reference；ManualAdjustment 保存 canonical Int32 Value。重判覆盖同一行的 Result/FailureCode，不保留旧判定，也不保存分数。
 
 ### RuntimeInstance
 
-RuntimeInstance 表示一个具体 Generation 的外部 Runtime。异步状态保存在 RuntimeInstance/Submission/ChallengeFlag 自身，Wolverine 保存投递状态；不存在 RuntimeOperation 表。
+RuntimeInstance 表示一个具体 Generation 的外部 Runtime。异步状态保存在 RuntimeInstance/GameplayFact/ChallengeFlag 自身，Wolverine 保存投递状态；不存在 RuntimeOperation 表。
 
 ## Competition 生命周期
 
@@ -94,10 +94,10 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 - 只有 Published 允许创建团队和凭 Token 加入。
 - AutoApprove 为 true 时新团队是 Approved，否则 Pending。
 - Pending 可被批准或拒绝；Rejected 可重新提交为 Pending。
-- Pending/Rejected 可管理成员与资料，但不能获得题目私有数据、Flag、Runtime 或 Submission 权限。
+- Pending/Rejected 可管理成员与资料，但不能获得题目私有数据、Flag、Runtime 或 GameplayFact 权限。
 - Running/Paused/Finished 冻结成员与审核状态；违规处置使用 Ban。
 - CaptainId 是唯一队长来源。转让队长原子更新 CaptainId；成员数组无顺序。
-- Ban 立即拒绝私有数据、Runtime 与 Submission，回收该队 CTF/AWD Runtime，并把该队及与其相关的攻防事实从投影排除。Unban 恢复历史事实；CTF Runtime 由选手重新启动，AWD 由系统重新配置。
+- Ban 立即拒绝私有数据、Runtime 与 GameplayFact，回收该队 CTF/AWD Runtime，并把该队及与其相关的攻防事实从投影排除。Unban 恢复当前事实；CTF Runtime 由选手重新启动，AWD 由系统重新配置。
 - 每次 Ban 对应一个不可变事件。队长可提交一次私密申诉，全队可读；Judge/Observer 只读，Administrator、Owner、Manager 裁决。接受申诉或主动纠错允许赛后恢复历史投影，但 Finished 比赛不重新配置 Runtime。申诉、裁决和公开纠错都保留原始事件关联，不公开工作人员原因或证据。
 
 ## 权限矩阵
@@ -107,9 +107,9 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 | Administrator | 全平台全部权限 |
 | Competition Owner | 比赛全部权限、权限数组、所有权转让、软/硬删除 |
 | Manager | 比赛/题目实例/Flag/附件/配置/团队/生命周期/Runtime/判题与重判；不能管理权限数组或所有权 |
-| Judge | 管理查询、原始 Flag、Submission、ScoringEvent、运行诊断、批量判题与重判；不能改配置/团队/生命周期 |
+| Judge | 管理查询、GameplayFact 原始 Flag/当前结果、运行诊断、批量判题与重判；不能改配置/团队/生命周期 |
 | Observer | 与 Judge 相同的读取范围；无写权限 |
-| Player | 公开数据与本队数据；绝不能访问其他队 Flag、Submission 原文或内部诊断 |
+| Player | 公开数据与本队 GameplayFact；绝不能访问其他队 Value、系统事实、管理员事实或内部诊断 |
 
 Owner/Manager 必须是 Organizer 或 Administrator；Judge/Observer 必须完成邮箱验证。Owner
 转让后，旧 Owner 自动进入 ManagerIds。权限数组的全量替换由独立 PermissionRevision 防止

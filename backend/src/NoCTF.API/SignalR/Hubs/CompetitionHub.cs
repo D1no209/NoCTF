@@ -8,9 +8,7 @@ namespace NoCTF.API.SignalR.Hubs;
 
 [Authorize]
 public sealed class CompetitionHub(
-    ICompetitionHubAccess access,
-    ILeaderboardSubscriptionRegistry subscriptions,
-    IBackendMessagePublisher messages) : Hub
+    ICompetitionHubAccess access) : Hub
 {
     public async Task JoinCompetition(Guid competitionId)
     {
@@ -19,39 +17,13 @@ public sealed class CompetitionHub(
             throw new HubException("You are not allowed to join this competition.");
         await Groups.AddToGroupAsync(Context.ConnectionId, $"competition:{competitionId:N}", Context.ConnectionAborted);
         JoinedCompetitions().Add(competitionId);
-        await TouchSubscriptionAsync(competitionId, Context.ConnectionAborted);
     }
 
     public Task HeartbeatCompetition(Guid competitionId)
     {
         if (!JoinedCompetitions().Contains(competitionId))
             throw new HubException("Join the competition before renewing its subscription.");
-        return TouchSubscriptionAsync(competitionId, Context.ConnectionAborted);
-    }
-
-    public override async Task OnDisconnectedAsync(Exception? exception)
-    {
-        var removals = JoinedCompetitions().Select(competitionId =>
-            subscriptions.RemoveAsync(competitionId, Context.ConnectionId, CancellationToken.None));
-        try
-        {
-            await Task.WhenAll(removals);
-        }
-        finally
-        {
-            await base.OnDisconnectedAsync(exception);
-        }
-    }
-
-    private async Task TouchSubscriptionAsync(
-        Guid competitionId,
-        CancellationToken cancellationToken)
-    {
-        if (await subscriptions.TouchAsync(
-                competitionId,
-                Context.ConnectionId,
-                cancellationToken))
-            await messages.ProjectLeaderboardAsync(competitionId, cancellationToken);
+        return Task.CompletedTask;
     }
 
     private HashSet<Guid> JoinedCompetitions()

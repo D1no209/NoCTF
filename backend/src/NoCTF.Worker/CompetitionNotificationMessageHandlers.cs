@@ -187,16 +187,15 @@ public static class CompetitionNotificationMessageHandlers
             .ToArray();
         await delivery.DeliverToUsersAsync(
             message.CompetitionId,
-            message.ScoringEventId,
+            message.GameplayFactId,
             NotificationKind.CheatIncidentDetected,
-            $"cheat-incident:{message.SubmissionId:N}",
+            $"cheat-incident:{message.GameplayFactId:N}",
             new CheatIncidentDetectedPayload(
                 message.CompetitionId,
-                message.ScoringEventId,
-                message.SubmissionId,
+                message.GameplayFactId,
                 message.SourceTeamId,
                 message.OwnerTeamId,
-                message.SubmittedByUserId,
+                message.ActorUserId,
                 message.CompetitionChallengeId,
                 message.DetectedAt),
             recipients,

@@ -39,21 +39,21 @@ Attachment 策略：
 - All 默认：显示全部 Attachment；全局符合条件 Flag 均可正确。
 - RandomOnePerTeam：只用于多附件；首次下载隐式随机固定一个 Attachment，并复制其全部 Flag 为团队级记录。玩家不能指定 Id，后续不重抽。
 
-## Submission
+## FlagAttempt GameplayFact
 
 只接受单个 `flag`，不接受 `flags`。题目配置 `EvaluationDispatchMode` 与 `MaxFlagSubmissions`；<=0 无限。API 预检+Worker 二次验证。
 
-同队同题按 ReceivedAt、SubmissionId 的第一条当前 Correct 是 solve；后来匹配正确答案的 Submission 为 Duplicate/DuplicateSolve。没有当前有效匹配为 Wrong/FlagNotMatched，只命中过期窗口为 Wrong/FlagExpired；判定只加载通用 Flag 与本队 Flag，其他队同值不会参与。Wrong/Duplicate 都消耗已接收尝试；平台失败不消耗。重判可改变 solve 与血位。
+同队同题按 OccurredAt、GameplayFactId 的第一条当前 Correct FlagAttempt 是 solve；后来匹配正确答案的事实为 Duplicate。没有当前有效匹配为 Wrong，只命中过期窗口记录稳定 FailureCode；Wrong/Duplicate 都消耗已接收尝试，平台失败不消耗。重判可改变 solve 与血位。
 
 ## 动态题值
 
 InitialPoints=CompetitionChallenge.BaseScore。Competition 提供 MinimumPoints、DecayParameter、DynamicExpresso 表达式，题目可覆盖 Minimum/Parameter/表达式。表达式变量、默认公式、安全与错误行为见 [计分规范](../scoring-projection.md#dynamicexpresso-ctf-衰减)。
 
-当前所有有效 solve 共享同一当前题值。配置变更立即使榜单 dirty，但不重判 Submission。
+当前所有有效 solve 共享同一当前题值。配置变更立即使榜单 dirty，但不重判 GameplayFact。
 
 ## 血奖
 
-一血、二血、三血按 ReceivedAt+SubmissionId；Ban/删除队伍排除。RewardKind：FixedPoints、InitialPointsPercentage、SolveValuePercentage。百分比 0..100、奖励非负。SolveValuePercentage 以血位 solveCount 调表达式；奖励不随以后人数变化，但配置/重判重新投影。
+一血、二血、三血按 OccurredAt+GameplayFactId；Ban/删除队伍排除。RewardKind：FixedPoints、InitialPointsPercentage、SolveValuePercentage。百分比 0..100、奖励非负。SolveValuePercentage 以血位 solveCount 调表达式；奖励不随以后人数变化，但配置/重判重新投影。
 
 排行榜公开每题前三血，而不是只公开一血：顶层 `bloods[]` 的每项带
 `First/Second/Third` 强类型血位（OpenAPI 数值 1/2/3），队伍 slot 同步带血位与时间。

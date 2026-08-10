@@ -4,12 +4,12 @@ using StackExchange.Redis;
 
 namespace NoCTF.Infrastructure.Notifications;
 
-public sealed class RedisSubmissionResultNotification(IConnectionMultiplexer? redis = null)
-    : ISubmissionResultNotification
+public sealed class RedisGameplayFactStateChangedNotification(IConnectionMultiplexer? redis = null)
+    : IGameplayFactStateChangedNotification
 {
-    public const string Channel = "noctf:submission-results";
+    public const string Channel = "noctf:gameplay-fact-states";
 
-    public Task PublishAsync(SubmissionResultNotification notification, CancellationToken cancellationToken)
+    public Task PublishAsync(GameplayFactStateChangedNotification notification, CancellationToken cancellationToken)
     {
         if (redis is null) return Task.CompletedTask;
         return redis.GetSubscriber().PublishAsync(

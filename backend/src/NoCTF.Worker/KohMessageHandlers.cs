@@ -5,7 +5,7 @@ using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using Wolverine.Attributes;
@@ -95,11 +95,11 @@ public sealed class KohPollingHandler(
         CancellationToken cancellationToken)
     {
         if (response.Kind == KohControlResponseKind.Timeout)
-            return new(null, ScoringResult.PlatformFailed, ScoringFailureCode.ProducerTimeout);
+            return new(null, null, GameplayFactFailureCode.ProducerTimeout);
         if (response.Kind == KohControlResponseKind.Unavailable)
-            return new(null, ScoringResult.PlatformFailed, ScoringFailureCode.ProducerUnavailable);
+            return new(null, null, GameplayFactFailureCode.ProducerUnavailable);
         if (response.Body.Length is 0 or > 4096 || response.Body.Span.Contains((byte)0))
-            return new(null, ScoringResult.Wrong, null);
+            return new(null, GameplayFactResult.Uncontrolled, null);
 
         string flag;
         try
@@ -108,7 +108,7 @@ public sealed class KohPollingHandler(
         }
         catch (DecoderFallbackException)
         {
-            return new(null, ScoringResult.Wrong, null);
+            return new(null, GameplayFactResult.Uncontrolled, null);
         }
 
         var hash = SHA256.HashData(response.Body.Span);
@@ -128,16 +128,16 @@ public sealed class KohPollingHandler(
             .ToArrayAsync(cancellationToken);
         return matches.Length switch
         {
-            0 => new(null, ScoringResult.Wrong, null),
-            1 => new(matches[0], ScoringResult.Correct, null),
-            _ => new(null, ScoringResult.PlatformFailed, ScoringFailureCode.AmbiguousFlagMatch)
+            0 => new(null, GameplayFactResult.Uncontrolled, null),
+            1 => new(matches[0], GameplayFactResult.Controlled, null),
+            _ => new(null, null, GameplayFactFailureCode.AmbiguousFlagMatch)
         };
     }
 
     private sealed record KohDecision(
         Guid? TeamId,
-        ScoringResult Result,
-        ScoringFailureCode? FailureCode);
+        GameplayFactResult? Result,
+        GameplayFactFailureCode? FailureCode);
 }
 
 public sealed class KohObservationHandler(
@@ -176,25 +176,22 @@ public sealed class KohObservationHandler(
         if (currentRevision == message.CompetitionConfigurationRevision
             && currentChallengeRevision == message.CompetitionChallengeRevision)
         {
-            db.ScoringEvents.Add(new ScoringEvent
+            db.GameplayFacts.Add(new GameplayFact
             {
                 Id = Guid.CreateVersion7(message.ObservedAt),
                 CompetitionId = message.CompetitionId,
                 CompetitionChallengeId = message.CompetitionChallengeId,
                 TeamId = message.TeamId,
-                Kind = ScoringEventKind.KohObservation,
+                Kind = GameplayFactKind.KohControlObservation,
+                State = message.Result is null
+                    ? GameplayFactState.PlatformFailed
+                    : GameplayFactState.Completed,
                 Result = message.Result,
                 FailureCode = message.FailureCode,
-                CompetitionConfigurationRevision = currentRevision,
-                CompetitionChallengeRevision = currentChallengeRevision,
                 OccurredAt = message.ObservedAt,
-                CreatedAt = timeProvider.GetUtcNow()
+                UpdatedAt = timeProvider.GetUtcNow()
             });
-            await LeaderboardRevision.IncrementAsync(
-                db,
-                message.CompetitionId,
-                cancellationToken);
-            await outbox.PublishAsync(new InvalidateLeaderboard(message.CompetitionId));
+            target.Competition.LeaderboardDirty = true;
         }
 
         var nextDue = KohPollSchedule.NextDue(

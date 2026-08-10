@@ -27,8 +27,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
                 candidate.ObserverIds,
                 candidate.LeaderboardVisibility,
                 candidate.LeaderboardVisibilityStartsAt,
-                candidate.LeaderboardVisibilityRevision,
-                candidate.LeaderboardRevision
+                candidate.LeaderboardVisibilityRevision
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
@@ -59,8 +58,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             competition.Status,
             visibility,
             scope,
-            competition.LeaderboardVisibilityRevision,
-            competition.LeaderboardRevision);
+            competition.LeaderboardVisibilityRevision);
     }
 
     private static LeaderboardDataScope DataScope(

@@ -66,7 +66,7 @@ Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传
 
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
 
-Leaderboard GET 的 statusUrl 指回自身：无快照且投影中返回 202+targetRevision+Retry-After；有旧快照返回 200 并标 stale/revision；无快照且最后投影失败返回 503 ProblemDetails。它不创建独立 ProjectionOperation。
+Leaderboard GET 的 statusUrl 指回自身：无快照时原子置 Dirty 并返回仅含 competitionId/state/statusUrl 的 202；Dirty 且有旧快照仍返回 200 完整旧快照；无快照且最后投影失败返回 503 ProblemDetails。响应不含 revision/stale/failure 时间，也不创建 ProjectionOperation。
 Leaderboard 使用 `challenges[]` 列与 ranked `entries[]` 行；每行的稀疏 `cells[]` 直接携带
 `competitionChallengeId`、score、solvedAt、solverName 和 nullable `bloodRank`。CTF 每题前三个
 不同队伍的单元分别为 First、Second、Third；不再返回重复的 subjects/slots、bloods 或 series。
@@ -88,7 +88,7 @@ POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hi
 
 `attachments` 列表与带 Id 下载只用于 `All`；`attachment` 单数路由只用于 `RandomOnePerTeam`，抽取发生在该 GET 内且请求没有 AttachmentId。策略不匹配返回 404。KoH 详情在 Running 时对本队返回 Control Flag 与 shared Hill 的公开 urls，不返回 ControlCheckUrl；CTF PerTeamRuntime Flag 不单独返回，注入 Runtime 环境。
 
-Hint unlock 始终返回 `202 Accepted`，响应只包含 `submissionId`、`evaluationState` 和状态 URL；客户端通过 Submission 状态与 Hint 查询获取最终结果。评估结果为 `Correct`、`Duplicate`、`Rejected + InsufficientScore` 或 `Rejected + HintUnavailable`。
+Hint unlock 返回 `202 Accepted`，响应只包含 `gameplayFactId`、`state` 和状态 URL；客户端通过 GameplayFact 状态与 Hint 查询获取最终结果。成功结果为 `Unlocked`，重复/拒绝使用强类型 Result/FailureCode。
 
 玩家 Challenge 列表/详情绝不返回 FlagId、正确答案、Flag 数量、RandomOne 候选附件数量/文件名、内部 Runtime 配置或 ObjectKey。All 的列表返回 AttachmentId、显示名、MIME、字节数；RandomOne 首次单数下载请求完成原子抽取后直接 302/stream 被选文件，客户端不能选择，之后固定返回同一附件。
 Blackout 不隐藏题面、附件、Runtime 或提交入口，但 Challenge 的 `baseScore` 返回 null，并随列表/
@@ -117,14 +117,14 @@ Question 根就是 `notifications.id`，回复使用 `ReplyToId` 组成不可分
 Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向选手必须显式选择 CompetitionParticipants。所有写操作使用 Revision 乐观并发控制，发起与回复共享每用户/IP
 每分钟 8 次的限流策略。
 
-## Submission
+## GameplayFact 动作
 
 ```text
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/fix-submissions
-GET  /api/v1/competitions/{competitionId}/submissions/{submissionId}
-GET  /api/v1/competitions/{competitionId}/submissions
+GET  /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
+GET  /api/v1/competitions/{competitionId}/gameplay-facts
 ```
 
 Flag request：
@@ -133,9 +133,9 @@ Flag request：
 { "flag": "flag{...}", "flags": null }
 ```
 
-AWD 可二选一使用 flag 或 flags；CTF/AWDP Break 必须只用 flag。AWD flags 不限元素数、无尝试上限；任一项格式非法则整个请求 400、零写入。每项独立 Submission/ScoringEvent；数据库不保存 batch。单 flag 的 202 body 返回一个 SubmissionId/statusUrl；flags 的 202 body 返回保持输入顺序的 `submissions` 项数组，不返回 BatchId 或批次状态 URL。
+AWD 可二选一使用 flag 或 flags；CTF/AWDP Break 必须只用 flag。AWD flags 不限元素数、无尝试上限；任一项格式非法则整个请求 400、零写入。每项创建独立 GameplayFact；数据库不保存 batch。单 flag 的 202 body 返回 GameplayFactId/state/statusUrl；flags 保持输入顺序，不返回 BatchId。
 
-Patch upload 是 multipart 单文件，成功返回 PatchUploadId；Fix trigger body 只含该 Id。上传不创建 Submission，触发才做尝试预检与消费。
+Patch upload 是 multipart 单文件，成功返回 PatchUploadId；Fix trigger body 只含该 Id。上传不创建 GameplayFact，触发才做尝试预检、锁定与 Reference 关联。
 
 ## Runtime
 
@@ -188,10 +188,10 @@ GET  /api/v1/admin/competitions/{competitionId}/events/export
 GET  /api/v1/admin/competitions/{competitionId}/data-exports
 POST /api/v1/admin/competitions/{competitionId}/data-exports
 GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents
-GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}
-POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/dismiss
-POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/confirm
-POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/correct
+GET  /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}
+POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/dismiss
+POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/confirm
+POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/correct
 ```
 
 Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍是独立文件/路由/TypedResults。
@@ -206,7 +206,7 @@ Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍�
 仅 Administrator、Owner、Manager 可用。实时通知只携带事件 Id、类型、级别与发生时间，客户端
 收到后通过本 GET 重新读取，不通过 SignalR 传输敏感正文。
 
-跨队 Flag 线索从不可变 ScoringEvent 事实与 CompetitionEvent 处置事件推导，不新增独立业务表。
+跨队 Flag 线索以触发 ForeignTeamFlagDetected 的 GameplayFactId 为身份，并结合 CompetitionEvent 处置事件推导，不新增独立业务表。
 Observer 可读取不含 Flag 的列表，Judge 可显式读取完整 Flag 并驳回线索；每次完整证据读取都会写入
 审计事件且响应禁止缓存。只有 Administrator、Owner、Manager 可确认并封禁，或纠正误判并解封。
 驳回不通知参赛者；确认与纠错只发送不含 Flag 和工作人员原因的全场通用通知。误判纠错允许在
@@ -321,23 +321,23 @@ template、Competition mode 与活动唯一约束。稳定 conflict code 为 `Re
 Hint 没有独立 revision，但其增删恢复与 CompetitionChallenge 管理写共享 Competition
 transaction lock，并在同一事务内递增父聚合 revision 与 leaderboard revision。
 
-## Admin Submission 与判定
+## Admin GameplayFact 与判定
 
 ```text
-GET  /api/v1/admin/competitions/{competitionId}/submissions
-GET  /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}
-POST /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/flag-access
-POST /api/v1/admin/competitions/{competitionId}/submissions/queue-evaluation
-POST /api/v1/admin/competitions/{competitionId}/submissions/rejudge
-POST /api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/rejudge
-POST /api/v1/admin/competitions/{competitionId}/submissions/manual-adjustments
+GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts
+GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
+POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access
+POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/queue-evaluation
+POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/rejudge
+POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/rejudge
+POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/manual-adjustments
 ```
 
-列表筛选：competitionChallengeId、teamId、userId、submissionKind、evaluationState、scoringResult、failureCode、receivedFrom/To、submittedFlag 精确匹配、hasCurrentScoringEvent。failureCode 对 Completed 匹配当前 ScoringEvent.FailureCode，对 PlatformFailed 匹配 Submission.EvaluationFailureCode。顺序 ReceivedAt desc/Id desc，limit 50..200，不算 total。
+管理 GameplayFact 列表筛选 competitionChallengeId、teamId、victimTeamId、actorUserId、kind、state、result、failureCode、occurredFrom/To、value 精确匹配、referenceKind/referenceId。顺序 OccurredAt desc/Id desc，limit 1..200，不算 total。
 
-queue-evaluation 用于 ManualBatch 的 Pending/无旧事件 PlatformFailed 集合；rejudge 集合只允许有当前事件的 Flag/Break 按题筛选。两者请求都必须指定 CompetitionChallengeId，接入事务只写带筛选 cutoff 的 durable drain message，Worker 再以 500 条 SKIP LOCKED 短事务更新实体状态/ProcessingVersion 与逐项 Outbox。单 Submission rejudge 用于任意管理员重判以及 AWDP Fix/Patch 精确重判。不建 Batch/Rejudge 实体。
+queue-evaluation 用于 Pending/首次 PlatformFailed 集合；rejudge 选择已有 Result 的 Flag/Break 或精确 GameplayFact。两者必须指定 CompetitionChallengeId，事务写入对应 durable drain message，Worker 以 500 条 SKIP LOCKED 短事务置 Queued 并写逐项 EvaluateGameplayFact Outbox。不使用 ProcessingVersion，也不建 Batch/Rejudge 实体。
 
-ManualAdjustment 请求为 `{ teamId, competitionChallengeId, delta: int }`，仅 Administrator/Owner/Manager 可用，零值返回 400。delta 以 canonical signed Int32 十进制写入 `Submission.SubmittedFlag`，不增加额外分数字段；评估始终创建 `ScoringEvent(ManualAdjust, Correct)`。
+ManualAdjustment 请求为 `{ teamId, competitionChallengeId, delta: int }`，仅 Administrator/Owner/Manager 可用，零值返回 400。delta 以 canonical signed Int32 十进制写入 GameplayFact.Value，事实直接为 Completed/Applied，不增加分数字段。
 
 ## Notifications
 
@@ -387,13 +387,13 @@ Token 签发请求包含正数 ExpiresInSeconds，只接受 Bot 身份，返回�
 ExpiresAt，不签发 Refresh Token。Role 更新与 token invalidate 原子递增 User.TokenVersion。
 Dead Letter DTO 只返回投递元数据，省略消息 body、异常正文和 archive 内容；requeue 创建新的 durable
 delivery attempt 并保留 Wolverine 原失败记录，不直接调用 Handler。比赛管理者不能操作
-DLQ，只能从 Competition/Submission/Runtime 领域 API 重新触发。
+DLQ，只能从 Competition/GameplayFact/Runtime 领域 API 重新触发。
 
 平台运行日志使用每日 Redis Stream 分片聚合 API、Worker、Runner、Host 的结构化诊断日志，并通过
 管理员专用 SignalR Hub `/hubs/v1/admin/platform-logs` 实时推送。每个 UTC 日分片精确保留最多
 50,000 条，保留 14 天后由 Redis TTL 删除，不自动归档。历史查询默认从 Warning 开始，使用
 与筛选条件绑定的签名游标，支持按服务、最低级别、UTC 时间、Category、Competition、
-RuntimeInstance、Team、User、CompetitionChallenge、Submission 以及有界全文摘要筛选；全文
+RuntimeInstance、Team、User、CompetitionChallenge、GameplayFact 以及有界全文摘要筛选；全文
 搜索不区分大小写，覆盖 Category、Event、Message 和 Exception。JSONL 导出沿用相同筛选，
 范围最多 14 天且最多 50,000 条。
 
@@ -418,17 +418,17 @@ ID 与头像，不把 GitHub 可用性变成管理后台的运行时依赖。
 ```text
 POST /api/internal/v1/awd/check-results
 POST /api/internal/v1/awdp/fix-results
-GET  /api/internal/v1/awdp/fix-archives/{submissionId}
+GET  /api/internal/v1/awdp/fix-archives/{gameplayFactId}
 ```
 
-全部使用独立 JWT Scheme、精确 audience/permission 与资源 Claims。Request body 不能包含可覆盖 Claims 的 Competition/Team/Submission Id。JWT 由调度该 durable Job 的可信进程签发，不提供公开“任意换 Token”接口。
+全部使用独立 JWT Scheme、精确 audience/permission 与资源 Claims。Request body 不能包含可覆盖 Claims 的 Competition/Team/GameplayFact Id。JWT 由调度该 durable Job 的可信进程签发，不提供公开“任意换 Token”接口。
 
 - AWD callback permission=`awd:check-result:write`，绑定 RuntimeInstanceId、Generation、
   checker sequence、runtime processing version 与 deadline；请求只提交 typed checker
   status。sequence/version 与 Runtime 当前值精确匹配的同一次执行可以多次写，后一次覆盖
   前一次。
-- AWDP callback permission=`awdp:fix-result:write`，绑定 SubmissionId、ProcessingVersion、deadline。
-- Archive permission=`awdp:fix-archive:read`，只绑定一个 SubmissionId；Runner 使用它读取 archive，Checker callback Token 不含此权限。S3 可返回短时预签名地址，LocalFileSystem 可流式返回。
+- AWDP callback permission=`awdp:fix-result:write`，绑定 GameplayFactId、RuntimeInstanceId、Generation、Runtime 自身 ProcessingVersion 与 deadline；不存在 GameplayFact ProcessingVersion。
+- Archive permission=`awdp:fix-archive:read`，只绑定一个 GameplayFactId/PatchUpload；Runner 使用它读取 archive，Checker callback Token 不含此权限。S3 可返回短时预签名地址，LocalFileSystem 可流式返回。
 
 callback 成功且当前时返回 200。AWD 当前 sequence/version 下的重复或后续 typed status
 更新均返回 200；过时 sequence/version 返回 202 superseded，任一未来 fence 返回 409。
@@ -439,7 +439,7 @@ Runner 自身通过 Wolverine 读写，不需要 HTTP callback Endpoint。
 
 ## 通用成功契约
 
-- 创建普通资源返回 201+资源 DTO+Location；异步 Submission/Runtime 返回 202+资源 Id+`statusUrl`；同步读取/更新返回 200；无 body 删除返回 204。无 Batch/Rejudge 实体的 queue-evaluation/集合 rejudge 例外返回 202+规范化筛选/cutoff，状态通过 Submission 列表查询。
+- 创建普通资源返回 201+资源 DTO+Location；异步 GameplayFact/Runtime 返回 202+资源 Id+`statusUrl`；同步读取/更新返回 200；无 body 删除返回 204。无 Batch/Rejudge 实体的 queue-evaluation/集合 rejudge 返回 202，状态通过 GameplayFact 列表查询。
 - 202 不是判定成功。客户端轮询 statusUrl 或接收 SignalR invalidation，最终仍以 GET 资源为事实源。
 - 所有写入必须在返回前完成接入事务与 Outbox commit；commit 失败不得返回资源 Id。
 - 资源 revision 写统一使用 expectedRevision；状态机动作不复用 revision 作为幂等键，而是在事务内校验当前状态。

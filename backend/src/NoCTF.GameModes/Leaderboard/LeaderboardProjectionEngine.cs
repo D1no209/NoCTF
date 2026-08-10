@@ -1,6 +1,6 @@
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.GameModes.Leaderboard;
 
@@ -62,18 +62,18 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
             .Where(challenge => !challenge.IsDeleted)
             .Select(challenge => challenge.Id)
             .ToHashSet();
-        return input.Submissions
-            .Where(fact => validTeams.Contains(fact.TeamId)
-                && fact.Kind == SubmissionKind.Flag
+        return input.GameplayFacts
+            .Where(fact => fact.TeamId is Guid teamId && validTeams.Contains(teamId)
+                && fact.Kind == GameplayFactKind.FlagAttempt
                 && fact.CompetitionChallengeId is not null
                 && (validChallenges.Count == 0
                     || validChallenges.Contains(fact.CompetitionChallengeId.Value))
-                && fact.Event is { DeletedAt: null, Result: ScoringResult.Correct })
+                && fact.Result == GameplayFactResult.Correct)
             .Select(fact => new CtfSolveObservation(
-                fact.TeamId,
+                fact.TeamId!.Value,
                 fact.CompetitionChallengeId!.Value,
-                fact.ReceivedAt,
-                fact.SubmissionId))
+                fact.OccurredAt,
+                fact.GameplayFactId))
             .ToList();
     }
 

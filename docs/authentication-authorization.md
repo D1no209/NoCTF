@@ -64,7 +64,7 @@ Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未�
 
 ## 内部 JWT
 
-内部 Scheme 必须验证精确 audience、permission、资源 Claims 与 exp，不能接受用户 Access/Refresh audience。Token 绑定具体 SubmissionId 或 RuntimeInstanceId/Generation；请求体不能覆盖 Claims 身份。
+内部 Scheme 必须验证精确 audience、permission、资源 Claims 与 exp，不能接受用户 Access/Refresh audience。Token 绑定具体 GameplayFactId 或 RuntimeInstanceId/Generation；请求体不能覆盖 Claims 身份。AWDP Token 不携带 GameplayFact ProcessingVersion。
 
 AWD Checker callback 绑定 Runtime identity/generation、checker sequence、runtime processing
 version 和最小写权限。只有 sequence/version 与 Runtime 当前值精确匹配时才可写入；同一次执行
@@ -72,4 +72,4 @@ version 和最小写权限。只有 sequence/version 与 Runtime 当前值精确
 
 ## 日志中的敏感内容
 
-选手永远不能通过 API 看到正确 Flag。管理者可查看 Submission 原始 Flag，日志允许记录 Flag，且不建立 Flag 读取审计日志。密码、PasswordHash、InvitationToken、Access/Refresh/Internal JWT、邮箱验证 Token、密码重置 Token、FlagDerivationSecret 永远不得记录。
+选手永远不能通过 API 看到其他队或系统 GameplayFact 的 Value。管理者可查看 GameplayFact 原始 Flag，并通过受保护访问事件审计；密码、PasswordHash、InvitationToken、Access/Refresh/Internal JWT、邮箱验证 Token、密码重置 Token、FlagDerivationSecret 永远不得记录。

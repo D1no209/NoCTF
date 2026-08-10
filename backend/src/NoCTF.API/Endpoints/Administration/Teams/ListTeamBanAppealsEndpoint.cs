@@ -15,7 +15,7 @@ public sealed class ListTeamBanAppealsRequest
 
 public sealed record AdminTeamBanAppealResponse(
     Guid Id,
-    Guid SubmittedByUserId,
+    Guid ActorUserId,
     string SubmittedByUserName,
     string Statement,
     DateTimeOffset SubmittedAt,
@@ -104,7 +104,7 @@ public sealed class ListTeamBanAppealsEndpoint(
                 && appeal.Status == TeamBanAppealStatus.Submitted,
             new AdminTeamBanAppealResponse(
                 appeal.Id,
-                appeal.SubmittedByUserId,
+                appeal.ActorUserId,
                 appeal.SubmittedByUserName,
                 appeal.Statement,
                 appeal.SubmittedAt,

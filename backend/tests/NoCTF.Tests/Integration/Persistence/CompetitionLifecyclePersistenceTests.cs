@@ -179,7 +179,8 @@ public sealed class CompetitionLifecyclePersistenceTests
                         && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged,
                         cancellationToken))
                 .IsEqualTo(2);
-            await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count()).IsEqualTo(2);
+            await Assert.That((await verify.Competitions.AsNoTracking().SingleAsync(
+                competition => competition.Id == fixture.CompetitionId, cancellationToken)).LeaderboardDirty).IsTrue();
             await Assert.That(outbox.Published.OfType<ProvisionCompetitionRuntimes>().Count())
                 .IsEqualTo(1);
         });

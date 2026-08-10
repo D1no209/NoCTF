@@ -41,7 +41,17 @@ public sealed class RawSqlPersistenceRulesTests
                 "ExecuteSqlInterpolated",
                 "FOR UPDATE"
             ],
-            ["backend/src/NoCTF.Infrastructure/Submissions/Processing/SubmissionProcessor.cs"] =
+            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Intake/SubmissionIntakeStore.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/SubmissionProcessor.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "pg_advisory_"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Scoring/Leaderboard/FusionLeaderboardCache.cs"] =
             [
                 "ExecuteSqlInterpolated",
                 "pg_advisory_"
@@ -49,7 +59,9 @@ public sealed class RawSqlPersistenceRulesTests
             ["backend/src/NoCTF.Worker/BackendMessageHandlers.cs"] =
             [
                 "ExecuteSqlInterpolated",
-                "FOR UPDATE"
+                "FromSqlInterpolated",
+                "FOR UPDATE",
+                "SKIP LOCKED"
             ]
         };
 

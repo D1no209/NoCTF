@@ -41,7 +41,7 @@ Competition 配置 `HardeningDurationSeconds >= 0`、`RoundDurationSeconds > 0`�
 加固期内：
 
 - 团队只能看到自己的 Runtime 地址/凭据，不能看到对手实例；
-- 禁止攻击 Flag Submission；
+- 禁止攻击 FlagAttempt GameplayFact；
 - 不轮换 AWD Flag，不计攻防/服务分；
 - Checker 仍按 Interval 运行以建立真实状态。
 
@@ -67,7 +67,7 @@ Round 不建表。Round 1 生成后，ChallengeFlag 的 AwdRound Specification �
 
 不提前生成/注入；调度迟到仍使用原定窗口；重启只补当前轮，不补历史。注入按 raw `${FLAG}` Shell 模板，失败复用同一 Flag 重试到 ValidUntil。窗口不等待注入成功。
 
-## 攻击 Submission
+## 攻击 GameplayFact
 
 AWD 可使用单 `flag` 或 `flags` 数组；无尝试上限。Worker 以原文、CompetitionChallenge、ReceivedAt 窗口、AwdRound Specification 反查：
 
@@ -75,7 +75,7 @@ AWD 可使用单 `flag` 或 `flags` 数组；无尝试上限。Worker 以原文�
 - 自己 TeamId -> Rejected/SelfAttackRejected；
 - 当前窗口无匹配 -> Wrong/FlagNotMatched；只命中其他窗口 -> Wrong/FlagExpired；
 - 匹配不同 Victim 多个 -> PlatformFailed/AmbiguousFlagMatch；
-- 唯一匹配后写一条 SubmissionEvaluation ScoringEvent，包含 VictimTeamId 与 Round Specification。
+- 唯一匹配后完成同一 FlagAttempt GameplayFact，写入 VictimTeamId 与 AwdRound Reference。
 
 攻击重复唯一维度：
 

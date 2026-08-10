@@ -66,7 +66,7 @@ public sealed class CompetitionConfigurationStore(
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(x => x.ConfigurationJson, json)
                     .SetProperty(x => x.ConfigurationRevision, expectedRevision + 1)
-                    .SetProperty(x => x.LeaderboardRevision, x => checked(x.LeaderboardRevision + 1))
+                    .SetProperty(x => x.LeaderboardDirty, true)
                     .SetProperty(x => x.ConfigurationUpdatedAt, now), ct);
         }
         else
@@ -79,13 +79,12 @@ public sealed class CompetitionConfigurationStore(
             {
                 tracked.ConfigurationJson = json;
                 tracked.ConfigurationRevision = expectedRevision + 1;
-                tracked.LeaderboardRevision = checked(tracked.LeaderboardRevision + 1);
+                tracked.LeaderboardDirty = true;
                 tracked.ConfigurationUpdatedAt = now;
             }
             changed = tracked is null ? 0 : 1;
         }
         if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.RevisionConflict);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         if (mode == GameMode.Awd && status == CompetitionStatus.Running)
         {
             if (db.Database.IsRelational())

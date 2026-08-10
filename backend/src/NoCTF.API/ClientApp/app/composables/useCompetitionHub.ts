@@ -13,7 +13,7 @@ export interface CompetitionHubHandlers {
   competitionLifecycleChanged?: (payload: unknown) => void
   competitionEventChanged?: (payload: unknown) => void
   /** 定向投递给提交者本人,载荷为该提交的状态视图。 */
-  submissionResult?: (payload: unknown) => void
+  gameplayFactStateChanged?: (payload: unknown) => void
   /** 连接(重)建立并完成 Join 后触发,用于全量刷新。 */
   onReconnected?: () => void
 }
@@ -70,7 +70,7 @@ function ensureConnection(): signalR.HubConnection {
   for (const event of GROUP_EVENTS) {
     hub.on(event, (payload: unknown) => dispatch(event, payload))
   }
-  hub.on('submissionResult', (payload: unknown) => dispatch('submissionResult', payload, true))
+  hub.on('gameplayFactStateChanged', (payload: unknown) => dispatch('gameplayFactStateChanged', payload, true))
 
   hub.onreconnected(() => {
     void rejoinAll()

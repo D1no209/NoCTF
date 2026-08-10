@@ -1314,7 +1314,7 @@ apply job 在 GitHub Job Summary 中输出：
 - Runtime Reset 后才使用新的 Definition；
 - 已生成的 per-team ChallengeFlag 不被模板 Flag 修改追溯重写；
 - Rules 修改只影响后续计分、后续尝试或后续调度；
-- 不回写既有 Submission、ScoringEvent 和已经完成的轮次事实；
+- 不自动重判既有 GameplayFact，也不改写已经完成的轮次事实；
 - 删除或取消发布必须遵守当前领域规则。
 
 Pause 停止相应调度；Resume 后继续，不补跑暂停期间错过的 Checker 或 KoH 观测。

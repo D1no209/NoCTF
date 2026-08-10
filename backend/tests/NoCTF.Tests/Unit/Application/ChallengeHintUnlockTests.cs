@@ -29,9 +29,9 @@ public sealed class ChallengeHintUnlockTests
     {
         var competitionChallengeId = Guid.NewGuid();
         var hintId = Guid.NewGuid();
-        var submissionId = Guid.NewGuid();
+        var gameplayFactId = Guid.NewGuid();
         var result = await new UnlockChallengeHint(new Store(
-                HintUnlockAttempt.Success(new HintUnlockResult(submissionId, true))))
+                HintUnlockAttempt.Success(new HintUnlockResult(gameplayFactId, true))))
             .ExecuteAsync(
                 Guid.NewGuid(),
                 competitionChallengeId,
@@ -41,7 +41,7 @@ public sealed class ChallengeHintUnlockTests
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(result.Value!.Created).IsTrue();
-        await Assert.That(result.Value.SubmissionId).IsEqualTo(submissionId);
+        await Assert.That(result.Value.GameplayFactId).IsEqualTo(gameplayFactId);
     }
 
     private sealed class Store(HintUnlockAttempt attempt) : IChallengeHintStore

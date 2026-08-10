@@ -19,7 +19,7 @@ public sealed class ExportPlatformLogsRequest
     [QueryParam] public Guid? TeamId { get; set; }
     [QueryParam] public Guid? UserId { get; set; }
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
-    [QueryParam] public Guid? SubmissionId { get; set; }
+    [QueryParam] public Guid? GameplayFactId { get; set; }
 }
 
 public sealed class ExportPlatformLogsValidator : Validator<ExportPlatformLogsRequest>
@@ -76,7 +76,7 @@ public sealed class ExportPlatformLogsEndpoint(ExportPlatformLogs export)
             request.TeamId,
             request.UserId,
             request.CompetitionChallengeId,
-            request.SubmissionId,
+            request.GameplayFactId,
             null,
             50_000), ct);
         if (result.State != PlatformLogReadState.Available || result.Export is null)

@@ -3,12 +3,12 @@ using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
-public class SubmissionAdmissionModePolicyTests
+public class GameplayFactAdmissionModePolicyTests
 {
     [Test]
     public async Task Koh_DoesNotAcceptManualSubmissions()
     {
-        var policy = new GameModeSubmissionAdmissionPolicy();
+        var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(GameMode.Koh, "{}", "{}");
 
@@ -20,7 +20,7 @@ public class SubmissionAdmissionModePolicyTests
     public async Task Awdp_UsesConfiguredBreakAndFixAttemptLimits()
     {
         const string json = """{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":true,"maxBreakSubmissions":3,"maxFixSubmissions":2,"runtime":{"allocation":1,"definition":{"kind":"container","image":"target:v1","internalPorts":[8080]},"limits":{"memoryBytes":268435456,"nanoCpus":500000000,"pidsLimit":128}},"patchEntrypoint":"fix.sh","patchCommand":["/bin/sh","{entrypoint}"],"patchTimeoutSeconds":60,"checker":{"image":"checker:v1","timeoutSeconds":60},"readyTimeoutSeconds":30}""";
-        var policy = new GameModeSubmissionAdmissionPolicy();
+        var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(
             GameMode.Awdp,
@@ -40,7 +40,7 @@ public class SubmissionAdmissionModePolicyTests
             """{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"violationPenalty":100,"serviceDownPenalty":50,"requireBreakBeforeFix":true}""";
         const string challenge =
             """{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":null,"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
-        var policy = new GameModeSubmissionAdmissionPolicy();
+        var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(GameMode.Awdp, competition, challenge);
 
@@ -54,7 +54,7 @@ public class SubmissionAdmissionModePolicyTests
             """{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"violationPenalty":100,"serviceDownPenalty":50}""";
         const string challenge =
             """{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":null,"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
-        var policy = new GameModeSubmissionAdmissionPolicy();
+        var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(GameMode.Awdp, competition, challenge);
 
@@ -73,7 +73,7 @@ public class SubmissionAdmissionModePolicyTests
             $$"""{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"violationPenalty":100,"serviceDownPenalty":50,"requireBreakBeforeFix":{{competitionValue.ToString().ToLowerInvariant()}}}""";
         var challenge =
             $$"""{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":{{challengeValue.ToString().ToLowerInvariant()}},"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
-        var policy = new GameModeSubmissionAdmissionPolicy();
+        var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(GameMode.Awdp, competition, challenge);
 

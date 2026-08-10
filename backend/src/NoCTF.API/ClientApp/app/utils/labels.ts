@@ -7,9 +7,9 @@ import type {
   NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol,
   NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol,
   NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
-  NoCtfapiEndpointsSubmissionsSubmissionKindProtocol,
-  NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol,
-  NoCtfapiEndpointsSubmissionsScoringResultProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
   NoCtfapiEndpointsNotificationsNotificationKindProtocol,
 } from '~/api'
@@ -40,17 +40,23 @@ export const RuntimeState = {
   Queued: 'Queued', Provisioning: 'Provisioning', Running: 'Running', Stopping: 'Stopping', Stopped: 'Stopped', Failed: 'Failed',
 } as const
 
-/** 提交类型(NoCTF.Domain.Submissions.SubmissionKind)。 */
-export const SubmissionKind = { Flag: 'Flag', Break: 'Break', Fix: 'Fix' } as const
+/** 比赛客观行为类型。 */
+export const GameplayFactKind = {
+  FlagAttempt: 'FlagAttempt', BreakAttempt: 'BreakAttempt', FixAttempt: 'FixAttempt',
+  HintUnlock: 'HintUnlock', ManualAdjustment: 'ManualAdjustment',
+  AwdServiceTransition: 'AwdServiceTransition', KohControlObservation: 'KohControlObservation',
+} as const
 
-/** 提交评测状态(NoCTF.Domain.Submissions.SubmissionEvaluationState)。 */
-export const EvaluationState = {
+/** GameplayFact 当前处理状态。 */
+export const GameplayFactState = {
   Pending: 'Pending', Queued: 'Queued', Processing: 'Processing', Completed: 'Completed', PlatformFailed: 'PlatformFailed',
 } as const
 
-/** 评测结果(NoCTF.Domain.Submissions.ScoringResult)。 */
-export const ScoringResult = {
-  Correct: 'Correct', Wrong: 'Wrong', Duplicate: 'Duplicate', AttemptsExhausted: 'AttemptsExhausted', PlatformFailed: 'PlatformFailed', Rejected: 'Rejected',
+/** GameplayFact 当前结果。 */
+export const GameplayFactResult = {
+  Correct: 'Correct', Wrong: 'Wrong', Duplicate: 'Duplicate', AttemptsExhausted: 'AttemptsExhausted', Rejected: 'Rejected',
+  Unlocked: 'Unlocked', Applied: 'Applied', ServiceUp: 'ServiceUp', ServiceDown: 'ServiceDown',
+  Controlled: 'Controlled', Uncontrolled: 'Uncontrolled',
 } as const
 
 /** 排行榜数据范围(NoCTF.Application.Scoring.Leaderboard.LeaderboardDataScope)。 */
@@ -72,23 +78,23 @@ export function runtimeStateLabel(state?: NoCtfapiEndpointsRuntimeRuntimeStatePr
   return ({ Queued: '排队中', Provisioning: '部署中', Running: '运行中', Stopping: '停止中', Stopped: '已停止', Failed: '失败' } as Record<string, string>)[String(state)] ?? '未知'
 }
 
-export function submissionKindLabel(kind?: NoCtfapiEndpointsSubmissionsSubmissionKindProtocol | string | number): string {
-  return ({ Flag: 'Flag', Break: 'Break', Fix: 'Fix' } as Record<string, string>)[String(kind)] ?? '提交'
+export function gameplayFactKindLabel(kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol | string | number): string {
+  return ({ FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: '提示解锁', ManualAdjustment: '人工调分', AwdServiceTransition: 'AWD 服务状态', KohControlObservation: 'KoH 控制观测' } as Record<string, string>)[String(kind)] ?? '比赛事实'
 }
 
-export function evaluationStateLabel(state?: NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol | string | number): string {
+export function gameplayFactStateLabel(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | string | number): string {
   return ({ Pending: '待评测', Queued: '排队中', Processing: '评测中', Completed: '已完成', PlatformFailed: '平台故障' } as Record<string, string>)[String(state)] ?? '未知'
 }
 
-export function scoringResultLabel(result?: NoCtfapiEndpointsSubmissionsScoringResultProtocol | string | number | null): string {
+export function gameplayFactResultLabel(result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | string | number | null): string {
   if (result === null || result === undefined) return '评测中'
   return (
-    { Correct: '正确', Wrong: '错误', Duplicate: '重复提交', AttemptsExhausted: '次数耗尽', PlatformFailed: '平台故障', Rejected: '已拒绝' } as Record<string, string>
+    { Correct: '正确', Wrong: '错误', Duplicate: '重复', AttemptsExhausted: '次数耗尽', Rejected: '已拒绝', Unlocked: '已解锁', Applied: '已应用', ServiceUp: '服务正常', ServiceDown: '服务异常', Controlled: '已控制', Uncontrolled: '未控制' } as Record<string, string>
   )[String(result)] ?? '未知'
 }
 
 /** 评测是否仍在进行中(需要继续轮询)。 */
-export function isEvaluationPending(state?: NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol | string | number): boolean {
+export function isGameplayFactPending(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | string | number): boolean {
   return state === 'Pending' || state === 'Queued' || state === 'Processing' || state === 0 || state === 1 || state === 2
 }
 
@@ -135,7 +141,7 @@ export function competitionEventText(
     ChallengePublished: `${challenge}已发布`, ChallengeUnpublished: `${challenge}已下线`, HintPublished: `${challenge}发布了新提示`,
     HintUnlocked: `${team}解锁了${challenge}的提示`, TeamRegistered: `${team}报名参赛`, TeamRegistrationChanged: `${team}的报名状态已变更`,
     TeamMemberJoined: `${team}加入了新成员`, TeamBanned: `${team}被封禁`, TeamUnbanned: `${team}已解除封禁`, SubmissionReceived: `${team}提交了${challenge}`,
-    SubmissionEvaluated: `${team}在${challenge}的提交已评测`, FirstBloodAwarded: `${team}拿下了${challenge}的一血`, SecondBloodAwarded: `${team}拿下了${challenge}的二血`,
+    GameplayFactAdjudicated: `${team}在${challenge}的提交已评测`, FirstBloodAwarded: `${team}拿下了${challenge}的一血`, SecondBloodAwarded: `${team}拿下了${challenge}的二血`,
     ThirdBloodAwarded: `${team}拿下了${challenge}的三血`, RuntimeCreated: `${team}申请了${challenge}的环境`, RuntimeStateChanged: `${team}的${challenge}环境状态已变更`,
     AnnouncementPublished: '官方发布了一条公告', QuestionOpened: `${actor}提出了咨询`, QuestionReplied: '咨询已有回复', QuestionStatusChanged: '咨询状态已变更', QuestionPublished: '一条咨询已公开',
   }
@@ -185,7 +191,7 @@ export function notificationTargetPath(
   const challengeId = notificationContentId(notification, 'competitionChallengeId')
   const questionId = notificationContentId(notification, 'questionId')
     ?? (notification.kind === 'QuestionOpened' ? notification.id ?? null : null)
-  const scoringEventId = notificationContentId(notification, 'scoringEventId')
+  const gameplayFactId = notificationContentId(notification, 'gameplayFactId')
   switch (notification.kind) {
     case 'BloodAwarded':
     case 'ChallengePublished':
@@ -203,10 +209,10 @@ export function notificationTargetPath(
     case 'TeamBanCorrected':
       return `/competitions/${competitionId}/my/team#ban-appeal`
     case 'CheatIncidentDetected':
-      return scoringEventId
-        ? `/admin/competitions/${competitionId}/cheats?incident=${scoringEventId}`
+      return gameplayFactId
+        ? `/admin/competitions/${competitionId}/cheats?incident=${gameplayFactId}`
         : `/admin/competitions/${competitionId}/cheats`
-    case 'SubmissionEvaluated':
+    case 'GameplayFactAdjudicated':
       return `/competitions/${competitionId}/my/submissions`
     case 'RuntimeStateChanged':
       return challengeId
@@ -258,7 +264,7 @@ export function notificationActionLabel(
     case 'TeamBanned':
     case 'TeamBanCorrected': return '查看封禁与申诉'
     case 'CheatIncidentDetected': return '查看作弊事件'
-    case 'SubmissionEvaluated': return '查看提交'
+    case 'GameplayFactAdjudicated': return '查看提交'
     case 'TeamRegistrationChanged': return '查看我的队伍'
     default: return '查看比赛动态'
   }
@@ -278,7 +284,7 @@ export function notificationText(
     ? `${announcementTitle}：${announcementBody}`
     : announcementTitle
   const templates: Record<string, string> = {
-    CompetitionLifecycleChanged: `竞赛${title}的生命周期已变更`, TeamRegistrationChanged: `你的队伍${team}报名状态已变更`, SubmissionEvaluated: `你在${challenge}的提交已完成评测`,
+    CompetitionLifecycleChanged: `竞赛${title}的生命周期已变更`, TeamRegistrationChanged: `你的队伍${team}报名状态已变更`, GameplayFactAdjudicated: `你在${challenge}的提交已完成评测`,
     RuntimeStateChanged: `${challenge}的运行环境状态已变更`, StartGateFailed: `竞赛${title}启动检查未通过`, ManagementFailure: `竞赛${title}出现管理侧故障`,
     BloodAwarded: `恭喜,你在${challenge}拿下了血榜名次`, ChallengePublished: `竞赛${title}发布了新题目${challenge}`, HintPublished: `${challenge}发布了新提示`,
     TeamBanned: `你的队伍${team}已被封禁`, QuestionOpened: `竞赛${title}有新的咨询`, Message: '你的咨询已有新回复',

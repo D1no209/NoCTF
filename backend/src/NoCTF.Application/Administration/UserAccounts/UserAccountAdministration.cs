@@ -10,10 +10,9 @@ public enum UserDeletionReferenceKind
     ChallengeManager,
     TeamCaptain,
     TeamMember,
-    Submission,
+    GameplayFact,
     PatchUpload,
     Notification,
-    ScoringEvent,
     CompetitionEvent
 }
 

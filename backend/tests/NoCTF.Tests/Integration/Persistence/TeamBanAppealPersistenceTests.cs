@@ -104,7 +104,7 @@ public sealed class TeamBanAppealPersistenceTests
                 candidate => candidate.Id == fixture.CompetitionId,
                 cancellationToken);
             await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Finished);
-            await Assert.That(competition.LeaderboardRevision).IsEqualTo(1);
+            await Assert.That(competition.LeaderboardDirty).IsTrue();
 
             var publicCorrection = await db.CompetitionEvents.AsNoTracking().SingleAsync(
                 @event =>
@@ -131,8 +131,6 @@ public sealed class TeamBanAppealPersistenceTests
 
             var correctionMessage = outbox.Published.OfType<TeamBanCorrected>().Single();
             await Assert.That(correctionMessage.BanEventId).IsEqualTo(fixture.BanEventId);
-            await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>()).Count()
-                .IsEqualTo(1);
         });
     }
 

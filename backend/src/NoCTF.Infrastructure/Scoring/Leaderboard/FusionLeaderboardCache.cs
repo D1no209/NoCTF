@@ -1,14 +1,13 @@
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
-using NoCTF.Domain.Teams;
 using NoCTF.Domain.Competitions.Events;
-using NoCTF.GameModes.Leaderboard;
+using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Persistence;
 using ZiggyCreatures.Caching.Fusion;
 
@@ -17,9 +16,8 @@ namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 public sealed class FusionLeaderboardCache(
     NoCtfDbContext db,
     ILeaderboardProjectionEngine projectionEngine,
-    IConfiguration configuration,
     ILeaderboardRefreshPublisher publisher,
-    IFusionCache cache) : ILeaderboardCache, ILeaderboardSnapshotFactory
+    IFusionCacheProvider caches) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
     private sealed record LifecyclePayload(
         int SchemaVersion,
@@ -29,33 +27,12 @@ public sealed class FusionLeaderboardCache(
         string? Reason);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private readonly TimeSpan ttl = TimeSpan.FromSeconds(Math.Max(5, configuration.GetValue("Leaderboard:CacheTtlSeconds", 60)));
+    private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
 
-    public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct)
-    {
-        var targetRevision = await db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == competitionId)
-            .Select(competition => (long?)competition.LeaderboardRevision)
-            .SingleOrDefaultAsync(ct);
-        if (targetRevision is null)
-            return null;
-        var snapshot = await cache.GetOrDefaultAsync<LeaderboardResponse?>(
-            SnapshotKey(competitionId, targetRevision.Value),
-            null,
-            token: ct);
-        if (snapshot is null)
-            return null;
-        return snapshot with
-        {
-            TargetRevision = targetRevision.Value,
-            Stale = false,
-            LastFailureAt = null
-        };
-    }
+    public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct) =>
+        cache.GetOrDefaultAsync<LeaderboardResponse?>(SnapshotKey(competitionId), null, token: ct).AsTask();
 
-    public async Task<LeaderboardResponse?> GetFrozenAsync(
-        Guid competitionId,
-        CancellationToken ct)
+    public async Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken ct)
     {
         var payload = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)
@@ -69,7 +46,6 @@ public sealed class FusionLeaderboardCache(
     public async Task<LeaderboardResponse?> CreateAsync(
         Guid competitionId,
         DateTimeOffset projectedAt,
-        bool historical,
         CancellationToken ct)
     {
         var competition = await db.Competitions.AsNoTracking()
@@ -77,160 +53,72 @@ public sealed class FusionLeaderboardCache(
         if (competition is null)
             return null;
 
-        var teamsQuery = historical
-            ? db.Teams.IgnoreQueryFilters().AsNoTracking()
-                .Where(team => team.CompetitionId == competitionId
-                    && team.RegisteredAt <= projectedAt
-                    && (team.DeletedAt == null || team.DeletedAt > projectedAt))
-            : db.Teams.AsNoTracking()
-                .Where(team => team.CompetitionId == competitionId);
-        var teams = await teamsQuery
-            .Where(team => team.RegistrationStatus == TeamRegistrationStatus.Approved)
+        var teams = await db.Teams.AsNoTracking()
+            .Where(team => team.CompetitionId == competitionId
+                && team.RegistrationStatus == TeamRegistrationStatus.Approved)
             .Select(team => new LeaderboardTeamFact(
                 team.Id,
                 team.Name,
-                historical
-                    ? team.IsBanned && (team.BannedAt == null || team.BannedAt <= projectedAt)
-                    : team.IsBanned,
+                team.IsBanned,
                 false,
                 team.RegisteredAt))
             .ToListAsync(ct);
 
-        var challengeInstances = historical
-            ? db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
-                .Where(instance => instance.CompetitionId == competitionId
-                    && (instance.DeletedAt == null || instance.DeletedAt > projectedAt))
-            : db.CompetitionChallenges.AsNoTracking()
-                .Where(instance => instance.CompetitionId == competitionId);
-        var challengeTemplates = historical
-            ? db.Challenges.IgnoreQueryFilters().AsNoTracking()
-                .Where(template => template.DeletedAt == null || template.DeletedAt > projectedAt)
-            : db.Challenges.AsNoTracking();
-        var challenges = await challengeInstances
-            .Join(
-                challengeTemplates,
-                instance => instance.ChallengeId,
-                template => template.Id,
-                (instance, template) => new { Instance = instance, Template = template })
-            .OrderBy(item => item.Instance.Order)
-            .ThenBy(item => item.Instance.Id)
-            .Select(item => new LeaderboardChallengeFact(
-                item.Instance.Id,
-                item.Template.Direction,
-                item.Template.Title,
-                false,
-                item.Instance.RulesJson))
+        var challengeEntities = await db.CompetitionChallenges.AsNoTracking()
+            .Where(instance => instance.CompetitionId == competitionId)
+            .OrderBy(instance => instance.Order)
+            .ThenBy(instance => instance.Id)
             .ToListAsync(ct);
-
-        IReadOnlyList<LeaderboardSubmissionFact> submissions;
-        if (historical)
-        {
-            var historicalSubmissions = db.Submissions.AsNoTracking()
-                .Where(submission => submission.CompetitionId == competitionId
-                    && submission.ReceivedAt <= projectedAt)
-                .Select(submission => new
-                {
-                    Submission = submission,
-                    ScoringEventId = db.ScoringEvents.IgnoreQueryFilters()
-                        .Where(scoringEvent => scoringEvent.CompetitionId == competitionId
-                            && scoringEvent.SubmissionId == submission.Id
-                            && scoringEvent.CreatedAt <= projectedAt)
-                        .OrderByDescending(scoringEvent => scoringEvent.ProcessingVersion)
-                        .ThenByDescending(scoringEvent => scoringEvent.CreatedAt)
-                        .ThenByDescending(scoringEvent => scoringEvent.Id)
-                        .Select(scoringEvent => (Guid?)scoringEvent.Id)
-                        .FirstOrDefault()
-                })
-                .Where(item => item.ScoringEventId != null);
-            submissions = await historicalSubmissions
-                .Join(
-                    db.ScoringEvents.IgnoreQueryFilters().AsNoTracking(),
-                    item => item.ScoringEventId,
-                    scoringEvent => (Guid?)scoringEvent.Id,
-                    (item, scoringEvent) => new { item.Submission, ScoringEvent = scoringEvent })
-                .Join(
-                    db.Users.AsNoTracking(),
-                    item => item.Submission.SubmittedByUserId,
-                    user => user.Id,
-                    (item, user) => new LeaderboardSubmissionFact(
-                        item.Submission.Id,
-                        item.Submission.TeamId,
-                        item.Submission.CompetitionChallengeId,
-                        item.Submission.Kind,
-                        item.Submission.ReceivedAt,
-                        item.ScoringEvent,
-                        item.ScoringEvent.VictimTeamId,
-                        user.UserName,
-                        item.Submission.SubmittedFlag))
-                .ToListAsync(ct);
-        }
-        else
-        {
-            submissions = await db.Submissions.AsNoTracking()
-                .Where(submission => submission.CompetitionId == competitionId
-                    && submission.CurrentScoringEventId != null)
-                .Join(
-                    db.ScoringEvents.AsNoTracking(),
-                    submission => submission.CurrentScoringEventId,
-                    scoringEvent => (Guid?)scoringEvent.Id,
-                    (submission, scoringEvent) => new { Submission = submission, ScoringEvent = scoringEvent })
-                .Join(
-                    db.Users.AsNoTracking(),
-                    item => item.Submission.SubmittedByUserId,
-                    user => user.Id,
-                    (item, user) => new LeaderboardSubmissionFact(
-                        item.Submission.Id,
-                        item.Submission.TeamId,
-                        item.Submission.CompetitionChallengeId,
-                        item.Submission.Kind,
-                        item.Submission.ReceivedAt,
-                        item.ScoringEvent,
-                        item.ScoringEvent.VictimTeamId,
-                        user.UserName,
-                        item.Submission.SubmittedFlag))
-                .ToListAsync(ct);
-        }
-
-        var currentHintCosts = (await challengeInstances.ToListAsync(ct))
-            .SelectMany(item => item.Hints)
-            .ToDictionary(item => item.Id, item => item.Cost);
-        submissions = submissions
-            .Select(item => item with
-            {
-                HintCost = item.Event.SpecificationId is Guid hintId
-                    ? currentHintCosts.GetValueOrDefault(hintId)
-                    : null
-            })
+        var templateIds = challengeEntities.Select(instance => instance.ChallengeId).ToArray();
+        var templates = await db.Challenges.AsNoTracking()
+            .Where(template => templateIds.Contains(template.Id))
+            .ToDictionaryAsync(template => template.Id, ct);
+        var challenges = challengeEntities
+            .Where(instance => templates.ContainsKey(instance.ChallengeId))
+            .Select(instance => new LeaderboardChallengeFact(
+                instance.Id,
+                templates[instance.ChallengeId].Direction,
+                templates[instance.ChallengeId].Title,
+                false,
+                instance.RulesJson))
             .ToList();
 
-        var systemEvents = historical
-            ? db.ScoringEvents.IgnoreQueryFilters().AsNoTracking()
-                .Where(scoringEvent => scoringEvent.CompetitionId == competitionId
-                    && scoringEvent.SubmissionId == null
-                    && scoringEvent.CreatedAt <= projectedAt
-                    && scoringEvent.OccurredAt <= projectedAt
-                    && (scoringEvent.DeletedAt == null || scoringEvent.DeletedAt > projectedAt))
-            : db.ScoringEvents.AsNoTracking()
-                .Where(scoringEvent => scoringEvent.CompetitionId == competitionId
-                    && scoringEvent.SubmissionId == null);
-        var hintCosts = (await challengeInstances.ToListAsync(ct))
+        var users = await db.Users.AsNoTracking()
+            .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
+        var hintCosts = challengeEntities
             .SelectMany(challenge => challenge.Hints)
-            .Where(hint => hint.HiddenAt == null || historical && hint.HiddenAt > projectedAt)
             .ToDictionary(hint => hint.Id, hint => hint.Cost);
-        var loadedSystemEvents = await systemEvents.ToListAsync(ct);
-        var system = loadedSystemEvents.Select(scoringEvent => new LeaderboardSystemFact(
-            scoringEvent,
-            scoringEvent.Kind == ScoringEventKind.HintUnlock
-                && scoringEvent.SpecificationId is { } hintId
-                ? hintCosts.GetValueOrDefault(hintId)
-                : 0)).ToList();
+        var facts = (await db.GameplayFacts.AsNoTracking()
+                .Where(fact => fact.CompetitionId == competitionId)
+                .OrderBy(fact => fact.OccurredAt)
+                .ThenBy(fact => fact.Id)
+                .ToListAsync(ct))
+            .Select(fact => new LeaderboardGameplayFact(
+                fact.Id,
+                fact.TeamId,
+                fact.CompetitionChallengeId,
+                fact.Kind,
+                fact.OccurredAt,
+                fact.State,
+                fact.Result,
+                fact.FailureCode,
+                fact.ReferenceKind,
+                fact.ReferenceId,
+                fact.VictimTeamId,
+                fact.ActorUserId is Guid actorId ? users.GetValueOrDefault(actorId) : null,
+                fact.Value,
+                fact.ReferenceKind == GameplayFactReferenceKind.Hint && fact.ReferenceId is Guid hintId
+                    ? hintCosts.GetValueOrDefault(hintId)
+                    : null))
+            .ToList();
+
         var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
             .Where(@event => @event.CompetitionId == competitionId
-                && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged
-                && (!historical || @event.OccurredAt <= projectedAt))
+                && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
             .OrderBy(@event => @event.OccurredAt)
+            .ThenBy(@event => @event.Id)
             .ToListAsync(ct);
-        var lifecycleAudits = lifecycleEvents.Select(@event =>
+        var lifecycle = lifecycleEvents.Select(@event =>
         {
             var payload = JsonSerializer.Deserialize<LifecyclePayload>(@event.PayloadJson, JsonOptions)!;
             return new CompetitionLifecycleTransition
@@ -249,27 +137,21 @@ public sealed class FusionLeaderboardCache(
         IReadOnlyList<LeaderboardAwdRoundFact> awdRounds = [];
         if (competition.Mode == GameMode.Awd)
         {
-            var flags = historical
-                ? db.ChallengeFlags.IgnoreQueryFilters().AsNoTracking()
-                    .Where(flag => flag.DeletedAt == null || flag.DeletedAt > projectedAt)
-                : db.ChallengeFlags.AsNoTracking();
-            awdRounds = await flags
+            var competitionChallengeIds = challengeEntities.Select(challenge => challenge.Id).ToArray();
+            awdRounds = await db.ChallengeFlags.AsNoTracking()
                 .Where(flag => flag.TeamId != null
                     && flag.CompetitionChallengeId != null
+                    && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value)
                     && flag.SpecificationKind == SpecificationKind.AwdRound
                     && flag.SpecificationId != null
                     && flag.ValidStart != null
                     && flag.ValidUntil != null)
-                .Join(
-                    challengeInstances,
-                    flag => flag.CompetitionChallengeId,
-                    challenge => (Guid?)challenge.Id,
-                    (flag, _) => new LeaderboardAwdRoundFact(
-                        flag.CompetitionChallengeId!.Value,
-                        flag.TeamId!.Value,
-                        flag.SpecificationId!.Value,
-                        flag.ValidStart!.Value,
-                        flag.ValidUntil!.Value))
+                .Select(flag => new LeaderboardAwdRoundFact(
+                    flag.CompetitionChallengeId!.Value,
+                    flag.TeamId!.Value,
+                    flag.SpecificationId!.Value,
+                    flag.ValidStart!.Value,
+                    flag.ValidUntil!.Value))
                 .ToListAsync(ct);
         }
 
@@ -277,20 +159,16 @@ public sealed class FusionLeaderboardCache(
             competitionId,
             competition.Mode,
             teams,
-            submissions,
-            system,
+            facts,
             challenges,
             competition.ConfigurationJson,
             competition.StartAt,
-            lifecycleAudits,
+            lifecycle,
             awdRounds,
             projectedAt));
         return new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
         {
             Challenges = projection.Challenges,
-            SnapshotRevision = competition.LeaderboardRevision,
-            TargetRevision = competition.LeaderboardRevision,
-            Stale = false,
             Visibility = CompetitionLeaderboardVisibility.Normal,
             DataScope = LeaderboardDataScope.Live,
             DataAsOf = projectedAt
@@ -299,37 +177,30 @@ public sealed class FusionLeaderboardCache(
 
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
     {
-        var attemptedRevision = await db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == competitionId)
-            .Select(competition => (long?)competition.LeaderboardRevision)
-            .SingleOrDefaultAsync(ct);
-        if (attemptedRevision is null)
+        if (db.Database.IsInMemory())
+        {
+            var developmentResponse = await CreateAsync(
+                competitionId, DateTimeOffset.UtcNow, ct);
+            if (developmentResponse is null)
+                return;
+            await cache.SetAsync(SnapshotKey(competitionId), developmentResponse, token: ct);
+            await cache.RemoveAsync(FailureKey(competitionId), token: ct);
+            await publisher.PublishAsync(competitionId, developmentResponse.GeneratedAt, ct);
             return;
+        }
         try
         {
-            var response = await cache.GetOrSetAsync<LeaderboardResponse?>(
-                SnapshotKey(competitionId, attemptedRevision.Value),
-                async (_, token) =>
-                {
-                    var projected = await CreateAsync(
-                        competitionId,
-                        DateTimeOffset.UtcNow,
-                        historical: false,
-                        token);
-                    if (projected is not null)
-                        await publisher.PublishAsync(
-                            competitionId,
-                            projected.GeneratedAt,
-                            token);
-                    return projected;
-                },
-                options => options.SetDuration(ttl),
-                token: ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({competitionId.ToString("N")}, 0))",
+                ct);
+            var response = await CreateAsync(competitionId, DateTimeOffset.UtcNow, ct);
             if (response is null)
                 return;
-            await cache.RemoveAsync(
-                FailureKey(competitionId, response.SnapshotRevision),
-                token: ct);
+            await cache.SetAsync(SnapshotKey(competitionId), response, token: ct);
+            await cache.RemoveAsync(FailureKey(competitionId), token: ct);
+            await transaction.CommitAsync(ct);
+            await publisher.PublishAsync(competitionId, response.GeneratedAt, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -337,39 +208,42 @@ public sealed class FusionLeaderboardCache(
         }
         catch
         {
-            await cache.SetAsync(
-                FailureKey(competitionId, attemptedRevision.Value),
-                DateTimeOffset.UtcNow,
-                options => options.SetDuration(ttl),
-                token: CancellationToken.None);
+            db.ChangeTracker.Clear();
+            await db.Competitions
+                .Where(competition => competition.Id == competitionId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(competition => competition.LeaderboardDirty, true), CancellationToken.None);
+            await cache.SetAsync(FailureKey(competitionId), DateTimeOffset.UtcNow, token: CancellationToken.None);
             throw;
         }
     }
 
-    public Task InvalidateAsync(Guid competitionId, CancellationToken ct)
+    public async Task InvalidateAsync(Guid competitionId, CancellationToken ct)
     {
-        ct.ThrowIfCancellationRequested();
-        return Task.CompletedTask;
-    }
-
-    public async Task<LeaderboardCacheStatus> GetStatusAsync(
-        Guid competitionId,
-        CancellationToken ct)
-    {
-        var targetRevision = await db.Competitions.AsNoTracking()
+        if (db.Database.IsInMemory())
+        {
+            var competition = await db.Competitions.SingleOrDefaultAsync(
+                candidate => candidate.Id == competitionId, ct);
+            if (competition is not null)
+            {
+                competition.LeaderboardDirty = true;
+                await db.SaveChangesAsync(ct);
+            }
+            return;
+        }
+        _ = await db.Competitions
             .Where(competition => competition.Id == competitionId)
-            .Select(competition => competition.LeaderboardRevision)
-            .SingleOrDefaultAsync(ct);
-        var failure = await cache.GetOrDefaultAsync<DateTimeOffset?>(
-            FailureKey(competitionId, targetRevision),
-            null,
-            token: ct);
-        return new(targetRevision, failure);
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(competition => competition.LeaderboardDirty, true), ct);
     }
 
-    private static string SnapshotKey(Guid competitionId, long revision) =>
-        $"leaderboard:v4:{competitionId:N}:snapshot:{revision}";
+    public async Task<LeaderboardCacheStatus> GetStatusAsync(Guid competitionId, CancellationToken ct)
+    {
+        var failure = await cache.GetOrDefaultAsync<DateTimeOffset?>(
+            FailureKey(competitionId), null, token: ct);
+        return new(failure);
+    }
 
-    private static string FailureKey(Guid competitionId, long revision) =>
-        $"leaderboard:v4:{competitionId:N}:failure:{revision}";
+    private static string SnapshotKey(Guid competitionId) => $"leaderboard:{competitionId:N}";
+    private static string FailureKey(Guid competitionId) => $"leaderboard:{competitionId:N}:last-failure";
 }

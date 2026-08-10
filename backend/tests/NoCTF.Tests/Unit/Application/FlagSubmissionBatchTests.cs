@@ -1,4 +1,4 @@
-using NoCTF.Application.Submissions.Intake;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -18,7 +18,7 @@ public sealed class FlagSubmissionBatchTests
             ["flag{valid}", "\0"],
             DateTimeOffset.UtcNow);
 
-        await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.FlagInvalid);
+        await Assert.That(result.FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.FlagInvalid);
         await Assert.That(store.BatchWrites).IsEqualTo(0);
     }
 
@@ -40,17 +40,17 @@ public sealed class FlagSubmissionBatchTests
         await Assert.That(store.LastFlags).IsEquivalentTo(["flag{one}", "flag{two}"]);
     }
 
-    private sealed class Store : ISubmissionIntakeStore
+    private sealed class Store : IGameplayFactIntakeStore
     {
         public int BatchWrites { get; private set; }
         public IReadOnlyList<string> LastFlags { get; private set; } = [];
 
-        public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
+        public Task<GameplayFactAdmissionSnapshot?> LoadAdmissionAsync(
             Guid competitionId,
             Guid competitionChallengeId,
             Guid userId,
             CancellationToken cancellationToken) =>
-            Task.FromResult<SubmissionAdmissionSnapshot?>(new(
+            Task.FromResult<GameplayFactAdmissionSnapshot?>(new(
                 competitionId,
                 Guid.NewGuid(),
                 competitionChallengeId,
@@ -72,39 +72,39 @@ public sealed class FlagSubmissionBatchTests
                 true,
                 true));
 
-        public Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
-            FlagSubmissionReceived received,
-            SubmissionAdmissionSnapshot snapshot,
+        public Task<GameplayFactAcceptanceResult> TryAcceptFlagAsync(
+            FlagGameplayFactReceived received,
+            GameplayFactAdmissionSnapshot snapshot,
             int? maxAttempts,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("The batch path must be used.");
 
-        public Task<IReadOnlyList<SubmissionAcceptanceResult>> TryAcceptFlagsAsync(
-            IReadOnlyList<FlagSubmissionReceived> received,
-            SubmissionAdmissionSnapshot snapshot,
+        public Task<IReadOnlyList<GameplayFactAcceptanceResult>> TryAcceptFlagsAsync(
+            IReadOnlyList<FlagGameplayFactReceived> received,
+            GameplayFactAdmissionSnapshot snapshot,
             int? maxAttempts,
             CancellationToken cancellationToken)
         {
             BatchWrites++;
-            LastFlags = received.Select(item => item.SubmittedFlag).ToArray();
-            return Task.FromResult<IReadOnlyList<SubmissionAcceptanceResult>>(
-                received.Select(item => new SubmissionAcceptanceResult(
-                    SubmissionAcceptanceState.Created,
-                    item.SubmissionId,
-                    item.ReceivedAt)).ToArray());
+            LastFlags = received.Select(item => item.Value).ToArray();
+            return Task.FromResult<IReadOnlyList<GameplayFactAcceptanceResult>>(
+                received.Select(item => new GameplayFactAcceptanceResult(
+                    GameplayFactAcceptanceState.Created,
+                    item.GameplayFactId,
+                    item.OccurredAt)).ToArray());
         }
 
-        public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
-            FixSubmissionReceived received,
-            SubmissionAdmissionSnapshot snapshot,
+        public Task<GameplayFactAcceptanceResult> TryAcceptFixAsync(
+            FixGameplayFactReceived received,
+            GameplayFactAdmissionSnapshot snapshot,
             int? maxAttempts,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException();
     }
 
-    private sealed class Policy : ISubmissionAdmissionModePolicy
+    private sealed class Policy : IGameplayFactAdmissionModePolicy
     {
-        public SubmissionAdmissionRules GetRules(
+        public GameplayFactAdmissionRules GetRules(
             GameMode mode,
             string competitionConfigurationJson,
             string challengeConfigurationJson) =>

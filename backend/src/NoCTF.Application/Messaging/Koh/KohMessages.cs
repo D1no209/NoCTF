@@ -1,4 +1,4 @@
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Messaging;
 
@@ -14,8 +14,8 @@ public sealed record RecordKohObservation(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid? TeamId,
-    ScoringResult Result,
-    ScoringFailureCode? FailureCode,
+    GameplayFactResult? Result,
+    GameplayFactFailureCode? FailureCode,
     int CompetitionConfigurationRevision,
     int CompetitionChallengeRevision,
     DateTimeOffset RunningSince,

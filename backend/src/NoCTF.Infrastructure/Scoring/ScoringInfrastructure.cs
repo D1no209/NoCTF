@@ -12,8 +12,6 @@ internal static class ScoringInfrastructure
     {
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
-        services.AddSingleton<ILeaderboardSubscriptionRegistry,
-            FusionLeaderboardSubscriptionRegistry>();
         services.AddScoped<ILeaderboardCache, FusionLeaderboardCache>();
         services.AddScoped<ILeaderboardSnapshotFactory, FusionLeaderboardCache>();
         return services;

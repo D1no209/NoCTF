@@ -341,19 +341,19 @@ public sealed class CtfFullBoundaryTests
             await Assert.That(composeFlag).StartsWith("flag{");
             await Assert.That(composeFlag).IsNotEqualTo(flag);
 
-            var wrongSubmissionAccepted = await SendJsonAsync(
+            var wrongGameplayFactAccepted = await SendJsonAsync(
                 teammate,
                 HttpMethod.Post,
                 $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions",
                 new { flag = flag + "-wrong" },
                 HttpStatusCode.Accepted,
                 cancellationToken);
-            var wrongSubmissionId = wrongSubmissionAccepted
-                .GetProperty("submissionId")
+            var wrongGameplayFactId = wrongGameplayFactAccepted
+                .GetProperty("gameplayFactId")
                 .GetGuid();
             var wrongSubmission = await PollJsonAsync(
                 teammate,
-                $"/api/v1/competitions/{competitionId}/submissions/{wrongSubmissionId}",
+                $"/api/v1/competitions/{competitionId}/submissions/{wrongGameplayFactId}",
                 value => value.GetProperty("evaluationState").GetInt32() == 3,
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
@@ -378,10 +378,10 @@ public sealed class CtfFullBoundaryTests
                 new { flag },
                 HttpStatusCode.Accepted,
                 cancellationToken);
-            var submissionId = submissionAccepted.GetProperty("submissionId").GetGuid();
+            var gameplayFactId = submissionAccepted.GetProperty("gameplayFactId").GetGuid();
             var submission = await PollJsonAsync(
                 player,
-                $"/api/v1/competitions/{competitionId}/submissions/{submissionId}",
+                $"/api/v1/competitions/{competitionId}/submissions/{gameplayFactId}",
                 value => value.GetProperty("evaluationState").GetInt32() == 3,
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
@@ -405,12 +405,12 @@ public sealed class CtfFullBoundaryTests
                 teammate,
                 competitionId,
                 items => items.Any(item =>
-                    item.GetProperty("id").GetGuid() == submissionId
+                    item.GetProperty("id").GetGuid() == gameplayFactId
                     && item.GetProperty("result").GetInt32() == 0),
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
             var sharedCorrectSubmission = teammateSubmissions.Single(item =>
-                item.GetProperty("id").GetGuid() == submissionId);
+                item.GetProperty("id").GetGuid() == gameplayFactId);
             await Assert.That(sharedCorrectSubmission.GetProperty("teamId").GetGuid())
                 .IsEqualTo(teamId);
             await Assert.That(sharedCorrectSubmission
@@ -420,19 +420,19 @@ public sealed class CtfFullBoundaryTests
             await Assert.That(sharedCorrectSubmission.GetProperty("submittedByUserId").GetGuid())
                 .IsEqualTo(captainId);
 
-            var duplicateSubmissionAccepted = await SendJsonAsync(
+            var duplicateGameplayFactAccepted = await SendJsonAsync(
                 teammate,
                 HttpMethod.Post,
                 $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions",
                 new { flag },
                 HttpStatusCode.Accepted,
                 cancellationToken);
-            var duplicateSubmissionId = duplicateSubmissionAccepted
-                .GetProperty("submissionId")
+            var duplicateGameplayFactId = duplicateGameplayFactAccepted
+                .GetProperty("gameplayFactId")
                 .GetGuid();
             var duplicateSubmission = await PollJsonAsync(
                 teammate,
-                $"/api/v1/competitions/{competitionId}/submissions/{duplicateSubmissionId}",
+                $"/api/v1/competitions/{competitionId}/submissions/{duplicateGameplayFactId}",
                 value => value.GetProperty("evaluationState").GetInt32() == 3,
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
@@ -441,15 +441,15 @@ public sealed class CtfFullBoundaryTests
                 teammate,
                 competitionId,
                 items => items.Any(item =>
-                        item.GetProperty("id").GetGuid() == submissionId
+                        item.GetProperty("id").GetGuid() == gameplayFactId
                         && item.GetProperty("result").GetInt32() == 0)
                     && items.Any(item =>
-                        item.GetProperty("id").GetGuid() == duplicateSubmissionId
+                        item.GetProperty("id").GetGuid() == duplicateGameplayFactId
                         && item.GetProperty("result").GetInt32() == 2),
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
             var sharedDuplicateSubmission = submissionsAfterDuplicate.Single(item =>
-                item.GetProperty("id").GetGuid() == duplicateSubmissionId);
+                item.GetProperty("id").GetGuid() == duplicateGameplayFactId);
             await Assert.That(sharedDuplicateSubmission.GetProperty("submittedByUserId").GetGuid())
                 .IsEqualTo(teammateId);
             var leaderboardAfterDuplicate = await PollLeaderboardAsync(
@@ -482,12 +482,12 @@ public sealed class CtfFullBoundaryTests
             await SendWithoutBodyForJsonAsync(
                 admin,
                 HttpMethod.Post,
-                $"/api/v1/admin/competitions/{competitionId}/submissions/{submissionId}/rejudge",
+                $"/api/v1/admin/competitions/{competitionId}/submissions/{gameplayFactId}/rejudge",
                 HttpStatusCode.Accepted,
                 cancellationToken);
             await PollJsonAsync(
                 player,
-                $"/api/v1/competitions/{competitionId}/submissions/{submissionId}",
+                $"/api/v1/competitions/{competitionId}/submissions/{gameplayFactId}",
                 value => value.GetProperty("evaluationState").GetInt32() == 3
                     && value.GetProperty("processingVersion").GetInt64() > evaluatedVersion,
                 TimeSpan.FromSeconds(60),

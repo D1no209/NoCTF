@@ -40,7 +40,7 @@ Worker、Runner 与 API 均可多副本。每个进程中的每种角色至多�
 ## 数据依赖
 
 - PostgreSQL：唯一业务事实源；同时承载 Wolverine PostgreSQL persistence。
-- Redis：排行榜快照、TokenVersion 缓存、分布式限流、SignalR backplane、活跃排行榜订阅和 Runner heartbeat/capacity。Redis 丢失不丢业务事实。
+- Redis：FusionCache 排行榜 L2、TokenVersion 缓存、分布式限流、SignalR backplane 和 Runner heartbeat/capacity。Redis 丢失不丢业务事实，也不决定排行榜是否刷新。
 - Object Storage：Challenge Attachment 与 AWDP Patch archive；支持 S3Compatible 和开发用 LocalFileSystem。
 - Runtime Provider：Docker、Kubernetes、Libvirt/QEMU/KVM。Provider 隐藏资源创建、查询、销毁与 receipt 细节。
 
@@ -59,9 +59,9 @@ Domain <- Application <- API / Worker / Runner / Host
 
 ## 一致性边界
 
-API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务中。消息可至少一次投递，因此 Handler 必须以实体 ProcessingVersion、唯一约束或自然幂等规则防重复。
+API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务中。消息可至少一次投递，因此 Handler 使用状态、唯一约束或自然幂等规则防重复；GameplayFact 消息不使用 ProcessingVersion，Runtime 仍使用自己的版本栅栏。
 
-分数投影不写回 Submission/ScoringEvent。影响排行榜的事务只递增 Competition.LeaderboardRevision 并发出 invalidation。完整投影仅在有人查看或首次读取时执行。
+分数投影不写回 GameplayFact。影响排行榜的事务设置 Competition.LeaderboardDirty；Worker 每 15 秒领取脏比赛并全量投影到命名 FusionCache，无论是否有订阅者。
 
 ## Runner Pool
 

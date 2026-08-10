@@ -1,35 +1,34 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Net.Http.Headers;
-using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.GameplayFacts;
 using NoCTF.API.Security;
-using NoCTF.Application.Submissions.CheatIncidents;
+using NoCTF.Application.GameplayFacts.CheatIncidents;
 using NoCTF.Application.Teams.Moderation;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.API.Endpoints.Administration.CheatIncidents;
 
 public sealed class GetCheatIncidentRequest
 {
     public Guid CompetitionId { get; set; }
-    public Guid ScoringEventId { get; set; }
+    public Guid GameplayFactId { get; set; }
 }
 
 public sealed record CheatIncidentDetailResponse(
-    Guid ScoringEventId,
-    Guid SubmissionId,
-    string SubmittedFlag,
+    Guid GameplayFactId,
+    string Value,
     Guid SourceTeamId,
     string SourceTeamName,
     Guid OwnerTeamId,
     string OwnerTeamName,
-    Guid SubmittedByUserId,
+    Guid ActorUserId,
     string SubmittedByUserName,
     Guid CompetitionChallengeId,
     string ChallengeTitle,
-    SubmissionKindProtocol SubmissionKind,
-    ScoringResultProtocol Result,
-    ScoringFailureCodeProtocol FailureCode,
+    GameplayFactKindProtocol GameplayFactKind,
+    GameplayFactResultProtocol Result,
+    GameplayFactFailureCodeProtocol FailureCode,
     CheatIncidentStatusProtocol Status,
     Guid? ResolvedByUserId,
     string? ResolvedByUserName,
@@ -55,7 +54,7 @@ public sealed class GetCheatIncidentEndpoint(
 {
     public override void Configure()
     {
-        Get("/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}");
+        Get("/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminGetCheatIncident"));
         Summary(summary =>
@@ -73,7 +72,7 @@ public sealed class GetCheatIncidentEndpoint(
             CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
-        request.ScoringEventId = Route<Guid>("scoringEventId");
+        request.GameplayFactId = Route<Guid>("gameplayFactId");
         if (!await authorizer.CanJudgeAsync(
                 user.UserId,
                 request.CompetitionId,
@@ -88,7 +87,7 @@ public sealed class GetCheatIncidentEndpoint(
         };
         var detail = await access.ExecuteAsync(
             request.CompetitionId,
-            request.ScoringEventId,
+            request.GameplayFactId,
             user.UserId,
             timeProvider.GetUtcNow(),
             cancellationToken);
@@ -99,20 +98,19 @@ public sealed class GetCheatIncidentEndpoint(
             request.CompetitionId,
             cancellationToken);
         return TypedResults.Ok(new CheatIncidentDetailResponse(
-            detail.ScoringEventId,
-            detail.SubmissionId,
-            detail.SubmittedFlag,
+            detail.GameplayFactId,
+            detail.Value,
             detail.SourceTeamId,
             detail.SourceTeamName,
             detail.OwnerTeamId,
             detail.OwnerTeamName,
-            detail.SubmittedByUserId,
+            detail.ActorUserId,
             detail.SubmittedByUserName,
             detail.CompetitionChallengeId,
             detail.ChallengeTitle,
-            SubmissionMapper.ToProtocol(detail.SubmissionKind),
-            SubmissionMapper.ToProtocol(detail.Result),
-            SubmissionMapper.ToProtocol(detail.FailureCode),
+            GameplayFactMapper.ToProtocol(detail.GameplayFactKind),
+            GameplayFactMapper.ToProtocol(detail.Result),
+            GameplayFactMapper.ToProtocol(detail.FailureCode),
             CheatIncidentProtocolMapper.ToProtocol(detail.Status),
             detail.ResolvedByUserId,
             detail.ResolvedByUserName,

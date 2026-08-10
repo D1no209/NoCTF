@@ -12,10 +12,6 @@ public enum LeaderboardDataScope
 public sealed record LeaderboardResponse(Guid CompetitionId, DateTimeOffset GeneratedAt, IReadOnlyList<LeaderboardEntry> Entries)
 {
     public IReadOnlyList<LeaderboardChallengeInfo> Challenges { get; init; } = [];
-    public long SnapshotRevision { get; init; }
-    public long TargetRevision { get; init; }
-    public bool Stale { get; init; }
-    public DateTimeOffset? LastFailureAt { get; init; }
     public CompetitionLeaderboardVisibility Visibility { get; init; }
     public LeaderboardDataScope DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }
@@ -24,9 +20,8 @@ public enum LeaderboardProjectionState { Processing }
 public sealed record LeaderboardProcessingResponse(
     Guid CompetitionId,
     LeaderboardProjectionState State,
-    long TargetRevision,
     string StatusUrl);
-public sealed record LeaderboardCacheStatus(long TargetRevision, DateTimeOffset? LastFailureAt);
+public sealed record LeaderboardCacheStatus(DateTimeOffset? LastFailureAt);
 
 public interface ILeaderboardCache
 {
@@ -38,7 +33,7 @@ public interface ILeaderboardCache
     Task<LeaderboardCacheStatus> GetStatusAsync(
         Guid competitionId,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new LeaderboardCacheStatus(0, null));
+        Task.FromResult(new LeaderboardCacheStatus(null));
 }
 
 public interface ILeaderboardSnapshotFactory
@@ -46,6 +41,5 @@ public interface ILeaderboardSnapshotFactory
     Task<LeaderboardResponse?> CreateAsync(
         Guid competitionId,
         DateTimeOffset projectedAt,
-        bool historical,
         CancellationToken cancellationToken);
 }

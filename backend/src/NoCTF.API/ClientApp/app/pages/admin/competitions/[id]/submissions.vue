@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import {
-  adminAccessCompetitionSubmissionFlag,
-  adminGetSubmission,
+  adminAccessCompetitionGameplayFactValue,
+  adminGetGameplayFact,
   adminListCompetitionChallenges,
-  adminListSubmissions,
+  adminListGameplayFacts,
   adminListTeams,
-  adminQueueSubmissionEvaluation,
-  adminRejudgeSubmission,
-  adminRejudgeSubmissions,
+  adminQueueGameplayFactEvaluation,
+  adminRejudgeGameplayFact,
+  adminRejudgeGameplayFacts,
 } from '~/api'
 import type {
-  NoCtfapiEndpointsSubmissionsAdminSubmissionStatusResponse,
-  NoCtfapiEndpointsSubmissionsSubmissionListItemResponse,
-  NoCtfapiEndpointsSubmissionsScoringResultProtocol,
-  NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol,
-  NoCtfapiEndpointsSubmissionsSubmissionKindProtocol,
+  NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse,
+  NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse,
+  NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
@@ -48,17 +48,17 @@ const filterResult = ref('')
 const filterFlag = ref('')
 
 const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagination<
-  NoCtfapiEndpointsSubmissionsSubmissionListItemResponse
+  NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
 >(async (cursor) => {
-  const { data, error } = await adminListSubmissions({
+  const { data, error } = await adminListGameplayFacts({
     path: { competitionId },
     query: {
       competitionChallengeId: filterChallenge.value || null,
       teamId: filterTeam.value || null,
-      submissionKind: filterKind.value === '' ? null : filterKind.value as NoCtfapiEndpointsSubmissionsSubmissionKindProtocol,
-      evaluationState: filterState.value === '' ? null : filterState.value as NoCtfapiEndpointsSubmissionsSubmissionEvaluationStateProtocol,
-      scoringResult: filterResult.value === '' ? null : filterResult.value as NoCtfapiEndpointsSubmissionsScoringResultProtocol,
-      submittedFlag: filterFlag.value || null,
+      gameplayFactKind: filterKind.value === '' ? null : filterKind.value as NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol,
+      state: filterState.value === '' ? null : filterState.value as NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
+      gameplayFactResult: filterResult.value === '' ? null : filterResult.value as NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
+      value: filterFlag.value || null,
       cursor,
       limit: 30,
     },
@@ -73,7 +73,7 @@ function applyFilters() {
 }
 
 // ---- Detail sheet ----
-const detail = ref<NoCtfapiEndpointsSubmissionsAdminSubmissionStatusResponse | null>(null)
+const detail = ref<NoCtfapiEndpointsGameplayFactsAdminGameplayFactStatusResponse | null>(null)
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 
@@ -82,7 +82,7 @@ async function openDetail(id?: string) {
   detailOpen.value = true
   detailLoading.value = true
   detail.value = null
-  const { data, error } = await adminGetSubmission({ path: { competitionId, submissionId: id } })
+  const { data, error } = await adminGetGameplayFact({ path: { competitionId, gameplayFactId: id } })
   if (error) toast.error(parseApiError(error).message)
   else detail.value = data ?? null
   detailLoading.value = false
@@ -91,11 +91,11 @@ async function openDetail(id?: string) {
 // ---- Rejudge / queue evaluation ----
 const actionPending = ref<string | null>(null)
 
-async function rejudgeOne(submissionId?: string) {
-  if (!submissionId) return
-  actionPending.value = submissionId
+async function rejudgeOne(gameplayFactId?: string) {
+  if (!gameplayFactId) return
+  actionPending.value = gameplayFactId
   try {
-    const { error } = await adminRejudgeSubmission({ path: { competitionId, submissionId } })
+    const { error } = await adminRejudgeGameplayFact({ path: { competitionId, gameplayFactId } })
     if (error) throw error
     toast.success('已加入重判队列')
     applyFilters()
@@ -114,7 +114,7 @@ async function rejudgeBatch() {
   if (!batchTarget.value) return
   actionPending.value = 'batch'
   try {
-    const { error } = await adminRejudgeSubmissions({
+    const { error } = await adminRejudgeGameplayFacts({
       path: { competitionId },
       body: { competitionChallengeId: batchTarget.value },
     })
@@ -134,7 +134,7 @@ async function queueEvaluation() {
   if (!batchTarget.value) return
   actionPending.value = 'queue'
   try {
-    const { error } = await adminQueueSubmissionEvaluation({
+    const { error } = await adminQueueGameplayFactEvaluation({
       path: { competitionId },
       body: { competitionChallengeId: batchTarget.value },
     })
@@ -150,14 +150,14 @@ async function queueEvaluation() {
 }
 
 // ---- Protected flag access (audited) ----
-const flagDialog = ref<{ submissionId: string } | null>(null)
+const flagDialog = ref<{ gameplayFactId: string } | null>(null)
 const flagReason = ref('')
 const flagResult = ref<string | null>(null)
 const flagPending = ref(false)
 
-function openFlagAccess(submissionId?: string) {
-  if (!submissionId) return
-  flagDialog.value = { submissionId }
+function openFlagAccess(gameplayFactId?: string) {
+  if (!gameplayFactId) return
+  flagDialog.value = { gameplayFactId }
   flagReason.value = ''
   flagResult.value = null
 }
@@ -167,12 +167,12 @@ async function accessFlag() {
   if (!ctx || !flagReason.value.trim()) return
   flagPending.value = true
   try {
-    const { data, error } = await adminAccessCompetitionSubmissionFlag({
-      path: { competitionId, submissionId: ctx.submissionId },
+    const { data, error } = await adminAccessCompetitionGameplayFactValue({
+      path: { competitionId, gameplayFactId: ctx.gameplayFactId },
       body: { reason: flagReason.value.trim() },
     })
     if (error) throw error
-    flagResult.value = data?.submittedFlag ?? '(无内容)'
+    flagResult.value = data?.value ?? '(无内容)'
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -313,19 +313,19 @@ onMounted(() => {
           <TableRow v-for="s in items" :key="s.id">
             <TableCell class="font-medium">{{ teamName(s.teamId) }}</TableCell>
             <TableCell>{{ challengeTitle(s.competitionChallengeId) }}</TableCell>
-            <TableCell>{{ enumLabel(SubmissionKindLabel, s.kind) }}</TableCell>
+            <TableCell>{{ enumLabel(GameplayFactKindLabel, s.kind) }}</TableCell>
             <TableCell>
-              <Badge :variant="s.evaluationState === 'Completed' ? 'default' : s.evaluationState === 'PlatformFailed' ? 'destructive' : 'secondary'">
-                {{ enumLabel(SubmissionEvaluationStateLabel, s.evaluationState) }}
+              <Badge :variant="s.state === 'Completed' ? 'default' : s.state === 'PlatformFailed' ? 'destructive' : 'secondary'">
+                {{ enumLabel(GameplayFactStateLabel, s.state) }}
               </Badge>
             </TableCell>
             <TableCell>
               <Badge v-if="s.result !== null && s.result !== undefined" :variant="s.result === 'Correct' ? 'default' : 'outline'">
-                {{ enumLabel(ScoringResultLabel, s.result) }}
+                {{ enumLabel(GameplayFactResultLabel, s.result) }}
               </Badge>
               <span v-else class="text-muted-foreground">—</span>
             </TableCell>
-            <TableCell>{{ adminFormatDateTime(s.receivedAt) }}</TableCell>
+            <TableCell>{{ adminFormatDateTime(s.occurredAt) }}</TableCell>
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="openDetail(s.id)">详情</Button>
@@ -351,20 +351,19 @@ onMounted(() => {
       <SheetContent class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>提交详情</SheetTitle>
-          <SheetDescription>提交 ID:{{ detail?.submissionId }}</SheetDescription>
+          <SheetDescription>提交 ID:{{ detail?.gameplayFactId }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
           <div class="flex justify-between"><span class="text-muted-foreground">队伍</span><span>{{ teamName(detail.teamId) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">题目</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">提交人</span><span class="font-mono text-xs">{{ detail.submittedByUserId }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">类型</span><span>{{ enumLabel(SubmissionKindLabel, detail.kind) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">评测状态</span><span>{{ enumLabel(SubmissionEvaluationStateLabel, detail.evaluationState) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">结果</span><span>{{ detail.result !== null && detail.result !== undefined ? enumLabel(ScoringResultLabel, detail.result) : '—' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">行为人</span><span class="font-mono text-xs">{{ detail.actorUserId ?? '—' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">类型</span><span>{{ enumLabel(GameplayFactKindLabel, detail.kind) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">评测状态</span><span>{{ enumLabel(GameplayFactStateLabel, detail.state) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">结果</span><span>{{ detail.result !== null && detail.result !== undefined ? enumLabel(GameplayFactResultLabel, detail.result) : '—' }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">失败代码</span><span>{{ detail.failureCode ?? '—' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">提交时间</span><span>{{ adminFormatDateTime(detail.receivedAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">评测更新时间</span><span>{{ adminFormatDateTime(detail.evaluationUpdatedAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">处理版本</span><span>{{ detail.processingVersion }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">提交时间</span><span>{{ adminFormatDateTime(detail.occurredAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">更新时间</span><span>{{ adminFormatDateTime(detail.updatedAt) }}</span></div>
         </div>
       </SheetContent>
     </Sheet>

@@ -89,8 +89,7 @@ public sealed class ChallengeManagementStore(
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
+            await LeaderboardDirty.MarkAsync(db, command.CompetitionId, ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
             return new(Map(entity, template));
@@ -181,8 +180,7 @@ public sealed class ChallengeManagementStore(
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardRevision.IncrementAsync(db, command.CompetitionId, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(command.CompetitionId));
+            await LeaderboardDirty.MarkAsync(db, command.CompetitionId, ct);
             if (becamePublished)
             {
                 var publishedTemplate = await db.Challenges.AsNoTracking()
@@ -307,8 +305,7 @@ public sealed class ChallengeManagementStore(
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+            await LeaderboardDirty.MarkAsync(db, competitionId, ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
             return null;

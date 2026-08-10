@@ -1,6 +1,6 @@
-using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Runtime;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -28,16 +28,16 @@ public sealed class AwdCheckerResultTests
 
     [Test]
     [Arguments(AwdServiceState.Up, AwdServiceState.Up, null)]
-    [Arguments(AwdServiceState.Up, AwdServiceState.Down, ScoringResult.Wrong)]
+    [Arguments(AwdServiceState.Up, AwdServiceState.Down, GameplayFactResult.ServiceDown)]
     [Arguments(AwdServiceState.Down, AwdServiceState.Down, null)]
-    [Arguments(AwdServiceState.Down, AwdServiceState.Up, ScoringResult.Correct)]
+    [Arguments(AwdServiceState.Down, AwdServiceState.Up, GameplayFactResult.ServiceUp)]
     [Arguments(AwdServiceState.Up, AwdServiceState.CheckerAbnormalExit, null)]
     public async Task Only_service_state_changes_produce_scoring_facts(
         AwdServiceState current,
         AwdServiceState received,
-        ScoringResult? expected)
+        GameplayFactResult? expected)
     {
-        var result = AwdServiceStateTransition.ToScoringResult(current, received);
+        var result = AwdServiceStateTransition.ToGameplayFactResult(current, received);
 
         await Assert.That(result).IsEqualTo(expected);
     }

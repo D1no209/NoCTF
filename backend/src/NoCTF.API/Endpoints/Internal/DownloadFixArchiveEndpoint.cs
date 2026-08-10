@@ -2,7 +2,7 @@ using System.Security.Claims;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Storage;
-using NoCTF.Application.Submissions.PatchUploads;
+using NoCTF.Application.GameplayFacts.PatchUploads;
 
 namespace NoCTF.API.Endpoints.Internal;
 
@@ -13,14 +13,14 @@ public sealed class DownloadFixArchiveEndpoint(
 {
     public override void Configure()
     {
-        Get("/api/internal/v1/awdp/fix-archives/{submissionId}");
+        Get("/api/internal/v1/awdp/fix-archives/{gameplayFactId}");
         AuthSchemes("Internal");
         Policies("FixArchiveRead");
         RoutePrefixOverride(string.Empty);
         Summary(summary =>
         {
             summary.Summary = "Download one AWDP fix archive";
-            summary.Description = "Returns only the archive bound to the internal JWT submission claim.";
+            summary.Description = "Returns only the archive bound to the internal JWT gameplay-fact claim.";
         });
     }
 
@@ -28,7 +28,7 @@ public sealed class DownloadFixArchiveEndpoint(
         Results<FileStreamHttpResult, NotFound, UnauthorizedHttpResult>> ExecuteAsync(
         CancellationToken ct)
     {
-        var routeId = Route<Guid>("submissionId");
+        var routeId = Route<Guid>("gameplayFactId");
         if (!Guid.TryParse(
                 User.FindFirstValue("submission_id"),
                 out var claimedId)
