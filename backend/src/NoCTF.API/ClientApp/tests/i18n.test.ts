@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { effect, stop } from 'vue'
 import { englishMessages } from '../app/locales/en'
 import { localeTag, setLocale, translate } from '../app/utils/i18n'
 
@@ -40,6 +41,17 @@ describe('platform locale', () => {
     expect(localeTag()).toBe('en-US')
   })
 
+  test('reactively updates translated consumers in place', () => {
+    setLocale('zh-CN')
+    const rendered: string[] = []
+    const runner = effect(() => rendered.push(translate('竞赛管理')))
+
+    setLocale('en')
+
+    expect(rendered).toEqual(['竞赛管理', 'Competition Admin'])
+    stop(runner)
+  })
+
   test('provides English resources for every localized Chinese UI key', async () => {
     const files = sourceFiles(fileURLToPath(new URL('../app', import.meta.url)))
     const callPattern = /(?:translate|\$t|\bt)\(\s*(['"])((?:\\.|(?!\1).)*)\1/g
@@ -68,12 +80,17 @@ describe('locale switch placement', () => {
     expect(layout).toContain('<ThemeToggle />\n          <LanguageToggle />')
   })
 
-  test('persists the selected locale before reloading the SPA', async () => {
+  test('switches the selected locale without reloading the SPA', async () => {
     const composable = await Bun.file(
       new URL('../app/composables/useLocale.ts', import.meta.url),
     ).text()
+    const app = await Bun.file(
+      new URL('../app/app.vue', import.meta.url),
+    ).text()
 
     expect(composable).toContain("setLocale(isEnglish.value ? 'zh-CN' : 'en')")
-    expect(composable).toContain('window.location.reload()')
+    expect(composable).not.toContain('window.location.reload()')
+    expect(app).toContain('const { locale } = useLocale()')
+    expect(app).toContain('<NuxtPage :key="locale" />')
   })
 })
