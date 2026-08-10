@@ -3,6 +3,8 @@ import { registerEndpoint } from '~/api'
 
 definePageMeta({ middleware: 'guest' })
 
+const { configuration } = usePlatform()
+
 const userName = ref('')
 const email = ref('')
 const password = ref('')
@@ -36,6 +38,14 @@ async function submit() {
 
 <template>
   <div class="mx-auto flex max-w-md flex-col px-4 py-12">
+    <div class="mb-8 flex flex-col items-center gap-2 text-center">
+      <NuxtLink to="/" class="flex items-baseline gap-1.5 font-mono text-2xl font-semibold tracking-tight">
+        <span class="text-primary">&gt;</span>
+        <span>{{ configuration?.name ?? 'NoCTF' }}</span>
+        <span class="animate-blink text-primary">_</span>
+      </NuxtLink>
+      <p v-if="configuration?.description" class="text-sm text-muted-foreground">{{ configuration.description }}</p>
+    </div>
     <Card v-if="registered">
       <CardHeader>
         <CardTitle>{{ $t('注册成功') }}</CardTitle>

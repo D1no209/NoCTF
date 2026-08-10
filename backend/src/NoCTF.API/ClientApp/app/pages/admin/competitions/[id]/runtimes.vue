@@ -29,7 +29,7 @@ const { isAdministrator } = useAuth()
 const challengeOptions = ref<{ id: string; title: string }[]>([])
 const teamOptions = ref<{ id: string; name: string }[]>([])
 const teamName = (id?: string | null) => (id ? (teamOptions.value.find(t => t.id === id)?.name ?? id) : translate("共享"))
-const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '—'
+const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
 
 async function loadRefs() {
   const [challenges, teams] = await Promise.all([
@@ -309,7 +309,7 @@ onMounted(() => {
     </Alert>
 
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
-    <Empty v-else-if="initialized && items.length === 0">
+    <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('没有符合条件的运行时实例') }}</EmptyTitle>
       </EmptyHeader>
@@ -331,14 +331,14 @@ onMounted(() => {
           <TableRow v-for="rt in items" :key="rt.id">
             <TableCell class="font-medium">{{ teamName(rt.teamId) }}</TableCell>
             <TableCell>{{ challengeTitle(rt.competitionChallengeId) }}</TableCell>
-            <TableCell>{{ rt.generation }}</TableCell>
+            <TableCell class="font-mono tabular-nums">{{ rt.generation }}</TableCell>
             <TableCell>{{ enumLabel(RuntimeKindLabel, rt.runtimeKind) }}</TableCell>
             <TableCell>
               <Badge :variant="rt.state === 'Running' ? 'default' : rt.state === 'Failed' ? 'destructive' : 'secondary'">
                 {{ enumLabel(RuntimeStateLabel, rt.state) }}
               </Badge>
             </TableCell>
-            <TableCell>{{ adminFormatDateTime(rt.expiresAt) }}</TableCell>
+            <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(rt.expiresAt) }}</TableCell>
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="openDetail(rt.id)">{{ $t('详情') }}</Button>
@@ -391,16 +391,16 @@ onMounted(() => {
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('队伍') }}</span><span>{{ teamName(detail.teamId) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('题目') }}</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('代数') }}</span><span>{{ detail.generation }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('代数') }}</span><span class="font-mono tabular-nums">{{ detail.generation }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(RuntimeKindLabel, detail.runtimeKind) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">Provider</span><span>{{ enumLabel(RuntimeProviderLabel, detail.provider) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">Runner</span><span>{{ detail.runnerPool }}{{ detail.runnerId ? ` / ${detail.runnerId}` : '' }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('状态') }}</span><span>{{ enumLabel(RuntimeStateLabel, detail.state) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败代码') }}</span><span>{{ detail.failureCode ?? '—' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('创建时间') }}</span><span>{{ adminFormatDateTime(detail.createdAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('运行时间') }}</span><span>{{ adminFormatDateTime(detail.runningAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('到期时间') }}</span><span>{{ adminFormatDateTime(detail.expiresAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('停止时间') }}</span><span>{{ adminFormatDateTime(detail.stoppedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败代码') }}</span><span>{{ detail.failureCode ?? '-' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('创建时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.createdAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('运行时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.runningAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('到期时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.expiresAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('停止时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.stoppedAt) }}</span></div>
           <template v-if="detail.urls?.length">
             <Separator />
             <p class="text-muted-foreground">{{ $t('访问地址') }}</p>
@@ -410,7 +410,7 @@ onMounted(() => {
             <Separator />
             <p class="text-muted-foreground">{{ $t('端口映射') }}</p>
             <div v-for="(p, i) in detail.publishedPorts" :key="i" class="font-mono text-xs">
-              {{ $t('{service}:{containerPort} → 主机 {hostPort}', { service: p.serviceName ?? 'service', containerPort: p.containerPort ?? '—', hostPort: p.hostPort ?? '—' }) }}
+              {{ $t('{service}:{containerPort} → 主机 {hostPort}', { service: p.serviceName ?? 'service', containerPort: p.containerPort ?? '-', hostPort: p.hostPort ?? '-' }) }}
             </div>
           </template>
           <template v-if="detail.providerReceiptJson">

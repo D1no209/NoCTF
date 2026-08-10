@@ -86,7 +86,7 @@ onMounted(() => {
       </CardContent>
     </Card>
 
-    <Empty v-else-if="items.length === 0">
+    <Empty v-else-if="items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('死信队列为空') }}</EmptyTitle>
         <EmptyDescription>{{ $t('没有投递失败的消息。') }}</EmptyDescription>

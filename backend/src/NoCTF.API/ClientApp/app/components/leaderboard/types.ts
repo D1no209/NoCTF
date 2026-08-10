@@ -52,3 +52,20 @@ export function normalizeChallengeKey(value?: string | null): string {
 }
 
 export const bloodRankLabel: Record<string, string> = { First: translate("一血"), Second: translate("二血"), Third: translate("三血") }
+
+const bloodRankOrder = ['First', 'Second', 'Third'] as const
+
+/** 金/银/铜 Medal 图标着色,总榜名次(rank 1-3)与题目血榜(First/Second/Third)共用。 */
+export const medalRankClass: Record<number, string> = {
+  1: 'text-amber-500',
+  2: 'text-slate-400',
+  3: 'text-orange-600',
+}
+
+/** 血榜名次 → Medal 图标着色;非前三名返回 undefined(调用方自行兜底)。 */
+export function medalBloodRankClass(bloodRank?: string | null): string | undefined {
+  const index = bloodRank
+    ? bloodRankOrder.indexOf(bloodRank as (typeof bloodRankOrder)[number])
+    : -1
+  return index >= 0 ? medalRankClass[index + 1] : undefined
+}

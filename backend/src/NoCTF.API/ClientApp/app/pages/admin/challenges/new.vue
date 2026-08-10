@@ -60,66 +60,78 @@ async function submit(): Promise<void> {
     <Card v-else>
       <CardContent class="pt-6">
         <form @submit.prevent="submit">
-          <FieldGroup>
-            <Alert v-if="error" variant="destructive">
-              <AlertDescription>{{ error }}</AlertDescription>
-            </Alert>
-            <Field>
-              <FieldLabel for="title">{{ $t('标题') }}</FieldLabel>
-              <Input id="title" v-model="title" required maxlength="200" :placeholder="$t('例如:Web 入门 - SQL 注入')" />
-            </Field>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel for="mode">{{ $t('游戏模式') }}</FieldLabel>
-                <Select v-model="mode">
-                  <SelectTrigger id="mode" class="w-full">
-                    <SelectValue :placeholder="$t('选择模式')" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="Ctf">CTF</SelectItem>
-                      <SelectItem value="Awd">AWD</SelectItem>
-                      <SelectItem value="Awdp">AWDP</SelectItem>
-                      <SelectItem value="Koh">KoH</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel for="visibility">{{ $t('可见性') }}</FieldLabel>
-                <Select v-model="visibility">
-                  <SelectTrigger id="visibility" class="w-full">
-                    <SelectValue :placeholder="$t('选择可见性')" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="Private">{{ $t('私有(仅负责人/管理员可用)') }}</SelectItem>
-                      <SelectItem value="Shared">{{ $t('共享(所有组织者可用)') }}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-            <Field>
-              <FieldLabel for="direction">{{ $t('方向') }}</FieldLabel>
-              <Input id="direction" v-model="direction" required maxlength="100" :placeholder="$t('例如:Web / Pwn / Misc')" />
-            </Field>
-            <Field>
-              <FieldLabel for="description">{{ $t('题面') }}</FieldLabel>
-              <Textarea id="description" v-model="description" rows="6" :placeholder="$t('题目描述,支持 Markdown')" />
-            </Field>
-            <Field>
-              <FieldLabel>{{ $t('题目定义') }}</FieldLabel>
-              <DefinitionEditor v-model="definitionJson" :mode="mode" />
-            </Field>
-            <Field orientation="horizontal">
-              <Button type="submit" :disabled="pending">
-                <Spinner v-if="pending" data-icon="inline-start" /> {{ $t('创建模板') }} </Button>
-              <Button type="button" variant="outline" as-child>
-                <NuxtLink to="/admin/challenges">{{ $t('取消') }}</NuxtLink>
-              </Button>
-            </Field>
-          </FieldGroup>
+          <Alert v-if="error" variant="destructive" class="mb-6">
+            <AlertDescription>{{ error }}</AlertDescription>
+          </Alert>
+          <Tabs default-value="basic">
+            <TabsList>
+              <TabsTrigger value="basic">{{ $t('基本信息') }}</TabsTrigger>
+              <TabsTrigger value="definition">{{ $t('题目定义') }}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="basic">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel for="title">{{ $t('标题') }}</FieldLabel>
+                  <Input id="title" v-model="title" required maxlength="200" :placeholder="$t('例如:Web 入门 - SQL 注入')" />
+                </Field>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <Field>
+                    <FieldLabel for="mode">{{ $t('游戏模式') }}</FieldLabel>
+                    <Select v-model="mode">
+                      <SelectTrigger id="mode" class="w-full">
+                        <SelectValue :placeholder="$t('选择模式')" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="Ctf">CTF</SelectItem>
+                          <SelectItem value="Awd">AWD</SelectItem>
+                          <SelectItem value="Awdp">AWDP</SelectItem>
+                          <SelectItem value="Koh">KoH</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel for="visibility">{{ $t('可见性') }}</FieldLabel>
+                    <Select v-model="visibility">
+                      <SelectTrigger id="visibility" class="w-full">
+                        <SelectValue :placeholder="$t('选择可见性')" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="Private">{{ $t('私有(仅负责人/管理员可用)') }}</SelectItem>
+                          <SelectItem value="Shared">{{ $t('共享(所有组织者可用)') }}</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+                <Field>
+                  <FieldLabel for="direction">{{ $t('方向') }}</FieldLabel>
+                  <Input id="direction" v-model="direction" required maxlength="100" :placeholder="$t('例如:Web / Pwn / Misc')" />
+                </Field>
+                <Field>
+                  <FieldLabel for="description">{{ $t('题面') }}</FieldLabel>
+                  <Textarea id="description" v-model="description" rows="6" :placeholder="$t('题目描述,支持 Markdown')" />
+                </Field>
+                <Field orientation="horizontal">
+                  <Button type="submit" :disabled="pending">
+                    <Spinner v-if="pending" data-icon="inline-start" /> {{ $t('创建模板') }} </Button>
+                  <Button type="button" variant="outline" as-child>
+                    <NuxtLink to="/admin/challenges">{{ $t('取消') }}</NuxtLink>
+                  </Button>
+                </Field>
+              </FieldGroup>
+            </TabsContent>
+            <TabsContent value="definition">
+              <FieldGroup>
+                <Alert>
+                  <AlertDescription>{{ $t('可选,创建后可再配置。') }}</AlertDescription>
+                </Alert>
+                <DefinitionEditor v-model="definitionJson" :mode="mode" />
+              </FieldGroup>
+            </TabsContent>
+          </Tabs>
         </form>
       </CardContent>
     </Card>

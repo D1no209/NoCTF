@@ -131,7 +131,7 @@ onMounted(() => {
         <CardContent class="flex flex-col gap-4">
           <div class="flex items-center gap-2">
             <span class="text-sm text-muted-foreground">{{ $t('版本') }}</span>
-            <Badge variant="secondary" class="font-mono">{{ information?.version ?? '—' }}</Badge>
+            <Badge variant="secondary" class="font-mono">{{ information?.version ?? '-' }}</Badge>
           </div>
           <div class="flex flex-col gap-2">
             <span class="text-sm text-muted-foreground">{{ $t('贡献者') }}</span>
@@ -141,7 +141,7 @@ onMounted(() => {
                 <AvatarFallback>{{ contributor.id?.slice(0, 2) ?? '?' }}</AvatarFallback>
               </Avatar>
             </div>
-            <span v-else class="text-sm text-muted-foreground">—</span>
+            <span v-else class="text-sm text-muted-foreground">-</span>
           </div>
         </CardContent>
       </Card>

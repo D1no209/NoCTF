@@ -157,7 +157,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
 
     <Skeleton v-if="loading" class="h-48 w-full" />
 
-    <Empty v-else-if="items.length === 0">
+    <Empty v-else-if="items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('暂无题目') }}</EmptyTitle>
         <EmptyDescription>{{ $t('从题库中添加题目后开始配置竞赛') }}</EmptyDescription>
@@ -177,7 +177,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
       </TableHeader>
       <TableBody>
         <TableRow v-for="c in items" :key="c.id" :class="{ 'opacity-60': c.deletedAt }">
-          <TableCell>{{ c.order }}</TableCell>
+          <TableCell class="font-mono tabular-nums">{{ c.order }}</TableCell>
           <TableCell>
             <NuxtLink
               v-if="!c.deletedAt"
@@ -193,7 +193,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
               {{ c.direction }}
             </Badge>
           </TableCell>
-          <TableCell class="font-mono tabular-nums">{{ c.baseScore ?? '—' }}</TableCell>
+          <TableCell class="font-mono tabular-nums">{{ c.baseScore ?? '-' }}</TableCell>
           <TableCell>
             <Badge v-if="c.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
             <Badge v-else :variant="c.isPublished ? 'default' : 'outline'">
@@ -276,7 +276,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
         <AlertDialogHeader>
           <AlertDialogTitle>{{ $t('删除题目') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('删除「{title}」后选手将无法看到该题，可稍后恢复。确认删除？', { title: deleteTarget?.title ?? '—' }) }}
+            {{ $t('删除「{title}」后选手将无法看到该题，可稍后恢复。确认删除？', { title: deleteTarget?.title ?? '-' }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

@@ -187,7 +187,7 @@ onMounted(() => {
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
       <Skeleton v-if="loading" class="h-48 w-full" />
-      <Empty v-else-if="teams.length === 0">
+      <Empty v-else-if="teams.length === 0" class="border border-dashed py-12">
         <EmptyHeader>
           <EmptyTitle>{{ $t('暂无注册队伍') }}</EmptyTitle>
         </EmptyHeader>
@@ -206,7 +206,7 @@ onMounted(() => {
         <TableBody>
           <TableRow v-for="t in teams" :key="t.id">
             <TableCell class="font-medium">{{ t.name }}</TableCell>
-            <TableCell>{{ t.memberIds?.length ?? 0 }}</TableCell>
+            <TableCell class="font-mono tabular-nums">{{ t.memberIds?.length ?? 0 }}</TableCell>
             <TableCell>
               <Badge :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">
                 {{ enumLabel(TeamRegistrationStatusLabel, t.registrationStatus) }}
@@ -214,9 +214,9 @@ onMounted(() => {
             </TableCell>
             <TableCell>
               <Badge v-if="t.isBanned" variant="destructive">{{ $t('已封禁') }}</Badge>
-              <span v-else class="text-muted-foreground">—</span>
+              <span v-else class="text-muted-foreground">-</span>
             </TableCell>
-            <TableCell>{{ adminFormatDateTime(t.registeredAt) }}</TableCell>
+            <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(t.registeredAt) }}</TableCell>
             <TableCell v-if="canWrite || canJudge" class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <template v-if="canWrite && t.registrationStatus === 'Pending'">
@@ -242,7 +242,7 @@ onMounted(() => {
     <div class="flex flex-col gap-4">
       <h2 class="text-lg font-semibold">{{ $t('封禁申诉') }}</h2>
       <Skeleton v-if="appealsLoading" class="h-32 w-full" />
-      <Empty v-else-if="appeals.length === 0">
+      <Empty v-else-if="appeals.length === 0" class="border border-dashed py-12">
         <EmptyHeader>
           <EmptyTitle>{{ $t('暂无申诉') }}</EmptyTitle>
         </EmptyHeader>
@@ -266,7 +266,7 @@ onMounted(() => {
             <p><span class="text-muted-foreground">{{ $t('申诉人:') }}</span>{{ a.appeal.submittedByUserName }} · {{ adminFormatDateTime(a.appeal.submittedAt) }}</p>
             <p class="whitespace-pre-wrap">{{ a.appeal.statement }}</p>
             <p v-if="a.appeal.resolutionReason" class="text-muted-foreground">
-              {{ $t('裁决：{user} · {time} — {reason}', { user: a.appeal.resolvedByUserName ?? '—', time: adminFormatDateTime(a.appeal.resolvedAt), reason: a.appeal.resolutionReason }) }}
+              {{ $t('裁决：{user} · {time} · {reason}', { user: a.appeal.resolvedByUserName ?? '-', time: adminFormatDateTime(a.appeal.resolvedAt), reason: a.appeal.resolutionReason }) }}
             </p>
           </CardContent>
           <CardFooter v-if="canJudge && a.appeal?.status === 'Submitted' && a.canResolve" class="gap-2">
@@ -282,7 +282,7 @@ onMounted(() => {
         <DialogHeader>
           <DialogTitle>{{ $t('解除队伍封禁？') }}</DialogTitle>
           <DialogDescription>
-            {{ $t('将立即恢复「{team}」的参赛资格、历史计分资格和正常运行时生命周期。', { team: unbanDialog?.name ?? '—' }) }}
+            {{ $t('将立即恢复「{team}」的参赛资格、历史计分资格和正常运行时生命周期。', { team: unbanDialog?.name ?? '-' }) }}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -303,8 +303,8 @@ onMounted(() => {
           <DialogTitle>{{ banDialog?.mode === 'ban' ? $t('封禁队伍') : $t('纠正封禁') }}</DialogTitle>
           <DialogDescription>
             {{ banDialog?.mode === 'ban'
-              ? $t('封禁「{team}」，该队将无法继续参赛。', { team: banDialog?.team.name ?? '—' })
-              : $t('将「{team}」的封禁标记为误封并纠正。', { team: banDialog?.team.name ?? '—' }) }}
+              ? $t('封禁「{team}」，该队将无法继续参赛。', { team: banDialog?.team.name ?? '-' })
+              : $t('将「{team}」的封禁标记为误封并纠正。', { team: banDialog?.team.name ?? '-' }) }}
             {{ $t('必须填写原因（将记入审计）。') }}
           </DialogDescription>
         </DialogHeader>
@@ -341,8 +341,8 @@ onMounted(() => {
           <DialogTitle>{{ appealDialog?.mode === 'accept' ? $t('接受申诉') : $t('维持封禁') }}</DialogTitle>
           <DialogDescription>
             {{ appealDialog?.mode === 'accept'
-              ? $t('接受「{team}」的申诉并解除封禁。', { team: appealDialog?.banCase.teamName ?? '—' })
-              : $t('驳回「{team}」的申诉，维持封禁。', { team: appealDialog?.banCase.teamName ?? '—' }) }}
+              ? $t('接受「{team}」的申诉并解除封禁。', { team: appealDialog?.banCase.teamName ?? '-' })
+              : $t('驳回「{team}」的申诉，维持封禁。', { team: appealDialog?.banCase.teamName ?? '-' }) }}
             {{ $t('必须填写裁决理由。') }}
           </DialogDescription>
         </DialogHeader>

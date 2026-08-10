@@ -36,7 +36,7 @@ onMounted(async () => {
             <AvatarFallback>{{ profile.userName?.slice(0, 2) ?? '?' }}</AvatarFallback>
           </Avatar>
           <div class="flex flex-col gap-1">
-            <CardTitle class="text-xl">{{ profile.userName }}</CardTitle>
+            <CardTitle class="text-display text-xl">{{ profile.userName }}</CardTitle>
             <CardDescription v-if="profile.isEmailPublic && profile.email">
               {{ profile.email }}
             </CardDescription>

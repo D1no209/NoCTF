@@ -145,135 +145,158 @@ const isCaptain = computed(
 
 <template>
   <div v-if="competition" class="flex flex-col gap-6">
-    <!-- Banner -->
-    <div class="relative overflow-hidden rounded-xl border bg-gradient-to-br from-primary/90 via-primary/70 to-primary/40 text-primary-foreground">
-      <Trophy class="pointer-events-none absolute -right-8 -bottom-10 size-56 opacity-15" />
-      <div class="relative flex flex-col gap-6 p-6 sm:p-10">
-        <div class="flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{{ gameModeLabel(competition.mode) }}</Badge>
-          <Badge variant="outline" class="border-primary-foreground/40 text-primary-foreground">
-            {{ competitionStatusLabel(competition.status) }}
-          </Badge>
-        </div>
+    <!-- Hero -->
+    <Card class="overflow-hidden">
+      <div class="grid gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-12">
+        <div class="flex min-w-0 flex-col gap-5">
+          <div class="flex flex-wrap items-center gap-2">
+            <ModeBadge :mode="competition.mode" />
+            <LifecycleBadge :status="competition.status" />
+          </div>
 
-        <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">{{ competition.title }}</h1>
+          <h1 class="text-display text-3xl sm:text-4xl">{{ competition.title }}</h1>
 
-        <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <span class="flex items-center gap-1.5">
-            <CalendarRange class="size-4" />
+          <p class="flex items-center gap-2 font-mono text-xs text-muted-foreground tabular-nums sm:text-sm">
+            <CalendarRange class="size-4 shrink-0" />
             {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
-          </span>
-          <span v-if="countdown" class="flex items-center gap-1.5 font-medium">
-            <Clock class="size-4" />
-            {{ countdown.label }}{{ countdown.ms > 0 ? ` ${formatDuration(countdown.ms)}` : '' }}
-          </span>
+          </p>
+
+          <div v-if="countdown" class="flex flex-wrap items-end gap-x-3 gap-y-1">
+            <span v-if="countdown.ms > 0" class="flex items-center gap-1.5 pb-2 text-sm text-muted-foreground">
+              <Clock class="size-4" />
+              {{ countdown.label }}
+            </span>
+            <span class="font-mono text-3xl font-semibold text-primary tabular-nums sm:text-4xl">
+              {{ countdown.ms > 0 ? formatDuration(countdown.ms) : countdown.label }}
+            </span>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 pt-1">
+            <template v-if="!teamLoaded">
+              <Skeleton class="h-10 w-32" />
+            </template>
+
+            <template v-else-if="!isLoggedIn">
+              <Button as-child size="lg">
+                <NuxtLink :to="`/auth/login?redirect=/competitions/${competitionId}`">
+                  <LogIn data-icon="inline-start" /> {{ $t('登录 / 注册后报名') }} </NuxtLink>
+              </Button>
+            </template>
+
+            <template v-else-if="!myTeam">
+              <Dialog v-if="teamRegistrationOpen" v-model:open="createOpen">
+                <DialogTrigger as-child>
+                  <Button size="lg">
+                    <UserPlus data-icon="inline-start" /> {{ $t('立即报名') }} </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{{ $t('创建队伍') }}</DialogTitle>
+                    <DialogDescription>{{ $t('队伍创建后你就是队长,可邀请成员加入') }}</DialogDescription>
+                  </DialogHeader>
+                  <form @submit.prevent="submitCreate">
+                    <FieldGroup>
+                      <Field>
+                        <FieldLabel for="team-name">{{ $t('队伍名称') }}</FieldLabel>
+                        <Input id="team-name" v-model="createName" required maxlength="64" />
+                      </Field>
+                      <Field>
+                        <Button type="submit" class="w-full" :disabled="createPending">
+                          <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('创建') }} </Button>
+                      </Field>
+                    </FieldGroup>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <Alert v-else class="w-auto">
+                <AlertDescription>{{ $t('当前比赛阶段已关闭新队伍创建。') }}</AlertDescription>
+              </Alert>
+
+              <Dialog v-model:open="joinOpen">
+                <DialogTrigger as-child>
+                  <Button size="lg" variant="outline">
+                    <KeyRound data-icon="inline-start" /> {{ $t('凭邀请码加入') }} </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{{ $t('加入队伍') }}</DialogTitle>
+                    <DialogDescription>{{ $t('输入队长分享给你的 32 位邀请码') }}</DialogDescription>
+                  </DialogHeader>
+                  <form @submit.prevent="submitJoin">
+                    <FieldGroup>
+                      <Field>
+                        <FieldLabel for="invitation-token">{{ $t('邀请码') }}</FieldLabel>
+                        <Input id="invitation-token" v-model="joinToken" required />
+                      </Field>
+                      <Field>
+                        <Button type="submit" class="w-full" :disabled="joinPending">
+                          <Spinner v-if="joinPending" data-icon="inline-start" /> {{ $t('加入') }} </Button>
+                      </Field>
+                    </FieldGroup>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </template>
+
+            <template v-else>
+              <Button v-if="canParticipate" as-child size="lg">
+                <NuxtLink :to="`/competitions/${competitionId}/challenges`"> {{ $t('进入比赛') }} <ArrowRight data-icon="inline-end" />
+                </NuxtLink>
+              </Button>
+              <Button as-child size="lg" variant="outline">
+                <NuxtLink :to="`/competitions/${competitionId}/my/team`">{{ $t('我的队伍') }}</NuxtLink>
+              </Button>
+            </template>
+          </div>
         </div>
 
-        <div class="flex flex-wrap gap-2">
-          <span class="flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs">
-            <Users class="size-3.5" />
-            {{ $t('队伍人数上限 {count} 人', { count: competition.maxTeamMembers ?? '—' }) }}
-          </span>
-          <span class="flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs">
-            <Box class="size-3.5" />
-            {{ $t('同时环境上限 {count} 个', { count: competition.maxConcurrentRuntimeInstancesPerTeam ?? '—' }) }}
-          </span>
-          <span class="flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs">
-            <ShieldCheck class="size-3.5" />
-            {{ competition.teamRegistrationAutoApprove ? $t('报名自动通过') : $t('报名需审核') }}
-          </span>
-          <span v-if="approvedTeamCount !== null" class="flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-3 py-1 text-xs">
-            <Trophy class="size-3.5" />
-            {{ $t('{count} 支队伍已报名', { count: approvedTeamCount }) }}
-          </span>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-3 pt-2">
-          <template v-if="!teamLoaded">
-            <Skeleton class="h-10 w-32" />
-          </template>
-
-          <template v-else-if="!isLoggedIn">
-            <Button as-child size="lg" variant="secondary">
-              <NuxtLink :to="`/auth/login?redirect=/competitions/${competitionId}`">
-                <LogIn data-icon="inline-start" /> {{ $t('登录 / 注册后报名') }} </NuxtLink>
-            </Button>
-          </template>
-
-          <template v-else-if="!myTeam">
-            <Dialog v-if="teamRegistrationOpen" v-model:open="createOpen">
-              <DialogTrigger as-child>
-                <Button size="lg" variant="secondary">
-                  <UserPlus data-icon="inline-start" /> {{ $t('立即报名') }} </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{{ $t('创建队伍') }}</DialogTitle>
-                  <DialogDescription>{{ $t('队伍创建后你就是队长,可邀请成员加入') }}</DialogDescription>
-                </DialogHeader>
-                <form @submit.prevent="submitCreate">
-                  <FieldGroup>
-                    <Field>
-                      <FieldLabel for="team-name">{{ $t('队伍名称') }}</FieldLabel>
-                      <Input id="team-name" v-model="createName" required maxlength="64" />
-                    </Field>
-                    <Field>
-                      <Button type="submit" class="w-full" :disabled="createPending">
-                        <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('创建') }} </Button>
-                    </Field>
-                  </FieldGroup>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Alert v-else class="w-auto border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground">
-              <AlertDescription>{{ $t('当前比赛阶段已关闭新队伍创建。') }}</AlertDescription>
-            </Alert>
-
-            <Dialog v-model:open="joinOpen">
-              <DialogTrigger as-child>
-                <Button size="lg" variant="outline" class="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
-                  <KeyRound data-icon="inline-start" /> {{ $t('凭邀请码加入') }} </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{{ $t('加入队伍') }}</DialogTitle>
-                  <DialogDescription>{{ $t('输入队长分享给你的 32 位邀请码') }}</DialogDescription>
-                </DialogHeader>
-                <form @submit.prevent="submitJoin">
-                  <FieldGroup>
-                    <Field>
-                      <FieldLabel for="invitation-token">{{ $t('邀请码') }}</FieldLabel>
-                      <Input id="invitation-token" v-model="joinToken" required />
-                    </Field>
-                    <Field>
-                      <Button type="submit" class="w-full" :disabled="joinPending">
-                        <Spinner v-if="joinPending" data-icon="inline-start" /> {{ $t('加入') }} </Button>
-                    </Field>
-                  </FieldGroup>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </template>
-
-          <template v-else>
-            <Button v-if="canParticipate" as-child size="lg" variant="secondary">
-              <NuxtLink :to="`/competitions/${competitionId}/challenges`"> {{ $t('进入比赛') }} <ArrowRight data-icon="inline-end" />
-              </NuxtLink>
-            </Button>
-            <Button as-child size="lg" variant="outline" class="border-primary-foreground/40 bg-transparent text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
-              <NuxtLink :to="`/competitions/${competitionId}/my/team`">{{ $t('我的队伍') }}</NuxtLink>
-            </Button>
-          </template>
-        </div>
+        <dl class="flex flex-col justify-center gap-4 lg:border-l lg:pl-10">
+          <div class="flex items-center justify-between gap-4">
+            <dt class="flex items-center gap-2 text-xs text-muted-foreground">
+              <Users class="size-3.5" />
+              {{ $t('队伍人数上限') }}
+            </dt>
+            <dd class="font-mono text-sm tabular-nums">
+              {{ $t('{count} 人', { count: competition.maxTeamMembers ?? '-' }) }}
+            </dd>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <dt class="flex items-center gap-2 text-xs text-muted-foreground">
+              <Box class="size-3.5" />
+              {{ $t('同时环境上限') }}
+            </dt>
+            <dd class="font-mono text-sm tabular-nums">
+              {{ $t('{count} 个', { count: competition.maxConcurrentRuntimeInstancesPerTeam ?? '-' }) }}
+            </dd>
+          </div>
+          <div class="flex items-center justify-between gap-4">
+            <dt class="flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldCheck class="size-3.5" />
+              {{ $t('审核方式') }}
+            </dt>
+            <dd class="text-sm">
+              {{ competition.teamRegistrationAutoApprove ? $t('报名自动通过') : $t('报名需审核') }}
+            </dd>
+          </div>
+          <div v-if="approvedTeamCount !== null" class="flex items-center justify-between gap-4">
+            <dt class="flex items-center gap-2 text-xs text-muted-foreground">
+              <Trophy class="size-3.5" />
+              {{ $t('报名队伍') }}
+            </dt>
+            <dd class="font-mono text-sm tabular-nums">
+              {{ $t('{count} 支', { count: approvedTeamCount }) }}
+            </dd>
+          </div>
+        </dl>
       </div>
-    </div>
+    </Card>
 
     <!-- 我的队伍状态提示 -->
     <Alert v-if="myTeam && myTeam.registrationStatus === TeamRegistrationStatus.Pending">
       <ShieldCheck class="size-4" />
       <AlertDescription>
-        {{ $t('队伍「{team}」报名已提交，等待主办方审核通过后即可参赛。', { team: myTeam.name ?? '—' }) }}
+        {{ $t('队伍「{team}」报名已提交，等待主办方审核通过后即可参赛。', { team: myTeam.name ?? '-' }) }}
       </AlertDescription>
     </Alert>
     <Alert v-else-if="myTeam && myTeam.registrationStatus === TeamRegistrationStatus.Rejected" variant="destructive">
@@ -282,7 +305,7 @@ const isCaptain = computed(
       </AlertDescription>
     </Alert>
     <Alert v-else-if="myTeam?.isBanned" variant="destructive">
-      <AlertDescription>{{ $t('队伍「{team}」已被封禁，如有异议请联系主办方。', { team: myTeam.name ?? '—' }) }}</AlertDescription>
+      <AlertDescription>{{ $t('队伍「{team}」已被封禁，如有异议请联系主办方。', { team: myTeam.name ?? '-' }) }}</AlertDescription>
     </Alert>
 
     <!-- 竞赛介绍 -->

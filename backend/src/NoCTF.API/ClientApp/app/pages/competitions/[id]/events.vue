@@ -118,7 +118,7 @@ const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventL
         </Badge>
         <div class="flex min-w-0 flex-col gap-0.5">
           <p class="text-sm">{{ competitionEventText(event) }}</p>
-          <p class="text-xs text-muted-foreground">{{ formatDateTime(event.occurredAt) }}</p>
+          <p class="font-mono text-xs text-muted-foreground tabular-nums">{{ formatDateTime(event.occurredAt) }}</p>
         </div>
       </li>
     </ul>

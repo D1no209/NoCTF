@@ -29,7 +29,7 @@ const navGroups: WorkspaceNavGroup[] = [
   <AppWorkspaceNav :groups="navGroups" :title="$t('平台管理')">
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6">
       <div>
-        <h1 class="text-2xl font-semibold">{{ $t('平台管理') }}</h1>
+        <h1 class="text-display text-2xl">{{ $t('平台管理') }}</h1>
         <p class="text-sm text-muted-foreground">{{ $t('平台配置、用户、日志与运维管理') }}</p>
       </div>
       <NuxtPage />

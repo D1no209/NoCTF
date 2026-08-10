@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bell, CalendarCog, Database, Flag, LogOut, ShieldCheck, Trophy, User } from '@lucide/vue'
+import { Bell, CalendarCog, Database, Flag, LogOut, ShieldCheck, User } from '@lucide/vue'
 
 const { user, isLoggedIn, isAdministrator, canOrganize, logout } = useAuth()
 const { configuration } = usePlatform()
@@ -39,11 +39,10 @@ onBeforeUnmount(() => {
   <div class="flex min-h-screen flex-col">
     <header class="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <div class="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 md:px-6">
-        <NuxtLink to="/" class="flex shrink-0 items-center gap-2.5 text-lg font-semibold">
-          <span class="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Trophy class="size-5" />
-          </span>
-          {{ configuration?.name ?? 'NoCTF' }}
+        <NuxtLink to="/" class="flex shrink-0 items-baseline gap-1.5 font-mono text-base font-semibold tracking-tight">
+          <span class="text-primary">&gt;</span>
+          <span>{{ configuration?.name ?? 'NoCTF' }}</span>
+          <span class="animate-blink text-primary">_</span>
         </NuxtLink>
         <nav class="flex min-w-0 items-center gap-1 overflow-x-auto">
           <Button
@@ -128,10 +127,10 @@ onBeforeUnmount(() => {
     </main>
     <footer class="border-t">
       <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-6 text-xs text-muted-foreground md:px-6">
-        <p class="flex items-center gap-2">
-          <Trophy class="size-3.5 text-primary" />
-          <span class="font-medium text-foreground">{{ configuration?.name ?? 'NoCTF' }}</span>
-          <span v-if="configuration?.description"> · {{ configuration.description }}</span>
+        <p class="flex items-baseline gap-1.5">
+          <span class="font-mono text-primary">&gt;</span>
+          <span class="font-mono font-medium text-foreground">{{ configuration?.name ?? 'NoCTF' }}</span>
+          <span v-if="configuration?.description">{{ configuration.description }}</span>
         </p>
         <p class="font-mono">Powered by NoCTF</p>
       </div>

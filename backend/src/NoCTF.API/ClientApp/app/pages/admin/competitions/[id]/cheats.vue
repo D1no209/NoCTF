@@ -206,7 +206,7 @@ onBeforeUnmount(() => {
     </Alert>
 
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
-    <Empty v-else-if="initialized && items.length === 0">
+    <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('暂无作弊事件') }}</EmptyTitle>
       </EmptyHeader>
@@ -238,7 +238,7 @@ onBeforeUnmount(() => {
                 {{ enumLabel(CheatIncidentStatusLabel, i.status) }}
               </Badge>
             </TableCell>
-            <TableCell>{{ adminFormatDateTime(i.detectedAt) }}</TableCell>
+            <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(i.detectedAt) }}</TableCell>
             <TableCell class="text-right">
               <Button variant="ghost" size="sm" @click="openDetail(i.gameplayFactId)">{{ $t('详情') }}</Button>
             </TableCell>
@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
       <SheetContent class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{{ $t('作弊事件详情') }}</SheetTitle>
-          <SheetDescription>{{ $t('事件 ID：{id}', { id: detail?.gameplayFactId ?? '—' }) }}</SheetDescription>
+          <SheetDescription>{{ $t('事件 ID：{id}', { id: detail?.gameplayFactId ?? '-' }) }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
@@ -266,17 +266,17 @@ onBeforeUnmount(() => {
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('结果') }}</span><span>{{ enumLabel(GameplayFactResultLabel, detail.result) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('状态') }}</span><span>{{ enumLabel(CheatIncidentStatusLabel, detail.status) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交时间') }}</span><span>{{ adminFormatDateTime(detail.submittedAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('检测时间') }}</span><span>{{ adminFormatDateTime(detail.detectedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.submittedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('检测时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.detectedAt) }}</span></div>
           <template v-if="detail.resolvedByUserName">
             <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('处理人') }}</span><span>{{ detail.resolvedByUserName }}</span></div>
-            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('处理时间') }}</span><span>{{ adminFormatDateTime(detail.resolvedAt) }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('处理时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.resolvedAt) }}</span></div>
             <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('处理理由') }}</span><span class="whitespace-pre-wrap">{{ detail.resolutionReason }}</span></div>
           </template>
           <template v-if="detail.sourceTeamIsBanned">
             <Separator />
-            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('封禁时间') }}</span><span>{{ adminFormatDateTime(detail.sourceTeamBannedAt) }}</span></div>
-            <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('封禁原因') }}</span><span class="whitespace-pre-wrap">{{ detail.sourceTeamBanReason ?? '—' }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('封禁时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.sourceTeamBannedAt) }}</span></div>
+            <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('封禁原因') }}</span><span class="whitespace-pre-wrap">{{ detail.sourceTeamBanReason ?? '-' }}</span></div>
           </template>
           <Separator />
           <div class="flex flex-col gap-2">

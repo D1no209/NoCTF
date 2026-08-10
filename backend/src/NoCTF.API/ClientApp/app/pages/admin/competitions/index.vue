@@ -63,7 +63,7 @@ onMounted(load)
   <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-semibold">{{ $t('竞赛管理') }}</h1>
+        <h1 class="text-display text-2xl">{{ $t('竞赛管理') }}</h1>
         <p class="text-sm text-muted-foreground">{{ $t('我参与管理的全部竞赛') }}</p>
       </div>
       <div class="flex items-center gap-3">
@@ -84,7 +84,7 @@ onMounted(load)
       <Skeleton v-for="i in 3" :key="i" class="h-24 w-full" />
     </div>
 
-    <Empty v-else-if="items.length === 0">
+    <Empty v-else-if="items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('暂无竞赛') }}</EmptyTitle>
         <EmptyDescription>{{ $t('你还没有参与管理任何竞赛') }}</EmptyDescription>
@@ -104,7 +104,7 @@ onMounted(load)
           </div>
           <CardDescription class="line-clamp-2">{{ c.description || $t('暂无描述') }}</CardDescription>
         </CardHeader>
-        <CardContent class="flex items-center justify-between text-sm text-muted-foreground">
+        <CardContent class="flex items-center justify-between font-mono text-sm tabular-nums text-muted-foreground">
           <span>{{ adminFormatDateTime(c.startTime) }} ~ {{ adminFormatDateTime(c.endTime) }}</span>
           <Badge variant="outline">{{ c.id && roles[c.id] ? RoleLabel[roles[c.id]!] : '…' }}</Badge>
         </CardContent>

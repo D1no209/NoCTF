@@ -26,8 +26,8 @@ const { competitionId, canWrite } = useCompetitionAdmin()
 // ---- Reference data for filters ----
 const challengeOptions = ref<{ id: string; title: string }[]>([])
 const teamOptions = ref<{ id: string; name: string }[]>([])
-const teamName = (id?: string | null) => teamOptions.value.find(t => t.id === id)?.name ?? id ?? '—'
-const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '—'
+const teamName = (id?: string | null) => teamOptions.value.find(t => t.id === id)?.name ?? id ?? '-'
+const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
 
 async function loadRefs() {
   const [challenges, teams] = await Promise.all([
@@ -285,7 +285,7 @@ onMounted(() => {
     </Card>
 
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
-    <Empty v-else-if="initialized && items.length === 0">
+    <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('没有符合条件的提交') }}</EmptyTitle>
       </EmptyHeader>
@@ -317,9 +317,9 @@ onMounted(() => {
               <Badge v-if="s.result !== null && s.result !== undefined" :variant="s.result === 'Correct' ? 'default' : 'outline'">
                 {{ enumLabel(GameplayFactResultLabel, s.result) }}
               </Badge>
-              <span v-else class="text-muted-foreground">—</span>
+              <span v-else class="text-muted-foreground">-</span>
             </TableCell>
-            <TableCell>{{ adminFormatDateTime(s.occurredAt) }}</TableCell>
+            <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(s.occurredAt) }}</TableCell>
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="openDetail(s.id)">{{ $t('详情') }}</Button>
@@ -341,19 +341,19 @@ onMounted(() => {
       <SheetContent class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{{ $t('提交详情') }}</SheetTitle>
-          <SheetDescription>{{ $t('提交 ID：{id}', { id: detail?.gameplayFactId ?? '—' }) }}</SheetDescription>
+          <SheetDescription>{{ $t('提交 ID：{id}', { id: detail?.gameplayFactId ?? '-' }) }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('队伍') }}</span><span>{{ teamName(detail.teamId) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('题目') }}</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('行为人') }}</span><span class="font-mono text-xs">{{ detail.actorUserId ?? '—' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('行为人') }}</span><span class="font-mono text-xs">{{ detail.actorUserId ?? '-' }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.kind) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('评测状态') }}</span><span>{{ enumLabel(GameplayFactStateLabel, detail.state) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('结果') }}</span><span>{{ detail.result !== null && detail.result !== undefined ? enumLabel(GameplayFactResultLabel, detail.result) : '—' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败代码') }}</span><span>{{ detail.failureCode ?? '—' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交时间') }}</span><span>{{ adminFormatDateTime(detail.occurredAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('更新时间') }}</span><span>{{ adminFormatDateTime(detail.updatedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('结果') }}</span><span>{{ detail.result !== null && detail.result !== undefined ? enumLabel(GameplayFactResultLabel, detail.result) : '-' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败代码') }}</span><span>{{ detail.failureCode ?? '-' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.occurredAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('更新时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.updatedAt) }}</span></div>
         </div>
       </SheetContent>
     </Sheet>

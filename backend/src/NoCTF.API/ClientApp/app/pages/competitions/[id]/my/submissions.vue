@@ -92,7 +92,7 @@ function resultText(submission: Submission) {
 
 <template>
   <div class="flex flex-col gap-4">
-    <h2 class="text-lg font-semibold">{{ $t('我的提交') }}</h2>
+    <h2 class="text-display text-lg">{{ $t('我的提交') }}</h2>
 
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error.message }}</AlertDescription>
@@ -137,7 +137,7 @@ function resultText(submission: Submission) {
               {{ resultText(submission) }}
             </Badge>
           </TableCell>
-          <TableCell class="text-muted-foreground">{{ formatDateTime(submission.occurredAt) }}</TableCell>
+          <TableCell class="font-mono text-xs text-muted-foreground tabular-nums">{{ formatDateTime(submission.occurredAt) }}</TableCell>
         </TableRow>
       </TableBody>
     </Table>

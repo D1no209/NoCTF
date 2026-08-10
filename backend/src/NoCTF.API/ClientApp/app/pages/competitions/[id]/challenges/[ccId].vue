@@ -96,12 +96,12 @@ const mode = computed(() => ctx.competition.value?.mode)
 
     <template v-else-if="challenge">
       <div class="flex flex-wrap items-center gap-3">
-        <h2 class="text-xl font-semibold">{{ challenge.title }}</h2>
+        <h2 class="text-display text-2xl">{{ challenge.title }}</h2>
         <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
           {{ challenge.direction }}
         </Badge>
         <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
-        <span v-else class="font-semibold text-primary">{{ $t('{score} 分', { score: challenge.baseScore }) }}</span>
+        <span v-else class="font-mono text-lg font-semibold text-primary tabular-nums">{{ $t('{score} 分', { score: challenge.baseScore }) }}</span>
       </div>
 
       <Card>

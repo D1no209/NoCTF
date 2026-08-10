@@ -3,7 +3,7 @@ import { Award, Medal, Target, Users } from '@lucide/vue'
 import { getTeamEndpoint } from '~/api'
 import type { NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
 import type { echarts } from '~/utils/echarts'
-import { normalizeChallengeKey } from './types'
+import { medalRankClass, normalizeChallengeKey } from './types'
 import type { ChallengeInfo, TrendSeries } from './types'
 
 const props = defineProps<{
@@ -127,7 +127,7 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
             <AvatarFallback class="text-lg">{{ entry.teamName?.slice(0, 2) ?? '?' }}</AvatarFallback>
           </Avatar>
           <div>
-            <h2 class="text-2xl font-bold">{{ entry.teamName }}</h2>
+            <h2 class="text-display text-2xl">{{ entry.teamName }}</h2>
             <p class="text-sm text-muted-foreground">{{ $t('报名时间：{time}', { time: formatDateTime(team?.registeredAt) }) }}</p>
           </div>
         </div>
@@ -135,37 +135,37 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
         <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Card>
             <CardContent class="flex items-center gap-3 pt-6">
-              <Medal class="size-8 text-amber-500" />
+              <Medal class="size-8" :class="medalRankClass[entry.rank ?? 0] ?? 'text-primary'" />
               <div>
                 <p class="text-xs text-muted-foreground">{{ $t('排名') }}</p>
-                <p class="text-xl font-bold">#{{ entry.rank }}</p>
+                <p class="font-mono text-xl font-semibold tabular-nums">#{{ entry.rank }}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent class="flex items-center gap-3 pt-6">
-              <Target class="size-8 text-emerald-500" />
+              <Target class="size-8 text-primary" />
               <div>
                 <p class="text-xs text-muted-foreground">{{ $t('解题数') }}</p>
-                <p class="text-xl font-bold">{{ entry.solveCount ?? 0 }}</p>
+                <p class="font-mono text-xl font-semibold tabular-nums">{{ entry.solveCount ?? 0 }}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent class="flex items-center gap-3 pt-6">
-              <Award class="size-8 text-sky-500" />
+              <Award class="size-8 text-primary" />
               <div>
                 <p class="text-xs text-muted-foreground">{{ $t('总分') }}</p>
-                <p class="text-xl font-bold">{{ entry.score ?? 0 }} pts</p>
+                <p class="font-mono text-xl font-semibold tabular-nums">{{ entry.score ?? 0 }} pts</p>
               </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent class="flex items-center gap-3 pt-6">
-              <Users class="size-8 text-violet-500" />
+              <Users class="size-8 text-primary" />
               <div>
                 <p class="text-xs text-muted-foreground">{{ $t('成员数') }}</p>
-                <p class="text-xl font-bold">{{ team?.memberIds?.length ?? '—' }}</p>
+                <p class="font-mono text-xl font-semibold tabular-nums">{{ team?.memberIds?.length ?? '-' }}</p>
               </div>
             </CardContent>
           </Card>
@@ -236,11 +236,11 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
                     <li
                       v-for="(solve, index) in solves"
                       :key="index"
-                      class="flex items-center justify-between gap-3 rounded-md border border-l-4 border-l-emerald-500 px-3 py-2"
+                      class="flex items-center justify-between gap-3 rounded-md border border-l-4 border-l-primary px-3 py-2"
                     >
                       <div class="flex flex-col gap-1">
                         <span class="flex items-center gap-2 font-medium">
-                          <Badge variant="secondary">#{{ solve.solveOrdinal ?? '—' }}</Badge>
+                          <Badge variant="secondary" class="font-mono tabular-nums">#{{ solve.solveOrdinal ?? '-' }}</Badge>
                           {{ challengeTitle(solve.competitionChallengeId) }}
                         </span>
                         <span class="flex items-center gap-3 text-xs text-muted-foreground">
@@ -248,10 +248,10 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
                             <Users class="size-3" />
                             {{ solve.submitterName || $t('未知成员') }}
                           </span>
-                          <span>{{ formatDateTime(solve.at) }}</span>
+                          <span class="font-mono tabular-nums">{{ formatDateTime(solve.at) }}</span>
                         </span>
                       </div>
-                      <Badge class="bg-emerald-600 text-white hover:bg-emerald-600">+{{ solve.points ?? 0 }} pts</Badge>
+                      <Badge variant="secondary" class="font-mono tabular-nums">+{{ solve.points ?? 0 }} pts</Badge>
                     </li>
                     <li v-if="!solves.length" class="py-8 text-center text-sm text-muted-foreground">{{ $t('还没有解题记录') }}</li>
                   </ul>

@@ -224,7 +224,7 @@ async function submitDelete() {
     <Card>
       <CardHeader>
         <CardTitle>{{ $t('生命周期') }}</CardTitle>
-        <CardDescription>
+        <CardDescription class="font-mono tabular-nums">
           {{ adminFormatDateTime(competition.startTime) }} ~ {{ adminFormatDateTime(competition.endTime) }}
         </CardDescription>
       </CardHeader>
@@ -263,7 +263,7 @@ async function submitDelete() {
           <Alert v-for="(ve, i) in validationErrors" :key="i" variant="destructive">
             <AlertDescription>
               <span class="font-mono text-xs">{{ ve.code }}</span>
-              — {{ ve.message }}
+              · {{ ve.message }}
               <NuxtLink
                 v-if="ve.competitionChallengeId"
                 class="underline"
@@ -288,7 +288,7 @@ async function submitDelete() {
         <div v-if="generateFailures && generateFailures.length > 0" class="flex flex-col gap-2">
           <Alert v-for="(f, i) in generateFailures" :key="i" variant="destructive">
             <AlertDescription>
-              {{ $t('题目 {challenge} / 队伍 {team}：{description}', { challenge: f.competitionChallengeId ?? '—', team: f.teamId ?? '—', description: f.description ?? f.code ?? '—' }) }}
+              {{ $t('题目 {challenge} / 队伍 {team}：{description}', { challenge: f.competitionChallengeId ?? '-', team: f.teamId ?? '-', description: f.description ?? f.code ?? '-' }) }}
             </AlertDescription>
           </Alert>
         </div>
