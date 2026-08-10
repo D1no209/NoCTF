@@ -50,7 +50,7 @@ public sealed class UpholdTeamBanAppealEndpoint(
     {
         request.CompetitionId = Route<Guid>("competitionId");
         request.AppealId = Route<Guid>("appealId");
-        if (!await authorizer.CanModerateAsync(
+        if (!await authorizer.CanJudgeAsync(
                 user.UserId,
                 request.CompetitionId,
                 cancellationToken))
