@@ -35,9 +35,27 @@
   中文页头显示“竞赛”和“切换为英文”；两次切换后 `html lang` 分别为 `en` / `zh-CN`，刷新后中文
   选择保持，主题按钮与语言按钮顺序正确，浏览器控制台无新增 Warning/Error。验收临时进程和标签页
   已清理。
-- 本阶段只创建本地功能提交与本 HANDOFF 提交，尚未 push、尚未部署；生产仍运行此前已部署版本。
-  获得新的明确授权后再推送和部署 Alpha.23，并使用已登录的普通参赛者、Judge 与 Administrator 会话
-  抽查各自专属页面的英文长文案和窄屏布局。
+- 用户明确授权后，Alpha.22–Alpha.23 的 5 个提交已从 `cebfef4d` 无冲突快进推送到远程 `main`，
+  部署基线为 `9f3f5a0d`。生产 `/root/NoCTF` 通过要求先决提交 `cebfef4d` 的增量 Git bundle 快进到
+  同一提交；既有未跟踪 `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、PostgreSQL/Redis/
+  上传卷和题目镜像均未覆盖。681,564,160 字节镜像归档 SHA-256 为
+  `5e31bc8d5e44f7c8cbfe6a16d23eb5364b0031a44fef03fb94ebd0652f1914bc`，113,397 字节 Git bundle
+  SHA-256 为 `787c356999e40f14101ee5360a0489e4a417a19e0b20150a4fc19cde4dabf61b`；本地与服务器校验一致。
+- Alpha.23 API/Migration、Worker、Runner 的 `linux/amd64` 镜像 ID 分别为
+  `36ca335e6423`、`a995edb3b860`、`8a54ce1ea688`，镜像内程序集均包含 `0.1.0-alpha.23`。迁移容器
+  明确报告数据库已是最新，没有应用 schema 变化；随后只以 `--no-build --no-deps` 原地重建 API、
+  Worker 和 Runner，没有重建 PostgreSQL/Redis。API 与 Runner healthy、Worker running，三者
+  restart count 均为 0；外网 HTTPS `/` 与 `/health` 均返回 200，部署后服务日志未发现 fail、crit、
+  Fatal、Unhandled、ArgumentNullException、OutOfMemory 或 error。
+- 生产首页 HTML 已确认包含语言首屏恢复脚本；其 48 个预加载 JavaScript 资源均可从 HTTPS 正常读取，
+  并包含 `noctf-locale`、`Switch to Chinese`、“切换为英文”、`Competitions` 和“竞赛管理”等 Alpha.23
+  标识。Edge 扩展能发现生产标签页，但两次读取生产 DOM 均超时并重置连接，因此没有伪造生产视觉
+  交互结果；本节上方记录的本地 production preview 双语交互验收仍完整通过。
+- 部署校验后删除了精确传输目录 `/root/noctf-deploy-alpha23-9f3f5a0d` 和不再作为即时回滚版本的
+  Alpha.20 三个服务镜像；没有运行广域 Docker prune。保留的即时回滚镜像是 Alpha.21
+  `rollback-cebfef4`：API/Migration `0e32e54ae2ff`、Worker `8d0967a03b8f`、Runner
+  `d91cfcf7f90e`。根分区从加载镜像后的 75% 恢复到 68%，约 14 GB 可用；数据库、Redis、上传文件、
+  题目镜像、Runtime 和比赛事实均未删除或修改。
 
 ## 2026-08-10 Alpha.22 裁判处理封禁申诉
 
