@@ -4,7 +4,6 @@ export function useLocale() {
 
   function switchLocale() {
     setLocale(isEnglish.value ? 'zh-CN' : 'en')
-    window.location.reload()
   }
 
   return {
