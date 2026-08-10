@@ -36,7 +36,7 @@ onMounted(() => {
 })
 
 function visibilityLabel(visibility?: string): string {
-  return visibility === 'Shared' ? '共享' : '私有'
+  return visibility === 'Shared' ? translate("共享") : translate("私有")
 }
 </script>
 
@@ -44,25 +44,23 @@ function visibilityLabel(visibility?: string): string {
   <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
     <div class="flex items-center justify-between gap-4">
       <div>
-        <h1 class="text-2xl font-semibold">题库管理</h1>
-        <p class="text-sm text-muted-foreground">全局题目模板,可实例化到各场竞赛</p>
+        <h1 class="text-2xl font-semibold">{{ $t('题库管理') }}</h1>
+        <p class="text-sm text-muted-foreground">{{ $t('全局题目模板,可实例化到各场竞赛') }}</p>
       </div>
       <Button v-if="canOrganize" as-child>
         <NuxtLink to="/admin/challenges/new">
-          <Plus data-icon="inline-start" />
-          新建模板
-        </NuxtLink>
+          <Plus data-icon="inline-start" /> {{ $t('新建模板') }} </NuxtLink>
       </Button>
     </div>
 
     <Alert v-if="!canOrganize" variant="destructive">
-      <AlertDescription>需要组织者或管理员权限才能管理题库。</AlertDescription>
+      <AlertDescription>{{ $t('需要组织者或管理员权限才能管理题库。') }}</AlertDescription>
     </Alert>
 
     <template v-else>
       <div class="flex items-center gap-2">
         <Switch id="include-deleted" v-model="includeDeleted" />
-        <Label for="include-deleted">显示已删除的模板</Label>
+        <Label for="include-deleted">{{ $t('显示已删除的模板') }}</Label>
       </div>
 
       <Alert v-if="loadError" variant="destructive">
@@ -77,8 +75,8 @@ function visibilityLabel(visibility?: string): string {
 
       <Empty v-else-if="templates.length === 0 && !loadError">
         <EmptyHeader>
-          <EmptyTitle>暂无题目模板</EmptyTitle>
-          <EmptyDescription>点击右上角「新建模板」创建第一个题目模板。</EmptyDescription>
+          <EmptyTitle>{{ $t('暂无题目模板') }}</EmptyTitle>
+          <EmptyDescription>{{ $t('点击右上角「新建模板」创建第一个题目模板。') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
 
@@ -86,13 +84,13 @@ function visibilityLabel(visibility?: string): string {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>标题</TableHead>
-              <TableHead>模式</TableHead>
-              <TableHead>方向</TableHead>
-              <TableHead>可见性</TableHead>
-              <TableHead>被引用</TableHead>
-              <TableHead>更新时间</TableHead>
-              <TableHead>状态</TableHead>
+              <TableHead>{{ $t('标题') }}</TableHead>
+              <TableHead>{{ $t('模式') }}</TableHead>
+              <TableHead>{{ $t('方向') }}</TableHead>
+              <TableHead>{{ $t('可见性') }}</TableHead>
+              <TableHead>{{ $t('被引用') }}</TableHead>
+              <TableHead>{{ $t('更新时间') }}</TableHead>
+              <TableHead>{{ $t('状态') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -114,8 +112,8 @@ function visibilityLabel(visibility?: string): string {
                 <AdminDateTime :value="template.updatedAt" />
               </TableCell>
               <TableCell>
-                <Badge v-if="template.deletedAt" variant="destructive">已删除</Badge>
-                <Badge v-else variant="secondary">正常</Badge>
+                <Badge v-if="template.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
+                <Badge v-else variant="secondary">{{ $t('正常') }}</Badge>
               </TableCell>
             </TableRow>
           </TableBody>

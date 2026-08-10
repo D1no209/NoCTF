@@ -43,10 +43,10 @@ async function remove(userId: string) {
   })
   removing.value = null
   if (error) {
-    toast.error(parseApiError(error, '移除成员失败').message)
+    toast.error(parseApiError(error, translate("移除成员失败")).message)
     return
   }
-  toast.success('成员已移除')
+  toast.success(translate("成员已移除"))
   emit('changed')
 }
 </script>
@@ -71,9 +71,7 @@ async function remove(userId: string) {
         {{ profiles[memberId]?.userName ?? memberId.slice(0, 8) }}
       </NuxtLink>
       <Badge v-if="memberId === team.captainId" variant="secondary" class="gap-1">
-        <Crown class="size-3" />
-        队长
-      </Badge>
+        <Crown class="size-3" /> {{ $t('队长') }} </Badge>
       <Button
         v-if="canManage && memberId !== team.captainId"
         variant="ghost"
@@ -83,9 +81,7 @@ async function remove(userId: string) {
         @click="remove(memberId)"
       >
         <Spinner v-if="removing === memberId" data-icon="inline-start" />
-        <UserMinus v-else data-icon="inline-start" />
-        移除
-      </Button>
+        <UserMinus v-else data-icon="inline-start" /> {{ $t('移除') }} </Button>
     </li>
   </ul>
 </template>

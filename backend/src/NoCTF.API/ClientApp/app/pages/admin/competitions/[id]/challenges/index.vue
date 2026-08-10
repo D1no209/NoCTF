@@ -67,7 +67,7 @@ async function openAdd() {
 
 async function addChallenge() {
   if (!selectedTemplateId.value) {
-    addError.value = '请选择题库模板'
+    addError.value = translate('请选择题库模板')
     return
   }
   adding.value = true
@@ -82,7 +82,7 @@ async function addChallenge() {
       },
     })
     if (error) throw error
-    toast.success('题目已添加')
+    toast.success(translate("题目已添加"))
     addOpen.value = false
     await load()
   }
@@ -107,7 +107,7 @@ async function removeChallenge() {
       query: { expectedRevision: target.revision ?? 0 },
     })
     if (error) throw error
-    toast.success('题目已删除')
+    toast.success(translate("题目已删除"))
     deleteTarget.value = null
     await load()
   }
@@ -128,7 +128,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
       query: { expectedRevision: c.revision ?? 0 },
     })
     if (error) throw error
-    toast.success('题目已恢复')
+    toast.success(translate("题目已恢复"))
     await load()
   }
   catch (e) {
@@ -145,12 +145,10 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-2">
         <Checkbox id="show-deleted" v-model="includeDeleted" />
-        <label for="show-deleted" class="text-sm text-muted-foreground">显示已删除</label>
+        <label for="show-deleted" class="text-sm text-muted-foreground">{{ $t('显示已删除') }}</label>
       </div>
       <Button v-if="canWrite" size="sm" @click="openAdd">
-        <Plus data-icon="inline-start" />
-        从题库添加
-      </Button>
+        <Plus data-icon="inline-start" /> {{ $t('从题库添加') }} </Button>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -161,20 +159,20 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
 
     <Empty v-else-if="items.length === 0">
       <EmptyHeader>
-        <EmptyTitle>暂无题目</EmptyTitle>
-        <EmptyDescription>从题库中添加题目后开始配置竞赛</EmptyDescription>
+        <EmptyTitle>{{ $t('暂无题目') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('从题库中添加题目后开始配置竞赛') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
     <Table v-else>
       <TableHeader>
         <TableRow>
-          <TableHead class="w-16">顺序</TableHead>
-          <TableHead>标题</TableHead>
-          <TableHead>方向</TableHead>
-          <TableHead class="w-24">基础分</TableHead>
-          <TableHead class="w-28">状态</TableHead>
-          <TableHead v-if="canWrite" class="w-40 text-right">操作</TableHead>
+          <TableHead class="w-16">{{ $t('顺序') }}</TableHead>
+          <TableHead>{{ $t('标题') }}</TableHead>
+          <TableHead>{{ $t('方向') }}</TableHead>
+          <TableHead class="w-24">{{ $t('基础分') }}</TableHead>
+          <TableHead class="w-28">{{ $t('状态') }}</TableHead>
+          <TableHead v-if="canWrite" class="w-40 text-right">{{ $t('操作') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -197,9 +195,9 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
           </TableCell>
           <TableCell class="font-mono tabular-nums">{{ c.baseScore ?? '—' }}</TableCell>
           <TableCell>
-            <Badge v-if="c.deletedAt" variant="destructive">已删除</Badge>
+            <Badge v-if="c.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
             <Badge v-else :variant="c.isPublished ? 'default' : 'outline'">
-              {{ c.isPublished ? '已发布' : '未发布' }}
+              {{ c.isPublished ? $t('已发布') : $t('未发布') }}
             </Badge>
           </TableCell>
           <TableCell v-if="canWrite" class="text-right">
@@ -211,18 +209,14 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
                 :disabled="pendingId === c.id"
                 @click="restoreChallenge(c)"
               >
-                <Spinner v-if="pendingId === c.id" data-icon="inline-start" />
-                恢复
-              </Button>
+                <Spinner v-if="pendingId === c.id" data-icon="inline-start" /> {{ $t('恢复') }} </Button>
               <Button
                 v-else
                 variant="ghost"
                 size="sm"
                 :disabled="pendingId === c.id"
                 @click="deleteTarget = c"
-              >
-                删除
-              </Button>
+              > {{ $t('删除') }} </Button>
             </div>
           </TableCell>
         </TableRow>
@@ -232,19 +226,19 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
     <Dialog v-model:open="addOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>从题库添加题目</DialogTitle>
-          <DialogDescription>选择与本竞赛模式匹配的题库模板,实例化为竞赛题目</DialogDescription>
+          <DialogTitle>{{ $t('从题库添加题目') }}</DialogTitle>
+          <DialogDescription>{{ $t('选择与本竞赛模式匹配的题库模板,实例化为竞赛题目') }}</DialogDescription>
         </DialogHeader>
         <FieldGroup>
           <Alert v-if="addError" variant="destructive">
             <AlertDescription>{{ addError }}</AlertDescription>
           </Alert>
           <Field>
-            <FieldLabel for="tpl">题库模板</FieldLabel>
+            <FieldLabel for="tpl">{{ $t('题库模板') }}</FieldLabel>
             <Skeleton v-if="templatesLoading" class="h-9 w-full" />
             <Select v-else id="tpl" v-model="selectedTemplateId">
               <SelectTrigger class="w-full">
-                <SelectValue placeholder="选择模板" />
+                <SelectValue :placeholder="$t('选择模板')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -255,26 +249,24 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
               </SelectContent>
             </Select>
             <FieldDescription v-if="!templatesLoading && modeTemplates.length === 0">
-              题库中没有 {{ enumLabel(GameModeLabel, competition?.mode) }} 模式的可用模板
+              {{ $t('题库中没有 {mode} 模式的可用模板', { mode: enumLabel(GameModeLabel, competition?.mode) }) }}
             </FieldDescription>
           </Field>
           <div class="grid gap-4 sm:grid-cols-2">
             <Field>
-              <FieldLabel for="new-score">基础分</FieldLabel>
+              <FieldLabel for="new-score">{{ $t('基础分') }}</FieldLabel>
               <Input id="new-score" v-model.number="newBaseScore" type="number" min="0" />
             </Field>
             <Field>
-              <FieldLabel for="new-order">顺序</FieldLabel>
+              <FieldLabel for="new-order">{{ $t('顺序') }}</FieldLabel>
               <Input id="new-order" v-model.number="newOrder" type="number" min="0" />
             </Field>
           </div>
         </FieldGroup>
         <DialogFooter>
-          <Button variant="outline" @click="addOpen = false">取消</Button>
+          <Button variant="outline" @click="addOpen = false">{{ $t('取消') }}</Button>
           <Button :disabled="adding || !selectedTemplateId" @click="addChallenge">
-            <Spinner v-if="adding" data-icon="inline-start" />
-            添加
-          </Button>
+            <Spinner v-if="adding" data-icon="inline-start" /> {{ $t('添加') }} </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -282,14 +274,14 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
     <AlertDialog :open="deleteTarget !== null" @update:open="(v) => { if (!v) deleteTarget = null }">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>删除题目</AlertDialogTitle>
+          <AlertDialogTitle>{{ $t('删除题目') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            删除「{{ deleteTarget?.title }}」后选手将无法看到该题,可稍后恢复。确认删除?
+            {{ $t('删除「{title}」后选手将无法看到该题，可稍后恢复。确认删除？', { title: deleteTarget?.title ?? '—' }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" @click="removeChallenge">确认删除</AlertDialogAction>
+          <AlertDialogCancel>{{ $t('取消') }}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" @click="removeChallenge">{{ $t('确认删除') }}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

@@ -97,7 +97,7 @@ async function rejudgeOne(gameplayFactId?: string) {
   try {
     const { error } = await adminRejudgeGameplayFact({ path: { competitionId, gameplayFactId } })
     if (error) throw error
-    toast.success('已加入重判队列')
+    toast.success(translate("已加入重判队列"))
     applyFilters()
   }
   catch (e) {
@@ -119,7 +119,7 @@ async function rejudgeBatch() {
       body: { competitionChallengeId: batchTarget.value },
     })
     if (error) throw error
-    toast.success('已将题目全部提交加入重判队列')
+    toast.success(translate("已将题目全部提交加入重判队列"))
     applyFilters()
   }
   catch (e) {
@@ -139,7 +139,7 @@ async function queueEvaluation() {
       body: { competitionChallengeId: batchTarget.value },
     })
     if (error) throw error
-    toast.success('已触发评测队列')
+    toast.success(translate("已触发评测队列"))
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -172,7 +172,7 @@ async function accessFlag() {
       body: { reason: flagReason.value.trim() },
     })
     if (error) throw error
-    flagResult.value = data?.value ?? '(无内容)'
+    flagResult.value = data?.value ?? translate('(无内容)')
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -195,7 +195,7 @@ onMounted(() => {
         <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Select v-model="filterChallenge">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="题目(全部)" />
+              <SelectValue :placeholder="$t('题目(全部)')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -205,7 +205,7 @@ onMounted(() => {
           </Select>
           <Select v-model="filterTeam">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="队伍(全部)" />
+              <SelectValue :placeholder="$t('队伍(全部)')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -215,7 +215,7 @@ onMounted(() => {
           </Select>
           <Select v-model="filterKind">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="类型(全部)" />
+              <SelectValue :placeholder="$t('类型(全部)')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -227,49 +227,47 @@ onMounted(() => {
           </Select>
           <Select v-model="filterState">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="评测状态(全部)" />
+              <SelectValue :placeholder="$t('评测状态(全部)')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="Pending">待处理</SelectItem>
-                <SelectItem value="Queued">排队中</SelectItem>
-                <SelectItem value="Processing">评测中</SelectItem>
-                <SelectItem value="Completed">已完成</SelectItem>
-                <SelectItem value="PlatformFailed">平台失败</SelectItem>
+                <SelectItem value="Pending">{{ $t('待处理') }}</SelectItem>
+                <SelectItem value="Queued">{{ $t('排队中') }}</SelectItem>
+                <SelectItem value="Processing">{{ $t('评测中') }}</SelectItem>
+                <SelectItem value="Completed">{{ $t('已完成') }}</SelectItem>
+                <SelectItem value="PlatformFailed">{{ $t('平台失败') }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
           <Select v-model="filterResult">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="结果(全部)" />
+              <SelectValue :placeholder="$t('结果(全部)')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="Correct">正确</SelectItem>
-                <SelectItem value="Wrong">错误</SelectItem>
-                <SelectItem value="Duplicate">重复</SelectItem>
-                <SelectItem value="AttemptsExhausted">次数耗尽</SelectItem>
-                <SelectItem value="PlatformFailed">平台失败</SelectItem>
-                <SelectItem value="Rejected">已拒绝</SelectItem>
+                <SelectItem value="Correct">{{ $t('正确') }}</SelectItem>
+                <SelectItem value="Wrong">{{ $t('错误') }}</SelectItem>
+                <SelectItem value="Duplicate">{{ $t('重复') }}</SelectItem>
+                <SelectItem value="AttemptsExhausted">{{ $t('次数耗尽') }}</SelectItem>
+                <SelectItem value="PlatformFailed">{{ $t('平台失败') }}</SelectItem>
+                <SelectItem value="Rejected">{{ $t('已拒绝') }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
-          <Input v-model="filterFlag" placeholder="提交的 Flag 包含…" />
+          <Input v-model="filterFlag" :placeholder="$t('提交的 Flag 包含…')" />
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <Button size="sm" @click="applyFilters">应用筛选</Button>
+          <Button size="sm" @click="applyFilters">{{ $t('应用筛选') }}</Button>
           <Button
             variant="ghost"
             size="sm"
             @click="filterChallenge = ''; filterTeam = ''; filterKind = ''; filterState = ''; filterResult = ''; filterFlag = ''; applyFilters()"
-          >
-            清空
-          </Button>
+          > {{ $t('清空') }} </Button>
           <template v-if="canWrite">
             <Separator orientation="vertical" class="h-6" />
             <Select v-model="batchTarget">
               <SelectTrigger class="w-48">
-                <SelectValue placeholder="选择题目(批量操作)" />
+                <SelectValue :placeholder="$t('选择题目(批量操作)')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -278,13 +276,9 @@ onMounted(() => {
               </SelectContent>
             </Select>
             <Button variant="outline" size="sm" :disabled="!batchTarget || actionPending !== null" @click="rejudgeBatch">
-              <Spinner v-if="actionPending === 'batch'" data-icon="inline-start" />
-              整题重判
-            </Button>
+              <Spinner v-if="actionPending === 'batch'" data-icon="inline-start" /> {{ $t('整题重判') }} </Button>
             <Button variant="outline" size="sm" :disabled="!batchTarget || actionPending !== null" @click="queueEvaluation">
-              <Spinner v-if="actionPending === 'queue'" data-icon="inline-start" />
-              触发评测
-            </Button>
+              <Spinner v-if="actionPending === 'queue'" data-icon="inline-start" /> {{ $t('触发评测') }} </Button>
           </template>
         </div>
       </CardContent>
@@ -293,20 +287,20 @@ onMounted(() => {
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
     <Empty v-else-if="initialized && items.length === 0">
       <EmptyHeader>
-        <EmptyTitle>没有符合条件的提交</EmptyTitle>
+        <EmptyTitle>{{ $t('没有符合条件的提交') }}</EmptyTitle>
       </EmptyHeader>
     </Empty>
     <template v-else>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>队伍</TableHead>
-            <TableHead>题目</TableHead>
-            <TableHead class="w-20">类型</TableHead>
-            <TableHead class="w-24">评测状态</TableHead>
-            <TableHead class="w-24">结果</TableHead>
-            <TableHead class="w-44">提交时间</TableHead>
-            <TableHead class="w-52 text-right">操作</TableHead>
+            <TableHead>{{ $t('队伍') }}</TableHead>
+            <TableHead>{{ $t('题目') }}</TableHead>
+            <TableHead class="w-20">{{ $t('类型') }}</TableHead>
+            <TableHead class="w-24">{{ $t('评测状态') }}</TableHead>
+            <TableHead class="w-24">{{ $t('结果') }}</TableHead>
+            <TableHead class="w-44">{{ $t('提交时间') }}</TableHead>
+            <TableHead class="w-52 text-right">{{ $t('操作') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -328,12 +322,10 @@ onMounted(() => {
             <TableCell>{{ adminFormatDateTime(s.occurredAt) }}</TableCell>
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
-                <Button variant="ghost" size="sm" @click="openDetail(s.id)">详情</Button>
-                <Button variant="ghost" size="sm" @click="openFlagAccess(s.id)">读取 Flag</Button>
+                <Button variant="ghost" size="sm" @click="openDetail(s.id)">{{ $t('详情') }}</Button>
+                <Button variant="ghost" size="sm" @click="openFlagAccess(s.id)">{{ $t('读取 Flag') }}</Button>
                 <Button v-if="canWrite" variant="ghost" size="sm" :disabled="actionPending === s.id" @click="rejudgeOne(s.id)">
-                  <Spinner v-if="actionPending === s.id" data-icon="inline-start" />
-                  重判
-                </Button>
+                  <Spinner v-if="actionPending === s.id" data-icon="inline-start" /> {{ $t('重判') }} </Button>
               </div>
             </TableCell>
           </TableRow>
@@ -341,29 +333,27 @@ onMounted(() => {
       </Table>
       <div v-if="hasMore" class="flex justify-center">
         <Button variant="outline" :disabled="loading" @click="loadMore">
-          <Spinner v-if="loading" data-icon="inline-start" />
-          加载更多
-        </Button>
+          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('加载更多') }} </Button>
       </div>
     </template>
 
     <Sheet v-model:open="detailOpen">
       <SheetContent class="overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>提交详情</SheetTitle>
-          <SheetDescription>提交 ID:{{ detail?.gameplayFactId }}</SheetDescription>
+          <SheetTitle>{{ $t('提交详情') }}</SheetTitle>
+          <SheetDescription>{{ $t('提交 ID：{id}', { id: detail?.gameplayFactId ?? '—' }) }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
-          <div class="flex justify-between"><span class="text-muted-foreground">队伍</span><span>{{ teamName(detail.teamId) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">题目</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">行为人</span><span class="font-mono text-xs">{{ detail.actorUserId ?? '—' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">类型</span><span>{{ enumLabel(GameplayFactKindLabel, detail.kind) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">评测状态</span><span>{{ enumLabel(GameplayFactStateLabel, detail.state) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">结果</span><span>{{ detail.result !== null && detail.result !== undefined ? enumLabel(GameplayFactResultLabel, detail.result) : '—' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">失败代码</span><span>{{ detail.failureCode ?? '—' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">提交时间</span><span>{{ adminFormatDateTime(detail.occurredAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">更新时间</span><span>{{ adminFormatDateTime(detail.updatedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('队伍') }}</span><span>{{ teamName(detail.teamId) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('题目') }}</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('行为人') }}</span><span class="font-mono text-xs">{{ detail.actorUserId ?? '—' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.kind) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('评测状态') }}</span><span>{{ enumLabel(GameplayFactStateLabel, detail.state) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('结果') }}</span><span>{{ detail.result !== null && detail.result !== undefined ? enumLabel(GameplayFactResultLabel, detail.result) : '—' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败代码') }}</span><span>{{ detail.failureCode ?? '—' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交时间') }}</span><span>{{ adminFormatDateTime(detail.occurredAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('更新时间') }}</span><span>{{ adminFormatDateTime(detail.updatedAt) }}</span></div>
         </div>
       </SheetContent>
     </Sheet>
@@ -371,28 +361,26 @@ onMounted(() => {
     <Dialog :open="flagDialog !== null" @update:open="(v) => { if (!v) flagDialog = null }">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>读取受保护的提交 Flag</DialogTitle>
-          <DialogDescription>该操作会被记录审计日志,请填写读取原因。</DialogDescription>
+          <DialogTitle>{{ $t('读取受保护的提交 Flag') }}</DialogTitle>
+          <DialogDescription>{{ $t('该操作会被记录审计日志,请填写读取原因。') }}</DialogDescription>
         </DialogHeader>
         <template v-if="flagResult === null">
           <FieldGroup>
             <Field>
-              <FieldLabel for="flag-reason">读取原因</FieldLabel>
+              <FieldLabel for="flag-reason">{{ $t('读取原因') }}</FieldLabel>
               <Textarea id="flag-reason" v-model="flagReason" required />
             </Field>
           </FieldGroup>
           <DialogFooter>
-            <Button variant="outline" @click="flagDialog = null">取消</Button>
+            <Button variant="outline" @click="flagDialog = null">{{ $t('取消') }}</Button>
             <Button :disabled="flagPending || !flagReason.trim()" @click="accessFlag">
-              <Spinner v-if="flagPending" data-icon="inline-start" />
-              读取
-            </Button>
+              <Spinner v-if="flagPending" data-icon="inline-start" /> {{ $t('读取') }} </Button>
           </DialogFooter>
         </template>
         <template v-else>
           <div class="rounded-md border bg-muted p-3 font-mono text-sm break-all">{{ flagResult }}</div>
           <DialogFooter>
-            <Button @click="flagDialog = null">关闭</Button>
+            <Button @click="flagDialog = null">{{ $t('关闭') }}</Button>
           </DialogFooter>
         </template>
       </DialogContent>

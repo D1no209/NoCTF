@@ -50,13 +50,13 @@ async function loadList() {
       query: { limit: 100 },
     })
     if (error || !data) {
-      listError.value = parseApiError(error, '加载咨询列表失败').message
+      listError.value = parseApiError(error, translate("加载咨询列表失败")).message
       return
     }
     questions.value = data.items ?? []
   }
   catch (error) {
-    listError.value = parseApiError(error, '加载咨询列表失败').message
+    listError.value = parseApiError(error, translate("加载咨询列表失败")).message
   }
   finally {
     loading.value = false
@@ -113,11 +113,11 @@ async function submitCreate() {
       },
     })
     if (error || !data) {
-      createError.value = competitionQuestionErrorMessage(error, '提交咨询失败')
+      createError.value = competitionQuestionErrorMessage(error, translate("提交咨询失败"))
       toast.error(createError.value)
       return
     }
-    toast.success('咨询已提交')
+    toast.success(translate("咨询已提交"))
     createOpen.value = false
     createTitle.value = ''
     createBody.value = ''
@@ -126,7 +126,7 @@ async function submitCreate() {
     await select(data.id!)
   }
   catch (error) {
-    createError.value = competitionQuestionErrorMessage(error, '提交咨询失败')
+    createError.value = competitionQuestionErrorMessage(error, translate("提交咨询失败"))
     toast.error(createError.value)
   }
   finally {
@@ -152,7 +152,7 @@ async function select(id: string, syncRoute = true) {
   try {
     const { data, error } = await getCompetitionQuestion({ path: { competitionId, questionId: id } })
     if (error || !data) {
-      toast.error(parseApiError(error, '加载咨询详情失败').message)
+      toast.error(parseApiError(error, translate("加载咨询详情失败")).message)
       return
     }
     detail.value = data
@@ -163,7 +163,7 @@ async function select(id: string, syncRoute = true) {
     }
   }
   catch (error) {
-    toast.error(parseApiError(error, '加载咨询详情失败').message)
+    toast.error(parseApiError(error, translate("加载咨询详情失败")).message)
   }
   finally {
     detailLoading.value = false
@@ -197,7 +197,7 @@ async function submitReply() {
       body: { body: reply.value.trim(), expectedRevision: detail.value.revision ?? 0 },
     })
     if (error || !data) {
-      replyError.value = competitionQuestionErrorMessage(error, '发送失败')
+      replyError.value = competitionQuestionErrorMessage(error, translate("发送失败"))
       toast.error(replyError.value)
       return
     }
@@ -205,10 +205,10 @@ async function submitReply() {
     upsertQuestion(data)
     markRead(data)
     reply.value = ''
-    toast.success('消息已发送')
+    toast.success(translate("消息已发送"))
   }
   catch (error) {
-    replyError.value = competitionQuestionErrorMessage(error, '发送失败')
+    replyError.value = competitionQuestionErrorMessage(error, translate("发送失败"))
     toast.error(replyError.value)
   }
   finally {
@@ -228,16 +228,16 @@ async function changeStatus(status: 'Resolved' | 'Closed') {
       body: { status, expectedRevision: detail.value.revision ?? 0 },
     })
     if (error || !data) {
-      toast.error(competitionQuestionErrorMessage(error, '状态更新失败'))
+      toast.error(competitionQuestionErrorMessage(error, translate("状态更新失败")))
       return
     }
     detail.value = data
     upsertQuestion(data)
     markRead(data)
-    toast.success(status === 'Resolved' ? '咨询已标记为已解决' : '咨询已关闭')
+    toast.success(status === 'Resolved' ? translate("咨询已标记为已解决") : translate("咨询已关闭"))
   }
   catch (error) {
-    toast.error(competitionQuestionErrorMessage(error, '状态更新失败'))
+    toast.error(competitionQuestionErrorMessage(error, translate("状态更新失败")))
   }
   finally {
     statusPending.value = false
@@ -251,9 +251,9 @@ const statusVariant = (status?: string) =>
       ? ('default' as const)
       : ('outline' as const)
 const statusLabel = (status?: string) =>
-  ({ Pending: '待回复', Replied: '已回复', Resolved: '已解决', Closed: '已关闭' })[status ?? ''] ?? status
+  ({ Pending: translate("待回复"), Replied: translate("已回复"), Resolved: translate("已解决"), Closed: translate("已关闭") })[status ?? ''] ?? status
 const roleLabel = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
-  role ? competitionQuestionRoleLabel[role] : '未知角色'
+  role ? competitionQuestionRoleLabel[role] : translate("未知角色")
 const isHandlerRole = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
   isCompetitionQuestionHandlerRole(role)
 const participantLimitReached = computed(() =>
@@ -267,37 +267,37 @@ const participantLimitReached = computed(() =>
   <div class="grid gap-6 lg:grid-cols-5">
     <div class="flex flex-col gap-4 lg:col-span-2">
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold">咨询问答</h2>
+        <h2 class="text-lg font-semibold">{{ $t('咨询问答') }}</h2>
         <Dialog :open="createOpen" @update:open="setCreateOpen">
           <DialogTrigger as-child>
-            <Button size="sm">发起咨询</Button>
+            <Button size="sm">{{ $t('发起咨询') }}</Button>
           </DialogTrigger>
           <DialogContent class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>发起咨询</DialogTitle>
-              <DialogDescription>咨询内容默认仅本队与有权工作人员可见；需要公开的信息将通过 Hint 或比赛公告发布。</DialogDescription>
+              <DialogTitle>{{ $t('发起咨询') }}</DialogTitle>
+              <DialogDescription>{{ $t('咨询内容默认仅本队与有权工作人员可见；需要公开的信息将通过 Hint 或比赛公告发布。') }}</DialogDescription>
             </DialogHeader>
             <form @submit.prevent>
               <FieldGroup>
                 <Field>
-                  <FieldLabel>类型</FieldLabel>
+                  <FieldLabel>{{ $t('类型') }}</FieldLabel>
                   <Select v-model="createSubject">
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="Challenge">题目相关</SelectItem>
-                        <SelectItem value="Platform">平台/赛事相关</SelectItem>
+                        <SelectItem value="Challenge">{{ $t('题目相关') }}</SelectItem>
+                        <SelectItem value="Platform">{{ $t('平台/赛事相关') }}</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field v-if="createSubject === 'Challenge'">
-                  <FieldLabel>关联题目(必选)</FieldLabel>
+                  <FieldLabel>{{ $t('关联题目(必选)') }}</FieldLabel>
                   <Select v-model="createChallengeId">
-                    <SelectTrigger><SelectValue placeholder="不关联题目" /></SelectTrigger>
+                    <SelectTrigger><SelectValue :placeholder="$t('不关联题目')" /></SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectItem value="none">不关联题目</SelectItem>
+                        <SelectItem value="none">{{ $t('不关联题目') }}</SelectItem>
                         <SelectItem v-for="c in challenges" :key="c.id" :value="c.id!">
                           {{ c.title }}
                         </SelectItem>
@@ -306,7 +306,7 @@ const participantLimitReached = computed(() =>
                   </Select>
                 </Field>
                 <Field>
-                  <FieldLabel for="q-title">标题</FieldLabel>
+                  <FieldLabel for="q-title">{{ $t('标题') }}</FieldLabel>
                   <Input
                     id="q-title"
                     v-model="createTitle"
@@ -317,7 +317,7 @@ const participantLimitReached = computed(() =>
                   />
                 </Field>
                 <Field>
-                  <FieldLabel for="q-body">内容</FieldLabel>
+                  <FieldLabel for="q-body">{{ $t('内容') }}</FieldLabel>
                   <Textarea
                     id="q-body"
                     v-model="createBody"
@@ -334,9 +334,7 @@ const participantLimitReached = computed(() =>
                 </p>
                 <Field>
                   <Button type="button" class="w-full" :disabled="createPending" @click="submitCreate">
-                    <Spinner v-if="createPending" data-icon="inline-start" />
-                    提交
-                  </Button>
+                    <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('提交') }} </Button>
                 </Field>
               </FieldGroup>
             </form>
@@ -350,8 +348,8 @@ const participantLimitReached = computed(() =>
       <Skeleton v-else-if="loading" class="h-40 w-full" />
       <Empty v-else-if="!questions.length" class="border py-8">
         <EmptyHeader>
-          <EmptyTitle>暂无咨询</EmptyTitle>
-          <EmptyDescription>遇到问题?向主办方发起咨询</EmptyDescription>
+          <EmptyTitle>{{ $t('暂无咨询') }}</EmptyTitle>
+          <EmptyDescription>{{ $t('遇到问题?向主办方发起咨询') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
       <ul v-else class="flex flex-col gap-2">
@@ -366,16 +364,16 @@ const participantLimitReached = computed(() =>
               <span class="min-w-0 truncate text-sm font-medium">{{ q.title }}</span>
               <div class="flex shrink-0 items-center gap-1.5">
                 <Badge v-if="unreadCount(q) > 0" variant="destructive">
-                  {{ unreadCount(q) }} 未读
+                  {{ $t('{count} 条未读', { count: unreadCount(q) }) }}
                 </Badge>
                 <Badge :variant="statusVariant(q.status)">{{ statusLabel(q.status) }}</Badge>
               </div>
             </div>
             <p class="mt-1 text-xs text-muted-foreground">
-              {{ q.subject === 'Challenge' ? `题目 · ${q.challengeTitle ?? '未知题目'}` : '平台 / 赛事' }}
+              {{ q.subject === 'Challenge' ? `题目 · ${q.challengeTitle ?? '未知题目'}` : $t('平台 / 赛事') }}
             </p>
             <p class="mt-1 truncate text-xs text-muted-foreground">
-              最近由 {{ roleLabel(q.lastActorRole) }} {{ q.lastActorDisplayName }} 更新 · {{ formatDateTime(q.updatedAt) }}
+              {{ $t('最近由 {role} {actor} 更新 · {time}', { role: roleLabel(q.lastActorRole), actor: q.lastActorDisplayName ?? '—', time: formatDateTime(q.updatedAt) }) }}
             </p>
           </button>
         </li>
@@ -385,7 +383,7 @@ const participantLimitReached = computed(() =>
     <div class="lg:col-span-3">
       <Empty v-if="!selectedId" class="border py-16">
         <EmptyHeader>
-          <EmptyTitle>选择左侧的咨询查看对话</EmptyTitle>
+          <EmptyTitle>{{ $t('选择左侧的咨询查看对话') }}</EmptyTitle>
         </EmptyHeader>
       </Empty>
       <Skeleton v-else-if="detailLoading" class="h-64 w-full" />
@@ -396,7 +394,7 @@ const participantLimitReached = computed(() =>
             <Badge :variant="statusVariant(detail.status)">{{ statusLabel(detail.status) }}</Badge>
           </div>
           <CardDescription>
-            {{ detail.subject === 'Challenge' ? `题目咨询 · ${detail.challengeTitle ?? '未知题目'}` : '平台 / 赛事咨询' }}
+            {{ detail.subject === 'Challenge' ? `题目咨询 · ${detail.challengeTitle ?? '未知题目'}` : $t('平台 / 赛事咨询') }}
             · {{ detail.teamDisplayName ?? detail.askerDisplayName }}
           </CardDescription>
         </CardHeader>
@@ -420,7 +418,7 @@ const participantLimitReached = computed(() =>
                 </p>
               </template>
               <p v-else-if="entry.kind === 'StatusTransition'" class="text-xs text-muted-foreground">
-                状态变更:{{ statusLabel(entry.fromStatus ?? undefined) }} → {{ statusLabel(entry.toStatus ?? undefined) }}
+                {{ $t('状态变更：{from} → {to}', { from: statusLabel(entry.fromStatus ?? undefined) ?? '—', to: statusLabel(entry.toStatus ?? undefined) ?? '—' }) }}
                 · {{ roleLabel(entry.actorRole) }} {{ entry.actorDisplayName }}
                 · {{ formatDateTime(entry.createdAt) }}
               </p>
@@ -432,49 +430,43 @@ const participantLimitReached = computed(() =>
             <form @submit.prevent="submitReply">
               <FieldGroup>
                 <Field>
-                  <FieldLabel for="q-reply">追加消息</FieldLabel>
+                  <FieldLabel for="q-reply">{{ $t('追加消息') }}</FieldLabel>
                   <Textarea id="q-reply" v-model="reply" rows="5" required @input="replyError = null" />
                   <FieldDescription v-if="detail.access === 'Asker'">
-                    本轮还可连续发送 {{ detail.participantMessagesRemaining ?? 0 }} / {{ detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }} 条；工作人员回复后重置。
-                    <span v-if="detail.status === 'Resolved'">继续追问会将咨询重新设为待处理。</span>
+                    {{ $t('本轮还可连续发送 {remaining} / {maximum} 条；工作人员回复后重置。', { remaining: detail.participantMessagesRemaining ?? 0, maximum: detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }) }}
+                    <span v-if="detail.status === 'Resolved'">{{ $t('继续追问会将咨询重新设为待处理。') }}</span>
                   </FieldDescription>
-                  <FieldDescription v-else>工作人员回复不受连续消息额度限制。</FieldDescription>
+                  <FieldDescription v-else>{{ $t('工作人员回复不受连续消息额度限制。') }}</FieldDescription>
                 </Field>
                 <p v-if="replyError" role="alert" class="text-sm text-destructive">{{ replyError }}</p>
                 <div class="flex flex-wrap items-center gap-2">
                   <Button type="submit" :disabled="replyPending || !reply.trim()">
-                    <Spinner v-if="replyPending" data-icon="inline-start" />
-                    发送
-                  </Button>
+                    <Spinner v-if="replyPending" data-icon="inline-start" /> {{ $t('发送') }} </Button>
                   <Button
                     v-if="detail.canResolve"
                     type="button"
                     variant="outline"
                     :disabled="statusPending"
                     @click="changeStatus('Resolved')"
-                  >
-                    标记已解决
-                  </Button>
+                  > {{ $t('标记已解决') }} </Button>
                   <Button
                     v-if="detail.canClose"
                     type="button"
                     variant="outline"
                     :disabled="statusPending"
                     @click="changeStatus('Closed')"
-                  >
-                    关闭咨询
-                  </Button>
+                  > {{ $t('关闭咨询') }} </Button>
                 </div>
               </FieldGroup>
             </form>
           </template>
           <Alert v-else-if="participantLimitReached">
             <AlertDescription>
-              工作人员回复前最多连续发送 {{ detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }} 条消息，请等待回复；历史内容仍会完整保留。
+              {{ $t('工作人员回复前最多连续发送 {maximum} 条消息，请等待回复；历史内容仍会完整保留。', { maximum: detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }) }}
             </AlertDescription>
           </Alert>
-          <p v-else-if="detail.access === 'Observer'" class="text-sm text-muted-foreground">你对该咨询只有只读权限。</p>
-          <p v-else class="text-sm text-muted-foreground">该咨询已{{ statusLabel(detail.status) }}，无法继续回复。</p>
+          <p v-else-if="detail.access === 'Observer'" class="text-sm text-muted-foreground">{{ $t('你对该咨询只有只读权限。') }}</p>
+          <p v-else class="text-sm text-muted-foreground">{{ $t('该咨询已{status}，无法继续回复。', { status: statusLabel(detail.status) ?? '—' }) }}</p>
         </CardContent>
       </Card>
     </div>

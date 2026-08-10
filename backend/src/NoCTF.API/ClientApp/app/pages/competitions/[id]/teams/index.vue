@@ -13,7 +13,7 @@ onMounted(async () => {
   const { data, error: err } = await listCompetitionTeamsEndpoint({ path: { competitionId } })
   loading.value = false
   if (err || !data) {
-    error.value = parseApiError(err, '加载队伍列表失败').message
+    error.value = parseApiError(err, translate("加载队伍列表失败")).message
     return
   }
   teams.value = data.items ?? []
@@ -32,8 +32,8 @@ onMounted(async () => {
 
     <Empty v-else-if="!teams.length" class="border py-12">
       <EmptyHeader>
-        <EmptyTitle>暂无报名队伍</EmptyTitle>
-        <EmptyDescription>成为第一支报名参赛的队伍吧</EmptyDescription>
+        <EmptyTitle>{{ $t('暂无报名队伍') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('成为第一支报名参赛的队伍吧') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -58,7 +58,7 @@ onMounted(async () => {
                   >
                     {{ teamRegistrationStatusLabel(team.registrationStatus) }}
                   </Badge>
-                  <span class="text-xs text-muted-foreground">{{ team.memberIds?.length ?? 0 }} 名成员</span>
+                  <span class="text-xs text-muted-foreground">{{ $t('{count} 名成员', { count: team.memberIds?.length ?? 0 }) }}</span>
                 </div>
               </div>
             </div>

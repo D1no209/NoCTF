@@ -44,7 +44,7 @@ async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'a
       ? await adminApproveTeam({ path })
       : await adminRejectTeam({ path })
     if (error) throw error
-    toast.success('操作成功')
+    toast.success(translate("操作成功"))
     await load()
   }
   catch (e) {
@@ -65,7 +65,7 @@ function openUnban(team: NoCtfapiEndpointsTeamsTeamResponse) {
 async function submitUnban() {
   const team = unbanDialog.value
   if (!team?.id) {
-    toast.error('队伍标识缺失，请刷新后重试')
+    toast.error(translate("队伍标识缺失，请刷新后重试"))
     return
   }
   pendingId.value = team.id
@@ -74,7 +74,7 @@ async function submitUnban() {
       path: { competitionId, teamId: team.id },
     })
     if (error) throw error
-    toast.success(`已解除「${team.name ?? '该队伍'}」的封禁`)
+    toast.success(translate('已解除「{team}」的封禁', { team: team.name ?? translate('该队伍') }))
     unbanDialog.value = null
     await Promise.all([load(), loadAppeals()])
   }
@@ -118,7 +118,7 @@ async function submitBan() {
         })
       : await adminCorrectTeamBan({ path, body: { reason: banReason.value.trim() } })
     if (error) throw error
-    toast.success(ctx.mode === 'ban' ? '队伍已封禁' : '封禁已纠正')
+    toast.success(ctx.mode === 'ban' ? translate("队伍已封禁") : translate("封禁已纠正"))
     banDialog.value = null
     await load()
   }
@@ -161,7 +161,7 @@ async function submitAppeal() {
       ? await adminAcceptTeamBanAppeal({ path, body: { reason: appealReason.value.trim() } })
       : await adminUpholdTeamBanAppeal({ path, body: { reason: appealReason.value.trim() } })
     if (error) throw error
-    toast.success(ctx.mode === 'accept' ? '申诉已接受,队伍解封' : '申诉已驳回,维持封禁')
+    toast.success(ctx.mode === 'accept' ? translate("申诉已接受,队伍解封") : translate("申诉已驳回,维持封禁"))
     appealDialog.value = null
     await Promise.all([load(), loadAppeals()])
   }
@@ -182,25 +182,25 @@ onMounted(() => {
 <template>
   <div class="flex flex-col gap-8">
     <div class="flex flex-col gap-4">
-      <h2 class="text-lg font-semibold">团队管理</h2>
+      <h2 class="text-lg font-semibold">{{ $t('团队管理') }}</h2>
       <Alert v-if="error" variant="destructive">
         <AlertDescription>{{ error }}</AlertDescription>
       </Alert>
       <Skeleton v-if="loading" class="h-48 w-full" />
       <Empty v-else-if="teams.length === 0">
         <EmptyHeader>
-          <EmptyTitle>暂无注册队伍</EmptyTitle>
+          <EmptyTitle>{{ $t('暂无注册队伍') }}</EmptyTitle>
         </EmptyHeader>
       </Empty>
       <Table v-else>
         <TableHeader>
           <TableRow>
-            <TableHead>队名</TableHead>
-            <TableHead class="w-24">人数</TableHead>
-            <TableHead class="w-28">注册状态</TableHead>
-            <TableHead class="w-28">封禁状态</TableHead>
-            <TableHead class="w-44">注册时间</TableHead>
-            <TableHead v-if="canWrite || canJudge" class="w-64 text-right">操作</TableHead>
+            <TableHead>{{ $t('队名') }}</TableHead>
+            <TableHead class="w-24">{{ $t('人数') }}</TableHead>
+            <TableHead class="w-28">{{ $t('注册状态') }}</TableHead>
+            <TableHead class="w-28">{{ $t('封禁状态') }}</TableHead>
+            <TableHead class="w-44">{{ $t('注册时间') }}</TableHead>
+            <TableHead v-if="canWrite || canJudge" class="w-64 text-right">{{ $t('操作') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -213,22 +213,22 @@ onMounted(() => {
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge v-if="t.isBanned" variant="destructive">已封禁</Badge>
+              <Badge v-if="t.isBanned" variant="destructive">{{ $t('已封禁') }}</Badge>
               <span v-else class="text-muted-foreground">—</span>
             </TableCell>
             <TableCell>{{ adminFormatDateTime(t.registeredAt) }}</TableCell>
             <TableCell v-if="canWrite || canJudge" class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <template v-if="canWrite && t.registrationStatus === 'Pending'">
-                  <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">通过</Button>
-                  <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">拒绝</Button>
+                  <Button size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'approve')">{{ $t('通过') }}</Button>
+                  <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="simpleAction(t, 'reject')">{{ $t('拒绝') }}</Button>
                 </template>
                 <template v-if="canJudge && !t.isBanned">
-                  <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="openBan(t, 'ban')">封禁</Button>
+                  <Button variant="outline" size="sm" :disabled="pendingId === t.id" @click="openBan(t, 'ban')">{{ $t('封禁') }}</Button>
                 </template>
                 <template v-else-if="canWrite">
-                  <Button type="button" variant="outline" size="sm" :disabled="pendingId === t.id" @click.stop="openUnban(t)">解封</Button>
-                  <Button type="button" variant="ghost" size="sm" :disabled="pendingId === t.id" @click.stop="openBan(t, 'correct')">纠正封禁</Button>
+                  <Button type="button" variant="outline" size="sm" :disabled="pendingId === t.id" @click.stop="openUnban(t)">{{ $t('解封') }}</Button>
+                  <Button type="button" variant="ghost" size="sm" :disabled="pendingId === t.id" @click.stop="openBan(t, 'correct')">{{ $t('纠正封禁') }}</Button>
                 </template>
               </div>
             </TableCell>
@@ -240,11 +240,11 @@ onMounted(() => {
     <Separator />
 
     <div class="flex flex-col gap-4">
-      <h2 class="text-lg font-semibold">封禁申诉</h2>
+      <h2 class="text-lg font-semibold">{{ $t('封禁申诉') }}</h2>
       <Skeleton v-if="appealsLoading" class="h-32 w-full" />
       <Empty v-else-if="appeals.length === 0">
         <EmptyHeader>
-          <EmptyTitle>暂无申诉</EmptyTitle>
+          <EmptyTitle>{{ $t('暂无申诉') }}</EmptyTitle>
         </EmptyHeader>
       </Empty>
       <div v-else class="flex flex-col gap-3">
@@ -255,23 +255,23 @@ onMounted(() => {
               <div class="flex items-center gap-1">
                 <Badge variant="outline">{{ enumLabel(TeamBanSourceLabel, a.source) }}</Badge>
                 <Badge v-if="a.appeal" :variant="a.appeal.status === 'Submitted' ? 'secondary' : a.appeal.status === 'Accepted' ? 'default' : 'destructive'">
-                  申诉{{ enumLabel(TeamBanAppealStatusLabel, a.appeal.status) }}
+                  {{ $t('申诉{status}', { status: enumLabel(TeamBanAppealStatusLabel, a.appeal.status) }) }}
                 </Badge>
-                <Badge v-if="a.isCurrentlyBanned" variant="destructive">封禁中</Badge>
+                <Badge v-if="a.isCurrentlyBanned" variant="destructive">{{ $t('封禁中') }}</Badge>
               </div>
             </div>
-            <CardDescription>封禁于 {{ adminFormatDateTime(a.bannedAt) }}</CardDescription>
+            <CardDescription>{{ $t('封禁于 {time}', { time: adminFormatDateTime(a.bannedAt) }) }}</CardDescription>
           </CardHeader>
           <CardContent v-if="a.appeal" class="flex flex-col gap-2 text-sm">
-            <p><span class="text-muted-foreground">申诉人:</span>{{ a.appeal.submittedByUserName }} · {{ adminFormatDateTime(a.appeal.submittedAt) }}</p>
+            <p><span class="text-muted-foreground">{{ $t('申诉人:') }}</span>{{ a.appeal.submittedByUserName }} · {{ adminFormatDateTime(a.appeal.submittedAt) }}</p>
             <p class="whitespace-pre-wrap">{{ a.appeal.statement }}</p>
             <p v-if="a.appeal.resolutionReason" class="text-muted-foreground">
-              裁决:{{ a.appeal.resolvedByUserName }} · {{ adminFormatDateTime(a.appeal.resolvedAt) }} — {{ a.appeal.resolutionReason }}
+              {{ $t('裁决：{user} · {time} — {reason}', { user: a.appeal.resolvedByUserName ?? '—', time: adminFormatDateTime(a.appeal.resolvedAt), reason: a.appeal.resolutionReason }) }}
             </p>
           </CardContent>
           <CardFooter v-if="canJudge && a.appeal?.status === 'Submitted' && a.canResolve" class="gap-2">
-            <Button size="sm" :disabled="appealPending" @click="openAppeal(a, 'accept')">接受申诉(解封)</Button>
-            <Button variant="outline" size="sm" :disabled="appealPending" @click="openAppeal(a, 'uphold')">维持封禁</Button>
+            <Button size="sm" :disabled="appealPending" @click="openAppeal(a, 'accept')">{{ $t('接受申诉(解封)') }}</Button>
+            <Button variant="outline" size="sm" :disabled="appealPending" @click="openAppeal(a, 'uphold')">{{ $t('维持封禁') }}</Button>
           </CardFooter>
         </Card>
       </div>
@@ -280,21 +280,19 @@ onMounted(() => {
     <Dialog :open="unbanDialog !== null" @update:open="(v) => { if (!v && pendingId === null) unbanDialog = null }">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>解除队伍封禁？</DialogTitle>
+          <DialogTitle>{{ $t('解除队伍封禁？') }}</DialogTitle>
           <DialogDescription>
-            将立即恢复「{{ unbanDialog?.name }}」的参赛资格、历史计分资格和正常运行时生命周期。
+            {{ $t('将立即恢复「{team}」的参赛资格、历史计分资格和正常运行时生命周期。', { team: unbanDialog?.name ?? '—' }) }}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button type="button" variant="outline" :disabled="pendingId !== null" @click="unbanDialog = null">取消</Button>
+          <Button type="button" variant="outline" :disabled="pendingId !== null" @click="unbanDialog = null">{{ $t('取消') }}</Button>
           <Button
             type="button"
             :disabled="pendingId !== null"
             @click="submitUnban"
           >
-            <Spinner v-if="pendingId === unbanDialog?.id" data-icon="inline-start" />
-            确认解封
-          </Button>
+            <Spinner v-if="pendingId === unbanDialog?.id" data-icon="inline-start" /> {{ $t('确认解封') }} </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -302,41 +300,37 @@ onMounted(() => {
     <Dialog :open="banDialog !== null" @update:open="(v) => { if (!v) banDialog = null }">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ banDialog?.mode === 'ban' ? '封禁队伍' : '纠正封禁' }}</DialogTitle>
+          <DialogTitle>{{ banDialog?.mode === 'ban' ? $t('封禁队伍') : $t('纠正封禁') }}</DialogTitle>
           <DialogDescription>
             {{ banDialog?.mode === 'ban'
-              ? `封禁「${banDialog?.team.name}」,该队将无法继续参赛。`
-              : `将「${banDialog?.team.name}」的封禁标记为误封并纠正。` }}
-            必须填写原因(将记入审计)。
+              ? $t('封禁「{team}」，该队将无法继续参赛。', { team: banDialog?.team.name ?? '—' })
+              : $t('将「{team}」的封禁标记为误封并纠正。', { team: banDialog?.team.name ?? '—' }) }}
+            {{ $t('必须填写原因（将记入审计）。') }}
           </DialogDescription>
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel for="ban-reason">原因</FieldLabel>
+            <FieldLabel for="ban-reason">{{ $t('原因') }}</FieldLabel>
             <Textarea id="ban-reason" v-model="banReason" maxlength="512" required />
             <FieldDescription v-if="banDialog?.mode === 'correct'">
-              至少 8 个字符；当前 {{ banReason.trim().length }}/512。
+              {{ $t('至少 8 个字符；当前 {length}/512。', { length: banReason.trim().length }) }}
             </FieldDescription>
             <FieldDescription v-else>
-              当前 {{ banReason.trim().length }}/512。
+              {{ $t('当前 {length}/512。', { length: banReason.trim().length }) }}
             </FieldDescription>
           </Field>
           <Field v-if="banDialog?.mode === 'ban'" orientation="horizontal">
             <Checkbox id="ban-announce-publicly" v-model="banAnnouncePublicly" />
             <div class="grid gap-1.5 leading-none">
-              <FieldLabel for="ban-announce-publicly">封禁后发布赛事纪律公告</FieldLabel>
-              <FieldDescription>
-                默认关闭。开启后将向参赛者公告该队伍因违反赛事规则被封禁，不公开处置原因或证据。
-              </FieldDescription>
+              <FieldLabel for="ban-announce-publicly">{{ $t('封禁后发布赛事纪律公告') }}</FieldLabel>
+              <FieldDescription> {{ $t('默认关闭。开启后将向参赛者公告该队伍因违反赛事规则被封禁，不公开处置原因或证据。') }} </FieldDescription>
             </div>
           </Field>
         </FieldGroup>
         <DialogFooter>
-          <Button variant="outline" @click="banDialog = null">取消</Button>
+          <Button variant="outline" @click="banDialog = null">{{ $t('取消') }}</Button>
           <Button type="button" :disabled="banPending || !banReasonValid" @click="submitBan">
-            <Spinner v-if="banPending" data-icon="inline-start" />
-            确认
-          </Button>
+            <Spinner v-if="banPending" data-icon="inline-start" /> {{ $t('确认') }} </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -344,26 +338,24 @@ onMounted(() => {
     <Dialog :open="appealDialog !== null" @update:open="(v) => { if (!v) appealDialog = null }">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{{ appealDialog?.mode === 'accept' ? '接受申诉' : '维持封禁' }}</DialogTitle>
+          <DialogTitle>{{ appealDialog?.mode === 'accept' ? $t('接受申诉') : $t('维持封禁') }}</DialogTitle>
           <DialogDescription>
             {{ appealDialog?.mode === 'accept'
-              ? `接受「${appealDialog?.banCase.teamName}」的申诉并解除封禁。`
-              : `驳回「${appealDialog?.banCase.teamName}」的申诉,维持封禁。` }}
-            必须填写裁决理由。
+              ? $t('接受「{team}」的申诉并解除封禁。', { team: appealDialog?.banCase.teamName ?? '—' })
+              : $t('驳回「{team}」的申诉，维持封禁。', { team: appealDialog?.banCase.teamName ?? '—' }) }}
+            {{ $t('必须填写裁决理由。') }}
           </DialogDescription>
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel for="appeal-reason">裁决理由</FieldLabel>
+            <FieldLabel for="appeal-reason">{{ $t('裁决理由') }}</FieldLabel>
             <Textarea id="appeal-reason" v-model="appealReason" required />
           </Field>
         </FieldGroup>
         <DialogFooter>
-          <Button variant="outline" @click="appealDialog = null">取消</Button>
+          <Button variant="outline" @click="appealDialog = null">{{ $t('取消') }}</Button>
           <Button :disabled="appealPending || !appealReason.trim()" @click="submitAppeal">
-            <Spinner v-if="appealPending" data-icon="inline-start" />
-            确认
-          </Button>
+            <Spinner v-if="appealPending" data-icon="inline-start" /> {{ $t('确认') }} </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

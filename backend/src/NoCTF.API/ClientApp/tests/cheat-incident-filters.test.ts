@@ -55,7 +55,7 @@ describe('cheat incident filter wiring', () => {
     ).text()
 
     expect(page).toContain("const filterStatus = ref<CheatIncidentStatusFilter>('All')")
-    expect(page).toContain('<SelectItem value="All">全部</SelectItem>')
+    expect(page).toContain('<SelectItem value="All">{{ $t(\'全部\') }}</SelectItem>')
     expect(page).toContain("status: appliedStatus.value === 'All' ? null : appliedStatus.value")
     expect(page).toContain('from: appliedRange.value.from')
     expect(page).toContain('to: appliedRange.value.to')

@@ -52,7 +52,7 @@ onMounted(async () => {
   ])
   loading.value = false
   if (err || !data) {
-    error.value = parseApiError(err, '加载题目失败').message
+    error.value = parseApiError(err, translate("加载题目失败")).message
     return
   }
   items.value = (data.items ?? []).filter((c) => c.isPublished)
@@ -132,7 +132,7 @@ function currentScoreFor(challenge: Challenge): number | null {
 const groups = computed(() => {
   const map = new Map<string, Challenge[]>()
   for (const item of items.value) {
-    const direction = item.direction || '未分类'
+    const direction = item.direction || translate('未分类')
     const list = map.get(direction) ?? []
     list.push(item)
     map.set(direction, list)
@@ -150,7 +150,7 @@ const groups = computed(() => {
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
     <Alert v-else-if="dataScope === LeaderboardDataScope.Frozen">
-      <AlertDescription>排行榜已冻结,题目分数显示为冻结时快照。</AlertDescription>
+      <AlertDescription>{{ $t('排行榜已冻结,题目分数显示为冻结时快照。') }}</AlertDescription>
     </Alert>
 
     <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
@@ -161,8 +161,8 @@ const groups = computed(() => {
 
         <Empty v-else-if="!items.length" class="border border-dashed py-12">
           <EmptyHeader>
-            <EmptyTitle>暂无已发布的题目</EmptyTitle>
-            <EmptyDescription>题目开放后会同步显示在右侧赛事播报中</EmptyDescription>
+            <EmptyTitle>{{ $t('暂无已发布的题目') }}</EmptyTitle>
+            <EmptyDescription>{{ $t('题目开放后会同步显示在右侧赛事播报中') }}</EmptyDescription>
           </EmptyHeader>
         </Empty>
 
@@ -205,34 +205,32 @@ const groups = computed(() => {
                   </CardHeader>
                   <CardContent class="relative flex items-end justify-between gap-3">
                     <div class="flex flex-col items-start gap-2">
-                      <Badge v-if="currentScoreFor(challenge) === null" variant="secondary">
-                        分数隐藏
-                      </Badge>
+                      <Badge v-if="currentScoreFor(challenge) === null" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
                       <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
                         {{ currentScoreFor(challenge) }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
                       </span>
-                      <span v-if="currentScoreFor(challenge) !== null" class="text-xs text-muted-foreground">当前动态分值</span>
+                      <span v-if="currentScoreFor(challenge) !== null" class="text-xs text-muted-foreground">{{ $t('当前动态分值') }}</span>
                       <Badge v-if="progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
                         <Flag class="size-3" />
                         {{ progressFor(challenge.id)?.bloodRank
                           ? bloodRankLabel[String(progressFor(challenge.id)?.bloodRank)]
-                          : '已解出' }}
+                          : $t('已解出') }}
                       </Badge>
                       <span
                         v-if="progressFor(challenge.id)?.myScore !== null"
                         class="text-xs text-muted-foreground"
                       >
-                        本队结算 {{ progressFor(challenge.id)?.myScore }} pts
+                        {{ $t('本队结算 {score} pts', { score: progressFor(challenge.id)?.myScore ?? 0 }) }}
                       </span>
                     </div>
                     <span
                       v-if="progressFor(challenge.id)"
                       class="flex items-center gap-1 text-xs text-muted-foreground"
-                      :aria-label="`${progressFor(challenge.id)?.solveCount ?? 0} 支队伍已解出`"
+                      :aria-label="$t('{count} 支队伍已解出', { count: progressFor(challenge.id)?.solveCount ?? 0 })"
                     >
                       <Users class="size-3.5" aria-hidden="true" />
                       <span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.solveCount ?? 0 }}</span>
-                      <span>解出</span>
+                      <span>{{ $t('解出') }}</span>
                     </span>
                   </CardContent>
                 </Card>

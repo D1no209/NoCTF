@@ -32,7 +32,7 @@ async function load(): Promise<void> {
   })
   loading.value = false
   if (requestError || !data) {
-    error.value = parseApiError(requestError, '加载赛事播报失败').message
+    error.value = parseApiError(requestError, translate("加载赛事播报失败")).message
     return
   }
   items.value = data.items ?? []
@@ -60,7 +60,7 @@ onUnmounted(() => unwatch?.())
     <header class="flex items-center justify-between gap-3 border-b px-4 py-3">
       <div class="flex items-center gap-2">
         <Megaphone class="size-4 text-primary" aria-hidden="true" />
-        <h2 id="competition-broadcast-title" class="text-sm font-semibold">赛事播报</h2>
+        <h2 id="competition-broadcast-title" class="text-sm font-semibold">{{ $t('赛事播报') }}</h2>
       </div>
       <span class="text-[0.6875rem] font-medium tracking-wide text-muted-foreground">LIVE</span>
     </header>
@@ -70,11 +70,11 @@ onUnmounted(() => unwatch?.())
     </div>
     <div v-else-if="error" class="p-4">
       <p class="text-xs leading-5 text-destructive">{{ error }}</p>
-      <Button variant="ghost" size="sm" class="mt-2 px-0" @click="load">重新加载</Button>
+      <Button variant="ghost" size="sm" class="mt-2 px-0" @click="load">{{ $t('重新加载') }}</Button>
     </div>
     <div v-else-if="!items.length" class="px-4 py-8 text-center">
-      <p class="text-sm text-muted-foreground">暂无赛事播报</p>
-      <p class="mt-1 text-xs text-muted-foreground/80">血榜、题目与纪律消息会在这里更新</p>
+      <p class="text-sm text-muted-foreground">{{ $t('暂无赛事播报') }}</p>
+      <p class="mt-1 text-xs text-muted-foreground/80">{{ $t('血榜、题目与纪律消息会在这里更新') }}</p>
     </div>
     <ol v-else class="max-h-[32rem] divide-y overflow-y-auto">
       <li v-for="event in items" :key="event.id">

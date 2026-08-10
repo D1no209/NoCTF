@@ -5,6 +5,7 @@ import type {
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode,
 } from '../api'
 import { parseApiError } from '../utils/api-error'
+import { translate } from '../utils/i18n'
 
 type FailureCode = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode
 type FailurePayload = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse
@@ -12,24 +13,24 @@ type ParticipantRole = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionPa
 type QuestionAccess = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode
 
 const staticFailureMessages = {
-  InvalidRequest: '咨询内容或请求参数无效，请检查后重试。',
-  SpamRejected: '咨询内容疑似重复或无效文本，请补充清晰的问题描述。',
-  CompetitionNotAcceptingQuestions: '当前比赛状态不允许创建咨询。',
-  TeamNotEligible: '当前队伍尚不具备发起咨询的资格。',
-  InvalidChallengeReference: '关联题目无效、未发布或不属于当前比赛。',
-  RevisionConflict: '咨询已被其他成员更新，请刷新后再发送。',
-  InvalidTransition: '当前咨询状态不允许执行此操作。',
-  QuestionClosed: '该咨询已关闭；如需继续沟通，请重新创建咨询。',
+  InvalidRequest: translate("咨询内容或请求参数无效，请检查后重试。"),
+  SpamRejected: translate("咨询内容疑似重复或无效文本，请补充清晰的问题描述。"),
+  CompetitionNotAcceptingQuestions: translate("当前比赛状态不允许创建咨询。"),
+  TeamNotEligible: translate("当前队伍尚不具备发起咨询的资格。"),
+  InvalidChallengeReference: translate("关联题目无效、未发布或不属于当前比赛。"),
+  RevisionConflict: translate("咨询已被其他成员更新，请刷新后再发送。"),
+  InvalidTransition: translate("当前咨询状态不允许执行此操作。"),
+  QuestionClosed: translate("该咨询已关闭；如需继续沟通，请重新创建咨询。"),
 } satisfies Partial<Record<FailureCode, string>>
 
 export const competitionQuestionRoleLabel = {
-  Asker: '选手',
-  Participant: '选手',
-  Handler: '工作人员',
-  Judge: '裁判',
-  ChallengeOwner: '题目所有者',
-  CompetitionManager: '比赛管理员',
-  PlatformAdministrator: '平台管理员',
+  Asker: translate("选手"),
+  Participant: translate("选手"),
+  Handler: translate("工作人员"),
+  Judge: translate("裁判"),
+  ChallengeOwner: translate("题目所有者"),
+  CompetitionManager: translate("比赛管理员"),
+  PlatformAdministrator: translate("平台管理员"),
 } satisfies Record<ParticipantRole, string>
 
 export function isCompetitionQuestionHandlerRole(role?: ParticipantRole): boolean {
@@ -46,9 +47,9 @@ export function competitionQuestionErrorMessage(
 
   const limit = payload.limit ?? undefined
   if (payload.code === 'TeamActiveQuestionLimitReached')
-    return `本队已有 ${limit ?? 5} 个活跃咨询，请先解决已有咨询。`
+    return translate('本队已有 {limit} 个活跃咨询，请先解决已有咨询。', { limit: limit ?? 5 })
   if (payload.code === 'ParticipantMessageLimitReached')
-    return `工作人员回复前最多连续发送 ${limit ?? 3} 条消息，请等待回复。`
+    return translate('工作人员回复前最多连续发送 {limit} 条消息，请等待回复。', { limit: limit ?? 3 })
 
   return staticFailureMessages[payload.code] ?? fallback
 }

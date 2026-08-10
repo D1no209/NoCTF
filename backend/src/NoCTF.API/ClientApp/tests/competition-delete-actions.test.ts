@@ -24,6 +24,6 @@ describe('competition deletion actions', () => {
     expect(detailPage).toContain('v-if="!isDeleted"')
     expect(detailPage).toContain('v-if="isDeleted && canManagePermissions"')
     expect(listPage).toContain('query: { includeDeleted: includeDeleted.value }')
-    expect(listPage).toContain('<Badge v-if="c.deletedAt" variant="destructive">已删除</Badge>')
+    expect(listPage).toContain('<Badge v-if="c.deletedAt" variant="destructive">{{ $t(\'已删除\') }}</Badge>')
   })
 })

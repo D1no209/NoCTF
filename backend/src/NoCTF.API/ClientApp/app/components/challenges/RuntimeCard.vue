@@ -65,7 +65,7 @@ async function act(action: () => Promise<{ error?: unknown }>, failMessage: stri
     toast.error(parseApiError(error, failMessage).message)
     return
   }
-  toast.success('操作已受理,环境状态更新中')
+  toast.success(translate("操作已受理,环境状态更新中"))
   startPolling()
 }
 
@@ -74,9 +74,9 @@ const path = computed(() => ({
   competitionChallengeId: props.competitionChallengeId,
 }))
 
-const start = () => act(() => startRuntimeEndpoint({ path: path.value }), '启动环境失败')
-const stop = () => act(() => stopRuntimeEndpoint({ path: path.value }), '停止环境失败')
-const reset = () => act(() => resetRuntimeEndpoint({ path: path.value }), '重置环境失败')
+const start = () => act(() => startRuntimeEndpoint({ path: path.value }), translate("启动环境失败"))
+const stop = () => act(() => stopRuntimeEndpoint({ path: path.value }), translate("停止环境失败"))
+const reset = () => act(() => resetRuntimeEndpoint({ path: path.value }), translate("重置环境失败"))
 const extend = () =>
   act(
     () =>
@@ -84,7 +84,7 @@ const extend = () =>
         path: path.value,
         body: { seconds: Math.max(60, Math.round(extendMinutes.value * 60)) },
       }),
-    '续期失败',
+    translate("续期失败"),
   )
 
 // TTL 倒计时
@@ -101,7 +101,7 @@ onUnmounted(() => {
 const ttl = computed(() => {
   if (!runtime.value?.expiresAt) return null
   const remaining = new Date(runtime.value.expiresAt).getTime() - now.value
-  return remaining > 0 ? formatDuration(remaining) : '已到期'
+  return remaining > 0 ? formatDuration(remaining) : translate("已到期")
 })
 
 const isRunning = computed(() => runtime.value?.state === RuntimeState.Running)
@@ -124,30 +124,28 @@ const stateVariant = computed(() => {
   <Card>
     <CardHeader>
       <div class="flex items-center justify-between gap-2">
-        <CardTitle class="text-base">题目环境</CardTitle>
+        <CardTitle class="text-base">{{ $t('题目环境') }}</CardTitle>
         <Badge v-if="runtime" :variant="stateVariant">
           {{ runtimeStateLabel(runtime.state) }}
         </Badge>
       </div>
-      <CardDescription v-if="controls === 'reset-only'">
-        AWD 模式下环境由平台统一发放,仅支持重置
-      </CardDescription>
+      <CardDescription v-if="controls === 'reset-only'"> {{ $t('AWD 模式下环境由平台统一发放,仅支持重置') }} </CardDescription>
     </CardHeader>
     <CardContent class="flex flex-col gap-4">
       <Skeleton v-if="loading" class="h-16 w-full" />
 
       <template v-else>
         <Alert v-if="timedOut">
-          <AlertDescription>环境状态更新超时,请稍后手动刷新。</AlertDescription>
+          <AlertDescription>{{ $t('环境状态更新超时,请稍后手动刷新。') }}</AlertDescription>
         </Alert>
 
         <div v-if="!runtime" class="text-sm text-muted-foreground">
-          {{ controls === 'full' ? '环境尚未启动,点击「启动环境」获取你的专属实例。' : '平台尚未为本队发放环境。' }}
+          {{ controls === 'full' ? $t('环境尚未启动,点击「启动环境」获取你的专属实例。') : $t('平台尚未为本队发放环境。') }}
         </div>
 
         <template v-else>
           <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
-            <span class="text-sm text-muted-foreground">访问地址</span>
+            <span class="text-sm text-muted-foreground">{{ $t('访问地址') }}</span>
             <a
               v-for="url in runtime.urls"
               :key="url"
@@ -160,25 +158,18 @@ const stateVariant = computed(() => {
             </a>
           </div>
 
-          <div v-if="isRunning && ttl" class="text-sm">
-            剩余时间:<span class="font-medium">{{ ttl }}</span>
+          <div v-if="isRunning && ttl" class="text-sm"> {{ $t('剩余时间:') }}<span class="font-medium">{{ ttl }}</span>
           </div>
         </template>
 
         <div class="flex flex-wrap items-center gap-2">
           <template v-if="controls === 'full'">
             <Button v-if="!runtime || runtime.state === RuntimeState.Stopped || runtime.state === RuntimeState.Failed" :disabled="busy" @click="start">
-              <Spinner v-if="busy && polling" data-icon="inline-start" />
-              启动环境
-            </Button>
-            <Button v-if="isRunning" variant="outline" :disabled="busy" @click="stop">
-              停止
-            </Button>
+              <Spinner v-if="busy && polling" data-icon="inline-start" /> {{ $t('启动环境') }} </Button>
+            <Button v-if="isRunning" variant="outline" :disabled="busy" @click="stop"> {{ $t('停止') }} </Button>
           </template>
           <Button v-if="runtime" variant="outline" :disabled="busy" @click="reset">
-            <Spinner v-if="polling" data-icon="inline-start" />
-            重置环境
-          </Button>
+            <Spinner v-if="polling" data-icon="inline-start" /> {{ $t('重置环境') }} </Button>
           <template v-if="controls === 'full' && isRunning">
             <div class="flex items-center gap-2">
               <Input
@@ -187,9 +178,9 @@ const stateVariant = computed(() => {
                 min="1"
                 max="720"
                 class="w-20"
-                aria-label="续期分钟数"
+                :aria-label="$t('续期分钟数')"
               />
-              <Button variant="outline" :disabled="busy" @click="extend">续期(分钟)</Button>
+              <Button variant="outline" :disabled="busy" @click="extend">{{ $t('续期(分钟)') }}</Button>
             </div>
           </template>
         </div>

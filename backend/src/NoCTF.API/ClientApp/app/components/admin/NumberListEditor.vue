@@ -11,7 +11,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   placeholder: '',
-  addLabel: '添加端口',
+  addLabel: translate("添加端口"),
   min: 1,
   max: 65535,
   disabled: false,
@@ -57,7 +57,7 @@ function add(): void {
         </Button>
       </div>
       <p v-if="port === null" class="text-xs text-destructive">
-        请输入 {{ min }} 至 {{ max }} 的端口，或点击右侧按钮删除。
+        {{ $t('请输入 {minimum} 至 {maximum} 的端口，或点击右侧按钮删除。', { minimum: min, maximum: max }) }}
       </p>
     </div>
     <Button

@@ -5,7 +5,6 @@ export const supportedLocales = ['zh-CN', 'en'] as const
 export type AppLocale = typeof supportedLocales[number]
 
 const localeStorageKey = 'noctf-locale'
-const activeLocale = shallowRef<AppLocale>('zh-CN')
 
 function isSupportedLocale(value: string | null | undefined): value is AppLocale {
   return supportedLocales.includes(value as AppLocale)
@@ -27,6 +26,10 @@ export function detectLocale(): AppLocale {
 
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en'
 }
+
+// Resolve the persisted locale while modules are evaluated so labels declared at
+// module scope are created in the same language as the first rendered frame.
+const activeLocale = shallowRef<AppLocale>(detectLocale())
 
 export function initializeLocale(): AppLocale {
   const locale = detectLocale()

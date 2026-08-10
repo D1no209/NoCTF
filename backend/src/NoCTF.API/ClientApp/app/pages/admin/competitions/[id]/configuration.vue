@@ -48,7 +48,7 @@ async function saveMeta() {
   const start = localInputToIso(startTime.value)
   const end = localInputToIso(endTime.value)
   if (!title.value.trim() || !start || !end) {
-    metaError.value = '请完整填写标题与时间'
+    metaError.value = translate('请完整填写标题与时间')
     return
   }
   savingMeta.value = true
@@ -70,7 +70,7 @@ async function saveMeta() {
       },
     })
     if (error) throw error
-    toast.success('基础信息已保存')
+    toast.success(translate("基础信息已保存"))
     await refresh()
   }
   catch (e) {
@@ -103,7 +103,7 @@ async function saveConfig(json: string) {
     })
     if (error) throw error
     config.value = data ?? config.value
-    toast.success('模式配置已保存')
+    toast.success(translate("模式配置已保存"))
   }
   catch (e) {
     toastWriteError(e, loadConfig)
@@ -120,8 +120,8 @@ onMounted(loadConfig)
   <div class="flex flex-col gap-6">
     <Card>
       <CardHeader>
-        <CardTitle>基础信息</CardTitle>
-        <CardDescription>标题、时间与队伍限制;游戏模式创建后不可修改</CardDescription>
+        <CardTitle>{{ $t('基础信息') }}</CardTitle>
+        <CardDescription>{{ $t('标题、时间与队伍限制;游戏模式创建后不可修改') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <form @submit.prevent="saveMeta">
@@ -130,68 +130,66 @@ onMounted(loadConfig)
               <AlertDescription>{{ metaError }}</AlertDescription>
             </Alert>
             <Field>
-              <FieldLabel for="c-title">标题</FieldLabel>
+              <FieldLabel for="c-title">{{ $t('标题') }}</FieldLabel>
               <Input id="c-title" v-model="title" :readonly="!canWrite" required />
             </Field>
             <Field>
-              <FieldLabel for="c-desc">描述</FieldLabel>
+              <FieldLabel for="c-desc">{{ $t('描述') }}</FieldLabel>
               <Textarea id="c-desc" v-model="description" :readonly="!canWrite" />
             </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="c-start">开始时间</FieldLabel>
+                <FieldLabel for="c-start">{{ $t('开始时间') }}</FieldLabel>
                 <Input id="c-start" v-model="startTime" type="datetime-local" :readonly="!canWrite" required />
               </Field>
               <Field>
-                <FieldLabel for="c-end">结束时间</FieldLabel>
+                <FieldLabel for="c-end">{{ $t('结束时间') }}</FieldLabel>
                 <Input id="c-end" v-model="endTime" type="datetime-local" :readonly="!canWrite" required />
               </Field>
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="c-max-members">每队最大人数</FieldLabel>
+                <FieldLabel for="c-max-members">{{ $t('每队最大人数') }}</FieldLabel>
                 <Input id="c-max-members" v-model.number="maxTeamMembers" type="number" min="1" :readonly="!canWrite" required />
               </Field>
               <Field>
-                <FieldLabel for="c-max-runtime">每队并发运行时上限</FieldLabel>
+                <FieldLabel for="c-max-runtime">{{ $t('每队并发运行时上限') }}</FieldLabel>
                 <Input id="c-max-runtime" v-model.number="maxConcurrentRuntimeInstancesPerTeam" type="number" min="1" :readonly="!canWrite" required />
               </Field>
             </div>
             <Field orientation="horizontal">
               <Checkbox id="c-auto-approve" v-model="teamRegistrationAutoApprove" :disabled="!canWrite" />
-              <FieldLabel for="c-auto-approve" class="font-normal">队伍注册自动通过</FieldLabel>
+              <FieldLabel for="c-auto-approve" class="font-normal">{{ $t('队伍注册自动通过') }}</FieldLabel>
             </Field>
             <Field orientation="horizontal">
               <Checkbox id="c-allow-running-registration" v-model="allowTeamRegistrationWhileRunning" :disabled="!canWrite" />
               <div class="grid gap-1.5 leading-none">
-                <FieldLabel for="c-allow-running-registration" class="font-normal">比赛进行中仍允许创建队伍</FieldLabel>
-                <FieldDescription>关闭时，比赛进入 Running 后停止接收新队伍与重新报名。</FieldDescription>
+                <FieldLabel for="c-allow-running-registration" class="font-normal">{{ $t('比赛进行中仍允许创建队伍') }}</FieldLabel>
+                <FieldDescription>{{ $t('关闭时，比赛进入 Running 后停止接收新队伍与重新报名。') }}</FieldDescription>
               </div>
             </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="c-max-active-questions">每队活跃咨询上限</FieldLabel>
+                <FieldLabel for="c-max-active-questions">{{ $t('每队活跃咨询上限') }}</FieldLabel>
                 <Input id="c-max-active-questions" v-model.number="maxActiveQuestionsPerTeam" type="number" min="1" :readonly="!canWrite" required />
-                <FieldDescription>待处理与已回复的咨询计入上限。</FieldDescription>
+                <FieldDescription>{{ $t('待处理与已回复的咨询计入上限。') }}</FieldDescription>
               </Field>
               <Field>
-                <FieldLabel for="c-max-participant-messages">连续补充消息上限</FieldLabel>
+                <FieldLabel for="c-max-participant-messages">{{ $t('连续补充消息上限') }}</FieldLabel>
                 <Input id="c-max-participant-messages" v-model.number="maxParticipantMessagesBeforeHandlerReply" type="number" min="1" :readonly="!canWrite" required />
-                <FieldDescription>初始提问计入额度；工作人员回复后重置。</FieldDescription>
+                <FieldDescription>{{ $t('初始提问计入额度；工作人员回复后重置。') }}</FieldDescription>
               </Field>
             </div>
             <Field orientation="horizontal">
               <Checkbox id="c-allow-challenge-owner-questions" v-model="allowChallengeOwnersToHandleQuestions" :disabled="!canWrite" />
               <div class="grid gap-1.5 leading-none">
-                <FieldLabel for="c-allow-challenge-owner-questions" class="font-normal">允许题目所有者处理关联咨询</FieldLabel>
-                <FieldDescription>仅限其拥有或协作的题目；不会授予 Flag、Token 或平台密钥权限。</FieldDescription>
+                <FieldLabel for="c-allow-challenge-owner-questions" class="font-normal">{{ $t('允许题目所有者处理关联咨询') }}</FieldLabel>
+                <FieldDescription>{{ $t('仅限其拥有或协作的题目；不会授予 Flag、Token 或平台密钥权限。') }}</FieldDescription>
               </div>
             </Field>
             <Field v-if="canWrite">
               <Button type="submit" :disabled="savingMeta">
-                <Spinner v-if="savingMeta" data-icon="inline-start" />
-                保存基础信息
-              </Button>
+                <Spinner v-if="savingMeta" data-icon="inline-start" /> {{ $t('保存基础信息') }} </Button>
             </Field>
           </FieldGroup>
         </form>
@@ -200,9 +198,9 @@ onMounted(loadConfig)
 
     <Card>
       <CardHeader>
-        <CardTitle>模式配置</CardTitle>
+        <CardTitle>{{ $t('模式配置') }}</CardTitle>
         <CardDescription>
-          {{ enumLabel(GameModeLabel, config?.mode) }} 模式的专属配置;保存时携带修订版本进行乐观并发校验
+          {{ $t('{mode} 模式的专属配置；保存时携带修订版本进行乐观并发校验', { mode: enumLabel(GameModeLabel, config?.mode) }) }}
         </CardDescription>
       </CardHeader>
       <CardContent>

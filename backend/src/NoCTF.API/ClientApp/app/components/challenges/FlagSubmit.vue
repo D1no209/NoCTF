@@ -18,7 +18,7 @@ const props = withDefaults(
     title?: string
     description?: string
   }>(),
-  { multiple: false, title: '提交 Flag', description: '' },
+  { multiple: false, title: translate("提交 Flag"), description: '' },
 )
 
 const emit = defineEmits<{ evaluated: [] }>()
@@ -72,10 +72,10 @@ async function refreshOne(id: string): Promise<void> {
   if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id)) {
     toasted.add(id)
     if (data.result === GameplayFactResult.Correct) {
-      toast.success('提交评测完成:正确')
+      toast.success(translate("提交评测完成:正确"))
       celebrateCorrectFlag()
     }
-    else toast.error(`提交评测完成:${gameplayFactResultLabel(data.result)}`)
+    else toast.error(translate('提交评测完成：{result}', { result: gameplayFactResultLabel(data.result) }))
     emit('evaluated')
   }
 }
@@ -97,7 +97,7 @@ async function submit() {
   })
   submitting.value = false
   if (error || !data) {
-    toast.error(parseApiError(error, '提交失败').message)
+    toast.error(parseApiError(error, translate("提交失败")).message)
     return
   }
   const ids = [
@@ -110,7 +110,7 @@ async function submit() {
     }
   }
   input.value = ''
-  toast.success(`已受理 ${ids.length} 条提交,评测中`)
+  toast.success(translate('已受理 {count} 条提交，评测中', { count: ids.length }))
   startPolling()
 }
 
@@ -147,7 +147,7 @@ function resultVariant(result?: string | null) {
         aria-live="polite"
         class="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-background/70"
       >
-        <span class="sr-only">Flag 正确</span>
+        <span class="sr-only">{{ $t('Flag 正确') }}</span>
         <span aria-hidden="true" class="flag-celebration-mark">🎉</span>
       </div>
     </Transition>
@@ -160,7 +160,7 @@ function resultVariant(result?: string | null) {
         <FieldGroup>
           <Field>
             <FieldLabel :for="`flag-input-${competitionChallengeId}`">
-              {{ multiple ? 'Flag 列表(每行一个)' : 'Flag' }}
+              {{ multiple ? $t('Flag 列表(每行一个)') : 'Flag' }}
             </FieldLabel>
             <Textarea
               v-if="multiple"
@@ -180,16 +180,14 @@ function resultVariant(result?: string | null) {
           </Field>
           <Field>
             <Button type="submit" :disabled="submitting || !input.trim()">
-              <Spinner v-if="submitting" data-icon="inline-start" />
-              提交
-            </Button>
+              <Spinner v-if="submitting" data-icon="inline-start" /> {{ $t('提交') }} </Button>
           </Field>
         </FieldGroup>
       </form>
 
       <div v-if="tracked.length" class="mt-4 flex flex-col gap-2">
         <Alert v-if="timedOut">
-          <AlertDescription>评测结果等待超时,可稍后在「我的提交」查看结果。</AlertDescription>
+          <AlertDescription>{{ $t('评测结果等待超时,可稍后在「我的提交」查看结果。') }}</AlertDescription>
         </Alert>
         <Alert
           v-for="item in tracked"
@@ -201,8 +199,7 @@ function resultVariant(result?: string | null) {
             <span v-if="isGameplayFactPending(item.state)">
               {{ gameplayFactStateLabel(item.state) }}…
             </span>
-            <span v-else>
-              评测结果:<strong>{{ gameplayFactResultLabel(item.result) }}</strong>
+            <span v-else> {{ $t('评测结果:') }}<strong>{{ gameplayFactResultLabel(item.result) }}</strong>
             </span>
           </AlertDescription>
         </Alert>

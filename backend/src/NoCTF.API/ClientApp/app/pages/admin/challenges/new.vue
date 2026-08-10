@@ -22,7 +22,7 @@ const pending = ref(false)
 async function submit(): Promise<void> {
   error.value = null
   if (!title.value.trim() || !direction.value.trim()) {
-    error.value = '请填写标题和方向'
+    error.value = translate('请填写标题和方向')
     return
   }
   pending.value = true
@@ -41,7 +41,7 @@ async function submit(): Promise<void> {
     error.value = parseApiError(apiError).message
     return
   }
-  toast.success('模板已创建')
+  toast.success(translate("模板已创建"))
   await navigateTo(`/admin/challenges/${data.id}`)
 }
 </script>
@@ -49,12 +49,12 @@ async function submit(): Promise<void> {
 <template>
   <div class="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
     <div>
-      <h1 class="text-2xl font-semibold">新建题目模板</h1>
-      <p class="text-sm text-muted-foreground">创建全局题库模板,之后可实例化到竞赛中</p>
+      <h1 class="text-2xl font-semibold">{{ $t('新建题目模板') }}</h1>
+      <p class="text-sm text-muted-foreground">{{ $t('创建全局题库模板,之后可实例化到竞赛中') }}</p>
     </div>
 
     <Alert v-if="!canOrganize" variant="destructive">
-      <AlertDescription>需要组织者或管理员权限才能创建题目模板。</AlertDescription>
+      <AlertDescription>{{ $t('需要组织者或管理员权限才能创建题目模板。') }}</AlertDescription>
     </Alert>
 
     <Card v-else>
@@ -65,15 +65,15 @@ async function submit(): Promise<void> {
               <AlertDescription>{{ error }}</AlertDescription>
             </Alert>
             <Field>
-              <FieldLabel for="title">标题</FieldLabel>
-              <Input id="title" v-model="title" required maxlength="200" placeholder="例如:Web 入门 - SQL 注入" />
+              <FieldLabel for="title">{{ $t('标题') }}</FieldLabel>
+              <Input id="title" v-model="title" required maxlength="200" :placeholder="$t('例如:Web 入门 - SQL 注入')" />
             </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="mode">游戏模式</FieldLabel>
+                <FieldLabel for="mode">{{ $t('游戏模式') }}</FieldLabel>
                 <Select v-model="mode">
                   <SelectTrigger id="mode" class="w-full">
-                    <SelectValue placeholder="选择模式" />
+                    <SelectValue :placeholder="$t('选择模式')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -86,39 +86,37 @@ async function submit(): Promise<void> {
                 </Select>
               </Field>
               <Field>
-                <FieldLabel for="visibility">可见性</FieldLabel>
+                <FieldLabel for="visibility">{{ $t('可见性') }}</FieldLabel>
                 <Select v-model="visibility">
                   <SelectTrigger id="visibility" class="w-full">
-                    <SelectValue placeholder="选择可见性" />
+                    <SelectValue :placeholder="$t('选择可见性')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="Private">私有(仅负责人/管理员可用)</SelectItem>
-                      <SelectItem value="Shared">共享(所有组织者可用)</SelectItem>
+                      <SelectItem value="Private">{{ $t('私有(仅负责人/管理员可用)') }}</SelectItem>
+                      <SelectItem value="Shared">{{ $t('共享(所有组织者可用)') }}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </Field>
             </div>
             <Field>
-              <FieldLabel for="direction">方向</FieldLabel>
-              <Input id="direction" v-model="direction" required maxlength="100" placeholder="例如:Web / Pwn / Misc" />
+              <FieldLabel for="direction">{{ $t('方向') }}</FieldLabel>
+              <Input id="direction" v-model="direction" required maxlength="100" :placeholder="$t('例如:Web / Pwn / Misc')" />
             </Field>
             <Field>
-              <FieldLabel for="description">题面</FieldLabel>
-              <Textarea id="description" v-model="description" rows="6" placeholder="题目描述,支持 Markdown" />
+              <FieldLabel for="description">{{ $t('题面') }}</FieldLabel>
+              <Textarea id="description" v-model="description" rows="6" :placeholder="$t('题目描述,支持 Markdown')" />
             </Field>
             <Field>
-              <FieldLabel>题目定义</FieldLabel>
+              <FieldLabel>{{ $t('题目定义') }}</FieldLabel>
               <DefinitionEditor v-model="definitionJson" :mode="mode" />
             </Field>
             <Field orientation="horizontal">
               <Button type="submit" :disabled="pending">
-                <Spinner v-if="pending" data-icon="inline-start" />
-                创建模板
-              </Button>
+                <Spinner v-if="pending" data-icon="inline-start" /> {{ $t('创建模板') }} </Button>
               <Button type="button" variant="outline" as-child>
-                <NuxtLink to="/admin/challenges">取消</NuxtLink>
+                <NuxtLink to="/admin/challenges">{{ $t('取消') }}</NuxtLink>
               </Button>
             </Field>
           </FieldGroup>

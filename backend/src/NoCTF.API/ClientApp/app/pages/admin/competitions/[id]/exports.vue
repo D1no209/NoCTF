@@ -20,7 +20,7 @@ async function downloadFile(url: string, fallbackName: string) {
     credentials: 'same-origin',
   })
   if (!response.ok) {
-    let message = `下载失败(${response.status})`
+    let message = translate('下载失败（{status}）', { status: response.status })
     try {
       const problem = await response.json()
       message = problem.detail ?? problem.title ?? message
@@ -48,7 +48,7 @@ async function exportEvents() {
   const from = localInputToIso(eventsFrom.value)
   const to = localInputToIso(eventsTo.value)
   if (!from || !to) {
-    toast.error('请选择导出时间范围')
+    toast.error(translate("请选择导出时间范围"))
     return
   }
   exportingEvents.value = true
@@ -58,10 +58,10 @@ async function exportEvents() {
       `/api/v1/admin/competitions/${competitionId}/events/export?${params}`,
       `competition-${competitionId}-events.jsonl`,
     )
-    toast.success('事件导出已开始下载')
+    toast.success(translate("事件导出已开始下载"))
   }
   catch (e) {
-    toast.error(e instanceof Error ? e.message : '导出失败')
+    toast.error(e instanceof Error ? e.message : translate("导出失败"))
   }
   finally {
     exportingEvents.value = false
@@ -94,7 +94,7 @@ async function createExport() {
       },
     })
     if (error) throw error
-    toast.success('导出任务已创建,完成后可下载')
+    toast.success(translate("导出任务已创建,完成后可下载"))
     exportReason.value = ''
     await loadExports()
   }
@@ -113,7 +113,7 @@ async function downloadExport(item: NoCtfapiEndpointsAdministrationDataExportsDa
     await downloadFile(`/api/v1/admin/data-exports/${item.id}/download`, item.fileName ?? `export-${item.id}.zip`)
   }
   catch (e) {
-    toast.error(e instanceof Error ? e.message : '下载失败')
+    toast.error(e instanceof Error ? e.message : translate("下载失败"))
   }
   finally {
     downloadingId.value = null
@@ -129,72 +129,66 @@ onMounted(loadExports)
   <div class="flex flex-col gap-6">
     <Card>
       <CardHeader>
-        <CardTitle>事件导出(JSONL)</CardTitle>
-        <CardDescription>按时间范围导出竞赛事件流,每行一个 JSON 事件</CardDescription>
+        <CardTitle>{{ $t('事件导出(JSONL)') }}</CardTitle>
+        <CardDescription>{{ $t('按时间范围导出竞赛事件流,每行一个 JSON 事件') }}</CardDescription>
       </CardHeader>
       <CardContent class="flex flex-wrap items-end gap-3">
         <Field>
-          <FieldLabel for="ev-from">起始时间</FieldLabel>
+          <FieldLabel for="ev-from">{{ $t('起始时间') }}</FieldLabel>
           <Input id="ev-from" v-model="eventsFrom" type="datetime-local" />
         </Field>
         <Field>
-          <FieldLabel for="ev-to">结束时间</FieldLabel>
+          <FieldLabel for="ev-to">{{ $t('结束时间') }}</FieldLabel>
           <Input id="ev-to" v-model="eventsTo" type="datetime-local" />
         </Field>
         <Button :disabled="exportingEvents" @click="exportEvents">
-          <Spinner v-if="exportingEvents" data-icon="inline-start" />
-          导出事件
-        </Button>
+          <Spinner v-if="exportingEvents" data-icon="inline-start" /> {{ $t('导出事件') }} </Button>
       </CardContent>
     </Card>
 
     <Card>
       <CardHeader>
-        <CardTitle>数据导出</CardTitle>
-        <CardDescription>创建竞赛数据归档导出任务,生成后可下载</CardDescription>
+        <CardTitle>{{ $t('数据导出') }}</CardTitle>
+        <CardDescription>{{ $t('创建竞赛数据归档导出任务,生成后可下载') }}</CardDescription>
       </CardHeader>
       <CardContent class="flex flex-col gap-4">
         <div v-if="canWrite" class="flex flex-wrap items-end gap-3">
           <Field>
-            <FieldLabel for="ex-reason">导出原因(可选)</FieldLabel>
-            <Input id="ex-reason" v-model="exportReason" class="w-72" placeholder="记入审计" />
+            <FieldLabel for="ex-reason">{{ $t('导出原因(可选)') }}</FieldLabel>
+            <Input id="ex-reason" v-model="exportReason" class="w-72" :placeholder="$t('记入审计')" />
           </Field>
           <Field orientation="horizontal">
             <Checkbox id="ex-flags" v-model="includeProtectedFlags" />
-            <FieldLabel for="ex-flags" class="font-normal">包含受保护的 Flag</FieldLabel>
+            <FieldLabel for="ex-flags" class="font-normal">{{ $t('包含受保护的 Flag') }}</FieldLabel>
           </Field>
           <Button :disabled="creating" @click="createExport">
-            <Spinner v-if="creating" data-icon="inline-start" />
-            创建导出任务
-          </Button>
+            <Spinner v-if="creating" data-icon="inline-start" /> {{ $t('创建导出任务') }} </Button>
         </div>
 
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-medium">导出任务</h3>
+          <h3 class="text-sm font-medium">{{ $t('导出任务') }}</h3>
           <Button variant="ghost" size="sm" @click="loadExports">
-            <Spinner v-if="loadingExports" data-icon="inline-start" />
-            刷新
-          </Button>
+            <Spinner v-if="loadingExports" data-icon="inline-start" /> {{ $t('刷新') }} </Button>
         </div>
         <Alert v-if="hasActive">
-          <AlertDescription>有导出任务正在处理中,可稍后刷新查看进度</AlertDescription>
+          <AlertDescription>{{ $t('有导出任务正在处理中,可稍后刷新查看进度') }}</AlertDescription>
         </Alert>
         <Skeleton v-if="loadingExports && exports_.length === 0" class="h-32 w-full" />
         <Empty v-else-if="exports_.length === 0">
           <EmptyHeader>
-            <EmptyTitle>暂无导出任务</EmptyTitle>
+            <EmptyTitle>{{ $t('暂无导出任务') }}</EmptyTitle>
           </EmptyHeader>
         </Empty>
         <Table v-else>
           <TableHeader>
             <TableRow>
-              <TableHead class="w-44">创建时间</TableHead>
-              <TableHead class="w-24">状态</TableHead>
-              <TableHead>含 Flag</TableHead>
-              <TableHead>原因</TableHead>
-              <TableHead>文件名</TableHead>
-              <TableHead class="w-44">过期时间</TableHead>
-              <TableHead class="w-28 text-right">操作</TableHead>
+              <TableHead class="w-44">{{ $t('创建时间') }}</TableHead>
+              <TableHead class="w-24">{{ $t('状态') }}</TableHead>
+              <TableHead>{{ $t('含 Flag') }}</TableHead>
+              <TableHead>{{ $t('原因') }}</TableHead>
+              <TableHead>{{ $t('文件名') }}</TableHead>
+              <TableHead class="w-44">{{ $t('过期时间') }}</TableHead>
+              <TableHead class="w-28 text-right">{{ $t('操作') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -205,7 +199,7 @@ onMounted(loadExports)
                   {{ enumLabel(DataExportStatusLabel, e.status) }}
                 </Badge>
               </TableCell>
-              <TableCell>{{ e.includeProtectedFlags ? '是' : '否' }}</TableCell>
+              <TableCell>{{ e.includeProtectedFlags ? $t('是') : $t('否') }}</TableCell>
               <TableCell class="max-w-40 truncate">{{ e.reason ?? '—' }}</TableCell>
               <TableCell class="max-w-48 truncate font-mono text-xs">
                 {{ e.fileName ?? '—' }}
@@ -220,9 +214,7 @@ onMounted(loadExports)
                   :disabled="downloadingId === e.id"
                   @click="downloadExport(e)"
                 >
-                  <Spinner v-if="downloadingId === e.id" data-icon="inline-start" />
-                  下载
-                </Button>
+                  <Spinner v-if="downloadingId === e.id" data-icon="inline-start" /> {{ $t('下载') }} </Button>
               </TableCell>
             </TableRow>
           </TableBody>

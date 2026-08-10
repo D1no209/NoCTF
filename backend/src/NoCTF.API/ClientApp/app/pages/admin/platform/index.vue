@@ -65,7 +65,7 @@ async function save(): Promise<void> {
   saving.value = false
   if (error) {
     if (response?.status === 409) {
-      toast.error('配置已被他人修改,请刷新后重试')
+      toast.error(translate("配置已被他人修改,请刷新后重试"))
       await load()
     }
     else {
@@ -75,7 +75,7 @@ async function save(): Promise<void> {
   }
   configuration.value = data ?? configuration.value
   if (data) globalConfiguration.value = data
-  toast.success('平台配置已保存')
+  toast.success(translate("平台配置已保存"))
 }
 
 async function uploadLogo(event: Event): Promise<void> {
@@ -90,7 +90,7 @@ async function uploadLogo(event: Event): Promise<void> {
   logoUploading.value = false
   if (error) {
     if (response?.status === 409) {
-      toast.error('配置已被他人修改,请刷新后重试')
+      toast.error(translate("配置已被他人修改,请刷新后重试"))
       await load()
     }
     else {
@@ -103,7 +103,7 @@ async function uploadLogo(event: Event): Promise<void> {
     globalConfiguration.value = data
   }
   logoVersion.value += 1
-  toast.success('Logo 已更新')
+  toast.success(translate("Logo 已更新"))
 }
 
 onMounted(() => {
@@ -125,16 +125,16 @@ onMounted(() => {
     <div v-else class="grid gap-6 lg:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle>平台信息</CardTitle>
-          <CardDescription>后端版本与项目贡献者</CardDescription>
+          <CardTitle>{{ $t('平台信息') }}</CardTitle>
+          <CardDescription>{{ $t('后端版本与项目贡献者') }}</CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-4">
           <div class="flex items-center gap-2">
-            <span class="text-sm text-muted-foreground">版本</span>
+            <span class="text-sm text-muted-foreground">{{ $t('版本') }}</span>
             <Badge variant="secondary" class="font-mono">{{ information?.version ?? '—' }}</Badge>
           </div>
           <div class="flex flex-col gap-2">
-            <span class="text-sm text-muted-foreground">贡献者</span>
+            <span class="text-sm text-muted-foreground">{{ $t('贡献者') }}</span>
             <div v-if="information?.contributors?.length" class="flex flex-wrap gap-2">
               <Avatar v-for="contributor in information.contributors" :key="contributor.id" class="size-8">
                 <AvatarImage v-if="contributor.avatarUrl" :src="contributor.avatarUrl" :alt="contributor.id ?? ''" />
@@ -148,18 +148,18 @@ onMounted(() => {
 
       <Card>
         <CardHeader>
-          <CardTitle>平台配置</CardTitle>
-          <CardDescription>平台名称、描述与 Logo(修订版本 {{ configuration?.revision ?? 0 }})</CardDescription>
+          <CardTitle>{{ $t('平台配置') }}</CardTitle>
+          <CardDescription>{{ $t('平台名称、描述与 Logo（修订版本 {revision}）', { revision: configuration?.revision ?? 0 }) }}</CardDescription>
         </CardHeader>
         <CardContent>
           <form @submit.prevent="save">
             <FieldGroup>
               <Field>
-                <FieldLabel for="platform-name">平台名称</FieldLabel>
+                <FieldLabel for="platform-name">{{ $t('平台名称') }}</FieldLabel>
                 <Input id="platform-name" v-model="name" required maxlength="100" />
               </Field>
               <Field>
-                <FieldLabel for="platform-description">平台描述</FieldLabel>
+                <FieldLabel for="platform-description">{{ $t('平台描述') }}</FieldLabel>
                 <Textarea id="platform-description" v-model="description" rows="3" maxlength="500" />
               </Field>
               <Field>
@@ -168,23 +168,19 @@ onMounted(() => {
                   <img
                     v-if="logoSrc"
                     :src="logoSrc"
-                    alt="平台 Logo"
+                    :alt="$t('平台 Logo')"
                     class="size-16 rounded-md border object-contain"
                   >
-                  <span v-else class="text-sm text-muted-foreground">尚未设置 Logo</span>
+                  <span v-else class="text-sm text-muted-foreground">{{ $t('尚未设置 Logo') }}</span>
                   <input ref="logoInput" type="file" accept="image/*" class="hidden" @change="uploadLogo">
                   <Button type="button" variant="outline" :disabled="logoUploading" @click="logoInput?.click()">
                     <Spinner v-if="logoUploading" data-icon="inline-start" />
-                    <Upload v-else data-icon="inline-start" />
-                    上传 Logo
-                  </Button>
+                    <Upload v-else data-icon="inline-start" /> {{ $t('上传 Logo') }} </Button>
                 </div>
               </Field>
               <Field orientation="horizontal">
                 <Button type="submit" :disabled="saving || !name.trim()">
-                  <Spinner v-if="saving" data-icon="inline-start" />
-                  保存配置
-                </Button>
+                  <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('保存配置') }} </Button>
               </Field>
             </FieldGroup>
           </form>

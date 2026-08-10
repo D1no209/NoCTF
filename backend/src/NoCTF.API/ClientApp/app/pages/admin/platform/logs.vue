@@ -14,7 +14,7 @@ definePageMeta({ middleware: 'platform-admin' })
 type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
 
 const LEVEL_LABELS: Record<string, string> = {
-  Trace: '跟踪', Debug: '调试', Information: '信息', Warning: '警告', Error: '错误', Critical: '严重',
+  Trace: translate("跟踪"), Debug: translate("调试"), Information: translate("信息"), Warning: translate("警告"), Error: translate("错误"), Critical: translate("严重"),
 }
 const SERVICE_LABELS: Record<string, string> = {
   Api: 'API', Worker: 'Worker', Runner: 'Runner', Host: 'Host',
@@ -88,13 +88,13 @@ watch(live, (enabled) => {
 const hubStateBadge = computed(() => {
   switch (hubState.value) {
     case 'connected':
-      return { label: '实时流已连接', variant: 'secondary' as const }
+      return { label: translate("实时流已连接"), variant: 'secondary' as const }
     case 'connecting':
-      return { label: '实时流连接中', variant: 'outline' as const }
+      return { label: translate("实时流连接中"), variant: 'outline' as const }
     case 'reconnecting':
-      return { label: '实时流重连中', variant: 'outline' as const }
+      return { label: translate("实时流重连中"), variant: 'outline' as const }
     default:
-      return { label: '实时流已断开', variant: 'destructive' as const }
+      return { label: translate("实时流已断开"), variant: 'destructive' as const }
   }
 })
 
@@ -103,7 +103,7 @@ async function exportLogs(): Promise<void> {
   const fromIso = toIso(from.value)
   const toIsoValue = toIso(to.value)
   if (!fromIso || !toIsoValue) {
-    toast.error('导出需要选择起止时间')
+    toast.error(translate("导出需要选择起止时间"))
     return
   }
   exporting.value = true
@@ -116,7 +116,7 @@ async function exportLogs(): Promise<void> {
     if (service.value !== 'all') params.set('service', service.value)
     if (search.value.trim()) params.set('search', search.value.trim())
     await downloadProtectedFile(`/api/v1/admin/platform/logs/export?${params.toString()}`, 'platform-logs.jsonl')
-    toast.success('日志导出已开始下载')
+    toast.success(translate("日志导出已开始下载"))
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -136,32 +136,32 @@ onMounted(() => {
   <div class="flex flex-col gap-4">
     <div class="flex flex-wrap items-end gap-4">
       <Field>
-        <FieldLabel for="log-level">最低级别</FieldLabel>
+        <FieldLabel for="log-level">{{ $t('最低级别') }}</FieldLabel>
         <Select v-model="minimumLevel">
           <SelectTrigger id="log-level" class="w-32">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="Trace">跟踪</SelectItem>
-              <SelectItem value="Debug">调试</SelectItem>
-              <SelectItem value="Information">信息</SelectItem>
-              <SelectItem value="Warning">警告</SelectItem>
-              <SelectItem value="Error">错误</SelectItem>
-              <SelectItem value="Critical">严重</SelectItem>
+              <SelectItem value="Trace">{{ $t('跟踪') }}</SelectItem>
+              <SelectItem value="Debug">{{ $t('调试') }}</SelectItem>
+              <SelectItem value="Information">{{ $t('信息') }}</SelectItem>
+              <SelectItem value="Warning">{{ $t('警告') }}</SelectItem>
+              <SelectItem value="Error">{{ $t('错误') }}</SelectItem>
+              <SelectItem value="Critical">{{ $t('严重') }}</SelectItem>
             </SelectGroup>
           </SelectContent>
         </Select>
       </Field>
       <Field>
-        <FieldLabel for="log-service">服务</FieldLabel>
+        <FieldLabel for="log-service">{{ $t('服务') }}</FieldLabel>
         <Select v-model="service">
           <SelectTrigger id="log-service" class="w-32">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectItem value="all">全部</SelectItem>
+              <SelectItem value="all">{{ $t('全部') }}</SelectItem>
               <SelectItem value="Api">API</SelectItem>
               <SelectItem value="Worker">Worker</SelectItem>
               <SelectItem value="Runner">Runner</SelectItem>
@@ -171,33 +171,29 @@ onMounted(() => {
         </Select>
       </Field>
       <Field>
-        <FieldLabel for="log-from">起始时间</FieldLabel>
+        <FieldLabel for="log-from">{{ $t('起始时间') }}</FieldLabel>
         <Input id="log-from" v-model="from" type="datetime-local" />
       </Field>
       <Field>
-        <FieldLabel for="log-to">结束时间</FieldLabel>
+        <FieldLabel for="log-to">{{ $t('结束时间') }}</FieldLabel>
         <Input id="log-to" v-model="to" type="datetime-local" />
       </Field>
       <Field class="min-w-56 flex-1">
-        <FieldLabel for="log-search">搜索</FieldLabel>
-        <Input id="log-search" v-model="search" placeholder="消息或类别关键字" @keyup.enter="applyFilters" />
+        <FieldLabel for="log-search">{{ $t('搜索') }}</FieldLabel>
+        <Input id="log-search" v-model="search" :placeholder="$t('消息或类别关键字')" @keyup.enter="applyFilters" />
       </Field>
       <div class="flex items-center gap-2">
-        <Button @click="applyFilters">查询</Button>
+        <Button @click="applyFilters">{{ $t('查询') }}</Button>
         <Button variant="outline" :disabled="exporting" @click="exportLogs">
           <Spinner v-if="exporting" data-icon="inline-start" />
-          <Download v-else data-icon="inline-start" />
-          导出
-        </Button>
+          <Download v-else data-icon="inline-start" /> {{ $t('导出') }} </Button>
       </div>
     </div>
 
     <div class="flex items-center gap-3">
       <Switch id="live-stream" v-model="live" />
       <Label for="live-stream" class="inline-flex items-center gap-1">
-        <Radio class="size-4" />
-        实时接收新日志
-      </Label>
+        <Radio class="size-4" /> {{ $t('实时接收新日志') }} </Label>
       <Badge :variant="hubStateBadge.variant">{{ hubStateBadge.label }}</Badge>
     </div>
 
@@ -209,8 +205,8 @@ onMounted(() => {
 
     <Empty v-else-if="initialized && items.length === 0">
       <EmptyHeader>
-        <EmptyTitle>没有匹配的日志</EmptyTitle>
-        <EmptyDescription>调整级别、时间范围或搜索关键字。</EmptyDescription>
+        <EmptyTitle>{{ $t('没有匹配的日志') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('调整级别、时间范围或搜索关键字。') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -218,11 +214,11 @@ onMounted(() => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead class="w-44">时间</TableHead>
-            <TableHead class="w-20">级别</TableHead>
-            <TableHead class="w-20">服务</TableHead>
-            <TableHead class="w-56">类别</TableHead>
-            <TableHead>消息</TableHead>
+            <TableHead class="w-44">{{ $t('时间') }}</TableHead>
+            <TableHead class="w-20">{{ $t('级别') }}</TableHead>
+            <TableHead class="w-20">{{ $t('服务') }}</TableHead>
+            <TableHead class="w-56">{{ $t('类别') }}</TableHead>
+            <TableHead>{{ $t('消息') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

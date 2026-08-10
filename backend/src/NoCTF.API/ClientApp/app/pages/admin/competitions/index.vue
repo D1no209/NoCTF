@@ -16,10 +16,10 @@ const error = ref<string | null>(null)
 const includeDeleted = ref(route.query.includeDeleted === 'true')
 
 const RoleLabel: Record<CompetitionAdminRole, string> = {
-  owner: '负责人',
-  manager: '管理员',
-  judge: '裁判',
-  observer: '观察员',
+  owner: translate("负责人"),
+  manager: translate("管理员"),
+  judge: translate("裁判"),
+  observer: translate("观察员"),
 }
 
 function adminRole(competition: NoCtfapiEndpointsCompetitionsCompetitionResponse): CompetitionAdminRole {
@@ -63,19 +63,15 @@ onMounted(load)
   <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-semibold">竞赛管理</h1>
-        <p class="text-sm text-muted-foreground">我参与管理的全部竞赛</p>
+        <h1 class="text-2xl font-semibold">{{ $t('竞赛管理') }}</h1>
+        <p class="text-sm text-muted-foreground">{{ $t('我参与管理的全部竞赛') }}</p>
       </div>
       <div class="flex items-center gap-3">
         <label class="flex items-center gap-2 text-sm text-muted-foreground">
-          <Checkbox v-model="includeDeleted" />
-          包含已删除
-        </label>
+          <Checkbox v-model="includeDeleted" /> {{ $t('包含已删除') }} </label>
         <Button v-if="canOrganize" as-child>
           <NuxtLink to="/admin/competitions/new">
-            <Plus data-icon="inline-start" />
-            新建竞赛
-          </NuxtLink>
+            <Plus data-icon="inline-start" /> {{ $t('新建竞赛') }} </NuxtLink>
         </Button>
       </div>
     </div>
@@ -90,8 +86,8 @@ onMounted(load)
 
     <Empty v-else-if="items.length === 0">
       <EmptyHeader>
-        <EmptyTitle>暂无竞赛</EmptyTitle>
-        <EmptyDescription>你还没有参与管理任何竞赛</EmptyDescription>
+        <EmptyTitle>{{ $t('暂无竞赛') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('你还没有参与管理任何竞赛') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -103,10 +99,10 @@ onMounted(load)
             <div class="flex shrink-0 items-center gap-1">
               <GameModeBadge :mode="c.mode" />
               <CompetitionStatusBadge :status="c.status" />
-              <Badge v-if="c.deletedAt" variant="destructive">已删除</Badge>
+              <Badge v-if="c.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
             </div>
           </div>
-          <CardDescription class="line-clamp-2">{{ c.description || '暂无描述' }}</CardDescription>
+          <CardDescription class="line-clamp-2">{{ c.description || $t('暂无描述') }}</CardDescription>
         </CardHeader>
         <CardContent class="flex items-center justify-between text-sm text-muted-foreground">
           <span>{{ adminFormatDateTime(c.startTime) }} ~ {{ adminFormatDateTime(c.endTime) }}</span>
@@ -114,7 +110,7 @@ onMounted(load)
         </CardContent>
         <CardFooter>
           <Button variant="outline" size="sm" as-child class="w-full">
-            <NuxtLink :to="`/admin/competitions/${c.id}`">进入管理</NuxtLink>
+            <NuxtLink :to="`/admin/competitions/${c.id}`">{{ $t('进入管理') }}</NuxtLink>
           </Button>
         </CardFooter>
       </Card>

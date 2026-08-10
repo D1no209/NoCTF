@@ -92,12 +92,12 @@ function save() {
 <template>
   <div class="flex flex-col gap-3">
     <div class="flex items-center gap-2 text-xs text-muted-foreground">
-      <span>修订版本:{{ revision }}</span>
-      <span v-if="dirty">· 有未保存的修改</span>
+      <span>{{ $t('修订版本：{revision}', { revision }) }}</span>
+      <span v-if="dirty">{{ $t('· 有未保存的修改') }}</span>
     </div>
     <Skeleton v-if="loading" class="h-64 w-full" />
     <Alert v-else-if="parseFailed" variant="destructive">
-      <AlertDescription>配置 JSON 无法解析,请联系平台管理员修复</AlertDescription>
+      <AlertDescription>{{ $t('配置 JSON 无法解析,请联系平台管理员修复') }}</AlertDescription>
     </Alert>
     <template v-else>
       <FieldGroup>
@@ -110,8 +110,8 @@ function save() {
               :disabled="readonly"
               @update:model-value="setOverride(field.key, $event === true)"
             />
-            <span class="text-xs text-muted-foreground">覆盖</span>
-            <span v-if="!(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">· 继承竞赛默认</span>
+            <span class="text-xs text-muted-foreground">{{ $t('覆盖') }}</span>
+            <span v-if="!(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">{{ $t('· 继承竞赛默认') }}</span>
           </div>
           <ConfigFieldInput
             :field="field"
@@ -124,9 +124,7 @@ function save() {
       </FieldGroup>
       <div v-if="!readonly">
         <Button :disabled="saving || !dirty" @click="save">
-          <Spinner v-if="saving" data-icon="inline-start" />
-          保存配置
-        </Button>
+          <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('保存配置') }} </Button>
       </div>
     </template>
   </div>

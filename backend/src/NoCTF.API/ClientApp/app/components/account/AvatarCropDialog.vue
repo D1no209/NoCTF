@@ -191,12 +191,12 @@ async function createCroppedFile() {
     const blob = webp
       ?? (await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png')))
     if (!blob)
-      throw new Error('无法编码裁剪后的头像')
+      throw new Error(translate("无法编码裁剪后的头像"))
 
     emit('save', new File([blob], webp ? 'avatar.webp' : 'avatar.png', { type: blob.type }))
   }
   catch (error) {
-    emit('error', error instanceof Error ? error : new Error('头像裁剪失败'))
+    emit('error', error instanceof Error ? error : new Error(translate("头像裁剪失败")))
   }
   finally {
     encoding.value = false
@@ -212,10 +212,8 @@ onBeforeUnmount(releaseSource)
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent class="sm:max-w-[760px]">
       <DialogHeader>
-        <DialogTitle>裁剪头像</DialogTitle>
-        <DialogDescription>
-          在图片上拖动调整位置，滚动鼠标滚轮缩放；虚线圆内是头像显示区域。
-        </DialogDescription>
+        <DialogTitle>{{ $t('裁剪头像') }}</DialogTitle>
+        <DialogDescription> {{ $t('在图片上拖动调整位置，滚动鼠标滚轮缩放；虚线圆内是头像显示区域。') }} </DialogDescription>
       </DialogHeader>
 
       <div class="grid gap-5 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
@@ -225,7 +223,7 @@ onBeforeUnmount(releaseSource)
           :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           role="group"
           tabindex="0"
-          aria-label="头像裁剪预览"
+          :aria-label="$t('头像裁剪预览')"
           @dragstart.prevent
           @wheel.prevent="handleWheel"
           @pointerdown="startDrag"
@@ -239,7 +237,7 @@ onBeforeUnmount(releaseSource)
             :width="AVATAR_CROP_SIZE"
             :height="AVATAR_CROP_SIZE"
             class="size-full"
-            aria-label="头像裁剪画布"
+            :aria-label="$t('头像裁剪画布')"
           />
           <div
             class="pointer-events-none absolute inset-0 rounded-full border-2 border-dashed border-background/90 shadow-[0_0_0_999px_oklch(0_0_0/0.3)]"
@@ -247,21 +245,17 @@ onBeforeUnmount(releaseSource)
           <div
             v-if="loadError"
             class="absolute inset-0 grid place-items-center bg-background p-6 text-center text-sm text-destructive"
-          >
-            无法读取这张图片，请换用 JPEG、PNG 或 WebP。
-          </div>
+          > {{ $t('无法读取这张图片，请换用 JPEG、PNG 或 WebP。') }} </div>
         </div>
 
         <div class="flex min-w-0 flex-col gap-5">
-          <div class="rounded-lg border bg-muted/50 p-3 text-sm leading-6 text-muted-foreground">
-            滚轮以指针位置为中心缩放。拖动方向与图片移动方向一致，图片不会离开裁剪范围。
-          </div>
+          <div class="rounded-lg border bg-muted/50 p-3 text-sm leading-6 text-muted-foreground"> {{ $t('滚轮以指针位置为中心缩放。拖动方向与图片移动方向一致，图片不会离开裁剪范围。') }} </div>
           <div class="flex items-center justify-between border-b pb-3 text-sm">
-            <span class="text-muted-foreground">当前缩放</span>
+            <span class="text-muted-foreground">{{ $t('当前缩放') }}</span>
             <span class="font-mono font-semibold tabular-nums">{{ zoomPercent }}%</span>
           </div>
           <div class="flex flex-col gap-2">
-            <span class="text-sm font-medium">旋转</span>
+            <span class="text-sm font-medium">{{ $t('旋转') }}</span>
             <div class="grid grid-cols-2 gap-2">
               <Button variant="outline" type="button" @click="rotate(-90)">
                 <RotateCcw />
@@ -274,20 +268,14 @@ onBeforeUnmount(releaseSource)
             </div>
           </div>
           <Button variant="ghost" type="button" class="self-start" @click="resetCrop">
-            <Scan />
-            重置裁剪
-          </Button>
+            <Scan /> {{ $t('重置裁剪') }} </Button>
         </div>
       </div>
 
       <DialogFooter>
-        <Button variant="outline" :disabled="saving || encoding" @click="emit('update:open', false)">
-          取消
-        </Button>
+        <Button variant="outline" :disabled="saving || encoding" @click="emit('update:open', false)"> {{ $t('取消') }} </Button>
         <Button :disabled="saving || encoding || !sourceImage || loadError" @click="createCroppedFile">
-          <Spinner v-if="saving || encoding" data-icon="inline-start" />
-          裁剪并上传
-        </Button>
+          <Spinner v-if="saving || encoding" data-icon="inline-start" /> {{ $t('裁剪并上传') }} </Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

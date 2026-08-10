@@ -28,24 +28,24 @@ const loadError = ref<string | null>(null)
 const search = ref('')
 const roleFilter = ref('all')
 
-const ROLE_LABELS: Record<string, string> = { User: '用户', Organizer: '组织者', Administrator: '管理员' }
-const STATUS_LABELS: Record<string, string> = { Active: '正常', Banned: '已封禁', Disabled: '已禁用', Anonymized: '已匿名' }
+const ROLE_LABELS: Record<string, string> = { User: translate("用户"), Organizer: translate("组织者"), Administrator: translate("管理员") }
+const STATUS_LABELS: Record<string, string> = { Active: translate("正常"), Banned: translate("已封禁"), Disabled: translate("已禁用"), Anonymized: translate("已匿名") }
 const REFERENCE_LABELS: Record<string, string> = {
-  CompetitionOwner: '竞赛负责人',
-  CompetitionCollaborator: '竞赛协作者',
-  ChallengeOwner: '题库模板负责人',
-  ChallengeManager: '题库模板管理员',
-  TeamCaptain: '队伍队长',
-  TeamMember: '队伍成员',
-  Submission: '提交记录',
-  PatchUpload: '补丁上传',
-  Notification: '通知',
-  GameplayFact: '比赛事实',
-  CompetitionLifecycleAudit: '竞赛生命周期审计',
-  CompetitionQuestion: '竞赛问答',
-  CompetitionQuestionEntry: '问答回复',
-  CompetitionEvent: '竞赛事件',
-  UserAccountLifecycleAudit: '账户生命周期审计',
+  CompetitionOwner: translate("竞赛负责人"),
+  CompetitionCollaborator: translate("竞赛协作者"),
+  ChallengeOwner: translate("题库模板负责人"),
+  ChallengeManager: translate("题库模板管理员"),
+  TeamCaptain: translate("队伍队长"),
+  TeamMember: translate("队伍成员"),
+  Submission: translate("提交记录"),
+  PatchUpload: translate("补丁上传"),
+  Notification: translate("通知"),
+  GameplayFact: translate("比赛事实"),
+  CompetitionLifecycleAudit: translate("竞赛生命周期审计"),
+  CompetitionQuestion: translate("竞赛问答"),
+  CompetitionQuestionEntry: translate("问答回复"),
+  CompetitionEvent: translate("竞赛事件"),
+  UserAccountLifecycleAudit: translate("账户生命周期审计"),
 }
 
 const filteredUsers = computed(() => {
@@ -104,7 +104,7 @@ async function saveRole(): Promise<void> {
   roleSaving.value = false
   if (error) {
     if (response?.status === 409) {
-      toast.error('该用户仍是活跃竞赛/模板的负责人或管理员,无法调整角色')
+      toast.error(translate("该用户仍是活跃竞赛/模板的负责人或管理员,无法调整角色"))
     }
     else {
       toast.error(parseApiError(error).message)
@@ -112,7 +112,7 @@ async function saveRole(): Promise<void> {
     return
   }
   detail.value = data ?? detail.value
-  toast.success('角色已更新')
+  toast.success(translate("角色已更新"))
   await load()
 }
 
@@ -125,7 +125,7 @@ async function invalidateTokens(): Promise<void> {
     toast.error(parseApiError(error).message)
     return
   }
-  toast.success('已吊销该用户的全部令牌')
+  toast.success(translate("已吊销该用户的全部令牌"))
 }
 
 // ---------- 删除 ----------
@@ -157,13 +157,13 @@ function deletionConflictMessage(error: unknown): string {
   const code = (error as { code?: string } | undefined)?.code
   switch (code) {
     case 'SelfDeletionForbidden':
-      return '不能删除自己的账户'
+      return translate("不能删除自己的账户")
     case 'LastAdministratorProtected':
-      return '不能删除最后一名管理员'
+      return translate("不能删除最后一名管理员")
     case 'HardDeleteBlocked':
-      return '该用户存在业务引用,无法物理删除,请改用匿名化'
+      return translate("该用户存在业务引用,无法物理删除,请改用匿名化")
     case 'AlreadyAnonymized':
-      return '该用户已被匿名化'
+      return translate("该用户已被匿名化")
     default:
       return parseApiError(error).message
   }
@@ -181,7 +181,7 @@ async function confirmDelete(): Promise<void> {
     toast.error(deletionConflictMessage(error))
     return
   }
-  toast.success(deletionMode.value === 'HardDelete' ? '用户已物理删除' : '用户已匿名化')
+  toast.success(deletionMode.value === 'HardDelete' ? translate("用户已物理删除") : translate("用户已匿名化"))
   deleteOpen.value = false
   detailOpen.value = false
   await load()
@@ -195,17 +195,17 @@ onMounted(() => {
 <template>
   <div class="flex flex-col gap-4">
     <div class="flex flex-wrap items-center gap-4">
-      <Input v-model="search" class="max-w-xs" placeholder="搜索用户名或邮箱" />
+      <Input v-model="search" class="max-w-xs" :placeholder="$t('搜索用户名或邮箱')" />
       <Select v-model="roleFilter">
         <SelectTrigger class="w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem value="all">全部角色</SelectItem>
-            <SelectItem value="User">用户</SelectItem>
-            <SelectItem value="Organizer">组织者</SelectItem>
-            <SelectItem value="Administrator">管理员</SelectItem>
+            <SelectItem value="all">{{ $t('全部角色') }}</SelectItem>
+            <SelectItem value="User">{{ $t('用户') }}</SelectItem>
+            <SelectItem value="Organizer">{{ $t('组织者') }}</SelectItem>
+            <SelectItem value="Administrator">{{ $t('管理员') }}</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
@@ -223,8 +223,8 @@ onMounted(() => {
 
     <Empty v-else-if="filteredUsers.length === 0">
       <EmptyHeader>
-        <EmptyTitle>没有匹配的用户</EmptyTitle>
-        <EmptyDescription>调整搜索或筛选条件。</EmptyDescription>
+        <EmptyTitle>{{ $t('没有匹配的用户') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('调整搜索或筛选条件。') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -232,12 +232,12 @@ onMounted(() => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>用户名</TableHead>
-            <TableHead>邮箱</TableHead>
-            <TableHead>类型</TableHead>
-            <TableHead>角色</TableHead>
-            <TableHead>状态</TableHead>
-            <TableHead>注册时间</TableHead>
+            <TableHead>{{ $t('用户名') }}</TableHead>
+            <TableHead>{{ $t('邮箱') }}</TableHead>
+            <TableHead>{{ $t('类型') }}</TableHead>
+            <TableHead>{{ $t('角色') }}</TableHead>
+            <TableHead>{{ $t('状态') }}</TableHead>
+            <TableHead>{{ $t('注册时间') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -249,12 +249,12 @@ onMounted(() => {
           >
             <TableCell class="font-medium">
               {{ user.userName }}
-              <Badge v-if="user.id === currentUser?.userId" variant="outline" class="ml-2">我</Badge>
+              <Badge v-if="user.id === currentUser?.userId" variant="outline" class="ml-2">{{ $t('我') }}</Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ user.email }}</TableCell>
             <TableCell>
               <Badge :variant="user.kind === 'Bot' ? 'secondary' : 'outline'">
-                {{ user.kind === 'Bot' ? 'Bot' : '用户' }}
+                {{ user.kind === 'Bot' ? 'Bot' : $t('用户') }}
               </Badge>
             </TableCell>
             <TableCell>
@@ -278,33 +278,33 @@ onMounted(() => {
     <Sheet v-model:open="detailOpen">
       <SheetContent class="overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>用户详情</SheetTitle>
-          <SheetDescription>{{ detail?.userName ?? '加载中…' }}</SheetDescription>
+          <SheetTitle>{{ $t('用户详情') }}</SheetTitle>
+          <SheetDescription>{{ detail?.userName ?? $t('加载中…') }}</SheetDescription>
         </SheetHeader>
         <div v-if="detailLoading" class="flex flex-col gap-3 px-4">
           <Skeleton v-for="i in 5" :key="i" class="h-8 w-full" />
         </div>
         <div v-else-if="detail" class="flex flex-col gap-6 px-4 pb-6">
           <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            <dt class="text-muted-foreground">用户 ID</dt>
+            <dt class="text-muted-foreground">{{ $t('用户 ID') }}</dt>
             <dd class="font-mono break-all">{{ detail.id }}</dd>
-            <dt class="text-muted-foreground">用户名</dt>
+            <dt class="text-muted-foreground">{{ $t('用户名') }}</dt>
             <dd>{{ detail.userName }}</dd>
-            <dt class="text-muted-foreground">邮箱</dt>
+            <dt class="text-muted-foreground">{{ $t('邮箱') }}</dt>
             <dd class="break-all">
               {{ detail.email }}
-              <Badge v-if="detail.emailVerified" variant="secondary" class="ml-1">已验证</Badge>
-              <Badge v-else variant="outline" class="ml-1">未验证</Badge>
+              <Badge v-if="detail.emailVerified" variant="secondary" class="ml-1">{{ $t('已验证') }}</Badge>
+              <Badge v-else variant="outline" class="ml-1">{{ $t('未验证') }}</Badge>
             </dd>
-            <dt class="text-muted-foreground">类型</dt>
-            <dd>{{ detail.kind === 'Bot' ? 'Bot' : '用户' }}</dd>
-            <dt class="text-muted-foreground">状态</dt>
+            <dt class="text-muted-foreground">{{ $t('类型') }}</dt>
+            <dd>{{ detail.kind === 'Bot' ? 'Bot' : $t('用户') }}</dd>
+            <dt class="text-muted-foreground">{{ $t('状态') }}</dt>
             <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ?? detail.accountStatus }}</dd>
-            <dt class="text-muted-foreground">令牌版本</dt>
+            <dt class="text-muted-foreground">{{ $t('令牌版本') }}</dt>
             <dd>{{ detail.tokenVersion ?? 0 }}</dd>
-            <dt class="text-muted-foreground">注册时间</dt>
+            <dt class="text-muted-foreground">{{ $t('注册时间') }}</dt>
             <dd><AdminDateTime :value="detail.createdAt" /></dd>
-            <dt class="text-muted-foreground">更新时间</dt>
+            <dt class="text-muted-foreground">{{ $t('更新时间') }}</dt>
             <dd><AdminDateTime :value="detail.updatedAt" /></dd>
           </dl>
 
@@ -312,7 +312,7 @@ onMounted(() => {
 
           <FieldGroup>
             <Field>
-              <FieldLabel for="user-role">平台角色</FieldLabel>
+              <FieldLabel for="user-role">{{ $t('平台角色') }}</FieldLabel>
               <div class="flex items-center gap-2">
                 <Select v-model="pendingRole" :disabled="detail.id === currentUser?.userId">
                   <SelectTrigger id="user-role" class="w-full">
@@ -320,9 +320,9 @@ onMounted(() => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="User">用户</SelectItem>
-                      <SelectItem value="Organizer">组织者</SelectItem>
-                      <SelectItem value="Administrator">管理员</SelectItem>
+                      <SelectItem value="User">{{ $t('用户') }}</SelectItem>
+                      <SelectItem value="Organizer">{{ $t('组织者') }}</SelectItem>
+                      <SelectItem value="Administrator">{{ $t('管理员') }}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -330,46 +330,38 @@ onMounted(() => {
                   :disabled="roleSaving || pendingRole === String(detail.role ?? 'User') || detail.id === currentUser?.userId"
                   @click="saveRole"
                 >
-                  <Spinner v-if="roleSaving" data-icon="inline-start" />
-                  保存
-                </Button>
+                  <Spinner v-if="roleSaving" data-icon="inline-start" /> {{ $t('保存') }} </Button>
               </div>
-              <FieldDescription v-if="detail.id === currentUser?.userId">不能修改自己的角色。</FieldDescription>
+              <FieldDescription v-if="detail.id === currentUser?.userId">{{ $t('不能修改自己的角色。') }}</FieldDescription>
             </Field>
           </FieldGroup>
 
           <Separator />
 
           <div class="flex flex-col gap-3">
-            <h3 class="text-sm font-medium">危险操作</h3>
+            <h3 class="text-sm font-medium">{{ $t('危险操作') }}</h3>
             <div class="flex flex-wrap gap-2">
               <AlertDialog>
                 <AlertDialogTrigger as-child>
                   <Button variant="outline">
-                    <KeyRound data-icon="inline-start" />
-                    吊销全部令牌
-                  </Button>
+                    <KeyRound data-icon="inline-start" /> {{ $t('吊销全部令牌') }} </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>吊销令牌</AlertDialogTitle>
+                    <AlertDialogTitle>{{ $t('吊销令牌') }}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      将吊销用户「{{ detail.userName }}」的全部访问与刷新令牌,该用户需要重新登录。
+                      {{ $t('将吊销用户「{user}」的全部访问与刷新令牌，该用户需要重新登录。', { user: detail.userName ?? '—' }) }}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogCancel>{{ $t('取消') }}</AlertDialogCancel>
                     <AlertDialogAction :disabled="invalidating" @click="invalidateTokens">
-                      <Spinner v-if="invalidating" data-icon="inline-start" />
-                      确认吊销
-                    </AlertDialogAction>
+                      <Spinner v-if="invalidating" data-icon="inline-start" /> {{ $t('确认吊销') }} </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
               <Button variant="destructive" @click="startDelete">
-                <Trash2 data-icon="inline-start" />
-                删除用户
-              </Button>
+                <Trash2 data-icon="inline-start" /> {{ $t('删除用户') }} </Button>
             </div>
           </div>
         </div>
@@ -379,10 +371,8 @@ onMounted(() => {
     <AlertDialog v-model:open="deleteOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>删除用户「{{ detail?.userName }}」</AlertDialogTitle>
-          <AlertDialogDescription>
-            删除不可恢复,请先确认影响范围。
-          </AlertDialogDescription>
+          <AlertDialogTitle>{{ $t('删除用户「{user}」', { user: detail?.userName ?? '—' }) }}</AlertDialogTitle>
+          <AlertDialogDescription> {{ $t('删除不可恢复,请先确认影响范围。') }} </AlertDialogDescription>
         </AlertDialogHeader>
         <div v-if="previewLoading" class="flex flex-col gap-2">
           <Skeleton v-for="i in 3" :key="i" class="h-8 w-full" />
@@ -390,50 +380,48 @@ onMounted(() => {
         <div v-else-if="preview" class="flex flex-col gap-4">
           <Alert v-if="preview.selfDeletionForbidden || preview.lastAdministratorProtected" variant="destructive">
             <AlertDescription>
-              {{ preview.selfDeletionForbidden ? '不能删除自己的账户。' : '不能删除最后一名管理员。' }}
+              {{ preview.selfDeletionForbidden ? $t('不能删除自己的账户。') : $t('不能删除最后一名管理员。') }}
             </AlertDescription>
           </Alert>
           <div v-if="preview.references?.length" class="flex flex-col gap-2">
-            <p class="text-sm text-muted-foreground">该用户存在以下业务引用:</p>
+            <p class="text-sm text-muted-foreground">{{ $t('该用户存在以下业务引用:') }}</p>
             <div class="flex flex-wrap gap-2">
               <Badge v-for="reference in preview.references" :key="reference.code" variant="secondary">
                 {{ REFERENCE_LABELS[reference.code ?? ''] ?? reference.code }} × {{ reference.count }}
               </Badge>
             </div>
           </div>
-          <p v-else class="text-sm text-muted-foreground">该用户没有业务引用。</p>
+          <p v-else class="text-sm text-muted-foreground">{{ $t('该用户没有业务引用。') }}</p>
           <FieldGroup>
             <Field>
-              <FieldLabel for="deletion-mode">删除方式</FieldLabel>
+              <FieldLabel for="deletion-mode">{{ $t('删除方式') }}</FieldLabel>
               <Select v-model="deletionMode">
                 <SelectTrigger id="deletion-mode" class="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem v-if="preview.canAnonymize" value="Anonymize">匿名化(保留数据,移除身份)</SelectItem>
-                    <SelectItem v-if="preview.canHardDelete" value="HardDelete">物理删除(彻底清除)</SelectItem>
+                    <SelectItem v-if="preview.canAnonymize" value="Anonymize">{{ $t('匿名化(保留数据,移除身份)') }}</SelectItem>
+                    <SelectItem v-if="preview.canHardDelete" value="HardDelete">{{ $t('物理删除(彻底清除)') }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
             <Field>
-              <FieldLabel for="deletion-reason">删除原因</FieldLabel>
-              <Input id="deletion-reason" v-model="deletionReason" required placeholder="将记录到审计日志" />
+              <FieldLabel for="deletion-reason">{{ $t('删除原因') }}</FieldLabel>
+              <Input id="deletion-reason" v-model="deletionReason" required :placeholder="$t('将记录到审计日志')" />
             </Field>
           </FieldGroup>
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogCancel>{{ $t('取消') }}</AlertDialogCancel>
           <AlertDialogAction
             variant="destructive"
             :disabled="deleting || !preview || !deletionReason.trim()
               || preview.selfDeletionForbidden || preview.lastAdministratorProtected"
             @click="confirmDelete"
           >
-            <Spinner v-if="deleting" data-icon="inline-start" />
-            确认删除
-          </AlertDialogAction>
+            <Spinner v-if="deleting" data-icon="inline-start" /> {{ $t('确认删除') }} </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

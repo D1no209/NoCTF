@@ -1,4 +1,5 @@
 import { toast } from 'vue-sonner'
+import { localeTag, translate } from './i18n'
 
 /** Protocol enum label maps. HTTP enums are PascalCase strings. */
 
@@ -7,37 +8,37 @@ export const GameModeLabel: Record<string, string> = {
 }
 
 export const CompetitionStatusLabel: Record<string, string> = {
-  Draft: '草稿', Visible: '可见', Published: '已发布', Running: '进行中', Paused: '已暂停', Finished: '已结束',
+  Draft: translate("草稿"), Visible: translate("可见"), Published: translate("已发布"), Running: translate("进行中"), Paused: translate("已暂停"), Finished: translate("已结束"),
 }
 
 export const TeamRegistrationStatusLabel: Record<string, string> = {
-  Pending: '待审批', Approved: '已通过', Rejected: '已拒绝',
+  Pending: translate("待审批"), Approved: translate("已通过"), Rejected: translate("已拒绝"),
 }
 
 export const TeamBanSourceLabel: Record<string, string> = {
-  ManualModeration: '人工封禁', CheatIncident: '作弊事件',
+  ManualModeration: translate("人工封禁"), CheatIncident: translate("作弊事件"),
 }
 
 export const TeamBanAppealStatusLabel: Record<string, string> = {
-  Submitted: '待裁决', Upheld: '已维持', Accepted: '已接受',
+  Submitted: translate("待裁决"), Upheld: translate("已维持"), Accepted: translate("已接受"),
 }
 
 export const GameplayFactKindLabel: Record<string, string> = {
-  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: '提示解锁',
-  ManualAdjustment: '人工调分', AwdServiceTransition: 'AWD 服务状态', KohControlObservation: 'KoH 控制观测',
+  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: translate("提示解锁"),
+  ManualAdjustment: translate("人工调分"), AwdServiceTransition: translate("AWD 服务状态"), KohControlObservation: translate("KoH 控制观测"),
 }
 
 export const GameplayFactStateLabel: Record<string, string> = {
-  Pending: '待处理', Queued: '排队中', Processing: '评测中', Completed: '已完成', PlatformFailed: '平台失败',
+  Pending: translate("待处理"), Queued: translate("排队中"), Processing: translate("评测中"), Completed: translate("已完成"), PlatformFailed: translate("平台失败"),
 }
 
 export const GameplayFactResultLabel: Record<string, string> = {
-  Correct: '正确', Wrong: '错误', Duplicate: '重复', AttemptsExhausted: '次数耗尽', Rejected: '已拒绝',
-  Unlocked: '已解锁', Applied: '已应用', ServiceUp: '服务正常', ServiceDown: '服务异常', Controlled: '已控制', Uncontrolled: '未控制',
+  Correct: translate("正确"), Wrong: translate("错误"), Duplicate: translate("重复"), AttemptsExhausted: translate("次数耗尽"), Rejected: translate("已拒绝"),
+  Unlocked: translate("已解锁"), Applied: translate("已应用"), ServiceUp: translate("服务正常"), ServiceDown: translate("服务异常"), Controlled: translate("已控制"), Uncontrolled: translate("未控制"),
 }
 
 export const RuntimeKindLabel: Record<string, string> = {
-  Container: '容器', Compose: 'Compose', OvaVm: '虚拟机',
+  Container: translate("容器"), Compose: 'Compose', OvaVm: translate("虚拟机"),
 }
 
 export const RuntimeProviderLabel: Record<string, string> = {
@@ -45,23 +46,23 @@ export const RuntimeProviderLabel: Record<string, string> = {
 }
 
 export const RuntimeStateLabel: Record<string, string> = {
-  Queued: '排队中', Provisioning: '准备中', Running: '运行中', Stopping: '停止中', Stopped: '已停止', Failed: '失败',
+  Queued: translate("排队中"), Provisioning: translate("准备中"), Running: translate("运行中"), Stopping: translate("停止中"), Stopped: translate("已停止"), Failed: translate("失败"),
 }
 
 export const CheatIncidentStatusLabel: Record<string, string> = {
-  Pending: '待处理', Confirmed: '已确认', Dismissed: '已驳回', Superseded: '已取代', Corrected: '已纠正',
+  Pending: translate("待处理"), Confirmed: translate("已确认"), Dismissed: translate("已驳回"), Superseded: translate("已取代"), Corrected: translate("已纠正"),
 }
 
 export const LeaderboardVisibilityLabel: Record<string, string> = {
-  Normal: '正常', Frozen: '冻结', Blackout: '遮蔽',
+  Normal: translate("正常"), Frozen: translate("冻结"), Blackout: translate("遮蔽"),
 }
 
 export const DataExportStatusLabel: Record<string, string> = {
-  Queued: '排队中', Processing: '处理中', Available: '可下载', Failed: '失败', Expired: '已过期',
+  Queued: translate("排队中"), Processing: translate("处理中"), Available: translate("可下载"), Failed: translate("失败"), Expired: translate("已过期"),
 }
 
 export const SpecificationKindLabel: Record<string, string> = {
-  Attachment: '附件', AwdRound: 'AWD 轮次', RuntimeDefinition: '运行时定义', Hint: '提示',
+  Attachment: translate("附件"), AwdRound: translate("AWD 轮次"), RuntimeDefinition: translate("运行时定义"), Hint: translate("提示"),
 }
 
 export function enumLabel(map: Record<string, string>, value: string | number | null | undefined): string {
@@ -73,7 +74,7 @@ export function adminFormatDateTime(value: string | null | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', { hour12: false })
+  return date.toLocaleString(localeTag(), { hour12: false })
 }
 
 /** Convert a datetime-local input value to an ISO string, or undefined when empty. */
@@ -106,7 +107,7 @@ export function isRevisionConflict(error: unknown): boolean {
  */
 export function toastWriteError(error: unknown, refresh?: () => void | Promise<void>): void {
   if (isRevisionConflict(error)) {
-    toast.error('数据已被他人修改,请刷新后重试')
+    toast.error(translate("数据已被他人修改,请刷新后重试"))
     void refresh?.()
     return
   }

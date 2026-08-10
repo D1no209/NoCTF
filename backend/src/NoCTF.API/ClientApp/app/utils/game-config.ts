@@ -1,3 +1,5 @@
+import { translate } from './i18n'
+
 /**
  * 游戏模式专属配置 JSON 的前端模型。
  * 对应后端 NoCTF.GameModes 各 *Configuration record:
@@ -29,25 +31,25 @@ export const AwardSettlement = { Milestone: 0, PerRound: 1 } as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
 
 export const ATTACK_REWARD_MODES = [
-  { value: 'FixedPerAttack', label: '每次攻击固定得分' },
-  { value: 'SplitVictimDefensePool', label: '瓜分受害方防御分池' },
+  { value: 'FixedPerAttack', label: translate("每次攻击固定得分") },
+  { value: 'SplitVictimDefensePool', label: translate("瓜分受害方防御分池") },
 ] as const
 
 export const BLOOD_REWARD_POLICIES = [
-  { value: BloodRewardPolicy.FixedPoints, label: '固定分值' },
-  { value: BloodRewardPolicy.InitialPointsPercentage, label: '初始分百分比' },
-  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: '解题时分值百分比' },
-  { value: BloodRewardPolicy.CurrentPointsPercentage, label: '当前分值百分比' },
+  { value: BloodRewardPolicy.FixedPoints, label: translate("固定分值") },
+  { value: BloodRewardPolicy.InitialPointsPercentage, label: translate("初始分百分比") },
+  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: translate("解题时分值百分比") },
+  { value: BloodRewardPolicy.CurrentPointsPercentage, label: translate("当前分值百分比") },
 ] as const
 
 export const AWARD_SETTLEMENTS = [
-  { value: AwardSettlement.Milestone, label: '里程碑结算(一次性)' },
-  { value: AwardSettlement.PerRound, label: '按轮次结算' },
+  { value: AwardSettlement.Milestone, label: translate("里程碑结算(一次性)") },
+  { value: AwardSettlement.PerRound, label: translate("按轮次结算") },
 ] as const
 
 export const EVALUATION_DISPATCH_MODES = [
-  { value: EvaluationDispatch.Automatic, label: '自动评测' },
-  { value: EvaluationDispatch.ManualBatch, label: '手动批量评测' },
+  { value: EvaluationDispatch.Automatic, label: translate("自动评测") },
+  { value: EvaluationDispatch.ManualBatch, label: translate("手动批量评测") },
 ] as const
 
 // ---------- 题目模板 Definition 模型 ----------
@@ -603,42 +605,42 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
-        { key: 'defaultPoints', label: '默认分值曲线', type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: '未单独设置规则的题目继承的初始分/最低分/衰减系数' },
-        { key: 'bloodRewards', label: '血榜奖励', type: 'bloodRewards', defaultValue: [], description: '前三个解题队伍的额外奖励,最多 3 条' },
-        { key: 'scoreExpression', label: '自定义计分表达式', type: 'text', description: '可选;变量:initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayParameter' },
-        { key: 'wrongSubmissionPenalty', label: '错误提交扣分', type: 'int', min: 0, defaultValue: 0 },
-        { key: 'flagTemplate', label: '动态 Flag 模板', type: 'flagTemplate', description: '仅用于系统今后生成的每队容器 Flag；手工或静态 Flag 不受影响' },
+        { key: 'defaultPoints', label: translate("默认分值曲线"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("未单独设置规则的题目继承的初始分/最低分/衰减系数") },
+        { key: 'bloodRewards', label: translate("血榜奖励"), type: 'bloodRewards', defaultValue: [], description: translate("前三个解题队伍的额外奖励,最多 3 条") },
+        { key: 'scoreExpression', label: translate("自定义计分表达式"), type: 'text', description: translate("可选;变量:initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayParameter") },
+        { key: 'wrongSubmissionPenalty', label: translate("错误提交扣分"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'flagTemplate', label: translate("动态 Flag 模板"), type: 'flagTemplate', description: translate("仅用于系统今后生成的每队容器 Flag；手工或静态 Flag 不受影响") },
       ]
     case 'Awd':
       return [
-        { key: 'hardeningDurationSeconds', label: '加固阶段时长(秒)', type: 'int', min: 0, defaultValue: 0, description: '开赛后的加固时间,期间不开放攻击' },
-        { key: 'roundDurationSeconds', label: '轮次时长(秒)', type: 'int', min: 1, defaultValue: 300 },
-        { key: 'attackRewardMode', label: '攻击得分方式', type: 'select', options: ATTACK_REWARD_MODES, defaultValue: 'FixedPerAttack' },
-        { key: 'attackPoints', label: '每次攻击得分', type: 'int', min: 0, defaultValue: 50 },
-        { key: 'victimDefensePoolPoints', label: '受害方防御分池', type: 'int', min: 0, defaultValue: 100 },
-        { key: 'checkerIntervalSeconds', label: '检查间隔(秒)', type: 'int', min: 1, defaultValue: 30 },
-        { key: 'serviceHealthyPoints', label: '服务正常得分', type: 'int', min: 0, defaultValue: 100 },
-        { key: 'serviceUnhealthyPenalty', label: '服务异常扣分', type: 'int', min: 0, defaultValue: 50 },
-        { key: 'flagTemplate', label: '队伍 Flag 模板', type: 'flagTemplate', description: '可选;用于生成每队每轮的 Flag' },
+        { key: 'hardeningDurationSeconds', label: translate("加固阶段时长(秒)"), type: 'int', min: 0, defaultValue: 0, description: translate("开赛后的加固时间,期间不开放攻击") },
+        { key: 'roundDurationSeconds', label: translate("轮次时长(秒)"), type: 'int', min: 1, defaultValue: 300 },
+        { key: 'attackRewardMode', label: translate("攻击得分方式"), type: 'select', options: ATTACK_REWARD_MODES, defaultValue: 'FixedPerAttack' },
+        { key: 'attackPoints', label: translate("每次攻击得分"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'victimDefensePoolPoints', label: translate("受害方防御分池"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'checkerIntervalSeconds', label: translate("检查间隔(秒)"), type: 'int', min: 1, defaultValue: 30 },
+        { key: 'serviceHealthyPoints', label: translate("服务正常得分"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'serviceUnhealthyPenalty', label: translate("服务异常扣分"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'flagTemplate', label: translate("队伍 Flag 模板"), type: 'flagTemplate', description: translate("可选;用于生成每队每轮的 Flag") },
       ]
     case 'Awdp':
       return [
-        { key: 'roundDurationSeconds', label: '轮次时长(秒)', type: 'int', min: 1, defaultValue: 300 },
-        { key: 'break', label: 'Break 得分', type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: '攻破(正确提交 Flag)的得分与结算方式' },
-        { key: 'fix', label: 'Fix 得分', type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: '修复(提交补丁存档)的得分与结算方式' },
-        { key: 'requireBreakBeforeFix', label: '先 Break 才能 Fix', type: 'bool', defaultValue: true },
-        { key: 'maxBreakSubmissions', label: 'Break 提交次数上限', type: 'int', min: 1, defaultValue: 10 },
-        { key: 'maxFixSubmissions', label: 'Fix 提交次数上限', type: 'int', min: 1, defaultValue: 10 },
-        { key: 'breakWrongPenalty', label: 'Break 错误扣分', type: 'int', min: 0, defaultValue: 0 },
-        { key: 'fixFailurePenalty', label: 'Fix 失败扣分', type: 'int', min: 0, defaultValue: 0 },
-        { key: 'violationPenalty', label: '违规扣分', type: 'int', min: 0, defaultValue: 100 },
-        { key: 'serviceDownPenalty', label: '服务宕机扣分', type: 'int', min: 0, defaultValue: 50 },
-        { key: 'evaluationDispatchMode', label: '评测调度方式', type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
+        { key: 'roundDurationSeconds', label: translate("轮次时长(秒)"), type: 'int', min: 1, defaultValue: 300 },
+        { key: 'break', label: translate("Break 得分"), type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: translate("攻破(正确提交 Flag)的得分与结算方式") },
+        { key: 'fix', label: translate("Fix 得分"), type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: translate("修复(提交补丁存档)的得分与结算方式") },
+        { key: 'requireBreakBeforeFix', label: translate("先 Break 才能 Fix"), type: 'bool', defaultValue: true },
+        { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
+        { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
+        { key: 'breakWrongPenalty', label: translate("Break 错误扣分"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'fixFailurePenalty', label: translate("Fix 失败扣分"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'violationPenalty', label: translate("违规扣分"), type: 'int', min: 0, defaultValue: 100 },
+        { key: 'serviceDownPenalty', label: translate("服务宕机扣分"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'evaluationDispatchMode', label: translate("评测调度方式"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
       ]
     case 'Koh':
       return [
-        { key: 'pollIntervalSeconds', label: '控制检查间隔(秒)', type: 'int', min: 1, defaultValue: 5 },
-        { key: 'controlPointsPerInterval', label: '每间隔控制得分', type: 'int', min: 0, defaultValue: 10 },
+        { key: 'pollIntervalSeconds', label: translate("控制检查间隔(秒)"), type: 'int', min: 1, defaultValue: 5 },
+        { key: 'controlPointsPerInterval', label: translate("每间隔控制得分"), type: 'int', min: 0, defaultValue: 10 },
       ]
   }
 }
@@ -648,38 +650,38 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
-        { key: 'points', label: '分值曲线', type: 'pointsCurve' },
-        { key: 'bloodRewards', label: '血榜奖励', type: 'bloodRewards', description: '最多 3 条' },
-        { key: 'maxFlagAttempts', label: 'Flag 提交次数上限', type: 'int', min: 1 },
-        { key: 'scoreExpression', label: '自定义计分表达式', type: 'text', description: '变量:initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayParameter' },
-        { key: 'wrongSubmissionPenalty', label: '错误提交扣分', type: 'int', min: 0 },
+        { key: 'points', label: translate("分值曲线"), type: 'pointsCurve' },
+        { key: 'bloodRewards', label: translate("血榜奖励"), type: 'bloodRewards', description: translate("最多 3 条") },
+        { key: 'maxFlagAttempts', label: translate("Flag 提交次数上限"), type: 'int', min: 1 },
+        { key: 'scoreExpression', label: translate("自定义计分表达式"), type: 'text', description: translate("变量:initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayParameter") },
+        { key: 'wrongSubmissionPenalty', label: translate("错误提交扣分"), type: 'int', min: 0 },
       ]
     case 'Awd':
       return [
-        { key: 'attackRewardMode', label: '攻击得分方式', type: 'select', options: ATTACK_REWARD_MODES },
-        { key: 'attackPoints', label: '每次攻击得分', type: 'int', min: 0 },
-        { key: 'victimDefensePoolPoints', label: '受害方防御分池', type: 'int', min: 0 },
-        { key: 'checkerIntervalSeconds', label: '检查间隔(秒)', type: 'int', min: 1 },
-        { key: 'serviceHealthyPoints', label: '服务正常得分', type: 'int', min: 0 },
-        { key: 'serviceUnhealthyPenalty', label: '服务异常扣分', type: 'int', min: 0 },
+        { key: 'attackRewardMode', label: translate("攻击得分方式"), type: 'select', options: ATTACK_REWARD_MODES },
+        { key: 'attackPoints', label: translate("每次攻击得分"), type: 'int', min: 0 },
+        { key: 'victimDefensePoolPoints', label: translate("受害方防御分池"), type: 'int', min: 0 },
+        { key: 'checkerIntervalSeconds', label: translate("检查间隔(秒)"), type: 'int', min: 1 },
+        { key: 'serviceHealthyPoints', label: translate("服务正常得分"), type: 'int', min: 0 },
+        { key: 'serviceUnhealthyPenalty', label: translate("服务异常扣分"), type: 'int', min: 0 },
       ]
     case 'Awdp':
       return [
-        { key: 'break', label: 'Break 得分', type: 'milestonePoints' },
-        { key: 'fix', label: 'Fix 得分', type: 'milestonePoints' },
-        { key: 'requireBreakBeforeFix', label: '先 Break 才能 Fix', type: 'bool' },
-        { key: 'maxBreakSubmissions', label: 'Break 提交次数上限', type: 'int', min: 1 },
-        { key: 'maxFixSubmissions', label: 'Fix 提交次数上限', type: 'int', min: 1 },
-        { key: 'breakWrongPenalty', label: 'Break 错误扣分', type: 'int', min: 0 },
-        { key: 'fixFailurePenalty', label: 'Fix 失败扣分', type: 'int', min: 0 },
-        { key: 'violationPenalty', label: '违规扣分', type: 'int', min: 0 },
-        { key: 'serviceDownPenalty', label: '服务宕机扣分', type: 'int', min: 0 },
-        { key: 'evaluationDispatchMode', label: '评测调度方式', type: 'select', options: EVALUATION_DISPATCH_MODES },
+        { key: 'break', label: translate("Break 得分"), type: 'milestonePoints' },
+        { key: 'fix', label: translate("Fix 得分"), type: 'milestonePoints' },
+        { key: 'requireBreakBeforeFix', label: translate("先 Break 才能 Fix"), type: 'bool' },
+        { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1 },
+        { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1 },
+        { key: 'breakWrongPenalty', label: translate("Break 错误扣分"), type: 'int', min: 0 },
+        { key: 'fixFailurePenalty', label: translate("Fix 失败扣分"), type: 'int', min: 0 },
+        { key: 'violationPenalty', label: translate("违规扣分"), type: 'int', min: 0 },
+        { key: 'serviceDownPenalty', label: translate("服务宕机扣分"), type: 'int', min: 0 },
+        { key: 'evaluationDispatchMode', label: translate("评测调度方式"), type: 'select', options: EVALUATION_DISPATCH_MODES },
       ]
     case 'Koh':
       return [
-        { key: 'pollIntervalSeconds', label: '控制检查间隔(秒)', type: 'int', min: 1 },
-        { key: 'controlPointsPerInterval', label: '每间隔控制得分', type: 'int', min: 0 },
+        { key: 'pollIntervalSeconds', label: translate("控制检查间隔(秒)"), type: 'int', min: 1 },
+        { key: 'controlPointsPerInterval', label: translate("每间隔控制得分"), type: 'int', min: 0 },
       ]
   }
 }

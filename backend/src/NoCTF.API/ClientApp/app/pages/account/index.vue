@@ -28,7 +28,7 @@ async function saveProfile() {
     })
     if (error) throw parseApiError(error)
     await fetchMe()
-    toast.success('资料已保存')
+    toast.success(translate("资料已保存"))
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -51,7 +51,7 @@ function selectAvatar(event: Event) {
   if (!file)
     return
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 12 * 1024 * 1024) {
-    toast.error('请选择不超过 12 MiB 的 JPEG、PNG 或 WebP 图片')
+    toast.error(translate("请选择不超过 12 MiB 的 JPEG、PNG 或 WebP 图片"))
     return
   }
   avatarSourceFile.value = file
@@ -74,7 +74,7 @@ async function uploadAvatar(file: File) {
     await fetchMe()
     avatarEditorOpen.value = false
     avatarSourceFile.value = null
-    toast.success('头像已更新')
+    toast.success(translate("头像已更新"))
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -92,7 +92,7 @@ const passwordPending = ref(false)
 
 async function changePassword() {
   if (newPassword.value !== confirmNewPassword.value) {
-    toast.error('两次输入的新密码不一致')
+    toast.error(translate("两次输入的新密码不一致"))
     return
   }
   passwordPending.value = true
@@ -101,7 +101,7 @@ async function changePassword() {
       body: { currentPassword: currentPassword.value, newPassword: newPassword.value },
     })
     if (error) throw parseApiError(error)
-    toast.success('密码已修改,请重新登录')
+    toast.success(translate("密码已修改,请重新登录"))
     await logoutAll()
   }
   catch (e) {
@@ -115,24 +115,24 @@ async function changePassword() {
 
 <template>
   <div class="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
-    <h1 class="text-2xl font-semibold">账户设置</h1>
+    <h1 class="text-2xl font-semibold">{{ $t('账户设置') }}</h1>
     <Tabs default-value="profile">
       <TabsList>
-        <TabsTrigger value="profile">资料</TabsTrigger>
-        <TabsTrigger value="password">密码</TabsTrigger>
-        <TabsTrigger value="security">安全</TabsTrigger>
+        <TabsTrigger value="profile">{{ $t('资料') }}</TabsTrigger>
+        <TabsTrigger value="password">{{ $t('密码') }}</TabsTrigger>
+        <TabsTrigger value="security">{{ $t('安全') }}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="profile">
         <Card>
           <CardHeader>
-            <CardTitle>个人资料</CardTitle>
+            <CardTitle>{{ $t('个人资料') }}</CardTitle>
             <CardDescription>{{ user?.userName }} · {{ user?.email }}</CardDescription>
           </CardHeader>
           <CardContent>
             <FieldGroup>
               <Field>
-                <FieldLabel>头像</FieldLabel>
+                <FieldLabel>{{ $t('头像') }}</FieldLabel>
                 <div class="flex items-center gap-4">
                   <Avatar class="size-16">
                     <AvatarImage v-if="user?.avatarUrl" :src="user.avatarUrl" :alt="user?.userName ?? ''" />
@@ -147,28 +147,24 @@ async function changePassword() {
                       @change="selectAvatar"
                     >
                     <Button variant="outline" :disabled="avatarPending" @click="avatarInput?.click()">
-                      <Spinner v-if="avatarPending" data-icon="inline-start" />
-                      选择并裁剪头像
-                    </Button>
-                    <span class="text-xs text-muted-foreground">JPEG、PNG 或 WebP，原图不超过 12 MiB</span>
+                      <Spinner v-if="avatarPending" data-icon="inline-start" /> {{ $t('选择并裁剪头像') }} </Button>
+                    <span class="text-xs text-muted-foreground">{{ $t('JPEG、PNG 或 WebP，原图不超过 12 MiB') }}</span>
                   </div>
                 </div>
               </Field>
               <Field>
-                <FieldLabel for="description">个人简介</FieldLabel>
-                <Textarea id="description" v-model="description" rows="4" placeholder="介绍一下自己(可选)" />
+                <FieldLabel for="description">{{ $t('个人简介') }}</FieldLabel>
+                <Textarea id="description" v-model="description" rows="4" :placeholder="$t('介绍一下自己(可选)')" />
               </Field>
               <Field orientation="horizontal">
                 <Switch id="isEmailPublic" v-model="isEmailPublic" />
-                <FieldLabel for="isEmailPublic">在个人资料页公开邮箱</FieldLabel>
+                <FieldLabel for="isEmailPublic">{{ $t('在个人资料页公开邮箱') }}</FieldLabel>
               </Field>
             </FieldGroup>
           </CardContent>
           <CardFooter>
             <Button :disabled="profilePending" @click="saveProfile">
-              <Spinner v-if="profilePending" data-icon="inline-start" />
-              保存资料
-            </Button>
+              <Spinner v-if="profilePending" data-icon="inline-start" /> {{ $t('保存资料') }} </Button>
           </CardFooter>
         </Card>
       </TabsContent>
@@ -176,22 +172,22 @@ async function changePassword() {
       <TabsContent value="password">
         <Card>
           <CardHeader>
-            <CardTitle>修改密码</CardTitle>
-            <CardDescription>修改成功后所有设备都需要重新登录</CardDescription>
+            <CardTitle>{{ $t('修改密码') }}</CardTitle>
+            <CardDescription>{{ $t('修改成功后所有设备都需要重新登录') }}</CardDescription>
           </CardHeader>
           <CardContent>
             <form @submit.prevent="changePassword">
               <FieldGroup>
                 <Field>
-                  <FieldLabel for="currentPassword">当前密码</FieldLabel>
+                  <FieldLabel for="currentPassword">{{ $t('当前密码') }}</FieldLabel>
                   <Input id="currentPassword" v-model="currentPassword" type="password" autocomplete="current-password" required />
                 </Field>
                 <Field>
-                  <FieldLabel for="newPassword">新密码</FieldLabel>
+                  <FieldLabel for="newPassword">{{ $t('新密码') }}</FieldLabel>
                   <Input id="newPassword" v-model="newPassword" type="password" autocomplete="new-password" required />
                 </Field>
                 <Field>
-                  <FieldLabel for="confirmNewPassword">确认新密码</FieldLabel>
+                  <FieldLabel for="confirmNewPassword">{{ $t('确认新密码') }}</FieldLabel>
                   <Input id="confirmNewPassword" v-model="confirmNewPassword" type="password" autocomplete="new-password" required />
                 </Field>
               </FieldGroup>
@@ -199,9 +195,7 @@ async function changePassword() {
           </CardContent>
           <CardFooter>
             <Button :disabled="passwordPending" @click="changePassword">
-              <Spinner v-if="passwordPending" data-icon="inline-start" />
-              修改密码
-            </Button>
+              <Spinner v-if="passwordPending" data-icon="inline-start" /> {{ $t('修改密码') }} </Button>
           </CardFooter>
         </Card>
       </TabsContent>
@@ -209,30 +203,28 @@ async function changePassword() {
       <TabsContent value="security">
         <Card>
           <CardHeader>
-            <CardTitle>安全</CardTitle>
-            <CardDescription>管理你的登录会话</CardDescription>
+            <CardTitle>{{ $t('安全') }}</CardTitle>
+            <CardDescription>{{ $t('管理你的登录会话') }}</CardDescription>
           </CardHeader>
           <CardContent>
             <Alert variant="destructive">
-              <AlertTitle>全局注销</AlertTitle>
-              <AlertDescription>
-                吊销你在所有设备上的会话(包括本机),之后需要重新登录。
-              </AlertDescription>
+              <AlertTitle>{{ $t('全局注销') }}</AlertTitle>
+              <AlertDescription> {{ $t('吊销你在所有设备上的会话(包括本机),之后需要重新登录。') }} </AlertDescription>
             </Alert>
           </CardContent>
           <CardFooter>
             <AlertDialog>
               <AlertDialogTrigger as-child>
-                <Button variant="destructive">注销所有会话</Button>
+                <Button variant="destructive">{{ $t('注销所有会话') }}</Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>确认注销所有会话?</AlertDialogTitle>
-                  <AlertDialogDescription>所有设备上的登录状态将立即失效。</AlertDialogDescription>
+                  <AlertDialogTitle>{{ $t('确认注销所有会话?') }}</AlertDialogTitle>
+                  <AlertDialogDescription>{{ $t('所有设备上的登录状态将立即失效。') }}</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>取消</AlertDialogCancel>
-                  <AlertDialogAction @click="logoutAll">确认注销</AlertDialogAction>
+                  <AlertDialogCancel>{{ $t('取消') }}</AlertDialogCancel>
+                  <AlertDialogAction @click="logoutAll">{{ $t('确认注销') }}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>

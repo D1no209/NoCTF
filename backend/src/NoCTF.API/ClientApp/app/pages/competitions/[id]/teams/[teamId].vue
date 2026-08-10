@@ -14,7 +14,7 @@ onMounted(async () => {
   const { data, error: err } = await getTeamEndpoint({ path: { competitionId, teamId } })
   loading.value = false
   if (err || !data) {
-    error.value = parseApiError(err, '加载队伍信息失败').message
+    error.value = parseApiError(err, translate("加载队伍信息失败")).message
     return
   }
   team.value = data
@@ -44,13 +44,13 @@ onMounted(async () => {
         >
           {{ teamRegistrationStatusLabel(team.registrationStatus) }}
         </Badge>
-        <Badge v-if="team.isBanned" variant="destructive">已封禁</Badge>
+        <Badge v-if="team.isBanned" variant="destructive">{{ $t('已封禁') }}</Badge>
       </div>
-      <p class="text-sm text-muted-foreground">报名时间:{{ formatDateTime(team.registeredAt) }}</p>
+      <p class="text-sm text-muted-foreground">{{ $t('报名时间：{time}', { time: formatDateTime(team.registeredAt) }) }}</p>
 
       <Card>
         <CardHeader>
-          <CardTitle class="text-base">成员({{ team.memberIds?.length ?? 0 }})</CardTitle>
+          <CardTitle class="text-base">{{ $t('成员（{count}）', { count: team.memberIds?.length ?? 0 }) }}</CardTitle>
         </CardHeader>
         <CardContent>
           <TeamMembers :competition-id="competitionId" :team="team" />
