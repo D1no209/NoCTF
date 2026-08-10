@@ -9,6 +9,27 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-10 Alpha.22 裁判处理封禁申诉
+
+- 功能提交 `0e842531` 修复封禁申诉仍错误复用 `CanModerateAsync` 的权限缺口。申诉列表现在用
+  `CanJudgeAsync` 计算每条待决申诉的 `canResolve`，接受申诉与维持封禁端点也使用同一裁判授权；
+  Judge、Manager、Owner 和平台 Administrator 均可完成两种裁决，Observer 仍只能读取私有申诉。
+- 管理端申诉卡片由 `canJudge` 控制处置按钮，因此裁判能看到并调用生成 SDK 完成“接受申诉（解封）”
+  或“维持封禁”。普通解封、无申诉纠正封禁、报名审批和配置写入继续受 `canWrite` / `CanModerateAsync`
+  约束，没有扩大裁判的其他权限。
+- 新增真实 FastEndpoints HTTP 回归，验证 Judge 列表返回 `canResolve=true` 且 Accept/Uphold 各只执行
+  一次，Observer 列表返回 `canResolve=false` 且处置得到 403；前端回归同时锁定裁判申诉按钮与管理者
+  专属反向操作的边界。平台版本递增为 `0.1.0-alpha.22`。
+- OpenAPI 描述已从后端重新导出，`swagger.json`、`wwwroot/openapi/v1.json` 与 TypeScript SDK 均由
+  生成工具更新并通过二次生成 SHA-256 幂等检查；没有新增或修改路由、请求/响应结构、数据表、列、
+  migration 或 snapshot。EF CLI 明确报告模型无 pending changes。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；新增端点测试 2/2、
+  非 Integration 627/627、现有 TeamBanAppeal PostgreSQL Testcontainers 1/1 通过；ClientApp
+  `bun test` 77/77、`bun run typecheck`、`bun run build`、`git diff --check` 全部通过。仓库仍无 lint
+  script/ESLint 配置；Nuxt 仅保留既有大 chunk、插件耗时与第三方 trailing-slash 警告。
+- 本阶段尚未推送或部署，生产仍运行 `0.1.0-alpha.21`。没有使用真实申诉做破坏性浏览器验收；获得
+  明确推送部署授权后，应使用可丢弃的待决申诉和 Judge 账号分别复核接受与维持封禁两条路径。
+
 ## 2026-08-10 Alpha.21 消息中心、赛事播报与管理角色修正
 
 - 功能提交 `8cd8ef63` 重新划分比赛信息的三个前端入口。比赛「动态」继续投影按权限过滤的完整
