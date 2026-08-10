@@ -25,8 +25,28 @@
   既有大 chunk、插件耗时及第三方 trailing-slash deprecation 警告；仓库仍无 lint script。
 - 本地 production preview 浏览器验收通过：中→英和英→中均保持 `http://127.0.0.1:3418/`，`html lang`
   与页头、首页模式文案同步更新，控制台无 Warning/Error；验收临时服务与标签页已清理。
-- 本阶段尚未推送或部署；远程 `main` 和生产仍为 `ddb3eb4c` / `0.1.0-alpha.23`。下一步仅在用户明确授权后
-  推送功能提交与本 HANDOFF 提交，并按现有三进程生产流程部署 Alpha.24。
+- 用户明确授权后，功能提交 `be97a8ec` 与本阶段原 HANDOFF 提交 `ff953a2d` 已从 `ddb3eb4c`
+  无冲突快进推送到远程 `main`；`git ls-remote` 核对远程提交为
+  `ff953a2d3d12471ed110460f5555b418c3bd4f95`。生产 `/root/NoCTF` 通过带先决提交校验的增量
+  Git bundle 快进到同一提交；既有未跟踪 `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、
+  PostgreSQL/Redis/上传卷、题目镜像和 Runtime 均未覆盖或修改。
+- Alpha.24 Git bundle 为 2,917 字节，SHA-256
+  `10f4de5742c60ed9b66fdca0d903007455315d4d4bcb1c6a9fc4e414e86496e5`；三镜像归档为
+  681,565,184 字节，SHA-256
+  `0d47cbf272f5e596e9364ecb04b9ab56d66dd3d74e61a4a05cbd9a6917c96730`，本地与服务器校验一致。
+  API/Migration、Worker、Runner 的 `linux/amd64` 镜像 ID 分别为 `6d118d62dd23`、
+  `bcf0941a8bb1`、`ed561f130c63`，镜像内程序集均包含 `0.1.0-alpha.24`。
+- Migration 容器明确报告数据库已是最新，没有应用 schema 变化；随后只以 `--no-build --no-deps`
+  原地重建 API、Worker 和 Runner。API 与 Runner healthy、Worker running，三者 restart count 均为
+  0；外网 HTTPS `/` 与 `/health` 均返回 200，生产首页已加载 Alpha.24 静态产物和语言首屏恢复脚本。
+- 生产内置浏览器能够读取新版无刷新语言按钮，但点击后的自动化状态读取因浏览器控制内核超时重置，
+  因此没有伪造生产交互结论；完整中英双向切换已在本地 production preview 实际验收通过。部署后的
+  API 启动期间 Wolverine 成功接管旧节点后，向已退出节点发送停止命令的确认等待在 60 秒后记录一次
+  瞬时 timeout；该时间点之后的 API、Worker、Runner 日志未再出现匹配的错误签名，服务持续稳定。
+- 已校验并删除服务器精确传输目录 `/root/noctf-deploy-alpha24-ff953a2d`，移除未被容器引用且不再作为
+  即时回滚版本的 Alpha.21 三个服务镜像；没有执行广域 Docker prune。保留 Alpha.23 为即时回滚：
+  API/Migration `36ca335e6423`、Worker `a995edb3b860`、Runner `8a54ce1ea688`。根分区恢复为
+  68% 使用、约 14 GB 可用；数据库、Redis、上传文件、题目镜像、Runtime 和比赛事实均未删除或修改。
 
 ## 2026-08-10 Alpha.23 中英文界面适配
 
