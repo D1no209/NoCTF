@@ -9,6 +9,36 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-10 Alpha.23 中英文界面适配
+
+- 基础提交 `230386f2` 建立轻量的强类型语言层，功能提交 `2c74f31a` 完成参与者端、比赛管理、
+  题库管理、平台管理、认证、账户、通知、运行时和排行榜等现有界面的中英文适配。中文仍是无偏好时
+  的默认语言；首次访问识别浏览器语言，之后把明确选择保存到 `noctf-locale`。切换时同步更新
+  `document.documentElement.lang`，日期和数字使用 `zh-CN` / `en-US`，不会把队伍名、题目名、用户名、
+  Flag、邮箱等用户数据当作翻译键。
+- 全局页头在白日/黑夜主题切换右侧新增紧凑语言按钮，中文界面显示 `EN`，英文界面显示 `中`；
+  图标、ARIA 文案和主题按钮本身也会随当前语言切换。Nuxt 启动前脚本在首屏渲染前恢复语言，避免
+  刷新时先显示错误语言再闪烁；页面脚本复用同一 `translate()` / `$t()` 入口，没有引入第二套路由、
+  手写 API URL 或服务端会话状态。
+- 英文资源当前包含 1,444 个界面条目，自动覆盖扫描确认 1,431 个已使用中文源键全部存在英文值，
+  英文资源值不含遗留汉字。动态错误、状态、权限角色、比赛模式、血榜、通知、咨询、作弊处置、
+  Runtime 和管理表单均走参数化翻译；源文本中的队伍、题目和其他开放文本只作为插值保留。
+- 平台版本由 `0.1.0-alpha.22` 递增为 `0.1.0-alpha.23`。本阶段没有 HTTP/OpenAPI 契约、生成
+  TypeScript SDK、数据模型、数据表、列、migration 或 snapshot 变化，因此没有重新生成 SDK 或 EF
+  migration；检查确认生成 API 目录无差异。
+- 验证：ClientApp `bun test` 为 83/83（含 6 项语言切换、插值、区域格式、资源覆盖、页头顺序和
+  持久化回归），`bun run typecheck` 与 `bun run build` 通过；`dotnet build NoCTF.slnx --no-restore`
+  为 0 警告/0 错误，`git diff --check` 通过。仓库仍没有 lint script/ESLint 配置，`bun run lint`
+  明确报告脚本不存在，未伪造 lint 结果；Nuxt 只保留既有大 chunk、插件耗时及第三方
+  trailing-slash deprecation 警告。
+- Edge 对本地 production preview 的实际验收通过：英文页头显示 `Competitions` 和“切换为中文”，
+  中文页头显示“竞赛”和“切换为英文”；两次切换后 `html lang` 分别为 `en` / `zh-CN`，刷新后中文
+  选择保持，主题按钮与语言按钮顺序正确，浏览器控制台无新增 Warning/Error。验收临时进程和标签页
+  已清理。
+- 本阶段只创建本地功能提交与本 HANDOFF 提交，尚未 push、尚未部署；生产仍运行此前已部署版本。
+  获得新的明确授权后再推送和部署 Alpha.23，并使用已登录的普通参赛者、Judge 与 Administrator 会话
+  抽查各自专属页面的英文长文案和窄屏布局。
+
 ## 2026-08-10 Alpha.22 裁判处理封禁申诉
 
 - 功能提交 `0e842531` 修复封禁申诉仍错误复用 `CanModerateAsync` 的权限缺口。申诉列表现在用
