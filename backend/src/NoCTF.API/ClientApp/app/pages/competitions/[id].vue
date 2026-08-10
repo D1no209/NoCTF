@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { Activity, FileCheck, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound, Users } from '@lucide/vue'
 import { getCompetitionEndpoint } from '~/api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
+import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
 
 const route = useRoute()
 const competitionId = computed(() => route.params.id as string)
@@ -35,38 +37,45 @@ onUnmounted(() => unwatch?.())
 
 provide(competitionContextKey, { competition, loading, error, refresh })
 
-const tabs = computed(() => {
+const navGroups = computed<WorkspaceNavGroup[]>(() => {
   const base = `/competitions/${competitionId.value}`
   const challengesVisible = competition.value?.status === CompetitionStatus.Running
     || competition.value?.status === CompetitionStatus.Paused
     || competition.value?.status === CompetitionStatus.Finished
   return [
-    { to: base, label: translate("概览"), exact: true },
-    ...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目") }] : []),
-    { to: `${base}/leaderboard`, label: translate("记分板") },
-    { to: `${base}/teams`, label: translate("队伍") },
-    { to: `${base}/events`, label: translate("动态") },
-    { to: `${base}/questions`, label: translate("咨询") },
-    { to: `${base}/my/team`, label: translate("我的队伍") },
-    { to: `${base}/my/submissions`, label: translate("我的提交") },
+    {
+      label: translate("竞赛"),
+      items: [
+        { to: base, label: translate("概览"), icon: LayoutDashboard, exact: true },
+        ...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : []),
+        { to: `${base}/leaderboard`, label: translate("记分板"), icon: Trophy },
+        { to: `${base}/teams`, label: translate("队伍"), icon: Users },
+        { to: `${base}/events`, label: translate("动态"), icon: Activity },
+      ],
+    },
+    {
+      label: translate("互动"),
+      items: [
+        { to: `${base}/questions`, label: translate("咨询"), icon: MessageCircleQuestion },
+      ],
+    },
+    {
+      label: translate("我的"),
+      items: [
+        { to: `${base}/my/team`, label: translate("我的队伍"), icon: UserRound },
+        { to: `${base}/my/submissions`, label: translate("我的提交"), icon: FileCheck },
+      ],
+    },
   ]
 })
-
-function isActive(to: string, exact: boolean) {
-  return exact ? route.path === to : route.path.startsWith(to)
-}
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8">
-    <Alert v-if="error" variant="destructive">
-      <AlertDescription>{{ error }}</AlertDescription>
-    </Alert>
-
-    <template v-else-if="competition">
+  <AppWorkspaceNav v-if="competition" :groups="navGroups" :title="competition.title">
+    <div class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
       <div class="flex flex-col gap-3">
         <div class="flex flex-wrap items-center gap-3">
-          <h1 class="text-3xl font-bold tracking-tight">{{ competition.title }}</h1>
+          <h1 class="text-2xl font-bold tracking-tight md:text-3xl">{{ competition.title }}</h1>
           <ModeBadge :mode="competition.mode" />
           <LifecycleBadge :status="competition.status" />
           <CompetitionCountdown
@@ -81,21 +90,14 @@ function isActive(to: string, exact: boolean) {
         </p>
       </div>
 
-      <nav class="flex flex-wrap items-center gap-1 border-b">
-        <Button
-          v-for="tab in tabs"
-          :key="tab.to"
-          variant="ghost"
-          as-child
-          class="rounded-b-none"
-          :class="isActive(tab.to, tab.exact ?? false) ? 'border-b-2 border-primary font-semibold text-foreground' : 'text-muted-foreground'"
-        >
-          <NuxtLink :to="tab.to">{{ tab.label }}</NuxtLink>
-        </Button>
-      </nav>
-
       <NuxtPage />
-    </template>
+    </div>
+  </AppWorkspaceNav>
+
+  <div v-else class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8">
+    <Alert v-if="error" variant="destructive">
+      <AlertDescription>{{ error }}</AlertDescription>
+    </Alert>
 
     <div v-else class="flex flex-col gap-4">
       <Skeleton class="h-10 w-2/3" />

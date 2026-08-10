@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bell, LogOut, Settings, ShieldCheck, Trophy, User } from '@lucide/vue'
+import { Bell, CalendarCog, Database, Flag, LogOut, ShieldCheck, Trophy, User } from '@lucide/vue'
 
 const { user, isLoggedIn, isAdministrator, canOrganize, logout } = useAuth()
 const { configuration } = usePlatform()
@@ -10,10 +10,10 @@ const { t } = useLocale()
 let notificationTimer: ReturnType<typeof setInterval> | undefined
 
 const navItems = computed(() => [
-  { to: '/competitions', label: t('竞赛'), show: true },
-  { to: '/admin/competitions', label: t('竞赛管理'), show: isLoggedIn.value },
-  { to: '/admin/challenges', label: t('题库管理'), show: canOrganize.value },
-  { to: '/admin/platform', label: t('平台管理'), show: isAdministrator.value },
+  { to: '/competitions', label: t('竞赛'), icon: Flag, show: true },
+  { to: '/admin/competitions', label: t('竞赛管理'), icon: CalendarCog, show: isLoggedIn.value },
+  { to: '/admin/challenges', label: t('题库管理'), icon: Database, show: canOrganize.value },
+  { to: '/admin/platform', label: t('平台管理'), icon: ShieldCheck, show: isAdministrator.value },
 ])
 
 function isActive(to: string) {
@@ -51,9 +51,13 @@ onBeforeUnmount(() => {
             :key="item.to"
             variant="ghost"
             as-child
-            :class="isActive(item.to) ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'"
+            class="relative"
+            :class="isActive(item.to) ? 'text-foreground font-medium after:absolute after:inset-x-2.5 after:bottom-1 after:h-0.5 after:rounded-full after:bg-primary' : 'text-muted-foreground'"
           >
-            <NuxtLink :to="item.to">{{ item.label }}</NuxtLink>
+            <NuxtLink :to="item.to">
+              <component :is="item.icon" />
+              {{ item.label }}
+            </NuxtLink>
           </Button>
         </nav>
         <div class="ml-auto flex items-center gap-2">
@@ -97,12 +101,6 @@ onBeforeUnmount(() => {
                     <NuxtLink to="/admin/platform" class="flex items-center gap-2">
                       <ShieldCheck />
                       {{ t('平台管理') }}
-                    </NuxtLink>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem as-child>
-                    <NuxtLink to="/account" class="flex items-center gap-2">
-                      <Settings />
-                      {{ t('偏好') }}
                     </NuxtLink>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>

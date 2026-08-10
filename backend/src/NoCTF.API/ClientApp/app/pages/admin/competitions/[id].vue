@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Megaphone } from '@lucide/vue'
+import { Container, Download, FileCheck, KeyRound, LayoutDashboard, Megaphone, Puzzle, Settings, ShieldAlert, Trophy, Users } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   adminCreateCompetitionAnnouncement,
@@ -9,6 +9,7 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsAnnouncementAudience,
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
 } from '~/api'
+import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
 import { CompetitionAdminKey } from '~/lib/admin-competition'
 import type { CompetitionAdminRole } from '~/lib/admin-competition'
 
@@ -116,36 +117,37 @@ provide(CompetitionAdminKey, {
   refresh,
 })
 
-interface NavItem {
-  to: string
-  label: string
-  ownerOnly?: boolean
-}
-
 const base = `/admin/competitions/${competitionId}`
-const navItems: NavItem[] = [
-  { to: base, label: translate("概览") },
-  { to: `${base}/configuration`, label: translate("配置") },
-  { to: `${base}/challenges`, label: translate("题目") },
-  { to: `${base}/teams`, label: translate("团队") },
-  { to: `${base}/submissions`, label: translate("提交") },
-  { to: `${base}/runtimes`, label: translate("运行时") },
-  { to: `${base}/cheats`, label: translate("作弊") },
-  { to: `${base}/leaderboard`, label: translate("记分板") },
-  { to: `${base}/exports`, label: translate("导出") },
-  { to: `${base}/permissions`, label: translate("权限"), ownerOnly: true },
-]
 
-const visibleNav = computed(() => navItems.filter(i => !i.ownerOnly || canManagePermissions.value))
-
-// Keep deep child routes (e.g. challenge detail) highlighting their section tab.
-const activeTab = computed(() => {
-  const path = route.path
-  const match = [...visibleNav.value]
-    .sort((a, b) => b.to.length - a.to.length)
-    .find(i => (i.to === base ? path === base : path.startsWith(i.to)))
-  return match?.to ?? base
-})
+const navGroups = computed<WorkspaceNavGroup[]>(() => [
+  {
+    label: translate("运营"),
+    items: [
+      { to: base, label: translate("概览"), icon: LayoutDashboard, exact: true },
+      { to: `${base}/configuration`, label: translate("配置"), icon: Settings },
+      { to: `${base}/challenges`, label: translate("题目"), icon: Puzzle },
+      { to: `${base}/teams`, label: translate("团队"), icon: Users },
+    ],
+  },
+  {
+    label: translate("监控"),
+    items: [
+      { to: `${base}/submissions`, label: translate("提交"), icon: FileCheck },
+      { to: `${base}/runtimes`, label: translate("运行时"), icon: Container },
+      { to: `${base}/cheats`, label: translate("作弊"), icon: ShieldAlert },
+      { to: `${base}/leaderboard`, label: translate("记分板"), icon: Trophy },
+    ],
+  },
+  {
+    label: translate("管理"),
+    items: [
+      { to: `${base}/exports`, label: translate("导出"), icon: Download },
+      ...(canManagePermissions.value
+        ? [{ to: `${base}/permissions`, label: translate("权限"), icon: KeyRound }]
+        : []),
+    ],
+  },
+])
 
 onMounted(async () => {
   loading.value = true
@@ -156,16 +158,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
-    <div v-if="loading" class="flex flex-col gap-4">
-      <Skeleton class="h-10 w-64" />
-      <Skeleton class="h-8 w-full max-w-xl" />
-      <Skeleton class="h-64 w-full" />
-    </div>
-    <Alert v-else-if="error && !competition" variant="destructive">
-      <AlertDescription>{{ error }}</AlertDescription>
-    </Alert>
-    <template v-else-if="competition">
+  <AppWorkspaceNav v-if="competition" :groups="navGroups" :title="competition.title">
+    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 md:px-6">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex flex-wrap items-center gap-3">
           <h1 class="text-2xl font-semibold">{{ competition.title }}</h1>
@@ -176,21 +170,10 @@ onMounted(async () => {
         <Button v-if="canAnnounce" variant="outline" @click="announcementOpen = true">
           <Megaphone data-icon="inline-start" /> {{ $t('发布通知') }} </Button>
       </div>
-      <Tabs :model-value="activeTab" @update:model-value="(v) => navigateTo(String(v))">
-        <TabsList class="max-w-full justify-start gap-1 overflow-x-auto overflow-y-hidden p-1 group-data-horizontal/tabs:h-11">
-          <TabsTrigger
-            v-for="item in visibleNav"
-            :key="item.to"
-            :value="item.to"
-            class="h-9 flex-none px-3.5 text-base"
-          >
-            {{ item.label }}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
       <NuxtPage />
+    </div>
 
-      <Dialog :open="announcementOpen" @update:open="setAnnouncementOpen">
+    <Dialog :open="announcementOpen" @update:open="setAnnouncementOpen">
         <DialogContent class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{{ $t('发布比赛通知') }}</DialogTitle>
@@ -240,6 +223,16 @@ onMounted(async () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </template>
+  </AppWorkspaceNav>
+
+  <div v-else class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8">
+    <div v-if="loading" class="flex flex-col gap-4">
+      <Skeleton class="h-10 w-64" />
+      <Skeleton class="h-8 w-full max-w-xl" />
+      <Skeleton class="h-64 w-full" />
+    </div>
+    <Alert v-else variant="destructive">
+      <AlertDescription>{{ error ?? $t('加载竞赛失败') }}</AlertDescription>
+    </Alert>
   </div>
 </template>
