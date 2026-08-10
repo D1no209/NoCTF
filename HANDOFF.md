@@ -38,9 +38,26 @@
   配置门禁跳过；ClientApp `bun test` 77/77、`bun run typecheck`、`bun run build` 全部通过；EF
   model drift 与 `git diff --check` 通过。仓库仍没有 lint script/ESLint 配置，因此未伪造 lint 结果；
   Nuxt 只保留既有大 chunk、插件耗时和第三方 trailing-slash 警告。
-- 本阶段仅创建本地功能提交与本 HANDOFF 提交，尚未 push、尚未部署。生产当前仍运行 Alpha.20，
-  因而不能用线上旧页面冒充新版浏览器验收；获得明确部署授权后，应使用两个不同参赛账号复核 Inbox
-  差异、题目页赛事播报和 Fa1lSnow 的「裁判」标签，并检查浏览器控制台无新增错误。
+- 用户明确授权后，`8cd8ef63` 与 `cd18dfd8` 已无冲突快进推送到远程 `main`。生产
+  `/root/NoCTF` 通过先决提交为 `b757a254` 的增量 bundle 快进到 `cd18dfd8`；既有未跟踪
+  `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、PostgreSQL/Redis/上传卷及题目镜像均未
+  覆盖。681,527,808 字节镜像归档 SHA-256 为
+  `7935ebc45eefdd75f7366705261d2169c86808969a633e91b495b5fc3c969ff7`，Git bundle SHA-256 为
+  `00c10bcddca2e4d7b78a2fab5a94a0fb45aa5d4c03a1de835788666f232a0401`；本地与服务器端校验一致。
+- Alpha.21 API/Migration、Worker、Runner 镜像 ID 分别为 `0e32e54ae2ff`、`8d0967a03b8f`、
+  `d91cfcf7f90e`，均为 `linux/amd64`，程序集包含 `0.1.0-alpha.21`。旧 Alpha.20 镜像保留
+  `rollback-b757a254` 精确标签；Migration 容器报告数据库已是最新，没有应用 schema 变化。API、
+  Worker、Runner 重建后 API/Runner healthy、Worker running，restart count 均为 0；外网 HTTPS
+  `/`、`/health`、`/notifications`、管理比赛列表和目标题目页均返回 200，新静态产物包含「赛事播报」。
+- API 启动时 Wolverine 检测到旧 leader 并尝试停止已退出节点，等待确认 60 秒后记录两条瞬时 Timeout
+  fail；10 秒后新节点成功接管数据库代理，后续完整观察窗口 API/Worker/Runner 均无新增 fail、crit、
+  Fatal、Unhandled、ArgumentNullException 或 OutOfMemory。只读 PostgreSQL 核对 Fa1lSnow 在
+  `TEST GAME II` 的角色码为 `2 = Judge`，与新版强类型列表响应一致。浏览器现有页面停在登录页，
+  没有 Fa1lSnow 登录会话，因此未重置账号或伪造有会话的视觉验收。
+- 部署后已校验并删除精确传输目录 `/root/noctf-deploy-alpha21-cd18dfd8`，同时移除已被 Alpha.20
+  回滚镜像取代、未被容器引用的 Alpha.16 三个服务镜像；没有执行广域 Docker prune。根分区从加载
+  镜像后的 75% 使用恢复到 68%，约 14 GB 可用。数据库、Redis、上传文件、题目镜像、Runtime 和
+  业务事实均未删除或修改。
 
 ## 2026-08-10 Alpha.20 GameplayFact/组合宿主同步、数据迁移与生产部署
 
