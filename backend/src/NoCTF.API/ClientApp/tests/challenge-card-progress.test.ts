@@ -22,7 +22,7 @@ describe('participant challenge progress', () => {
     ).text()
 
     expect(shell).toContain('competition.value?.status === CompetitionStatus.Running')
-    expect(shell).toContain("...(challengesVisible ? [{ to: `${base}/challenges`, label: '题目' }] : [])")
+    expect(shell).toContain('...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目") }] : [])')
   })
 
   test('celebrates a correct flag once and respects reduced motion', async () => {

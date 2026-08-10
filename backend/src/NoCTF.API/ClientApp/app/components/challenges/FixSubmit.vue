@@ -35,8 +35,8 @@ const { start: startPolling, stop: stopPolling } = usePolling(
     if (error || !data) return false
     result.value = { state: data.state, result: data.result }
     if (!isGameplayFactPending(data.state)) {
-      if (data.result === GameplayFactResult.Correct) toast.success('Fix 评测完成:修复生效')
-      else toast.error(`Fix 评测完成:${gameplayFactResultLabel(data.result)}`)
+      if (data.result === GameplayFactResult.Correct) toast.success(translate("Fix 评测完成:修复生效"))
+      else toast.error(translate('Fix 评测完成：{result}', { result: gameplayFactResultLabel(data.result) }))
       emit('evaluated')
       return true
     }
@@ -59,7 +59,7 @@ async function submit() {
       body: { file: file.value },
     })
     if (uploadError || !upload?.patchUploadId) {
-      toast.error(parseApiError(uploadError, '补丁上传失败').message)
+      toast.error(parseApiError(uploadError, translate("补丁上传失败")).message)
       return
     }
     stage.value = 'submitting'
@@ -68,13 +68,13 @@ async function submit() {
       body: { patchUploadId: upload.patchUploadId },
     })
     if (submitError || !accepted?.gameplayFactId) {
-      toast.error(parseApiError(submitError, 'Fix 提交失败').message)
+      toast.error(parseApiError(submitError, translate("Fix 提交失败")).message)
       return
     }
     gameplayFactId.value = accepted.gameplayFactId
     result.value = { state: GameplayFactState.Pending, result: null }
     stage.value = 'evaluating'
-    toast.success('Fix 已受理,等待评测')
+    toast.success(translate("Fix 已受理,等待评测"))
     startPolling()
   }
   finally {
@@ -108,19 +108,17 @@ onUnmounted(() => {
 <template>
   <Card>
     <CardHeader>
-      <CardTitle class="text-base">提交 Fix(修复归档)</CardTitle>
-      <CardDescription>
-        上传包含修复内容的 tar.gz 归档,平台将重建靶机并验证漏洞是否修复
-      </CardDescription>
+      <CardTitle class="text-base">{{ $t('提交 Fix(修复归档)') }}</CardTitle>
+      <CardDescription> {{ $t('上传包含修复内容的 tar.gz 归档,平台将重建靶机并验证漏洞是否修复') }} </CardDescription>
     </CardHeader>
     <CardContent>
       <Alert v-if="disabled" class="mb-4">
-        <AlertDescription>{{ disabledReason ?? '当前不可提交 Fix。' }}</AlertDescription>
+        <AlertDescription>{{ disabledReason ?? $t('当前不可提交 Fix。') }}</AlertDescription>
       </Alert>
       <form @submit.prevent="submit">
         <FieldGroup>
           <Field>
-            <FieldLabel :for="`patch-file-${competitionChallengeId}`">修复归档(.tar.gz)</FieldLabel>
+            <FieldLabel :for="`patch-file-${competitionChallengeId}`">{{ $t('修复归档(.tar.gz)') }}</FieldLabel>
             <Input
               :id="`patch-file-${competitionChallengeId}`"
               type="file"
@@ -128,12 +126,12 @@ onUnmounted(() => {
               :disabled="disabled"
               @change="onFileChange"
             />
-            <FieldDescription v-if="file">已选择:{{ file.name }}({{ formatBytes(file.size) }})</FieldDescription>
+            <FieldDescription v-if="file">{{ $t('已选择：{file}（{size}）', { file: file.name, size: formatBytes(file.size) }) }}</FieldDescription>
           </Field>
           <Field>
             <Button type="submit" :disabled="pending || !file || disabled">
               <Spinner v-if="pending" data-icon="inline-start" />
-              {{ stage === 'uploading' ? '上传中…' : stage === 'submitting' ? '提交中…' : '上传并提交 Fix' }}
+              {{ stage === 'uploading' ? $t('上传中…') : stage === 'submitting' ? $t('提交中…') : $t('上传并提交 Fix') }}
             </Button>
           </Field>
         </FieldGroup>
@@ -143,7 +141,7 @@ onUnmounted(() => {
         <AlertDescription class="flex items-center gap-2">
           <Spinner v-if="isGameplayFactPending(result.state)" class="size-3" />
           <span v-if="isGameplayFactPending(result.state)">{{ gameplayFactStateLabel(result.state) }}…</span>
-          <span v-else>评测结果:<strong>{{ gameplayFactResultLabel(result.result) }}</strong></span>
+          <span v-else>{{ $t('评测结果:') }}<strong>{{ gameplayFactResultLabel(result.result) }}</strong></span>
         </AlertDescription>
       </Alert>
     </CardContent>

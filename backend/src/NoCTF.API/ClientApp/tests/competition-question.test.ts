@@ -66,7 +66,7 @@ describe('competition question page wiring', () => {
     ).text()
 
     expect(page).toContain('if (replyPending.value || !reply.value.trim() || !detail.value?.canReply) return')
-    expect(page).toContain("competitionQuestionErrorMessage(error, '发送失败')")
+    expect(page).toContain('competitionQuestionErrorMessage(error, translate("发送失败"))')
     expect(page).toContain('finally {')
     expect(page).toContain('replyPending.value = false')
     expect(page).toContain('upsertQuestion(data)')

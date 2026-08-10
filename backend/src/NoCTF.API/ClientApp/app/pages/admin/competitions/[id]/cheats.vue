@@ -89,15 +89,15 @@ async function openDetail(gameplayFactId?: string) {
 
 // ---- Actions ----
 const ActionMeta = {
-  confirm: { title: '确认作弊并封禁', description: '确认该事件为作弊，并立即封禁来源队伍。' },
-  dismiss: { title: '驳回作弊事件', description: '驳回该作弊事件，不产生封禁。' },
-  correct: { title: '纠正作弊事件', description: '将此前确认的作弊标记为误判并解除相关封禁。' },
+  confirm: { title: translate("确认作弊并封禁"), description: translate("确认该事件为作弊，并立即封禁来源队伍。") },
+  dismiss: { title: translate("驳回作弊事件"), description: translate("驳回该作弊事件，不产生封禁。") },
+  correct: { title: translate("纠正作弊事件"), description: translate("将此前确认的作弊标记为误判并解除相关封禁。") },
 } as const
 
 const SuccessMessage = {
-  confirm: '已确认作弊并封禁来源队伍',
-  dismiss: '已驳回作弊事件',
-  correct: '已纠正作弊事件并解除相关封禁',
+  confirm: translate("已确认作弊并封禁来源队伍"),
+  dismiss: translate("已驳回作弊事件"),
+  correct: translate("已纠正作弊事件并解除相关封禁"),
 } as const
 
 async function refreshResolvedIncident(request: CheatIncidentResolutionRequest) {
@@ -130,7 +130,7 @@ const {
 
 const resolutionTargetLabel = computed(() => resolutionTarget.value?.sourceTeamName
   ?? resolutionTarget.value?.sourceTeamId
-  ?? '未知队伍')
+  ?? translate('未知队伍'))
 
 function openAction(mode: 'confirm' | 'dismiss' | 'correct') {
   const current = detail.value
@@ -177,31 +177,29 @@ onBeforeUnmount(() => {
     <div class="flex flex-wrap items-center gap-3">
       <Select v-model="filterStatus">
         <SelectTrigger class="w-40">
-          <SelectValue placeholder="状态(全部)" />
+          <SelectValue :placeholder="$t('状态(全部)')" />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
-            <SelectItem value="All">全部</SelectItem>
-            <SelectItem value="Pending">待处理</SelectItem>
-            <SelectItem value="Confirmed">已确认</SelectItem>
-            <SelectItem value="Dismissed">已驳回</SelectItem>
-            <SelectItem value="Superseded">已取代</SelectItem>
-            <SelectItem value="Corrected">已纠正</SelectItem>
+            <SelectItem value="All">{{ $t('全部') }}</SelectItem>
+            <SelectItem value="Pending">{{ $t('待处理') }}</SelectItem>
+            <SelectItem value="Confirmed">{{ $t('已确认') }}</SelectItem>
+            <SelectItem value="Dismissed">{{ $t('已驳回') }}</SelectItem>
+            <SelectItem value="Superseded">{{ $t('已取代') }}</SelectItem>
+            <SelectItem value="Corrected">{{ $t('已纠正') }}</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
-      <Input v-model="filterFrom" type="datetime-local" class="w-52" aria-label="起始时间" />
-      <span class="text-sm text-muted-foreground">至</span>
-      <Input v-model="filterTo" type="datetime-local" class="w-52" aria-label="结束时间" />
-      <Button size="sm" @click="applyFilters">应用筛选</Button>
+      <Input v-model="filterFrom" type="datetime-local" class="w-52" :aria-label="$t('起始时间')" />
+      <span class="text-sm text-muted-foreground">{{ $t('至') }}</span>
+      <Input v-model="filterTo" type="datetime-local" class="w-52" :aria-label="$t('结束时间')" />
+      <Button size="sm" @click="applyFilters">{{ $t('应用筛选') }}</Button>
       <Badge v-if="pendingCount !== null && pendingCount > 0" variant="destructive">
-        {{ pendingCount }} 件待处理
+        {{ $t('{count} 件待处理', { count: pendingCount }) }}
       </Badge>
     </div>
 
-    <p class="text-xs text-muted-foreground">
-      时间全部留空时查询最近 31 天；手动筛选时需同时填写起止时间，范围最长 31 天。
-    </p>
+    <p class="text-xs text-muted-foreground"> {{ $t('时间全部留空时查询最近 31 天；手动筛选时需同时填写起止时间，范围最长 31 天。') }} </p>
 
     <Alert v-if="filterError || listError" variant="destructive">
       <AlertDescription>{{ filterError ?? listError?.message }}</AlertDescription>
@@ -210,27 +208,27 @@ onBeforeUnmount(() => {
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
     <Empty v-else-if="initialized && items.length === 0">
       <EmptyHeader>
-        <EmptyTitle>暂无作弊事件</EmptyTitle>
+        <EmptyTitle>{{ $t('暂无作弊事件') }}</EmptyTitle>
       </EmptyHeader>
     </Empty>
     <template v-else>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>来源队伍</TableHead>
-            <TableHead>Flag 属主队伍</TableHead>
-            <TableHead>题目</TableHead>
-            <TableHead class="w-20">类型</TableHead>
-            <TableHead class="w-24">状态</TableHead>
-            <TableHead class="w-44">检测时间</TableHead>
-            <TableHead class="w-40 text-right">操作</TableHead>
+            <TableHead>{{ $t('来源队伍') }}</TableHead>
+            <TableHead>{{ $t('Flag 属主队伍') }}</TableHead>
+            <TableHead>{{ $t('题目') }}</TableHead>
+            <TableHead class="w-20">{{ $t('类型') }}</TableHead>
+            <TableHead class="w-24">{{ $t('状态') }}</TableHead>
+            <TableHead class="w-44">{{ $t('检测时间') }}</TableHead>
+            <TableHead class="w-40 text-right">{{ $t('操作') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           <TableRow v-for="i in items" :key="i.gameplayFactId">
             <TableCell class="font-medium">
               {{ i.sourceTeamName }}
-              <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">已封禁</Badge>
+              <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">{{ $t('已封禁') }}</Badge>
             </TableCell>
             <TableCell>{{ i.ownerTeamName }}</TableCell>
             <TableCell>{{ i.challengeTitle }}</TableCell>
@@ -242,66 +240,58 @@ onBeforeUnmount(() => {
             </TableCell>
             <TableCell>{{ adminFormatDateTime(i.detectedAt) }}</TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openDetail(i.gameplayFactId)">详情</Button>
+              <Button variant="ghost" size="sm" @click="openDetail(i.gameplayFactId)">{{ $t('详情') }}</Button>
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
       <div v-if="hasMore" class="flex justify-center">
         <Button variant="outline" :disabled="loading" @click="loadNextPage">
-          <Spinner v-if="loading" data-icon="inline-start" />
-          加载更多
-        </Button>
+          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('加载更多') }} </Button>
       </div>
     </template>
 
     <Sheet v-model:open="detailOpen">
       <SheetContent class="overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>作弊事件详情</SheetTitle>
-          <SheetDescription>事件 ID:{{ detail?.gameplayFactId }}</SheetDescription>
+          <SheetTitle>{{ $t('作弊事件详情') }}</SheetTitle>
+          <SheetDescription>{{ $t('事件 ID：{id}', { id: detail?.gameplayFactId ?? '—' }) }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
-          <div class="flex justify-between"><span class="text-muted-foreground">来源队伍</span><span>{{ detail.sourceTeamName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">Flag 属主</span><span>{{ detail.ownerTeamName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">题目</span><span>{{ detail.challengeTitle }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">提交人</span><span>{{ detail.submittedByUserName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">类型</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">结果</span><span>{{ enumLabel(GameplayFactResultLabel, detail.result) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">状态</span><span>{{ enumLabel(CheatIncidentStatusLabel, detail.status) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">提交时间</span><span>{{ adminFormatDateTime(detail.submittedAt) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">检测时间</span><span>{{ adminFormatDateTime(detail.detectedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('来源队伍') }}</span><span>{{ detail.sourceTeamName }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('Flag 属主') }}</span><span>{{ detail.ownerTeamName }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('题目') }}</span><span>{{ detail.challengeTitle }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交人') }}</span><span>{{ detail.submittedByUserName }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('结果') }}</span><span>{{ enumLabel(GameplayFactResultLabel, detail.result) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('状态') }}</span><span>{{ enumLabel(CheatIncidentStatusLabel, detail.status) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交时间') }}</span><span>{{ adminFormatDateTime(detail.submittedAt) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('检测时间') }}</span><span>{{ adminFormatDateTime(detail.detectedAt) }}</span></div>
           <template v-if="detail.resolvedByUserName">
-            <div class="flex justify-between"><span class="text-muted-foreground">处理人</span><span>{{ detail.resolvedByUserName }}</span></div>
-            <div class="flex justify-between"><span class="text-muted-foreground">处理时间</span><span>{{ adminFormatDateTime(detail.resolvedAt) }}</span></div>
-            <div class="flex flex-col gap-1"><span class="text-muted-foreground">处理理由</span><span class="whitespace-pre-wrap">{{ detail.resolutionReason }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('处理人') }}</span><span>{{ detail.resolvedByUserName }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('处理时间') }}</span><span>{{ adminFormatDateTime(detail.resolvedAt) }}</span></div>
+            <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('处理理由') }}</span><span class="whitespace-pre-wrap">{{ detail.resolutionReason }}</span></div>
           </template>
           <template v-if="detail.sourceTeamIsBanned">
             <Separator />
-            <div class="flex justify-between"><span class="text-muted-foreground">封禁时间</span><span>{{ adminFormatDateTime(detail.sourceTeamBannedAt) }}</span></div>
-            <div class="flex flex-col gap-1"><span class="text-muted-foreground">封禁原因</span><span class="whitespace-pre-wrap">{{ detail.sourceTeamBanReason ?? '—' }}</span></div>
+            <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('封禁时间') }}</span><span>{{ adminFormatDateTime(detail.sourceTeamBannedAt) }}</span></div>
+            <div class="flex flex-col gap-1"><span class="text-muted-foreground">{{ $t('封禁原因') }}</span><span class="whitespace-pre-wrap">{{ detail.sourceTeamBanReason ?? '—' }}</span></div>
           </template>
           <Separator />
           <div class="flex flex-col gap-2">
-            <span class="text-muted-foreground">提交的 Flag(证据)</span>
+            <span class="text-muted-foreground">{{ $t('提交的 Flag(证据)') }}</span>
             <Button variant="outline" size="sm" class="w-fit" @click="showFlag = !showFlag">
-              {{ showFlag ? '隐藏' : '显示完整 Flag' }}
+              {{ showFlag ? $t('隐藏') : $t('显示完整 Flag') }}
             </Button>
             <div v-if="showFlag" class="rounded-md border bg-muted p-3 font-mono text-xs break-all">
               {{ detail.value }}
             </div>
           </div>
           <div v-if="detail.canConfirm || detail.canDismiss || detail.canCorrect" class="flex flex-wrap gap-2 pt-2">
-            <Button v-if="detail.canConfirm" variant="destructive" size="sm" @click="openAction('confirm')">
-              确认作弊(封禁)
-            </Button>
-            <Button v-if="detail.canDismiss" variant="outline" size="sm" @click="openAction('dismiss')">
-              驳回
-            </Button>
-            <Button v-if="detail.canCorrect" variant="outline" size="sm" @click="openAction('correct')">
-              纠正(解封)
-            </Button>
+            <Button v-if="detail.canConfirm" variant="destructive" size="sm" @click="openAction('confirm')"> {{ $t('确认作弊(封禁)') }} </Button>
+            <Button v-if="detail.canDismiss" variant="outline" size="sm" @click="openAction('dismiss')"> {{ $t('驳回') }} </Button>
+            <Button v-if="detail.canCorrect" variant="outline" size="sm" @click="openAction('correct')"> {{ $t('纠正(解封)') }} </Button>
           </div>
         </div>
       </SheetContent>
@@ -313,14 +303,14 @@ onBeforeUnmount(() => {
           <AlertDialogTitle>{{ resolutionAction ? ActionMeta[resolutionAction].title : '' }}</AlertDialogTitle>
           <AlertDialogDescription>
             {{ resolutionAction ? ActionMeta[resolutionAction].description : '' }}
-            影响对象：{{ resolutionTargetLabel }}。理由会记入比赛事件和审计记录。
+            {{ $t('影响对象：{target}。理由会记入比赛事件和审计记录。', { target: resolutionTargetLabel }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div class="grid gap-2 px-1 pb-2">
           <Textarea
             v-model="resolutionReason"
-            placeholder="请输入至少 8 个字符的处置理由"
-            aria-label="处置理由"
+            :placeholder="$t('请输入至少 8 个字符的处置理由')"
+            :aria-label="$t('处置理由')"
             aria-describedby="cheat-resolution-reason-help"
             :aria-invalid="remainingCharacters > 0"
             :disabled="resolutionPending"
@@ -331,20 +321,16 @@ onBeforeUnmount(() => {
             :class="remainingCharacters > 0 ? 'text-destructive' : 'text-muted-foreground'"
           >
             <template v-if="remainingCharacters > 0">
-              理由至少需要 8 个字符，还需 {{ remainingCharacters }} 个字符。
+              {{ $t('理由至少需要 8 个字符，还需 {count} 个字符。', { count: remainingCharacters }) }}
             </template>
-            <template v-else>
-              理由长度符合要求。
-            </template>
+            <template v-else> {{ $t('理由长度符合要求。') }} </template>
           </p>
           <p v-if="resolutionError" role="alert" class="text-destructive text-sm">
             {{ resolutionError }}
           </p>
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="resolutionPending">
-            取消
-          </AlertDialogCancel>
+          <AlertDialogCancel :disabled="resolutionPending"> {{ $t('取消') }} </AlertDialogCancel>
           <Button
             type="button"
             :variant="resolutionAction === 'confirm' ? 'destructive' : 'default'"
@@ -352,7 +338,7 @@ onBeforeUnmount(() => {
             @click="handleResolutionSubmit"
           >
             <Spinner v-if="resolutionPending" data-icon="inline-start" />
-            {{ resolutionPending ? '提交中' : (resolutionAction ? ActionMeta[resolutionAction].title : '确认') }}
+            {{ resolutionPending ? $t('提交中') : (resolutionAction ? ActionMeta[resolutionAction].title : $t('确认')) }}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

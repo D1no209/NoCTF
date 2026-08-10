@@ -13,7 +13,7 @@ onMounted(async () => {
   const { data, error: err } = await userProfileGet({ path: { userId } })
   loading.value = false
   if (err || !data) {
-    error.value = parseApiError(err, '用户不存在或加载失败').message
+    error.value = parseApiError(err, translate("用户不存在或加载失败")).message
     return
   }
   profile.value = data
@@ -47,7 +47,7 @@ onMounted(async () => {
         <p v-if="profile.description" class="whitespace-pre-line text-sm leading-6">
           {{ profile.description }}
         </p>
-        <p v-else class="text-sm text-muted-foreground">这个用户还没有填写简介。</p>
+        <p v-else class="text-sm text-muted-foreground">{{ $t('这个用户还没有填写简介。') }}</p>
       </CardContent>
     </Card>
   </div>

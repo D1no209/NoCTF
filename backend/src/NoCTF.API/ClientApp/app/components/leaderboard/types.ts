@@ -1,3 +1,5 @@
+import { translate } from '../../utils/i18n'
+
 /** 排行榜页面内部使用的结构化类型(对应后端 LeaderboardProtocolResponse 的 camelCase JSON)。 */
 
 export interface TrendPoint {
@@ -49,4 +51,4 @@ export function normalizeChallengeKey(value?: string | null): string {
   return (value ?? '').replace(/[^0-9a-f]/gi, '').toLowerCase()
 }
 
-export const bloodRankLabel: Record<string, string> = { First: '一血', Second: '二血', Third: '三血' }
+export const bloodRankLabel: Record<string, string> = { First: translate("一血"), Second: translate("二血"), Third: translate("三血") }

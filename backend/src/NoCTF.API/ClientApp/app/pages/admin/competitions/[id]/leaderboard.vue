@@ -52,7 +52,7 @@ async function save() {
     if (error) throw error
     current.value = data ?? current.value
     reason.value = ''
-    toast.success('记分板可见性已更新')
+    toast.success(translate("记分板可见性已更新"))
   }
   catch (e) {
     toastWriteError(e, load)
@@ -74,23 +74,23 @@ onMounted(load)
     <template v-else-if="current">
       <Card>
         <CardHeader>
-          <CardTitle>当前状态</CardTitle>
+          <CardTitle>{{ $t('当前状态') }}</CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-2 text-sm">
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">配置的可见性:</span>
+            <span class="text-muted-foreground">{{ $t('配置的可见性:') }}</span>
             <Badge variant="secondary">{{ enumLabel(LeaderboardVisibilityLabel, current.configuredVisibility) }}</Badge>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">实际生效:</span>
+            <span class="text-muted-foreground">{{ $t('实际生效:') }}</span>
             <Badge>{{ enumLabel(LeaderboardVisibilityLabel, current.effectiveVisibility) }}</Badge>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">生效时间:</span>
-            <span>{{ current.startsAt ? adminFormatDateTime(current.startsAt) : '立即' }}</span>
+            <span class="text-muted-foreground">{{ $t('生效时间:') }}</span>
+            <span>{{ current.startsAt ? adminFormatDateTime(current.startsAt) : $t('立即') }}</span>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">上次应用:</span>
+            <span class="text-muted-foreground">{{ $t('上次应用:') }}</span>
             <span>{{ adminFormatDateTime(current.appliedAt) }}</span>
           </div>
         </CardContent>
@@ -98,40 +98,38 @@ onMounted(load)
 
       <Card>
         <CardHeader>
-          <CardTitle>修改可见性</CardTitle>
-          <CardDescription>冻结保留最后排名快照;遮蔽对选手完全隐藏记分板。可设置定时生效。</CardDescription>
+          <CardTitle>{{ $t('修改可见性') }}</CardTitle>
+          <CardDescription>{{ $t('冻结保留最后排名快照;遮蔽对选手完全隐藏记分板。可设置定时生效。') }}</CardDescription>
         </CardHeader>
         <CardContent>
           <form @submit.prevent="save">
             <FieldGroup>
               <Field>
-                <FieldLabel for="vis">可见性</FieldLabel>
+                <FieldLabel for="vis">{{ $t('可见性') }}</FieldLabel>
                 <Select id="vis" v-model="visibility" :disabled="!canWrite">
                   <SelectTrigger class="w-full max-w-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="Normal">正常</SelectItem>
-                      <SelectItem value="Frozen">冻结</SelectItem>
-                      <SelectItem value="Blackout">遮蔽</SelectItem>
+                      <SelectItem value="Normal">{{ $t('正常') }}</SelectItem>
+                      <SelectItem value="Frozen">{{ $t('冻结') }}</SelectItem>
+                      <SelectItem value="Blackout">{{ $t('遮蔽') }}</SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </Field>
               <Field>
-                <FieldLabel for="vis-start">生效时间(可选,留空立即生效)</FieldLabel>
+                <FieldLabel for="vis-start">{{ $t('生效时间(可选,留空立即生效)') }}</FieldLabel>
                 <Input id="vis-start" v-model="startsAt" type="datetime-local" class="max-w-sm" :readonly="!canWrite" />
               </Field>
               <Field>
-                <FieldLabel for="vis-reason">原因(可选,记入审计)</FieldLabel>
-                <Input id="vis-reason" v-model="reason" class="max-w-sm" :readonly="!canWrite" placeholder="例如:比赛最后 30 分钟冻结" />
+                <FieldLabel for="vis-reason">{{ $t('原因(可选,记入审计)') }}</FieldLabel>
+                <Input id="vis-reason" v-model="reason" class="max-w-sm" :readonly="!canWrite" :placeholder="$t('例如:比赛最后 30 分钟冻结')" />
               </Field>
               <Field v-if="canWrite">
                 <Button type="submit" :disabled="saving" class="w-fit">
-                  <Spinner v-if="saving" data-icon="inline-start" />
-                  保存
-                </Button>
+                  <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('保存') }} </Button>
               </Field>
             </FieldGroup>
           </form>

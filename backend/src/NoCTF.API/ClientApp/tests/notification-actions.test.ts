@@ -20,8 +20,8 @@ describe('notification unread state', () => {
       new URL('../app/components/notifications/NotificationCenter.vue', import.meta.url),
     ).text()
 
-    expect(layout).toContain(":aria-label=\"hasUnread ? '通知，有未读消息' : '通知'\"")
-    expect(layout).toContain('<span v-if="hasUnread" class="sr-only">有未读通知</span>')
+    expect(layout).toContain(":aria-label=\"hasUnread ? t('通知，有未读消息') : t('通知')\"")
+    expect(layout).toContain('<span v-if="hasUnread" class="sr-only">{{ t(\'有未读通知\') }}</span>')
     expect(page).toContain('<NotificationCenter />')
     expect(center).toContain('markAllRead(items.value[0]?.id)')
     expect(center).toContain("scope: 'Inbox'")

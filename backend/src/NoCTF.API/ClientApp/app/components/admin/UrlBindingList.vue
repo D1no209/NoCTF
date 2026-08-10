@@ -13,11 +13,11 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   exposureOptions: () => [
-    { value: UrlExposure.OwnerOnly, label: '仅队伍自己可见' },
-    { value: UrlExposure.Participants, label: '所有参赛者可见' },
+    { value: UrlExposure.OwnerOnly, label: translate("仅队伍自己可见") },
+    { value: UrlExposure.Participants, label: translate("所有参赛者可见") },
   ],
   showServiceName: false,
-  addLabel: '添加访问入口',
+  addLabel: translate("添加访问入口"),
   disabled: false,
 })
 
@@ -55,7 +55,7 @@ function add(): void {
       <div class="flex items-start gap-2">
         <div class="grid flex-1 gap-2 sm:grid-cols-2">
           <Field>
-            <FieldLabel>URL 模板</FieldLabel>
+            <FieldLabel>{{ $t('URL 模板') }}</FieldLabel>
             <Input
               :model-value="binding.urlTemplate"
               placeholder="http://{HOST}:{PORT}/"
@@ -65,7 +65,7 @@ function add(): void {
             />
           </Field>
           <Field>
-            <FieldLabel>暴露范围</FieldLabel>
+            <FieldLabel>{{ $t('暴露范围') }}</FieldLabel>
             <Select
               :model-value="String(binding.exposure)"
               :disabled="disabled || exposureOptions.length <= 1"
@@ -84,21 +84,21 @@ function add(): void {
             </Select>
           </Field>
           <Field>
-            <FieldLabel>容器端口</FieldLabel>
+            <FieldLabel>{{ $t('容器端口') }}</FieldLabel>
             <NullableNumberInput
               :model-value="binding.containerPort"
               :min="1"
               :max="65535"
-              placeholder="从端口映射中解析"
+              :placeholder="$t('从端口映射中解析')"
               :disabled="disabled"
               @update:model-value="update(index, { containerPort: $event })"
             />
           </Field>
           <Field v-if="showServiceName">
-            <FieldLabel>服务名(Compose)</FieldLabel>
+            <FieldLabel>{{ $t('服务名(Compose)') }}</FieldLabel>
             <Input
               :model-value="binding.serviceName"
-              placeholder="compose 中的 service 名"
+              :placeholder="$t('compose 中的 service 名')"
               class="font-mono text-sm"
               :disabled="disabled"
               @update:model-value="update(index, { serviceName: String($event ?? '') })"
@@ -128,8 +128,6 @@ function add(): void {
       <Plus data-icon="inline-start" />
       {{ addLabel }}
     </Button>
-    <p class="text-xs text-muted-foreground">
-      URL 模板只允许 {HOST} 与 {PORT} 占位符;{PORT} 为平台分配的随机主机端口。
-    </p>
+    <p class="text-xs text-muted-foreground"> {{ $t('URL 模板只允许 {HOST} 与 {PORT} 占位符;{PORT} 为平台分配的随机主机端口。') }} </p>
   </div>
 </template>

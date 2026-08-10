@@ -19,7 +19,7 @@ onMounted(async () => {
   const { error } = await verifyEmailEndpoint({ body: { token: token.value } })
   if (error) {
     state.value = 'failed'
-    message.value = parseApiError(error, '验证链接无效或已过期').message
+    message.value = parseApiError(error, translate("验证链接无效或已过期")).message
   }
   else {
     state.value = 'success'
@@ -44,11 +44,11 @@ async function resend() {
   <div class="mx-auto flex max-w-md flex-col px-4 py-12">
     <Card>
       <CardHeader>
-        <CardTitle>邮箱验证</CardTitle>
-        <CardDescription v-if="state === 'verifying'">正在验证你的邮箱…</CardDescription>
-        <CardDescription v-else-if="state === 'success'">邮箱验证成功,现在可以正常使用全部功能。</CardDescription>
-        <CardDescription v-else-if="token && state === 'failed'">验证失败</CardDescription>
-        <CardDescription v-else>平台要求验证邮箱后才能继续使用。</CardDescription>
+        <CardTitle>{{ $t('邮箱验证') }}</CardTitle>
+        <CardDescription v-if="state === 'verifying'">{{ $t('正在验证你的邮箱…') }}</CardDescription>
+        <CardDescription v-else-if="state === 'success'">{{ $t('邮箱验证成功,现在可以正常使用全部功能。') }}</CardDescription>
+        <CardDescription v-else-if="token && state === 'failed'">{{ $t('验证失败') }}</CardDescription>
+        <CardDescription v-else>{{ $t('平台要求验证邮箱后才能继续使用。') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <FieldGroup>
@@ -59,13 +59,13 @@ async function resend() {
             <AlertDescription>{{ message }}</AlertDescription>
           </Alert>
           <Alert v-if="resendDone">
-            <AlertDescription>验证邮件已重新发送,请查收。</AlertDescription>
+            <AlertDescription>{{ $t('验证邮件已重新发送,请查收。') }}</AlertDescription>
           </Alert>
         </FieldGroup>
       </CardContent>
       <CardFooter class="flex flex-col gap-2">
         <Button v-if="state === 'success'" as-child class="w-full">
-          <NuxtLink to="/auth/login">前往登录</NuxtLink>
+          <NuxtLink to="/auth/login">{{ $t('前往登录') }}</NuxtLink>
         </Button>
         <Button
           v-if="isLoggedIn && state !== 'success'"
@@ -74,11 +74,9 @@ async function resend() {
           :disabled="resendPending || resendDone"
           @click="resend"
         >
-          <Spinner v-if="resendPending" data-icon="inline-start" />
-          重新发送验证邮件
-        </Button>
+          <Spinner v-if="resendPending" data-icon="inline-start" /> {{ $t('重新发送验证邮件') }} </Button>
         <Button v-if="!isLoggedIn && !token" as-child variant="outline" class="w-full">
-          <NuxtLink to="/auth/login">返回登录</NuxtLink>
+          <NuxtLink to="/auth/login">{{ $t('返回登录') }}</NuxtLink>
         </Button>
       </CardFooter>
     </Card>

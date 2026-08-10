@@ -8,9 +8,9 @@ const props = withDefaults(defineProps<{
   addLabel?: string
   disabled?: boolean
 }>(), {
-  keyPlaceholder: '键',
-  valuePlaceholder: '值',
-  addLabel: '添加一项',
+  keyPlaceholder: translate("键"),
+  valuePlaceholder: translate("值"),
+  addLabel: translate("添加一项"),
   disabled: false,
 })
 

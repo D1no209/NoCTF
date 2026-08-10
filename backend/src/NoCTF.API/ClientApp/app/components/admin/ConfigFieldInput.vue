@@ -160,7 +160,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
 
   <div v-else-if="field.type === 'pointsCurve'" class="grid gap-3 sm:grid-cols-3">
     <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">初始分</span>
+      <span class="text-xs text-muted-foreground">{{ $t('初始分') }}</span>
       <Input
         type="number"
         :model-value="curve.initialPoints ?? ''"
@@ -169,7 +169,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
       />
     </div>
     <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">最低分</span>
+      <span class="text-xs text-muted-foreground">{{ $t('最低分') }}</span>
       <Input
         type="number"
         :model-value="curve.minimumPoints ?? ''"
@@ -178,7 +178,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
       />
     </div>
     <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">衰减系数</span>
+      <span class="text-xs text-muted-foreground">{{ $t('衰减系数') }}</span>
       <Input
         type="number"
         step="any"
@@ -191,7 +191,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
 
   <div v-else-if="field.type === 'milestonePoints'" class="grid gap-3 sm:grid-cols-2">
     <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">结算方式</span>
+      <span class="text-xs text-muted-foreground">{{ $t('结算方式') }}</span>
       <Select
         :model-value="milestone.settlement"
         :disabled="disabled"
@@ -210,7 +210,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
       </Select>
     </div>
     <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">分值</span>
+      <span class="text-xs text-muted-foreground">{{ $t('分值') }}</span>
       <Input
         type="number"
         :model-value="milestone.points ?? ''"
@@ -221,7 +221,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
   </div>
 
   <div v-else-if="field.type === 'bloodRewards'" class="flex flex-col gap-2">
-    <p v-if="rewards.length === 0" class="text-sm text-muted-foreground">无血榜奖励</p>
+    <p v-if="rewards.length === 0" class="text-sm text-muted-foreground">{{ $t('无血榜奖励') }}</p>
     <div v-for="(reward, index) in rewards" :key="index" class="flex items-center gap-2">
       <Select
         :model-value="reward.policy"
@@ -247,21 +247,17 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
         :disabled="disabled"
         @update:model-value="updateReward(index, { value: parseNullableNumber($event) })"
       />
-      <Button variant="ghost" size="sm" :disabled="disabled" @click="removeReward(index)">
-        删除
-      </Button>
+      <Button variant="ghost" size="sm" :disabled="disabled" @click="removeReward(index)"> {{ $t('删除') }} </Button>
     </div>
     <div>
-      <Button variant="outline" size="sm" :disabled="disabled || rewards.length >= 3" @click="addReward">
-        添加奖励
-      </Button>
+      <Button variant="outline" size="sm" :disabled="disabled || rewards.length >= 3" @click="addReward"> {{ $t('添加奖励') }} </Button>
     </div>
   </div>
 
   <div v-else-if="field.type === 'flagTemplate'" class="flex flex-col gap-3">
     <div class="grid gap-3 sm:grid-cols-2">
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">前缀(header)</span>
+        <span class="text-xs text-muted-foreground">{{ $t('前缀(header)') }}</span>
         <Input
           :model-value="flagTemplateValue.header"
           :disabled="disabled"
@@ -269,7 +265,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
         />
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">正文模板(bodyTemplate)</span>
+        <span class="text-xs text-muted-foreground">{{ $t('正文模板(bodyTemplate)') }}</span>
         <Input
           :model-value="flagTemplateValue.bodyTemplate"
           class="font-mono"
@@ -284,10 +280,8 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
         :disabled="disabled"
         @update:model-value="updateFlagTemplate({ leetLiteralText: $event === true })"
       />
-      <span class="text-sm text-muted-foreground">leetLiteralText(字面文本转 leet 风格)</span>
+      <span class="text-sm text-muted-foreground">{{ $t('leetLiteralText(字面文本转 leet 风格)') }}</span>
     </div>
-    <FieldDescription>
-      可用占位符:[GUID]、[TEAMID]、[CHALLENGEID]、[COMPETITIONCHALLENGEID]、[COMPETITIONID]、[TEAMHASH:n]、[RANDOM:n]
-    </FieldDescription>
+    <FieldDescription> {{ $t('可用占位符:[GUID]、[TEAMID]、[CHALLENGEID]、[COMPETITIONCHALLENGEID]、[COMPETITIONID]、[TEAMHASH:n]、[RANDOM:n]') }} </FieldDescription>
   </div>
 </template>

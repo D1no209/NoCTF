@@ -12,7 +12,7 @@ onMounted(async () => {
   const { data, error: err } = await listCompetitionsEndpoint()
   loading.value = false
   if (err || !data) {
-    error.value = parseApiError(err, '加载竞赛列表失败').message
+    error.value = parseApiError(err, translate("加载竞赛列表失败")).message
     return
   }
   items.value = data.items ?? []
@@ -40,8 +40,8 @@ const tab = ref('running')
 <template>
   <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10">
     <div>
-      <h1 class="text-2xl font-semibold">竞赛</h1>
-      <p class="text-sm text-muted-foreground">浏览平台上的公开竞赛,报名参赛并进入工作区</p>
+      <h1 class="text-2xl font-semibold">{{ $t('竞赛') }}</h1>
+      <p class="text-sm text-muted-foreground">{{ $t('浏览平台上的公开竞赛,报名参赛并进入工作区') }}</p>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -54,9 +54,9 @@ const tab = ref('running')
 
     <Tabs v-else v-model="tab">
       <TabsList>
-        <TabsTrigger value="running">进行中 ({{ running.length }})</TabsTrigger>
-        <TabsTrigger value="upcoming">即将开始 ({{ upcoming.length }})</TabsTrigger>
-        <TabsTrigger value="finished">已结束 ({{ finished.length }})</TabsTrigger>
+        <TabsTrigger value="running">{{ $t('进行中（{count}）', { count: running.length }) }}</TabsTrigger>
+        <TabsTrigger value="upcoming">{{ $t('即将开始（{count}）', { count: upcoming.length }) }}</TabsTrigger>
+        <TabsTrigger value="finished">{{ $t('已结束（{count}）', { count: finished.length }) }}</TabsTrigger>
       </TabsList>
       <TabsContent value="running">
         <div v-if="running.length" class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -64,8 +64,8 @@ const tab = ref('running')
         </div>
         <Empty v-else class="border border-dashed py-12">
           <EmptyHeader>
-            <EmptyTitle>暂无进行中的竞赛</EmptyTitle>
-            <EmptyDescription>去看看即将开始的竞赛,提前报名吧</EmptyDescription>
+            <EmptyTitle>{{ $t('暂无进行中的竞赛') }}</EmptyTitle>
+            <EmptyDescription>{{ $t('去看看即将开始的竞赛,提前报名吧') }}</EmptyDescription>
           </EmptyHeader>
         </Empty>
       </TabsContent>
@@ -75,7 +75,7 @@ const tab = ref('running')
         </div>
         <Empty v-else class="border border-dashed py-12">
           <EmptyHeader>
-            <EmptyTitle>暂无即将开始的竞赛</EmptyTitle>
+            <EmptyTitle>{{ $t('暂无即将开始的竞赛') }}</EmptyTitle>
           </EmptyHeader>
         </Empty>
       </TabsContent>
@@ -85,7 +85,7 @@ const tab = ref('running')
         </div>
         <Empty v-else class="border border-dashed py-12">
           <EmptyHeader>
-            <EmptyTitle>暂无已结束的竞赛</EmptyTitle>
+            <EmptyTitle>{{ $t('暂无已结束的竞赛') }}</EmptyTitle>
           </EmptyHeader>
         </Empty>
       </TabsContent>

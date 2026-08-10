@@ -25,17 +25,17 @@ const pending = ref(false)
 async function submit() {
   error.value = null
   if (!title.value.trim()) {
-    error.value = '请输入竞赛标题'
+    error.value = translate('请输入竞赛标题')
     return
   }
   const start = localInputToIso(startTime.value)
   const end = localInputToIso(endTime.value)
   if (!start || !end) {
-    error.value = '请选择开始和结束时间'
+    error.value = translate('请选择开始和结束时间')
     return
   }
   if (new Date(start) >= new Date(end)) {
-    error.value = '开始时间必须早于结束时间'
+    error.value = translate('开始时间必须早于结束时间')
     return
   }
   pending.value = true
@@ -57,7 +57,7 @@ async function submit() {
       },
     })
     if (e || !data) throw e
-    toast.success('竞赛已创建')
+    toast.success(translate("竞赛已创建"))
     await navigateTo(`/admin/competitions/${data.id}`)
   }
   catch (e) {
@@ -72,12 +72,12 @@ async function submit() {
 <template>
   <div class="mx-auto flex max-w-2xl flex-col px-4 py-8">
     <Alert v-if="!canOrganize" variant="destructive" class="mb-4">
-      <AlertDescription>当前账户没有创建竞赛的权限</AlertDescription>
+      <AlertDescription>{{ $t('当前账户没有创建竞赛的权限') }}</AlertDescription>
     </Alert>
     <Card>
       <CardHeader>
-        <CardTitle>新建竞赛</CardTitle>
-        <CardDescription>创建后游戏模式不可修改,其余信息可稍后调整</CardDescription>
+        <CardTitle>{{ $t('新建竞赛') }}</CardTitle>
+        <CardDescription>{{ $t('创建后游戏模式不可修改,其余信息可稍后调整') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <form @submit.prevent="submit">
@@ -86,18 +86,18 @@ async function submit() {
               <AlertDescription>{{ error }}</AlertDescription>
             </Alert>
             <Field>
-              <FieldLabel for="title">标题</FieldLabel>
+              <FieldLabel for="title">{{ $t('标题') }}</FieldLabel>
               <Input id="title" v-model="title" required maxlength="200" />
             </Field>
             <Field>
-              <FieldLabel for="description">描述</FieldLabel>
-              <Textarea id="description" v-model="description" placeholder="可选" />
+              <FieldLabel for="description">{{ $t('描述') }}</FieldLabel>
+              <Textarea id="description" v-model="description" :placeholder="$t('可选')" />
             </Field>
             <Field>
-              <FieldLabel for="mode">游戏模式</FieldLabel>
+              <FieldLabel for="mode">{{ $t('游戏模式') }}</FieldLabel>
               <Select id="mode" v-model="mode">
                 <SelectTrigger class="w-full">
-                  <SelectValue placeholder="选择模式" />
+                  <SelectValue :placeholder="$t('选择模式')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -108,63 +108,61 @@ async function submit() {
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              <FieldDescription>创建后不可修改</FieldDescription>
+              <FieldDescription>{{ $t('创建后不可修改') }}</FieldDescription>
             </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="start">开始时间</FieldLabel>
+                <FieldLabel for="start">{{ $t('开始时间') }}</FieldLabel>
                 <Input id="start" v-model="startTime" type="datetime-local" required />
               </Field>
               <Field>
-                <FieldLabel for="end">结束时间</FieldLabel>
+                <FieldLabel for="end">{{ $t('结束时间') }}</FieldLabel>
                 <Input id="end" v-model="endTime" type="datetime-local" required />
               </Field>
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="max-members">每队最大人数</FieldLabel>
+                <FieldLabel for="max-members">{{ $t('每队最大人数') }}</FieldLabel>
                 <Input id="max-members" v-model.number="maxTeamMembers" type="number" min="1" required />
               </Field>
               <Field>
-                <FieldLabel for="max-runtime">每队并发运行时上限</FieldLabel>
+                <FieldLabel for="max-runtime">{{ $t('每队并发运行时上限') }}</FieldLabel>
                 <Input id="max-runtime" v-model.number="maxConcurrentRuntimeInstancesPerTeam" type="number" min="1" required />
               </Field>
             </div>
             <Field orientation="horizontal">
               <Checkbox id="auto-approve" v-model="teamRegistrationAutoApprove" />
-              <FieldLabel for="auto-approve" class="font-normal">队伍注册自动通过(无需审批)</FieldLabel>
+              <FieldLabel for="auto-approve" class="font-normal">{{ $t('队伍注册自动通过(无需审批)') }}</FieldLabel>
             </Field>
             <Field orientation="horizontal">
               <Checkbox id="allow-running-registration" v-model="allowTeamRegistrationWhileRunning" />
               <div class="grid gap-1.5 leading-none">
-                <FieldLabel for="allow-running-registration" class="font-normal">比赛进行中仍允许创建队伍</FieldLabel>
-                <FieldDescription>关闭时，比赛进入 Running 后停止接收新队伍与重新报名。</FieldDescription>
+                <FieldLabel for="allow-running-registration" class="font-normal">{{ $t('比赛进行中仍允许创建队伍') }}</FieldLabel>
+                <FieldDescription>{{ $t('关闭时，比赛进入 Running 后停止接收新队伍与重新报名。') }}</FieldDescription>
               </div>
             </Field>
             <div class="grid gap-4 sm:grid-cols-2">
               <Field>
-                <FieldLabel for="max-active-questions">每队活跃咨询上限</FieldLabel>
+                <FieldLabel for="max-active-questions">{{ $t('每队活跃咨询上限') }}</FieldLabel>
                 <Input id="max-active-questions" v-model.number="maxActiveQuestionsPerTeam" type="number" min="1" required />
-                <FieldDescription>待处理与已回复的咨询计入上限。</FieldDescription>
+                <FieldDescription>{{ $t('待处理与已回复的咨询计入上限。') }}</FieldDescription>
               </Field>
               <Field>
-                <FieldLabel for="max-participant-messages">连续补充消息上限</FieldLabel>
+                <FieldLabel for="max-participant-messages">{{ $t('连续补充消息上限') }}</FieldLabel>
                 <Input id="max-participant-messages" v-model.number="maxParticipantMessagesBeforeHandlerReply" type="number" min="1" required />
-                <FieldDescription>初始提问计入额度；工作人员回复后重置。</FieldDescription>
+                <FieldDescription>{{ $t('初始提问计入额度；工作人员回复后重置。') }}</FieldDescription>
               </Field>
             </div>
             <Field orientation="horizontal">
               <Checkbox id="allow-challenge-owner-questions" v-model="allowChallengeOwnersToHandleQuestions" />
               <div class="grid gap-1.5 leading-none">
-                <FieldLabel for="allow-challenge-owner-questions" class="font-normal">允许题目所有者处理关联咨询</FieldLabel>
-                <FieldDescription>仅限其拥有或协作的题目；不会授予 Flag、Token 或平台密钥权限。</FieldDescription>
+                <FieldLabel for="allow-challenge-owner-questions" class="font-normal">{{ $t('允许题目所有者处理关联咨询') }}</FieldLabel>
+                <FieldDescription>{{ $t('仅限其拥有或协作的题目；不会授予 Flag、Token 或平台密钥权限。') }}</FieldDescription>
               </div>
             </Field>
             <Field>
               <Button type="submit" :disabled="pending || !canOrganize" class="w-full">
-                <Spinner v-if="pending" data-icon="inline-start" />
-                创建竞赛
-              </Button>
+                <Spinner v-if="pending" data-icon="inline-start" /> {{ $t('创建竞赛') }} </Button>
             </Field>
           </FieldGroup>
         </form>

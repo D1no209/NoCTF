@@ -12,12 +12,12 @@ const initialKind = typeof route.query.kind === 'string' ? route.query.kind : 'a
 const kind = ref<string>(initialKind)
 
 const kindOptions = [
-  { value: 'all', label: '全部动态' },
-  { value: 'CompetitionLifecycleChanged', label: '比赛状态' },
-  { value: 'AnnouncementPublished', label: '公告' }, { value: 'ChallengePublished', label: '题目发布' }, { value: 'HintPublished', label: '提示发布' },
-  { value: 'FirstBloodAwarded', label: '一血' }, { value: 'SecondBloodAwarded', label: '二血' }, { value: 'ThirdBloodAwarded', label: '三血' },
-  { value: 'GameplayFactAdjudicated', label: '提交评测' }, { value: 'TeamRegistered', label: '队伍报名' }, { value: 'TeamBanned', label: '队伍封禁' },
-  { value: 'QuestionOpened', label: '咨询创建' }, { value: 'QuestionReplied', label: '咨询回复' }, { value: 'QuestionStatusChanged', label: '咨询状态' },
+  { value: 'all', label: translate("全部动态") },
+  { value: 'CompetitionLifecycleChanged', label: translate("比赛状态") },
+  { value: 'AnnouncementPublished', label: translate("公告") }, { value: 'ChallengePublished', label: translate("题目发布") }, { value: 'HintPublished', label: translate("提示发布") },
+  { value: 'FirstBloodAwarded', label: translate("一血") }, { value: 'SecondBloodAwarded', label: translate("二血") }, { value: 'ThirdBloodAwarded', label: translate("三血") },
+  { value: 'GameplayFactAdjudicated', label: translate("提交评测") }, { value: 'TeamRegistered', label: translate("队伍报名") }, { value: 'TeamBanned', label: translate("队伍封禁") },
+  { value: 'QuestionOpened', label: translate("咨询创建") }, { value: 'QuestionReplied', label: translate("咨询回复") }, { value: 'QuestionStatusChanged', label: translate("咨询状态") },
 ]
 
 const { items, loading, error, hasMore, initialized, loadMore, reset } =
@@ -37,7 +37,7 @@ const { items, loading, error, hasMore, initialized, loadMore, reset } =
         limit: 50,
       },
     })
-    if (err || !data) throw err ?? new Error('加载失败')
+    if (err || !data) throw err ?? new Error(translate("加载失败"))
     return { items: data.items, nextCursor: data.nextCursor }
   })
 
@@ -71,7 +71,7 @@ onUnmounted(() => unwatch?.())
 
 const levelVariant = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) =>
   level === 'Error' ? ('destructive' as const) : level === 'Warning' ? ('secondary' as const) : ('outline' as const)
-const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) => (level === 'Error' ? '警告' : level === 'Warning' ? '注意' : '信息')
+const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol) => (level === 'Error' ? translate("警告") : level === 'Warning' ? translate("注意") : translate("信息"))
 </script>
 
 <template>
@@ -79,7 +79,7 @@ const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventL
     <div class="flex items-center justify-between gap-2">
       <Select v-model="kind">
         <SelectTrigger class="w-40">
-          <SelectValue placeholder="全部动态" />
+          <SelectValue :placeholder="$t('全部动态')" />
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>
@@ -89,7 +89,7 @@ const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventL
           </SelectGroup>
         </SelectContent>
       </Select>
-      <Button variant="outline" size="sm" @click="reload">刷新</Button>
+      <Button variant="outline" size="sm" @click="reload">{{ $t('刷新') }}</Button>
     </div>
 
     <Alert v-if="error" variant="destructive">
@@ -102,8 +102,8 @@ const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventL
 
     <Empty v-else-if="initialized && !items.length" class="border py-12">
       <EmptyHeader>
-        <EmptyTitle>暂无动态</EmptyTitle>
-        <EmptyDescription>公告、题目发布、血榜等动态会出现在这里</EmptyDescription>
+        <EmptyTitle>{{ $t('暂无动态') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('公告、题目发布、血榜等动态会出现在这里') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -125,9 +125,7 @@ const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventL
 
     <div v-if="hasMore" class="flex justify-center">
       <Button variant="outline" :disabled="loading" @click="loadMore">
-        <Spinner v-if="loading" data-icon="inline-start" />
-        加载更多
-      </Button>
+        <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('加载更多') }} </Button>
     </div>
   </div>
 </template>

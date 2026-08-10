@@ -15,7 +15,7 @@ async function refresh() {
   })
   loading.value = false
   if (err || !data) {
-    error.value = parseApiError(err, '加载竞赛失败').message
+    error.value = parseApiError(err, translate("加载竞赛失败")).message
     return
   }
   error.value = null
@@ -41,14 +41,14 @@ const tabs = computed(() => {
     || competition.value?.status === CompetitionStatus.Paused
     || competition.value?.status === CompetitionStatus.Finished
   return [
-    { to: base, label: '概览', exact: true },
-    ...(challengesVisible ? [{ to: `${base}/challenges`, label: '题目' }] : []),
-    { to: `${base}/leaderboard`, label: '记分板' },
-    { to: `${base}/teams`, label: '队伍' },
-    { to: `${base}/events`, label: '动态' },
-    { to: `${base}/questions`, label: '咨询' },
-    { to: `${base}/my/team`, label: '我的队伍' },
-    { to: `${base}/my/submissions`, label: '我的提交' },
+    { to: base, label: translate("概览"), exact: true },
+    ...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目") }] : []),
+    { to: `${base}/leaderboard`, label: translate("记分板") },
+    { to: `${base}/teams`, label: translate("队伍") },
+    { to: `${base}/events`, label: translate("动态") },
+    { to: `${base}/questions`, label: translate("咨询") },
+    { to: `${base}/my/team`, label: translate("我的队伍") },
+    { to: `${base}/my/submissions`, label: translate("我的提交") },
   ]
 })
 

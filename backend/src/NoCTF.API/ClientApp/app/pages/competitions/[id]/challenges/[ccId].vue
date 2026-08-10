@@ -23,7 +23,7 @@ onMounted(async () => {
   })
   loading.value = false
   if (err || !data) {
-    error.value = parseApiError(err, '加载题目失败').message
+    error.value = parseApiError(err, translate("加载题目失败")).message
     return
   }
   challenge.value = data
@@ -57,7 +57,7 @@ async function downloadAttachment(attachmentId: string, fileName: string) {
     )
   }
   catch (e) {
-    toast.error(parseApiError(e, '附件下载失败').message)
+    toast.error(parseApiError(e, translate("附件下载失败")).message)
   }
   finally {
     downloading.value = false
@@ -73,7 +73,7 @@ async function downloadRandom() {
     )
   }
   catch (e) {
-    toast.error(parseApiError(e, '附件下载失败').message)
+    toast.error(parseApiError(e, translate("附件下载失败")).message)
   }
   finally {
     downloading.value = false
@@ -100,37 +100,33 @@ const mode = computed(() => ctx.competition.value?.mode)
         <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
           {{ challenge.direction }}
         </Badge>
-        <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary">
-          分数隐藏
-        </Badge>
-        <span v-else class="font-semibold text-primary">{{ challenge.baseScore }} 分</span>
+        <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
+        <span v-else class="font-semibold text-primary">{{ $t('{score} 分', { score: challenge.baseScore }) }}</span>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle class="text-base">题面</CardTitle>
+          <CardTitle class="text-base">{{ $t('题面') }}</CardTitle>
         </CardHeader>
         <CardContent>
           <p v-if="challenge.description" class="whitespace-pre-line text-sm leading-6">
             {{ challenge.description }}
           </p>
-          <p v-else class="text-sm text-muted-foreground">本题没有额外描述。</p>
+          <p v-else class="text-sm text-muted-foreground">{{ $t('本题没有额外描述。') }}</p>
         </CardContent>
       </Card>
 
       <Card v-if="attachments.length || isLoggedIn">
         <CardHeader>
           <div class="flex items-center justify-between gap-2">
-            <CardTitle class="text-base">附件</CardTitle>
+            <CardTitle class="text-base">{{ $t('附件') }}</CardTitle>
             <Button variant="outline" size="sm" :disabled="downloading" @click="downloadRandom">
-              <Dice5 data-icon="inline-start" />
-              随机下载一个附件
-            </Button>
+              <Dice5 data-icon="inline-start" /> {{ $t('随机下载一个附件') }} </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <p v-if="!attachmentsLoaded" class="text-sm text-muted-foreground">加载中…</p>
-          <p v-else-if="!attachments.length" class="text-sm text-muted-foreground">本题没有附件。</p>
+          <p v-if="!attachmentsLoaded" class="text-sm text-muted-foreground">{{ $t('加载中…') }}</p>
+          <p v-else-if="!attachments.length" class="text-sm text-muted-foreground">{{ $t('本题没有附件。') }}</p>
           <ul v-else class="flex flex-col gap-2">
             <li
               v-for="attachment in attachments"
@@ -148,9 +144,7 @@ const mode = computed(() => ctx.competition.value?.mode)
                 :disabled="downloading"
                 @click="downloadAttachment(attachment.id!, attachment.fileName ?? 'attachment')"
               >
-                <Download data-icon="inline-start" />
-                下载
-              </Button>
+                <Download data-icon="inline-start" /> {{ $t('下载') }} </Button>
             </li>
           </ul>
         </CardContent>

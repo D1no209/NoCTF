@@ -21,7 +21,7 @@ onMounted(async () => {
   })
   targetsLoaded.value = true
   if (error || !data) {
-    targetsError.value = parseApiError(error, '加载攻击目标失败').message
+    targetsError.value = parseApiError(error, translate("加载攻击目标失败")).message
     return
   }
   targets.value = data.items ?? []
@@ -31,9 +31,7 @@ onMounted(async () => {
 <template>
   <div class="flex flex-col gap-6">
     <Alert>
-      <AlertDescription>
-        AWD 模式:维护好自己的服务不被攻击,同时攻击其他队伍的靶机获取 flag 批量提交。
-      </AlertDescription>
+      <AlertDescription> {{ $t('AWD 模式:维护好自己的服务不被攻击,同时攻击其他队伍的靶机获取 flag 批量提交。') }} </AlertDescription>
     </Alert>
 
     <RuntimeCard
@@ -44,8 +42,8 @@ onMounted(async () => {
 
     <Card>
       <CardHeader>
-        <CardTitle class="text-base">攻击目标</CardTitle>
-        <CardDescription>加固期结束后,这里会列出其他队伍的靶机地址</CardDescription>
+        <CardTitle class="text-base">{{ $t('攻击目标') }}</CardTitle>
+        <CardDescription>{{ $t('加固期结束后,这里会列出其他队伍的靶机地址') }}</CardDescription>
       </CardHeader>
       <CardContent>
         <Skeleton v-if="!targetsLoaded" class="h-16 w-full" />
@@ -54,15 +52,15 @@ onMounted(async () => {
         </Alert>
         <Empty v-else-if="!targets.length" class="border py-8">
           <EmptyHeader>
-            <EmptyTitle>暂无可攻击的目标</EmptyTitle>
-            <EmptyDescription>可能仍处于加固期,或尚无其他队伍的环境就绪</EmptyDescription>
+            <EmptyTitle>{{ $t('暂无可攻击的目标') }}</EmptyTitle>
+            <EmptyDescription>{{ $t('可能仍处于加固期,或尚无其他队伍的环境就绪') }}</EmptyDescription>
           </EmptyHeader>
         </Empty>
         <Table v-else>
           <TableHeader>
             <TableRow>
-              <TableHead>队伍</TableHead>
-              <TableHead>靶机地址</TableHead>
+              <TableHead>{{ $t('队伍') }}</TableHead>
+              <TableHead>{{ $t('靶机地址') }}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -92,8 +90,8 @@ onMounted(async () => {
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       multiple
-      title="批量提交 Flag"
-      description="从其他队伍靶机拿到的 flag,每行一个,一次提交多个"
+      :title="$t('批量提交 Flag')"
+      :description="$t('从其他队伍靶机拿到的 flag,每行一个,一次提交多个')"
     />
   </div>
 </template>

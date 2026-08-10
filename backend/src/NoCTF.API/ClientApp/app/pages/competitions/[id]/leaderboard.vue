@@ -26,7 +26,7 @@ async function fetchOnce(): Promise<boolean> {
   const { data, error: err, response } = await getLeaderboardEndpoint({ path: { competitionId } })
   loading.value = false
   if (err) {
-    error.value = parseApiError(err, '加载记分板失败').message
+    error.value = parseApiError(err, translate("加载记分板失败")).message
     return true
   }
   if (response?.status === 202) return false
@@ -64,7 +64,7 @@ interface DirectionGroup {
 const directionGroups = computed<DirectionGroup[]>(() => {
   const groups: DirectionGroup[] = []
   for (const challenge of challenges.value) {
-    const direction = challenge.direction || '未分类'
+    const direction = challenge.direction || translate('未分类')
     const last = groups[groups.length - 1]
     if (last && last.direction === direction) last.challenges.push(challenge)
     else groups.push({ direction, challenges: [challenge] })
@@ -103,7 +103,7 @@ const bloodIconClass: Record<string, string> = {
 
 function cellText(slot: LeaderboardCell, title: string): string {
   const parts = [title]
-  if (slot.score !== undefined) parts.push(`${slot.score} 分`)
+  if (slot.score !== undefined) parts.push(translate('{score} 分', { score: slot.score }))
   if (slot.bloodRank) parts.push(bloodRankLabel[String(slot.bloodRank)] ?? '')
   if (slot.solvedAt) parts.push(formatDateTime(slot.solvedAt))
   if (slot.solverName) parts.push(slot.solverName)
@@ -166,7 +166,7 @@ function openDetail(entry: (typeof entries.value)[number]) {
 function exportCsv() {
   const board = leaderboard.value
   if (!board) return
-  const header = ['名次', '队伍', '总分', '解题数', '最后得分', ...challenges.value.map((c) => c.title ?? '题目')]
+  const header = [translate("名次"), translate("队伍"), translate("总分"), translate("解题数"), translate("最后得分"), ...challenges.value.map((c) => c.title ?? '题目')]
   const rows = entries.value.map((entry) => [
     entry.rank ?? '',
     entry.teamName ?? '',
@@ -185,7 +185,7 @@ function exportCsv() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${ctx.competition.value?.title ?? 'leaderboard'}-记分板.csv`
+  a.download = `${ctx.competition.value?.title ?? 'leaderboard'}-${translate('记分板')}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -208,9 +208,7 @@ const rankIconClass: Record<number, string> = {
     <div v-else-if="loading || polling" class="flex flex-col gap-4">
       <Alert>
         <AlertDescription class="flex items-center gap-2">
-          <Spinner class="size-3" />
-          记分板数据投影中,请稍候…
-        </AlertDescription>
+          <Spinner class="size-3" /> {{ $t('记分板数据投影中,请稍候…') }} </AlertDescription>
       </Alert>
       <Skeleton class="h-64 w-full" />
     </div>
@@ -218,30 +216,24 @@ const rankIconClass: Record<number, string> = {
     <template v-else-if="leaderboard">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="flex items-center gap-2 text-xl font-bold">
-          <Trophy class="size-6 text-amber-500" />
-          排行榜
-        </h2>
+          <Trophy class="size-6 text-amber-500" /> {{ $t('排行榜') }} </h2>
         <div class="flex items-center gap-4">
           <label class="flex items-center gap-2 text-sm">
-            <Checkbox v-model="showGroupLabels" />
-            显示分组标签
-          </label>
+            <Checkbox v-model="showGroupLabels" /> {{ $t('显示分组标签') }} </label>
           <Button variant="outline" :disabled="!entries.length" @click="exportCsv">
-            <Download data-icon="inline-start" />
-            下载为Excel
-          </Button>
+            <Download data-icon="inline-start" /> {{ $t('下载为Excel') }} </Button>
         </div>
       </div>
 
       <Alert v-if="leaderboard.dataScope === LeaderboardDataScope.Frozen">
         <AlertDescription>
-          排行榜已冻结,以下为截至 {{ formatDateTime(leaderboard.dataAsOf) }} 的快照。
+          {{ $t('排行榜已冻结，以下为截至 {time} 的快照。', { time: formatDateTime(leaderboard.dataAsOf) }) }}
         </AlertDescription>
       </Alert>
       <Empty v-if="leaderboard.dataScope === LeaderboardDataScope.Hidden" class="border py-12">
         <EmptyHeader>
-          <EmptyTitle>排行榜暂不公开</EmptyTitle>
-          <EmptyDescription>主办方当前隐藏了排行榜数据</EmptyDescription>
+          <EmptyTitle>{{ $t('排行榜暂不公开') }}</EmptyTitle>
+          <EmptyDescription>{{ $t('主办方当前隐藏了排行榜数据') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
 
@@ -261,7 +253,7 @@ const rankIconClass: Record<number, string> = {
           <CardContent class="flex flex-col gap-3 pt-6">
             <Empty v-if="!entries.length" class="border py-8">
               <EmptyHeader>
-                <EmptyTitle>还没有队伍得分</EmptyTitle>
+                <EmptyTitle>{{ $t('还没有队伍得分') }}</EmptyTitle>
               </EmptyHeader>
             </Empty>
 
@@ -288,9 +280,9 @@ const rankIconClass: Record<number, string> = {
                       </TableHead>
                     </TableRow>
                     <TableRow>
-                      <TableHead class="w-14">名次</TableHead>
-                      <TableHead class="min-w-44">参赛队伍</TableHead>
-                      <TableHead class="w-24 text-right">总分</TableHead>
+                      <TableHead class="w-14">{{ $t('名次') }}</TableHead>
+                      <TableHead class="min-w-44">{{ $t('参赛队伍') }}</TableHead>
+                      <TableHead class="w-24 text-right">{{ $t('总分') }}</TableHead>
                       <TableHead
                         v-for="challenge in challenges"
                         :key="challenge.competitionChallengeId"
@@ -340,9 +332,7 @@ const rankIconClass: Record<number, string> = {
               </div>
 
               <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                <label class="flex items-center gap-2">
-                  每页显示:
-                  <Select v-model="pageSize">
+                <label class="flex items-center gap-2"> {{ $t('每页显示:') }} <Select v-model="pageSize">
                     <SelectTrigger class="w-20">
                       <SelectValue />
                     </SelectTrigger>
@@ -356,7 +346,7 @@ const rankIconClass: Record<number, string> = {
                   </Select>
                 </label>
                 <span class="flex items-center gap-3">
-                  共 {{ entries.length }} 支队伍,第 {{ page }} / {{ totalPages }} 页
+                  {{ $t('共 {count} 支队伍，第 {page} / {total} 页', { count: entries.length, page, total: totalPages }) }}
                   <span class="flex items-center gap-1">
                     <Button variant="outline" size="icon" :disabled="page <= 1" @click="page--">
                       <ChevronLeft />

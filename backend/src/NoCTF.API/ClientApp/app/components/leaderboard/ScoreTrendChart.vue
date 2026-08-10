@@ -40,9 +40,9 @@ function buildOption(): echarts.EChartsCoreOption {
     toolbox: {
       right: 16,
       feature: {
-        saveAsImage: { title: '下载为图片' },
-        dataZoom: { title: { zoom: '区域缩放', back: '缩放还原' }, yAxisIndex: 'none' },
-        restore: { title: '还原' },
+        saveAsImage: { title: translate("下载为图片") },
+        dataZoom: { title: { zoom: translate("区域缩放"), back: translate("缩放还原") }, yAxisIndex: 'none' },
+        restore: { title: translate("还原") },
       },
     },
     xAxis: {
@@ -51,7 +51,7 @@ function buildOption(): echarts.EChartsCoreOption {
     },
     yAxis: {
       type: 'value',
-      name: '分数',
+      name: translate("分数"),
       nameTextStyle: { color: foreground },
       axisLabel: { color: foreground },
       splitLine: { lineStyle: { opacity: 0.35 } },
@@ -69,7 +69,7 @@ function buildOption(): echarts.EChartsCoreOption {
         : [[new Date(start).getTime(), 0], [new Date(end).getTime(), 0]]
       return {
         type: 'line' as const,
-        name: team.teamName ?? '队伍',
+        name: team.teamName ?? translate('队伍'),
         step: 'end' as const,
         showSymbol: false,
         emphasis: { focus: 'series' as const },

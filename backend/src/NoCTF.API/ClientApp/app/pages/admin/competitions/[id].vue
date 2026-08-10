@@ -36,16 +36,16 @@ const announcementPending = ref(false)
 const announcementError = ref<string | null>(null)
 
 const RoleLabel: Record<CompetitionAdminRole, string> = {
-  owner: '负责人',
-  manager: '管理员',
-  judge: '裁判',
-  observer: '观察员',
+  owner: translate("负责人"),
+  manager: translate("管理员"),
+  judge: translate("裁判"),
+  observer: translate("观察员"),
 }
 
 async function refresh() {
   const { data, error: e } = await adminGetCompetition({ path: { competitionId } })
   if (e || !data) {
-    error.value = parseApiError(e, '加载竞赛失败').message
+    error.value = parseApiError(e, translate("加载竞赛失败")).message
     return
   }
   competition.value = data
@@ -72,9 +72,9 @@ async function publishAnnouncement() {
   const title = announcementTitle.value.trim()
   const body = announcementBody.value.trim()
   announcementError.value = !title
-    ? '请输入通知标题。'
+    ? translate("请输入通知标题。")
     : !body
-      ? '请输入通知内容。'
+      ? translate("请输入通知内容。")
       : null
   if (announcementError.value) return
 
@@ -85,14 +85,14 @@ async function publishAnnouncement() {
       body: { title, body, audience: announcementAudience.value },
     })
     if (requestError) throw requestError
-    toast.success('比赛通知已发布')
+    toast.success(translate("比赛通知已发布"))
     announcementOpen.value = false
     announcementTitle.value = ''
     announcementBody.value = ''
     announcementError.value = null
   }
   catch (requestError) {
-    announcementError.value = parseApiError(requestError, '发布比赛通知失败').message
+    announcementError.value = parseApiError(requestError, translate("发布比赛通知失败")).message
     toast.error(announcementError.value)
   }
   finally {
@@ -124,16 +124,16 @@ interface NavItem {
 
 const base = `/admin/competitions/${competitionId}`
 const navItems: NavItem[] = [
-  { to: base, label: '概览' },
-  { to: `${base}/configuration`, label: '配置' },
-  { to: `${base}/challenges`, label: '题目' },
-  { to: `${base}/teams`, label: '团队' },
-  { to: `${base}/submissions`, label: '提交' },
-  { to: `${base}/runtimes`, label: '运行时' },
-  { to: `${base}/cheats`, label: '作弊' },
-  { to: `${base}/leaderboard`, label: '记分板' },
-  { to: `${base}/exports`, label: '导出' },
-  { to: `${base}/permissions`, label: '权限', ownerOnly: true },
+  { to: base, label: translate("概览") },
+  { to: `${base}/configuration`, label: translate("配置") },
+  { to: `${base}/challenges`, label: translate("题目") },
+  { to: `${base}/teams`, label: translate("团队") },
+  { to: `${base}/submissions`, label: translate("提交") },
+  { to: `${base}/runtimes`, label: translate("运行时") },
+  { to: `${base}/cheats`, label: translate("作弊") },
+  { to: `${base}/leaderboard`, label: translate("记分板") },
+  { to: `${base}/exports`, label: translate("导出") },
+  { to: `${base}/permissions`, label: translate("权限"), ownerOnly: true },
 ]
 
 const visibleNav = computed(() => navItems.filter(i => !i.ownerOnly || canManagePermissions.value))
@@ -171,12 +171,10 @@ onMounted(async () => {
           <h1 class="text-2xl font-semibold">{{ competition.title }}</h1>
           <GameModeBadge :mode="competition.mode" />
           <CompetitionStatusBadge :status="competition.status" />
-          <Badge variant="outline">我的角色:{{ RoleLabel[role] }}</Badge>
+          <Badge variant="outline">{{ $t('我的角色：{role}', { role: RoleLabel[role] }) }}</Badge>
         </div>
         <Button v-if="canAnnounce" variant="outline" @click="announcementOpen = true">
-          <Megaphone data-icon="inline-start" />
-          发布通知
-        </Button>
+          <Megaphone data-icon="inline-start" /> {{ $t('发布通知') }} </Button>
       </div>
       <Tabs :model-value="activeTab" @update:model-value="(v) => navigateTo(String(v))">
         <TabsList class="max-w-full justify-start gap-1 overflow-x-auto overflow-y-hidden p-1 group-data-horizontal/tabs:h-11">
@@ -195,24 +193,24 @@ onMounted(async () => {
       <Dialog :open="announcementOpen" @update:open="setAnnouncementOpen">
         <DialogContent class="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>发布比赛通知</DialogTitle>
-            <DialogDescription>向全体参赛者或赛事工作人员发送一条永久通知。</DialogDescription>
+            <DialogTitle>{{ $t('发布比赛通知') }}</DialogTitle>
+            <DialogDescription>{{ $t('向全体参赛者或赛事工作人员发送一条永久通知。') }}</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Field>
-              <FieldLabel>通知对象</FieldLabel>
+              <FieldLabel>{{ $t('通知对象') }}</FieldLabel>
               <Select v-model="announcementAudience">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="Participants">全体参赛者</SelectItem>
-                    <SelectItem value="Collaborators">赛事工作人员</SelectItem>
+                    <SelectItem value="Participants">{{ $t('全体参赛者') }}</SelectItem>
+                    <SelectItem value="Collaborators">{{ $t('赛事工作人员') }}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
             </Field>
             <Field>
-              <FieldLabel for="announcement-title">标题</FieldLabel>
+              <FieldLabel for="announcement-title">{{ $t('标题') }}</FieldLabel>
               <Input
                 id="announcement-title"
                 v-model="announcementTitle"
@@ -221,7 +219,7 @@ onMounted(async () => {
               />
             </Field>
             <Field>
-              <FieldLabel for="announcement-body">内容</FieldLabel>
+              <FieldLabel for="announcement-body">{{ $t('内容') }}</FieldLabel>
               <Textarea
                 id="announcement-body"
                 v-model="announcementBody"
@@ -236,13 +234,9 @@ onMounted(async () => {
             </p>
           </FieldGroup>
           <DialogFooter>
-            <Button variant="outline" :disabled="announcementPending" @click="setAnnouncementOpen(false)">
-              取消
-            </Button>
+            <Button variant="outline" :disabled="announcementPending" @click="setAnnouncementOpen(false)"> {{ $t('取消') }} </Button>
             <Button :disabled="announcementPending" @click="publishAnnouncement">
-              <Spinner v-if="announcementPending" data-icon="inline-start" />
-              发布通知
-            </Button>
+              <Spinner v-if="announcementPending" data-icon="inline-start" /> {{ $t('发布通知') }} </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

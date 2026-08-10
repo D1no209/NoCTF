@@ -24,9 +24,9 @@ const isCompose = computed(() => props.runtime.definition.kind === 'compose')
 
 const kindOptions = computed(() =>
   props.mode === 'Awdp'
-    ? [{ value: 'container', label: '单容器' }]
+    ? [{ value: 'container', label: translate("单容器") }]
     : [
-        { value: 'container', label: '单容器' },
+        { value: 'container', label: translate("单容器") },
         { value: 'compose', label: 'Docker Compose' },
       ],
 )
@@ -38,20 +38,20 @@ function switchKind(kind: string): void {
 
 const flagSourceOptions = computed(() => {
   const all = [
-    { value: FlagSource.Static, label: '静态 Flag(模板预置)' },
-    { value: FlagSource.PerTeam, label: '每队独立 Flag' },
-    { value: FlagSource.AwdRotation, label: '按轮次轮换(AWD)' },
+    { value: FlagSource.Static, label: translate("静态 Flag(模板预置)") },
+    { value: FlagSource.PerTeam, label: translate("每队独立 Flag") },
+    { value: FlagSource.AwdRotation, label: translate("按轮次轮换(AWD)") },
   ]
   return props.mode === 'Ctf' ? all.slice(0, 2) : all
 })
 
 const exposureOptions = computed(() => {
   if (props.mode === 'Ctf') {
-    return [{ value: UrlExposure.OwnerOnly, label: '仅队伍自己可见' }]
+    return [{ value: UrlExposure.OwnerOnly, label: translate("仅队伍自己可见") }]
   }
   return [
-    { value: UrlExposure.OwnerOnly, label: '仅队伍自己可见' },
-    { value: UrlExposure.Participants, label: '所有参赛者可见' },
+    { value: UrlExposure.OwnerOnly, label: translate("仅队伍自己可见") },
+    { value: UrlExposure.Participants, label: translate("所有参赛者可见") },
   ]
 })
 
@@ -89,18 +89,18 @@ watch(
 <template>
   <FieldGroup>
     <Field>
-      <FieldLabel>分配方式</FieldLabel>
+      <FieldLabel>{{ $t('分配方式') }}</FieldLabel>
       <div class="flex items-center gap-2">
         <Badge variant="secondary">
-          {{ runtime.allocation === RuntimeAllocation.Shared ? '共享' : '每队独立' }}
+          {{ runtime.allocation === RuntimeAllocation.Shared ? $t('共享') : $t('每队独立') }}
         </Badge>
-        <FieldDescription v-if="mode === 'Koh'">KoH 要求所有队伍共享同一套环境。</FieldDescription>
-        <FieldDescription v-else>{{ mode }} 要求每个队伍独立的运行环境。</FieldDescription>
+        <FieldDescription v-if="mode === 'Koh'">{{ $t('KoH 要求所有队伍共享同一套环境。') }}</FieldDescription>
+        <FieldDescription v-else>{{ $t('{mode} 要求每个队伍独立的运行环境。', { mode }) }}</FieldDescription>
       </div>
     </Field>
 
     <Field>
-      <FieldLabel>运行环境类型</FieldLabel>
+      <FieldLabel>{{ $t('运行环境类型') }}</FieldLabel>
       <Select
         :model-value="runtime.definition.kind"
         :disabled="disabled || mode === 'Awdp'"
@@ -117,7 +117,7 @@ watch(
           </SelectGroup>
         </SelectContent>
       </Select>
-      <FieldDescription v-if="mode === 'Awdp'">AWDP 仅支持单容器运行环境。</FieldDescription>
+      <FieldDescription v-if="mode === 'Awdp'">{{ $t('AWDP 仅支持单容器运行环境。') }}</FieldDescription>
     </Field>
 
     <DefinitionContainer
@@ -134,62 +134,62 @@ watch(
     />
 
     <FieldSet class="rounded-md border p-3">
-      <FieldLegend class="text-sm font-medium">资源限制(实例整体)</FieldLegend>
+      <FieldLegend class="text-sm font-medium">{{ $t('资源限制(实例整体)') }}</FieldLegend>
       <div class="grid gap-4 sm:grid-cols-3">
         <Field>
-          <FieldLabel>内存(MiB)</FieldLabel>
+          <FieldLabel>{{ $t('内存(MiB)') }}</FieldLabel>
           <NullableNumberInput
             :model-value="bytesToMib(runtime.limits.memoryBytes)"
             :min="1"
-            placeholder="如 512"
+            :placeholder="$t('如 512')"
             :disabled="disabled"
             @update:model-value="runtime.limits.memoryBytes = mibToBytes($event)"
           />
         </Field>
         <Field>
-          <FieldLabel>CPU(核)</FieldLabel>
+          <FieldLabel>{{ $t('CPU(核)') }}</FieldLabel>
           <NullableNumberInput
             :model-value="nanoCpusToCores(runtime.limits.nanoCpus)"
             :min="0"
             step="0.1"
-            placeholder="如 1"
+            :placeholder="$t('如 1')"
             :disabled="disabled"
             @update:model-value="runtime.limits.nanoCpus = coresToNanoCpus($event)"
           />
         </Field>
         <Field>
-          <FieldLabel>进程数上限</FieldLabel>
+          <FieldLabel>{{ $t('进程数上限') }}</FieldLabel>
           <NullableNumberInput
             :model-value="runtime.limits.pidsLimit"
             :min="1"
-            placeholder="如 256"
+            :placeholder="$t('如 256')"
             :disabled="disabled"
             @update:model-value="runtime.limits.pidsLimit = $event"
           />
         </Field>
       </div>
-      <FieldDescription>启动实例前必须全部填写,用于隔离队伍环境。</FieldDescription>
+      <FieldDescription>{{ $t('启动实例前必须全部填写,用于隔离队伍环境。') }}</FieldDescription>
     </FieldSet>
 
     <div class="grid gap-4 sm:grid-cols-2">
       <Field>
-        <FieldLabel>实例存活时间(秒)</FieldLabel>
+        <FieldLabel>{{ $t('实例存活时间(秒)') }}</FieldLabel>
         <NullableNumberInput
           :model-value="runtime.ttlSeconds"
           :min="1"
           :max="604800"
-          placeholder="到点自动回收"
+          :placeholder="$t('到点自动回收')"
           :disabled="disabled"
           @update:model-value="runtime.ttlSeconds = $event"
         />
       </Field>
       <Field>
-        <FieldLabel>操作超时(秒)</FieldLabel>
+        <FieldLabel>{{ $t('操作超时(秒)') }}</FieldLabel>
         <NullableNumberInput
           :model-value="runtime.operationTimeoutSeconds"
           :min="1"
           :max="300"
-          placeholder="启动/停止操作超时"
+          :placeholder="$t('启动/停止操作超时')"
           :disabled="disabled"
           @update:model-value="runtime.operationTimeoutSeconds = $event"
         />
@@ -197,7 +197,7 @@ watch(
     </div>
 
     <Field>
-      <FieldLabel>Flag 来源</FieldLabel>
+      <FieldLabel>{{ $t('Flag 来源') }}</FieldLabel>
       <Select
         :model-value="String(runtime.flagSource)"
         :disabled="disabled"
@@ -217,7 +217,7 @@ watch(
     </Field>
 
     <Field v-if="mode !== 'Awdp'">
-      <FieldLabel>访问入口</FieldLabel>
+      <FieldLabel>{{ $t('访问入口') }}</FieldLabel>
       <UrlBindingList
         :model-value="runtime.urlBindings"
         :exposure-options="exposureOptions"
@@ -225,24 +225,20 @@ watch(
         :disabled="disabled"
         @update:model-value="runtime.urlBindings = $event"
       />
-      <FieldDescription v-if="mode === 'Koh'">
-        KoH 开赛时要求至少一个「所有参赛者可见」的入口。
-      </FieldDescription>
-      <FieldDescription v-else-if="mode === 'Awd'">
-        AWD 中选手互相访问对方服务,通常需要「所有参赛者可见」的入口。
-      </FieldDescription>
+      <FieldDescription v-if="mode === 'Koh'"> {{ $t('KoH 开赛时要求至少一个「所有参赛者可见」的入口。') }} </FieldDescription>
+      <FieldDescription v-else-if="mode === 'Awd'"> {{ $t('AWD 中选手互相访问对方服务,通常需要「所有参赛者可见」的入口。') }} </FieldDescription>
     </Field>
 
     <Field v-if="mode === 'Koh'">
-      <FieldLabel>控制检查入口</FieldLabel>
+      <FieldLabel>{{ $t('控制检查入口') }}</FieldLabel>
       <UrlBindingList
         v-model="controlBindingList"
-        :exposure-options="[{ value: UrlExposure.Participants, label: '平台检查使用' }]"
+        :exposure-options="[{ value: UrlExposure.Participants, label: $t('平台检查使用') }]"
         :show-service-name="isCompose"
-        add-label="设置控制检查入口"
+        :add-label="$t('设置控制检查入口')"
         :disabled="disabled"
       />
-      <FieldDescription>平台周期性检查控制权的地址;KoH 开赛必填。</FieldDescription>
+      <FieldDescription>{{ $t('平台周期性检查控制权的地址;KoH 开赛必填。') }}</FieldDescription>
     </Field>
   </FieldGroup>
 </template>

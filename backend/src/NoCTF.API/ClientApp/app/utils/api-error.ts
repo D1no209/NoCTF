@@ -1,3 +1,5 @@
+import { translate } from './i18n'
+
 /**
  * Normalized API error parsed from RFC 9457 problem+json responses.
  * `code` is the stable machine code emitted by the backend (when present).
@@ -26,7 +28,7 @@ interface ProblemDetailsLike {
 }
 
 /** Convert an SDK error payload into a user-facing ApiError. */
-export function parseApiError(error: unknown, fallback = '请求失败,请稍后重试'): ApiError {
+export function parseApiError(error: unknown, fallback = translate("请求失败,请稍后重试")): ApiError {
   if (error instanceof ApiError) return error
   if (error && typeof error === 'object') {
     const problem = error as ProblemDetailsLike
@@ -45,17 +47,17 @@ export function parseApiError(error: unknown, fallback = '请求失败,请稍后
 /** 无 problem+json 响应体时,按 HTTP 状态码给出有意义的提示。 */
 export function statusErrorMessage(status: number | undefined, url?: string): string {
   switch (status) {
-    case 400: return '请求参数有误,请检查输入'
+    case 400: return translate("请求参数有误,请检查输入")
     case 401:
-      return url?.includes('/auth/login') ? '用户名或密码错误' : '登录状态已失效,请重新登录'
-    case 403: return '没有权限执行此操作'
-    case 404: return '请求的资源不存在'
-    case 409: return '数据已被他人修改,请刷新后重试'
-    case 413: return '上传的文件过大'
-    case 429: return '请求过于频繁,请稍后重试'
+      return url?.includes('/auth/login') ? translate("用户名或密码错误") : translate("登录状态已失效,请重新登录")
+    case 403: return translate("没有权限执行此操作")
+    case 404: return translate("请求的资源不存在")
+    case 409: return translate("数据已被他人修改,请刷新后重试")
+    case 413: return translate("上传的文件过大")
+    case 429: return translate("请求过于频繁,请稍后重试")
     default:
-      if (status !== undefined && status >= 500) return '服务器内部错误,请稍后重试'
-      if (status === undefined) return '无法连接到服务器,请检查网络后重试'
-      return '请求失败,请稍后重试'
+      if (status !== undefined && status >= 500) return translate("服务器内部错误,请稍后重试")
+      if (status === undefined) return translate("无法连接到服务器,请检查网络后重试")
+      return translate("请求失败,请稍后重试")
   }
 }

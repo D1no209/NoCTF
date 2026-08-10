@@ -8,7 +8,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   placeholder: '',
-  addLabel: '添加一项',
+  addLabel: translate("添加一项"),
   disabled: false,
 })
 

@@ -25,7 +25,7 @@ const { items, loading, error, hasMore, initialized, loadMore } =
     if ((err as { status?: number } | undefined)?.status === 404) {
       return { items: [], nextCursor: null }
     }
-    if (err || !data) throw err ?? new Error('加载失败')
+    if (err || !data) throw err ?? new Error(translate("加载失败"))
     return { items: data.items, nextCursor: data.nextCursor }
   })
 
@@ -92,7 +92,7 @@ function resultText(submission: Submission) {
 
 <template>
   <div class="flex flex-col gap-4">
-    <h2 class="text-lg font-semibold">我的提交</h2>
+    <h2 class="text-lg font-semibold">{{ $t('我的提交') }}</h2>
 
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error.message }}</AlertDescription>
@@ -104,18 +104,18 @@ function resultText(submission: Submission) {
 
     <Empty v-else-if="initialized && !items.length" class="border py-12">
       <EmptyHeader>
-        <EmptyTitle>暂无提交记录</EmptyTitle>
-        <EmptyDescription>到题目区解题并提交 flag 吧</EmptyDescription>
+        <EmptyTitle>{{ $t('暂无提交记录') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('到题目区解题并提交 flag 吧') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
     <Table v-else>
       <TableHeader>
         <TableRow>
-          <TableHead>题目</TableHead>
-          <TableHead>类型</TableHead>
-          <TableHead>状态</TableHead>
-          <TableHead>提交时间</TableHead>
+          <TableHead>{{ $t('题目') }}</TableHead>
+          <TableHead>{{ $t('类型') }}</TableHead>
+          <TableHead>{{ $t('状态') }}</TableHead>
+          <TableHead>{{ $t('提交时间') }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -125,7 +125,7 @@ function resultText(submission: Submission) {
               :to="`/competitions/${competitionId}/challenges/${submission.competitionChallengeId}`"
               class="font-medium hover:underline"
             >
-              {{ challengeTitles[submission.competitionChallengeId!] ?? '未知题目' }}
+              {{ challengeTitles[submission.competitionChallengeId!] ?? $t('未知题目') }}
             </NuxtLink>
           </TableCell>
           <TableCell>
@@ -144,9 +144,7 @@ function resultText(submission: Submission) {
 
     <div v-if="hasMore" class="flex justify-center">
       <Button variant="outline" :disabled="loading" @click="loadMore">
-        <Spinner v-if="loading" data-icon="inline-start" />
-        加载更多
-      </Button>
+        <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('加载更多') }} </Button>
     </div>
   </div>
 </template>

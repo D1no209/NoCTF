@@ -16,7 +16,7 @@ definePageMeta({ middleware: 'platform-admin' })
 
 type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 
-const ROLE_LABELS: Record<string, string> = { User: '用户', Organizer: '组织者', Administrator: '管理员' }
+const ROLE_LABELS: Record<string, string> = { User: translate("用户"), Organizer: translate("组织者"), Administrator: translate("管理员") }
 
 const bots = ref<PlatformUser[]>([])
 const loading = ref(true)
@@ -58,7 +58,7 @@ async function createBot(): Promise<void> {
     return
   }
   createOpen.value = false
-  toast.success('Bot 已创建')
+  toast.success(translate("Bot 已创建"))
   await load()
 }
 
@@ -95,10 +95,10 @@ async function copyToken(): Promise<void> {
   if (!issuedToken.value?.accessToken) return
   try {
     await navigator.clipboard.writeText(issuedToken.value.accessToken)
-    toast.success('已复制到剪贴板')
+    toast.success(translate("已复制到剪贴板"))
   }
   catch {
-    toast.error('复制失败,请手动选择复制')
+    toast.error(translate("复制失败,请手动选择复制"))
   }
 }
 
@@ -110,11 +110,9 @@ onMounted(() => {
 <template>
   <div class="flex flex-col gap-4">
     <div class="flex items-center justify-between gap-4">
-      <p class="text-sm text-muted-foreground">Bot 是用于 API 集成的服务账户,通过签发的访问令牌调用接口。</p>
+      <p class="text-sm text-muted-foreground">{{ $t('Bot 是用于 API 集成的服务账户,通过签发的访问令牌调用接口。') }}</p>
       <Button @click="openCreate">
-        <Plus data-icon="inline-start" />
-        创建 Bot
-      </Button>
+        <Plus data-icon="inline-start" /> {{ $t('创建 Bot') }} </Button>
     </div>
 
     <Alert v-if="loadError" variant="destructive">
@@ -129,8 +127,8 @@ onMounted(() => {
 
     <Empty v-else-if="bots.length === 0">
       <EmptyHeader>
-        <EmptyTitle>暂无 Bot</EmptyTitle>
-        <EmptyDescription>创建 Bot 服务账户并为其签发访问令牌。</EmptyDescription>
+        <EmptyTitle>{{ $t('暂无 Bot') }}</EmptyTitle>
+        <EmptyDescription>{{ $t('创建 Bot 服务账户并为其签发访问令牌。') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
@@ -138,10 +136,10 @@ onMounted(() => {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>名称</TableHead>
-            <TableHead>角色</TableHead>
-            <TableHead>创建时间</TableHead>
-            <TableHead class="text-right">操作</TableHead>
+            <TableHead>{{ $t('名称') }}</TableHead>
+            <TableHead>{{ $t('角色') }}</TableHead>
+            <TableHead>{{ $t('创建时间') }}</TableHead>
+            <TableHead class="text-right">{{ $t('操作') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -162,9 +160,7 @@ onMounted(() => {
             </TableCell>
             <TableCell class="text-right">
               <Button size="sm" variant="outline" @click="openIssue(bot)">
-                <KeyRound data-icon="inline-start" />
-                签发令牌
-              </Button>
+                <KeyRound data-icon="inline-start" /> {{ $t('签发令牌') }} </Button>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -174,36 +170,34 @@ onMounted(() => {
     <Dialog v-model:open="createOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>创建 Bot</DialogTitle>
-          <DialogDescription>Bot 是特殊的服务账户,创建后可为其签发访问令牌。</DialogDescription>
+          <DialogTitle>{{ $t('创建 Bot') }}</DialogTitle>
+          <DialogDescription>{{ $t('Bot 是特殊的服务账户,创建后可为其签发访问令牌。') }}</DialogDescription>
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel for="bot-name">名称</FieldLabel>
-            <Input id="bot-name" v-model="botName" required maxlength="50" placeholder="例如:scoreboard-sync" />
+            <FieldLabel for="bot-name">{{ $t('名称') }}</FieldLabel>
+            <Input id="bot-name" v-model="botName" required maxlength="50" :placeholder="$t('例如:scoreboard-sync')" />
           </Field>
           <Field>
-            <FieldLabel for="bot-role">角色</FieldLabel>
+            <FieldLabel for="bot-role">{{ $t('角色') }}</FieldLabel>
             <Select v-model="botRole">
               <SelectTrigger id="bot-role" class="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="User">用户</SelectItem>
-                  <SelectItem value="Organizer">组织者</SelectItem>
-                  <SelectItem value="Administrator">管理员</SelectItem>
+                  <SelectItem value="User">{{ $t('用户') }}</SelectItem>
+                  <SelectItem value="Organizer">{{ $t('组织者') }}</SelectItem>
+                  <SelectItem value="Administrator">{{ $t('管理员') }}</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
           </Field>
         </FieldGroup>
         <DialogFooter>
-          <Button variant="outline" @click="createOpen = false">取消</Button>
+          <Button variant="outline" @click="createOpen = false">{{ $t('取消') }}</Button>
           <Button :disabled="creating || !botName.trim()" @click="createBot">
-            <Spinner v-if="creating" data-icon="inline-start" />
-            创建
-          </Button>
+            <Spinner v-if="creating" data-icon="inline-start" /> {{ $t('创建') }} </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -211,45 +205,42 @@ onMounted(() => {
     <Dialog v-model:open="issueOpen">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>签发访问令牌</DialogTitle>
-          <DialogDescription>为「{{ issueTarget?.userName }}」签发 Bot 访问令牌。</DialogDescription>
+          <DialogTitle>{{ $t('签发访问令牌') }}</DialogTitle>
+          <DialogDescription>{{ $t('为「{user}」签发 Bot 访问令牌。', { user: issueTarget?.userName ?? '—' }) }}</DialogDescription>
         </DialogHeader>
         <template v-if="!issuedToken">
           <FieldGroup>
             <Field>
-              <FieldLabel for="token-ttl">有效期(秒)</FieldLabel>
+              <FieldLabel for="token-ttl">{{ $t('有效期(秒)') }}</FieldLabel>
               <Input id="token-ttl" v-model.number="expiresInSeconds" type="number" min="60" step="60" />
-              <FieldDescription>默认 3600 秒(1 小时)。</FieldDescription>
+              <FieldDescription>{{ $t('默认 3600 秒(1 小时)。') }}</FieldDescription>
             </Field>
           </FieldGroup>
           <DialogFooter>
-            <Button variant="outline" @click="issueOpen = false">取消</Button>
+            <Button variant="outline" @click="issueOpen = false">{{ $t('取消') }}</Button>
             <Button :disabled="issuing || !expiresInSeconds" @click="issueToken">
-              <Spinner v-if="issuing" data-icon="inline-start" />
-              签发
-            </Button>
+              <Spinner v-if="issuing" data-icon="inline-start" /> {{ $t('签发') }} </Button>
           </DialogFooter>
         </template>
         <template v-else>
           <Alert>
-            <AlertDescription>令牌仅此一次展示,请立即复制保存,关闭后无法再次查看。</AlertDescription>
+            <AlertDescription>{{ $t('令牌仅此一次展示,请立即复制保存,关闭后无法再次查看。') }}</AlertDescription>
           </Alert>
           <FieldGroup>
             <Field>
-              <FieldLabel for="issued-token">访问令牌</FieldLabel>
+              <FieldLabel for="issued-token">{{ $t('访问令牌') }}</FieldLabel>
               <div class="flex items-center gap-2">
                 <Input id="issued-token" :model-value="issuedToken.accessToken" readonly class="font-mono text-xs" />
-                <Button size="icon" variant="outline" aria-label="复制令牌" @click="copyToken">
+                <Button size="icon" variant="outline" :aria-label="$t('复制令牌')" @click="copyToken">
                   <Copy />
                 </Button>
               </div>
-              <FieldDescription>
-                过期时间:<AdminDateTime :value="issuedToken.expiresAt" />
+              <FieldDescription> {{ $t('过期时间:') }}<AdminDateTime :value="issuedToken.expiresAt" />
               </FieldDescription>
             </Field>
           </FieldGroup>
           <DialogFooter>
-            <Button @click="issueOpen = false">我已保存,关闭</Button>
+            <Button @click="issueOpen = false">{{ $t('我已保存,关闭') }}</Button>
           </DialogFooter>
         </template>
       </DialogContent>

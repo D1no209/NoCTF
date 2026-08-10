@@ -21,10 +21,10 @@ onUnmounted(() => {
 const text = computed(() => {
   const start = props.startTime ? new Date(props.startTime).getTime() : null
   const end = props.endTime ? new Date(props.endTime).getTime() : null
-  if (props.status === CompetitionStatus.Finished) return '已结束'
-  if (start !== null && now.value < start) return `距开始 ${formatDuration(start - now.value)}`
-  if (end !== null && now.value < end) return `距结束 ${formatDuration(end - now.value)}`
-  if (end !== null) return '已结束'
+  if (props.status === CompetitionStatus.Finished) return translate("已结束")
+  if (start !== null && now.value < start) return translate('距开始 {duration}', { duration: formatDuration(start - now.value) })
+  if (end !== null && now.value < end) return translate('距结束 {duration}', { duration: formatDuration(end - now.value) })
+  if (end !== null) return translate("已结束")
   return ''
 })
 </script>
