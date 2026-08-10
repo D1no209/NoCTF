@@ -44,17 +44,29 @@ public enum NotificationFailureCode
     CursorInvalid
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<NotificationListScopeProtocol>))]
+public enum NotificationListScopeProtocol
+{
+    All,
+    Inbox
+}
+
 [Mapper]
 internal static partial class NotificationProtocolMapper
 {
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial NotificationKindProtocol ToProtocol(NotificationKind value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial NotificationReadScope ToDomain(NotificationListScopeProtocol value);
 }
 
 public sealed class ListNotificationsRequest
 {
     [QueryParam]
     public Guid? CompetitionId { get; set; }
+    [QueryParam]
+    public NotificationListScopeProtocol Scope { get; set; } = NotificationListScopeProtocol.All;
     [QueryParam]
     public string? Cursor { get; set; }
     [QueryParam]
@@ -113,7 +125,7 @@ public sealed class ListNotificationsEndpoint(
         if (!cursors.TryDecode(
                 request.Cursor,
                 CursorEndpoint,
-                CursorScope(user.UserId, request.CompetitionId),
+                CursorScope(user.UserId, request.CompetitionId, request.Scope),
                 out var position))
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
@@ -129,6 +141,7 @@ public sealed class ListNotificationsEndpoint(
             position?.CreatedAt,
             position?.Id,
             request.Limit,
+            NotificationProtocolMapper.ToDomain(request.Scope),
             ct);
         var response = items.Select(item => new NotificationResponse(
             item.Id,
@@ -146,12 +159,19 @@ public sealed class ListNotificationsEndpoint(
         var next = items.Count == request.Limit
             ? cursors.Encode(
                 CursorEndpoint,
-                CursorScope(user.UserId, request.CompetitionId),
+                CursorScope(user.UserId, request.CompetitionId, request.Scope),
                 new(items[^1].SentAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new NotificationListResponse(response, next));
     }
 
-    private static string CursorScope(Guid userId, Guid? competitionId) =>
-        string.Join('|', userId.ToString("N"), competitionId?.ToString("N") ?? "all");
+    private static string CursorScope(
+        Guid userId,
+        Guid? competitionId,
+        NotificationListScopeProtocol scope) =>
+        string.Join(
+            '|',
+            userId.ToString("N"),
+            competitionId?.ToString("N") ?? "all",
+            scope);
 }

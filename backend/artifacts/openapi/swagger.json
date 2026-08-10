@@ -1327,6 +1327,18 @@
             }
           },
           {
+            "name": "scope",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsNotificationsNotificationListScopeProtocol"
+                }
+              ]
+            }
+          },
+          {
             "name": "cursor",
             "in": "query",
             "schema": {
@@ -2410,6 +2422,19 @@
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol"
                 }
               ]
+            }
+          },
+          {
+            "name": "kinds",
+            "in": "query",
+            "style": "form",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "nullable": true,
+              "items": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsCompetitionEventKindProtocol"
+              }
             }
           },
           {
@@ -12576,6 +12601,18 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsNotificationsNotificationListScopeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "All",
+          "Inbox"
+        ],
+        "enum": [
+          "All",
+          "Inbox"
+        ]
+      },
       "NoCTFAPIEndpointsNotificationsNotificationFeedResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -13534,7 +13571,8 @@
           "AnnouncementPublished",
           "QuestionOpened",
           "QuestionReplied",
-          "QuestionStatusChanged"
+          "QuestionStatusChanged",
+          "ChallengeDescriptionUpdated"
         ],
         "enum": [
           "CompetitionCreated",
@@ -13586,7 +13624,8 @@
           "AnnouncementPublished",
           "QuestionOpened",
           "QuestionReplied",
-          "QuestionStatusChanged"
+          "QuestionStatusChanged",
+          "ChallengeDescriptionUpdated"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {

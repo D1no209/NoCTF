@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Management;
+using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
 
@@ -15,6 +16,7 @@ public sealed class ListAdminCompetitionsRequest
 
 public sealed class ListAdminCompetitionsEndpoint(
     ListAdminCompetitions list,
+    ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
     : Endpoint<ListAdminCompetitionsRequest, Ok<AdminCompetitionListResponse>>
 {
@@ -39,7 +41,21 @@ public sealed class ListAdminCompetitionsEndpoint(
             user.IsAdministrator,
             request.IncludeDeleted,
             ct);
-        return TypedResults.Ok(new AdminCompetitionListResponse(
-            items.Select(CompetitionMapper.ToResponse).ToArray()));
+        var responses = new List<CompetitionResponse>(items.Count);
+        foreach (var item in items)
+        {
+            var role = user.IsAdministrator || item.OwnerId == user.UserId
+                ? CompetitionAdministrationRoleProtocol.Owner
+                : await authorizer.CanModerateAsync(user.UserId, item.Id, ct)
+                    ? CompetitionAdministrationRoleProtocol.Manager
+                    : await authorizer.CanJudgeAsync(user.UserId, item.Id, ct)
+                        ? CompetitionAdministrationRoleProtocol.Judge
+                        : CompetitionAdministrationRoleProtocol.Observer;
+            responses.Add(CompetitionMapper.ToResponse(item) with
+            {
+                AdministrationRole = role
+            });
+        }
+        return TypedResults.Ok(new AdminCompetitionListResponse(responses));
     }
 }

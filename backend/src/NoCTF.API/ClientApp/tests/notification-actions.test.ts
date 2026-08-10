@@ -24,6 +24,8 @@ describe('notification unread state', () => {
     expect(layout).toContain('<span v-if="hasUnread" class="sr-only">有未读通知</span>')
     expect(page).toContain('<NotificationCenter />')
     expect(center).toContain('markAllRead(items.value[0]?.id)')
+    expect(center).toContain("scope: 'Inbox'")
+    expect(center).toContain('官方通知，以及与你的账号、队伍或管理职责直接相关的消息')
   })
 })
 

@@ -4,13 +4,25 @@ using NoCTF.Application.Challenges.Bank;
 using NoCTF.Domain.Challenges;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Challenges;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Application.Messaging;
+using NoCTF.Domain.Competitions.Events;
+using NoCTF.Infrastructure.Messaging;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace NoCTF.Infrastructure.Challenges.Bank;
 
-public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
+public sealed class ChallengeBankStore(
+    NoCtfDbContext db,
+    ITransactionalMessageOutbox? messageOutbox = null,
+    ICompetitionEventRecorder? eventRecorder = null) : IChallengeBankStore
 {
+    private readonly ITransactionalMessageOutbox outbox =
+        messageOutbox ?? new OpenApiTransactionalMessageOutbox();
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public async Task<ChallengeTemplateWriteResult> CreateAsync(
         CreateChallengeTemplateCommand command,
         CancellationToken ct)
@@ -128,6 +140,19 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         {
             return new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
         }
+        var descriptionChanged = !string.Equals(
+            entity.Description,
+            command.Description,
+            StringComparison.Ordinal);
+        var publishedReferences = descriptionChanged
+            ? await db.CompetitionChallenges.AsNoTracking()
+                .Where(item =>
+                    item.ChallengeId == entity.Id
+                    && item.IsPublished
+                    && item.DeletedAt == null)
+                .Select(item => new PublishedChallengeReference(item.CompetitionId, item.Id))
+                .ToArrayAsync(ct)
+            : Array.Empty<PublishedChallengeReference>();
         entity.Mode = command.Mode;
         entity.Visibility = command.Visibility;
         entity.Title = command.Title;
@@ -136,6 +161,17 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
         entity.DefinitionJson = command.DefinitionJson;
         entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
+        foreach (var reference in publishedReferences)
+        {
+            await events.RecordAsync(new(
+                reference.CompetitionId,
+                CompetitionEventKind.ChallengeDescriptionUpdated,
+                CompetitionEventLevel.Information,
+                CompetitionEventVisibility.Public,
+                command.UpdatedAt,
+                ActorUserId: command.ActorId,
+                CompetitionChallengeId: reference.Id), ct);
+        }
         try
         {
             await db.SaveChangesAsync(ct);
@@ -148,6 +184,7 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
         await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
         return new(ChallengeTemplateWriteState.Succeeded, result);
     }
 
@@ -408,5 +445,9 @@ public sealed class ChallengeBankStore(NoCtfDbContext db) : IChallengeBankStore
                 item.ChallengeId == challenge.Id && item.DeletedAt == null),
             challenge.CreatedAt,
             challenge.UpdatedAt));
+
+    private sealed record PublishedChallengeReference(
+        Guid CompetitionId,
+        Guid Id);
 
 }

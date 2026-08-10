@@ -17,6 +17,12 @@ public sealed record NotificationView(
     DateTimeOffset SentAt,
     string? SourceDisplayName = null);
 
+public enum NotificationReadScope : short
+{
+    All,
+    Inbox
+}
+
 public interface INotificationReader
 {
     Task<IReadOnlyList<NotificationView>> ListAsync(
@@ -25,6 +31,15 @@ public interface INotificationReader
         Guid? beforeId,
         int limit,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<NotificationView>> ListAsync(
+        Guid userId,
+        DateTimeOffset? beforeCreatedAt,
+        Guid? beforeId,
+        int limit,
+        NotificationReadScope scope,
+        CancellationToken cancellationToken) =>
+        ListAsync(userId, beforeCreatedAt, beforeId, limit, cancellationToken);
 
     Task<IReadOnlyList<NotificationView>> ListCompetitionAsync(
         Guid userId,
@@ -35,6 +50,22 @@ public interface INotificationReader
         CancellationToken cancellationToken) =>
         ListAsync(
             userId,
+            beforeCreatedAt,
+            beforeId,
+            limit,
+            cancellationToken);
+
+    Task<IReadOnlyList<NotificationView>> ListCompetitionAsync(
+        Guid userId,
+        Guid competitionId,
+        DateTimeOffset? beforeCreatedAt,
+        Guid? beforeId,
+        int limit,
+        NotificationReadScope scope,
+        CancellationToken cancellationToken) =>
+        ListCompetitionAsync(
+            userId,
+            competitionId,
             beforeCreatedAt,
             beforeId,
             limit,
@@ -68,6 +99,7 @@ public sealed class ListNotifications(INotificationReader reader)
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
+        NotificationReadScope scope,
         CancellationToken ct = default) =>
         competitionId is { } id
             ? reader.ListCompetitionAsync(
@@ -76,8 +108,9 @@ public sealed class ListNotifications(INotificationReader reader)
                 beforeCreatedAt,
                 beforeId,
                 limit,
+                scope,
                 ct)
-            : reader.ListAsync(userId, beforeCreatedAt, beforeId, limit, ct);
+            : reader.ListAsync(userId, beforeCreatedAt, beforeId, limit, scope, ct);
 }
 
 public sealed class ReadNotificationFeed(INotificationReader reader)

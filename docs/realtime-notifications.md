@@ -26,6 +26,13 @@ API 多副本使用 Redis SignalR backplane。断线不补历史；客户端重�
 
 Payload 由 NotificationKind 对应强类型 DTO 序列化，只含安全展示字段。按 CreatedAt desc/Id desc keyset 查询。没有 Read/MarkAllRead/Delete/Expiry API。
 
+### 前端信息分层
+
+- 比赛「动态」是按访问级别过滤后的不可变 `competition_events` 完整事实流，用于追溯比赛状态和操作，不等同于个人消息。
+- 题目页「赛事播报」是公开事实流的紧凑投影，只展示一二三血、作弊封禁、申诉纠正、提示发布、题目描述更新和题目开放；不复制事件数据。
+- 全局「消息中心」使用 `GET /notifications?scope=Inbox`，只展示手工官方通知以及与当前账号、队伍或管理职责直接相关的消息。系统自动写入 `CompetitionParticipants` 的公开播报不进入个人收件箱，避免不同账号收到相同内容后被错误描述为“你的队伍”。
+- `GET /notifications/feed` 和默认 `scope=All` 保持完整动态受众语义，BOT 与已有消费者不受个人收件箱投影影响。
+
 旧的 QQBot 公钥 Agent、群组同步和专用投递协议不在目标架构中。QQBOT 作为普通
 User Bot 使用 Bearer JWT 消费自身的 `/notifications/feed`，并复用现有排行榜接口；
 平台不维护 QQ 群、投递状态或 QQBOT 专用通知表。详见 [QQBOT JWT 接入](qqbot-jwt.md)。

@@ -17,7 +17,7 @@ function notification(
 describe('notificationTargetPath', () => {
   test('routes cheat incident cards to competition administration', () => {
     expect(notificationTargetPath(notification('CheatIncidentDetected', 'competition-1', {
-      scoringEventId: 'incident-1',
+      gameplayFactId: 'incident-1',
     })))
       .toBe('/admin/competitions/competition-1/cheats?incident=incident-1')
   })
@@ -68,6 +68,11 @@ describe('notificationTargetPath', () => {
       .toBe('/notifications')
   })
 
+  test('keeps official competition announcements in the global message center', () => {
+    expect(notificationTargetPath(notification('CompetitionAnnouncement', 'competition-1')))
+      .toBe('/notifications?notification=notification-1')
+  })
+
   test('notification centers open readable detail and use the generated thread SDK', async () => {
     const component = await Bun.file(
       new URL('../app/components/notifications/NotificationCenter.vue', import.meta.url),
@@ -77,10 +82,11 @@ describe('notificationTargetPath', () => {
     ).text()
 
     expect(component).toContain('readNotificationThreadEndpoint({')
-    expect(component).toContain('competitionId: props.competitionId')
+    expect(component).toContain("scope: 'Inbox'")
     expect(component).toContain('notificationTargetPath(actionTarget.value)')
     expect(component).toContain('sourceLabel(selected)')
     expect(component).toContain('notificationBody(selected)')
-    expect(competitionPage).toContain(':competition-id="competitionId"')
+    expect(competitionPage).toContain("path: '/notifications'")
+    expect(competitionPage).toContain('{ replace: true }')
   })
 })

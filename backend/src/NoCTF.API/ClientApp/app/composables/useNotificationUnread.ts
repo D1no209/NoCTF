@@ -26,7 +26,9 @@ export function useNotificationUnread() {
       return
     }
 
-    const { data, error } = await listNotificationsEndpoint({ query: { limit: 1 } })
+    const { data, error } = await listNotificationsEndpoint({
+      query: { scope: 'Inbox', limit: 1 },
+    })
     if (error) return
 
     latestNotificationId.value = data?.items?.[0]?.id ?? null

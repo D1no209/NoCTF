@@ -33,6 +33,6 @@ describe('participant challenge progress', () => {
     expect(submit).toContain('celebrateCorrectFlag()')
     expect(submit).toContain('🎉')
     expect(submit).toContain('@media (prefers-reduced-motion: reduce)')
-    expect(submit).toContain("if (wasPending && !isEvaluationPending(data.evaluationState) && !toasted.has(id))")
+    expect(submit).toContain("if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id))")
   })
 })

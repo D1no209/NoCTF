@@ -3,11 +3,13 @@ using System.Text.Json.Nodes;
 using NoCTF.Application.Challenges.Bank;
 using NoCTF.Application.Challenges.Management;
 using NoCTF.Application.Messaging;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Management;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
 using NSubstitute;
 using Testcontainers.PostgreSql;
@@ -109,7 +111,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 .IsEqualTo(ChallengeTemplateWriteState.RevisionConflict);
             await Assert.That(stale.Template).IsNull();
 
-            var metadata = await UpdateAsync(
+            var metadata = await UpdateWithEventsAsync(
                 options,
                 Command(
                     fixture.ChallengeId,
@@ -135,6 +137,17 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 1,
                 changedAt,
                 cancellationToken);
+            await using (var eventDb = new NoCtfDbContext(options))
+            {
+                var descriptionEvents = await eventDb.CompetitionEvents.AsNoTracking()
+                    .Where(item =>
+                        item.CompetitionId == fixture.CompetitionId
+                        && item.Kind == CompetitionEventKind.ChallengeDescriptionUpdated
+                        && item.Visibility == CompetitionEventVisibility.Public
+                        && item.SubjectId == fixture.CompetitionChallengeId)
+                    .ToArrayAsync(cancellationToken);
+                await Assert.That(descriptionEvents).Count().IsEqualTo(1);
+            }
 
             await using (var deleteDb = new NoCtfDbContext(options))
             {
@@ -438,6 +451,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             ChallengeId = challengeId,
             BaseScore = 500,
             Order = 1,
+            IsPublished = true,
             UpdatedAt = now
         });
 
@@ -519,6 +533,18 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             await using var db = new NoCtfDbContext(options);
             return await new ChallengeBankStore(db).UpdateAsync(command, cancellationToken);
         }
+    }
+
+    private static async Task<ChallengeTemplateWriteResult> UpdateWithEventsAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        UpdateChallengeTemplateCommand command,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var outbox = Substitute.For<ITransactionalMessageOutbox>();
+        var events = new CompetitionEventStore(db, outbox);
+        return await new ChallengeBankStore(db, outbox, events)
+            .UpdateAsync(command, cancellationToken);
     }
 
     private static UpdateChallengeTemplateCommand Command(

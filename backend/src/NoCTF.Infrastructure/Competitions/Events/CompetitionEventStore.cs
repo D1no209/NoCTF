@@ -285,6 +285,8 @@ public sealed class CompetitionEventStore(
         }
         if (filter.Kind is CompetitionEventKind kind)
             query = query.Where(item => item.Kind == kind);
+        else if (filter.Kinds is { Count: > 0 } kinds)
+            query = query.Where(item => kinds.Contains(item.Kind));
         if (filter.MinimumLevel is CompetitionEventLevel level)
             query = query.Where(item => item.Level >= level);
         if (filter.TeamId is Guid filteredTeamId)

@@ -10,16 +10,42 @@ namespace NoCTF.Infrastructure.Notifications;
 
 public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
 {
+    public Task<IReadOnlyList<NotificationView>> ListAsync(
+        Guid userId,
+        DateTimeOffset? beforeCreatedAt,
+        Guid? beforeId,
+        int limit,
+        CancellationToken ct) =>
+        ListAsync(userId, beforeCreatedAt, beforeId, limit, NotificationReadScope.All, ct);
+
     public async Task<IReadOnlyList<NotificationView>> ListAsync(
         Guid userId,
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
+        NotificationReadScope scope,
         CancellationToken ct)
     {
         var query = await VisibleToAsync(userId, ct);
+        query = ApplyScope(query, scope);
         return await ListPageAsync(query, beforeCreatedAt, beforeId, limit, ct);
     }
+
+    public Task<IReadOnlyList<NotificationView>> ListCompetitionAsync(
+        Guid userId,
+        Guid competitionId,
+        DateTimeOffset? beforeCreatedAt,
+        Guid? beforeId,
+        int limit,
+        CancellationToken ct) =>
+        ListCompetitionAsync(
+            userId,
+            competitionId,
+            beforeCreatedAt,
+            beforeId,
+            limit,
+            NotificationReadScope.All,
+            ct);
 
     public async Task<IReadOnlyList<NotificationView>> ListCompetitionAsync(
         Guid userId,
@@ -27,13 +53,24 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         DateTimeOffset? beforeCreatedAt,
         Guid? beforeId,
         int limit,
+        NotificationReadScope scope,
         CancellationToken ct)
     {
-        var query = (await VisibleToAsync(userId, ct)).Where(notification =>
+        var query = ApplyScope(await VisibleToAsync(userId, ct), scope).Where(notification =>
             notification.RelatedType == EntityReferenceKind.Competition
             && notification.RelatedId == competitionId);
         return await ListPageAsync(query, beforeCreatedAt, beforeId, limit, ct);
     }
+
+    private static IQueryable<Notification> ApplyScope(
+        IQueryable<Notification> query,
+        NotificationReadScope scope) =>
+        scope == NotificationReadScope.Inbox
+            ? query.Where(notification =>
+                notification.TargetType != NotificationTargetType.CompetitionParticipants
+                || notification.Kind == NotificationKind.CompetitionAnnouncement
+                    && notification.SourceType == NotificationSourceType.User)
+            : query;
 
     private async Task<IReadOnlyList<NotificationView>> ListPageAsync(
         IQueryable<Notification> query,
