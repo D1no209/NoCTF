@@ -2,11 +2,56 @@
 
 ## 当前状态
 
-- 已用 EF CLI 重建 `InitialBaseline`，业务 schema 为计划中的 17 张表。
+- 已用 EF CLI 重建 `InitialBaseline`，业务 schema 已按 GameplayFact 收敛为 16 张表；旧
+  `submissions`/`scoring_events` 已由单一 `gameplay_facts` 当前事实表取代。
 - API、测试项目当前均可编译；EF model snapshot 与当前模型无 pending changes（2026-08-08 再次验证）。
 - OpenAPI 已重新导出，Nuxt 生成客户端已更新。
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
+
+## 2026-08-10 Alpha.20 GameplayFact/组合宿主同步、数据迁移与生产部署
+
+- 已同步并审阅协作者提交 `f1e5f02c`、`07f98b9a`：新增可组合的 `NoCTF.Hosting` 与
+  `NoCTF.Host`，同时保留 API/Worker/Runner 独立进程；Submission 与 ScoringEvent 收敛为单一
+  `GameplayFact` 当前权威事实，排行榜由 `Competition.LeaderboardDirty` 驱动全量刷新。Domain、
+  Application、Infrastructure、API、OpenAPI 和生成 TypeScript SDK 已同步改名；生产本次继续使用
+  既有三进程拓扑，没有把进程合并与数据模型切换同时进行。
+- 新 EF CLI 基线为 `20260810002212_InitialBaseline`，业务表从 17 张减为 16 张。协作者明确取消旧
+  persistence/messaging 合约兼容，直接在 Alpha.19 数据库运行新基线会因 `files` 等表已存在而失败。
+  `6df94001` 因此新增一次性、事务化的 `deploy/data-migrations/alpha19-to-alpha20.sql`，没有新增业务表，
+  也没有手改 migration/snapshot。脚本只接受“新基线空目标 + `legacy_alpha19` 源”，按共享列复制 15 张
+  既有表，把每条旧 Submission 及其当前 ScoringEvent 合成同 ID GameplayFact，并迁移 Runtime、
+  CompetitionEvent、Notification 的强类型引用和 JSON payload；计数、GameplayFact 外键、Runtime/
+  Event 引用和旧 payload 键均在提交前验证，失败会回滚整个数据复制事务。平台版本递增为
+  `0.1.0-alpha.20`。
+- 使用生产只读压缩备份在独立 PostgreSQL 16 容器中重复演练完整流程：重命名旧 schema、应用
+  `dotnet ef 10.0.9 migrations script` 生成的基线 SQL、运行数据迁移、启动新 API/Worker。演练保留
+  4 用户、2 比赛、4 队伍、4 GameplayFact、84 CompetitionEvent、14 Notification、5 Runtime；
+  两场比赛各恢复 1 条作弊投影，排行榜能重建，第二场 `TEST_CHALL` 为 500 当前分 + 25 一血奖励 =
+  525。新镜像构建成功；协作者精确提交 `07f98b9a` 的 GitHub 门禁中 restore/audit/build、四种 publish、
+  后端测试、analyzer/EF drift 和 Kubernetes 验证均通过，唯一 Compose 失败是 CI 未传
+  `EMAIL_VERIFICATION_ENCRYPTION_KEY`，用户已明确延后处理，本提交未混入 CI 修复。
+- `6df94001` 已快进推送到远程 `main`，生产 `/root/NoCTF` 通过带先决提交 `3edb0ae6` 的增量 bundle
+  快进到相同提交。681,519,616 字节三镜像归档 SHA-256 为
+  `4f83cb365fba657261697b55e7032fce45b8a5b272e3d9e89402e8e1040050db`；加载后的 API/Migration、
+  Worker、Runner 镜像 ID 分别为 `19c521bbd43a`、`eebd3099c0df`、`71ca9462c5f5`。既有未跟踪生产
+  Compose override、`.env`、HTTPS 证书、PostgreSQL/Redis/上传卷均未覆盖。
+- 停机前只有一个周期性 `DispatchAwdCheckers` 调度，5 个 Runtime 均为 Stopped，且没有运行中的题目
+  Docker 容器。首次 schema 切换因远程 `docker exec psql` 未挂标准输入而没有执行，新基线的非空目标
+  保护立即中止；自动回退恢复 Alpha.19 镜像和 HTTPS 200，未复制或修改业务数据。改为显式
+  `psql -c` 事务后，生产成功切换 schema、应用新 EF 基线和已演练的数据复制；旧 Wolverine API/
+  Worker/Runner/Queue schema 因消息类型不兼容而清空重建，周期维护代理重新生成调度，没有丢弃待发送
+  邮件或人工业务命令。
+- 部署后 API、Runner healthy，Worker 正常，HTTPS `/health` 返回 200；迁移历史仅为新基线。强类型
+  管理登录确认平台版本 `0.1.0-alpha.20`、贡献者 3 人、两场比赛各 1 条作弊事件；排行榜分别恢复
+  1000 和 525 的头名分数。最近启动日志没有真实 Fatal/Unhandled/fail，日志筛选只命中 Wolverine
+  建表 DDL 的 `exception_*` 列名。Edge 能发现生产标签页，但两次读取页面 DOM 时扩展超时，因此没有
+  伪造浏览器交互验收，也没有处置任何真实比赛数据。
+- 迁移前后数据库备份已移到本机 `E:\Backups\NoCTF`：Alpha.19 SHA-256
+  `60387279de53ace12293c35af3d81de6cd19ea5231815f4d69b8862138668c83`，Alpha.20 SHA-256
+  `58132af239416e5e289c2376c1fdfa1c300dd5f631450d7fe877360799d23806`。生产验收后已按用户授权删除
+  `legacy_alpha19` 和所有历史回退镜像标签，并精确清理一个 16 小时前的已退出 Bun 构建容器；未执行
+  广域 Docker prune。根分区由 82% 降至 68%，约 14 GB 可用，当前仅保留 Alpha.20 服务镜像。
 
 ## 2026-08-10 Alpha.19 私有比赛咨询工单
 
