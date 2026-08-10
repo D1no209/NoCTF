@@ -9,6 +9,25 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-10 Alpha.24 语言切换黑屏修复
+
+- 功能提交 `be97a8ec` 修复页头语言按钮短暂黑屏。根因是 `useLocale().switchLocale()` 在更新共享语言状态和
+  `localStorage` 后仍调用 `window.location.reload()`，导致浏览器卸载整套 Nuxt SPA，并在重新下载、解析和
+  挂载静态资源期间露出空页面底色。
+- 语言切换现在只更新现有响应式 locale，不再触发文档导航或整页刷新；根 `NuxtPage` 以 locale 为 key
+  在当前 SPA 内重新挂载当前路由，使 `<script setup>` 中构建的静态选项和普通 `$t()` / `translate()`
+  消费者在同一页面内统一重算。URL、布局、认证会话和浏览器文档保持不变，切换过程中不再出现黑屏。
+- 平台版本由 `0.1.0-alpha.23` 递增为 `0.1.0-alpha.24`。本阶段没有 HTTP/OpenAPI 契约、生成 TypeScript
+  SDK、数据模型、数据表、列、migration 或 snapshot 变化，生成 API 目录确认无差异。
+- 新增 locale 响应式更新与“不得调用 `window.location.reload()`”回归，并锁定根页面按 locale 重挂载。
+  验证：ClientApp `bun test` 84/84、`bun run typecheck`、`bun run build` 均通过；
+  `dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误，`git diff --check` 通过。构建只保留
+  既有大 chunk、插件耗时及第三方 trailing-slash deprecation 警告；仓库仍无 lint script。
+- 本地 production preview 浏览器验收通过：中→英和英→中均保持 `http://127.0.0.1:3418/`，`html lang`
+  与页头、首页模式文案同步更新，控制台无 Warning/Error；验收临时服务与标签页已清理。
+- 本阶段尚未推送或部署；远程 `main` 和生产仍为 `ddb3eb4c` / `0.1.0-alpha.23`。下一步仅在用户明确授权后
+  推送功能提交与本 HANDOFF 提交，并按现有三进程生产流程部署 Alpha.24。
+
 ## 2026-08-10 Alpha.23 中英文界面适配
 
 - 基础提交 `230386f2` 建立轻量的强类型语言层，功能提交 `2c74f31a` 完成参与者端、比赛管理、
