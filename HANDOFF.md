@@ -9,6 +9,39 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-10 Alpha.21 消息中心、赛事播报与管理角色修正
+
+- 功能提交 `8cd8ef63` 重新划分比赛信息的三个前端入口。比赛「动态」继续投影按权限过滤的完整
+  `competition_events`；全局「消息中心」改用新增的强类型 `scope=Inbox`，只展示手工发布的官方
+  公告，以及与当前账号、队伍或管理职责直接相关的消息；系统自动投递给全部参赛者的公开赛事播报
+  不再混入个人收件箱。原比赛内「公告/通知」标签被移除，旧路由保留为到全局消息中心的重定向。
+  默认 `scope=All` 与 `/notifications/feed` 仍保留完整动态受众语义，现有 BOT 消费不受影响。
+- 题目页右侧新增紧凑的「赛事播报」窗口，直接查询既有不可变比赛事件，只展示一血、二血、三血、
+  作弊封禁、申诉纠正、提示发布、题目描述更新和题目开放；卡片按题目或队伍落到对应页面，并通过
+  既有实时事件失效刷新。为补齐真实事实链，Domain/Application/Infrastructure/API 协议追加
+  `ChallengeDescriptionUpdated`，作弊确认产生幂等的公开 `TeamBanned` 事件；事件列表支持强类型
+  `kinds[]` 查询。没有复制播报数据，也没有新增 read-state、broadcast 或其他业务表。
+- 两个账号收到相同通知的根因是公开自动化通知使用 `CompetitionParticipants` 动态受众，旧前端又把
+  这些公共信息描述成“你的队伍”。Inbox 现在只允许 `SourceType=User` 的人工官方公告继续面向全部
+  参赛者显示，`SourceType=System` 的公开自动播报由题目页比赛事件投影承担；直接用户、队伍、工作
+  人员和平台管理员消息继续保持各自动态可见性。
+- 修复 Fa1lSnow 等 Judge 在竞赛管理列表被显示为 Observer。旧前端通过 1970–2999 的作弊查询探测
+  权限，超过后端 31 天范围后请求失败并静默回退为 Observer。管理比赛列表现在和详情接口一致，直接
+  返回强类型 `administrationRole`（Owner/Manager/Judge/Observer），前端不再探测或猜测权限；Judge
+  会稳定显示为「裁判」。
+- OpenAPI 已由后端重新导出，`swagger.json`、`wwwroot/openapi/v1.json` 和 TypeScript SDK 均由生成
+  工具更新，没有手写 URL、DTO、枚举或端点路径。平台版本由 `0.1.0-alpha.20` 递增为
+  `0.1.0-alpha.21`。EF CLI 确认模型无 pending changes，本阶段没有新增或修改 migration、snapshot、
+  数据表或列。
+- 验证：`dotnet build backend/NoCTF.slnx --no-restore -m:1` 为 0 警告/0 错误；非 Integration
+  625/625；强制 Docker/Testcontainers Integration 132 通过，Kubernetes/Libvirt 两项按既有外部
+  配置门禁跳过；ClientApp `bun test` 77/77、`bun run typecheck`、`bun run build` 全部通过；EF
+  model drift 与 `git diff --check` 通过。仓库仍没有 lint script/ESLint 配置，因此未伪造 lint 结果；
+  Nuxt 只保留既有大 chunk、插件耗时和第三方 trailing-slash 警告。
+- 本阶段仅创建本地功能提交与本 HANDOFF 提交，尚未 push、尚未部署。生产当前仍运行 Alpha.20，
+  因而不能用线上旧页面冒充新版浏览器验收；获得明确部署授权后，应使用两个不同参赛账号复核 Inbox
+  差异、题目页赛事播报和 Fa1lSnow 的「裁判」标签，并检查浏览器控制台无新增错误。
+
 ## 2026-08-10 Alpha.20 GameplayFact/组合宿主同步、数据迁移与生产部署
 
 - 已同步并审阅协作者提交 `f1e5f02c`、`07f98b9a`：新增可组合的 `NoCTF.Hosting` 与
