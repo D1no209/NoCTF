@@ -8,14 +8,14 @@ import { computed, ref } from 'vue'
 export type CheatIncidentResolutionAction = 'confirm' | 'dismiss' | 'correct'
 
 export interface CheatIncidentResolutionTarget {
-  scoringEventId: string
+  gameplayFactId: string
   sourceTeamId?: string | null
   sourceTeamName?: string | null
 }
 
 export interface CheatIncidentResolutionRequest {
   action: CheatIncidentResolutionAction
-  scoringEventId: string
+  gameplayFactId: string
   reason: string
 }
 
@@ -55,7 +55,7 @@ async function executeResolution(
   const options = {
     path: {
       competitionId,
-      scoringEventId: request.scoringEventId,
+      gameplayFactId: request.gameplayFactId,
     },
     body: { reason: request.reason },
   }
@@ -138,7 +138,7 @@ export function useCheatIncidentResolution(options: CheatIncidentResolutionOptio
 
     const request: CheatIncidentResolutionRequest = {
       action: currentAction,
-      scoringEventId: currentTarget.scoringEventId,
+      gameplayFactId: currentTarget.gameplayFactId,
       reason: normalizedReason.value,
     }
 

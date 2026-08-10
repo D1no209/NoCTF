@@ -98,7 +98,7 @@ public sealed class RedisPlatformLoggerProvider(
             var teamId = ReadGuid(properties, "TeamId");
             var userId = ReadGuid(properties, "UserId", "ActorUserId", "RelatedUserId");
             var competitionChallengeId = ReadGuid(properties, "CompetitionChallengeId");
-            var submissionId = ReadGuid(properties, "SubmissionId");
+            var gameplayFactId = ReadGuid(properties, "GameplayFactId");
             var level = ToPlatformLevel(logLevel);
             if (!redis.IsConnected)
                 return;
@@ -126,7 +126,7 @@ public sealed class RedisPlatformLoggerProvider(
                         new(
                             "competitionChallengeId",
                             competitionChallengeId?.ToString("D") ?? string.Empty),
-                        new("submissionId", submissionId?.ToString("D") ?? string.Empty)
+                        new("gameplayFactId", gameplayFactId?.ToString("D") ?? string.Empty)
                     ],
                     maxLength: options.MaximumEntriesPerDay,
                     useApproximateMaxLength: false);
@@ -150,7 +150,7 @@ public sealed class RedisPlatformLoggerProvider(
                     teamId,
                     userId,
                     competitionChallengeId,
-                    submissionId);
+                    gameplayFactId);
                 redis.GetSubscriber().Publish(
                     RedisChannel.Literal(Channel),
                     System.Text.Json.JsonSerializer.Serialize(notification, JsonOptions));
@@ -350,7 +350,7 @@ public sealed class RedisPlatformLogStore(
         && (query.UserId is null || item.UserId == query.UserId)
         && (query.CompetitionChallengeId is null
             || item.CompetitionChallengeId == query.CompetitionChallengeId)
-        && (query.SubmissionId is null || item.SubmissionId == query.SubmissionId);
+        && (query.GameplayFactId is null || item.GameplayFactId == query.GameplayFactId);
 
     private static bool MatchesSearch(PlatformLogView item, string search) =>
         item.Category.Contains(search, StringComparison.OrdinalIgnoreCase)
@@ -393,7 +393,7 @@ public sealed class RedisPlatformLogStore(
         values.TryGetValue("teamId", out var teamIdText);
         values.TryGetValue("userId", out var userIdText);
         values.TryGetValue("competitionChallengeId", out var competitionChallengeIdText);
-        values.TryGetValue("submissionId", out var submissionIdText);
+        values.TryGetValue("gameplayFactId", out var gameplayFactIdText);
         item = new(
             RedisPlatformLoggerProvider.ComposeCursor(partition, entry.Id.ToString()),
             timestamp,
@@ -416,7 +416,7 @@ public sealed class RedisPlatformLogStore(
             Guid.TryParse(competitionChallengeIdText, out var competitionChallengeId)
                 ? competitionChallengeId
                 : null,
-            Guid.TryParse(submissionIdText, out var submissionId) ? submissionId : null);
+            Guid.TryParse(gameplayFactIdText, out var gameplayFactId) ? gameplayFactId : null);
         return true;
     }
 

@@ -307,10 +307,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         await Assert.That((await createTask).Failure).IsNull();
         await Assert.That((await updateTask).State)
             .IsEqualTo(ChallengeTemplateWriteState.RevisionConflict);
-        await createOutbox.Received(1).PublishAsync(
-            Arg.Is<InvalidateLeaderboard>(message =>
-                message!.CompetitionId == fixture.ConcurrentCompetitionId));
-        await createOutbox.Received(1).FlushOutgoingMessagesAsync();
         await AssertTemplateAsync(
             options,
             fixture.ConcurrentChallengeId,

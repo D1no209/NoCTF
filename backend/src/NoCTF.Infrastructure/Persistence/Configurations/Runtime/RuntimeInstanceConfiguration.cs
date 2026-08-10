@@ -20,8 +20,8 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                 "ck_runtime_instances_awd_checker_target",
                 "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
             table.HasCheckConstraint(
-                "ck_runtime_instances_awdp_submission",
-                "(purpose = 1) = (submission_id IS NOT NULL AND submission_processing_version IS NOT NULL)");
+                "ck_runtime_instances_awdp_gameplay_fact",
+                "(purpose = 1) = (gameplay_fact_id IS NOT NULL)");
         });
         builder.HasKey(instance => instance.Id);
         builder.HasAlternateKey(instance => new { instance.Id, instance.CompetitionId });
@@ -46,9 +46,9 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             instance.CompetitionChallengeId,
             instance.TeamId
         }).IsUnique().HasFilter("purpose = 0 AND state IN (0, 1, 2)");
-        builder.HasIndex(instance => instance.SubmissionId)
+        builder.HasIndex(instance => instance.GameplayFactId)
             .IsUnique()
-            .HasFilter("purpose = 1 AND submission_id IS NOT NULL AND state IN (0, 1, 2, 3)");
+            .HasFilter("purpose = 1 AND gameplay_fact_id IS NOT NULL AND state IN (0, 1, 2, 3)");
         builder.HasIndex(instance => new
         {
             instance.RunnerPool,
@@ -64,8 +64,8 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             .HasForeignKey(instance => instance.CompetitionChallengeId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<NoCTF.Domain.Teams.Team>().WithMany()
             .HasForeignKey(instance => instance.TeamId).OnDelete(DeleteBehavior.Restrict);
-        builder.HasOne<NoCTF.Domain.Submissions.Submission>().WithMany()
-            .HasForeignKey(instance => instance.SubmissionId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<NoCTF.Domain.Gameplay.GameplayFact>().WithMany()
+            .HasForeignKey(instance => instance.GameplayFactId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<RuntimeInstance>().WithMany()
             .HasForeignKey(instance => instance.ReplacesRuntimeInstanceId).OnDelete(DeleteBehavior.Restrict);
         builder.OwnsMany(instance => instance.PublishedPorts, ports =>

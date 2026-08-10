@@ -4,14 +4,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Endpoints.Competitions.Events;
-using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.GameplayFacts;
 using NoCTF.API.Endpoints.Teams;
 using NoCTF.API.Serialization;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Competitions.Events;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.API.Pagination;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
@@ -95,13 +95,11 @@ public sealed record PlatformAuditLogResponse(
     Guid? TeamId,
     Guid? CompetitionChallengeId,
     Guid? RuntimeInstanceId,
-    Guid? SubmissionId,
-    Guid? ScoringEventId,
+    Guid? GameplayFactId,
     Guid? QuestionId,
-    SubmissionKindProtocol? SubmissionKind,
-    SubmissionEvaluationStateProtocol? SubmissionState,
-    ScoringEventKindProtocol? ScoringEventKind,
-    ScoringResultProtocol? ScoringResult,
+    GameplayFactKindProtocol? GameplayFactKind,
+    GameplayFactStateProtocol? GameplayFactState,
+    GameplayFactResultProtocol? GameplayFactResult,
     string? SubjectDisplayName,
     string? Reason,
     bool Automatic,
@@ -175,13 +173,11 @@ public sealed class ListPlatformAuditLogsEndpoint(
                 view.TeamId,
                 view.CompetitionChallengeId,
                 view.RuntimeInstanceId,
-                view.SubmissionId,
-                view.ScoringEventId,
+                view.GameplayFactId,
                 view.QuestionId,
-                view.SubmissionKind is null ? null : SubmissionMapper.ToProtocol(view.SubmissionKind.Value),
-                view.SubmissionState is null ? null : SubmissionMapper.ToProtocol(view.SubmissionState.Value),
-                view.ScoringEventKind is null ? null : CompetitionEventProtocolMapper.ToProtocol(view.ScoringEventKind.Value),
-                view.ScoringResult is null ? null : SubmissionMapper.ToProtocol(view.ScoringResult.Value),
+                view.GameplayFactKind is null ? null : GameplayFactMapper.ToProtocol(view.GameplayFactKind.Value),
+                view.GameplayFactState is null ? null : GameplayFactMapper.ToProtocol(view.GameplayFactState.Value),
+                view.GameplayFactResult is null ? null : GameplayFactMapper.ToProtocol(view.GameplayFactResult.Value),
                 view.SubjectDisplayName,
                 view.Reason,
                 view.Automatic,

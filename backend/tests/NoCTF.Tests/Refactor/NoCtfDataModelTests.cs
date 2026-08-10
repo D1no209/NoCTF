@@ -1,6 +1,6 @@
-using NoCTF.Application.Submissions.Intake;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.Application.Scoring.Leaderboard;
 
@@ -9,7 +9,7 @@ namespace NoCTF.Tests.Refactor;
 public sealed class NoCtfDataModelTests
 {
     [Test]
-    public async Task Manual_adjustment_is_canonical_signed_int32_and_queued()
+    public async Task Manual_adjustment_is_created_with_a_canonical_signed_int32()
     {
         var store = new RecordingIntakeStore();
         var useCase = new CreateManualAdjustment(store);
@@ -28,25 +28,13 @@ public sealed class NoCtfDataModelTests
     {
         var teamId = Guid.NewGuid();
         var challengeId = Guid.NewGuid();
-        var eventId = Guid.NewGuid();
         var at = DateTimeOffset.UtcNow;
         var projection = new CtfLeaderboardProjector().Project(new(
             Guid.NewGuid(),
             GameMode.Ctf,
             [new(teamId, "red", false, false, at)],
-            [new(Guid.NewGuid(), teamId, challengeId, SubmissionKind.ManualAdjust, at,
-                new ScoringEvent
-                {
-                    Id = eventId,
-                    TeamId = teamId,
-                    CompetitionChallengeId = challengeId,
-                    Kind = ScoringEventKind.ManualAdjust,
-                    Result = ScoringResult.Correct,
-                    OccurredAt = at,
-                    CreatedAt = at
-                },
-                SubmittedFlag: "-25")],
-            [],
+            [new(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.ManualAdjustment, at,
+                GameplayFactState.Completed, GameplayFactResult.Applied, null, Value: "-25")],
             [new(challengeId, "web", "Web", false)]));
 
         await Assert.That(projection.Entries.Single().Score).IsEqualTo(-25);
@@ -57,20 +45,20 @@ public sealed class NoCtfDataModelTests
         await Assert.That(cell.SolvedAt).IsNull();
     }
 
-    private sealed class RecordingIntakeStore : ISubmissionIntakeStore
+    private sealed class RecordingIntakeStore : IGameplayFactIntakeStore
     {
-        public ManualAdjustmentSubmissionReceived? Received { get; private set; }
+        public ManualAdjustmentGameplayFactReceived? Received { get; private set; }
 
-        public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(Guid competitionId, Guid competitionChallengeId, Guid userId, CancellationToken cancellationToken) =>
-            Task.FromResult<SubmissionAdmissionSnapshot?>(null);
-        public Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(FlagSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<IReadOnlyList<SubmissionAcceptanceResult>> TryAcceptFlagsAsync(IReadOnlyList<FlagSubmissionReceived> received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(FixSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<SubmissionAcceptanceResult> TryAcceptHintUnlockAsync(HintUnlockSubmissionReceived received, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<SubmissionAcceptanceResult> TryAcceptManualAdjustmentAsync(ManualAdjustmentSubmissionReceived received, CancellationToken cancellationToken)
+        public Task<GameplayFactAdmissionSnapshot?> LoadAdmissionAsync(Guid competitionId, Guid competitionChallengeId, Guid userId, CancellationToken cancellationToken) =>
+            Task.FromResult<GameplayFactAdmissionSnapshot?>(null);
+        public Task<GameplayFactAcceptanceResult> TryAcceptFlagAsync(FlagGameplayFactReceived received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<GameplayFactAcceptanceResult>> TryAcceptFlagsAsync(IReadOnlyList<FlagGameplayFactReceived> received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<GameplayFactAcceptanceResult> TryAcceptFixAsync(FixGameplayFactReceived received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<GameplayFactAcceptanceResult> TryAcceptHintUnlockAsync(HintUnlockGameplayFactReceived received, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<GameplayFactAcceptanceResult> TryAcceptManualAdjustmentAsync(ManualAdjustmentGameplayFactReceived received, CancellationToken cancellationToken)
         {
             Received = received;
-            return Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.Created, received.SubmissionId, received.ReceivedAt));
+            return Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.Created, received.GameplayFactId, received.OccurredAt));
         }
     }
 }

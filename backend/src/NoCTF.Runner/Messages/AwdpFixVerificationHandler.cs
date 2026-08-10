@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
-using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Runtime;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Composition;
@@ -95,39 +95,38 @@ public sealed class AwdpFixWorkReader(
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-        var target = await db.Submissions.AsNoTracking()
-            .Where(submission => submission.Id == message.SubmissionId
+        var target = await db.GameplayFacts.AsNoTracking()
+            .Where(submission => submission.Id == message.GameplayFactId
                 && submission.CompetitionChallengeId == message.CompetitionChallengeId
-                && submission.Kind == SubmissionKind.Fix
-                && submission.EvaluationState == SubmissionEvaluationState.Processing
-                && submission.ProcessingVersion == message.ProcessingVersion
-                && submission.PatchUploadId == message.PatchUploadId)
+                && submission.Kind == GameplayFactKind.FixAttempt
+                && submission.State == GameplayFactState.Processing
+                && submission.ReferenceKind == GameplayFactReferenceKind.PatchUpload
+                && submission.ReferenceId == message.PatchUploadId)
             .Join(
                 db.PatchUploads.AsNoTracking(),
-                submission => submission.PatchUploadId,
+                submission => submission.ReferenceId,
                 upload => upload.Id,
-                (submission, upload) => new { Submission = submission, Upload = upload })
+                (submission, upload) => new { GameplayFact = submission, Upload = upload })
             .Join(
                 db.RuntimeInstances.AsNoTracking()
                     .Where(runtime => runtime.Id == message.RuntimeInstanceId
                         && runtime.Purpose == RuntimePurpose.AwdpTarget
-                        && runtime.SubmissionId == message.SubmissionId
-                        && runtime.SubmissionProcessingVersion == message.ProcessingVersion
+                        && runtime.GameplayFactId == message.GameplayFactId
                         && runtime.Generation == message.Generation
                         && runtime.ProcessingVersion == message.RuntimeProcessingVersion
                         && runtime.State == RuntimeState.Running
                         && runtime.RunnerPool == message.RunnerPool
                         && runtime.RunnerId == message.RunnerId),
-                pair => pair.Submission.Id,
-                runtime => runtime.SubmissionId,
-                (pair, runtime) => new { pair.Submission, pair.Upload, Runtime = runtime })
+                pair => pair.GameplayFact.Id,
+                runtime => runtime.GameplayFactId,
+                (pair, runtime) => new { pair.GameplayFact, pair.Upload, Runtime = runtime })
             .Join(
                 db.CompetitionChallenges.AsNoTracking(),
-                item => item.Submission.CompetitionChallengeId,
+                item => item.GameplayFact.CompetitionChallengeId,
                 challenge => challenge.Id,
                 (item, challenge) => new
                 {
-                    item.Submission,
+                    item.GameplayFact,
                     item.Upload,
                     item.Runtime,
                     ChallengeRulesJson = challenge.RulesJson,
@@ -145,11 +144,11 @@ public sealed class AwdpFixWorkReader(
                     item.ChallengeRulesJson,
                     ChallengeDefinitionJson = challenge.DefinitionJson,
                     item.Revision,
-                    item.Submission
+                    item.GameplayFact
                 })
             .Join(
                 db.Competitions.AsNoTracking(),
-                item => item.Submission.CompetitionId,
+                item => item.GameplayFact.CompetitionId,
                 competition => competition.Id,
                 (item, competition) => new
                 {
@@ -197,17 +196,16 @@ public sealed class AwdpFixWorkReader(
         var timeout = checkerTimeout < remaining ? checkerTimeout : remaining;
         var callbackToken = tokens.IssueAwdpFixResult(new(
             message.RunnerId,
-            message.SubmissionId,
+            message.GameplayFactId,
             message.RuntimeInstanceId,
             message.Generation,
-            message.ProcessingVersion,
             message.RuntimeProcessingVersion,
             message.Deadline,
             now));
         var archiveToken = tokens.IssueFixArchiveRead(
             message.RunnerId,
             message.PatchUploadId,
-            message.SubmissionId,
+            message.GameplayFactId,
             now);
         var patchCommand = AwdpPatchCommand.Create(
             settings.PatchCommand,
@@ -216,7 +214,7 @@ public sealed class AwdpFixWorkReader(
             new(
                 new Uri(
                     baseUri,
-                    $"/api/internal/v1/awdp/fix-archives/{message.SubmissionId:D}"),
+                    $"/api/internal/v1/awdp/fix-archives/{message.GameplayFactId:D}"),
                 archiveToken,
                 target.Upload.OriginalFileName,
                 target.Upload.ByteLength,
@@ -327,7 +325,7 @@ public sealed class AwdpFixVerificationHandler(
         var operationDirectory = Path.Combine(
             Path.GetTempPath(),
             "noctf-awdp",
-            $"{message.SubmissionId:N}-{message.RuntimeInstanceId:N}");
+            $"{message.GameplayFactId:N}-{message.RuntimeInstanceId:N}");
         var workDirectory = Path.Combine(operationDirectory, "work");
         var archivePath = Path.Combine(operationDirectory, "fix.tar.gz");
         var tarPath = Path.Combine(operationDirectory, "fix.tar");
@@ -388,10 +386,9 @@ public sealed class AwdpFixVerificationHandler(
         if (outcome is not AwdpFixOutcome result)
             return;
         await outbox.PublishAsync(AwdpFixResult.Create(
-            message.SubmissionId,
+            message.GameplayFactId,
             message.RuntimeInstanceId,
             message.Generation,
-            message.ProcessingVersion,
             message.RuntimeProcessingVersion,
             result,
             DateTimeOffset.UtcNow));

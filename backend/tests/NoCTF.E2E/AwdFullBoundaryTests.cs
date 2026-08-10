@@ -175,7 +175,7 @@ public sealed class AwdFullBoundaryTests
         await AssertSingleTargetAsync(redHardeningTargets, red.TeamId);
         await AssertSingleTargetAsync(blueHardeningTargets, blue.TeamId);
 
-        var hardeningSubmissionId = await SubmitSingleFlagAsync(
+        var hardeningGameplayFactId = await SubmitSingleFlagAsync(
             red.Client,
             competitionId,
             competitionChallengeId,
@@ -184,7 +184,7 @@ public sealed class AwdFullBoundaryTests
         var hardeningSubmission = await PollSubmissionAsync(
             red.Client,
             competitionId,
-            hardeningSubmissionId,
+            hardeningGameplayFactId,
             cancellationToken);
         await AssertSubmissionAsync(hardeningSubmission, result: 5, failureCode: 23);
 
@@ -226,7 +226,7 @@ public sealed class AwdFullBoundaryTests
             HttpStatusCode.Accepted,
             cancellationToken);
         var batchIds = batch.GetProperty("submissions").EnumerateArray()
-            .Select(item => item.GetProperty("submissionId").GetGuid())
+            .Select(item => item.GetProperty("gameplayFactId").GetGuid())
             .ToArray();
         await Assert.That(batchIds.Length).IsEqualTo(2);
         var correctBatchSubmission = await PollSubmissionAsync(
@@ -494,17 +494,17 @@ public sealed class AwdFullBoundaryTests
             new { flag },
             HttpStatusCode.Accepted,
             cancellationToken);
-        return accepted.GetProperty("submissionId").GetGuid();
+        return accepted.GetProperty("gameplayFactId").GetGuid();
     }
 
     private static Task<JsonElement> PollSubmissionAsync(
         HttpClient client,
         Guid competitionId,
-        Guid submissionId,
+        Guid gameplayFactId,
         CancellationToken cancellationToken) =>
         PollJsonAsync(
             client,
-            $"/api/v1/competitions/{competitionId}/submissions/{submissionId}",
+            $"/api/v1/competitions/{competitionId}/submissions/{gameplayFactId}",
             value => value.GetProperty("evaluationState").GetInt32() == 3,
             TimeSpan.FromSeconds(30),
             cancellationToken);

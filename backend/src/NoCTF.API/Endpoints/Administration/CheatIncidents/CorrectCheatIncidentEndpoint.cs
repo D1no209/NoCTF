@@ -3,7 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
-using NoCTF.Application.Submissions.CheatIncidents;
+using NoCTF.Application.GameplayFacts.CheatIncidents;
 using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.CheatIncidents;
@@ -29,7 +29,7 @@ public sealed class CorrectCheatIncidentEndpoint(
 {
     public override void Configure()
     {
-        Post("/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/correct");
+        Post("/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/correct");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminCorrectCheatIncident"));
         Summary(summary =>
@@ -50,7 +50,7 @@ public sealed class CorrectCheatIncidentEndpoint(
             return TypedResults.Forbid();
         var result = await resolve.CorrectAndUnbanAsync(new(
             competitionId,
-            Route<Guid>("scoringEventId"),
+            Route<Guid>("gameplayFactId"),
             user.UserId,
             request.Reason,
             timeProvider.GetUtcNow()), cancellationToken);

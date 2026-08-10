@@ -1,6 +1,6 @@
 using System.Reflection;
 using FastEndpoints;
-using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.GameplayFacts;
 
 namespace NoCTF.Tests.Architecture;
 

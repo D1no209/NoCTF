@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Internal;
-using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.GameplayFacts.Processing;
 
 namespace NoCTF.Tests.Unit.API;
 

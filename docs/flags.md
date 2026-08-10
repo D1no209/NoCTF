@@ -13,8 +13,8 @@
 唯一有效性规则为半开区间：
 
 ```text
-(ValidStart is null || ValidStart <= Submission.ReceivedAt)
-&& (ValidUntil is null || Submission.ReceivedAt < ValidUntil)
+(ValidStart is null || ValidStart <= GameplayFact.OccurredAt)
+&& (ValidUntil is null || GameplayFact.OccurredAt < ValidUntil)
 ```
 
 不使用 Active/Status。CTF/模板静态 Flag 通常无界；AWD 每轮严格 RoundStart..RoundEnd，上一轮在边界立即失效。比赛 Paused 时提交被拒绝，Resume 会顺延当前逻辑轮次与 ValidUntil。
@@ -35,7 +35,7 @@ ChallengeFlag 必须二选一：
 - `Attachment`：SpecificationId=ChallengeAttachment.Id；
 - `AwdRound`：SpecificationId=Round Number 编码 Guid；
 - `RuntimeDefinition`：绑定 versioned Competition/Challenge configuration JSON 中某个稳定 `definitionId`；definitionId 一经被 Flag 引用不得复用或原位改变语义；
-- `Hint`：仅 ScoringEvent HintUnlock 使用，不用于 ChallengeFlag。
+- `Hint`：仅 GameplayFact HintUnlock 的多态 Reference 使用，不用于 ChallengeFlag。
 
 Kind/Id 同时为空或同时非空。
 
@@ -140,7 +140,7 @@ m -> M,n,N        z -> Z,2
 
 不建 assignment 表，团队级 Flag 的 SpecificationId 即持久化选择。
 
-步骤 3 创建的是独立、固定的团队答案事实。之后修改/新增模板 Flag 只影响尚未抽取的团队；不得原位同步或替换已抽取团队的副本。管理者若确需改变某已抽取团队的答案，必须直接修改对应 CompetitionChallenge+Team Flag，并按需手动重判历史 Submission。这里的生成事实不属于 Challenge 题面“实时引用、不做快照”的范围。
+步骤 3 创建的是独立、固定的团队答案事实。之后修改/新增模板 Flag 只影响尚未抽取的团队；不得原位同步或替换已抽取团队的副本。管理者若确需改变某已抽取团队的答案，必须直接修改对应 CompetitionChallenge+Team Flag，并按需手动重判现有 GameplayFact。这里的生成事实不属于 Challenge 题面“实时引用、不做快照”的范围。
 
 All 判定使用模板中未绑定 Attachment 的 Flag和全部 Attachment-bound Flag；RandomOne 判定只使用未绑定的通用模板 Flag、已选 Attachment 的团队副本，以及该实例上与 Attachment 无关的合法 Flag。不得直接加载所有模板 Attachment Flag 后跳过选择过滤。
 

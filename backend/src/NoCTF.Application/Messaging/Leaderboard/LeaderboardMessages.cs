@@ -1,5 +1,4 @@
 namespace NoCTF.Application.Messaging;
 
-public sealed record InvalidateLeaderboard(Guid CompetitionId);
-
+public sealed record RefreshDirtyLeaderboards(DateTimeOffset TriggeredAt);
 public sealed record ProjectLeaderboard(Guid CompetitionId);

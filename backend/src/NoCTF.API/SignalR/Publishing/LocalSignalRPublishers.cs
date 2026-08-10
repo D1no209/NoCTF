@@ -19,14 +19,14 @@ public sealed class LocalLeaderboardRefreshPublisher(
             cancellationToken);
 }
 
-public sealed class LocalSubmissionResultPublisher(
-    IHubContext<CompetitionHub> hub) : ISubmissionResultNotification
+public sealed class LocalGameplayFactStatePublisher(
+    IHubContext<CompetitionHub> hub) : IGameplayFactStateChangedNotification
 {
     public Task PublishAsync(
-        SubmissionResultNotification notification,
+        GameplayFactStateChangedNotification notification,
         CancellationToken cancellationToken) =>
         hub.Clients.User(notification.UserId.ToString()).SendAsync(
-            "submissionResult",
+            "gameplayFactStateChanged",
             notification.Result,
             cancellationToken);
 }

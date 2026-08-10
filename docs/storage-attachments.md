@@ -29,8 +29,8 @@ Attachment 属于 Challenge 模板。文件内容、显示名称和 MIME 都不�
 
 上传与触发分离：
 
-1. multipart 上传 API 把单文件写对象存储，创建 PatchUpload；不创建 Submission/尝试。
-2. Fix trigger API 引用 PatchUploadId；次数预检通过后事务消费并创建 Submission/Outbox。
+1. multipart 上传 API 把单文件写对象存储，创建 PatchUpload；不创建 GameplayFact/尝试。
+2. Fix trigger API 引用 PatchUploadId；次数预检通过后事务锁定上传、验证未被引用，并创建 FixAttempt GameplayFact/Outbox。
 
 每队每题最多一个未消费 Upload。新上传成功后替换旧未消费记录，并以 Outbox 清理旧对象；消费后不可替换/删除，随 Competition 最终硬删除。
 

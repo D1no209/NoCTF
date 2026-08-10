@@ -1,13 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
-using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Challenges;
-using NoCTF.Domain.Submissions;
-using NoCTF.GameModes.Submission;
+using NoCTF.Domain.Gameplay;
+using NoCTF.GameModes.GameplayFact;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
-public sealed class CtfSubmissionEvaluatorTests
+public sealed class CtfGameplayFactEvaluatorTests
 {
     [Test]
     public async Task Foreign_team_flag_is_rejected_with_owner_team_evidence()
@@ -18,12 +18,12 @@ public sealed class CtfSubmissionEvaluatorTests
             fixture.Flag(ownerTeamId)
         ]);
 
-        var result = new CtfSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
             .Evaluate(context);
 
-        await Assert.That(result.Result).IsEqualTo(ScoringResult.Rejected);
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Rejected);
         await Assert.That(result.FailureCode)
-            .IsEqualTo(ScoringFailureCode.ForeignTeamFlagDetected);
+            .IsEqualTo(GameplayFactFailureCode.ForeignTeamFlagDetected);
         await Assert.That(result.VictimTeamId).IsEqualTo(ownerTeamId);
     }
 
@@ -36,10 +36,10 @@ public sealed class CtfSubmissionEvaluatorTests
             fixture.Flag(null)
         ]);
 
-        var result = new CtfSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
             .Evaluate(context);
 
-        await Assert.That(result.Result).IsEqualTo(ScoringResult.Correct);
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Correct);
         await Assert.That(result.FailureCode).IsNull();
         await Assert.That(result.VictimTeamId).IsNull();
     }
@@ -49,13 +49,13 @@ public sealed class CtfSubmissionEvaluatorTests
     {
         var fixture = CreateFixture("flag{expired}");
         var expired = fixture.Flag(Guid.NewGuid());
-        expired.ValidUntil = fixture.ReceivedAt;
+        expired.ValidUntil = fixture.OccurredAt;
         var context = fixture.Context([expired]);
 
-        var result = new CtfSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
             .Evaluate(context);
 
-        await Assert.That(result.Result).IsEqualTo(ScoringResult.Wrong);
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Wrong);
         await Assert.That(result.FailureCode).IsNull();
         await Assert.That(result.VictimTeamId).IsNull();
     }
@@ -69,12 +69,12 @@ public sealed class CtfSubmissionEvaluatorTests
             fixture.Flag(Guid.NewGuid())
         ]);
 
-        var result = new CtfSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
             .Evaluate(context);
 
-        await Assert.That(result.Result).IsEqualTo(ScoringResult.Rejected);
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Rejected);
         await Assert.That(result.FailureCode)
-            .IsEqualTo(ScoringFailureCode.AmbiguousFlagMatch);
+            .IsEqualTo(GameplayFactFailureCode.AmbiguousFlagMatch);
         await Assert.That(result.VictimTeamId).IsNull();
     }
 
@@ -87,27 +87,28 @@ public sealed class CtfSubmissionEvaluatorTests
         var teamId = Guid.NewGuid();
         var receivedAt = DateTimeOffset.UtcNow;
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(flag));
-        var submission = new Submission
+        var submission = new GameplayFact
         {
             Id = Guid.NewGuid(),
             CompetitionId = competitionId,
             CompetitionChallengeId = challengeId,
             TeamId = teamId,
-            Kind = SubmissionKind.Flag,
-            SubmittedFlag = flag,
-            SubmittedFlagSha256 = hash,
-            ReceivedAt = receivedAt
+            Kind = GameplayFactKind.FlagAttempt,
+            Value = flag,
+            ValueSha256 = hash,
+            OccurredAt = receivedAt
         };
-        var hintUnlock = new ScoringEvent
+        var hintUnlock = new GameplayFact
         {
             Id = Guid.NewGuid(),
             CompetitionId = competitionId,
             CompetitionChallengeId = challengeId,
             TeamId = teamId,
-            Kind = ScoringEventKind.HintUnlock,
-            Result = ScoringResult.Correct,
+            Kind = GameplayFactKind.HintUnlock,
+            State = GameplayFactState.Completed,
+            Result = GameplayFactResult.Unlocked,
             OccurredAt = receivedAt,
-            CreatedAt = receivedAt
+            UpdatedAt = receivedAt
         };
         var challengeFlag = new ChallengeFlag
         {
@@ -118,7 +119,7 @@ public sealed class CtfSubmissionEvaluatorTests
             FlagSha256 = hash,
             CreatedAt = receivedAt
         };
-        var context = new SubmissionProcessingContext(
+        var context = new GameplayFactProcessingContext(
             submission,
             [hintUnlock],
             [challengeFlag],
@@ -126,42 +127,42 @@ public sealed class CtfSubmissionEvaluatorTests
             "{}",
             "{}");
 
-        var result = new CtfSubmissionEvaluator(new DefaultEfSubmissionEvaluator())
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
             .Evaluate(context);
 
-        await Assert.That(result.Result).IsEqualTo(ScoringResult.Correct);
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Correct);
     }
 
     private static Fixture CreateFixture(string flag)
     {
         var receivedAt = DateTimeOffset.UtcNow;
-        var submission = new Submission
+        var submission = new GameplayFact
         {
             Id = Guid.NewGuid(),
             CompetitionId = Guid.NewGuid(),
             CompetitionChallengeId = Guid.NewGuid(),
             TeamId = Guid.NewGuid(),
-            Kind = SubmissionKind.Flag,
-            SubmittedFlag = flag,
-            SubmittedFlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
-            ReceivedAt = receivedAt
+            Kind = GameplayFactKind.FlagAttempt,
+            Value = flag,
+            ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
+            OccurredAt = receivedAt
         };
         return new(submission, receivedAt);
     }
 
-    private sealed record Fixture(Submission Submission, DateTimeOffset ReceivedAt)
+    private sealed record Fixture(GameplayFact GameplayFact, DateTimeOffset OccurredAt)
     {
-        public SubmissionProcessingContext Context(IReadOnlyList<ChallengeFlag> flags) =>
-            new(Submission, [], flags, null, "{}", "{}");
+        public GameplayFactProcessingContext Context(IReadOnlyList<ChallengeFlag> flags) =>
+            new(GameplayFact, [], flags, null, "{}", "{}");
 
         public ChallengeFlag Flag(Guid? teamId) => new()
         {
             Id = Guid.NewGuid(),
-            CompetitionChallengeId = Submission.CompetitionChallengeId,
+            CompetitionChallengeId = GameplayFact.CompetitionChallengeId,
             TeamId = teamId,
-            Flag = Submission.SubmittedFlag!,
-            FlagSha256 = Submission.SubmittedFlagSha256!,
-            CreatedAt = ReceivedAt
+            Flag = GameplayFact.Value!,
+            FlagSha256 = GameplayFact.ValueSha256!,
+            CreatedAt = OccurredAt
         };
     }
 }

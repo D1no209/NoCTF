@@ -42,7 +42,7 @@ public sealed class ListPlatformLogsRequest
     [QueryParam]
     public Guid? CompetitionChallengeId { get; set; }
     [QueryParam]
-    public Guid? SubmissionId { get; set; }
+    public Guid? GameplayFactId { get; set; }
     [QueryParam]
     public string? Cursor { get; set; }
     [QueryParam]
@@ -85,7 +85,7 @@ public sealed record PlatformLogResponse(
     Guid? TeamId,
     Guid? UserId,
     Guid? CompetitionChallengeId,
-    Guid? SubmissionId);
+    Guid? GameplayFactId);
 
 public sealed record PlatformLogListResponse(
     IReadOnlyList<PlatformLogResponse> Items,
@@ -125,7 +125,7 @@ internal static partial class PlatformLogMapping
             view.TeamId,
             view.UserId,
             view.CompetitionChallengeId,
-            view.SubmissionId);
+            view.GameplayFactId);
 }
 
 public sealed class ListPlatformLogsEndpoint(
@@ -183,7 +183,7 @@ public sealed class ListPlatformLogsEndpoint(
                 request.TeamId,
                 request.UserId,
                 request.CompetitionChallengeId,
-                request.SubmissionId,
+                request.GameplayFactId,
                 position,
                 request.Limit),
             ct);
@@ -216,7 +216,7 @@ public sealed class ListPlatformLogsEndpoint(
             request.TeamId,
             request.UserId,
             request.CompetitionChallengeId,
-            request.SubmissionId);
+            request.GameplayFactId);
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

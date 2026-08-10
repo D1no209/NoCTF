@@ -81,21 +81,15 @@ public sealed class CompetitionVisibilityStore(
         {
             var snapshot = await snapshots.CreateAsync(
                 competition.Id,
-                startsAt!.Value,
-                historical: true,
+                command.Now,
                 ct);
             if (snapshot is null)
                 return new(CompetitionVisibilityMutationState.NotFound);
-            var nextLeaderboardRevision = checked(competition.LeaderboardRevision + 1);
             frozenSnapshotJson = JsonSerializer.Serialize(snapshot with
             {
                 Visibility = CompetitionLeaderboardVisibility.Frozen,
                 DataScope = LeaderboardDataScope.Frozen,
-                DataAsOf = startsAt,
-                SnapshotRevision = nextLeaderboardRevision,
-                TargetRevision = nextLeaderboardRevision,
-                Stale = false,
-                LastFailureAt = null
+                DataAsOf = command.Now
             }, JsonOptions);
         }
 
@@ -136,8 +130,7 @@ public sealed class CompetitionVisibilityStore(
         }
         else if (before != after || after == CompetitionLeaderboardVisibility.Frozen)
         {
-            await LeaderboardRevision.IncrementAsync(db, competition.Id, ct);
-            await outbox.PublishAsync(new InvalidateLeaderboard(competition.Id));
+            await LeaderboardDirty.MarkAsync(db, competition.Id, ct);
         }
 
         await db.SaveChangesAsync(ct);
@@ -183,21 +176,15 @@ public sealed class CompetitionVisibilityStore(
         {
             var snapshot = await snapshots.CreateAsync(
                 competition.Id,
-                startsAt,
-                historical: true,
+                now,
                 ct);
             if (snapshot is null)
                 return;
-            var nextLeaderboardRevision = checked(competition.LeaderboardRevision + 1);
             competition.FrozenLeaderboardSnapshotJson = JsonSerializer.Serialize(snapshot with
             {
                 Visibility = CompetitionLeaderboardVisibility.Frozen,
                 DataScope = LeaderboardDataScope.Frozen,
-                DataAsOf = startsAt,
-                SnapshotRevision = nextLeaderboardRevision,
-                TargetRevision = nextLeaderboardRevision,
-                Stale = false,
-                LastFailureAt = null
+                DataAsOf = now
             }, JsonOptions);
         }
 
@@ -222,8 +209,7 @@ public sealed class CompetitionVisibilityStore(
             }, JsonOptions),
             CompetitionStatus: competition.Status,
             LeaderboardVisibility: competition.LeaderboardVisibility), ct);
-        await LeaderboardRevision.IncrementAsync(db, competition.Id, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competition.Id));
+        await LeaderboardDirty.MarkAsync(db, competition.Id, ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();

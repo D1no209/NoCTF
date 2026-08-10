@@ -1,4 +1,4 @@
-namespace NoCTF.Domain.Submissions;
+namespace NoCTF.Domain.Gameplay;
 
 public enum CheatIncidentStatus : short
 {

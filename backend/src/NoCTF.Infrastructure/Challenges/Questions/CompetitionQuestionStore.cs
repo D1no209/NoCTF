@@ -78,9 +78,9 @@ public sealed class CompetitionQuestionStore(
                 && candidate.DeletedAt == null, ct)
                 ? CompetitionQuestionChallengeReferenceState.Valid
                 : CompetitionQuestionChallengeReferenceState.Invalid;
-        var hasValidSubmission = command.SubmissionId is null
-            || team is not null && await db.Submissions.AsNoTracking().AnyAsync(submission =>
-                submission.Id == command.SubmissionId
+        var hasValidSubmission = command.GameplayFactId is null
+            || team is not null && await db.GameplayFacts.AsNoTracking().AnyAsync(submission =>
+                submission.Id == command.GameplayFactId
                 && submission.CompetitionId == command.CompetitionId
                 && submission.TeamId == team.Id
                 && (command.Subject == CompetitionQuestionSubject.Platform
@@ -140,7 +140,7 @@ public sealed class CompetitionQuestionStore(
             command.Body,
             team!.Id,
             command.CompetitionChallengeId,
-            command.SubmissionId,
+            command.GameplayFactId,
             CompetitionQuestionStatus.Pending);
         var notification = new Notification
         {
@@ -843,7 +843,7 @@ public sealed class CompetitionQuestionStore(
             askerId,
             names.GetValueOrDefault(askerId, "已删除用户"),
             teamName,
-            question.Root.SubmissionId,
+            question.Root.GameplayFactId,
             question.Root.Subject,
             challengeTitle,
             question.Root.Title,
@@ -942,7 +942,7 @@ public sealed class CompetitionQuestionStore(
         string Body,
         Guid TeamId,
         Guid? CompetitionChallengeId,
-        Guid? SubmissionId,
+        Guid? GameplayFactId,
         CompetitionQuestionStatus Status);
 
     private sealed record QuestionMessagePayload(

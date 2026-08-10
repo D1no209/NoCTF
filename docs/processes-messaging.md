@@ -18,19 +18,19 @@ EF Core 业务事务与 Outbox 必须通过 Wolverine EF Core integration 绑定
 
 | 消息 | 消费进程 |
 |---|---|
-| EvaluateSubmission / DrainManualEvaluation | Worker |
-| Invalidate/ProjectLeaderboard | Worker |
+| EvaluateGameplayFact / DrainGameplayFactEvaluation / DrainGameplayFactRejudge | Worker |
+| RefreshDirtyLeaderboards / ProjectLeaderboard | Worker |
 | AdvanceCompetitionLifecycle / GenerateFlags / RotateAwdRound | Worker |
 | SendNotification / CleanupFile | Worker |
 | Start/Stop/ResetRuntime | Runner Pool |
 | InjectAwdFlag / RunAwdChecker | Runner Pool |
 | RunAwdpFixVerification | Runner Pool |
 
-Runner 直接在完成事务中更新 RuntimeInstance，Provider/Archive 平台故障时可按 ProcessingVersion 更新对应 Submission，并通过 Outbox 发布后续消息。ChallengeFlag 是 Worker 生成的不可变答案事实，Runner 只读取并注入，不写注入状态。不存在 runtime_operations 表。
+Runner 直接在完成事务中更新 RuntimeInstance；AWDP callback 使用 claim 中的 GameplayFactId 和 Runtime 自身的 Generation/ProcessingVersion，覆盖同一 GameplayFact 当前结果。ChallengeFlag 是 Worker 生成的不可变答案事实，Runner 只读取并注入，不写注入状态。不存在 runtime_operations 表。
 
 ## 多 Worker 互斥
 
-普通 Submission 可并行。以下操作按 CompetitionId 获取 PostgreSQL transaction-level advisory lock：
+普通 GameplayFact 可并行。以下操作按 CompetitionId 获取 PostgreSQL transaction-level advisory lock：
 
 - 生命周期迁移；
 - EffectiveRunningTime、AWD/AWDP 轮次与 Flag 轮换；
@@ -38,7 +38,7 @@ Runner 直接在完成事务中更新 RuntimeInstance，Provider/Archive 平台�
 - Leaderboard 完整投影/重建；
 - 比赛级批量 Flag 预生成。
 
-Submission 尝试次数使用更细粒度 `(TeamId, CompetitionChallengeId, SubmissionKind)` advisory lock，只串行同队同题同类型。HTTP 限流和请求验证在事务前完成；事务只进行额度检查、Insert、PatchUpload 消费和 Outbox，禁止在锁内上传文件或调用外部服务。
+GameplayFact 尝试次数使用更细粒度 `(TeamId, CompetitionChallengeId, GameplayFactKind)` advisory lock，只串行同队同题同类型。Fix 还锁定 PatchUpload 并由部分唯一索引防并发消费。HTTP 限流和请求验证在事务前完成；事务只进行额度检查、Insert、引用验证和 Outbox，禁止在锁内上传文件或调用外部服务。
 
 ## 重试
 
@@ -49,11 +49,11 @@ Submission 尝试次数使用更细粒度 `(TeamId, CompetitionChallengeId, Subm
 
 `InjectAwdFlag` 是明确例外：使用同一 ChallengeFlag 以 1s 起步、最高 30s 的指数退避持续重新调度，下一次时间不得晚于 Flag.ValidUntil；到窗口结束后停止并记录最终管理失败，不提前因通用五次策略进入 DLQ，也绝不生成替代 Flag。Runtime 容量不足同样不是失败重试，而是保持实例 Queued 并由 capacity/heartbeat invalidation 再次唤醒派发。
 
-## ProcessingVersion 栅栏
+## 异步写回栅栏
 
-Submission、RuntimeInstance 以及需要异步写回的实体使用单调递增 ProcessingVersion。消息携带期望版本；写回时版本不符则结果为 superseded，不覆盖当前状态。相同版本与相同结果重放幂等成功，不同结果返回冲突。Runtime 的 Start/Stop/Reset/Extend 状态都落在 RuntimeInstance；Reset 预建下一 Generation 并用 `replaces_runtime_instance_id` 串联清理和创建，不引入 Operation 行。
+GameplayFact 消息只携带 GameplayFactId，不保存或传递事实 ProcessingVersion/ClaimId/结果摘要。当前结果直接覆盖同一行。Runtime 的 Start/Stop/Reset/Extend 仍使用 RuntimeInstance 自己的 ProcessingVersion；Reset 预建下一 Generation 并用 `replaces_runtime_instance_id` 串联清理和创建，不引入 Operation 行。
 
-AWD Checker 由 Worker 周期调度并附着到 Runtime 内部网络。Checker 通过 internal endpoint 主动更新状态，后一次覆盖前一次；正常无回报、异常退出、超时分别记录 `Unknown`、`CheckerAbnormalExit`、`CheckerTimedOut`，只在 Up/Down 改变时写计分事件。完整语义见 [Runtime Checker 调度](runtime.md#checker-调度与状态)。
+AWD Checker 由 Worker 周期调度并附着到 Runtime 内部网络。Checker 通过 internal endpoint 主动更新状态，只在 Up/Down 改变时写 AwdServiceTransition GameplayFact。完整语义见 [Runtime Checker 调度](runtime.md#checker-调度与状态)。
 
 ## Runner 容量
 

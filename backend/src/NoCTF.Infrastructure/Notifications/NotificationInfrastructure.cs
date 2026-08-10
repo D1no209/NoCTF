@@ -23,12 +23,12 @@ internal static class NotificationInfrastructure
         if (!development)
         {
             services.AddSingleton<ILeaderboardRefreshPublisher, RedisLeaderboardRefreshPublisher>();
-            services.AddSingleton<ISubmissionResultNotification, RedisSubmissionResultNotification>();
+            services.AddSingleton<IGameplayFactStateChangedNotification, RedisGameplayFactStateChangedNotification>();
         }
         else
         {
             services.TryAddSingleton<ILeaderboardRefreshPublisher, NullLeaderboardRefreshPublisher>();
-            services.TryAddSingleton<ISubmissionResultNotification, NullSubmissionResultNotification>();
+            services.TryAddSingleton<IGameplayFactStateChangedNotification, NullGameplayFactStateChangedNotification>();
         }
         return services;
     }
@@ -42,9 +42,9 @@ internal sealed class NullLeaderboardRefreshPublisher : ILeaderboardRefreshPubli
         CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
-internal sealed class NullSubmissionResultNotification : ISubmissionResultNotification
+internal sealed class NullGameplayFactStateChangedNotification : IGameplayFactStateChangedNotification
 {
     public Task PublishAsync(
-        SubmissionResultNotification notification,
+        GameplayFactStateChangedNotification notification,
         CancellationToken cancellationToken) => Task.CompletedTask;
 }

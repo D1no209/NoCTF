@@ -4,7 +4,7 @@ namespace NoCTF.Application.Teams.Appeals;
 
 public sealed record TeamBanAppealView(
     Guid Id,
-    Guid SubmittedByUserId,
+    Guid ActorUserId,
     string SubmittedByUserName,
     string Statement,
     DateTimeOffset SubmittedAt,

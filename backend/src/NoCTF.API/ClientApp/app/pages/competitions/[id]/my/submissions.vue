@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import {
-  getSubmissionStatusEndpoint,
+  getGameplayFactStatusEndpoint,
   listChallengesEndpoint,
-  listSubmissionsEndpoint,
+  listGameplayFactsEndpoint,
 } from '~/api'
-import type { NoCtfapiEndpointsSubmissionsSubmissionListItemResponse } from '~/api'
+import type { NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse } from '~/api'
 
 definePageMeta({ middleware: 'auth' })
 
-type Submission = NoCtfapiEndpointsSubmissionsSubmissionListItemResponse
+type Submission = NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
 
 const route = useRoute()
 const competitionId = route.params.id as string
@@ -17,7 +17,7 @@ const challengeTitles = ref<Record<string, string>>({})
 
 const { items, loading, error, hasMore, initialized, loadMore } =
   useCursorPagination<Submission>(async (cursor) => {
-    const { data, error: err } = await listSubmissionsEndpoint({
+    const { data, error: err } = await listGameplayFactsEndpoint({
       path: { competitionId },
       query: { cursor, limit: 50 },
     })
@@ -39,14 +39,14 @@ onMounted(async () => {
 
 // 待评测提交轮询刷新
 async function refreshPending() {
-  const pending = items.value.filter((s) => isEvaluationPending(s.evaluationState))
+  const pending = items.value.filter((s) => isGameplayFactPending(s.state))
   await Promise.all(
     pending.map(async (submission) => {
-      const { data } = await getSubmissionStatusEndpoint({
-        path: { competitionId, submissionId: submission.id! },
+      const { data } = await getGameplayFactStatusEndpoint({
+        path: { competitionId, gameplayFactId: submission.id! },
       })
       if (!data) return
-      submission.evaluationState = data.evaluationState
+      submission.state = data.state
       submission.result = data.result
       submission.failureCode = data.failureCode
     }),
@@ -56,13 +56,13 @@ async function refreshPending() {
 const { start: startPolling } = usePolling(
   async () => {
     await refreshPending()
-    return !items.value.some((s) => isEvaluationPending(s.evaluationState))
+    return !items.value.some((s) => isGameplayFactPending(s.state))
   },
   { interval: 3000, timeout: 300_000 },
 )
 
 watch(
-  () => items.value.some((s) => isEvaluationPending(s.evaluationState)),
+  () => items.value.some((s) => isGameplayFactPending(s.state)),
   (hasPending) => {
     if (hasPending) startPolling()
   },
@@ -72,21 +72,21 @@ watch(
 let unwatch: (() => void) | undefined
 onMounted(() => {
   unwatch = watchCompetition(competitionId, {
-    submissionResult: () => void refreshPending(),
+    gameplayFactStateChanged: () => void refreshPending(),
   })
 })
 onUnmounted(() => unwatch?.())
 
 function resultVariant(submission: Submission) {
-  if (isEvaluationPending(submission.evaluationState)) return 'secondary' as const
-  return submission.result === ScoringResult.Correct ? ('default' as const) : ('destructive' as const)
+  if (isGameplayFactPending(submission.state)) return 'secondary' as const
+  return submission.result === GameplayFactResult.Correct ? ('default' as const) : ('destructive' as const)
 }
 
 function resultText(submission: Submission) {
-  if (isEvaluationPending(submission.evaluationState)) {
-    return evaluationStateLabel(submission.evaluationState)
+  if (isGameplayFactPending(submission.state)) {
+    return gameplayFactStateLabel(submission.state)
   }
-  return scoringResultLabel(submission.result)
+  return gameplayFactResultLabel(submission.result)
 }
 </script>
 
@@ -129,15 +129,15 @@ function resultText(submission: Submission) {
             </NuxtLink>
           </TableCell>
           <TableCell>
-            <Badge variant="outline">{{ submissionKindLabel(submission.kind) }}</Badge>
+            <Badge variant="outline">{{ gameplayFactKindLabel(submission.kind) }}</Badge>
           </TableCell>
           <TableCell>
             <Badge :variant="resultVariant(submission)" class="gap-1">
-              <Spinner v-if="isEvaluationPending(submission.evaluationState)" class="size-3" />
+              <Spinner v-if="isGameplayFactPending(submission.state)" class="size-3" />
               {{ resultText(submission) }}
             </Badge>
           </TableCell>
-          <TableCell class="text-muted-foreground">{{ formatDateTime(submission.receivedAt) }}</TableCell>
+          <TableCell class="text-muted-foreground">{{ formatDateTime(submission.occurredAt) }}</TableCell>
         </TableRow>
       </TableBody>
     </Table>

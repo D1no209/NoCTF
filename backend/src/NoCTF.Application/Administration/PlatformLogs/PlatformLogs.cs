@@ -1,7 +1,7 @@
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Administration.PlatformLogs;
 
@@ -39,7 +39,7 @@ public sealed record PlatformLogView(
     Guid? TeamId,
     Guid? UserId,
     Guid? CompetitionChallengeId,
-    Guid? SubmissionId);
+    Guid? GameplayFactId);
 
 public sealed record PlatformLogQuery(
     PlatformLogLevel MinimumLevel,
@@ -53,7 +53,7 @@ public sealed record PlatformLogQuery(
     Guid? TeamId,
     Guid? UserId,
     Guid? CompetitionChallengeId,
-    Guid? SubmissionId,
+    Guid? GameplayFactId,
     string? Cursor,
     int Limit);
 
@@ -111,13 +111,11 @@ public sealed record PlatformAuditView(
     Guid? TeamId,
     Guid? CompetitionChallengeId,
     Guid? RuntimeInstanceId,
-    Guid? SubmissionId,
-    Guid? ScoringEventId,
+    Guid? GameplayFactId,
     Guid? QuestionId,
-    SubmissionKind? SubmissionKind,
-    SubmissionEvaluationState? SubmissionState,
-    ScoringEventKind? ScoringEventKind,
-    ScoringResult? ScoringResult,
+    GameplayFactKind? GameplayFactKind,
+    GameplayFactState? GameplayFactState,
+    GameplayFactResult? GameplayFactResult,
     string? SubjectDisplayName,
     string? Reason,
     bool Automatic,

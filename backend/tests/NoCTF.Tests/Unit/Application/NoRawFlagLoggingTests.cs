@@ -1,5 +1,5 @@
-using NoCTF.Application.Submissions.Intake;
-using NoCTF.Domain.Submissions;
+using NoCTF.Application.GameplayFacts.Intake;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -9,13 +9,13 @@ public class NoRawFlagLoggingTests
     public async Task Flag_input_string_representation_redacts_plaintext()
     {
         const string rawFlag = "flag{do-not-leak}";
-        var value = new FlagSubmissionReceived(
+        var value = new FlagGameplayFactReceived(
             Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),
-            SubmissionKind.Flag,
+            GameplayFactKind.FlagAttempt,
             rawFlag,
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(rawFlag)),

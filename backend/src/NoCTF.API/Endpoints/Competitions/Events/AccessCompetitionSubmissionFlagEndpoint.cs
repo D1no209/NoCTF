@@ -2,46 +2,46 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
-using NoCTF.API.Endpoints.Submissions;
+using NoCTF.API.Endpoints.GameplayFacts;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Events;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.API.Endpoints.Competitions.Events;
 
-public sealed class AccessCompetitionSubmissionFlagRequest
+public sealed class AccessCompetitionGameplayFactValueRequest
 {
     public string Reason { get; set; } = string.Empty;
 }
 
-public sealed class AccessCompetitionSubmissionFlagValidator
-    : Validator<AccessCompetitionSubmissionFlagRequest>
+public sealed class AccessCompetitionGameplayFactValueValidator
+    : Validator<AccessCompetitionGameplayFactValueRequest>
 {
-    public AccessCompetitionSubmissionFlagValidator() =>
+    public AccessCompetitionGameplayFactValueValidator() =>
         RuleFor(request => request.Reason)
             .NotEmpty()
             .MinimumLength(8)
             .MaximumLength(512);
 }
 
-public sealed record AccessCompetitionSubmissionFlagResponse(
-    Guid SubmissionId,
-    SubmissionKindProtocol SubmissionKind,
-    string SubmittedFlag,
+public sealed record AccessCompetitionGameplayFactValueResponse(
+    Guid GameplayFactId,
+    GameplayFactKindProtocol GameplayFactKind,
+    string Value,
     DateTimeOffset AccessedAt);
 
-public sealed class AccessCompetitionSubmissionFlagEndpoint(
-    AccessSubmissionFlag access,
+public sealed class AccessCompetitionGameplayFactValueEndpoint(
+    AccessGameplayFactValue access,
     IUserContext user,
     TimeProvider timeProvider)
-    : Endpoint<AccessCompetitionSubmissionFlagRequest,
-        Results<Ok<AccessCompetitionSubmissionFlagResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+    : Endpoint<AccessCompetitionGameplayFactValueRequest,
+        Results<Ok<AccessCompetitionGameplayFactValueResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
     {
-        Post("/admin/competitions/{competitionId}/submissions/{submissionId}/flag-access");
+        Post("/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminAccessCompetitionSubmissionFlag"));
+        Description(builder => builder.WithName("AdminAccessCompetitionGameplayFactValue"));
         Summary(summary =>
         {
             summary.Summary = "Explicitly reads one protected submitted Flag.";
@@ -51,14 +51,14 @@ public sealed class AccessCompetitionSubmissionFlagEndpoint(
     }
 
     public override async Task<
-        Results<Ok<AccessCompetitionSubmissionFlagResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+        Results<Ok<AccessCompetitionGameplayFactValueResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
         ExecuteAsync(
-            AccessCompetitionSubmissionFlagRequest request,
+            AccessCompetitionGameplayFactValueRequest request,
             CancellationToken cancellationToken)
     {
-        var result = await access.ExecuteAsync(new SubmissionFlagAccessCommand(
+        var result = await access.ExecuteAsync(new GameplayFactValueAccessCommand(
             Route<Guid>("competitionId"),
-            Route<Guid>("submissionId"),
+            Route<Guid>("gameplayFactId"),
             user.UserId,
             request.Reason,
             timeProvider.GetUtcNow()), cancellationToken);
@@ -73,10 +73,10 @@ public sealed class AccessCompetitionSubmissionFlagEndpoint(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Invalid Flag access request.");
         }
-        return TypedResults.Ok(new AccessCompetitionSubmissionFlagResponse(
-            result.View.SubmissionId,
-            SubmissionMapper.ToProtocol(result.View.SubmissionKind),
-            result.View.SubmittedFlag,
+        return TypedResults.Ok(new AccessCompetitionGameplayFactValueResponse(
+            result.View.GameplayFactId,
+            GameplayFactMapper.ToProtocol(result.View.GameplayFactKind),
+            result.View.Value,
             result.View.AccessedAt));
     }
 }

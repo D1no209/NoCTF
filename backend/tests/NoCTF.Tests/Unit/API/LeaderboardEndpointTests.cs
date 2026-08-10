@@ -19,17 +19,13 @@ namespace NoCTF.Tests.Unit.API;
 public sealed class LeaderboardEndpointTests
 {
     [Test]
-    [Arguments(true, 1)]
-    [Arguments(false, 0)]
-    public async Task Cached_snapshot_only_queues_refresh_when_stale(
-        bool stale,
-        int expectedMessages)
+    public async Task Cached_snapshot_is_returned_without_requesting_projection()
     {
         var competitionId = Guid.CreateVersion7();
         var messages = new RecordingMessagePublisher();
         await using var app = await CreateApplicationAsync(
             competitionId,
-            new CachedLeaderboard(stale),
+            new CachedLeaderboard(),
             messages);
         using var client = app.GetTestClient();
 
@@ -38,12 +34,7 @@ public sealed class LeaderboardEndpointTests
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(messages.ProjectedCompetitionIds).Count()
-            .IsEqualTo(expectedMessages);
-        if (stale)
-        {
-            await Assert.That(messages.ProjectedCompetitionIds[0])
-                .IsEqualTo(competitionId);
-        }
+            .IsEqualTo(0);
     }
 
     [Test]
@@ -51,9 +42,10 @@ public sealed class LeaderboardEndpointTests
     {
         var competitionId = Guid.CreateVersion7();
         var messages = new RecordingMessagePublisher();
+        var leaderboard = new CachedLeaderboard(missing: true);
         await using var app = await CreateApplicationAsync(
             competitionId,
-            new CachedLeaderboard(stale: false, missing: true),
+            leaderboard,
             messages);
         using var client = app.GetTestClient();
 
@@ -63,7 +55,8 @@ public sealed class LeaderboardEndpointTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Accepted);
         await Assert.That(response.Headers.RetryAfter?.Delta)
             .IsEqualTo(TimeSpan.FromSeconds(2));
-        await Assert.That(messages.ProjectedCompetitionIds)
+        await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
+        await Assert.That(leaderboard.InvalidatedCompetitionIds)
             .IsEquivalentTo([competitionId]);
     }
 
@@ -75,7 +68,6 @@ public sealed class LeaderboardEndpointTests
         await using var app = await CreateApplicationAsync(
             competitionId,
             new CachedLeaderboard(
-                stale: false,
                 missing: true,
                 lastFailureAt: DateTimeOffset.UtcNow),
             messages);
@@ -96,7 +88,7 @@ public sealed class LeaderboardEndpointTests
         var messages = new RecordingMessagePublisher();
         await using var app = await CreateApplicationAsync(
             competitionId,
-            new CachedLeaderboard(stale: false),
+            new CachedLeaderboard(),
             messages);
         using var client = app.GetTestClient();
 
@@ -114,7 +106,7 @@ public sealed class LeaderboardEndpointTests
         var messages = new RecordingMessagePublisher();
         await using var app = await CreateApplicationAsync(
             competitionId,
-            new CachedLeaderboard(stale: false),
+            new CachedLeaderboard(),
             messages,
             CompetitionLeaderboardVisibility.Blackout,
             LeaderboardDataScope.Hidden);
@@ -140,7 +132,7 @@ public sealed class LeaderboardEndpointTests
         var messages = new RecordingMessagePublisher();
         await using var app = await CreateApplicationAsync(
             competitionId,
-            new CachedLeaderboard(stale: false, frozen: true),
+            new CachedLeaderboard(frozen: true),
             messages,
             CompetitionLeaderboardVisibility.Frozen,
             LeaderboardDataScope.Frozen);
@@ -204,7 +196,6 @@ public sealed class LeaderboardEndpointTests
                         NoCTF.Domain.Competitions.CompetitionStatus.Running,
                         visibility,
                         dataScope,
-                        0,
                         2)
                     : null);
     }
@@ -216,26 +207,19 @@ public sealed class LeaderboardEndpointTests
     }
 
     private sealed class CachedLeaderboard(
-        bool stale,
         bool missing = false,
         bool frozen = false,
         DateTimeOffset? lastFailureAt = null) : ILeaderboardCache
     {
+        public List<Guid> InvalidatedCompetitionIds { get; } = [];
+
         public Task<LeaderboardResponse?> GetAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
             Task.FromResult<LeaderboardResponse?>(
                 missing
                     ? null
-                    : new(
-                        competitionId,
-                        DateTimeOffset.UtcNow,
-                        [])
-                    {
-                        SnapshotRevision = stale ? 1 : 2,
-                        TargetRevision = 2,
-                        Stale = stale
-                    });
+                    : new(competitionId, DateTimeOffset.UtcNow, []));
 
         public Task<LeaderboardResponse?> GetFrozenAsync(
             Guid competitionId,
@@ -248,16 +232,14 @@ public sealed class LeaderboardEndpointTests
                 {
                     Visibility = CompetitionLeaderboardVisibility.Frozen,
                     DataScope = LeaderboardDataScope.Frozen,
-                    DataAsOf = DateTimeOffset.UtcNow.AddMinutes(-5),
-                    SnapshotRevision = 1,
-                    TargetRevision = 1
+                    DataAsOf = DateTimeOffset.UtcNow.AddMinutes(-5)
                 }
                 : null);
 
         public Task<LeaderboardCacheStatus> GetStatusAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
-            Task.FromResult(new LeaderboardCacheStatus(2, lastFailureAt));
+            Task.FromResult(new LeaderboardCacheStatus(lastFailureAt));
 
         public Task RefreshAsync(
             Guid competitionId,
@@ -266,8 +248,11 @@ public sealed class LeaderboardEndpointTests
 
         public Task InvalidateAsync(
             Guid competitionId,
-            CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+            CancellationToken cancellationToken)
+        {
+            InvalidatedCompetitionIds.Add(competitionId);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RecordingMessagePublisher : IBackendMessagePublisher

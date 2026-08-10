@@ -47,7 +47,7 @@ public enum NotificationKind : short
     QuestionStatusChanged,
     CompetitionLifecycleChanged,
     TeamRegistrationChanged,
-    SubmissionEvaluated,
+    GameplayFactAdjudicated,
     RuntimeStateChanged,
     StartGateFailed,
     ManagementFailure,

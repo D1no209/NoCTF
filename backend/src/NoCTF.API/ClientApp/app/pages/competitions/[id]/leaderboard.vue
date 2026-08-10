@@ -238,10 +238,6 @@ const rankIconClass: Record<number, string> = {
           排行榜已冻结,以下为截至 {{ formatDateTime(leaderboard.dataAsOf) }} 的快照。
         </AlertDescription>
       </Alert>
-      <Alert v-if="leaderboard.stale" variant="destructive">
-        <AlertDescription>数据可能过期:排行榜投影暂时落后,稍后会自动刷新。</AlertDescription>
-      </Alert>
-
       <Empty v-if="leaderboard.dataScope === LeaderboardDataScope.Hidden" class="border py-12">
         <EmptyHeader>
           <EmptyTitle>排行榜暂不公开</EmptyTitle>

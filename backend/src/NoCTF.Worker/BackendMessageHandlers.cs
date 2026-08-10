@@ -1,7 +1,7 @@
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Platform;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Runtime.Instances;
@@ -363,10 +363,31 @@ public static class BackendMessageHandlers
     }
 
     public static Task Handle(
-        EvaluateSubmission message,
-        ISubmissionProcessor processor,
+        EvaluateGameplayFact message,
+        IGameplayFactProcessor processor,
         CancellationToken cancellationToken) =>
-        processor.ProcessAsync(message.SubmissionId, message.ProcessingVersion, cancellationToken);
+        processor.ProcessAsync(message.GameplayFactId, cancellationToken);
+
+    public static async Task Handle(
+        GameplayFactStateChanged message,
+        NoCtfDbContext db,
+        NoCTF.Application.Notifications.IGameplayFactStateChangedNotification notifications,
+        CancellationToken cancellationToken)
+    {
+        var fact = await db.GameplayFacts.AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.Id == message.GameplayFactId, cancellationToken);
+        if (fact?.ActorUserId is not Guid userId || fact.State != message.State)
+            return;
+        var view = new NoCTF.Application.GameplayFacts.Status.GameplayFactStatusView(
+            fact.Id, fact.CompetitionId, fact.TeamId, fact.CompetitionChallengeId, fact.Kind,
+            fact.State,
+            NoCTF.Application.GameplayFacts.Status.GameplayFactResultDisclosure.PlayerResult(fact.Result, fact.FailureCode),
+            NoCTF.Application.GameplayFacts.Status.GameplayFactResultDisclosure.PlayerFailureCode(fact.FailureCode),
+            fact.OccurredAt, fact.UpdatedAt);
+        await notifications.PublishAsync(
+            new NoCTF.Application.Notifications.GameplayFactStateChangedNotification(userId, view),
+            cancellationToken);
+    }
 
     public static Task Handle(
         ProjectLeaderboard message,
@@ -385,21 +406,60 @@ public static class BackendMessageHandlers
             cancellationToken);
 
     public static async Task Handle(
-        InvalidateLeaderboard message,
-        ILeaderboardCache leaderboard,
-        ILeaderboardSubscriptionRegistry subscriptions,
+        RefreshDirtyLeaderboards message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
-        await leaderboard.InvalidateAsync(
-            message.CompetitionId,
-            cancellationToken);
-        if (await subscriptions.HasActiveAsync(
-                message.CompetitionId,
-                cancellationToken))
+        _ = message;
+        if (db.Database.IsInMemory())
         {
-            await leaderboard.RefreshAsync(
-                message.CompetitionId,
-                cancellationToken);
+            while (true)
+            {
+                var developmentCompetitions = await db.Competitions
+                    .Where(competition => competition.LeaderboardDirty)
+                    .OrderBy(competition => competition.Id)
+                    .Take(500)
+                    .ToListAsync(cancellationToken);
+                if (developmentCompetitions.Count == 0)
+                    return;
+                foreach (var competition in developmentCompetitions)
+                {
+                    competition.LeaderboardDirty = false;
+                    await outbox.PublishAsync(new ProjectLeaderboard(competition.Id));
+                }
+                await db.SaveChangesAsync(cancellationToken);
+                await outbox.FlushOutgoingMessagesAsync();
+                db.ChangeTracker.Clear();
+            }
+        }
+        while (true)
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            var competitions = await db.Competitions
+                .FromSqlInterpolated($"""
+                    SELECT *
+                    FROM competitions
+                    WHERE leaderboard_dirty = TRUE
+                    ORDER BY id
+                    FOR UPDATE SKIP LOCKED
+                    LIMIT 500
+                    """)
+                .ToListAsync(cancellationToken);
+            if (competitions.Count == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return;
+            }
+            foreach (var competition in competitions)
+            {
+                competition.LeaderboardDirty = false;
+                await outbox.PublishAsync(new ProjectLeaderboard(competition.Id));
+            }
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
+            db.ChangeTracker.Clear();
         }
     }
 
@@ -428,49 +488,49 @@ public static class BackendMessageHandlers
         var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
             item => item.Id == message.RuntimeInstanceId,
             cancellationToken);
-        var submission = await db.Submissions.SingleOrDefaultAsync(
-            item => item.Id == message.SubmissionId,
+        var submission = await db.GameplayFacts.SingleOrDefaultAsync(
+            item => item.Id == message.GameplayFactId,
             cancellationToken);
         if (runtime is null
             || submission is null
             || runtime.Purpose != RuntimePurpose.AwdpTarget
-            || runtime.SubmissionId != submission.Id
+            || runtime.GameplayFactId != submission.Id
             || runtime.Generation != message.Generation
             || runtime.ProcessingVersion != message.RuntimeProcessingVersion
             || runtime.State != RuntimeState.Running
             || !string.Equals(runtime.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(runtime.RunnerId, message.RunnerId, StringComparison.Ordinal)
-            || submission.ProcessingVersion != message.ProcessingVersion
-            || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing)
+            || submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Processing)
             return;
 
-        submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
-        submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
-        submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+        submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
+        submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
+        submission.UpdatedAt = DateTimeOffset.UtcNow;
+        await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
         runtime.State = RuntimeState.Stopping;
         runtime.RunnerAssignmentReleaseToken = null;
         runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
         await events.RecordAsync(new(
             submission.CompetitionId,
-            CompetitionEventKind.SubmissionEvaluated,
+            CompetitionEventKind.GameplayFactAdjudicated,
             CompetitionEventLevel.Error,
             CompetitionEventVisibility.Team,
-            submission.EvaluationUpdatedAt,
-            ActorUserId: submission.SubmittedByUserId,
+            submission.UpdatedAt,
+            ActorUserId: submission.ActorUserId,
             TeamId: submission.TeamId,
             CompetitionChallengeId: submission.CompetitionChallengeId,
             RuntimeInstanceId: runtime.Id,
-            SubmissionId: submission.Id,
-            SubmissionKind: submission.Kind,
-            SubmissionState: submission.EvaluationState,
-            ScoringResult: NoCTF.Domain.Submissions.ScoringResult.PlatformFailed,
+            GameplayFactId: submission.Id,
+            GameplayFactKind: submission.Kind,
+            GameplayFactState: submission.State,
+            GameplayFactResult: null,
             RuntimeState: runtime.State,
             RuntimeGeneration: runtime.Generation), cancellationToken);
         await RecordRuntimeStateAsync(
             events,
             runtime,
             CompetitionEventLevel.Warning,
-            submission.EvaluationUpdatedAt,
+            submission.UpdatedAt,
             cancellationToken);
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
@@ -532,7 +592,7 @@ public static class BackendMessageHandlers
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
-            await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
+            await FailAwdpSubmissionAsync(target.Instance, db, outbox, cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
                 target.Instance,
@@ -619,7 +679,7 @@ public static class BackendMessageHandlers
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
             target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
-            await FailAwdpSubmissionAsync(target.Instance, db, cancellationToken);
+            await FailAwdpSubmissionAsync(target.Instance, db, outbox, cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
                 target.Instance,
@@ -637,21 +697,22 @@ public static class BackendMessageHandlers
     private static async Task FailAwdpSubmissionAsync(
         RuntimeInstance instance,
         NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
         if (instance.Purpose != RuntimePurpose.AwdpTarget
-            || instance.SubmissionId is not Guid submissionId)
+            || instance.GameplayFactId is not Guid gameplayFactId)
             return;
-        var submission = await db.Submissions.SingleOrDefaultAsync(
-            item => item.Id == submissionId,
+        var submission = await db.GameplayFacts.SingleOrDefaultAsync(
+            item => item.Id == gameplayFactId,
             cancellationToken);
         if (submission is null
-            || submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing
-            || submission.ProcessingVersion != instance.SubmissionProcessingVersion)
+            || submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Processing)
             return;
-        submission.EvaluationState = NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed;
-        submission.EvaluationFailureCode = NoCTF.Domain.Submissions.ScoringFailureCode.CheckerPlatformError;
-        submission.EvaluationUpdatedAt = DateTimeOffset.UtcNow;
+        submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
+        submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
+        submission.UpdatedAt = DateTimeOffset.UtcNow;
+        await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
     }
 
     public static async Task Handle(
@@ -1020,79 +1081,91 @@ public static class BackendMessageHandlers
     }
 
     public static async Task Handle(
-        DrainSubmissions message,
+        DrainGameplayFactEvaluation message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken) =>
+        await DrainGameplayFactsAsync(
+            message.CompetitionId, message.CompetitionChallengeId, message.Cutoff,
+            rejudge: false, message.GameplayFactId, message, db, outbox, cancellationToken);
+
+    public static async Task Handle(
+        DrainGameplayFactRejudge message,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken) =>
+        await DrainGameplayFactsAsync(
+            message.CompetitionId, message.CompetitionChallengeId, message.Cutoff,
+            rejudge: true, message.GameplayFactId, message, db, outbox, cancellationToken);
+
+    private static async Task DrainGameplayFactsAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        DateTimeOffset cutoff,
+        bool rejudge,
+        Guid? requestedGameplayFactId,
+        object continuationMessage,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken)
     {
         const int batchSize = 500;
-        var candidates = db.Submissions.Where(submission =>
-            submission.CompetitionId == message.CompetitionId
-            && submission.CompetitionChallengeId == message.CompetitionChallengeId
-            && submission.ReceivedAt <= message.Cutoff);
-        if (message.SubmissionId is Guid submissionId)
+        var candidates = db.GameplayFacts.Where(submission =>
+            submission.CompetitionId == competitionId
+            && submission.CompetitionChallengeId == competitionChallengeId
+            && submission.OccurredAt <= cutoff);
+        if (requestedGameplayFactId is Guid gameplayFactId)
         {
             candidates = candidates.Where(submission =>
-                submission.Id == submissionId
-                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued
-                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing);
+                submission.Id == gameplayFactId
+                && submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Queued
+                && submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Processing);
         }
-        else if (message.Rejudge)
+        else if (rejudge)
         {
             candidates = candidates.Where(submission =>
-                submission.CurrentScoringEventId != null
-                && (submission.Kind == NoCTF.Domain.Submissions.SubmissionKind.Flag
-                    || submission.Kind == NoCTF.Domain.Submissions.SubmissionKind.Break)
-                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued
-                && submission.EvaluationState != NoCTF.Domain.Submissions.SubmissionEvaluationState.Processing);
+                submission.Result != null
+                && (submission.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.FlagAttempt
+                    || submission.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.BreakAttempt)
+                && submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Queued
+                && submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Processing);
         }
         else
         {
             candidates = candidates.Where(submission =>
-                submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.Pending
-                || (submission.EvaluationState == NoCTF.Domain.Submissions.SubmissionEvaluationState.PlatformFailed
-                    && submission.CurrentScoringEventId == null));
+                submission.State == NoCTF.Domain.Gameplay.GameplayFactState.Pending
+                || (submission.State == NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed
+                    && submission.Result == null));
         }
 
         var candidateIds = await candidates.AsNoTracking()
-            .OrderBy(submission => submission.ReceivedAt)
+            .OrderBy(submission => submission.OccurredAt)
             .ThenBy(submission => submission.Id)
-            .Take(message.SubmissionId is null ? batchSize : 1)
+            .Take(requestedGameplayFactId is null ? batchSize : 1)
             .Select(submission => submission.Id)
             .ToArrayAsync(cancellationToken);
         if (candidateIds.Length == 0)
             return;
 
-        var claimId = Guid.CreateVersion7();
         var now = DateTimeOffset.UtcNow;
         await candidates.Where(submission => candidateIds.Contains(submission.Id))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(
-                    submission => submission.EvaluationState,
-                    NoCTF.Domain.Submissions.SubmissionEvaluationState.Queued)
-                .SetProperty(submission => submission.EvaluationFailureCode,
-                    (NoCTF.Domain.Submissions.ScoringFailureCode?)null)
-                .SetProperty(submission => submission.EvaluationResultBodySha256,
-                    (byte[]?)null)
-                .SetProperty(submission => submission.EvaluationUpdatedAt, now)
-                .SetProperty(
-                    submission => submission.ProcessingVersion,
-                    submission => submission.ProcessingVersion + 1)
-                .SetProperty(submission => submission.EvaluationClaimId, claimId),
+                    submission => submission.State,
+                    NoCTF.Domain.Gameplay.GameplayFactState.Queued)
+                .SetProperty(submission => submission.UpdatedAt, now),
                 cancellationToken);
-        var submissions = await db.Submissions.AsNoTracking()
-            .Where(submission => submission.EvaluationClaimId == claimId)
-            .OrderBy(submission => submission.ReceivedAt)
+        var submissions = await db.GameplayFacts.AsNoTracking()
+            .Where(submission => candidateIds.Contains(submission.Id))
+            .OrderBy(submission => submission.OccurredAt)
             .ThenBy(submission => submission.Id)
             .ToArrayAsync(cancellationToken);
         foreach (var submission in submissions)
         {
-            await outbox.PublishAsync(new EvaluateSubmission(
-                submission.Id,
-                submission.ProcessingVersion));
+            await outbox.PublishAsync(new EvaluateGameplayFact(submission.Id));
         }
-        if (candidateIds.Length == batchSize && message.SubmissionId is null)
-            await outbox.PublishAsync(message);
+        if (candidateIds.Length == batchSize && requestedGameplayFactId is null)
+            await outbox.PublishAsync(continuationMessage);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
     }
@@ -1126,7 +1199,7 @@ public static class BackendMessageHandlers
             TeamId: instance.TeamId,
             CompetitionChallengeId: instance.CompetitionChallengeId,
             RuntimeInstanceId: instance.Id,
-            SubmissionId: instance.SubmissionId,
+            GameplayFactId: instance.GameplayFactId,
             RuntimeState: instance.State,
             RuntimeGeneration: instance.Generation),
             cancellationToken);

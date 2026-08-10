@@ -1,15 +1,15 @@
 using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
-using NoCTF.Application.Submissions.Processing;
+using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Challenges;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awd.Configuration;
-using NoCTF.GameModes.Submission;
+using NoCTF.GameModes.GameplayFact;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
-public sealed class AwdSubmissionEvaluatorTests
+public sealed class AwdGameplayFactEvaluatorTests
 {
     [Test]
     public async Task Foreign_team_flag_remains_a_normal_awd_attack()
@@ -17,19 +17,19 @@ public sealed class AwdSubmissionEvaluatorTests
         const string flag = "flag{awd-attack}";
         var ownerTeamId = Guid.NewGuid();
         var receivedAt = DateTimeOffset.UtcNow;
-        var submission = new Submission
+        var submission = new GameplayFact
         {
             Id = Guid.NewGuid(),
             CompetitionId = Guid.NewGuid(),
             CompetitionChallengeId = Guid.NewGuid(),
             TeamId = Guid.NewGuid(),
-            Kind = SubmissionKind.Flag,
-            SubmittedFlag = flag,
-            SubmittedFlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
-            ReceivedAt = receivedAt
+            Kind = GameplayFactKind.FlagAttempt,
+            Value = flag,
+            ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
+            OccurredAt = receivedAt
         };
         var competition = AwdConfiguration.Default with { HardeningDurationSeconds = 0 };
-        var context = new SubmissionProcessingContext(
+        var context = new GameplayFactProcessingContext(
             submission,
             [],
             [new ChallengeFlag
@@ -38,7 +38,7 @@ public sealed class AwdSubmissionEvaluatorTests
                 CompetitionChallengeId = submission.CompetitionChallengeId,
                 TeamId = ownerTeamId,
                 Flag = flag,
-                FlagSha256 = submission.SubmittedFlagSha256,
+                FlagSha256 = submission.ValueSha256,
                 CreatedAt = receivedAt
             }],
             null,
@@ -48,9 +48,9 @@ public sealed class AwdSubmissionEvaluatorTests
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             EffectiveRunningTime: TimeSpan.FromHours(1));
 
-        var decision = new AwdSubmissionEvaluator().Evaluate(context);
+        var decision = new AwdGameplayFactEvaluator().Evaluate(context);
 
-        await Assert.That(decision.Result).IsEqualTo(ScoringResult.Correct);
+        await Assert.That(decision.Result).IsEqualTo(GameplayFactResult.Correct);
         await Assert.That(decision.FailureCode).IsNull();
         await Assert.That(decision.VictimTeamId).IsEqualTo(ownerTeamId);
     }
@@ -60,16 +60,16 @@ public sealed class AwdSubmissionEvaluatorTests
     {
         var now = DateTimeOffset.UtcNow;
         var competition = AwdConfiguration.Default with { HardeningDurationSeconds = 600 };
-        var submission = new Submission
+        var submission = new GameplayFact
         {
             Id = Guid.NewGuid(),
             CompetitionId = Guid.NewGuid(),
             CompetitionChallengeId = Guid.NewGuid(),
             TeamId = Guid.NewGuid(),
-            Kind = SubmissionKind.Flag,
-            ReceivedAt = now
+            Kind = GameplayFactKind.FlagAttempt,
+            OccurredAt = now
         };
-        var context = new SubmissionProcessingContext(
+        var context = new GameplayFactProcessingContext(
             submission,
             [],
             [],
@@ -79,9 +79,9 @@ public sealed class AwdSubmissionEvaluatorTests
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             EffectiveRunningTime: TimeSpan.FromMinutes(3));
 
-        var decision = new AwdSubmissionEvaluator().Evaluate(context);
+        var decision = new AwdGameplayFactEvaluator().Evaluate(context);
 
-        await Assert.That(decision.Result).IsEqualTo(ScoringResult.Rejected);
-        await Assert.That(decision.FailureCode).IsEqualTo(ScoringFailureCode.HardeningActive);
+        await Assert.That(decision.Result).IsEqualTo(GameplayFactResult.Rejected);
+        await Assert.That(decision.FailureCode).IsEqualTo(GameplayFactFailureCode.HardeningActive);
     }
 }

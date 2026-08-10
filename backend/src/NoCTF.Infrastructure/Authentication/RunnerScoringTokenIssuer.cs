@@ -20,13 +20,13 @@ public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
     public string IssueFixArchiveRead(
         string runnerId,
         Guid uploadId,
-        Guid submissionId,
+        Guid gameplayFactId,
         DateTimeOffset now) =>
         Write(runnerId, now, now.AddMinutes(5),
         [
             new("permission", "awdp:fix-archive:read"),
             new("patch_upload_id", uploadId.ToString("D")),
-            new("submission_id", submissionId.ToString("D"))
+            new("gameplay_fact_id", gameplayFactId.ToString("D"))
         ]);
 
     public string IssueAwdChecker(AwdCheckerTokenRequest request) =>
@@ -45,11 +45,10 @@ public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
         Write(request.RunnerId, request.IssuedAt, request.Deadline,
         [
             new("permission", "awdp:fix-result:write"),
-            new("resource", $"submission:{request.SubmissionId:D}:runtime:{request.RuntimeInstanceId:D}"),
-            new("submission_id", request.SubmissionId.ToString("D")),
+            new("resource", $"gameplay-fact:{request.GameplayFactId:D}:runtime:{request.RuntimeInstanceId:D}"),
+            new("gameplay_fact_id", request.GameplayFactId.ToString("D")),
             new("runtime_instance_id", request.RuntimeInstanceId.ToString("D")),
             new("generation", request.Generation.ToString(), ClaimValueTypes.Integer32),
-            new("processing_version", request.ProcessingVersion.ToString(), ClaimValueTypes.Integer64),
             new("runtime_processing_version", request.RuntimeProcessingVersion.ToString(), ClaimValueTypes.Integer64),
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);

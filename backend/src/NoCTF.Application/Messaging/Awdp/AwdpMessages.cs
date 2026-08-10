@@ -3,12 +3,11 @@ using NoCTF.Application.Runtime.Instances;
 namespace NoCTF.Application.Messaging;
 
 public sealed record RunAwdpFixVerification(
-    Guid SubmissionId,
+    Guid GameplayFactId,
     Guid CompetitionChallengeId,
     Guid PatchUploadId,
     Guid RuntimeInstanceId,
     int Generation,
-    long ProcessingVersion,
     long RuntimeProcessingVersion,
     DateTimeOffset Deadline,
     string RunnerPool,
@@ -22,10 +21,9 @@ public sealed record CleanupAwdpTarget(
     string RunnerId) : IRunnerNodeMessage;
 
 public sealed record ExpireAwdpFixVerification(
-    Guid SubmissionId,
+    Guid GameplayFactId,
     Guid RuntimeInstanceId,
     int Generation,
-    long ProcessingVersion,
     long RuntimeProcessingVersion,
     DateTimeOffset Deadline,
     string RunnerPool,

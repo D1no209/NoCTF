@@ -1,28 +1,28 @@
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.GameModes.Awdp.Scoring;
 
 public sealed record AwdpFixDecision(
-    ScoringResult Result,
-    ScoringFailureCode? FailureCode);
+    GameplayFactResult? Result,
+    GameplayFactFailureCode? FailureCode);
 
 public static class AwdpFixOutcomeMapper
 {
     public static AwdpFixDecision Map(AwdpFixOutcome outcome) => outcome switch
     {
-        AwdpFixOutcome.Fixed => new(ScoringResult.Correct, null),
+        AwdpFixOutcome.Fixed => new(GameplayFactResult.Correct, null),
         AwdpFixOutcome.StillVulnerable =>
-            new(ScoringResult.Wrong, ScoringFailureCode.AwdpFixFailed),
+            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpFixFailed),
         AwdpFixOutcome.RuleViolation =>
-            new(ScoringResult.Rejected, ScoringFailureCode.AwdpViolation),
+            new(GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpViolation),
         AwdpFixOutcome.ServiceUnavailable =>
-            new(ScoringResult.Wrong, ScoringFailureCode.AwdpServiceDown),
+            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceDown),
         AwdpFixOutcome.PatchFailed =>
-            new(ScoringResult.Wrong, ScoringFailureCode.AwdpPatchFailed),
+            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchFailed),
         AwdpFixOutcome.PatchTimeout =>
-            new(ScoringResult.Wrong, ScoringFailureCode.AwdpPatchTimeout),
+            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchTimeout),
         AwdpFixOutcome.PlatformFailed =>
-            new(ScoringResult.PlatformFailed, ScoringFailureCode.CheckerPlatformError),
+            new(null, GameplayFactFailureCode.CheckerPlatformError),
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
     };
 }

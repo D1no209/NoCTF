@@ -21,7 +21,7 @@ public sealed class WolverineBackendMessagePublisher(IMessageBus bus) : IBackend
     public async ValueTask RebuildCompetitionAsync(
         Guid competitionId,
         CancellationToken cancellationToken) =>
-        await bus.SendAsync(new InvalidateLeaderboard(competitionId));
+        await bus.SendAsync(new RefreshDirtyLeaderboards(DateTimeOffset.UtcNow));
 
     public async ValueTask CleanupCompetitionRuntimesAsync(
         Guid competitionId,

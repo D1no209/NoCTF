@@ -28,8 +28,8 @@ public enum CompetitionEventKind : short
     TeamCaptainTransferred,
     TeamBanned,
     TeamUnbanned,
-    SubmissionReceived,
-    SubmissionEvaluated,
+    GameplayFactReceived,
+    GameplayFactAdjudicated,
     ScoringRecorded,
     FirstBloodAwarded,
     SecondBloodAwarded,
@@ -39,7 +39,7 @@ public enum CompetitionEventKind : short
     RuntimeExtended,
     RuntimeReset,
     RuntimePortAllocated,
-    ProtectedSubmissionFlagAccessed,
+    ProtectedGameplayFactValueAccessed,
     CheatIncidentDetected,
     CheatIncidentConfirmed,
     CheatIncidentDismissed,
@@ -94,16 +94,14 @@ public sealed class CompetitionEvent
     [NotMapped] public Guid? CompetitionChallengeId => Reference(EntityReferenceKind.CompetitionChallenge) ?? PayloadValue<Guid>("competitionChallengeId");
     [NotMapped] public Guid? HintId => Reference(EntityReferenceKind.ChallengeHint) ?? PayloadValue<Guid>("hintId");
     [NotMapped] public Guid? RuntimeInstanceId => Reference(EntityReferenceKind.RuntimeInstance) ?? PayloadValue<Guid>("runtimeInstanceId");
-    [NotMapped] public Guid? SubmissionId => Reference(EntityReferenceKind.Submission) ?? PayloadValue<Guid>("submissionId");
-    [NotMapped] public Guid? ScoringEventId => Reference(EntityReferenceKind.ScoringEvent) ?? PayloadValue<Guid>("scoringEventId");
+    [NotMapped] public Guid? GameplayFactId => Reference(EntityReferenceKind.GameplayFact) ?? PayloadValue<Guid>("gameplayFactId");
     [NotMapped] public Guid? QuestionId => Reference(EntityReferenceKind.Notification) ?? PayloadValue<Guid>("questionId");
     [NotMapped] public CompetitionStatus? CompetitionStatus => PayloadValue<CompetitionStatus>("competitionStatus");
     [NotMapped] public CompetitionLeaderboardVisibility? LeaderboardVisibility => PayloadValue<CompetitionLeaderboardVisibility>("leaderboardVisibility");
     [NotMapped] public NoCTF.Domain.Teams.TeamRegistrationStatus? TeamRegistrationStatus => PayloadValue<NoCTF.Domain.Teams.TeamRegistrationStatus>("teamRegistrationStatus");
-    [NotMapped] public NoCTF.Domain.Submissions.SubmissionKind? SubmissionKind => PayloadValue<NoCTF.Domain.Submissions.SubmissionKind>("submissionKind");
-    [NotMapped] public NoCTF.Domain.Submissions.SubmissionEvaluationState? SubmissionState => PayloadValue<NoCTF.Domain.Submissions.SubmissionEvaluationState>("submissionState");
-    [NotMapped] public NoCTF.Domain.Submissions.ScoringEventKind? ScoringEventKind => PayloadValue<NoCTF.Domain.Submissions.ScoringEventKind>("scoringEventKind");
-    [NotMapped] public NoCTF.Domain.Submissions.ScoringResult? ScoringResult => PayloadValue<NoCTF.Domain.Submissions.ScoringResult>("scoringResult");
+    [NotMapped] public NoCTF.Domain.Gameplay.GameplayFactKind? GameplayFactKind => PayloadValue<NoCTF.Domain.Gameplay.GameplayFactKind>("gameplayFactKind");
+    [NotMapped] public NoCTF.Domain.Gameplay.GameplayFactState? GameplayFactState => PayloadValue<NoCTF.Domain.Gameplay.GameplayFactState>("gameplayFactState");
+    [NotMapped] public NoCTF.Domain.Gameplay.GameplayFactResult? GameplayFactResult => PayloadValue<NoCTF.Domain.Gameplay.GameplayFactResult>("gameplayFactResult");
     [NotMapped] public NoCTF.Domain.Runtime.RuntimeState? RuntimeState => PayloadValue<NoCTF.Domain.Runtime.RuntimeState>("runtimeState");
     [NotMapped] public NoCTF.Domain.Runtime.RuntimeCleanupResult? RuntimeCleanupResult =>
         PayloadValue<NoCTF.Domain.Runtime.RuntimeCleanupResult>("runtimeCleanupResult");

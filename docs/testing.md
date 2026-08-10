@@ -13,14 +13,14 @@
 - Flag template、TEAMHASH、SafeLeetV1 固定表/强制变化/碰撞；
 - CTF DynamicExpresso 默认/覆盖/边界/异常、assignment 禁用、Reflection 不可达、未知 identifier/额外类型拒绝、decimal rounding/overflow；
 - 四模式投影、血奖、罚分、所有 tie-break；
-- Submission 次数、预占释放、重判版本栅栏；
+- GameplayFact 次数、预占释放、当前结果覆盖和重判平台失败保留结果；
 - 权限矩阵、Team/Competition UUID 数组不变量；
-- 逻辑 URL 与 provider-neutral Runtime 配置验证、Queued/Reset replacement/ProcessingVersion、Checker 状态后写覆盖及 Unknown/异常退出/超时；
+- 逻辑 URL 与 provider-neutral Runtime 配置验证、Runtime Queued/Reset replacement/ProcessingVersion、Checker 状态后写覆盖及异常退出/超时；
 - Problem code/result mapping。
 
 ## PostgreSQL 集成
 
-验证真实：部分唯一索引、XOR/check、uuid[]/GIN、jsonb、软删除 query filter、advisory lock 并发、Submission 次数竞争、Manual/rejudge 500 条 SKIP LOCKED drain、重判事件原子替换、Hint 并发扣分、RandomOne 固化、Wolverine Inbox/Outbox/DLQ。
+验证真实：GameplayFact 字段矩阵 check、PatchUpload Reference 部分唯一索引、uuid[]/GIN、jsonb、advisory lock 并发、尝试次数竞争、Dirty competition 领取、500 条 SKIP LOCKED drain、当前结果覆盖、Hint 并发扣分、Wolverine Inbox/Outbox/DLQ。禁止 EF InMemory 证明关系行为。
 
 不得使用 EF InMemory 替代这些测试。
 
@@ -91,11 +91,11 @@ Runner assignment、AWD checker 的维护消息也由该进程启动；排行榜
 创建题目 Runtime，否则只有 Runtime 操作不可用，API 仍可启动。数据只在进程生命周期内
 存在，且该模式不证明 PostgreSQL 约束、事务、锁或 Wolverine durable inbox/outbox 行为。
 
-FusionCache 按用途分为三个 profile：默认实例承载排行榜，`read-models` 缓存平台配置与
+FusionCache 按用途分为三个命名 profile：`leaderboards` 承载排行榜，`read-models` 缓存平台配置与
 公开比赛查询，`local-computation` 缓存 Runtime/AWD/KoH 配置 JSON 的解析结果。生产环境中
 前两者使用 Redis L2 与 backplane 进行跨进程失效；纯计算结果只保留进程内 L1，避免把可由
-输入稳定重建的数据写入 Redis。相关 TTL 可通过 `Leaderboard:CacheTtlSeconds`、
-`Caching:ReadModelsTtlSeconds` 与 `Caching:LocalComputationTtlMinutes` 调整。
+输入稳定重建的数据写入 Redis。排行榜快照由 Dirty 刷新替换，不使用短逻辑 TTL；其他 TTL
+可通过 `Caching:ReadModelsTtlSeconds` 与 `Caching:LocalComputationTtlMinutes` 调整。
 
 从 `backend` 目录启动：
 
@@ -157,7 +157,7 @@ Full 在模式业务流程之后还会验证 API 重启后原 JWT 有效、Redis
 PostgreSQL、Redis 恢复后 Runner heartbeat 重建，以及 PostgreSQL 重启后三进程重新
 连接。服务停止和重启由编排器负责，成功条件只通过 HTTP 与 heartbeat 判断。
 
-E2E 只通过 HTTP、排行榜、Submission、Runtime 管理 API 和 Runtime 对外行为判断
+E2E 只通过 HTTP、排行榜、GameplayFact、Runtime 管理 API 和 Runtime 对外行为判断
 业务结果。不查询 PostgreSQL，不使用 Docker inspect/资源列表证明业务成功。
 Runner/数据库/Wolverine 的精确持久化事实和 KoH failure code 映射继续由真实依赖
 集成测试负责。

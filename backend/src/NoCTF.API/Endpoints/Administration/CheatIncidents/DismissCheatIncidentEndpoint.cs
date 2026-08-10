@@ -3,7 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
-using NoCTF.Application.Submissions.CheatIncidents;
+using NoCTF.Application.GameplayFacts.CheatIncidents;
 using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.CheatIncidents;
@@ -29,7 +29,7 @@ public sealed class DismissCheatIncidentEndpoint(
 {
     public override void Configure()
     {
-        Post("/admin/competitions/{competitionId}/cheat-incidents/{scoringEventId}/dismiss");
+        Post("/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}/dismiss");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("AdminDismissCheatIncident"));
         Summary(summary =>
@@ -50,7 +50,7 @@ public sealed class DismissCheatIncidentEndpoint(
             return TypedResults.Forbid();
         var result = await resolve.DismissAsync(new(
             competitionId,
-            Route<Guid>("scoringEventId"),
+            Route<Guid>("gameplayFactId"),
             user.UserId,
             request.Reason,
             timeProvider.GetUtcNow()), cancellationToken);

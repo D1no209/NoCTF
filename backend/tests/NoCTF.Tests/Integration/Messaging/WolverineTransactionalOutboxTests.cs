@@ -360,7 +360,7 @@ public sealed class WolverineTransactionalOutboxTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Lifecycle_state_and_outbox_roll_back_then_commit_together_on_replay(
+    public async Task Lifecycle_state_and_leaderboard_dirty_roll_back_then_commit_together_on_replay(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -406,7 +406,6 @@ public sealed class WolverineTransactionalOutboxTests
             }
 
             LifecycleTransitionProbeHandler.Fail = true;
-            var observed = LifecycleTransitionObservation.Expect(competitionId);
             await host.StartAsync(cancellationToken);
             try
             {
@@ -428,12 +427,23 @@ public sealed class WolverineTransactionalOutboxTests
                     new DeadLetterEnvelopeQuery([deadLetter.Id]),
                     cancellationToken);
 
-                await Assert.That(await observed.WaitAsync(cancellationToken)).IsTrue();
+                await WaitForLifecycleStatusAsync(
+                    host,
+                    competitionId,
+                    CompetitionStatus.Finished,
+                    cancellationToken);
                 await AssertLifecycleStatusAsync(
                     host,
                     competitionId,
                     CompetitionStatus.Finished,
                     cancellationToken);
+                await using var verificationScope = host.Services.CreateAsyncScope();
+                var verificationDb = verificationScope.ServiceProvider
+                    .GetRequiredService<NoCtfDbContext>();
+                await Assert.That(await verificationDb.Competitions.AsNoTracking()
+                    .Where(competition => competition.Id == competitionId)
+                    .Select(competition => competition.LeaderboardDirty)
+                    .SingleAsync(cancellationToken)).IsTrue();
             }
             finally
             {
@@ -653,6 +663,28 @@ public sealed class WolverineTransactionalOutboxTests
         await Assert.That(status).IsEqualTo(expected);
     }
 
+    private static async Task WaitForLifecycleStatusAsync(
+        IHost host,
+        Guid competitionId,
+        CompetitionStatus expected,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            await using var scope = host.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+            var status = await db.Competitions.AsNoTracking()
+                .Where(competition => competition.Id == competitionId)
+                .Select(competition => competition.Status)
+                .SingleAsync(cancellationToken);
+            if (status == expected)
+                return;
+            await Task.Delay(100, cancellationToken);
+        }
+        throw new TimeoutException($"Competition {competitionId} did not reach {expected}.");
+    }
+
     private static IHost BuildHost(
         string connectionString,
         string envelopeSchema = "wolverine_test")
@@ -713,7 +745,7 @@ public sealed class WolverineTransactionalOutboxTests
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<ProjectLeaderboard>()
                 .ToPostgresqlQueue("outbox-probe");
-            options.PublishMessage<InvalidateLeaderboard>()
+            options.PublishMessage<ProjectLeaderboard>()
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<AdvanceAwdRound>()
                 .ToPostgresqlQueue("outbox-probe");
@@ -956,7 +988,7 @@ public sealed class LifecycleTransitionProbeHandler
 public sealed class ObserveLifecycleProjectionHandler
 {
     public static async Task Handle(
-        InvalidateLeaderboard message,
+        ProjectLeaderboard message,
         NoCtfDbContext db,
         CancellationToken cancellationToken)
     {

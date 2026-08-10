@@ -1,5 +1,5 @@
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Scoring.Leaderboard;
 
@@ -7,8 +7,7 @@ public sealed record LeaderboardProjectionInput(
     Guid CompetitionId,
     GameMode Mode,
     IReadOnlyList<LeaderboardTeamFact> Teams,
-    IReadOnlyList<LeaderboardSubmissionFact> Submissions,
-    IReadOnlyList<LeaderboardSystemFact> SystemEvents,
+    IReadOnlyList<LeaderboardGameplayFact> GameplayFacts,
     IReadOnlyList<LeaderboardChallengeFact>? Challenges = null,
     string? CompetitionConfigurationJson = null,
     DateTimeOffset? CompetitionStartTime = null,
@@ -29,19 +28,21 @@ public sealed record LeaderboardChallengeFact(
     bool IsDeleted,
     string? ConfigurationJson = null);
 
-public sealed record LeaderboardSubmissionFact(
-    Guid SubmissionId,
-    Guid TeamId,
+public sealed record LeaderboardGameplayFact(
+    Guid GameplayFactId,
+    Guid? TeamId,
     Guid? CompetitionChallengeId,
-    SubmissionKind Kind,
-    DateTimeOffset ReceivedAt,
-    ScoringEvent Event,
+    GameplayFactKind Kind,
+    DateTimeOffset OccurredAt,
+    GameplayFactState State,
+    GameplayFactResult? Result,
+    GameplayFactFailureCode? FailureCode,
+    GameplayFactReferenceKind? ReferenceKind = null,
+    Guid? ReferenceId = null,
     Guid? VictimTeamId = null,
     string? SubmitterName = null,
-    string? SubmittedFlag = null,
+    string? Value = null,
     long? HintCost = null);
-
-public sealed record LeaderboardSystemFact(ScoringEvent Event, long CurrentValue = 0);
 
 public sealed record LeaderboardAwdRoundFact(
     Guid CompetitionChallengeId,

@@ -39,6 +39,7 @@ public sealed class MaintenanceTickAgent(IServiceScopeFactory scopeFactory)
     private async Task RunAsync(CancellationToken cancellationToken)
     {
         var lastSlowTick = DateTimeOffset.MinValue;
+        var lastLeaderboardTick = DateTimeOffset.MinValue;
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -46,6 +47,11 @@ public sealed class MaintenanceTickAgent(IServiceScopeFactory scopeFactory)
             await using var scope = scopeFactory.CreateAsyncScope();
             var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
             await bus.PublishAsync(new DispatchAwdCheckers(now));
+            if (now - lastLeaderboardTick >= TimeSpan.FromSeconds(15))
+            {
+                lastLeaderboardTick = now;
+                await bus.PublishAsync(new RefreshDirtyLeaderboards(now));
+            }
             if (now - lastSlowTick >= TimeSpan.FromSeconds(30))
             {
                 lastSlowTick = now;

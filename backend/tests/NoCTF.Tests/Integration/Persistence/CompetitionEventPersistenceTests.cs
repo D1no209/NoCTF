@@ -7,7 +7,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
@@ -101,20 +101,21 @@ public sealed class CompetitionEventPersistenceTests
                 setup.Teams.AddRange(
                     ApprovedTeam(ids.TeamAId, ids.CompetitionId, "Team A", ids.TeamAUserId, now),
                     ApprovedTeam(ids.TeamBId, ids.CompetitionId, "Team B", ids.TeamBUserId, now));
-                setup.Submissions.Add(new Submission
+                setup.GameplayFacts.Add(new GameplayFact
                 {
-                    Id = ids.SubmissionId,
+                    Id = ids.GameplayFactId,
                     CompetitionId = ids.CompetitionId,
                     CompetitionChallengeId = ids.CompetitionChallengeId,
                     TeamId = ids.TeamAId,
-                    SubmittedByUserId = ids.TeamAUserId,
-                    Kind = SubmissionKind.Flag,
-                    SubmittedFlag = "flag{competition-event-secret}",
-                    SubmittedFlagSha256 = SHA256.HashData(
+                    ActorUserId = ids.TeamAUserId,
+                    Kind = GameplayFactKind.FlagAttempt,
+                    Value = "flag{competition-event-secret}",
+                    ValueSha256 = SHA256.HashData(
                         Encoding.UTF8.GetBytes("flag{competition-event-secret}")),
-                    ReceivedAt = now.AddMinutes(-2),
-                    EvaluationState = SubmissionEvaluationState.Completed,
-                    EvaluationUpdatedAt = now.AddMinutes(-2)
+                    OccurredAt = now.AddMinutes(-2),
+                    State = GameplayFactState.Completed,
+                    Result = GameplayFactResult.Correct,
+                    UpdatedAt = now.AddMinutes(-2)
                 });
                 await setup.SaveChangesAsync(ct);
             }
@@ -141,15 +142,15 @@ public sealed class CompetitionEventPersistenceTests
                     CompetitionStatus: CompetitionStatus.Running), ct),
                 await store.RecordAsync(new(
                     ids.CompetitionId,
-                    CompetitionEventKind.SubmissionReceived,
+                    CompetitionEventKind.GameplayFactReceived,
                     CompetitionEventLevel.Information,
                     CompetitionEventVisibility.Team,
                     now.AddMinutes(-3),
                     ActorUserId: ids.TeamAUserId,
                     TeamId: ids.TeamAId,
                     CompetitionChallengeId: ids.CompetitionChallengeId,
-                    SubmissionId: ids.SubmissionId,
-                    SubmissionKind: SubmissionKind.Flag), ct),
+                    GameplayFactId: ids.GameplayFactId,
+                    GameplayFactKind: GameplayFactKind.FlagAttempt), ct),
                 await store.RecordAsync(new(
                     ids.CompetitionId,
                     CompetitionEventKind.RuntimeStateChanged,
@@ -194,7 +195,7 @@ public sealed class CompetitionEventPersistenceTests
             await Assert.That(observer.AccessLevel).IsEqualTo(CompetitionEventAccessLevel.Staff);
             await Assert.That(observer.Items!).Count().IsEqualTo(5);
             await Assert.That(observer.CanExport).IsFalse();
-            await Assert.That(observer.CanAccessSubmissionFlags).IsFalse();
+            await Assert.That(observer.CanAccessGameplayFactValues).IsFalse();
             await Assert.That(observer.Items!.Single(item => item.Kind == CompetitionEventKind.CompetitionUpdated).Reason)
                 .DoesNotContain("super-secret-token");
 
@@ -227,24 +228,24 @@ public sealed class CompetitionEventPersistenceTests
                 .IsEqualTo(5);
             await Assert.That(export).DoesNotContain("super-secret-token");
 
-            var observerFlag = await store.AccessSubmissionFlagAsync(new(
+            var observerFlag = await store.AccessGameplayFactValueAsync(new(
                 ids.CompetitionId,
-                ids.SubmissionId,
+                ids.GameplayFactId,
                 ids.ObserverId,
                 "Need incident review",
                 now), ct);
             await Assert.That(observerFlag.State).IsEqualTo(CompetitionEventReadState.Forbidden);
-            var judgeFlag = await store.AccessSubmissionFlagAsync(new(
+            var judgeFlag = await store.AccessGameplayFactValueAsync(new(
                 ids.CompetitionId,
-                ids.SubmissionId,
+                ids.GameplayFactId,
                 ids.JudgeId,
                 "Investigate flag{competition-event-secret} incident",
                 now), ct);
             await Assert.That(judgeFlag.State).IsEqualTo(CompetitionEventReadState.Available);
-            await Assert.That(judgeFlag.View!.SubmittedFlag)
+            await Assert.That(judgeFlag.View!.Value)
                 .IsEqualTo("flag{competition-event-secret}");
             var flagAudit = await db.CompetitionEvents.AsNoTracking().SingleAsync(
-                item => item.Kind == CompetitionEventKind.ProtectedSubmissionFlagAccessed,
+                item => item.Kind == CompetitionEventKind.ProtectedGameplayFactValueAccessed,
                 ct);
             await Assert.That(flagAudit.ActorUserId).IsEqualTo(ids.JudgeId);
             await Assert.That(flagAudit.Reason).Contains("[REDACTED]");
@@ -376,7 +377,7 @@ public sealed class CompetitionEventPersistenceTests
         public Guid CompetitionChallengeId { get; } = Guid.CreateVersion7();
         public Guid HintId { get; } = Guid.CreateVersion7();
         public Guid ChallengeId { get; } = Guid.CreateVersion7();
-        public Guid SubmissionId { get; } = Guid.CreateVersion7();
+        public Guid GameplayFactId { get; } = Guid.CreateVersion7();
         public Guid AdministratorId { get; } = Guid.CreateVersion7();
         public Guid OwnerId { get; } = Guid.CreateVersion7();
         public Guid ManagerId { get; } = Guid.CreateVersion7();

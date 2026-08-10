@@ -17,7 +17,7 @@ using NoCTF.Domain.DataExports;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Storage;
 using NoCTF.Domain.Shared;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.DataExports;
@@ -262,7 +262,7 @@ public sealed class DataExportProcessor(
                     competition.ConfigurationJson,
                     competition.ConfigurationRevision,
                     competition.ConfigurationUpdatedAt,
-                    competition.LeaderboardRevision,
+                    competition.LeaderboardDirty,
                     competition.LeaderboardVisibility,
                     competition.LeaderboardVisibilityStartsAt,
                     competition.LeaderboardVisibilityAppliedAt,
@@ -319,39 +319,10 @@ public sealed class DataExportProcessor(
                 })
                 .AsAsyncEnumerable(),
             cancellationToken);
-        counts["submissions.ndjson"] = await WriteSubmissionsAsync(
+        counts["gameplay-facts.ndjson"] = await WriteSubmissionsAsync(
             archive,
             competitionId,
             job.IncludeProtectedFlags,
-            cancellationToken);
-        counts["scoring-events.ndjson"] = await WriteAsyncRowsAsync(
-            archive,
-            "scoring-events.ndjson",
-            db.ScoringEvents.IgnoreQueryFilters().AsNoTracking()
-                .Where(item => item.CompetitionId == competitionId)
-                .OrderBy(item => item.OccurredAt)
-                .ThenBy(item => item.Id)
-                .Select(item => new
-                {
-                    item.Id,
-                    item.CompetitionId,
-                    item.TeamId,
-                    item.VictimTeamId,
-                    item.CompetitionChallengeId,
-                    item.SubmissionId,
-                    item.Kind,
-                    item.Result,
-                    item.FailureCode,
-                    item.SpecificationKind,
-                    item.SpecificationId,
-                    item.ProcessingVersion,
-                    item.CompetitionConfigurationRevision,
-                    item.CompetitionChallengeRevision,
-                    item.OccurredAt,
-                    item.CreatedAt,
-                    item.DeletedAt
-                })
-                .AsAsyncEnumerable(),
             cancellationToken);
         counts["cheat-incidents.ndjson"] = await WriteCheatIncidentsAsync(
             archive,
@@ -517,11 +488,13 @@ public sealed class DataExportProcessor(
         bool includeProtectedFlags,
         CancellationToken cancellationToken)
     {
-        var query = db.Submissions.AsNoTracking()
+        var query = db.GameplayFacts.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId)
             .GroupJoin(
                 db.PatchUploads.AsNoTracking(),
-                submission => submission.PatchUploadId,
+                submission => submission.ReferenceKind == GameplayFactReferenceKind.PatchUpload
+                    ? submission.ReferenceId
+                    : null,
                 patch => patch.Id,
                 (submission, patches) => new { submission, patches })
             .SelectMany(
@@ -535,7 +508,7 @@ public sealed class DataExportProcessor(
             .SelectMany(
                 item => item.files.DefaultIfEmpty(),
                 (item, file) => new { item.submission, item.patch, file })
-            .OrderBy(item => item.submission.ReceivedAt)
+            .OrderBy(item => item.submission.OccurredAt)
             .ThenBy(item => item.submission.Id)
             .Select(item => new
             {
@@ -543,12 +516,13 @@ public sealed class DataExportProcessor(
                 item.submission.CompetitionId,
                 item.submission.TeamId,
                 item.submission.CompetitionChallengeId,
-                item.submission.SubmittedByUserId,
+                item.submission.ActorUserId,
                 item.submission.Kind,
-                item.submission.ReceivedAt,
-                SubmittedFlag = includeProtectedFlags ? item.submission.SubmittedFlag : null,
-                item.submission.SubmittedFlagSha256,
-                item.submission.PatchUploadId,
+                item.submission.OccurredAt,
+                Value = includeProtectedFlags ? item.submission.Value : null,
+                item.submission.ValueSha256,
+                item.submission.ReferenceKind,
+                item.submission.ReferenceId,
                 PatchUpload = item.patch == null
                     ? null
                     : new
@@ -558,19 +532,16 @@ public sealed class DataExportProcessor(
                         item.file.ContentType,
                         ByteLength = item.file.ByteLength,
                         item.file.Sha256,
-                        item.patch.UploadedAt,
-                        item.patch.ConsumedAt
+                        item.patch.UploadedAt
                     },
-                item.submission.EvaluationState,
-                item.submission.EvaluationFailureCode,
-                item.submission.EvaluationUpdatedAt,
-                item.submission.CurrentScoringEventId,
-                item.submission.ProcessingVersion,
-                item.submission.EvaluationResultBodySha256
+                item.submission.State,
+                item.submission.Result,
+                item.submission.FailureCode,
+                item.submission.UpdatedAt
             });
         return await WriteAsyncRowsAsync(
             archive,
-            "submissions.ndjson",
+            "gameplay-facts.ndjson",
             query.AsAsyncEnumerable(),
             cancellationToken);
     }
@@ -580,18 +551,18 @@ public sealed class DataExportProcessor(
         Guid competitionId,
         CancellationToken cancellationToken)
     {
-        var incidents = await db.ScoringEvents.IgnoreQueryFilters().AsNoTracking()
+        var incidents = await db.GameplayFacts.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId
-                && item.FailureCode == ScoringFailureCode.ForeignTeamFlagDetected)
+                && item.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected)
             .OrderBy(item => item.OccurredAt)
             .ThenBy(item => item.Id)
             .ToArrayAsync(cancellationToken);
         var ids = incidents.Select(item => item.Id).ToArray();
         var resolutions = await db.CompetitionEvents.AsNoTracking()
             .Where(item => item.CompetitionId == competitionId
-                && (item.SubjectType == EntityReferenceKind.ScoringEvent
+                && (item.SubjectType == EntityReferenceKind.GameplayFact
                     && ids.Contains(item.SubjectId)
-                    || item.RelatedType == EntityReferenceKind.ScoringEvent
+                    || item.RelatedType == EntityReferenceKind.GameplayFact
                     && item.RelatedId != null
                     && ids.Contains(item.RelatedId.Value))
                 && CheatResolutionKinds.Contains(item.Kind))
@@ -601,17 +572,15 @@ public sealed class DataExportProcessor(
         var rows = incidents.Select(item => new
         {
             IncidentId = item.Id,
-            item.SubmissionId,
+            GameplayFactId = item.Id,
             SourceTeamId = item.TeamId,
             OwnerTeamId = item.VictimTeamId,
             item.CompetitionChallengeId,
             item.Result,
             item.FailureCode,
             DetectedAt = item.OccurredAt,
-            item.CreatedAt,
-            item.DeletedAt,
             ResolutionHistory = resolutions
-                .Where(resolution => resolution.ScoringEventId == item.Id)
+                .Where(resolution => resolution.GameplayFactId == item.Id)
                 .Select(resolution => new
                 {
                     resolution.Id,

@@ -10,7 +10,7 @@
 4. [数据库](database.md)
 5. [认证与授权](authentication-authorization.md)
 6. [API 通用规范](api-conventions.md) 与 [API 清单](api.md)
-7. [Submission 与重判](submissions-rejudging.md)
+7. [GameplayFact 与判定/重判](gameplay-facts-adjudication.md)
 8. [计分与排行榜投影](scoring-projection.md)
 9. [Flag](flags.md)
 10. [Runtime](runtime.md)
@@ -29,8 +29,8 @@
   `NoCTF.Host` 以任意非空组合运行，缺省为单进程全合一。
 - PostgreSQL 是业务事实源；Redis 是可丢失的缓存、限流、SignalR backplane 与 Runner 心跳存储。
 - Wolverine PostgreSQL persistence 承载 Inbox、Outbox、Scheduled Message 与 Dead Letter。业务任务不得使用进程内 Channel。
-- Submission/ScoringEvent 不保存分值、分差或累计分。排行榜始终用当前配置从事实重新投影。
-- 所有配置可在任何生命周期状态修改；保存后使排行榜 revision 失效，但不会自动重判 Submission。
+- GameplayFact 不保存分值、分差或累计分，只保存当前结果。排行榜每 15 秒为脏比赛用当前配置全量投影。
+- 所有配置可在任何生命周期状态修改；保存后设置排行榜 Dirty，但不会自动重判 GameplayFact。
 - Migration 与 Snapshot 只允许 `dotnet ef migrations ...` 生成，禁止手改。
 
 ## 已废弃内容

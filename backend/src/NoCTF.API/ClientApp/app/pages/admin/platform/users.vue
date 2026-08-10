@@ -40,7 +40,7 @@ const REFERENCE_LABELS: Record<string, string> = {
   Submission: '提交记录',
   PatchUpload: '补丁上传',
   Notification: '通知',
-  ScoringEvent: '记分事件',
+  GameplayFact: '比赛事实',
   CompetitionLifecycleAudit: '竞赛生命周期审计',
   CompetitionQuestion: '竞赛问答',
   CompetitionQuestionEntry: '问答回复',

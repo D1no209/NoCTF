@@ -75,13 +75,13 @@ const detailOpen = ref(false)
 const detailLoading = ref(false)
 const showFlag = ref(false)
 
-async function openDetail(scoringEventId?: string) {
-  if (!scoringEventId) return
+async function openDetail(gameplayFactId?: string) {
+  if (!gameplayFactId) return
   detailOpen.value = true
   detailLoading.value = true
   detail.value = null
   showFlag.value = false
-  const { data, error } = await adminGetCheatIncident({ path: { competitionId, scoringEventId } })
+  const { data, error } = await adminGetCheatIncident({ path: { competitionId, gameplayFactId } })
   if (error) toast.error(parseApiError(error).message)
   else detail.value = data ?? null
   detailLoading.value = false
@@ -102,7 +102,7 @@ const SuccessMessage = {
 
 async function refreshResolvedIncident(request: CheatIncidentResolutionRequest) {
   if (detailOpen.value)
-    await openDetail(request.scoringEventId)
+    await openDetail(request.gameplayFactId)
 
   await refreshLatest()
 }
@@ -134,11 +134,11 @@ const resolutionTargetLabel = computed(() => resolutionTarget.value?.sourceTeamN
 
 function openAction(mode: 'confirm' | 'dismiss' | 'correct') {
   const current = detail.value
-  if (!current?.scoringEventId)
+  if (!current?.gameplayFactId)
     return
 
   beginResolution(mode, {
-    scoringEventId: current.scoringEventId,
+    gameplayFactId: current.gameplayFactId,
     sourceTeamId: current.sourceTeamId,
     sourceTeamName: current.sourceTeamName,
   })
@@ -227,14 +227,14 @@ onBeforeUnmount(() => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="i in items" :key="i.scoringEventId">
+          <TableRow v-for="i in items" :key="i.gameplayFactId">
             <TableCell class="font-medium">
               {{ i.sourceTeamName }}
               <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">已封禁</Badge>
             </TableCell>
             <TableCell>{{ i.ownerTeamName }}</TableCell>
             <TableCell>{{ i.challengeTitle }}</TableCell>
-            <TableCell>{{ enumLabel(SubmissionKindLabel, i.submissionKind) }}</TableCell>
+            <TableCell>{{ enumLabel(GameplayFactKindLabel, i.gameplayFactKind) }}</TableCell>
             <TableCell>
               <Badge :variant="i.status === 'Pending' ? 'secondary' : i.status === 'Confirmed' ? 'destructive' : 'outline'">
                 {{ enumLabel(CheatIncidentStatusLabel, i.status) }}
@@ -242,7 +242,7 @@ onBeforeUnmount(() => {
             </TableCell>
             <TableCell>{{ adminFormatDateTime(i.detectedAt) }}</TableCell>
             <TableCell class="text-right">
-              <Button variant="ghost" size="sm" @click="openDetail(i.scoringEventId)">详情</Button>
+              <Button variant="ghost" size="sm" @click="openDetail(i.gameplayFactId)">详情</Button>
             </TableCell>
           </TableRow>
         </TableBody>
@@ -259,7 +259,7 @@ onBeforeUnmount(() => {
       <SheetContent class="overflow-y-auto">
         <SheetHeader>
           <SheetTitle>作弊事件详情</SheetTitle>
-          <SheetDescription>事件 ID:{{ detail?.scoringEventId }}</SheetDescription>
+          <SheetDescription>事件 ID:{{ detail?.gameplayFactId }}</SheetDescription>
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
@@ -267,8 +267,8 @@ onBeforeUnmount(() => {
           <div class="flex justify-between"><span class="text-muted-foreground">Flag 属主</span><span>{{ detail.ownerTeamName }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">题目</span><span>{{ detail.challengeTitle }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">提交人</span><span>{{ detail.submittedByUserName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">类型</span><span>{{ enumLabel(SubmissionKindLabel, detail.submissionKind) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">结果</span><span>{{ enumLabel(ScoringResultLabel, detail.result) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">类型</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">结果</span><span>{{ enumLabel(GameplayFactResultLabel, detail.result) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">状态</span><span>{{ enumLabel(CheatIncidentStatusLabel, detail.status) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">提交时间</span><span>{{ adminFormatDateTime(detail.submittedAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">检测时间</span><span>{{ adminFormatDateTime(detail.detectedAt) }}</span></div>
@@ -289,7 +289,7 @@ onBeforeUnmount(() => {
               {{ showFlag ? '隐藏' : '显示完整 Flag' }}
             </Button>
             <div v-if="showFlag" class="rounded-md border bg-muted p-3 font-mono text-xs break-all">
-              {{ detail.submittedFlag }}
+              {{ detail.value }}
             </div>
           </div>
           <div v-if="detail.canConfirm || detail.canDismiss || detail.canCorrect" class="flex flex-wrap gap-2 pt-2">

@@ -233,11 +233,10 @@ public sealed class CompetitionLifecycleStore(
                 automatic,
                 reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()
             })), cancellationToken);
-        await LeaderboardRevision.IncrementAsync(
+        await LeaderboardDirty.MarkAsync(
             db,
             competitionId,
             cancellationToken);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.ProvisionRuntimes))
             await outbox.PublishAsync(new ProvisionCompetitionRuntimes(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.CleanupRuntimes))

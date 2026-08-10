@@ -1,5 +1,5 @@
-using NoCTF.Application.Submissions.Intake;
-using NoCTF.Domain.Submissions;
+using NoCTF.Application.GameplayFacts.Intake;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.GameModes.Registration;
 using ArchUnitNET.Loader;
@@ -41,12 +41,12 @@ public class DependencyRulesTests
     }
 
     [Test]
-    public async Task Scoring_facts_do_not_persist_scores()
+    public async Task Gameplay_facts_do_not_persist_scores()
     {
-        await Assert.That(typeof(ScoringEvent).GetProperty(nameof(ScoringEvent.Result))!.PropertyType)
-            .IsEqualTo(typeof(ScoringResult));
-        await Assert.That(typeof(ScoringEvent).GetProperty("Score")).IsNull();
-        await Assert.That(typeof(ScoringEvent).GetProperty("ScoreDelta")).IsNull();
+        await Assert.That(typeof(GameplayFact).GetProperty(nameof(GameplayFact.Result))!.PropertyType)
+            .IsEqualTo(typeof(GameplayFactResult?));
+        await Assert.That(typeof(GameplayFact).GetProperty("Score")).IsNull();
+        await Assert.That(typeof(GameplayFact).GetProperty("ScoreDelta")).IsNull();
     }
 
     [Test]
@@ -54,9 +54,9 @@ public class DependencyRulesTests
     {
         var application = typeof(SubmitFlag).Assembly;
 
-        await Assert.That(application.GetType("NoCTF.Application.Submissions.Events.ISubmissionStreamEvent")).IsNull();
-        await Assert.That(application.GetType("NoCTF.Application.Submissions.Events.SubmissionOutcome")).IsNull();
-        await Assert.That(application.GetType("NoCTF.Application.Submissions.Events.SubmissionErrorCode")).IsNull();
+        await Assert.That(application.GetType("NoCTF.Application.GameplayFacts.Events.ISubmissionStreamEvent")).IsNull();
+        await Assert.That(application.GetType("NoCTF.Application.GameplayFacts.Events.SubmissionOutcome")).IsNull();
+        await Assert.That(application.GetType("NoCTF.Application.GameplayFacts.Events.SubmissionErrorCode")).IsNull();
         await Assert.That(application.GetType("NoCTF.Application.Scoring.Leaderboard.LeaderboardSnapshot")).IsNull();
     }
 

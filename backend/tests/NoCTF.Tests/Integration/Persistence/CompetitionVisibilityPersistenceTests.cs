@@ -84,16 +84,16 @@ public sealed class CompetitionVisibilityPersistenceTests
             await Assert.That(competition.LeaderboardVisibility)
                 .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
             await Assert.That(competition.LeaderboardVisibilityAppliedAt).IsNotNull();
-            await Assert.That(snapshot?.DataAsOf).IsEqualTo(startsAt);
+            await Assert.That(snapshot?.DataAsOf).IsEqualTo(startsAt.AddSeconds(1));
             await Assert.That(snapshot?.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
             await Assert.That(snapshots.Requests).HasSingleItem();
-            await Assert.That(snapshots.Requests[0].ProjectedAt).IsEqualTo(startsAt);
+            await Assert.That(snapshots.Requests[0].ProjectedAt).IsEqualTo(startsAt.AddSeconds(1));
             await Assert.That(await verify.CompetitionEvents.AsNoTracking()
                 .CountAsync(@event => @event.CompetitionId == fixture.CompetitionId
                     && @event.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct))
                 .IsEqualTo(1);
-            await Assert.That(outbox.Published.OfType<InvalidateLeaderboard>().Count())
-                .IsEqualTo(1);
+            await Assert.That((await verify.Competitions.AsNoTracking().SingleAsync(
+                competition => competition.Id == fixture.CompetitionId, ct)).LeaderboardDirty).IsTrue();
         });
     }
 
@@ -302,10 +302,9 @@ public sealed class CompetitionVisibilityPersistenceTests
         public Task<LeaderboardResponse?> CreateAsync(
             Guid competitionId,
             DateTimeOffset projectedAt,
-            bool historical,
             CancellationToken cancellationToken)
         {
-            Requests.Add((competitionId, projectedAt, historical));
+            Requests.Add((competitionId, projectedAt, false));
             return Task.FromResult<LeaderboardResponse?>(new(
                 competitionId,
                 projectedAt,

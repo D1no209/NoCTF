@@ -3,7 +3,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using NoCTF.Application.Storage;
-using NoCTF.Application.Submissions.PatchUploads;
+using NoCTF.Application.GameplayFacts.PatchUploads;
 
 namespace NoCTF.Tests.Unit.Application;
 

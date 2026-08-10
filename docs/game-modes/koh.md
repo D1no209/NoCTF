@@ -24,11 +24,11 @@ Worker 按 PollIntervalSeconds（Competition 默认、题覆盖）HTTP GET 展�
 - Running 执行；Paused 停止不补，Resume 立即一次；Finished 停止；
 - OccurredAt=实际完成/失败服务端时间，不伪造计划时间。
 
-每个已发布题只有一条 Wolverine scheduled poll 链：生命周期事务创建首条消息；Handler 完成观测并提交 ScoringEvent 时，在同一 Inbox/Outbox 事务安排下一条。消息携带计划 due time但不写入 ScoringEvent；Wolverine Inbox 以 MessageId 去重。若完成时已经错过一个或多个 interval，直接把下一 due 推进到第一个未来边界，不补观测。这样不需要 KohObservationSequence/SourceOperationId，也不会因同一消息重放重复计分。HTTP GET 发生在数据库事务外。
+每个已发布题只有一条 Wolverine scheduled poll 链：生命周期事务创建首条消息；Handler 完成观测并提交 KohControlObservation GameplayFact 时，在同一 Inbox/Outbox 事务安排下一条。消息携带计划 due time；Wolverine Inbox 以 MessageId 去重。若完成时已错过 interval，下一 due 推进到第一个未来边界，不补观测。每次实际完成轮询都创建事实，即使连续由同队控制。HTTP GET 发生在数据库事务外。
 
 每次观测独立，不延续上一控制者：
 
-| 状态 | ScoringEvent |
+| 状态 | GameplayFact |
 |---|---|
 | 唯一 Team Flag | KohObservation + Correct + TeamId |
 | 2xx 无匹配/格式非法 | Wrong / Uncontrolled |

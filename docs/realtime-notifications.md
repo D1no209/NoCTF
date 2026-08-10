@@ -8,15 +8,15 @@ Hub：`/hubs/v1/competitions`，使用 Access JWT。按授权加入：
 - `team:{teamId}`；
 - `competition:{id}:admin`。
 
-推送仅是 invalidation/提示，不是事实源。消息可包含实体 Id、状态 enum、revision、公开摘要；不得包含 Flag、Token、Patch URL/ObjectKey、内部日志、Provider receipt。
+推送仅是 invalidation/提示，不是事实源。消息可包含实体 Id、状态 enum 与公开摘要；不得包含 Flag、Token、Patch URL/ObjectKey、内部日志、Provider receipt。
 
-事件包括：SubmissionStateChanged、RuntimeStateChanged/Expiring、LeaderboardRevisionChanged、CompetitionLifecycleChanged、Challenge/HintPublished、ManagementFailure。
+事件包括：GameplayFactStateChanged、RuntimeStateChanged/Expiring、LeaderboardRefreshed、CompetitionLifecycleChanged、Challenge/HintPublished、ManagementFailure。
 
 API 多副本使用 Redis SignalR backplane。断线不补历史；客户端重连后通过 REST/cursor 恢复。
 
-## 排行榜订阅感知
+## 排行榜刷新
 
-订阅者在 Redis 写 Competition 活跃计数/TTL 心跳。有活跃订阅时 invalidation 触发合并投影；无人查看只递增 LeaderboardRevision/dirty。首次 GET/订阅触发按需投影。
+排行榜刷新不感知订阅者。Worker 每 15 秒扫描 `LeaderboardDirty`，只为脏比赛生成全量快照并替换 FusionCache；SignalR 的 `leaderboardRefreshed` 只在新快照写入成功后发送。缓存缺失的 GET 置 Dirty 并返回 202，订阅动作本身不触发投影。
 
 ## notifications
 

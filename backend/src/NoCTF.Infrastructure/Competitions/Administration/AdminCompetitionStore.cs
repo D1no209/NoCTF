@@ -124,7 +124,7 @@ public sealed class AdminCompetitionStore(
             await db.Teams.IgnoreQueryFilters().AnyAsync(team => team.CompetitionId == competitionId, ct) ||
             await db.CompetitionChallenges.IgnoreQueryFilters().AnyAsync(
                 challenge => challenge.CompetitionId == competitionId, ct) ||
-            await db.Submissions.IgnoreQueryFilters().AnyAsync(
+            await db.GameplayFacts.IgnoreQueryFilters().AnyAsync(
                 submission => submission.CompetitionId == competitionId, ct) ||
             await db.RuntimeInstances.AnyAsync(runtime => runtime.CompetitionId == competitionId, ct) ||
             await db.CompetitionEvents.AnyAsync(item => item.CompetitionId == competitionId, ct);

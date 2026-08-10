@@ -22,7 +22,7 @@ public sealed class Competition
     [ConcurrencyCheck]
     public int ConfigurationRevision { get; set; }
     public DateTimeOffset ConfigurationUpdatedAt { get; set; }
-    public long LeaderboardRevision { get; set; }
+    public bool LeaderboardDirty { get; set; } = true;
     public CompetitionLeaderboardVisibility LeaderboardVisibility { get; set; }
     public DateTimeOffset? LeaderboardVisibilityStartsAt { get; set; }
     public DateTimeOffset? LeaderboardVisibilityAppliedAt { get; set; }

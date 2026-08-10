@@ -19,27 +19,27 @@ EvaluationDispatchMode: Automatic | ManualBatch
 
 AWDP 是独立 Break/Fix 模式：
 
-- Break：正确 Flag Submission；只接受单 flag。
-- Fix：消费不可变 tar.gz PatchUpload 的 archive Submission；不是 Flag 动作。
+- Break：正确 Flag 的 BreakAttempt GameplayFact；只接受单 flag。
+- Fix：引用不可变 tar.gz PatchUpload 的 FixAttempt GameplayFact；不是 Flag 动作。
 
 两者分别配置 `AchievementSettlement.Milestone | PerRound` 与 Points。
 
 - Milestone：同队同题整场首次 Correct 获得一次。
 - PerRound：每逻辑轮同队同题首次 Correct 获得一次。
-- 后续正确 Submission 仍保存 Correct，投影器不重复计成就。
-- 首次由 ReceivedAt+SubmissionId 决定，重判可改变。
+- 后续正确 GameplayFact 仍保存 Correct，投影器不重复计成就。
+- 首次由 OccurredAt+GameplayFactId 决定，重判覆盖当前结果后可改变。
 
-Round 使用 EffectiveRunningTime；没有加固期。对任意 Submission，用 Competition 生命周期审计积分得到 `EffectiveRunningTimeAt(ReceivedAt)`，再计算 `floor(effective / current RoundDurationSeconds)+1`。RoundDuration 修改会自动重分组全部历史 Achievement，不需重判。中途 Finish 不伪造 RoundEnd，结束前 Break/Fix 仍按 ReceivedAt 所属轮次结算。
+Round 使用 EffectiveRunningTime；没有加固期。对任意 GameplayFact，用 Competition 生命周期事件得到 `EffectiveRunningTimeAt(OccurredAt)`，再计算 `floor(effective / current RoundDurationSeconds)+1`。RoundDuration 修改会自动重分组当前事实，不需重判。中途 Finish 不伪造 RoundEnd，结束前 Break/Fix 按 OccurredAt 所属轮次结算。
 
 ## RequireBreakBeforeFix
 
-Competition 默认、题目覆盖。为 true 时，Fix 触发前要求同队同 CompetitionChallenge 已有当前有效 Correct Break；否则 409、零 Submission、不消费 PatchUpload。Break 后续重判非 Correct 不删除 Fix，但投影不再给其成就分；恢复后重新参与。
+Competition 默认、题目覆盖。为 true 时，Fix 触发前要求同队同 CompetitionChallenge 已有当前有效 Correct Break；否则 409、零 GameplayFact、不引用 PatchUpload。Break 后续重判非 Correct 不删除 Fix，但投影不再给其成就分；恢复后重新参与。
 
 ## Upload 与次数
 
-Patch multipart 上传和 Fix trigger 是两个 API，详见 [存储](../storage-attachments.md)。MaxBreakSubmissions/MaxFixSubmissions <=0 无限；API 预检、Pending 预占、Worker 二次验证。触发时超限不消费 Upload、不建 Submission。
+Patch multipart 上传和 Fix trigger 是两个 API，详见 [存储](../storage-attachments.md)。MaxBreakSubmissions/MaxFixSubmissions <=0 无限；API 预检、Pending 预占、Worker 二次验证。触发时超限不引用 Upload、不建 GameplayFact。
 
-管理重判精确使用原 archive 和当前 Runtime/Checker 配置，不复制 Submission，不消耗尝试。Archive 保留到 Competition 最终硬删除。
+管理重判精确使用原 archive 和当前 Runtime/Checker 配置，不复制 GameplayFact，不消耗尝试。Archive 保留到 Competition 最终硬删除。
 
 ## 一次性判定网络
 
@@ -91,7 +91,7 @@ outcome: Fixed | StillVulnerable | RuleViolation | ServiceUnavailable
 | RuleViolation | Rejected / AwdpViolation |
 | ServiceUnavailable | Wrong / AwdpServiceDown |
 
-无 callback/Runner/Provider/Storage/非法 callback 是 PlatformFailed，不消耗尝试且不替换重判前旧事件。Patch 与 Checker 只是一个 Submission 的内部阶段，最终只有一条 ScoringEvent；诊断在结构化日志/Wolverine。
+无 callback/Runner/Provider/Storage/非法 callback 使同一 FixAttempt 为 PlatformFailed，不消耗尝试；重判失败保留原 Result。Patch 与 Checker 只是 GameplayFact 的内部阶段，诊断在结构化日志/Wolverine，不创建结果历史。
 
 ## 罚分
 

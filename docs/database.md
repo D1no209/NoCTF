@@ -1,8 +1,8 @@
 # NoCTF PostgreSQL 数据模型（InitialBaseline）
 
-当前数据库是一次性重建的业务基线，不提供旧数据库、旧 migration 或 persistence/API 兼容层。EF migration 必须使用 CLI 生成，业务 schema 固定为 17 张表：
+当前数据库是一次性重建的业务基线，不提供旧数据库、旧 migration 或 persistence/API 兼容层。EF migration 必须使用 CLI 生成，业务 schema 固定为 16 张表：
 
-`users`、`competitions`、`competition_events`、`teams`、`challenges`、`challenge_attachments`、`competition_challenges`、`challenge_flags`、`runtime_instances`、`patch_uploads`、`account_tokens`、`platform_settings`、`notifications`、`submissions`、`scoring_events`、`data_exports`、`files`。
+`users`、`competitions`、`competition_events`、`teams`、`challenges`、`challenge_attachments`、`competition_challenges`、`challenge_flags`、`runtime_instances`、`patch_uploads`、`account_tokens`、`platform_settings`、`notifications`、`gameplay_facts`、`data_exports`、`files`。
 
 ## 共通约定
 
@@ -25,7 +25,7 @@
 
 拥有者/协作者直接存 `owner_id uuid`、`manager_ids uuid[]`、`judge_ids uuid[]`、`observer_ids uuid[]`；
 另有 `id`、`title`、`description`、`mode`、`status`、`start_at`、`end_at`、运行时钟字段、团队限制、
-`configuration_json jsonb`、`configuration_revision`、`permission_revision`、`leaderboard_revision`、
+`configuration_json jsonb`、`configuration_revision`、`permission_revision`、`leaderboard_dirty bool`、
 `flag_derivation_secret bytea(32)`、`leaderboard_visibility` 状态字段、`poster_file_id uuid?`、时间戳和 `deleted_at?`。
 
 ### `competition_events`
@@ -57,12 +57,12 @@
 `revision`、AWD 调度游标、`updated_at`、`deleted_at?`、`hints_json jsonb`（EF owned JSON collection）。
 
 Hint 元素为 `{ id, content, cost, publishedAt, hiddenAt }`；Id 在数组内稳定且唯一，只能追加或隐藏，
-修改递增 challenge revision 与 competition leaderboard revision。
+修改递增 challenge revision 并设置 competition leaderboard dirty。
 
 ### `challenge_flags`
 
 Flag 原文/Hash、Challenge 或 CompetitionChallenge 作用域、Specification、Team、有效时间、创建/删除时间。
-模板级与比赛级作用域互斥；Submission、ScoringEvent、RuntimeInstance 始终引用 CompetitionChallenge。
+模板级与比赛级作用域互斥；GameplayFact、RuntimeInstance 始终引用 CompetitionChallenge。
 
 ### `runtime_instances`
 
@@ -71,7 +71,7 @@ Flag 原文/Hash、Challenge 或 CompetitionChallenge 作用域、Specification�
 
 ### `patch_uploads`
 
-保留业务范围、上传者、消费状态和 `submission_id?`；存储元数据只保留 `file_id`。
+保留业务范围、上传者和 `file_id`。是否消费由 `gameplay_facts` 中 PatchUpload Reference 推导，不保存 ConsumedAt 或 GameplayFactId。
 
 ### `account_tokens`
 
@@ -94,20 +94,14 @@ Target 支持 User、CompetitionCollaborators、CompetitionParticipants、TeamMe
 管理员比赛公告：`SourceType=User`、`SourceId=发送者 UserId`、`TargetId=CompetitionId`、默认 `TargetType=CompetitionCollaborators`；
 面向选手的公告显式使用 CompetitionParticipants。
 
-### `submissions`
+### `gameplay_facts`
 
-`id`、比赛/队伍/题目/提交者 FK、`kind`、`received_at`、`submitted_flag?`、`submitted_flag_sha256?`、`patch_upload_id?`、
-评估状态/失败原因、版本栅栏、`current_scoring_event_id?` 和评估结果摘要 Hash。
+`id`、Competition/CompetitionChallenge、Team/VictimTeam/Actor、`kind`、`occurred_at`、`reference_kind?`/`reference_id?`、
+`value?`、`value_sha256?`、`state`、当前 `result?`、`failure_code?`、`updated_at`。
 
-Kind 字段约束：Flag/Break 保存原文和 32 字节 Hash；Fix 只保存 PatchUploadId；HintUnlock 保存小写 canonical UUID 文本；
-ManualAdjust 保存 canonical signed Int32 十进制文本（例如 `-10`、`25`），拒绝 `+25`、前导零、`-0`、零值和越界。
-不新增 `additional_id`、score 或 delta 列。HintUnlock 与 ManualAdjust 都必须有 CompetitionChallengeId。
+Kind/Result/Reference check constraints 固定字段矩阵。Flag/Break 保存原文和 32 字节 Hash；Fix 必须引用 PatchUpload；HintUnlock 必须引用 Hint；AWD Flag 可引用 AwdRound。ManualAdjustment 保存非零 canonical signed Int32 十进制并固定 Applied。Completed 必须有 Result，KoH Controlled 必须有 Team、其余 KoH 结果不得有 Team。PatchUpload Reference 建部分唯一索引。
 
-### `scoring_events`
-
-`id`、比赛/题目/队伍/受害队伍/Submission/Specification 引用、`kind`、`result`、`failure_code?`、处理版本、配置版本、时间戳、`deleted_at?`。
-ManualAdjust 始终 `Kind=ManualAdjust, Result=Correct`；HintUnlock 使用 `Kind=HintUnlock, SpecificationKind=Hint`。
-每次新建或替换当前事件都原子递增 LeaderboardRevision，并通过 Outbox 失效排行榜；事件不保存累计分。
+没有 ProcessingVersion、ClaimId、结果 body hash、配置/challenge revision、soft delete 或历史判定列，也不保存 score/delta。
 
 ### `data_exports`
 
@@ -123,8 +117,7 @@ ManualAdjust 始终 `Kind=ManualAdjust, Result=Correct`；HintUnlock 使用 `Kin
 
 - CompetitionEvent：按 competition/occurred、kind、level、visibility、subject、related 和 parent 建组合索引。
 - Notification：`(target_type,target_id,sent_at DESC,id DESC)`、source/related 过滤索引、唯一 `reply_to_id` 过滤索引。
-- Submission：比赛时间线、题/队/Kind 组合、Flag Hash、当前 ScoringEvent 唯一索引。
-- ScoringEvent：未删除 SubmissionId 唯一、比赛/occurred、Specification/Team 查询索引。
+- GameplayFact：比赛时间线、题/队/Kind、Flag Hash、Reference 查询索引，以及 PatchUpload Reference 部分唯一索引。
 - Files：`object_key` 唯一；所有业务 File FK Restrict。
 
 ## 删除的表

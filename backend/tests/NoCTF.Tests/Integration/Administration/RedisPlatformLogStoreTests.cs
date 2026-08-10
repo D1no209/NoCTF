@@ -51,20 +51,20 @@ public sealed class RedisPlatformLogStoreTests
             var teamId = Guid.NewGuid();
             var userId = Guid.NewGuid();
             var competitionChallengeId = Guid.NewGuid();
-            var submissionId = Guid.NewGuid();
+            var gameplayFactId = Guid.NewGuid();
             const string password = "do-not-store-password";
             const string token = "do-not-store-token";
             const string flag = "flag{admin-can-see-this}";
 
             logger.LogInformation("Runner initialized.");
             logger.LogWarning(
-                "Runtime {RuntimeInstanceId} for competition {CompetitionId}, team {TeamId}, user {UserId}, challenge {CompetitionChallengeId}, submission {SubmissionId} used password {Password}, token {Token}, and Flag {Flag}.",
+                "Runtime {RuntimeInstanceId} for competition {CompetitionId}, team {TeamId}, user {UserId}, challenge {CompetitionChallengeId}, gameplay fact {GameplayFactId} used password {Password}, token {Token}, and Flag {Flag}.",
                 runtimeInstanceId,
                 competitionId,
                 teamId,
                 userId,
                 competitionChallengeId,
-                submissionId,
+                gameplayFactId,
                 password,
                 token,
                 flag);
@@ -84,7 +84,7 @@ public sealed class RedisPlatformLogStoreTests
                     TeamId: teamId,
                     UserId: userId,
                     CompetitionChallengeId: competitionChallengeId,
-                    SubmissionId: submissionId,
+                    GameplayFactId: gameplayFactId,
                     Cursor: null,
                     Limit: 1),
                 cancellationToken);
@@ -101,7 +101,7 @@ public sealed class RedisPlatformLogStoreTests
             await Assert.That(warnings.Items[0].UserId).IsEqualTo(userId);
             await Assert.That(warnings.Items[0].CompetitionChallengeId)
                 .IsEqualTo(competitionChallengeId);
-            await Assert.That(warnings.Items[0].SubmissionId).IsEqualTo(submissionId);
+            await Assert.That(warnings.Items[0].GameplayFactId).IsEqualTo(gameplayFactId);
             await Assert.That(warnings.Items[0].Cursor).StartsWith(
                 $"{DateTimeOffset.UtcNow:yyyyMMdd}:");
 
@@ -125,7 +125,7 @@ public sealed class RedisPlatformLogStoreTests
                     TeamId: null,
                     UserId: null,
                     CompetitionChallengeId: null,
-                    SubmissionId: null,
+                    GameplayFactId: null,
                     Cursor: warnings.NextCursor,
                     Limit: 10),
                 cancellationToken);
@@ -145,7 +145,7 @@ public sealed class RedisPlatformLogStoreTests
                     TeamId: teamId,
                     UserId: userId,
                     CompetitionChallengeId: competitionChallengeId,
-                    SubmissionId: submissionId,
+                    GameplayFactId: gameplayFactId,
                     Cursor: null,
                     Limit: 50_000),
                 cancellationToken);

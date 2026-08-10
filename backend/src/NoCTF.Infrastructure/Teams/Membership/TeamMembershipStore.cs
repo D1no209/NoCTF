@@ -63,8 +63,7 @@ public sealed class TeamMembershipStore(
             RelatedUserId: userId,
             TeamId: team.Id), ct);
         await db.SaveChangesAsync(ct);
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;
@@ -127,8 +126,7 @@ public sealed class TeamMembershipStore(
             RelatedUserId: targetUserId,
             TeamId: teamId), ct);
         await db.SaveChangesAsync(ct);
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;
@@ -162,8 +160,7 @@ public sealed class TeamMembershipStore(
             RelatedUserId: userId,
             TeamId: team.Id), ct);
         await db.SaveChangesAsync(ct);
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;
@@ -197,8 +194,7 @@ public sealed class TeamMembershipStore(
             RelatedUserId: newCaptainId,
             TeamId: teamId), ct);
         await db.SaveChangesAsync(ct);
-        await LeaderboardRevision.IncrementAsync(db, competitionId, ct);
-        await outbox.PublishAsync(new InvalidateLeaderboard(competitionId));
+        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;

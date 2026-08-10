@@ -5,13 +5,13 @@ using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Teams;
-using NoCTF.Domain.Submissions;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.DataExports;
 using NoCTF.Domain.Storage;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Infrastructure.Persistence;
 
@@ -30,8 +30,7 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<AccountToken> AccountTokens => Set<AccountToken>();
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
     public DbSet<Notification> Notifications => Set<Notification>();
-    public DbSet<Submission> Submissions => Set<Submission>();
-    public DbSet<ScoringEvent> ScoringEvents => Set<ScoringEvent>();
+    public DbSet<GameplayFact> GameplayFacts => Set<GameplayFact>();
     public DbSet<DataExport> DataExports => Set<DataExport>();
     public DbSet<StoredFile> Files => Set<StoredFile>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)

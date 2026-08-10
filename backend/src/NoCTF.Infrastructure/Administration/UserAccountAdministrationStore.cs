@@ -181,8 +181,8 @@ public sealed class UserAccountAdministrationStore(
             db.Teams.IgnoreQueryFilters().CountAsync(team => team.CaptainId == user.Id, ct));
         AddReference(UserDeletionReferenceKind.TeamMember, teamIds.Length);
         await AddReferenceAsync(
-            UserDeletionReferenceKind.Submission,
-            db.Submissions.CountAsync(submission => submission.SubmittedByUserId == user.Id, ct));
+            UserDeletionReferenceKind.GameplayFact,
+            db.GameplayFacts.CountAsync(submission => submission.ActorUserId == user.Id, ct));
         await AddReferenceAsync(
             UserDeletionReferenceKind.PatchUpload,
             db.PatchUploads.CountAsync(upload => upload.UploadedByUserId == user.Id, ct));
@@ -195,13 +195,6 @@ public sealed class UserAccountAdministrationStore(
                     && notification.TargetId == user.Id)
                 || (notification.RelatedType == EntityReferenceKind.User
                     && notification.RelatedId == user.Id), ct));
-        await AddReferenceAsync(
-            UserDeletionReferenceKind.ScoringEvent,
-            db.ScoringEvents.CountAsync(scoringEvent =>
-                scoringEvent.TeamId != null && teamIds.Contains(scoringEvent.TeamId.Value)
-                || scoringEvent.VictimTeamId != null
-                && teamIds.Contains(scoringEvent.VictimTeamId.Value),
-                ct));
         await AddReferenceAsync(
             UserDeletionReferenceKind.CompetitionEvent,
             db.CompetitionEvents.CountAsync(entry =>

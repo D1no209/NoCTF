@@ -1,5 +1,5 @@
 using System.Text.Json;
-using NoCTF.Application.Submissions.Intake;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
@@ -12,7 +12,7 @@ public sealed class SubmitFixTests
     public async Task Required_break_is_rejected_before_patch_upload_consumption()
     {
         var store = new Store();
-        var useCase = new SubmitFix(store, new GameModeSubmissionAdmissionPolicy());
+        var useCase = new SubmitFix(store, new GameModeGameplayFactAdmissionPolicy());
 
         var result = await useCase.ExecuteAsync(new(
             store.CompetitionId,
@@ -21,23 +21,23 @@ public sealed class SubmitFixTests
             Guid.NewGuid(),
             DateTimeOffset.UtcNow));
 
-        await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.BreakRequired);
+        await Assert.That(result.FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.BreakRequired);
         await Assert.That(store.FixWrites).IsEqualTo(0);
     }
 
-    private sealed class Store : ISubmissionIntakeStore
+    private sealed class Store : IGameplayFactIntakeStore
     {
         public Guid CompetitionId { get; } = Guid.NewGuid();
         public Guid CompetitionChallengeId { get; } = Guid.NewGuid();
         public Guid UserId { get; } = Guid.NewGuid();
         public int FixWrites { get; private set; }
 
-        public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
+        public Task<GameplayFactAdmissionSnapshot?> LoadAdmissionAsync(
             Guid competitionId,
             Guid competitionChallengeId,
             Guid userId,
             CancellationToken cancellationToken) =>
-            Task.FromResult<SubmissionAdmissionSnapshot?>(new(
+            Task.FromResult<GameplayFactAdmissionSnapshot?>(new(
                 competitionId,
                 Guid.NewGuid(),
                 competitionChallengeId,
@@ -67,31 +67,31 @@ public sealed class SubmitFixTests
                 true,
                 true));
 
-        public Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
-            FlagSubmissionReceived received,
-            SubmissionAdmissionSnapshot snapshot,
+        public Task<GameplayFactAcceptanceResult> TryAcceptFlagAsync(
+            FlagGameplayFactReceived received,
+            GameplayFactAdmissionSnapshot snapshot,
             int? maxAttempts,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException();
 
-        public Task<IReadOnlyList<SubmissionAcceptanceResult>> TryAcceptFlagsAsync(
-            IReadOnlyList<FlagSubmissionReceived> received,
-            SubmissionAdmissionSnapshot snapshot,
+        public Task<IReadOnlyList<GameplayFactAcceptanceResult>> TryAcceptFlagsAsync(
+            IReadOnlyList<FlagGameplayFactReceived> received,
+            GameplayFactAdmissionSnapshot snapshot,
             int? maxAttempts,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException();
 
-        public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
-            FixSubmissionReceived received,
-            SubmissionAdmissionSnapshot snapshot,
+        public Task<GameplayFactAcceptanceResult> TryAcceptFixAsync(
+            FixGameplayFactReceived received,
+            GameplayFactAdmissionSnapshot snapshot,
             int? maxAttempts,
             CancellationToken cancellationToken)
         {
             FixWrites++;
-            return Task.FromResult(new SubmissionAcceptanceResult(
-                SubmissionAcceptanceState.Created,
-                received.SubmissionId,
-                received.ReceivedAt));
+            return Task.FromResult(new GameplayFactAcceptanceResult(
+                GameplayFactAcceptanceState.Created,
+                received.GameplayFactId,
+                received.OccurredAt));
         }
     }
 }

@@ -1,6 +1,6 @@
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Submissions;
+using NoCTF.Domain.Gameplay;
 using System.Text.Json;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Awd.Configuration;
@@ -42,18 +42,18 @@ internal static class CtfLeaderboardProjection
         var validTeams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
         var defaults = ParseCompetition(input.CompetitionConfigurationJson);
-        var solves = input.Submissions
-            .Where(fact => validTeams.ContainsKey(fact.TeamId)
-                          && fact.Kind == SubmissionKind.Flag
-                          && fact.Event is { DeletedAt: null, Result: ScoringResult.Correct }
+        var solves = input.GameplayFacts
+            .Where(fact => fact.TeamId is Guid teamId && validTeams.ContainsKey(teamId)
+                          && fact.Kind == GameplayFactKind.FlagAttempt
+                          && fact.Result == GameplayFactResult.Correct
                           && fact.CompetitionChallengeId is not null
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
-            .OrderBy(fact => fact.ReceivedAt)
-            .ThenBy(fact => fact.SubmissionId)
+            .OrderBy(fact => fact.OccurredAt)
+            .ThenBy(fact => fact.GameplayFactId)
             .GroupBy(fact => (fact.TeamId, fact.CompetitionChallengeId))
             .Select(group => group.First())
-            .OrderBy(fact => fact.ReceivedAt)
-            .ThenBy(fact => fact.SubmissionId)
+            .OrderBy(fact => fact.OccurredAt)
+            .ThenBy(fact => fact.GameplayFactId)
             .ToList();
         var currentSolveCounts = solves
             .GroupBy(solve => solve.CompetitionChallengeId!.Value)
@@ -76,7 +76,7 @@ internal static class CtfLeaderboardProjection
                     points.DecayFactor));
             });
 
-        var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points, int SolveOrdinal)>>();
+        var awarded = new Dictionary<Guid, List<(LeaderboardGameplayFact Fact, long Points, int SolveOrdinal)>>();
         var solveNumber = new Dictionary<Guid, int>();
         foreach (var solve in solves)
         {
@@ -110,19 +110,20 @@ internal static class CtfLeaderboardProjection
                         points.DecayFactor)),
                 points));
             solveNumber[challengeId] = index + 1;
-            if (!awarded.TryGetValue(solve.TeamId, out var teamSolves))
-                awarded[solve.TeamId] = teamSolves = [];
+            var teamId = solve.TeamId!.Value;
+            if (!awarded.TryGetValue(teamId, out var teamSolves))
+                awarded[teamId] = teamSolves = [];
             teamSolves.Add((solve, score, solveOrdinal));
         }
 
-        var wrongFacts = input.Submissions
-            .Where(fact => validTeams.ContainsKey(fact.TeamId)
-                && fact.Kind == SubmissionKind.Flag
-                && fact.Event is { DeletedAt: null, Result: ScoringResult.Wrong })
+        var wrongFacts = input.GameplayFacts
+            .Where(fact => fact.TeamId is Guid teamId && validTeams.ContainsKey(teamId)
+                && fact.Kind == GameplayFactKind.FlagAttempt
+                && fact.Result == GameplayFactResult.Wrong)
             .Select(fact =>
-                (fact.TeamId,
-                fact.ReceivedAt,
-                fact.SubmissionId,
+                (TeamId: fact.TeamId!.Value,
+                fact.OccurredAt,
+                fact.GameplayFactId,
                 Penalty: (fact.CompetitionChallengeId is Guid challengeId
                         ? ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson)
                         : null)
@@ -139,7 +140,7 @@ internal static class CtfLeaderboardProjection
         var rows = validTeams.Values.Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
-            var last = own.Select(item => item.Fact.ReceivedAt)
+            var last = own.Select(item => item.Fact.OccurredAt)
                 .OrderByDescending(value => value)
                 .FirstOrDefault();
             var total = checked(own.Aggregate(0L, (sum, item) => checked(sum + item.Points))
@@ -169,7 +170,7 @@ internal static class CtfLeaderboardProjection
                 pair.Key,
                 item.Fact.CompetitionChallengeId!.Value,
                 item.Points,
-                item.Fact.ReceivedAt,
+                item.Fact.OccurredAt,
                 string.IsNullOrWhiteSpace(item.Fact.SubmitterName) ? null : item.Fact.SubmitterName)))
             .ToList());
         return (entries, cells, currentScores);
@@ -258,43 +259,42 @@ internal static class AwdLeaderboardProjection
         }
         var attackPoints = teams.Keys.ToDictionary(team => team, _ => 0L);
         var upRoundCounts = teams.Keys.ToDictionary(team => team, _ => 0);
-        var solves = input.Submissions
-            .Where(fact => teams.ContainsKey(fact.TeamId)
-                          && fact.Kind == SubmissionKind.Flag
-                          && fact.Event is
+        var solves = input.GameplayFacts
+            .Where(fact => fact.TeamId is Guid teamId && teams.ContainsKey(teamId)
+                          && fact.Kind == GameplayFactKind.FlagAttempt
+                          && fact is
                           {
-                              DeletedAt: null,
-                              Result: ScoringResult.Correct,
-                              SpecificationKind: NoCTF.Domain.Challenges.SpecificationKind.AwdRound,
-                              SpecificationId: not null
+                              Result: GameplayFactResult.Correct,
+                              ReferenceKind: GameplayFactReferenceKind.AwdRound,
+                              ReferenceId: not null
                           }
                           && fact.CompetitionChallengeId is not null
                           && fact.VictimTeamId is not null
                           && fact.VictimTeamId != fact.TeamId
                           && teams.ContainsKey(fact.VictimTeamId.Value)
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
-            .OrderBy(fact => fact.ReceivedAt)
-            .ThenBy(fact => fact.SubmissionId)
+            .OrderBy(fact => fact.OccurredAt)
+            .ThenBy(fact => fact.GameplayFactId)
             .ToList();
         var attacks = solves
             .GroupBy(fact => new
             {
                 ChallengeId = fact.CompetitionChallengeId!.Value,
-                RoundId = fact.Event.SpecificationId!.Value,
+                RoundId = fact.ReferenceId!.Value,
                 VictimId = fact.VictimTeamId!.Value,
-                AttackerId = fact.TeamId
+                AttackerId = fact.TeamId!.Value
             })
             .Select(group => group.First())
             .ToList();
         foreach (var pool in attacks.GroupBy(fact => new
         {
             ChallengeId = fact.CompetitionChallengeId!.Value,
-            RoundId = fact.Event.SpecificationId!.Value,
+            RoundId = fact.ReferenceId!.Value,
             VictimId = fact.VictimTeamId!.Value
         }))
         {
             var settings = Effective(configuration, challenges.GetValueOrDefault(pool.Key.ChallengeId)?.ConfigurationJson);
-            var attackers = pool.Select(fact => fact.TeamId).Distinct().ToList();
+            var attackers = pool.Select(fact => fact.TeamId!.Value).Distinct().ToList();
             var reward = settings.AttackRewardMode == AttackRewardMode.FixedPerAttack
                 ? settings.AttackPoints
                 : settings.VictimDefensePoolPoints / attackers.Count;
@@ -303,23 +303,22 @@ internal static class AwdLeaderboardProjection
                 values[attacker] = checked(values[attacker] + reward);
                 attackPoints[attacker] = checked(attackPoints[attacker] + reward);
                 var first = pool.First(fact => fact.TeamId == attacker);
-                AddCell(attacker, pool.Key.ChallengeId, reward, first.ReceivedAt, first.SubmitterName);
+                AddCell(attacker, pool.Key.ChallengeId, reward, first.OccurredAt, first.SubmitterName);
             }
             values[pool.Key.VictimId] = checked(
                 values[pool.Key.VictimId] - settings.VictimDefensePoolPoints);
             AddCell(pool.Key.VictimId, pool.Key.ChallengeId, -settings.VictimDefensePoolPoints);
         }
-        var serviceStates = input.SystemEvents
-            .Where(fact => fact.Event is
+        var serviceStates = input.GameplayFacts
+            .Where(fact => fact is
             {
-                DeletedAt: null,
-                Kind: ScoringEventKind.AwdServiceStatus,
+                Kind: GameplayFactKind.AwdServiceTransition,
                 TeamId: not null,
                 CompetitionChallengeId: not null,
-                Result: ScoringResult.Correct or ScoringResult.Wrong
+                Result: GameplayFactResult.ServiceUp or GameplayFactResult.ServiceDown
             })
-            .OrderBy(fact => fact.Event.OccurredAt)
-            .ThenBy(fact => fact.Event.Id)
+            .OrderBy(fact => fact.OccurredAt)
+            .ThenBy(fact => fact.GameplayFactId)
             .ToList();
         var projectedAt = input.ProjectedAt ?? DateTimeOffset.UtcNow;
         foreach (var round in (input.AwdRounds ?? [])
@@ -336,14 +335,14 @@ internal static class AwdLeaderboardProjection
                      .Select(group => group.First()))
         {
             var latestState = serviceStates
-                .Where(fact => fact.Event.TeamId == round.TeamId
-                    && fact.Event.CompetitionChallengeId == round.CompetitionChallengeId
-                    && fact.Event.OccurredAt < round.EndsAt)
+                .Where(fact => fact.TeamId == round.TeamId
+                    && fact.CompetitionChallengeId == round.CompetitionChallengeId
+                    && fact.OccurredAt < round.EndsAt)
                 .LastOrDefault();
             var settings = Effective(
                 configuration,
                 challenges[round.CompetitionChallengeId].ConfigurationJson);
-            if (latestState?.Event.Result == ScoringResult.Wrong)
+            if (latestState?.Result == GameplayFactResult.ServiceDown)
             {
                 values[round.TeamId] = checked(
                     values[round.TeamId] - settings.ServiceUnhealthyPenalty);
@@ -402,11 +401,11 @@ internal static class AwdLeaderboardProjection
     }
 
     private static DateTimeOffset? LastAttackAt(
-        IReadOnlyList<LeaderboardSubmissionFact> attacks,
+        IReadOnlyList<LeaderboardGameplayFact> attacks,
         Guid teamId)
     {
         var last = attacks.Where(attack => attack.TeamId == teamId)
-            .Select(attack => attack.ReceivedAt)
+            .Select(attack => attack.OccurredAt)
             .OrderByDescending(value => value)
             .FirstOrDefault();
         return last == default ? null : last;
@@ -474,54 +473,54 @@ internal static class AwdpLeaderboardProjection
         var competition = ParseCompetition(input.CompetitionConfigurationJson);
         var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
-        var facts = input.Submissions
-            .Where(fact => teams.ContainsKey(fact.TeamId)
-                          && fact.Kind is SubmissionKind.Break or SubmissionKind.Fix
-                          && fact.Event is { DeletedAt: null, Result: ScoringResult.Correct }
+        var facts = input.GameplayFacts
+            .Where(fact => fact.TeamId is Guid teamId && teams.ContainsKey(teamId)
+                          && fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
+                          && fact.Result == GameplayFactResult.Correct
                           && fact.CompetitionChallengeId is not null
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
-            .OrderBy(fact => fact.ReceivedAt)
-            .ThenBy(fact => fact.SubmissionId)
+            .OrderBy(fact => fact.OccurredAt)
+            .ThenBy(fact => fact.GameplayFactId)
             .ToList();
         var correctBreaks = facts
-            .Where(fact => fact.Kind == SubmissionKind.Break)
+            .Where(fact => fact.Kind == GameplayFactKind.BreakAttempt)
             .Select(fact => (fact.TeamId, fact.CompetitionChallengeId!.Value))
             .ToHashSet();
-        var awarded = new Dictionary<Guid, List<(LeaderboardSubmissionFact Fact, long Points)>>();
-        var milestones = new HashSet<(Guid TeamId, Guid ChallengeId, SubmissionKind Kind, int Round)>();
+        var awarded = new Dictionary<Guid, List<(LeaderboardGameplayFact Fact, long Points)>>();
+        var milestones = new HashSet<(Guid TeamId, Guid ChallengeId, GameplayFactKind Kind, int Round)>();
         foreach (var fact in facts)
         {
             var challengeId = fact.CompetitionChallengeId!.Value;
             var configuration = Effective(
                 competition,
                 challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
-            if (fact.Kind == SubmissionKind.Fix
+            if (fact.Kind == GameplayFactKind.FixAttempt
                 && configuration.RequireBreakBeforeFix
                 && !correctBreaks.Contains((fact.TeamId, challengeId)))
                 continue;
-            var achievement = fact.Kind == SubmissionKind.Break
+            var achievement = fact.Kind == GameplayFactKind.BreakAttempt
                 ? configuration.Break
                 : configuration.Fix;
             var round = achievement.Settlement == AchievementSettlement.Milestone
                 ? 0
                 : Round(
-                    fact.ReceivedAt,
+                    fact.OccurredAt,
                     input.LifecycleAudits,
                     input.CompetitionStartTime,
                     competition.RoundDurationSeconds);
-            if (!milestones.Add((fact.TeamId, challengeId, fact.Kind, round)))
+            var teamId = fact.TeamId!.Value;
+            if (!milestones.Add((teamId, challengeId, fact.Kind, round)))
                 continue;
-            if (!awarded.TryGetValue(fact.TeamId, out var teamFacts))
-                awarded[fact.TeamId] = teamFacts = [];
+            if (!awarded.TryGetValue(teamId, out var teamFacts))
+                awarded[teamId] = teamFacts = [];
             teamFacts.Add((fact, achievement.Points));
         }
-        var penalties = input.Submissions
-            .Where(fact => teams.ContainsKey(fact.TeamId)
-                           && fact.Kind is SubmissionKind.Break or SubmissionKind.Fix
-                           && fact.Event.DeletedAt is null
+        var penalties = input.GameplayFacts
+            .Where(fact => fact.TeamId is Guid teamId && teams.ContainsKey(teamId)
+                           && fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
                            && fact.CompetitionChallengeId is not null
                            && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
-            .GroupBy(fact => fact.TeamId)
+            .GroupBy(fact => fact.TeamId!.Value)
             .ToDictionary(
                 group => group.Key,
                 group => group.Aggregate(0L, (total, fact) => checked(total +
@@ -537,12 +536,12 @@ internal static class AwdpLeaderboardProjection
         var rows = teams.Values.Select(team =>
         {
             var own = awarded.GetValueOrDefault(team.Id) ?? [];
-            var last = own.Select(item => item.Fact.ReceivedAt)
+            var last = own.Select(item => item.Fact.OccurredAt)
                 .OrderByDescending(value => value)
                 .FirstOrDefault();
             var lastFixAt = own
-                .Where(item => item.Fact.Kind == SubmissionKind.Fix)
-                .Select(item => (DateTimeOffset?)item.Fact.ReceivedAt)
+                .Where(item => item.Fact.Kind == GameplayFactKind.FixAttempt)
+                .Select(item => (DateTimeOffset?)item.Fact.OccurredAt)
                 .OrderByDescending(value => value)
                 .FirstOrDefault();
             var awardedScore = own.Aggregate(0L, (total, item) => checked(total + item.Points));
@@ -556,8 +555,8 @@ internal static class AwdpLeaderboardProjection
                         + manualAdjustments.GetValueOrDefault(team.Id)),
                     own.Count,
                     last == default ? null : last),
-                own.Count(item => item.Fact.Kind == SubmissionKind.Fix),
-                own.Count(item => item.Fact.Kind == SubmissionKind.Break),
+                own.Count(item => item.Fact.Kind == GameplayFactKind.FixAttempt),
+                own.Count(item => item.Fact.Kind == GameplayFactKind.BreakAttempt),
                 penalty,
                 lastFixAt,
                 team.RegisteredAt);
@@ -576,12 +575,12 @@ internal static class AwdpLeaderboardProjection
                 .GroupBy(item => item.Fact.CompetitionChallengeId!.Value)
                 .Select(group =>
                 {
-                    var first = group.OrderBy(item => item.Fact.ReceivedAt).First();
+                    var first = group.OrderBy(item => item.Fact.OccurredAt).First();
                     return new LeaderboardCellFact(
                         pair.Key,
                         group.Key,
                         group.Aggregate(0L, (total, item) => checked(total + item.Points)),
-                        first.Fact.ReceivedAt,
+                        first.Fact.OccurredAt,
                         string.IsNullOrWhiteSpace(first.Fact.SubmitterName) ? null : first.Fact.SubmitterName);
                 }))
             .ToList());
@@ -619,18 +618,18 @@ internal static class AwdpLeaderboardProjection
         AwdpConfigurationResolver.Resolve(competition, ParseChallenge(challengeJson));
 
     private static long PenaltyFor(
-        LeaderboardSubmissionFact fact,
+        LeaderboardGameplayFact fact,
         AwdpEffectiveConfiguration configuration) =>
-        (fact.Kind, fact.Event.Result, fact.Event.FailureCode) switch
+        (fact.Kind, fact.Result, fact.FailureCode) switch
         {
-            (SubmissionKind.Break, ScoringResult.Wrong, _)
+            (GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong, _)
                 => configuration.BreakWrongPenalty,
-            (SubmissionKind.Fix, ScoringResult.Wrong, ScoringFailureCode.AwdpFixFailed
-                or ScoringFailureCode.AwdpPatchFailed or ScoringFailureCode.AwdpPatchTimeout)
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpFixFailed
+                or GameplayFactFailureCode.AwdpPatchFailed or GameplayFactFailureCode.AwdpPatchTimeout)
                 => configuration.FixFailurePenalty,
-            (SubmissionKind.Fix, ScoringResult.Rejected, ScoringFailureCode.AwdpViolation)
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpViolation)
                 => configuration.ViolationPenalty,
-            (SubmissionKind.Fix, ScoringResult.Wrong, ScoringFailureCode.AwdpServiceDown)
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceDown)
                 => configuration.ServiceDownPenalty,
             _ => 0L
         };
@@ -678,34 +677,33 @@ internal static class KohLeaderboardProjection
         var challengePoints = challenges.ToDictionary(
             item => item.Key,
             item => PointsFor(configuration, item.Value.ConfigurationJson));
-        var observations = input.SystemEvents
-            .Where(fact => fact.Event is
+        var observations = input.GameplayFacts
+            .Where(fact => fact is
             {
-                DeletedAt: null,
-                Kind: ScoringEventKind.KohObservation,
-                Result: ScoringResult.Correct,
+                Kind: GameplayFactKind.KohControlObservation,
+                Result: GameplayFactResult.Controlled,
                 TeamId: not null,
                 CompetitionChallengeId: not null
             }
-            && teams.ContainsKey(fact.Event.TeamId!.Value)
+            && teams.ContainsKey(fact.TeamId!.Value)
             && (!hasChallengeCatalog
-                || challenges.ContainsKey(fact.Event.CompetitionChallengeId!.Value)))
-            .OrderBy(fact => fact.Event.OccurredAt)
-            .ThenBy(fact => fact.Event.Id)
+                || challenges.ContainsKey(fact.CompetitionChallengeId!.Value)))
+            .OrderBy(fact => fact.OccurredAt)
+            .ThenBy(fact => fact.GameplayFactId)
             .ToList();
         var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, teams.Keys);
         var rows = teams.Values.Select(team =>
         {
-            var own = observations.Where(fact => fact.Event.TeamId == team.Id).ToList();
-            var first = own.Select(fact => fact.Event.OccurredAt).FirstOrDefault();
-            var last = own.Select(fact => fact.Event.OccurredAt).LastOrDefault();
+            var own = observations.Where(fact => fact.TeamId == team.Id).ToList();
+            var first = own.Select(fact => fact.OccurredAt).FirstOrDefault();
+            var last = own.Select(fact => fact.OccurredAt).LastOrDefault();
             var observationPoints = own.Aggregate(
                 0L,
                 (total, fact) => checked(total + PointsForObservation(
                     configuration.ControlPointsPerInterval,
                     challengePoints,
-                    fact.Event.CompetitionChallengeId!.Value)));
+                    fact.CompetitionChallengeId!.Value)));
             return new KohRankedEntry(
                 new LeaderboardEntry(
                     0,
@@ -716,7 +714,7 @@ internal static class KohLeaderboardProjection
                     own.Count,
                     last == default ? null : last),
                 own.Count,
-                own.Select(fact => fact.Event.CompetitionChallengeId!.Value).Distinct().Count(),
+                own.Select(fact => fact.CompetitionChallengeId!.Value).Distinct().Count(),
                 first == default ? null : first,
                 team.RegisteredAt);
         });
@@ -730,8 +728,8 @@ internal static class KohLeaderboardProjection
             .ToList();
         var cells = ProjectionPenalties.ApplyManualAdjustments(input, observations
             .GroupBy(fact => (
-                TeamId: fact.Event.TeamId!.Value,
-                ChallengeId: fact.Event.CompetitionChallengeId!.Value))
+                TeamId: fact.TeamId!.Value,
+                ChallengeId: fact.CompetitionChallengeId!.Value))
             .Select(group =>
             {
                 var first = group.First();
@@ -741,8 +739,8 @@ internal static class KohLeaderboardProjection
                     group.Aggregate(0L, (total, fact) => checked(total + PointsForObservation(
                         configuration.ControlPointsPerInterval,
                         challengePoints,
-                        fact.Event.CompetitionChallengeId!.Value))),
-                    first.Event.OccurredAt,
+                        fact.CompetitionChallengeId!.Value))),
+                    first.OccurredAt,
                     null);
             })
             .ToList());
@@ -806,21 +804,20 @@ internal static class ProjectionPenalties
             .Where(team => !team.IsBanned && !team.IsDeleted)
             .Select(team => team.Id)
             .ToHashSet();
-        var adjustments = input.Submissions
-            .Where(fact => validTeams.Contains(fact.TeamId)
+        var adjustments = input.GameplayFacts
+            .Where(fact => fact.TeamId is Guid teamId && validTeams.Contains(teamId)
                 && fact.CompetitionChallengeId is not null
-                && fact.Event is
+                && fact is
                 {
-                    DeletedAt: null,
-                    Result: ScoringResult.Correct,
-                    Kind: ScoringEventKind.ManualAdjust
+                    Result: GameplayFactResult.Applied,
+                    Kind: GameplayFactKind.ManualAdjustment
                 })
-            .GroupBy(fact => (fact.TeamId, ChallengeId: fact.CompetitionChallengeId!.Value))
+            .GroupBy(fact => (TeamId: fact.TeamId!.Value, ChallengeId: fact.CompetitionChallengeId!.Value))
             .ToDictionary(
                 group => group.Key,
                 group => group.Aggregate(
                     0L,
-                    (total, fact) => checked(total + ParseDelta(fact.SubmittedFlag))));
+                    (total, fact) => checked(total + ParseDelta(fact.Value))));
         var projectedKeys = projectedCells
             .Select(cell => (cell.TeamId, ChallengeId: cell.CompetitionChallengeId))
             .ToHashSet();
@@ -851,31 +848,18 @@ internal static class ProjectionPenalties
         IEnumerable<Guid> teamIds)
     {
         var validTeams = teamIds.ToHashSet();
-        var submissionHints = input.Submissions
-            .Where(fact => fact.Event is
+        var submissionHints = input.GameplayFacts
+            .Where(fact => fact is
             {
-                DeletedAt: null,
-                Result: ScoringResult.Correct,
-                Kind: ScoringEventKind.HintUnlock,
+                Result: GameplayFactResult.Unlocked,
+                Kind: GameplayFactKind.HintUnlock,
                 TeamId: not null
-            } && validTeams.Contains(fact.TeamId))
-            .GroupBy(fact => fact.TeamId)
+            } && validTeams.Contains(fact.TeamId!.Value))
+            .GroupBy(fact => fact.TeamId!.Value)
             .ToDictionary(
                 group => group.Key,
                 group => group.Aggregate(0L, (total, fact) => checked(total + (fact.HintCost ?? 0))));
-        if (submissionHints.Count > 0)
-            return submissionHints;
-        return input.SystemEvents
-            .Where(fact => fact.Event is
-            {
-                DeletedAt: null,
-                Kind: ScoringEventKind.HintUnlock,
-                TeamId: not null
-            } && validTeams.Contains(fact.Event.TeamId!.Value))
-            .GroupBy(fact => fact.Event.TeamId!.Value)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Aggregate(0L, (total, fact) => checked(total + fact.CurrentValue)));
+        return submissionHints;
     }
 
     public static IReadOnlyDictionary<Guid, long> ManualAdjustments(
@@ -883,18 +867,17 @@ internal static class ProjectionPenalties
         IEnumerable<Guid> teamIds)
     {
         var validTeams = teamIds.ToHashSet();
-        return input.Submissions
-            .Where(fact => fact.Event is
+        return input.GameplayFacts
+            .Where(fact => fact is
             {
-                DeletedAt: null,
-                Result: ScoringResult.Correct,
-                Kind: ScoringEventKind.ManualAdjust,
+                Result: GameplayFactResult.Applied,
+                Kind: GameplayFactKind.ManualAdjustment,
                 TeamId: not null
-            } && validTeams.Contains(fact.TeamId))
-            .GroupBy(fact => fact.TeamId)
+            } && validTeams.Contains(fact.TeamId!.Value))
+            .GroupBy(fact => fact.TeamId!.Value)
             .ToDictionary(
                 group => group.Key,
-                group => group.Aggregate(0L, (total, fact) => checked(total + ParseDelta(fact.SubmittedFlag))));
+                group => group.Aggregate(0L, (total, fact) => checked(total + ParseDelta(fact.Value))));
     }
 
     internal static long ParseDelta(string? value) =>

@@ -13,7 +13,7 @@ public sealed class CreateCompetitionQuestionRequest
 {
     public CompetitionQuestionSubjectCode? Subject { get; set; }
     public Guid? CompetitionChallengeId { get; set; }
-    public Guid? SubmissionId { get; set; }
+    public Guid? GameplayFactId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
 }
@@ -105,7 +105,7 @@ public sealed class CreateCompetitionQuestionEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Creates a private competition question.";
-            summary.Description = "Challenge questions target one published CompetitionChallenge; platform questions target competition management. Attachments are not accepted and an optional Submission is referenced without copying its protected content.";
+            summary.Description = "Challenge questions target one published CompetitionChallenge; platform questions target competition management. Attachments are not accepted and an optional GameplayFact is referenced without copying its protected content.";
         });
     }
 
@@ -126,7 +126,7 @@ public sealed class CreateCompetitionQuestionEndpoint(
             competitionId,
             CompetitionQuestionResponseMapper.ToDomain(request.Subject!.Value),
             request.CompetitionChallengeId,
-            request.SubmissionId,
+            request.GameplayFactId,
             user.UserId,
             request.Title,
             request.Body,

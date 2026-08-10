@@ -1,9 +1,9 @@
-using NoCTF.Application.Submissions.Intake;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
 
-public class SubmissionAdmissionPolicyTests
+public class GameplayFactAdmissionPolicyTests
 {
     [Test]
     public async Task Submission_received_before_end_remains_valid_after_processing_delay()
@@ -23,7 +23,7 @@ public class SubmissionAdmissionPolicyTests
 
         var result = Check(snapshot, snapshot.EndAt.AddTicks(1));
 
-        await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.CompetitionFinished);
+        await Assert.That(result.FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.CompetitionFinished);
     }
 
     [Test]
@@ -33,7 +33,7 @@ public class SubmissionAdmissionPolicyTests
 
         var result = Check(snapshot, DateTimeOffset.UtcNow);
 
-        await Assert.That(result.FailureCode).IsEqualTo(SubmissionFailureCode.TeamBanned);
+        await Assert.That(result.FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.TeamBanned);
     }
 
     [Test]
@@ -46,17 +46,17 @@ public class SubmissionAdmissionPolicyTests
         }
     }
 
-    private static SubmissionAdmissionSnapshot Snapshot(CompetitionStatus status) => new(
+    private static GameplayFactAdmissionSnapshot Snapshot(CompetitionStatus status) => new(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), GameMode.Ctf, 0, 0, "{}", "{}", 0, 0, status,
         DateTimeOffset.UtcNow.AddMinutes(-1),
         DateTimeOffset.UtcNow.AddMinutes(1),
         false, false, true, false, false, true, true);
 
-    private static NoCTF.Application.Common.OperationResult<SubmissionFailureCode> Check(
-        SubmissionAdmissionSnapshot snapshot,
-        DateTimeOffset receivedAt) => SubmissionAdmissionPolicy.Check(
+    private static NoCTF.Application.Common.OperationResult<GameplayFactAdmissionFailureCode> Check(
+        GameplayFactAdmissionSnapshot snapshot,
+        DateTimeOffset receivedAt) => GameplayFactAdmissionPolicy.Check(
         snapshot,
-        NoCTF.Domain.Submissions.SubmissionKind.Flag,
+        NoCTF.Domain.Gameplay.GameplayFactKind.FlagAttempt,
         new(true, false, null, null),
         receivedAt);
 }

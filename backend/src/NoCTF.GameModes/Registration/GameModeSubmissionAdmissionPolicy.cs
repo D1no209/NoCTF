@@ -1,11 +1,11 @@
-using NoCTF.Application.Submissions.Intake;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.GameModes.Registration;
 
-public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionModePolicy
+public sealed class GameModeGameplayFactAdmissionPolicy : IGameplayFactAdmissionModePolicy
 {
-    public SubmissionAdmissionRules GetRules(
+    public GameplayFactAdmissionRules GetRules(
         GameMode mode,
         string competitionConfigurationJson,
         string challengeConfigurationJson) => mode switch
@@ -19,19 +19,19 @@ public sealed class GameModeSubmissionAdmissionPolicy : ISubmissionAdmissionMode
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
         };
 
-    private static SubmissionAdmissionRules CtfRules(string json)
+    private static GameplayFactAdmissionRules CtfRules(string json)
     {
         var configuration = Ctf.Configuration.CtfConfigurationUpgrader.ParseChallenge(json);
         return new(true, false, configuration.MaxFlagAttempts, null);
     }
 
-    private static SubmissionAdmissionRules AwdRules(string json)
+    private static GameplayFactAdmissionRules AwdRules(string json)
     {
         _ = Awd.Configuration.AwdConfigurationUpgrader.ParseChallenge(json);
         return new(true, false, null, null);
     }
 
-    private static SubmissionAdmissionRules AwdpRules(
+    private static GameplayFactAdmissionRules AwdpRules(
         string competitionJson,
         string challengeJson)
     {

@@ -2,49 +2,49 @@ using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.RefreshSession;
 using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Application.Common;
-using NoCTF.Application.Submissions.Intake;
-using NoCTF.Application.Submissions.Status;
+using NoCTF.Application.GameplayFacts.Intake;
+using NoCTF.Application.GameplayFacts.Status;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Moderation;
-using NoCTF.Application.Submissions.PatchUploads;
+using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Storage;
 
 namespace NoCTF.API.OpenApi;
 
-internal sealed class SwaggerSubmissionStore : ISubmissionIntakeStore
+internal sealed class SwaggerGameplayFactStore : IGameplayFactIntakeStore
 {
-    public Task<SubmissionAdmissionSnapshot?> LoadAdmissionAsync(
+    public Task<GameplayFactAdmissionSnapshot?> LoadAdmissionAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid userId,
         CancellationToken cancellationToken) =>
-        Task.FromResult<SubmissionAdmissionSnapshot?>(null);
-    public Task<SubmissionAcceptanceResult> TryAcceptFlagAsync(
-        FlagSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts,
+        Task.FromResult<GameplayFactAdmissionSnapshot?>(null);
+    public Task<GameplayFactAcceptanceResult> TryAcceptFlagAsync(
+        FlagGameplayFactReceived received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
-    public Task<IReadOnlyList<SubmissionAcceptanceResult>> TryAcceptFlagsAsync(
-        IReadOnlyList<FlagSubmissionReceived> received,
-        SubmissionAdmissionSnapshot snapshot,
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
+    public Task<IReadOnlyList<GameplayFactAcceptanceResult>> TryAcceptFlagsAsync(
+        IReadOnlyList<FlagGameplayFactReceived> received,
+        GameplayFactAdmissionSnapshot snapshot,
         int? maxAttempts,
         CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<SubmissionAcceptanceResult>>(
-            received.Select(_ => new SubmissionAcceptanceResult(
-                SubmissionAcceptanceState.SnapshotChanged)).ToArray());
-    public Task<SubmissionAcceptanceResult> TryAcceptFixAsync(
-        FixSubmissionReceived received, SubmissionAdmissionSnapshot snapshot, int? maxAttempts,
+        Task.FromResult<IReadOnlyList<GameplayFactAcceptanceResult>>(
+            received.Select(_ => new GameplayFactAcceptanceResult(
+                GameplayFactAcceptanceState.SnapshotChanged)).ToArray());
+    public Task<GameplayFactAcceptanceResult> TryAcceptFixAsync(
+        FixGameplayFactReceived received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
-    public Task<SubmissionAcceptanceResult> TryAcceptHintUnlockAsync(
-        HintUnlockSubmissionReceived received,
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
+    public Task<GameplayFactAcceptanceResult> TryAcceptHintUnlockAsync(
+        HintUnlockGameplayFactReceived received,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
-    public Task<SubmissionAcceptanceResult> TryAcceptManualAdjustmentAsync(
-        ManualAdjustmentSubmissionReceived received,
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
+    public Task<GameplayFactAcceptanceResult> TryAcceptManualAdjustmentAsync(
+        ManualAdjustmentGameplayFactReceived received,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new SubmissionAcceptanceResult(SubmissionAcceptanceState.SnapshotChanged));
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
 }
 
 internal sealed class SwaggerPatchUploadStore : IPatchUploadStore
@@ -67,23 +67,23 @@ internal sealed class SwaggerPatchUploadStore : IPatchUploadStore
 internal sealed class SwaggerFixArchiveReader : IFixArchiveReader
 {
     public Task<FixArchiveDescriptor?> FindAsync(
-        Guid submissionId,
+        Guid gameplayFactId,
         CancellationToken cancellationToken) =>
         Task.FromResult<FixArchiveDescriptor?>(null);
 }
 
-internal sealed class SwaggerSubmissionAdmissionModePolicy : ISubmissionAdmissionModePolicy
+internal sealed class SwaggerGameplayFactAdmissionModePolicy : IGameplayFactAdmissionModePolicy
 {
-    public SubmissionAdmissionRules GetRules(
+    public GameplayFactAdmissionRules GetRules(
         GameMode mode,
         string competitionConfigurationJson,
         string challengeConfigurationJson) => new(true, true, null, null);
 }
 
-internal sealed class SwaggerStatusReader : ISubmissionStatusReader
+internal sealed class SwaggerStatusReader : IGameplayFactStatusReader
 {
-    public Task<SubmissionStatusView?> FindAsync(Guid competitionId, Guid submissionId, Guid userId, CancellationToken cancellationToken) =>
-        Task.FromResult<SubmissionStatusView?>(null);
+    public Task<GameplayFactStatusView?> FindAsync(Guid competitionId, Guid gameplayFactId, Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<GameplayFactStatusView?>(null);
 }
 
 internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore

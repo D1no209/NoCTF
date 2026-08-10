@@ -3,8 +3,8 @@ using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
-using NoCTF.Application.Submissions.Processing;
-using NoCTF.Domain.Submissions;
+using NoCTF.Application.GameplayFacts.Processing;
+using NoCTF.Domain.Gameplay;
 using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.Internal;
@@ -52,7 +52,7 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
         Summary(summary =>
         {
             summary.Summary = "Records a claim-bound AWDP fix result.";
-            summary.Description = "SubmissionId and ProcessingVersion come exclusively from the internal JWT.";
+            summary.Description = "GameplayFactId comes exclusively from the internal JWT.";
         });
     }
 
@@ -61,14 +61,13 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
         RecordAwdpCheckResultRequest request,
         CancellationToken ct)
     {
-        if (!Guid.TryParse(User.FindFirstValue("submission_id"), out var submissionId) ||
+        if (!Guid.TryParse(User.FindFirstValue("gameplay_fact_id"), out var gameplayFactId) ||
             !Guid.TryParse(User.FindFirstValue("runtime_instance_id"), out var runtimeInstanceId) ||
             !string.Equals(
                 User.FindFirstValue("resource"),
-                $"submission:{submissionId:D}:runtime:{runtimeInstanceId:D}",
+                $"gameplay-fact:{gameplayFactId:D}:runtime:{runtimeInstanceId:D}",
                 StringComparison.Ordinal) ||
             !int.TryParse(User.FindFirstValue("generation"), out var generation) ||
-            !long.TryParse(User.FindFirstValue("processing_version"), out var processingVersion) ||
             !long.TryParse(
                 User.FindFirstValue("runtime_processing_version"),
                 out var runtimeProcessingVersion) ||
@@ -76,10 +75,9 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
             DateTimeOffset.UtcNow.ToUnixTimeSeconds() > deadline)
             return TypedResults.Unauthorized();
         var disposition = await record.AwdpAsync(AwdpFixResult.Create(
-            submissionId,
+            gameplayFactId,
             runtimeInstanceId,
             generation,
-            processingVersion,
             runtimeProcessingVersion,
             AwdpFixOutcomeMapper.ToDomain(request.Outcome),
             DateTimeOffset.UtcNow), ct);

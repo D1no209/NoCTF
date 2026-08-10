@@ -22,16 +22,18 @@ export const TeamBanAppealStatusLabel: Record<string, string> = {
   Submitted: '待裁决', Upheld: '已维持', Accepted: '已接受',
 }
 
-export const SubmissionKindLabel: Record<string, string> = {
-  Flag: 'Flag', Break: 'Break', Fix: 'Fix',
+export const GameplayFactKindLabel: Record<string, string> = {
+  FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: '提示解锁',
+  ManualAdjustment: '人工调分', AwdServiceTransition: 'AWD 服务状态', KohControlObservation: 'KoH 控制观测',
 }
 
-export const SubmissionEvaluationStateLabel: Record<string, string> = {
+export const GameplayFactStateLabel: Record<string, string> = {
   Pending: '待处理', Queued: '排队中', Processing: '评测中', Completed: '已完成', PlatformFailed: '平台失败',
 }
 
-export const ScoringResultLabel: Record<string, string> = {
-  Correct: '正确', Wrong: '错误', Duplicate: '重复', AttemptsExhausted: '次数耗尽', PlatformFailed: '平台失败', Rejected: '已拒绝',
+export const GameplayFactResultLabel: Record<string, string> = {
+  Correct: '正确', Wrong: '错误', Duplicate: '重复', AttemptsExhausted: '次数耗尽', Rejected: '已拒绝',
+  Unlocked: '已解锁', Applied: '已应用', ServiceUp: '服务正常', ServiceDown: '服务异常', Controlled: '已控制', Uncontrolled: '未控制',
 }
 
 export const RuntimeKindLabel: Record<string, string> = {

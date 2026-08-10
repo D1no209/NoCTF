@@ -58,10 +58,9 @@ public sealed record CompetitionQuestionActivityPayload(
 
 public sealed record CheatIncidentDetectedPayload(
     Guid CompetitionId,
-    Guid ScoringEventId,
-    Guid SubmissionId,
+    Guid GameplayFactId,
     Guid SourceTeamId,
     Guid OwnerTeamId,
-    Guid SubmittedByUserId,
+    Guid ActorUserId,
     Guid CompetitionChallengeId,
     DateTimeOffset DetectedAt);

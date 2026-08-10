@@ -67,15 +67,15 @@ Owner transfer 同样递增该 revision；它不得复用 ConfigurationRevision 
 Competition Revision。Attachment、Flag、Hint 没有独立 Revision；GitOps 通过稳定 UUID、
 内容和删除状态收敛，子资源 Endpoint 不要求伪造一套 ExpectedRevision 协议。Hint 写仍属于
 CompetitionChallenge 聚合变更：必须与管理写共享 Competition transaction lock，并原子递增
-父聚合 Revision 与 LeaderboardRevision。
+父聚合 Revision；排行榜只使用 `LeaderboardDirty`，不暴露 revision。
 
 ## 限流
 
-Redis 分布式策略：认证按 IP；普通 API 按 User；Flag 按 Team+题；AWD 批量按一次 HTTP 请求；Patch 上传/触发分开；Runtime 按 Team+题；管理批量按 Actor+Competition。429 不写 Submission、不消费 PatchUpload、不写事件。
+Redis 分布式策略：认证按 IP；普通 API 按 User；Flag 按 Team+题；AWD 批量按一次 HTTP 请求；Patch 上传/触发分开；Runtime 按 Team+题；管理批量按 Actor+Competition。429 不写 GameplayFact、不引用 PatchUpload、不写事件。
 
 ## 幂等
 
-不支持公开 Idempotency-Key。每个通过接入的 Submission 都是新尝试；Patch 上传替换旧未消费对象；Runtime 由状态机处理重复；配置由 Revision 处理。内部写回依靠实体 Id+ProcessingVersion/Sequence 幂等。
+不支持公开 Idempotency-Key。每个通过接入的 GameplayFact 都是新尝试；Patch 上传替换未引用对象；Runtime 由状态机处理重复；配置由 Revision 处理。GameplayFact 内部消息只携带事实 ID，最终结果覆盖同一行；Runtime 自身仍用 ProcessingVersion/Sequence 防迟到写回。
 
 ## OpenAPI 验收
 

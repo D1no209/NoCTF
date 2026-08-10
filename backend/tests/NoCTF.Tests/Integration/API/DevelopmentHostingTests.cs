@@ -46,9 +46,8 @@ public sealed class DevelopmentHostingTests
             var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
             await Assert.That(db.Database.ProviderName)
                 .IsEqualTo("Microsoft.EntityFrameworkCore.InMemory");
-            await Assert.That(scope.ServiceProvider.GetRequiredService<IFusionCache>())
-                .IsNotNull();
             var caches = scope.ServiceProvider.GetRequiredService<IFusionCacheProvider>();
+            await Assert.That(caches.GetCache(NoCtfCacheNames.Leaderboards)).IsNotNull();
             await Assert.That(caches.GetCache(NoCtfCacheNames.ReadModels)).IsNotNull();
             await Assert.That(caches.GetCache(NoCtfCacheNames.LocalComputation)).IsNotNull();
             await Assert.That(scope.ServiceProvider
@@ -134,7 +133,6 @@ public sealed class DevelopmentHostingTests
                 .GetAsync(competitionId, cancellationToken);
             await Assert.That(leaderboard).IsNotNull();
             await Assert.That(leaderboard!.CompetitionId).IsEqualTo(competitionId);
-            await Assert.That(leaderboard.Stale).IsFalse();
         }
     }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { getSubmissionStatusEndpoint, submitFlagEndpoint } from '~/api'
+import { getGameplayFactStatusEndpoint, submitFlagEndpoint } from '~/api'
 
 interface TrackedSubmission {
   id: string
@@ -44,44 +44,44 @@ function celebrateCorrectFlag(): void {
 const { polling, timedOut, start: startPolling, stop: stopPolling } = usePolling(
   async () => {
     await refreshPending()
-    return !tracked.value.some((t) => isEvaluationPending(t.state))
+    return !tracked.value.some((t) => isGameplayFactPending(t.state))
   },
   { interval: 1500, timeout: 120_000 },
 )
 
 async function refreshOne(id: string): Promise<void> {
-  const { data, error } = await getSubmissionStatusEndpoint({
-    path: { competitionId: props.competitionId, submissionId: id },
+  const { data, error } = await getGameplayFactStatusEndpoint({
+    path: { competitionId: props.competitionId, gameplayFactId: id },
   })
   if (error || !data) return
   const item = tracked.value.find((t) => t.id === id)
-  const wasPending = item ? isEvaluationPending(item.state) : true
+  const wasPending = item ? isGameplayFactPending(item.state) : true
   if (item) {
-    item.state = data.evaluationState
+    item.state = data.state
     item.result = data.result
     item.failureCode = data.failureCode
   }
   else {
     tracked.value.unshift({
       id,
-      state: data.evaluationState,
+      state: data.state,
       result: data.result,
       failureCode: data.failureCode,
     })
   }
-  if (wasPending && !isEvaluationPending(data.evaluationState) && !toasted.has(id)) {
+  if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id)) {
     toasted.add(id)
-    if (data.result === ScoringResult.Correct) {
+    if (data.result === GameplayFactResult.Correct) {
       toast.success('提交评测完成:正确')
       celebrateCorrectFlag()
     }
-    else toast.error(`提交评测完成:${scoringResultLabel(data.result)}`)
+    else toast.error(`提交评测完成:${gameplayFactResultLabel(data.result)}`)
     emit('evaluated')
   }
 }
 
 async function refreshPending(): Promise<void> {
-  const pending = tracked.value.filter((t) => isEvaluationPending(t.state))
+  const pending = tracked.value.filter((t) => isGameplayFactPending(t.state))
   await Promise.all(pending.map((t) => refreshOne(t.id)))
 }
 
@@ -101,12 +101,12 @@ async function submit() {
     return
   }
   const ids = [
-    ...(data.submissionId ? [data.submissionId] : []),
-    ...(data.submissions ?? []).map((s) => s.submissionId).filter((id): id is string => !!id),
+    ...(data.gameplayFactId ? [data.gameplayFactId] : []),
+    ...(data.submissions ?? []).map((s) => s.gameplayFactId).filter((id): id is string => !!id),
   ]
   for (const id of ids) {
     if (!tracked.value.some((t) => t.id === id)) {
-      tracked.value.unshift({ id, state: EvaluationState.Pending, result: null })
+      tracked.value.unshift({ id, state: GameplayFactState.Pending, result: null })
     }
   }
   input.value = ''
@@ -118,8 +118,8 @@ async function submit() {
 let unwatch: (() => void) | undefined
 onMounted(() => {
   unwatch = watchCompetition(props.competitionId, {
-    submissionResult: (payload) => {
-      const id = (payload as { submissionId?: unknown })?.submissionId
+    gameplayFactStateChanged: (payload) => {
+      const id = (payload as { gameplayFactId?: unknown })?.gameplayFactId
       if (typeof id === 'string' && tracked.value.some((t) => t.id === id)) {
         void refreshOne(id)
       }
@@ -133,7 +133,7 @@ onUnmounted(() => {
 })
 
 function resultVariant(result?: string | null) {
-  if (result === ScoringResult.Correct) return 'default' as const
+  if (result === GameplayFactResult.Correct) return 'default' as const
   return 'destructive' as const
 }
 </script>
@@ -194,15 +194,15 @@ function resultVariant(result?: string | null) {
         <Alert
           v-for="item in tracked"
           :key="item.id"
-          :variant="isEvaluationPending(item.state) ? 'default' : resultVariant(item.result)"
+          :variant="isGameplayFactPending(item.state) ? 'default' : resultVariant(item.result)"
         >
           <AlertDescription class="flex items-center gap-2">
-            <Spinner v-if="isEvaluationPending(item.state)" class="size-3" />
-            <span v-if="isEvaluationPending(item.state)">
-              {{ evaluationStateLabel(item.state) }}…
+            <Spinner v-if="isGameplayFactPending(item.state)" class="size-3" />
+            <span v-if="isGameplayFactPending(item.state)">
+              {{ gameplayFactStateLabel(item.state) }}…
             </span>
             <span v-else>
-              评测结果:<strong>{{ scoringResultLabel(item.result) }}</strong>
+              评测结果:<strong>{{ gameplayFactResultLabel(item.result) }}</strong>
             </span>
           </AlertDescription>
         </Alert>
