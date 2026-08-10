@@ -269,7 +269,7 @@ onMounted(() => {
               裁决:{{ a.appeal.resolvedByUserName }} · {{ adminFormatDateTime(a.appeal.resolvedAt) }} — {{ a.appeal.resolutionReason }}
             </p>
           </CardContent>
-          <CardFooter v-if="canWrite && a.appeal?.status === 'Submitted' && a.canResolve" class="gap-2">
+          <CardFooter v-if="canJudge && a.appeal?.status === 'Submitted' && a.canResolve" class="gap-2">
             <Button size="sm" :disabled="appealPending" @click="openAppeal(a, 'accept')">接受申诉(解封)</Button>
             <Button variant="outline" size="sm" :disabled="appealPending" @click="openAppeal(a, 'uphold')">维持封禁</Button>
           </CardFooter>

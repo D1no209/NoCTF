@@ -4204,7 +4204,7 @@
           "Admin"
         ],
         "summary": "Lists private team ban appeals.",
-        "description": "Observers and judges may read; only administrators, owners, and managers may resolve.",
+        "description": "Observers may read; judges, managers, owners, and administrators may resolve.",
         "operationId": "AdminListTeamBanAppeals",
         "parameters": [
           {

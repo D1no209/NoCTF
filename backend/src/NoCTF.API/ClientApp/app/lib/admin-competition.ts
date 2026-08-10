@@ -5,7 +5,8 @@ import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
  * My role inside one competition, derived in the [id] shell:
  * - owner: competition owner or platform administrator (full access incl. permissions)
  * - manager: can moderate (read + write)
- * - judge / observer: read-only UI
+ * - judge: can adjudicate incidents, bans, and ban appeals
+ * - observer: read-only UI
  */
 export type CompetitionAdminRole = 'owner' | 'manager' | 'judge' | 'observer'
 

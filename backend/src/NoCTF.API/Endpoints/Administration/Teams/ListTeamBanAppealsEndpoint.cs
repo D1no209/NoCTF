@@ -55,7 +55,7 @@ public sealed class ListTeamBanAppealsEndpoint(
         {
             summary.Summary = "Lists private team ban appeals.";
             summary.Description =
-                "Observers and judges may read; only administrators, owners, and managers may resolve.";
+                "Observers may read; judges, managers, owners, and administrators may resolve.";
         });
     }
 
@@ -73,7 +73,7 @@ public sealed class ListTeamBanAppealsEndpoint(
         {
             return TypedResults.Forbid();
         }
-        var canModerate = await authorizer.CanModerateAsync(
+        var canResolve = await authorizer.CanJudgeAsync(
             user.UserId,
             request.CompetitionId,
             cancellationToken);
@@ -82,13 +82,13 @@ public sealed class ListTeamBanAppealsEndpoint(
             return TypedResults.NotFound();
         return TypedResults.Ok(new AdminTeamBanAppealListResponse(
             appeals.Where(banCase => banCase.Appeal is not null)
-                .Select(banCase => Map(banCase, canModerate))
+                .Select(banCase => Map(banCase, canResolve))
                 .ToArray()));
     }
 
     private static AdminTeamBanCaseResponse Map(
         TeamBanCaseView banCase,
-        bool canModerate)
+        bool canResolve)
     {
         var appeal = banCase.Appeal!;
         return new(
@@ -99,7 +99,7 @@ public sealed class ListTeamBanAppealsEndpoint(
             TeamMapper.ToProtocol(banCase.Source),
             banCase.BannedAt,
             banCase.IsCurrentlyBanned,
-            canModerate
+            canResolve
                 && banCase.IsCurrentlyBanned
                 && appeal.Status == TeamBanAppealStatus.Submitted,
             new AdminTeamBanAppealResponse(

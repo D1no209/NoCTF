@@ -1227,7 +1227,7 @@ export const adminListTeams = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Lists private team ban appeals.
  *
- * Observers and judges may read; only administrators, owners, and managers may resolve.
+ * Observers may read; judges, managers, owners, and administrators may resolve.
  */
 export const adminListTeamBanAppeals = <ThrowOnError extends boolean = false>(options: Options<AdminListTeamBanAppealsData, ThrowOnError>): RequestResult<AdminListTeamBanAppealsResponses, AdminListTeamBanAppealsErrors, ThrowOnError> => (options.client ?? client).get<AdminListTeamBanAppealsResponses, AdminListTeamBanAppealsErrors, ThrowOnError>({
     security: [{
