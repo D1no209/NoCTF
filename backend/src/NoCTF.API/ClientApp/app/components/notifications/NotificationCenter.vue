@@ -1,17 +1,7 @@
 <script setup lang="ts">
-import { ArrowRight, Bell, Megaphone } from '@lucide/vue'
+import { ArrowRight, Bell, Mail } from '@lucide/vue'
 import { listNotificationsEndpoint, readNotificationThreadEndpoint } from '~/api'
 import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '~/api'
-
-const props = withDefaults(defineProps<{
-  competitionId?: string
-  heading?: string
-  description?: string
-}>(), {
-  competitionId: undefined,
-  heading: '通知中心',
-  description: '竞赛动态、评测结果与队伍事件会通知到这里',
-})
 
 type Notification = NoCtfapiEndpointsNotificationsNotificationResponse
 
@@ -27,7 +17,7 @@ const { items, loading, error, hasMore, initialized, loadMore } =
   useCursorPagination<Notification>(async (cursor) => {
     const { data, error: requestError } = await listNotificationsEndpoint({
       query: {
-        competitionId: props.competitionId,
+        scope: 'Inbox',
         cursor,
         limit: 50,
       },
@@ -39,6 +29,29 @@ const { items, loading, error, hasMore, initialized, loadMore } =
 function sourceLabel(notification: Notification): string {
   if (notification.sourceDisplayName) return notification.sourceDisplayName
   return notification.sourceType === 0 ? '赛事系统' : '赛事工作人员'
+}
+
+function audienceLabel(notification: Notification): string {
+  return ({
+    0: '仅你',
+    1: '赛事工作组',
+    2: '赛事公告',
+    3: '本队',
+    4: '平台管理员',
+  } as Record<number, string>)[notification.targetType ?? -1] ?? '定向消息'
+}
+
+function categoryLabel(notification: Notification): string {
+  if (notification.kind === 'QuestionOpened' || notification.kind === 'QuestionStatusChanged' || notification.kind === 'Message')
+    return '咨询'
+  if (notification.kind === 'TeamBanned' || notification.kind === 'TeamBanCorrected' || notification.kind === 'TeamRegistrationChanged')
+    return '队伍'
+  if (notification.kind === 'GameplayFactAdjudicated') return '评测'
+  if (notification.kind === 'RuntimeStateChanged') return '环境'
+  if (notification.kind === 'CheatIncidentDetected' || notification.kind === 'ManagementFailure' || notification.kind === 'StartGateFailed')
+    return '管理'
+  if (notification.kind === 'UserAccountLifecycleChanged') return '账号'
+  return '消息'
 }
 
 function threadText(notification: Notification): string {
@@ -123,8 +136,8 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
         <Bell class="size-4" aria-hidden="true" />
       </div>
       <div>
-        <h2 class="text-xl font-semibold">{{ heading }}</h2>
-        <p class="text-sm text-muted-foreground">{{ description }}</p>
+        <h2 class="text-xl font-semibold">消息中心</h2>
+        <p class="text-sm text-muted-foreground">官方通知，以及与你的账号、队伍或管理职责直接相关的消息</p>
       </div>
     </header>
 
@@ -141,7 +154,7 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
         <Empty v-else-if="initialized && !items.length" class="border py-12">
           <EmptyHeader>
             <EmptyTitle>暂无通知</EmptyTitle>
-            <EmptyDescription>官方公告和与你有关的比赛消息会出现在这里</EmptyDescription>
+            <EmptyDescription>咨询回复、队伍状态和管理提醒会出现在这里</EmptyDescription>
           </EmptyHeader>
         </Empty>
 
@@ -155,14 +168,15 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
+                  <div class="mb-1.5 flex flex-wrap items-center gap-1.5">
+                    <Badge variant="secondary" class="text-[0.6875rem]">{{ categoryLabel(notification) }}</Badge>
+                    <span class="text-[0.6875rem] text-muted-foreground">{{ audienceLabel(notification) }}</span>
+                  </div>
                   <p class="line-clamp-2 text-sm font-medium">{{ notificationTitle(notification) }}</p>
                   <p class="mt-1 text-xs text-muted-foreground">
                     {{ sourceLabel(notification) }} · {{ formatDateTime(notification.sentAt) }}
                   </p>
                 </div>
-                <Badge v-if="notification.kind === 'CompetitionAnnouncement'" variant="secondary" class="shrink-0">
-                  公告
-                </Badge>
               </div>
             </button>
           </li>
@@ -179,9 +193,9 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
       <section aria-label="通知详情" class="min-w-0 rounded-xl border bg-card">
         <Empty v-if="!selected" class="py-16">
           <EmptyHeader>
-            <EmptyMedia variant="icon"><Megaphone /></EmptyMedia>
-            <EmptyTitle>选择一条通知查看详情</EmptyTitle>
-            <EmptyDescription>公告正文、发布信息、后续回复和状态变化会在这里完整展示</EmptyDescription>
+            <EmptyMedia variant="icon"><Mail /></EmptyMedia>
+            <EmptyTitle>选择一条消息查看详情</EmptyTitle>
+            <EmptyDescription>消息正文、处理入口和后续状态会在这里完整展示</EmptyDescription>
           </EmptyHeader>
         </Empty>
 

@@ -177,6 +177,17 @@ public sealed class CompetitionEventPersistenceTests
             await Assert.That(participant.Items!).Count().IsEqualTo(2);
             await Assert.That(participant.Items!.Any(item => item.HintId == ids.HintId))
                 .IsTrue();
+            var selectedBroadcastKinds = await store.QueryAsync(
+                Query(ids, ids.ParticipantId, now) with
+                {
+                    Kinds =
+                    [
+                        CompetitionEventKind.HintPublished,
+                        CompetitionEventKind.FirstBloodAwarded
+                    ]
+                }, ct);
+            await Assert.That(selectedBroadcastKinds.Items!.Select(item => item.Kind))
+                .IsEquivalentTo([CompetitionEventKind.HintPublished]);
 
             var teamA = await store.QueryAsync(Query(ids, ids.TeamAUserId, now), ct);
             await Assert.That(teamA.AccessLevel).IsEqualTo(CompetitionEventAccessLevel.Team);

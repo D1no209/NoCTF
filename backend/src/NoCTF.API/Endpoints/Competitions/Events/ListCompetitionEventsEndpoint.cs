@@ -38,7 +38,7 @@ public enum CompetitionEventKindProtocol
     TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished,
     RuntimeForceTerminationRequested, RuntimeForceTerminationCompleted,
     RuntimeForceTerminationFailed, AnnouncementPublished, QuestionOpened,
-    QuestionReplied, QuestionStatusChanged
+    QuestionReplied, QuestionStatusChanged, ChallengeDescriptionUpdated
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]
@@ -80,6 +80,7 @@ internal static partial class CompetitionEventProtocolMapper
 public sealed class ListCompetitionEventsRequest
 {
     [QueryParam] public CompetitionEventKindProtocol? Kind { get; set; }
+    [QueryParam] public CompetitionEventKindProtocol[]? Kinds { get; set; }
     [QueryParam] public CompetitionEventLevelProtocol? MinimumLevel { get; set; }
     [QueryParam] public Guid? TeamId { get; set; }
     [QueryParam] public Guid? UserId { get; set; }
@@ -103,6 +104,9 @@ public sealed class ListCompetitionEventsValidator
                 request.From <= request.To
                 && request.To - request.From <= TimeSpan.FromDays(31))
             .WithMessage("The event query range must be between zero and 31 days.");
+        RuleFor(request => request).Must(request =>
+                request.Kind is null || request.Kinds is null or { Length: 0 })
+            .WithMessage("Specify either kind or kinds, not both.");
     }
 }
 
@@ -201,7 +205,8 @@ public sealed class ListCompetitionEventsEndpoint(
             request.To,
             position?.CreatedAt,
             position?.Id,
-            request.Limit), cancellationToken);
+            request.Limit,
+            request.Kinds?.Select(CompetitionEventProtocolMapper.ToDomain).ToArray()), cancellationToken);
         if (result.State == CompetitionEventReadState.Forbidden)
             return TypedResults.Forbid();
         if (result.State == CompetitionEventReadState.CompetitionNotFound)
@@ -239,6 +244,7 @@ public sealed class ListCompetitionEventsEndpoint(
             '|',
             competitionId,
             request.Kind,
+            string.Join(',', (request.Kinds ?? []).OrderBy(item => item)),
             request.MinimumLevel,
             request.TeamId,
             request.UserId,

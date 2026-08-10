@@ -110,8 +110,10 @@ public static class CompetitionNotificationMessageHandlers
 
     public static async Task Handle(
         TeamBanned message,
+        NoCtfDbContext db,
         CompetitionNotificationDelivery delivery,
-        CancellationToken ct)
+        CancellationToken ct,
+        ICompetitionEventRecorder? eventRecorder = null)
     {
         await delivery.DeliverAsync(
             message.CompetitionId,
@@ -128,6 +130,30 @@ public static class CompetitionNotificationMessageHandlers
 
         if (message.AnnouncementKind is not { } announcementKind)
             return;
+
+        if (announcementKind == TeamBanAnnouncementKind.ConfirmedCheating)
+        {
+            var alreadyRecorded = await db.CompetitionEvents.AsNoTracking().AnyAsync(
+                item => item.CompetitionId == message.CompetitionId
+                    && item.SubjectType == EntityReferenceKind.Team
+                    && item.SubjectId == message.TeamId
+                    && item.Kind == CompetitionEventKind.TeamBanned
+                    && item.Visibility == CompetitionEventVisibility.Public
+                    && item.OccurredAt == message.BannedAt,
+                ct);
+            if (!alreadyRecorded)
+            {
+                var events = eventRecorder ?? NullCompetitionEventRecorder.Instance;
+                await events.RecordAsync(new(
+                    message.CompetitionId,
+                    CompetitionEventKind.TeamBanned,
+                    CompetitionEventLevel.Warning,
+                    CompetitionEventVisibility.Public,
+                    message.BannedAt,
+                    TeamId: message.TeamId), ct);
+                await db.SaveChangesAsync(ct);
+            }
+        }
 
         var body = announcementKind switch
         {

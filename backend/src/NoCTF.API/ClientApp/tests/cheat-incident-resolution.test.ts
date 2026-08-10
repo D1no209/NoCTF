@@ -8,7 +8,7 @@ import { useCheatIncidentResolution } from '../app/composables/useCheatIncidentR
 
 const competitionId = 'competition-1'
 const target: CheatIncidentResolutionTarget = {
-  scoringEventId: 'incident-1',
+  gameplayFactId: 'incident-1',
   sourceTeamId: 'team-1',
   sourceTeamName: 'Source Team',
 }
@@ -91,7 +91,7 @@ describe('useCheatIncidentResolution', () => {
     expect(calls).toEqual([{
       action: 'dismiss',
       options: {
-        path: { competitionId, scoringEventId: 'incident-1' },
+        path: { competitionId, gameplayFactId: 'incident-1' },
         body: { reason: 'reviewed evidence' },
       },
     }])
@@ -108,7 +108,7 @@ describe('useCheatIncidentResolution', () => {
     expect(calls).toEqual([{
       action: 'confirm',
       options: {
-        path: { competitionId, scoringEventId: 'incident-1' },
+        path: { competitionId, gameplayFactId: 'incident-1' },
         body: { reason: 'confirmed cross-team flag' },
       },
     }])
@@ -151,7 +151,7 @@ describe('useCheatIncidentResolution', () => {
     expect(await state.submit()).toBe(true)
     expect(completed).toEqual([{
       action: 'dismiss',
-      scoringEventId: 'incident-1',
+      gameplayFactId: 'incident-1',
       reason: 'reviewed evidence',
     }])
     expect(state.isOpen.value).toBe(false)
@@ -209,7 +209,7 @@ describe('cheat incident page wiring', () => {
     expect(page).toContain('@click="handleResolutionSubmit"')
     expect(page).not.toMatch(/<AlertDialogAction[\s\S]*?@click="handleResolutionSubmit"/)
     expect(page).toContain('理由至少需要 8 个字符')
-    expect(page).toContain('await openDetail(request.scoringEventId)')
+    expect(page).toContain('await openDetail(request.gameplayFactId)')
     expect(page).toContain('await refreshLatest()')
     expect(page).toContain('watchCompetition(competitionId')
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Plus } from '@lucide/vue'
-import { adminListCheatIncidents, adminListCompetitions } from '~/api'
+import { adminListCompetitions } from '~/api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
 import type { CompetitionAdminRole } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
 
 const route = useRoute()
-const { user, isAdministrator, canOrganize } = useAuth()
+const { canOrganize } = useAuth()
 
 const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
 const roles = ref<Record<string, CompetitionAdminRole>>({})
@@ -22,17 +22,14 @@ const RoleLabel: Record<CompetitionAdminRole, string> = {
   observer: '观察员',
 }
 
-async function probeRole(competition: NoCtfapiEndpointsCompetitionsCompetitionResponse): Promise<CompetitionAdminRole> {
-  if (isAdministrator.value || (user.value?.userId && competition.ownerId === user.value.userId))
-    return 'owner'
-  // Capability probe: the cheat-incident list reports judge/moderate capabilities.
-  const { data } = await adminListCheatIncidents({
-    path: { competitionId: competition.id! },
-    query: { from: '1970-01-01T00:00:00Z', to: '2999-12-31T23:59:59Z', limit: 1 },
-  }).catch(() => ({ data: undefined }))
-  if (data?.canConfirm) return 'manager'
-  if (data?.canDismiss) return 'judge'
-  return 'observer'
+function adminRole(competition: NoCtfapiEndpointsCompetitionsCompetitionResponse): CompetitionAdminRole {
+  return competition.administrationRole === 'Owner'
+    ? 'owner'
+    : competition.administrationRole === 'Manager'
+      ? 'manager'
+      : competition.administrationRole === 'Judge'
+        ? 'judge'
+        : 'observer'
 }
 
 async function load() {
@@ -47,11 +44,12 @@ async function load() {
     return
   }
   items.value = data.items ?? []
-  loading.value = false
-  const entries = await Promise.all(
-    items.value.map(async c => [c.id!, await probeRole(c)] as const),
+  roles.value = Object.fromEntries(
+    items.value.flatMap(competition => competition.id
+      ? [[competition.id, adminRole(competition)] as const]
+      : []),
   )
-  roles.value = Object.fromEntries(entries)
+  loading.value = false
 }
 
 watch(includeDeleted, () => {

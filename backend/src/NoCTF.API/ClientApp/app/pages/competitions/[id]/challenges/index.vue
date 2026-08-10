@@ -153,88 +153,96 @@ const groups = computed(() => {
       <AlertDescription>排行榜已冻结,题目分数显示为冻结时快照。</AlertDescription>
     </Alert>
 
-    <div v-if="loading" class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      <Skeleton v-for="i in 6" :key="i" class="h-28 w-full" />
-    </div>
+    <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <main class="min-w-0">
+        <div v-if="loading" class="grid gap-5 sm:grid-cols-2">
+          <Skeleton v-for="i in 6" :key="i" class="h-28 w-full" />
+        </div>
 
-    <Empty v-else-if="!items.length" class="border border-dashed py-12">
-      <EmptyHeader>
-        <EmptyTitle>暂无已发布的题目</EmptyTitle>
-        <EmptyDescription>题目发布后会在「动态」中通知,请稍后再来</EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+        <Empty v-else-if="!items.length" class="border border-dashed py-12">
+          <EmptyHeader>
+            <EmptyTitle>暂无已发布的题目</EmptyTitle>
+            <EmptyDescription>题目开放后会同步显示在右侧赛事播报中</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
 
-    <div v-for="group in groups" v-else :key="group.direction" class="flex flex-col gap-4">
-      <h2 class="flex items-center gap-2.5 text-lg font-semibold">
-        <component
-          :is="directionIcon(group.direction)"
-          class="size-5"
-          :class="directionTextClass(group.direction)"
-        />
-        {{ group.direction }}
-        <Badge variant="secondary">{{ group.challenges.length }}</Badge>
-      </h2>
-      <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        <NuxtLink
-          v-for="challenge in group.challenges"
-          :key="challenge.id"
-          :to="`/competitions/${competitionId}/challenges/${challenge.id}`"
-          class="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <Card
-            class="relative h-full overflow-hidden transition-[transform,border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg"
-            :class="progressFor(challenge.id)?.solvedByMyTeam ? 'border-primary/50 bg-primary/5' : ''"
-          >
-            <Flag
-              v-if="progressFor(challenge.id)?.solvedByMyTeam"
-              aria-hidden="true"
-              class="pointer-events-none absolute -right-2 -bottom-2 size-20 -rotate-12 text-primary/10"
-            />
-            <CardHeader>
-              <div class="flex items-start justify-between gap-2">
-                <CardTitle class="text-base leading-snug group-hover:text-primary">
-                  {{ challenge.title }}
-                </CardTitle>
-                <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
-                  {{ challenge.direction }}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent class="relative flex items-end justify-between gap-3">
-              <div class="flex flex-col items-start gap-2">
-                <Badge v-if="currentScoreFor(challenge) === null" variant="secondary">
-                  分数隐藏
-                </Badge>
-                <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
-                  {{ currentScoreFor(challenge) }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
-                </span>
-                <span v-if="currentScoreFor(challenge) !== null" class="text-xs text-muted-foreground">当前动态分值</span>
-                <Badge v-if="progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
-                  <Flag class="size-3" />
-                  {{ progressFor(challenge.id)?.bloodRank
-                    ? bloodRankLabel[String(progressFor(challenge.id)?.bloodRank)]
-                    : '已解出' }}
-                </Badge>
-                <span
-                  v-if="progressFor(challenge.id)?.myScore !== null"
-                  class="text-xs text-muted-foreground"
-                >
-                  本队结算 {{ progressFor(challenge.id)?.myScore }} pts
-                </span>
-              </div>
-              <span
-                v-if="progressFor(challenge.id)"
-                class="flex items-center gap-1 text-xs text-muted-foreground"
-                :aria-label="`${progressFor(challenge.id)?.solveCount ?? 0} 支队伍已解出`"
+        <div v-else class="flex flex-col gap-8">
+          <section v-for="group in groups" :key="group.direction" class="flex flex-col gap-4">
+            <h2 class="flex items-center gap-2.5 text-lg font-semibold">
+              <component
+                :is="directionIcon(group.direction)"
+                class="size-5"
+                :class="directionTextClass(group.direction)"
+              />
+              {{ group.direction }}
+              <Badge variant="secondary">{{ group.challenges.length }}</Badge>
+            </h2>
+            <div class="grid gap-5 sm:grid-cols-2">
+              <NuxtLink
+                v-for="challenge in group.challenges"
+                :key="challenge.id"
+                :to="`/competitions/${competitionId}/challenges/${challenge.id}`"
+                class="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <Users class="size-3.5" aria-hidden="true" />
-                <span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.solveCount ?? 0 }}</span>
-                <span>解出</span>
-              </span>
-            </CardContent>
-          </Card>
-        </NuxtLink>
-      </div>
+                <Card
+                  class="relative h-full overflow-hidden transition-[transform,border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg"
+                  :class="progressFor(challenge.id)?.solvedByMyTeam ? 'border-primary/50 bg-primary/5' : ''"
+                >
+                  <Flag
+                    v-if="progressFor(challenge.id)?.solvedByMyTeam"
+                    aria-hidden="true"
+                    class="pointer-events-none absolute -right-2 -bottom-2 size-20 -rotate-12 text-primary/10"
+                  />
+                  <CardHeader>
+                    <div class="flex items-start justify-between gap-2">
+                      <CardTitle class="text-base leading-snug group-hover:text-primary">
+                        {{ challenge.title }}
+                      </CardTitle>
+                      <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
+                        {{ challenge.direction }}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent class="relative flex items-end justify-between gap-3">
+                    <div class="flex flex-col items-start gap-2">
+                      <Badge v-if="currentScoreFor(challenge) === null" variant="secondary">
+                        分数隐藏
+                      </Badge>
+                      <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
+                        {{ currentScoreFor(challenge) }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
+                      </span>
+                      <span v-if="currentScoreFor(challenge) !== null" class="text-xs text-muted-foreground">当前动态分值</span>
+                      <Badge v-if="progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
+                        <Flag class="size-3" />
+                        {{ progressFor(challenge.id)?.bloodRank
+                          ? bloodRankLabel[String(progressFor(challenge.id)?.bloodRank)]
+                          : '已解出' }}
+                      </Badge>
+                      <span
+                        v-if="progressFor(challenge.id)?.myScore !== null"
+                        class="text-xs text-muted-foreground"
+                      >
+                        本队结算 {{ progressFor(challenge.id)?.myScore }} pts
+                      </span>
+                    </div>
+                    <span
+                      v-if="progressFor(challenge.id)"
+                      class="flex items-center gap-1 text-xs text-muted-foreground"
+                      :aria-label="`${progressFor(challenge.id)?.solveCount ?? 0} 支队伍已解出`"
+                    >
+                      <Users class="size-3.5" aria-hidden="true" />
+                      <span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.solveCount ?? 0 }}</span>
+                      <span>解出</span>
+                    </span>
+                  </CardContent>
+                </Card>
+              </NuxtLink>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <CompetitionBroadcastPanel :competition-id="competitionId" />
     </div>
   </div>
 </template>

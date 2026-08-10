@@ -56,7 +56,8 @@ public enum CompetitionEventKind : short
     AnnouncementPublished,
     QuestionOpened,
     QuestionReplied,
-    QuestionStatusChanged
+    QuestionStatusChanged,
+    ChallengeDescriptionUpdated
 }
 
 public enum CompetitionEventLevel : short

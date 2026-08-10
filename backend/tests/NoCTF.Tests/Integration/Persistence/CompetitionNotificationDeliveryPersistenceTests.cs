@@ -7,6 +7,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Permissions;
 using NoCTF.Infrastructure.Competitions.Events;
@@ -321,8 +322,19 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 "Banned",
                 now.AddMilliseconds(1),
                 TeamBanAnnouncementKind.ConfirmedCheating);
-            await CompetitionNotificationMessageHandlers.Handle(announcedBan, delivery, ct);
-            await CompetitionNotificationMessageHandlers.Handle(announcedBan, delivery, ct);
+            var banEventStore = new CompetitionEventStore(db, new RecordingOutbox());
+            await CompetitionNotificationMessageHandlers.Handle(
+                announcedBan,
+                db,
+                delivery,
+                ct,
+                banEventStore);
+            await CompetitionNotificationMessageHandlers.Handle(
+                announcedBan,
+                db,
+                delivery,
+                ct,
+                banEventStore);
 
             var announcements = await db.Notifications.AsNoTracking()
                 .Where(notification =>
@@ -335,6 +347,16 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             await Assert.That(announcements[0].ContentJson).Contains("赛事纪律公告");
             await Assert.That(announcements[0].ContentJson).Contains("作弊行为");
             await Assert.That(announcements[0].ContentJson).Contains("Banned");
+
+            var publicBanEvents = await db.CompetitionEvents.AsNoTracking()
+                .Where(item =>
+                    item.CompetitionId == competitionId
+                    && item.Kind == CompetitionEventKind.TeamBanned
+                    && item.Visibility == CompetitionEventVisibility.Public
+                    && item.SubjectType == EntityReferenceKind.Team
+                    && item.SubjectId == bannedTeamId)
+                .ToArrayAsync(ct);
+            await Assert.That(publicBanEvents).Count().IsEqualTo(1);
 
             await delivery.DeliverAsync(
                 competitionId,

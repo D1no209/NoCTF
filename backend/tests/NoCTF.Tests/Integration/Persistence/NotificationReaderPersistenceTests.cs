@@ -56,6 +56,15 @@ public sealed class NotificationReaderPersistenceTests
                     10,
                     cancellationToken)).Select(item => item.Id))
                     .Contains(ids.ParticipantAnnouncementId);
+                var formerParticipantInbox = await reader.ListAsync(
+                    ids.FormerParticipantId,
+                    null,
+                    null,
+                    10,
+                    NotificationReadScope.Inbox,
+                    cancellationToken);
+                await Assert.That(formerParticipantInbox.Select(item => item.Id))
+                    .IsEquivalentTo([ids.ManualAnnouncementId]);
                 var competitionNotifications = await reader.ListCompetitionAsync(
                     ids.FormerManagerId,
                     ids.CompetitionId,
@@ -127,6 +136,15 @@ public sealed class NotificationReaderPersistenceTests
                     10,
                     cancellationToken)).Select(item => item.Id))
                     .Contains(ids.ParticipantAnnouncementId);
+                var newParticipantInbox = await reader.ListAsync(
+                    ids.NewParticipantId,
+                    null,
+                    null,
+                    10,
+                    NotificationReadScope.Inbox,
+                    cancellationToken);
+                await Assert.That(newParticipantInbox.Select(item => item.Id))
+                    .IsEquivalentTo([ids.ManualAnnouncementId]);
 
                 checkpoint = await reader.GetFeedCheckpointAsync(
                     ids.FormerManagerId,
@@ -299,6 +317,19 @@ public sealed class NotificationReaderPersistenceTests
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = ids.CompetitionId,
                 SentAt = now.AddMilliseconds(500)
+            },
+            new Notification
+            {
+                Id = ids.ManualAnnouncementId,
+                SourceType = NotificationSourceType.User,
+                SourceId = ids.OwnerId,
+                TargetType = NotificationTargetType.CompetitionParticipants,
+                TargetId = ids.CompetitionId,
+                Kind = NotificationKind.CompetitionAnnouncement,
+                ContentJson = """{"schemaVersion":1,"body":"manual official notice"}""",
+                RelatedType = EntityReferenceKind.Competition,
+                RelatedId = ids.CompetitionId,
+                SentAt = now.AddMilliseconds(600)
             });
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -337,6 +368,7 @@ public sealed class NotificationReaderPersistenceTests
         public Guid NewParticipantId { get; } = Guid.CreateVersion7(now.AddMilliseconds(8));
         public Guid UnrelatedId { get; } = Guid.CreateVersion7(now.AddMilliseconds(9));
         public Guid ParticipantAnnouncementId { get; } = Guid.CreateVersion7(now.AddMilliseconds(500));
+        public Guid ManualAnnouncementId { get; } = Guid.CreateVersion7(now.AddMilliseconds(600));
         public Guid RootId { get; } = Guid.CreateVersion7(now.AddSeconds(1));
         public Guid FormerReplyId { get; } = Guid.CreateVersion7(now.AddSeconds(2));
         public Guid OwnerReplyId { get; } = Guid.CreateVersion7(now.AddSeconds(3));

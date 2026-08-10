@@ -89,7 +89,8 @@ public sealed record CompetitionEventQuery(
     DateTimeOffset To,
     DateTimeOffset? BeforeOccurredAt,
     Guid? BeforeId,
-    int Limit);
+    int Limit,
+    IReadOnlyList<CompetitionEventKind>? Kinds = null);
 
 public sealed record CompetitionEventView(
     Guid Id,
@@ -194,6 +195,7 @@ public sealed class ListCompetitionEvents(ICompetitionEventStore store)
         && query.Limit <= maximumLimit
         && query.From <= query.To
         && query.To - query.From <= TimeSpan.FromDays(31)
+        && (query.Kind is null || query.Kinds is null or { Count: 0 })
         && ((query.BeforeOccurredAt is null) == (query.BeforeId is null));
 }
 

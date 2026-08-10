@@ -138,9 +138,9 @@ export function competitionEventText(
   const templates: Record<string, string> = {
     CompetitionCreated: '竞赛已创建', CompetitionUpdated: '竞赛信息已更新', CompetitionLifecycleChanged: '竞赛生命周期变更',
     LeaderboardVisibilityChanged: '排行榜可见性已变更', ChallengeCreated: `${challenge}已加入竞赛`, ChallengeUpdated: `${challenge}已更新`,
-    ChallengePublished: `${challenge}已发布`, ChallengeUnpublished: `${challenge}已下线`, HintPublished: `${challenge}发布了新提示`,
+    ChallengePublished: `${challenge}已发布`, ChallengeDescriptionUpdated: `${challenge}已更新描述`, ChallengeUnpublished: `${challenge}已下线`, HintPublished: `${challenge}发布了新提示`,
     HintUnlocked: `${team}解锁了${challenge}的提示`, TeamRegistered: `${team}报名参赛`, TeamRegistrationChanged: `${team}的报名状态已变更`,
-    TeamMemberJoined: `${team}加入了新成员`, TeamBanned: `${team}被封禁`, TeamUnbanned: `${team}已解除封禁`, SubmissionReceived: `${team}提交了${challenge}`,
+    TeamMemberJoined: `${team}加入了新成员`, TeamBanned: `${team}被封禁`, TeamUnbanned: `${team}已解除封禁`, TeamBanCorrectionPublished: `${team}的封禁纠正已发布`, SubmissionReceived: `${team}提交了${challenge}`,
     GameplayFactAdjudicated: `${team}在${challenge}的提交已评测`, FirstBloodAwarded: `${team}拿下了${challenge}的一血`, SecondBloodAwarded: `${team}拿下了${challenge}的二血`,
     ThirdBloodAwarded: `${team}拿下了${challenge}的三血`, RuntimeCreated: `${team}申请了${challenge}的环境`, RuntimeStateChanged: `${team}的${challenge}环境状态已变更`,
     AnnouncementPublished: '官方发布了一条公告', QuestionOpened: `${actor}提出了咨询`, QuestionReplied: '咨询已有回复', QuestionStatusChanged: '咨询状态已变更', QuestionPublished: '一条咨询已公开',
@@ -221,7 +221,7 @@ export function notificationTargetPath(
     case 'TeamRegistrationChanged':
       return `/competitions/${competitionId}/my/team`
     case 'CompetitionAnnouncement':
-      return `/competitions/${competitionId}/notifications?notification=${notification.id ?? ''}`
+      return `/notifications?notification=${notification.id ?? ''}`
     default:
       return `/competitions/${competitionId}/events?kind=${notification.kind}`
   }
