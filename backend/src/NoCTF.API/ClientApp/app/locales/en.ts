@@ -1,0 +1,18 @@
+export const englishMessages: Record<string, string> = {
+  '竞赛': 'Competitions',
+  '竞赛管理': 'Competition Admin',
+  '题库管理': 'Challenge Library',
+  '平台管理': 'Platform Admin',
+  '账户设置': 'Account Settings',
+  '偏好': 'Preferences',
+  '退出登录': 'Sign Out',
+  '登录': 'Sign In',
+  '注册': 'Create Account',
+  '通知': 'Notifications',
+  '通知，有未读消息': 'Notifications, unread messages',
+  '有未读通知': 'Unread notifications',
+  '切换为浅色模式': 'Switch to light theme',
+  '切换为深色模式': 'Switch to dark theme',
+  '切换为英文': 'Switch to English',
+  '切换为中文': 'Switch to Chinese',
+}

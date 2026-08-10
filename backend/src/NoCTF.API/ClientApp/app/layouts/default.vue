@@ -5,14 +5,15 @@ const { user, isLoggedIn, isAdministrator, canOrganize, logout } = useAuth()
 const { configuration } = usePlatform()
 const route = useRoute()
 const { hasUnread, refreshUnread } = useNotificationUnread()
+const { t } = useLocale()
 
 let notificationTimer: ReturnType<typeof setInterval> | undefined
 
 const navItems = computed(() => [
-  { to: '/competitions', label: '竞赛', show: true },
-  { to: '/admin/competitions', label: '竞赛管理', show: isLoggedIn.value },
-  { to: '/admin/challenges', label: '题库管理', show: canOrganize.value },
-  { to: '/admin/platform', label: '平台管理', show: isAdministrator.value },
+  { to: '/competitions', label: t('竞赛'), show: true },
+  { to: '/admin/competitions', label: t('竞赛管理'), show: isLoggedIn.value },
+  { to: '/admin/challenges', label: t('题库管理'), show: canOrganize.value },
+  { to: '/admin/platform', label: t('平台管理'), show: isAdministrator.value },
 ])
 
 function isActive(to: string) {
@@ -57,12 +58,13 @@ onBeforeUnmount(() => {
         </nav>
         <div class="ml-auto flex items-center gap-2">
           <ThemeToggle />
+          <LanguageToggle />
           <template v-if="isLoggedIn">
             <Button variant="ghost" size="icon" as-child>
               <NuxtLink
                 to="/notifications"
                 class="relative"
-                :aria-label="hasUnread ? '通知，有未读消息' : '通知'"
+                :aria-label="hasUnread ? t('通知，有未读消息') : t('通知')"
               >
                 <Bell />
                 <span
@@ -70,7 +72,7 @@ onBeforeUnmount(() => {
                   class="absolute top-1 right-1 size-2.5 rounded-full border-2 border-background bg-destructive"
                   aria-hidden="true"
                 />
-                <span v-if="hasUnread" class="sr-only">有未读通知</span>
+                <span v-if="hasUnread" class="sr-only">{{ t('有未读通知') }}</span>
               </NuxtLink>
             </Button>
             <DropdownMenu>
@@ -88,36 +90,36 @@ onBeforeUnmount(() => {
                   <DropdownMenuItem as-child>
                     <NuxtLink to="/account" class="flex items-center gap-2">
                       <User />
-                      账户设置
+                      {{ t('账户设置') }}
                     </NuxtLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem v-if="isAdministrator" as-child>
                     <NuxtLink to="/admin/platform" class="flex items-center gap-2">
                       <ShieldCheck />
-                      平台管理
+                      {{ t('平台管理') }}
                     </NuxtLink>
                   </DropdownMenuItem>
                   <DropdownMenuItem as-child>
                     <NuxtLink to="/account" class="flex items-center gap-2">
                       <Settings />
-                      偏好
+                      {{ t('偏好') }}
                     </NuxtLink>
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem class="flex items-center gap-2" @click="logout">
                   <LogOut />
-                  退出登录
+                  {{ t('退出登录') }}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </template>
           <template v-else>
             <Button variant="ghost" as-child>
-              <NuxtLink to="/auth/login">登录</NuxtLink>
+              <NuxtLink to="/auth/login">{{ t('登录') }}</NuxtLink>
             </Button>
             <Button as-child>
-              <NuxtLink to="/auth/register">注册</NuxtLink>
+              <NuxtLink to="/auth/register">{{ t('注册') }}</NuxtLink>
             </Button>
           </template>
         </div>
