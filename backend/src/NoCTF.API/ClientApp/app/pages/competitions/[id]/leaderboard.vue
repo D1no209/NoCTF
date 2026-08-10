@@ -10,7 +10,8 @@ import { getLeaderboardEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
 } from '~/api'
-import { bloodRankLabel, normalizeChallengeKey } from '~/components/leaderboard/types'
+import { cn } from '@/lib/utils'
+import { bloodRankLabel, medalBloodRankClass, medalRankClass, normalizeChallengeKey } from '~/components/leaderboard/types'
 import type { ChallengeInfo, LeaderboardCell, MatrixEntry, TrendSeries } from '~/components/leaderboard/types'
 
 const route = useRoute()
@@ -93,12 +94,6 @@ const slotsByTeam = computed(() => {
 function slotFor(teamId?: string, challengeId?: string) {
   if (!teamId || !challengeId) return null
   return slotsByTeam.value.get(teamId)?.get(normalizeChallengeKey(challengeId)) ?? null
-}
-
-const bloodIconClass: Record<string, string> = {
-  First: 'text-amber-500',
-  Second: 'text-slate-400',
-  Third: 'text-orange-600',
 }
 
 function cellText(slot: LeaderboardCell, title: string): string {
@@ -190,13 +185,7 @@ function exportCsv() {
   URL.revokeObjectURL(url)
 }
 
-// ---- 方向图标/配色走共享映射(utils/directions.ts) ----
-
-const rankIconClass: Record<number, string> = {
-  1: 'text-amber-500',
-  2: 'text-slate-400',
-  3: 'text-orange-600',
-}
+// ---- 方向图标/配色走共享映射(utils/directions.ts),Medal 金银铜走 types.ts 共享常量 ----
 </script>
 
 <template>
@@ -215,10 +204,10 @@ const rankIconClass: Record<number, string> = {
 
     <template v-else-if="leaderboard">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 class="flex items-center gap-2 text-xl font-bold">
-          <Trophy class="size-6 text-amber-500" /> {{ $t('排行榜') }} </h2>
+        <h2 class="flex items-center gap-2 text-display text-xl">
+          <Trophy class="size-5 text-primary" /> {{ $t('排行榜') }} </h2>
         <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2 text-sm">
+          <label class="flex items-center gap-2 text-sm text-muted-foreground">
             <Checkbox v-model="showGroupLabels" /> {{ $t('显示分组标签') }} </label>
           <Button variant="outline" :disabled="!entries.length" @click="exportCsv">
             <Download data-icon="inline-start" /> {{ $t('下载为Excel') }} </Button>
@@ -281,7 +270,7 @@ const rankIconClass: Record<number, string> = {
                     </TableRow>
                     <TableRow>
                       <TableHead class="w-14">{{ $t('名次') }}</TableHead>
-                      <TableHead class="min-w-44">{{ $t('参赛队伍') }}</TableHead>
+                      <TableHead class="sticky left-0 z-10 min-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
                       <TableHead class="w-24 text-right">{{ $t('总分') }}</TableHead>
                       <TableHead
                         v-for="challenge in challenges"
@@ -297,14 +286,14 @@ const rankIconClass: Record<number, string> = {
                     <TableRow
                       v-for="entry in pageItems"
                       :key="entry.teamId"
-                      class="cursor-pointer"
+                      :class="cn('cursor-pointer', (entry.rank ?? 99) <= 3 && 'bg-primary/5 hover:bg-primary/10')"
                       @click="openDetail(entry)"
                     >
                       <TableCell>
-                        <Medal v-if="(entry.rank ?? 99) <= 3" :class="rankIconClass[entry.rank ?? 0]" class="size-5" />
+                        <Medal v-if="(entry.rank ?? 99) <= 3" :class="medalRankClass[entry.rank ?? 0]" class="size-5" />
                         <span v-else class="pl-1 font-mono text-sm tabular-nums">{{ entry.rank }}</span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell class="sticky left-0 z-10 border-r bg-card">
                         <span class="flex items-center gap-2">
                           <Avatar class="size-8">
                             <AvatarFallback>{{ entry.teamName?.slice(0, 2) ?? '?' }}</AvatarFallback>
@@ -321,7 +310,7 @@ const rankIconClass: Record<number, string> = {
                         <template v-if="slotFor(entry.teamId, challenge.competitionChallengeId)">
                           <Medal
                             class="mx-auto size-5"
-                            :class="bloodIconClass[String(slotFor(entry.teamId, challenge.competitionChallengeId)?.bloodRank)] ?? 'text-muted-foreground/50'"
+                            :class="medalBloodRankClass(slotFor(entry.teamId, challenge.competitionChallengeId)?.bloodRank) ?? 'text-muted-foreground/50'"
                             :title="cellText(slotFor(entry.teamId, challenge.competitionChallengeId)!, challenge.title ?? '')"
                           />
                         </template>

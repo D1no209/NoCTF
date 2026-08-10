@@ -38,9 +38,9 @@ const tab = ref('running')
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10">
+  <div class="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 md:px-6">
     <div>
-      <h1 class="text-2xl font-semibold">{{ $t('竞赛') }}</h1>
+      <h1 class="text-display text-2xl">{{ $t('竞赛') }}</h1>
       <p class="text-sm text-muted-foreground">{{ $t('浏览平台上的公开竞赛,报名参赛并进入工作区') }}</p>
     </div>
 
@@ -49,7 +49,7 @@ const tab = ref('running')
     </Alert>
 
     <div v-if="loading" class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-      <Skeleton v-for="i in 4" :key="i" class="h-36 w-full" />
+      <Skeleton v-for="i in 4" :key="i" class="h-44 w-full" />
     </div>
 
     <Tabs v-else v-model="tab">

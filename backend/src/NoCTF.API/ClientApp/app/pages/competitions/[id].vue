@@ -73,35 +73,43 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
 <template>
   <AppWorkspaceNav v-if="competition" :groups="navGroups" :title="competition.title">
     <div class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
-      <div class="flex flex-col gap-3">
-        <div class="flex flex-wrap items-center gap-3">
-          <h1 class="text-2xl font-bold tracking-tight md:text-3xl">{{ competition.title }}</h1>
+      <div class="flex flex-col gap-2">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
           <ModeBadge :mode="competition.mode" />
           <LifecycleBadge :status="competition.status" />
+        </div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
+          <span class="text-muted-foreground">
+            {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
+          </span>
           <CompetitionCountdown
             :start-time="competition.startTime"
             :end-time="competition.endTime"
             :status="competition.status"
-            class="font-mono font-medium text-primary"
+            class="font-medium text-primary"
           />
         </div>
-        <p class="font-mono text-xs text-muted-foreground tabular-nums">
-          {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
-        </p>
       </div>
 
       <NuxtPage />
     </div>
   </AppWorkspaceNav>
 
-  <div v-else class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8">
+  <div v-else class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
 
-    <div v-else class="flex flex-col gap-4">
-      <Skeleton class="h-10 w-2/3" />
-      <Skeleton class="h-6 w-1/3" />
+    <div v-else class="flex flex-col gap-6">
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-3">
+          <Skeleton class="h-9 w-64" />
+          <Skeleton class="h-6 w-14" />
+          <Skeleton class="h-6 w-14" />
+        </div>
+        <Skeleton class="h-4 w-80" />
+      </div>
       <Skeleton class="h-64 w-full" />
     </div>
   </div>

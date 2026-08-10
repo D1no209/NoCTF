@@ -221,7 +221,7 @@ onMounted(() => {
       </CardContent>
     </Card>
 
-    <Empty v-else-if="filteredUsers.length === 0">
+    <Empty v-else-if="filteredUsers.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('没有匹配的用户') }}</EmptyTitle>
         <EmptyDescription>{{ $t('调整搜索或筛选条件。') }}</EmptyDescription>
@@ -301,7 +301,7 @@ onMounted(() => {
             <dt class="text-muted-foreground">{{ $t('状态') }}</dt>
             <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ?? detail.accountStatus }}</dd>
             <dt class="text-muted-foreground">{{ $t('令牌版本') }}</dt>
-            <dd>{{ detail.tokenVersion ?? 0 }}</dd>
+            <dd class="font-mono tabular-nums">{{ detail.tokenVersion ?? 0 }}</dd>
             <dt class="text-muted-foreground">{{ $t('注册时间') }}</dt>
             <dd><AdminDateTime :value="detail.createdAt" /></dd>
             <dt class="text-muted-foreground">{{ $t('更新时间') }}</dt>
@@ -350,7 +350,7 @@ onMounted(() => {
                   <AlertDialogHeader>
                     <AlertDialogTitle>{{ $t('吊销令牌') }}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      {{ $t('将吊销用户「{user}」的全部访问与刷新令牌，该用户需要重新登录。', { user: detail.userName ?? '—' }) }}
+                      {{ $t('将吊销用户「{user}」的全部访问与刷新令牌，该用户需要重新登录。', { user: detail.userName ?? '-' }) }}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -371,7 +371,7 @@ onMounted(() => {
     <AlertDialog v-model:open="deleteOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('删除用户「{user}」', { user: detail?.userName ?? '—' }) }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ $t('删除用户「{user}」', { user: detail?.userName ?? '-' }) }}</AlertDialogTitle>
           <AlertDialogDescription> {{ $t('删除不可恢复,请先确认影响范围。') }} </AlertDialogDescription>
         </AlertDialogHeader>
         <div v-if="previewLoading" class="flex flex-col gap-2">

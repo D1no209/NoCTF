@@ -373,7 +373,7 @@ const participantLimitReached = computed(() =>
               {{ q.subject === 'Challenge' ? `题目 · ${q.challengeTitle ?? '未知题目'}` : $t('平台 / 赛事') }}
             </p>
             <p class="mt-1 truncate text-xs text-muted-foreground">
-              {{ $t('最近由 {role} {actor} 更新 · {time}', { role: roleLabel(q.lastActorRole), actor: q.lastActorDisplayName ?? '—', time: formatDateTime(q.updatedAt) }) }}
+              {{ $t('最近由 {role} {actor} 更新 · {time}', { role: roleLabel(q.lastActorRole), actor: q.lastActorDisplayName ?? '-', time: formatDateTime(q.updatedAt) }) }}
             </p>
           </button>
         </li>
@@ -418,7 +418,7 @@ const participantLimitReached = computed(() =>
                 </p>
               </template>
               <p v-else-if="entry.kind === 'StatusTransition'" class="text-xs text-muted-foreground">
-                {{ $t('状态变更：{from} → {to}', { from: statusLabel(entry.fromStatus ?? undefined) ?? '—', to: statusLabel(entry.toStatus ?? undefined) ?? '—' }) }}
+                {{ $t('状态变更：{from} → {to}', { from: statusLabel(entry.fromStatus ?? undefined) ?? '-', to: statusLabel(entry.toStatus ?? undefined) ?? '-' }) }}
                 · {{ roleLabel(entry.actorRole) }} {{ entry.actorDisplayName }}
                 · {{ formatDateTime(entry.createdAt) }}
               </p>
@@ -466,7 +466,7 @@ const participantLimitReached = computed(() =>
             </AlertDescription>
           </Alert>
           <p v-else-if="detail.access === 'Observer'" class="text-sm text-muted-foreground">{{ $t('你对该咨询只有只读权限。') }}</p>
-          <p v-else class="text-sm text-muted-foreground">{{ $t('该咨询已{status}，无法继续回复。', { status: statusLabel(detail.status) ?? '—' }) }}</p>
+          <p v-else class="text-sm text-muted-foreground">{{ $t('该咨询已{status}，无法继续回复。', { status: statusLabel(detail.status) ?? '-' }) }}</p>
         </CardContent>
       </Card>
     </div>

@@ -87,11 +87,11 @@ onMounted(load)
           </div>
           <div class="flex items-center gap-2">
             <span class="text-muted-foreground">{{ $t('生效时间:') }}</span>
-            <span>{{ current.startsAt ? adminFormatDateTime(current.startsAt) : $t('立即') }}</span>
+            <span class="font-mono tabular-nums">{{ current.startsAt ? adminFormatDateTime(current.startsAt) : $t('立即') }}</span>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-muted-foreground">{{ $t('上次应用:') }}</span>
-            <span>{{ adminFormatDateTime(current.appliedAt) }}</span>
+            <span class="font-mono tabular-nums">{{ adminFormatDateTime(current.appliedAt) }}</span>
           </div>
         </CardContent>
       </Card>

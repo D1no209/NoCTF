@@ -125,7 +125,7 @@ onMounted(() => {
       </CardContent>
     </Card>
 
-    <Empty v-else-if="bots.length === 0">
+    <Empty v-else-if="bots.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('暂无 Bot') }}</EmptyTitle>
         <EmptyDescription>{{ $t('创建 Bot 服务账户并为其签发访问令牌。') }}</EmptyDescription>
@@ -206,7 +206,7 @@ onMounted(() => {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ $t('签发访问令牌') }}</DialogTitle>
-          <DialogDescription>{{ $t('为「{user}」签发 Bot 访问令牌。', { user: issueTarget?.userName ?? '—' }) }}</DialogDescription>
+          <DialogDescription>{{ $t('为「{user}」签发 Bot 访问令牌。', { user: issueTarget?.userName ?? '-' }) }}</DialogDescription>
         </DialogHeader>
         <template v-if="!issuedToken">
           <FieldGroup>

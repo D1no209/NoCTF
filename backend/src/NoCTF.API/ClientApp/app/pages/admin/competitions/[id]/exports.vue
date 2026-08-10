@@ -174,7 +174,7 @@ onMounted(loadExports)
           <AlertDescription>{{ $t('有导出任务正在处理中,可稍后刷新查看进度') }}</AlertDescription>
         </Alert>
         <Skeleton v-if="loadingExports && exports_.length === 0" class="h-32 w-full" />
-        <Empty v-else-if="exports_.length === 0">
+        <Empty v-else-if="exports_.length === 0" class="border border-dashed py-12">
           <EmptyHeader>
             <EmptyTitle>{{ $t('暂无导出任务') }}</EmptyTitle>
           </EmptyHeader>
@@ -193,19 +193,19 @@ onMounted(loadExports)
           </TableHeader>
           <TableBody>
             <TableRow v-for="e in exports_" :key="e.id">
-              <TableCell>{{ adminFormatDateTime(e.requestedAt) }}</TableCell>
+              <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(e.requestedAt) }}</TableCell>
               <TableCell>
                   <Badge :variant="e.status === 'Available' ? 'default' : e.status === 'Failed' ? 'destructive' : 'secondary'">
                   {{ enumLabel(DataExportStatusLabel, e.status) }}
                 </Badge>
               </TableCell>
               <TableCell>{{ e.includeProtectedFlags ? $t('是') : $t('否') }}</TableCell>
-              <TableCell class="max-w-40 truncate">{{ e.reason ?? '—' }}</TableCell>
+              <TableCell class="max-w-40 truncate">{{ e.reason ?? '-' }}</TableCell>
               <TableCell class="max-w-48 truncate font-mono text-xs">
-                {{ e.fileName ?? '—' }}
+                {{ e.fileName ?? '-' }}
                 <span v-if="e.failureDetail" class="block text-destructive">{{ e.failureDetail }}</span>
               </TableCell>
-              <TableCell>{{ adminFormatDateTime(e.expiresAt) }}</TableCell>
+              <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(e.expiresAt) }}</TableCell>
               <TableCell class="text-right">
                 <Button
                   v-if="e.status === 'Available'"

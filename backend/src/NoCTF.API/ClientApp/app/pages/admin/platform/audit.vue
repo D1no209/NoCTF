@@ -69,7 +69,7 @@ function detailText(log: AuditLog): string {
   if (log.kind === 'CompetitionLifecycle' && log.fromCompetitionStatus !== null && log.fromCompetitionStatus !== undefined) {
     const fromLabel = COMPETITION_STATUS_LABELS[String(log.fromCompetitionStatus)] ?? log.fromCompetitionStatus
     const toLabel = COMPETITION_STATUS_LABELS[String(log.toCompetitionStatus)] ?? log.toCompetitionStatus
-    return translate('状态 {from} → {to}', { from: fromLabel ?? '—', to: toLabel ?? '—' })
+    return translate('状态 {from} → {to}', { from: fromLabel ?? '-', to: toLabel ?? '-' })
   }
   if (log.kind === 'UserAccountLifecycle' && log.userAccountAction !== null && log.userAccountAction !== undefined) {
     return ACCOUNT_ACTION_LABELS[String(log.userAccountAction)] ?? String(log.userAccountAction)
@@ -77,9 +77,9 @@ function detailText(log: AuditLog): string {
   if (log.kind === 'CompetitionLeaderboardVisibility' && log.fromLeaderboardVisibility !== null && log.fromLeaderboardVisibility !== undefined) {
     const fromLabel = VISIBILITY_LABELS[String(log.fromLeaderboardVisibility)] ?? log.fromLeaderboardVisibility
     const toLabel = VISIBILITY_LABELS[String(log.toLeaderboardVisibility)] ?? log.toLeaderboardVisibility
-    return translate('可见性 {from} → {to}', { from: fromLabel ?? '—', to: toLabel ?? '—' })
+    return translate('可见性 {from} → {to}', { from: fromLabel ?? '-', to: toLabel ?? '-' })
   }
-  return log.reason ?? '—'
+  return log.reason ?? '-'
 }
 
 // ---------- 数据导出 ----------
@@ -179,7 +179,7 @@ onMounted(() => {
         </CardContent>
       </Card>
 
-      <Empty v-else-if="initialized && items.length === 0">
+      <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
         <EmptyHeader>
           <EmptyTitle>{{ $t('没有匹配的审计记录') }}</EmptyTitle>
           <EmptyDescription>{{ $t('调整类型、时间范围或筛选条件。') }}</EmptyDescription>
@@ -244,7 +244,7 @@ onMounted(() => {
         <div v-if="exportsLoading && exports_.length === 0" class="flex flex-col gap-2">
           <Skeleton v-for="i in 2" :key="i" class="h-10 w-full" />
         </div>
-        <Empty v-else-if="exports_.length === 0">
+        <Empty v-else-if="exports_.length === 0" class="border border-dashed py-12">
           <EmptyHeader>
             <EmptyTitle>{{ $t('暂无导出任务') }}</EmptyTitle>
           </EmptyHeader>
@@ -273,7 +273,7 @@ onMounted(() => {
                 </p>
               </TableCell>
               <TableCell class="max-w-56 truncate font-mono text-xs" :title="item.fileName ?? ''">
-                {{ item.fileName ?? '—' }}
+                {{ item.fileName ?? '-' }}
               </TableCell>
               <TableCell>
                 <AdminDateTime :value="item.expiresAt" />

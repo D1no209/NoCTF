@@ -115,7 +115,10 @@ async function changePassword() {
 
 <template>
   <div class="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-8">
-    <h1 class="text-2xl font-semibold">{{ $t('账户设置') }}</h1>
+    <div>
+      <h1 class="text-display text-2xl">{{ $t('账户设置') }}</h1>
+      <p class="text-sm text-muted-foreground">{{ $t('管理你的个人资料、密码与登录会话') }}</p>
+    </div>
     <Tabs default-value="profile">
       <TabsList>
         <TabsTrigger value="profile">{{ $t('资料') }}</TabsTrigger>

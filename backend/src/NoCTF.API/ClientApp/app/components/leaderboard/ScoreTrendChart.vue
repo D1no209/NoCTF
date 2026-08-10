@@ -11,7 +11,7 @@ const props = withDefaults(
     rangeEnd?: string | null
     height?: string
   }>(),
-  { title: '', rangeStart: null, rangeEnd: null, height: '420px' },
+  { title: '', rangeStart: null, rangeEnd: null, height: '400px' },
 )
 
 const el = ref<HTMLElement | null>(null)
@@ -31,12 +31,12 @@ function buildOption(): echarts.EChartsCoreOption {
           textStyle: { fontSize: 15, fontWeight: 600, color: foreground },
         }
       : undefined,
-    grid: { left: 64, right: 32, top: props.title ? 48 : 24, bottom: 96 },
+    grid: { left: 64, right: 32, top: props.title ? 44 : 24, bottom: 88 },
     tooltip: {
       trigger: 'axis',
       valueFormatter: (value: number | string) => `${value} pts`,
     },
-    legend: { bottom: 40, type: 'scroll', textStyle: { color: foreground } },
+    legend: { bottom: 36, type: 'scroll', itemGap: 16, textStyle: { color: foreground } },
     toolbox: {
       right: 16,
       feature: {

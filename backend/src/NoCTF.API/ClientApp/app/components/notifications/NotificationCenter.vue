@@ -136,7 +136,7 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
         <Bell class="size-4" aria-hidden="true" />
       </div>
       <div>
-        <h2 class="text-xl font-semibold">{{ $t('消息中心') }}</h2>
+        <h1 class="text-display text-2xl">{{ $t('消息中心') }}</h1>
         <p class="text-sm text-muted-foreground">{{ $t('官方通知，以及与你的账号、队伍或管理职责直接相关的消息') }}</p>
       </div>
     </header>
@@ -173,7 +173,7 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
                     <span class="text-[0.6875rem] text-muted-foreground">{{ audienceLabel(notification) }}</span>
                   </div>
                   <p class="line-clamp-2 text-sm font-medium">{{ notificationTitle(notification) }}</p>
-                  <p class="mt-1 text-xs text-muted-foreground">
+                  <p class="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
                     {{ sourceLabel(notification) }} · {{ formatDateTime(notification.sentAt) }}
                   </p>
                 </div>
@@ -202,7 +202,7 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
             <div class="min-w-0">
               <Badge v-if="selected.kind === 'CompetitionAnnouncement'" variant="secondary" class="mb-2">{{ $t('官方公告') }}</Badge>
               <h3 class="text-lg font-semibold leading-snug">{{ notificationTitle(selected) }}</h3>
-              <p class="mt-2 text-xs text-muted-foreground">
+              <p class="mt-2 font-mono text-xs tabular-nums text-muted-foreground">
                 {{ $t('发布人：{source} · {time}', { source: sourceLabel(selected), time: formatDateTime(selected.sentAt) }) }}
               </p>
             </div>
@@ -233,7 +233,7 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
                 <li v-for="entry in thread" :key="entry.id" class="grid grid-cols-[0.5rem_1fr] gap-3">
                   <span class="mt-1.5 size-2 rounded-full bg-primary" aria-hidden="true" />
                   <div class="min-w-0">
-                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-xs tabular-nums text-muted-foreground">
                       <span class="font-medium text-foreground">{{ sourceLabel(entry) }}</span>
                       <span>{{ formatDateTime(entry.sentAt) }}</span>
                     </div>

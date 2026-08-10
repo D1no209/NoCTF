@@ -203,7 +203,7 @@ onMounted(() => {
       </CardContent>
     </Card>
 
-    <Empty v-else-if="initialized && items.length === 0">
+    <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('没有匹配的日志') }}</EmptyTitle>
         <EmptyDescription>{{ $t('调整级别、时间范围或搜索关键字。') }}</EmptyDescription>
@@ -232,7 +232,7 @@ onMounted(() => {
               </Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ SERVICE_LABELS[String(log.service)] ?? log.service }}</TableCell>
-            <TableCell class="max-w-56 truncate text-sm text-muted-foreground" :title="log.category">
+            <TableCell class="max-w-56 truncate font-mono text-xs text-muted-foreground" :title="log.category">
               {{ log.category }}
             </TableCell>
             <TableCell class="max-w-xl">

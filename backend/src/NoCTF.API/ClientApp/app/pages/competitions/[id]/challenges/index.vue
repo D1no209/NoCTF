@@ -168,14 +168,14 @@ const groups = computed(() => {
 
         <div v-else class="flex flex-col gap-8">
           <section v-for="group in groups" :key="group.direction" class="flex flex-col gap-4">
-            <h2 class="flex items-center gap-2.5 text-lg font-semibold">
+            <h2 class="flex items-center gap-2.5 text-display text-lg">
               <component
                 :is="directionIcon(group.direction)"
                 class="size-5"
                 :class="directionTextClass(group.direction)"
               />
               {{ group.direction }}
-              <Badge variant="secondary">{{ group.challenges.length }}</Badge>
+              <Badge variant="secondary" class="font-mono tabular-nums">{{ group.challenges.length }}</Badge>
             </h2>
             <div class="grid gap-5 sm:grid-cols-2">
               <NuxtLink
@@ -218,7 +218,7 @@ const groups = computed(() => {
                       </Badge>
                       <span
                         v-if="progressFor(challenge.id)?.myScore !== null"
-                        class="text-xs text-muted-foreground"
+                        class="font-mono text-xs text-muted-foreground tabular-nums"
                       >
                         {{ $t('本队结算 {score} pts', { score: progressFor(challenge.id)?.myScore ?? 0 }) }}
                       </span>

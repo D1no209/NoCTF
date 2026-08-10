@@ -88,37 +88,39 @@ watch(
 
 <template>
   <FieldGroup>
-    <Field>
-      <FieldLabel>{{ $t('分配方式') }}</FieldLabel>
-      <div class="flex items-center gap-2">
-        <Badge variant="secondary">
-          {{ runtime.allocation === RuntimeAllocation.Shared ? $t('共享') : $t('每队独立') }}
-        </Badge>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <Field>
+        <FieldLabel>{{ $t('分配方式') }}</FieldLabel>
+        <div class="flex h-9 items-center gap-2">
+          <Badge variant="secondary">
+            {{ runtime.allocation === RuntimeAllocation.Shared ? $t('共享') : $t('每队独立') }}
+          </Badge>
+        </div>
         <FieldDescription v-if="mode === 'Koh'">{{ $t('KoH 要求所有队伍共享同一套环境。') }}</FieldDescription>
         <FieldDescription v-else>{{ $t('{mode} 要求每个队伍独立的运行环境。', { mode }) }}</FieldDescription>
-      </div>
-    </Field>
+      </Field>
 
-    <Field>
-      <FieldLabel>{{ $t('运行环境类型') }}</FieldLabel>
-      <Select
-        :model-value="runtime.definition.kind"
-        :disabled="disabled || mode === 'Awdp'"
-        @update:model-value="switchKind(String($event))"
-      >
-        <SelectTrigger class="w-full sm:max-w-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectItem v-for="option in kindOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <FieldDescription v-if="mode === 'Awdp'">{{ $t('AWDP 仅支持单容器运行环境。') }}</FieldDescription>
-    </Field>
+      <Field>
+        <FieldLabel>{{ $t('运行环境类型') }}</FieldLabel>
+        <Select
+          :model-value="runtime.definition.kind"
+          :disabled="disabled || mode === 'Awdp'"
+          @update:model-value="switchKind(String($event))"
+        >
+          <SelectTrigger class="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem v-for="option in kindOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <FieldDescription v-if="mode === 'Awdp'">{{ $t('AWDP 仅支持单容器运行环境。') }}</FieldDescription>
+      </Field>
+    </div>
 
     <DefinitionContainer
       v-if="runtime.definition.kind === 'container'"
@@ -133,8 +135,7 @@ watch(
       :disabled="disabled"
     />
 
-    <FieldSet class="rounded-md border p-3">
-      <FieldLegend class="text-sm font-medium">{{ $t('资源限制(实例整体)') }}</FieldLegend>
+    <DefinitionSection :title="$t('资源与生命周期')" :collapsible="false">
       <div class="grid gap-4 sm:grid-cols-3">
         <Field>
           <FieldLabel>{{ $t('内存(MiB)') }}</FieldLabel>
@@ -167,78 +168,77 @@ watch(
             @update:model-value="runtime.limits.pidsLimit = $event"
           />
         </Field>
+        <Field>
+          <FieldLabel>{{ $t('实例存活时间(秒)') }}</FieldLabel>
+          <NullableNumberInput
+            :model-value="runtime.ttlSeconds"
+            :min="1"
+            :max="604800"
+            :placeholder="$t('到点自动回收')"
+            :disabled="disabled"
+            @update:model-value="runtime.ttlSeconds = $event"
+          />
+        </Field>
+        <Field>
+          <FieldLabel>{{ $t('操作超时(秒)') }}</FieldLabel>
+          <NullableNumberInput
+            :model-value="runtime.operationTimeoutSeconds"
+            :min="1"
+            :max="300"
+            :placeholder="$t('启动/停止操作超时')"
+            :disabled="disabled"
+            @update:model-value="runtime.operationTimeoutSeconds = $event"
+          />
+        </Field>
       </div>
       <FieldDescription>{{ $t('启动实例前必须全部填写,用于隔离队伍环境。') }}</FieldDescription>
-    </FieldSet>
+    </DefinitionSection>
 
-    <div class="grid gap-4 sm:grid-cols-2">
+    <DefinitionSection :title="$t('Flag 与访问')" :collapsible="false">
       <Field>
-        <FieldLabel>{{ $t('实例存活时间(秒)') }}</FieldLabel>
-        <NullableNumberInput
-          :model-value="runtime.ttlSeconds"
-          :min="1"
-          :max="604800"
-          :placeholder="$t('到点自动回收')"
+        <FieldLabel>{{ $t('Flag 来源') }}</FieldLabel>
+        <Select
+          :model-value="String(runtime.flagSource)"
           :disabled="disabled"
-          @update:model-value="runtime.ttlSeconds = $event"
-        />
+          @update:model-value="runtime.flagSource = Number($event)"
+        >
+          <SelectTrigger class="w-full sm:max-w-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem v-for="option in flagSourceOptions" :key="option.value" :value="String(option.value)">
+                {{ option.label }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </Field>
-      <Field>
-        <FieldLabel>{{ $t('操作超时(秒)') }}</FieldLabel>
-        <NullableNumberInput
-          :model-value="runtime.operationTimeoutSeconds"
-          :min="1"
-          :max="300"
-          :placeholder="$t('启动/停止操作超时')"
+
+      <Field v-if="mode !== 'Awdp'">
+        <FieldLabel>{{ $t('访问入口') }}</FieldLabel>
+        <UrlBindingList
+          :model-value="runtime.urlBindings"
+          :exposure-options="exposureOptions"
+          :show-service-name="isCompose"
           :disabled="disabled"
-          @update:model-value="runtime.operationTimeoutSeconds = $event"
+          @update:model-value="runtime.urlBindings = $event"
         />
+        <FieldDescription v-if="mode === 'Koh'"> {{ $t('KoH 开赛时要求至少一个「所有参赛者可见」的入口。') }} </FieldDescription>
+        <FieldDescription v-else-if="mode === 'Awd'"> {{ $t('AWD 中选手互相访问对方服务,通常需要「所有参赛者可见」的入口。') }} </FieldDescription>
       </Field>
-    </div>
 
-    <Field>
-      <FieldLabel>{{ $t('Flag 来源') }}</FieldLabel>
-      <Select
-        :model-value="String(runtime.flagSource)"
-        :disabled="disabled"
-        @update:model-value="runtime.flagSource = Number($event)"
-      >
-        <SelectTrigger class="w-full sm:max-w-xs">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectItem v-for="option in flagSourceOptions" :key="option.value" :value="String(option.value)">
-              {{ option.label }}
-            </SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-    </Field>
-
-    <Field v-if="mode !== 'Awdp'">
-      <FieldLabel>{{ $t('访问入口') }}</FieldLabel>
-      <UrlBindingList
-        :model-value="runtime.urlBindings"
-        :exposure-options="exposureOptions"
-        :show-service-name="isCompose"
-        :disabled="disabled"
-        @update:model-value="runtime.urlBindings = $event"
-      />
-      <FieldDescription v-if="mode === 'Koh'"> {{ $t('KoH 开赛时要求至少一个「所有参赛者可见」的入口。') }} </FieldDescription>
-      <FieldDescription v-else-if="mode === 'Awd'"> {{ $t('AWD 中选手互相访问对方服务,通常需要「所有参赛者可见」的入口。') }} </FieldDescription>
-    </Field>
-
-    <Field v-if="mode === 'Koh'">
-      <FieldLabel>{{ $t('控制检查入口') }}</FieldLabel>
-      <UrlBindingList
-        v-model="controlBindingList"
-        :exposure-options="[{ value: UrlExposure.Participants, label: $t('平台检查使用') }]"
-        :show-service-name="isCompose"
-        :add-label="$t('设置控制检查入口')"
-        :disabled="disabled"
-      />
-      <FieldDescription>{{ $t('平台周期性检查控制权的地址;KoH 开赛必填。') }}</FieldDescription>
-    </Field>
+      <Field v-if="mode === 'Koh'">
+        <FieldLabel>{{ $t('控制检查入口') }}</FieldLabel>
+        <UrlBindingList
+          v-model="controlBindingList"
+          :exposure-options="[{ value: UrlExposure.Participants, label: $t('平台检查使用') }]"
+          :show-service-name="isCompose"
+          :add-label="$t('设置控制检查入口')"
+          :disabled="disabled"
+        />
+        <FieldDescription>{{ $t('平台周期性检查控制权的地址;KoH 开赛必填。') }}</FieldDescription>
+      </Field>
+    </DefinitionSection>
   </FieldGroup>
 </template>

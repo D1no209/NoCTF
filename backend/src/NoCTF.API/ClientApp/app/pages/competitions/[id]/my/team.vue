@@ -331,7 +331,7 @@ function setAppealOpen(open: boolean) {
                         @input="appealError = null"
                       />
                       <p id="appeal-requirement" class="text-xs text-muted-foreground">
-                        {{ $t('需要 {minimum}–{maximum} 个字符。', { minimum: minimumAppealStatementLength, maximum: maximumAppealStatementLength }) }}
+                        {{ $t('需要 {minimum} ~ {maximum} 个字符。', { minimum: minimumAppealStatementLength, maximum: maximumAppealStatementLength }) }}
                       </p>
                       <p v-if="appealError" id="appeal-error" role="alert" class="text-sm text-destructive">
                         {{ appealError }}

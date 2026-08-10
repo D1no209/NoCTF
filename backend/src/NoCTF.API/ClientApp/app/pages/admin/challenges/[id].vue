@@ -25,6 +25,7 @@ import type {
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
   NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
 } from '~/api'
+import { FlagSource } from '~/utils/game-config'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -56,6 +57,23 @@ const deleting = ref(false)
 const restoring = ref(false)
 
 const isDeleted = computed(() => !!template.value?.deletedAt)
+
+// 题目定义:definitionJson 字符串仍是单一事实源,切片组件直接修改共享 model。
+const { model: definitionModel, parseFailed: definitionParseFailed } = useDefinitionModel(
+  () => form.definitionJson,
+  () => form.mode,
+  (json) => { form.definitionJson = json },
+)
+
+// 「模式定义」Tab 是否有适用块;无块时显示空态。
+const hasModeDefinition = computed(() => {
+  if (form.mode === 'Awd' || form.mode === 'Awdp') return true
+  if (form.mode === 'Ctf') return definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam
+  return false
+})
+
+// 依赖运行环境的模式定义块在未启用运行环境时不生效。
+const runtimeDisabled = computed(() => definitionModel.value !== null && definitionModel.value.runtime === null)
 
 function syncForm(value: Template): void {
   form.title = value.title ?? ''
@@ -494,6 +512,8 @@ onMounted(() => {
         <Tabs default-value="basic">
           <TabsList>
             <TabsTrigger value="basic">{{ $t('基本信息') }}</TabsTrigger>
+            <TabsTrigger value="runtime">{{ $t('运行环境') }}</TabsTrigger>
+            <TabsTrigger value="definition">{{ $t('模式定义') }}</TabsTrigger>
             <TabsTrigger value="attachments"> {{ $t('附件') }} <Badge variant="secondary" class="ml-1">{{ attachments.length }}</Badge>
             </TabsTrigger>
             <TabsTrigger value="flags">
@@ -553,11 +573,6 @@ onMounted(() => {
                       <FieldLabel for="edit-description">{{ $t('题面') }}</FieldLabel>
                       <Textarea id="edit-description" v-model="form.description" rows="8" :disabled="isDeleted" />
                     </Field>
-                    <Field>
-                      <FieldLabel>{{ $t('题目定义') }}</FieldLabel>
-                      <DefinitionEditor v-model="form.definitionJson" :mode="form.mode" :disabled="isDeleted" />
-                      <FieldDescription>{{ $t('Runtime / Checker / Flag 注入定义;修改对未来启动的实例生效。') }}</FieldDescription>
-                    </Field>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                       <span>{{ $t('修订版本 {revision}', { revision: template.revision ?? 0 }) }}</span>
                       <span>{{ $t('创建') }} <AdminDateTime :value="template.createdAt" /></span>
@@ -570,6 +585,56 @@ onMounted(() => {
                     </Field>
                   </FieldGroup>
                 </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="runtime">
+            <Card>
+              <CardContent class="pt-6">
+                <Alert v-if="definitionParseFailed" variant="destructive">
+                  <AlertDescription> {{ $t('现有定义 JSON 无法解析,可能是历史遗留数据。请先在数据库或 API 层面修复后再编辑。') }} </AlertDescription>
+                </Alert>
+                <FieldGroup v-else-if="definitionModel">
+                  <DefinitionRuntimeSection :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
+                  <FieldDescription>{{ $t('Runtime 定义修改对未来启动的实例生效。') }}</FieldDescription>
+                </FieldGroup>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="definition">
+            <Card>
+              <CardContent class="pt-6">
+                <Alert v-if="definitionParseFailed" variant="destructive">
+                  <AlertDescription> {{ $t('现有定义 JSON 无法解析,可能是历史遗留数据。请先在数据库或 API 层面修复后再编辑。') }} </AlertDescription>
+                </Alert>
+                <FieldGroup v-else-if="definitionModel">
+                  <Alert v-if="hasModeDefinition && runtimeDisabled">
+                    <AlertDescription>{{ $t('运行环境未启用时,以下配置不会生效。') }}</AlertDescription>
+                  </Alert>
+                  <template v-if="form.mode === 'Awd'">
+                    <DefinitionFlagInjectionSection :model="definitionModel" :disabled="isDeleted" />
+                    <DefinitionCheckerSection :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
+                    <DefinitionFlagTemplateSection :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
+                  </template>
+                  <template v-else-if="form.mode === 'Awdp'">
+                    <DefinitionPatchSection :model="definitionModel" :disabled="isDeleted" />
+                    <DefinitionCheckerSection :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
+                  </template>
+                  <DefinitionFlagTemplateSection
+                    v-else-if="form.mode === 'Ctf'"
+                    :model="definitionModel"
+                    :mode="form.mode"
+                    :disabled="isDeleted"
+                  />
+                  <Empty v-if="!hasModeDefinition">
+                    <EmptyHeader>
+                      <EmptyTitle>{{ $t('该模式没有额外模式定义') }}</EmptyTitle>
+                    </EmptyHeader>
+                  </Empty>
+                  <FieldDescription v-else> {{ $t('定义修改对未来启动/重置的实例生效,已存在的运行实例不受影响。') }} </FieldDescription>
+                </FieldGroup>
               </CardContent>
             </Card>
           </TabsContent>

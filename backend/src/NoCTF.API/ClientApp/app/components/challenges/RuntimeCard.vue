@@ -158,7 +158,7 @@ const stateVariant = computed(() => {
             </a>
           </div>
 
-          <div v-if="isRunning && ttl" class="text-sm"> {{ $t('剩余时间:') }}<span class="font-medium">{{ ttl }}</span>
+          <div v-if="isRunning && ttl" class="text-sm"> {{ $t('剩余时间:') }}<span class="font-mono font-medium tabular-nums">{{ ttl }}</span>
           </div>
         </template>
 

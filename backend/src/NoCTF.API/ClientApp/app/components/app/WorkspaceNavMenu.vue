@@ -22,11 +22,16 @@ function onNavigate() {
 
 <template>
   <SidebarGroup v-for="(group, index) in groups" :key="group.label ?? index">
-    <SidebarGroupLabel v-if="group.label">{{ group.label }}</SidebarGroupLabel>
+    <SidebarGroupLabel v-if="group.label" class="text-[11px] uppercase tracking-[0.14em]">{{ group.label }}</SidebarGroupLabel>
     <SidebarGroupContent>
       <SidebarMenu>
         <SidebarMenuItem v-for="item in group.items" :key="item.to">
-          <SidebarMenuButton as-child :is-active="isActive(item)" :tooltip="item.label">
+          <SidebarMenuButton
+            as-child
+            :is-active="isActive(item)"
+            :tooltip="item.label"
+            class="data-[active]:font-medium data-[active]:shadow-[inset_2px_0_0_0_var(--sidebar-primary)]"
+          >
             <NuxtLink :to="item.to" @click="onNavigate">
               <component :is="item.icon" />
               <span>{{ item.label }}</span>

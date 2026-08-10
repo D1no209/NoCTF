@@ -3,7 +3,7 @@ import { Plus, X } from '@lucide/vue'
 import type { ComposeDefinitionModel } from '~/utils/game-config'
 import { bytesToMib, coresToNanoCpus, mibToBytes, nanoCpusToCores } from '~/utils/game-config'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   definition: ComposeDefinitionModel
   disabled?: boolean
 }>(), {
@@ -13,6 +13,13 @@ withDefaults(defineProps<{
 function addService(definition: ComposeDefinitionModel): void {
   definition.serviceResources.push({ service: '', memoryBytes: null, nanoCpus: null, pidsLimit: null })
 }
+
+// 存量内容非空时默认展开,避免已配置的值被折叠藏住。
+const hasMetadata = computed(() =>
+  Object.keys(props.definition.environment).length > 0
+  || Object.keys(props.definition.labels).length > 0
+  || Object.keys(props.definition.flagEnvironmentVariables).length > 0,
+)
 </script>
 
 <template>
@@ -92,39 +99,46 @@ function addService(definition: ComposeDefinitionModel): void {
       </div>
       <FieldDescription>{{ $t('Compose 中每个服务都必须配置资源限制。') }}</FieldDescription>
     </Field>
-    <Field>
-      <FieldLabel>{{ $t('环境变量') }}</FieldLabel>
-      <KeyValueEditor
-        :model-value="definition.environment"
-        :key-placeholder="$t('变量名')"
-        :value-placeholder="$t('值')"
-        :add-label="$t('添加环境变量')"
-        :disabled="disabled"
-        @update:model-value="definition.environment = $event"
-      />
-    </Field>
-    <Field>
-      <FieldLabel>{{ $t('标签') }}</FieldLabel>
-      <KeyValueEditor
-        :model-value="definition.labels"
-        :key-placeholder="$t('标签名')"
-        :value-placeholder="$t('值')"
-        :add-label="$t('添加标签')"
-        :disabled="disabled"
-        @update:model-value="definition.labels = $event"
-      />
-    </Field>
-    <Field>
-      <FieldLabel>{{ $t('Flag 环境变量') }}</FieldLabel>
-      <KeyValueEditor
-        :model-value="definition.flagEnvironmentVariables"
-        :key-placeholder="$t('服务名')"
-        :value-placeholder="$t('环境变量名,如 FLAG')"
-        :add-label="$t('添加注入目标')"
-        :disabled="disabled"
-        @update:model-value="definition.flagEnvironmentVariables = $event"
-      />
-      <FieldDescription>{{ $t('按队伍注入 Flag 时,每个服务对应的环境变量名。') }}</FieldDescription>
-    </Field>
+
+    <DefinitionSection
+      :title="$t('环境与元数据')"
+      :hint="$t('环境变量、标签与 Flag 注入目标,大多数题目无需配置')"
+      :default-open="hasMetadata"
+    >
+      <Field>
+        <FieldLabel>{{ $t('环境变量') }}</FieldLabel>
+        <KeyValueEditor
+          :model-value="definition.environment"
+          :key-placeholder="$t('变量名')"
+          :value-placeholder="$t('值')"
+          :add-label="$t('添加环境变量')"
+          :disabled="disabled"
+          @update:model-value="definition.environment = $event"
+        />
+      </Field>
+      <Field>
+        <FieldLabel>{{ $t('标签') }}</FieldLabel>
+        <KeyValueEditor
+          :model-value="definition.labels"
+          :key-placeholder="$t('标签名')"
+          :value-placeholder="$t('值')"
+          :add-label="$t('添加标签')"
+          :disabled="disabled"
+          @update:model-value="definition.labels = $event"
+        />
+      </Field>
+      <Field>
+        <FieldLabel>{{ $t('Flag 环境变量') }}</FieldLabel>
+        <KeyValueEditor
+          :model-value="definition.flagEnvironmentVariables"
+          :key-placeholder="$t('服务名')"
+          :value-placeholder="$t('环境变量名,如 FLAG')"
+          :add-label="$t('添加注入目标')"
+          :disabled="disabled"
+          @update:model-value="definition.flagEnvironmentVariables = $event"
+        />
+        <FieldDescription>{{ $t('按队伍注入 Flag 时,每个服务对应的环境变量名。') }}</FieldDescription>
+      </Field>
+    </DefinitionSection>
   </FieldGroup>
 </template>

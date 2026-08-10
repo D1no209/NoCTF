@@ -352,7 +352,7 @@ onMounted(() => {
 
     <template v-else-if="challenge">
       <div class="flex flex-wrap items-center gap-3">
-        <h2 class="text-xl font-semibold">{{ challenge.title }}</h2>
+        <h2 class="text-display text-xl">{{ challenge.title }}</h2>
         <Badge :variant="challenge.isPublished ? 'default' : 'outline'">
           {{ challenge.isPublished ? $t('已发布') : $t('未发布') }}
         </Badge>
@@ -431,7 +431,7 @@ onMounted(() => {
                 <Plus data-icon="inline-start" /> {{ $t('添加 Flag') }} </Button>
             </div>
             <Skeleton v-if="flagsLoading" class="h-32 w-full" />
-            <Empty v-else-if="flags.length === 0">
+            <Empty v-else-if="flags.length === 0" class="border border-dashed py-12">
               <EmptyHeader>
                 <EmptyTitle>{{ $t('暂无 Flag') }}</EmptyTitle>
               </EmptyHeader>
@@ -455,9 +455,9 @@ onMounted(() => {
                     <span v-if="f.specificationKind !== null && f.specificationKind !== undefined">
                       {{ enumLabel(SpecificationKindLabel, f.specificationKind) }}
                     </span>
-                    <span v-else>—</span>
+                    <span v-else>-</span>
                   </TableCell>
-                  <TableCell class="text-xs">
+                  <TableCell class="font-mono text-xs tabular-nums">
                     {{ adminFormatDateTime(f.validStart) }} ~ {{ adminFormatDateTime(f.validUntil) }}
                   </TableCell>
                   <TableCell>
@@ -490,7 +490,7 @@ onMounted(() => {
                 <Plus data-icon="inline-start" /> {{ $t('添加提示') }} </Button>
             </div>
             <Skeleton v-if="hintsLoading" class="h-32 w-full" />
-            <Empty v-else-if="hints.length === 0">
+            <Empty v-else-if="hints.length === 0" class="border border-dashed py-12">
               <EmptyHeader>
                 <EmptyTitle>{{ $t('暂无提示') }}</EmptyTitle>
               </EmptyHeader>
@@ -508,8 +508,8 @@ onMounted(() => {
               <TableBody>
                 <TableRow v-for="h in hints" :key="h.id" :class="{ 'opacity-60': h.deletedAt }">
                   <TableCell class="max-w-96 truncate">{{ h.content }}</TableCell>
-                  <TableCell>{{ h.cost }}</TableCell>
-                  <TableCell>{{ h.publishedAt ? adminFormatDateTime(h.publishedAt) : $t('未发布') }}</TableCell>
+                  <TableCell class="font-mono tabular-nums">{{ h.cost }}</TableCell>
+                  <TableCell class="font-mono text-xs tabular-nums">{{ h.publishedAt ? adminFormatDateTime(h.publishedAt) : $t('未发布') }}</TableCell>
                   <TableCell>
                     <Badge v-if="h.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
                     <Badge v-else :variant="h.publishedAt ? 'default' : 'outline'">
