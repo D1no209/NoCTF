@@ -37,16 +37,21 @@ public sealed class CtfScoreExpression
         if (initialPoints <= 0
             || minimumPoints < 0
             || minimumPoints > initialPoints
-            || decayParameter <= 1)
+            || decayParameter <= 1
+            || eligibleTeamCount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(expression), "Score expression boundaries are invalid.");
         }
 
-        foreach (var solveCount in new[] { 0, 1, eligibleTeamCount })
+        for (var solveCount = 0; ; solveCount++)
         {
             Evaluate(
                 expression,
                 new(initialPoints, minimumPoints, solveCount, eligibleTeamCount, decayParameter));
+            if (solveCount == eligibleTeamCount)
+            {
+                break;
+            }
         }
     }
 
