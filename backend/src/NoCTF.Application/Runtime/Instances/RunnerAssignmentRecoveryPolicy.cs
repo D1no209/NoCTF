@@ -12,16 +12,12 @@ public static class RunnerAssignmentRecoveryPolicy
 {
     public static RunnerAssignmentRecoveryAction Decide(
         RuntimeState state,
-        bool hasReceipt,
         bool recoveryAlreadyRecorded,
         bool assignmentReleasePending)
     {
-        if (hasReceipt || state is RuntimeState.Provisioning or RuntimeState.Stopping)
-            return state is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
-                && (!recoveryAlreadyRecorded || assignmentReleasePending)
-                ? RunnerAssignmentRecoveryAction.AwaitOwnerCleanup
-                : RunnerAssignmentRecoveryAction.Ignore;
-
-        return RunnerAssignmentRecoveryAction.Ignore;
+        return state is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
+            && (!recoveryAlreadyRecorded || assignmentReleasePending)
+            ? RunnerAssignmentRecoveryAction.AwaitOwnerCleanup
+            : RunnerAssignmentRecoveryAction.Ignore;
     }
 }

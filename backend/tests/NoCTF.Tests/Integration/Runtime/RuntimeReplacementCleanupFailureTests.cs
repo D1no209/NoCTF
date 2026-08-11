@@ -239,6 +239,9 @@ public sealed class RuntimeReplacementCleanupFailureTests
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
                         fixture.OldProcessingVersion,
+                        1,
+                        "pool-a",
+                        "runner-a",
                         RuntimeFailureCode.CleanupFailed),
                     failureDb,
                     cancellationToken);
@@ -359,6 +362,9 @@ public sealed class RuntimeReplacementCleanupFailureTests
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
                         fixture.OldProcessingVersion,
+                        1,
+                        "pool-a",
+                        "runner-a",
                         RuntimeFailureCode.CleanupFailed),
                     failureDb,
                     cancellationToken);
@@ -496,7 +502,10 @@ public sealed class RuntimeReplacementCleanupFailureTests
                     await RuntimeWriteBackHandler.Handle(
                         new RuntimeStopped(
                             fixture.OldRuntimeId,
-                            fixture.OldProcessingVersion),
+                            fixture.OldProcessingVersion,
+                            1,
+                            "pool-a",
+                            "runner-a"),
                         ackDb,
                         ackOutbox,
                         cancellationToken);
@@ -580,6 +589,9 @@ public sealed class RuntimeReplacementCleanupFailureTests
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
                         fixture.OldProcessingVersion,
+                        1,
+                        "pool-a",
+                        "runner-a",
                         RuntimeFailureCode.CleanupFailed),
                     db,
                     cancellationToken);
@@ -622,6 +634,9 @@ public sealed class RuntimeReplacementCleanupFailureTests
             var message = new RuntimeStopFailed(
                 fixture.OldRuntimeId,
                 fixture.OldProcessingVersion,
+                1,
+                "pool-a",
+                "runner-a",
                 RuntimeFailureCode.CleanupFailed);
 
             await using (var first = new NoCtfDbContext(options))
@@ -665,6 +680,9 @@ public sealed class RuntimeReplacementCleanupFailureTests
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
                         fixture.OldProcessingVersion,
+                        1,
+                        "pool-a",
+                        "runner-a",
                         RuntimeFailureCode.CleanupFailed),
                     db,
                     cancellationToken);
@@ -705,6 +723,9 @@ public sealed class RuntimeReplacementCleanupFailureTests
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
                         checked(fixture.OldProcessingVersion - 1),
+                        1,
+                        "pool-a",
+                        "runner-a",
                         RuntimeFailureCode.CleanupFailed),
                     db,
                     cancellationToken);

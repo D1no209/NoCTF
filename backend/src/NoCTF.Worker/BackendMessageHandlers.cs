@@ -536,6 +536,7 @@ public static class BackendMessageHandlers
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
             runtime.ProcessingVersion,
+            runtime.Generation,
             message.RunnerPool,
             message.RunnerId));
         await QueueNextGameplayFactAsync(submission, db, outbox, cancellationToken);
@@ -756,9 +757,17 @@ public static class BackendMessageHandlers
             return;
         if (string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
         {
-            if (instance.RunnerId is not null
-                || instance.RunnerAssignmentReleaseToken is not null)
+            if (instance.RunnerAssignmentReleaseToken is not null)
+            {
+                instance.RunnerAssignmentReleaseToken = null;
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            if (instance.RunnerId is { } runnerId)
+            {
+                await PublishRuntimeStopAsync(outbox, instance, runnerId);
+                await outbox.FlushOutgoingMessagesAsync();
                 return;
+            }
 
             instance.State = RuntimeState.Stopped;
             instance.StoppedAt = DateTimeOffset.UtcNow;
@@ -917,7 +926,8 @@ public static class BackendMessageHandlers
             instance.State = RuntimeState.Stopping;
             instance.RunnerAssignmentReleaseToken = null;
             instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
-            if (!string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
+            if (!string.IsNullOrWhiteSpace(instance.ProviderReceiptJson)
+                || instance.RunnerId is not null)
                 await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
             else
             {
@@ -965,8 +975,9 @@ public static class BackendMessageHandlers
         {
             var failedCleanupOwners = await db.RuntimeInstances.AsNoTracking()
                 .Where(instance => instance.State == RuntimeState.Failed
-                    && instance.ProviderReceiptJson != null
-                    && instance.RunnerId != null)
+                    && instance.RunnerId != null
+                    && (instance.ProviderReceiptJson != null
+                        || instance.FailureCode == RuntimeFailureCode.CleanupFailed))
                 .Select(instance => new { instance.RunnerPool, instance.RunnerId })
                 .Distinct()
                 .ToListAsync(cancellationToken);
@@ -1033,14 +1044,12 @@ public static class BackendMessageHandlers
             {
                 instance.RunnerAssignmentReleaseToken = null;
                 applied = true;
-                continue;
             }
             if (heartbeat == RunnerHeartbeatStatus.Online && !assignmentReleasePending)
                 continue;
 
             var action = RunnerAssignmentRecoveryPolicy.Decide(
                 instance.State,
-                hasReceipt,
                 instance.RunnerUnavailableAt is not null,
                 assignmentReleasePending);
             if (action == RunnerAssignmentRecoveryAction.Ignore)
@@ -1238,18 +1247,21 @@ public static class BackendMessageHandlers
                 new StopContainerRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
+                    instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
                 new StopComposeRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
+                    instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             RuntimeKind.OvaVm => outbox.PublishToRunnerNodeAsync(
                 new StopOvaRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
+                    instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             _ => throw new InvalidOperationException(

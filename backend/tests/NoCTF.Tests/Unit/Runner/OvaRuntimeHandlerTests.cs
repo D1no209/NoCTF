@@ -91,6 +91,7 @@ public sealed class OvaRuntimeHandlerTests
         var message = new StopOvaRuntime(
             receipt.OperationId,
             8,
+            3,
             "default",
             "runner-a");
 
@@ -120,6 +121,7 @@ public sealed class OvaRuntimeHandlerTests
         var message = new StopOvaRuntime(
             receipt.OperationId,
             8,
+            3,
             "default",
             "runner-a");
 

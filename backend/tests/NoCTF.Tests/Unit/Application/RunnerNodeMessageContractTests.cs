@@ -33,5 +33,6 @@ public sealed class RunnerNodeMessageContractTests
     public async Task Stop_work_does_not_persist_the_provider_receipt(Type messageType)
     {
         await Assert.That(messageType.GetProperty("ProviderReceiptJson")).IsNull();
+        await Assert.That(messageType.GetProperty(nameof(IRuntimeStopMessage.Generation))).IsNotNull();
     }
 }

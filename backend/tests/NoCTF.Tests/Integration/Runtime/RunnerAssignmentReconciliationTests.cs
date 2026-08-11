@@ -112,6 +112,416 @@ public sealed class RunnerAssignmentReconciliationTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Offline_running_without_receipt_cleans_exact_identity_before_releasing_and_dispatching_once(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await using var redisContainer = new RedisBuilder("redis:7-alpine").Build();
+            await Task.WhenAll(
+                postgres.StartAsync(cancellationToken),
+                redisContainer.StartAsync(cancellationToken));
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            var replacementId = Guid.CreateVersion7();
+            await using (var prepare = new NoCtfDbContext(options))
+            {
+                var running = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                running.ProviderReceiptJson = null;
+                await prepare.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(
+                redisContainer.GetConnectionString());
+            var redisDatabase = redis.GetDatabase();
+            const string pool = "pool-a";
+            const string runner = "runner-c";
+            foreach (var onlineRunner in new[] { "runner-a", "runner-b", runner })
+            {
+                await redisDatabase.SetAddAsync($"runner-pool:{pool}:members", onlineRunner);
+                await redisDatabase.StringSetAsync(
+                    $"runner:{onlineRunner}:heartbeat",
+                    "alive",
+                    TimeSpan.FromMinutes(1));
+            }
+            await redisDatabase.HashSetAsync(
+                $"runner:{runner}:capacity",
+                [
+                    new("availableMemoryBytes", 1024),
+                    new("availableNanoCpus", 100),
+                    new("availablePids", 10),
+                    new("totalMemoryBytes", 1024),
+                    new("totalNanoCpus", 100),
+                    new("totalPids", 10)
+                ]);
+            var capacity = new RedisRunnerCapacityGate(redis);
+            var claim = await capacity.TryClaimForRunnerAsync(
+                new RunnerCapacityRequest(fixture.RetainReceiptId, pool, 256, 25, 2),
+                runner,
+                cancellationToken);
+            await Assert.That(claim.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
+            await redisDatabase.KeyDeleteAsync($"runner:{runner}:heartbeat");
+
+            var reconciliationOutbox = new RecordingTransactionalOutbox();
+            await using (var reconcileDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now),
+                    reconcileDb,
+                    capacity,
+                    reconciliationOutbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
+            }
+            await using (var replacementDb = new NoCtfDbContext(options))
+            {
+                var stopping = await replacementDb.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                replacementDb.RuntimeInstances.Add(CreateReplacement(
+                    stopping,
+                    replacementId,
+                    fixture.Now.AddMinutes(4)));
+                await replacementDb.SaveChangesAsync(cancellationToken);
+            }
+
+            var cleanup = reconciliationOutbox.RunnerNodeMessages
+                .OfType<StopContainerRuntime>()
+                .Single(message => message.RuntimeInstanceId == fixture.RetainReceiptId);
+            await Assert.That(cleanup.Generation).IsEqualTo(1);
+            await Assert.That(cleanup.RunnerPool).IsEqualTo(pool);
+            await Assert.That(cleanup.RunnerId).IsEqualTo(runner);
+            await Assert.That(reconciliationOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            await Assert.That(await redisDatabase.KeyExistsAsync(
+                $"runner-claim:{fixture.RetainReceiptId:N}")).IsTrue();
+
+            var services = new ServiceCollection();
+            services.AddDbContext<NoCtfDbContext>(builder => builder
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention());
+            await using var serviceProvider = services.BuildServiceProvider();
+            var workReader = new RuntimeNodeWorkReader(
+                serviceProvider.GetRequiredService<IServiceScopeFactory>());
+            var reconciler = new RecordingResourceReconciler(RuntimeProvider.Docker, []);
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Runner:Pool"] = pool,
+                    ["Runner:Id"] = runner
+                })
+                .Build();
+            var handler = new RuntimeProviderHandler(
+                new UnusedRuntimeProviderCatalog(),
+                [reconciler],
+                configuration,
+                capacity,
+                workReader);
+
+            Func<Task> wrongOwner = async () =>
+                _ = await handler.Handle(
+                    cleanup with { RunnerId = "runner-b" },
+                    cancellationToken);
+            await Assert.That(wrongOwner).Throws<InvalidOperationException>();
+
+            var wrongGeneration = (RuntimeStopped)await handler.Handle(
+                cleanup with { Generation = 2 },
+                cancellationToken);
+            var fencedOutbox = new RecordingTransactionalOutbox();
+            await using (var fencedDb = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    wrongGeneration,
+                    fencedDb,
+                    fencedOutbox,
+                    cancellationToken);
+            }
+            await using (var wrongOwnerAckDb = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    wrongGeneration with { Generation = 1, RunnerId = "runner-b" },
+                    wrongOwnerAckDb,
+                    fencedOutbox,
+                    cancellationToken);
+            }
+            await using (var fencedVerify = new NoCtfDbContext(options))
+            {
+                var waiting = await fencedVerify.RuntimeInstances.AsNoTracking().SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                await Assert.That(waiting.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(waiting.ProcessingVersion).IsEqualTo(8);
+            }
+            await Assert.That(fencedOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            await Assert.That(await redisDatabase.KeyExistsAsync(
+                $"runner-claim:{fixture.RetainReceiptId:N}")).IsTrue();
+
+            var firstAck = (RuntimeStopped)await handler.Handle(cleanup, cancellationToken);
+            var duplicateAck = (RuntimeStopped)await handler.Handle(cleanup, cancellationToken);
+            await Assert.That(reconciler.Destroyed)
+                .IsEquivalentTo([
+                    new RuntimeResourceIdentity(fixture.RetainReceiptId, 1),
+                    new RuntimeResourceIdentity(fixture.RetainReceiptId, 1)
+                ]);
+            await Assert.That(await redisDatabase.KeyExistsAsync(
+                $"runner-claim:{fixture.RetainReceiptId:N}")).IsFalse();
+            await Assert.That((long)(await redisDatabase.HashGetAsync(
+                $"runner:{runner}:capacity",
+                "availableMemoryBytes"))!).IsEqualTo(1024);
+            await Assert.That(reconciliationOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            await using (var completeDb = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    firstAck,
+                    completeDb,
+                    reconciliationOutbox,
+                    cancellationToken);
+            }
+            await using (var replayDb = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    duplicateAck,
+                    replayDb,
+                    reconciliationOutbox,
+                    cancellationToken);
+            }
+
+            var dispatches = reconciliationOutbox.Published.OfType<DispatchRuntime>()
+                .Where(message => message.RuntimeInstanceId == replacementId)
+                .ToArray();
+            await Assert.That(dispatches).Count().IsEqualTo(1);
+            await using var verify = new NoCtfDbContext(options);
+            var stopped = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+                instance => instance.Id == fixture.RetainReceiptId,
+                cancellationToken);
+            await Assert.That(stopped.State).IsEqualTo(RuntimeState.Stopped);
+            await Assert.That(stopped.ProcessingVersion).IsEqualTo(9);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Failed_unreceipted_cleanup_retains_capacity_and_later_start_retries_before_dispatch(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await using var redisContainer = new RedisBuilder("redis:7-alpine").Build();
+            await Task.WhenAll(
+                postgres.StartAsync(cancellationToken),
+                redisContainer.StartAsync(cancellationToken));
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            var failedReplacementId = Guid.CreateVersion7();
+            await using (var prepare = new NoCtfDbContext(options))
+            {
+                var running = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                running.ProviderReceiptJson = null;
+                await prepare.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(
+                redisContainer.GetConnectionString());
+            var redisDatabase = redis.GetDatabase();
+            const string pool = "pool-a";
+            const string runner = "runner-c";
+            foreach (var onlineRunner in new[] { "runner-a", "runner-b", runner })
+            {
+                await redisDatabase.SetAddAsync($"runner-pool:{pool}:members", onlineRunner);
+                await redisDatabase.StringSetAsync(
+                    $"runner:{onlineRunner}:heartbeat",
+                    "alive",
+                    TimeSpan.FromMinutes(1));
+            }
+            await redisDatabase.HashSetAsync(
+                $"runner:{runner}:capacity",
+                [
+                    new("availableMemoryBytes", 1024),
+                    new("availableNanoCpus", 100),
+                    new("availablePids", 10),
+                    new("totalMemoryBytes", 1024),
+                    new("totalNanoCpus", 100),
+                    new("totalPids", 10)
+                ]);
+            var capacity = new RedisRunnerCapacityGate(redis);
+            var claim = await capacity.TryClaimForRunnerAsync(
+                new RunnerCapacityRequest(fixture.RetainReceiptId, pool, 256, 25, 2),
+                runner,
+                cancellationToken);
+            await Assert.That(claim.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
+            await redisDatabase.KeyDeleteAsync($"runner:{runner}:heartbeat");
+
+            var reconciliationOutbox = new RecordingTransactionalOutbox();
+            await using (var reconcileDb = new NoCtfDbContext(options))
+            {
+                await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now),
+                    reconcileDb,
+                    capacity,
+                    reconciliationOutbox,
+                    cancellationToken);
+            }
+            await using (var replacementDb = new NoCtfDbContext(options))
+            {
+                var stopping = await replacementDb.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                replacementDb.RuntimeInstances.Add(CreateReplacement(
+                    stopping,
+                    failedReplacementId,
+                    fixture.Now.AddMinutes(4)));
+                await replacementDb.SaveChangesAsync(cancellationToken);
+            }
+            var initialCleanup = reconciliationOutbox.RunnerNodeMessages
+                .OfType<StopContainerRuntime>()
+                .Single(message => message.RuntimeInstanceId == fixture.RetainReceiptId);
+
+            var services = new ServiceCollection();
+            services.AddDbContext<NoCtfDbContext>(builder => builder
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention());
+            await using var serviceProvider = services.BuildServiceProvider();
+            var workReader = new RuntimeNodeWorkReader(
+                serviceProvider.GetRequiredService<IServiceScopeFactory>());
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Runner:Pool"] = pool,
+                    ["Runner:Id"] = runner
+                })
+                .Build();
+            var failedHandler = new RuntimeProviderHandler(
+                new UnusedRuntimeProviderCatalog(),
+                [new RecordingResourceReconciler(
+                    RuntimeProvider.Docker,
+                    [],
+                    failCleanup: true)],
+                configuration,
+                capacity,
+                workReader);
+            var failure = (RuntimeStopFailed)await failedHandler.Handle(
+                initialCleanup,
+                cancellationToken);
+            await Assert.That(failure.Generation).IsEqualTo(1);
+            await Assert.That(failure.RunnerId).IsEqualTo(runner);
+            await using (var failureDb = new NoCtfDbContext(options))
+                await RuntimeWriteBackHandler.Handle(failure, failureDb, cancellationToken);
+
+            await Assert.That(await redisDatabase.KeyExistsAsync(
+                $"runner-claim:{fixture.RetainReceiptId:N}")).IsTrue();
+            await Assert.That((long)(await redisDatabase.HashGetAsync(
+                $"runner:{runner}:capacity",
+                "availableMemoryBytes"))!).IsEqualTo(768);
+            await using (var failedVerify = new NoCtfDbContext(options))
+            {
+                var failed = await failedVerify.RuntimeInstances.AsNoTracking()
+                    .Where(instance => instance.Id == fixture.RetainReceiptId
+                        || instance.Id == failedReplacementId)
+                    .OrderBy(instance => instance.Generation)
+                    .ToListAsync(cancellationToken);
+                await Assert.That(failed).Count().IsEqualTo(2);
+                await Assert.That(failed.All(instance =>
+                    instance.State == RuntimeState.Failed
+                    && instance.FailureCode == RuntimeFailureCode.CleanupFailed)).IsTrue();
+                await Assert.That(failed[0].RunnerId).IsEqualTo(runner);
+            }
+
+            var retryOutbox = new RecordingTransactionalOutbox();
+            RuntimeMutationResult retry;
+            await using (var retryDb = new NoCtfDbContext(options))
+            {
+                var target = await retryDb.RuntimeInstances.AsNoTracking()
+                    .Where(instance => instance.Id == fixture.RetainReceiptId)
+                    .Select(instance => new
+                    {
+                        instance.CompetitionId,
+                        instance.CompetitionChallengeId
+                    })
+                    .SingleAsync(cancellationToken);
+                var userId = await retryDb.Competitions.AsNoTracking()
+                    .Where(competition => competition.Id == target.CompetitionId)
+                    .Select(competition => competition.OwnerId)
+                    .SingleAsync(cancellationToken);
+                var store = new RuntimeInstanceStore(
+                    retryDb,
+                    new ChallengeRuntimeTemplateCatalog(),
+                    new FixedRuntimePlacementPolicy(runnerPool: pool),
+                    new PostgresPerTeamRuntimeFlagStore(retryDb),
+                    retryOutbox);
+                retry = await store.MutatePlayerRuntimeAsync(
+                    new RuntimeMutationCommand(
+                        target.CompetitionId,
+                        target.CompetitionChallengeId,
+                        userId,
+                        RuntimeAction.Start,
+                        null,
+                        fixture.Now.AddMinutes(5)),
+                    cancellationToken);
+            }
+            await Assert.That(retry.Failure).IsNull();
+            await Assert.That(retry.Runtime).IsNotNull();
+            await Assert.That(retry.Runtime!.Generation).IsEqualTo(3);
+            await Assert.That(retryOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            var retryStop = retryOutbox.Published.OfType<StopRuntime>().Single();
+
+            await using (var routeDb = new NoCtfDbContext(options))
+            {
+                await BackendMessageHandlers.Handle(
+                    retryStop,
+                    routeDb,
+                    retryOutbox,
+                    cancellationToken);
+            }
+            var retriedCleanup = retryOutbox.RunnerNodeMessages
+                .OfType<StopContainerRuntime>()
+                .Single(message => message.RuntimeInstanceId == fixture.RetainReceiptId);
+            await Assert.That(retriedCleanup.Generation).IsEqualTo(1);
+            await Assert.That(retriedCleanup.RunnerId).IsEqualTo(runner);
+
+            var successfulReconciler = new RecordingResourceReconciler(
+                RuntimeProvider.Docker,
+                []);
+            var successHandler = new RuntimeProviderHandler(
+                new UnusedRuntimeProviderCatalog(),
+                [successfulReconciler],
+                configuration,
+                capacity,
+                workReader);
+            var acknowledgement = (RuntimeStopped)await successHandler.Handle(
+                retriedCleanup,
+                cancellationToken);
+            await Assert.That(successfulReconciler.Destroyed)
+                .IsEquivalentTo([new RuntimeResourceIdentity(fixture.RetainReceiptId, 1)]);
+            await Assert.That(await redisDatabase.KeyExistsAsync(
+                $"runner-claim:{fixture.RetainReceiptId:N}")).IsFalse();
+            await Assert.That(retryOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+
+            await using (var acknowledgementDb = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    acknowledgement,
+                    acknowledgementDb,
+                    retryOutbox,
+                    cancellationToken);
+            }
+            var dispatch = retryOutbox.Published.OfType<DispatchRuntime>().Single();
+            await Assert.That(dispatch.RuntimeInstanceId).IsEqualTo(retry.Runtime.Id);
+            await using var verify = new NoCtfDbContext(options);
+            var old = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+                instance => instance.Id == fixture.RetainReceiptId,
+                cancellationToken);
+            await Assert.That(old.State).IsEqualTo(RuntimeState.Stopped);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Offline_assignments_route_receipted_and_unreceipted_resources_back_to_the_owner_runner(
         CancellationToken cancellationToken)
     {
@@ -628,7 +1038,12 @@ public sealed class RunnerAssignmentReconciliationTests
 
             await using (var completeDb = new NoCtfDbContext(options))
                 await RuntimeWriteBackHandler.Handle(
-                    new RuntimeStopped(fixture.RedispatchId, 10),
+                    new RuntimeStopped(
+                        fixture.RedispatchId,
+                        10,
+                        1,
+                        "pool-a",
+                        "runner-a"),
                     completeDb,
                     outbox,
                     cancellationToken);
@@ -1015,9 +1430,15 @@ public sealed class RunnerAssignmentReconciliationTests
 
             status = await reader.ReadProvisionStatusAsync(provisionMessage, cancellationToken);
             await Assert.That(status).IsEqualTo(RuntimeProvisionWorkStatus.AssignmentRetained);
-            var directStop = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>().Single();
+            var typedStops = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>()
+                .OrderBy(message => message.ProcessingVersion)
+                .ToArray();
+            await Assert.That(typedStops.Select(message => message.ProcessingVersion))
+                .IsEquivalentTo([8L, 9L]);
+            var directStop = typedStops[^1];
             await Assert.That(directStop.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
             await Assert.That(directStop.ProcessingVersion).IsEqualTo(9);
+            await Assert.That(directStop.Generation).IsEqualTo(1);
             await Assert.That(directStop.RunnerId).IsEqualTo("runner-a");
 
             await using (var receiptFenceDb = new NoCtfDbContext(options))
@@ -1056,7 +1477,12 @@ public sealed class RunnerAssignmentReconciliationTests
 
             await using (var completeDb = new NoCtfDbContext(options))
                 await RuntimeWriteBackHandler.Handle(
-                    new RuntimeStopped(fixture.RedispatchId, 9),
+                    new RuntimeStopped(
+                        fixture.RedispatchId,
+                        9,
+                        1,
+                        "pool-a",
+                        "runner-a"),
                     completeDb,
                     outbox,
                     cancellationToken);
@@ -1722,6 +2148,21 @@ public sealed class RunnerAssignmentReconciliationTests
                 ? Task.FromException(new InvalidOperationException("cleanup failed"))
                 : Task.CompletedTask;
         }
+    }
+
+    private sealed class UnusedRuntimeProviderCatalog : IRuntimeProviderCatalog
+    {
+        public IContainerLifecycle Containers(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+
+        public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+
+        public IComposeRuntime Compose(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+
+        public IOvaRuntime Appliance(RuntimeProvider provider) =>
+            throw new NotSupportedException();
     }
 
 }

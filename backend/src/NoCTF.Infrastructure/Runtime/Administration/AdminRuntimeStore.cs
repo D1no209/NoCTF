@@ -414,7 +414,9 @@ public sealed class AdminRuntimeStore(
                         item.TeamId == teamId &&
                         item.Purpose == RuntimePurpose.Player &&
                         item.State == RuntimeState.Failed &&
-                        item.ProviderReceiptJson != null)
+                        item.RunnerId != null &&
+                        (item.ProviderReceiptJson != null
+                            || item.FailureCode == RuntimeFailureCode.CleanupFailed))
                     .OrderByDescending(item => item.Generation)
                     .FirstOrDefaultAsync(ct);
             if (cleanupTarget is not null)
