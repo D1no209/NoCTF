@@ -209,7 +209,11 @@ public sealed class ChallengeAttachmentStore(
                     .Where(flag =>
                         flag.ChallengeId == scope.ChallengeId &&
                         flag.SpecificationKind == SpecificationKind.Attachment &&
-                        flag.SpecificationId != null)
+                        flag.SpecificationId != null &&
+                        db.Set<ChallengeAttachment>().Any(attachment =>
+                            attachment.Id == flag.SpecificationId &&
+                            attachment.ChallengeId == scope.ChallengeId &&
+                            attachment.DeletedAt == null))
                     .OrderBy(flag => flag.Id)
                     .ToListAsync(ct);
                 if (candidates.Count == 0)
@@ -233,7 +237,10 @@ public sealed class ChallengeAttachmentStore(
 
         var attachment = await db.Set<ChallengeAttachment>().AsNoTracking()
             .Include(item => item.File)
-            .SingleOrDefaultAsync(item => item.Id == selectedId && item.DeletedAt == null, ct);
+            .SingleOrDefaultAsync(item =>
+                item.Id == selectedId &&
+                item.ChallengeId == scope.ChallengeId &&
+                item.DeletedAt == null, ct);
         if (attachment is null)
             return null;
         await transaction.CommitAsync(ct);
