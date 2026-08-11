@@ -42,8 +42,14 @@ function normalizeGuid(value: unknown): string {
   return typeof value === 'string' ? value.replaceAll('-', '').toLowerCase() : ''
 }
 
+export function competitionHubString(payload: unknown, key: string): string | null {
+  if (!payload || typeof payload !== 'object') return null
+  const value = Reflect.get(payload, key)
+  return typeof value === 'string' ? value : null
+}
+
 function dispatch(event: keyof CompetitionHubHandlers, payload: unknown, direct = false): void {
-  const competitionId = normalizeGuid((payload as { competitionId?: unknown })?.competitionId)
+  const competitionId = normalizeGuid(competitionHubString(payload, 'competitionId'))
   for (const subscriber of subscribers.values()) {
     const handler = subscriber.handlers[event]
     if (!handler) continue

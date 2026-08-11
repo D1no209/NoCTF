@@ -164,7 +164,7 @@ async function startDelete(): Promise<void> {
 }
 
 function deletionConflictMessage(error: unknown): string {
-  const code = (error as { code?: string } | undefined)?.code
+  const code = parseApiError(error).code
   switch (code) {
     case 'SelfDeletionForbidden':
       return translate("不能删除自己的账户")
