@@ -1,4 +1,5 @@
 import { listNotificationsEndpoint } from '../api'
+import { safeLocalStorage } from '../lib/safe-storage'
 import { ref } from 'vue'
 
 const latestNotificationId = ref<string | null>(null)
@@ -32,15 +33,15 @@ export function useNotificationUnread() {
     if (error) return
 
     latestNotificationId.value = data?.items?.[0]?.id ?? null
-    const lastReadId = import.meta.client ? localStorage.getItem(key) : null
+    const lastReadId = safeLocalStorage.getItem(key)
     hasUnread.value = isNotificationUnread(latestNotificationId.value, lastReadId)
   }
 
   function markAllRead(notificationId?: string | null): void {
     const key = storageKey()
     const id = notificationId ?? latestNotificationId.value
-    if (key && id && import.meta.client)
-      localStorage.setItem(key, id)
+    if (key && id)
+      safeLocalStorage.setItem(key, id)
     latestNotificationId.value = id ?? null
     hasUnread.value = false
   }

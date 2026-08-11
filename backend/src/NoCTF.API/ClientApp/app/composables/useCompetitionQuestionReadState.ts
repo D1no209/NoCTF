@@ -1,5 +1,6 @@
 import type { NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse } from '~/api'
 import { competitionQuestionUnreadCount } from '~/lib/competition-question'
+import { safeLocalStorage } from '~/lib/safe-storage'
 
 type Question = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
@@ -15,9 +16,9 @@ export function useCompetitionQuestionReadState(competitionId: string) {
 
   function load(): void {
     const key = storageKey()
-    if (!key || !import.meta.client) return
+    if (!key) return
     try {
-      const stored = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>
+      const stored = JSON.parse(safeLocalStorage.getItem(key) ?? '{}') as Record<string, unknown>
       seenRevisions.value = Object.fromEntries(
         Object.entries(stored).filter((entry): entry is [string, number] => Number.isInteger(entry[1])),
       )
@@ -44,8 +45,8 @@ export function useCompetitionQuestionReadState(competitionId: string) {
       [question.id]: Math.max(0, question.revision ?? 0),
     }
     const key = storageKey()
-    if (key && import.meta.client)
-      localStorage.setItem(key, JSON.stringify(seenRevisions.value))
+    if (key)
+      safeLocalStorage.setItem(key, JSON.stringify(seenRevisions.value))
   }
 
   onMounted(load)
