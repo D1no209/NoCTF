@@ -16,6 +16,8 @@ const { isLoggedIn } = useAuth()
 const items = ref<Challenge[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const leaderboardError = ref<string | null>(null)
+const leaderboardPending = ref(false)
 const dataScope = ref<string>(LeaderboardDataScope.Live)
 const leaderboard = ref<NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null>(null)
 const myTeamId = ref<string | null>(null)
@@ -24,8 +26,18 @@ async function loadLeaderboard(): Promise<boolean> {
   const { data, error: err, response } = await getLeaderboardEndpoint({
     path: { competitionId },
   })
-  if (err) return true
-  if (response?.status === 202) return false
+  if (response?.status === 202) {
+    leaderboardPending.value = true
+    leaderboardError.value = null
+    return false
+  }
+  if (err || !data) {
+    leaderboardPending.value = false
+    leaderboardError.value = parseApiError(err, translate("加载记分板失败")).message
+    return true
+  }
+  leaderboardPending.value = false
+  leaderboardError.value = null
   leaderboard.value = data as NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse
   return true
 }
@@ -123,7 +135,8 @@ const currentScoreByChallenge = computed(() => new Map(
 ))
 
 function currentScoreFor(challenge: Challenge): number | null {
-  if (!leaderboard.value || leaderboard.value.dataScope === LeaderboardDataScope.Hidden)
+  if (!leaderboard.value) return null
+  if (leaderboard.value.dataScope === LeaderboardDataScope.Hidden)
     return challenge.baseScore ?? null
   const score = currentScoreByChallenge.value.get(normalizeChallengeKey(challenge.id))
   return score ?? challenge.baseScore ?? null
@@ -148,6 +161,14 @@ const groups = computed(() => {
   <div class="flex flex-col gap-8">
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error }}</AlertDescription>
+    </Alert>
+    <Alert v-if="leaderboardError" variant="destructive">
+      <AlertDescription>{{ leaderboardError }}</AlertDescription>
+    </Alert>
+    <Alert v-else-if="leaderboardPending">
+      <AlertDescription class="flex items-center gap-2">
+        <Spinner class="size-3" /> {{ $t('记分板数据投影中,请稍候…') }}
+      </AlertDescription>
     </Alert>
     <Alert v-else-if="dataScope === LeaderboardDataScope.Frozen">
       <AlertDescription>{{ $t('排行榜已冻结,题目分数显示为冻结时快照。') }}</AlertDescription>
@@ -205,7 +226,9 @@ const groups = computed(() => {
                   </CardHeader>
                   <CardContent class="relative flex items-end justify-between gap-3">
                     <div class="flex flex-col items-start gap-2">
-                      <Badge v-if="currentScoreFor(challenge) === null" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
+                      <Badge v-if="!leaderboard && leaderboardError" variant="destructive"> {{ $t('加载记分板失败') }} </Badge>
+                      <Badge v-else-if="!leaderboard && leaderboardPending" variant="secondary"> {{ $t('记分板数据投影中,请稍候…') }} </Badge>
+                      <Badge v-else-if="currentScoreFor(challenge) === null" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
                       <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
                         {{ currentScoreFor(challenge) }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
                       </span>

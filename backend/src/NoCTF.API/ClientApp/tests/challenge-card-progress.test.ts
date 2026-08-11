@@ -14,6 +14,10 @@ describe('participant challenge progress', () => {
     expect(page).toContain('支队伍已解出')
     expect(page).toContain('已解出')
     expect(page).toContain('<Flag')
+    expect(page).toContain('leaderboardError.value = parseApiError')
+    expect(page).toContain('leaderboardPending.value = true')
+    expect(page).toContain('if (!leaderboard.value) return null')
+    expect(page).toContain('v-if="!leaderboard && leaderboardError"')
   })
 
   test('hides the participant challenge tab before the competition starts', async () => {

@@ -1475,5 +1475,7 @@ export const englishMessages: Record<string, string> = {
   "运营": "Operations",
   "监控": "Monitoring",
   "平台": "Platform",
+  "加载环境状态失败": "Failed to load the environment status",
+  "重试": "Retry",
   "运维": "Maintenance"
 }
