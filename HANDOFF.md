@@ -13,6 +13,9 @@
 
 - 功能提交 `f55a930c` 补齐 Cilium `toFQDNs` 的 DNS 观察前提：示例 policy 仅允许 Backend/Worker
   向集群 `kube-dns` 查询配置的精确 SMTP FQDN，并只允许该解析结果上的精确 SMTP TCP 端口。
+- 后续功能提交 `d8ab3ba4` 同时把基础 DNS allow 从“任意目标 53 端口”收紧为经 `kube-dns` 的
+  `*.svc.cluster.local` L7 查询。这样基础 L4 allow 不会覆盖 SMTP 的精确 L7 规则；其他外部名字也必须
+  显式获得自己的 exact-FQDN policy。
 - 运维生成 policy 时必须同时替换 DNS 规则与目标规则中的两处示例主机名；仍禁止通配域名、任意地址
   放行与把生产 SMTP 地址或凭据提交进仓库。默认未应用 policy 时邮件投递继续 fail closed。
 - 本阶段没有业务表、列、migration、snapshot、HTTP/OpenAPI、SDK 或版本号变化。验证通过：
