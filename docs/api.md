@@ -133,11 +133,10 @@ Flag request：
 { "flag": "flag{...}", "flags": null }
 ```
 
-AWD 可二选一使用 flag 或 flags；CTF/AWDP Break 必须只用 flag。AWD flags 每个 HTTP 请求最多
-64 项，所有 Flag 解码后的 UTF-8 正文合计最多 256 KiB，仍不设置尝试次数上限；超过任一批次上限返回
-稳定 `FlagBatchLimitExceeded`，任一项格式非法则返回 `FlagInvalid`，两者均为 400 且零写入。每项创建
-独立 GameplayFact；数据库不保存 batch。单 flag 的 202 body 返回 GameplayFactId/state/statusUrl；
-flags 保持输入顺序，不返回 BatchId。
+AWD 可二选一使用 flag 或 flags；CTF/AWDP Break 必须只用 flag。AWD flags 不限元素数、无总字节上限、
+无尝试次数上限；每项仍必须为 1–4096 UTF-8 bytes 且禁止 NUL。任一项格式非法则整个请求返回
+`FlagInvalid`/400 且零写入。每项创建独立 GameplayFact；数据库不保存 batch。单 flag 的 202 body 返回
+GameplayFactId/state/statusUrl；flags 保持输入顺序，不返回 BatchId。
 
 Patch upload 是 multipart 单文件，成功返回 PatchUploadId；Fix trigger body 只含该 Id。上传不创建 GameplayFact，触发才做尝试预检、锁定与 Reference 关联。
 

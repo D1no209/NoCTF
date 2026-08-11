@@ -135,7 +135,6 @@ public enum GameplayFactAdmissionFailureCodeProtocol
     BreakRequired,
     AttemptsExhausted,
     FlagInvalid,
-    FlagBatchLimitExceeded,
     FlagBatchNotSupported,
     GameplayFactScopeNotFound,
     GameplayFactConcurrency,
