@@ -3039,8 +3039,8 @@ export type ListCompetitionEventsData = {
         userId?: string | null;
         competitionChallengeId?: string | null;
         runtimeInstanceId?: string | null;
-        from: string;
-        to: string;
+        from?: string | null;
+        to?: string | null;
         cursor?: string | null;
         limit: number;
     };

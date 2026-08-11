@@ -86,8 +86,8 @@ public sealed class ListCompetitionEventsRequest
     [QueryParam] public Guid? UserId { get; set; }
     [QueryParam] public Guid? CompetitionChallengeId { get; set; }
     [QueryParam] public Guid? RuntimeInstanceId { get; set; }
-    [QueryParam] public DateTimeOffset From { get; set; }
-    [QueryParam] public DateTimeOffset To { get; set; }
+    [QueryParam] public DateTimeOffset? From { get; set; }
+    [QueryParam] public DateTimeOffset? To { get; set; }
     [QueryParam] public string? Cursor { get; set; }
     [QueryParam] public int Limit { get; set; } = 50;
 }
@@ -98,12 +98,13 @@ public sealed class ListCompetitionEventsValidator
     public ListCompetitionEventsValidator()
     {
         RuleFor(request => request.Limit).InclusiveBetween(1, 200);
-        RuleFor(request => request.From).NotEmpty();
-        RuleFor(request => request.To).NotEmpty();
         RuleFor(request => request).Must(request =>
-                request.From <= request.To
-                && request.To - request.From <= TimeSpan.FromDays(31))
-            .WithMessage("The event query range must be between zero and 31 days.");
+                request.From is null && request.To is null
+                || request.From is DateTimeOffset from
+                && request.To is DateTimeOffset to
+                && from <= to
+                && to - from <= TimeSpan.FromDays(31))
+            .WithMessage("Specify no event range for staff history, or a range between zero and 31 days.");
         RuleFor(request => request).Must(request =>
                 request.Kind is null || request.Kinds is null or { Length: 0 })
             .WithMessage("Specify either kind or kinds, not both.");
@@ -180,7 +181,7 @@ public sealed class ListCompetitionEventsEndpoint(
             CancellationToken cancellationToken)
     {
         var competitionId = Route<Guid>("competitionId");
-        var filterKey = FilterKey(competitionId, request);
+        var filterKey = FilterKey(competitionId, user.UserId, request);
         if (!cursors.TryDecode(
                 request.Cursor,
                 CursorEndpoint,
@@ -239,10 +240,12 @@ public sealed class ListCompetitionEventsEndpoint(
 
     internal static string FilterKey(
         Guid competitionId,
+        Guid actorUserId,
         ListCompetitionEventsRequest request) =>
         string.Join(
             '|',
             competitionId,
+            actorUserId,
             request.Kind,
             string.Join(',', (request.Kinds ?? []).OrderBy(item => item)),
             request.MinimumLevel,
@@ -250,8 +253,8 @@ public sealed class ListCompetitionEventsEndpoint(
             request.UserId,
             request.CompetitionChallengeId,
             request.RuntimeInstanceId,
-            request.From.ToString("O", CultureInfo.InvariantCulture),
-            request.To.ToString("O", CultureInfo.InvariantCulture));
+            request.From?.ToString("O", CultureInfo.InvariantCulture) ?? "*",
+            request.To?.ToString("O", CultureInfo.InvariantCulture) ?? "*");
 
     internal static CompetitionEventResponse Map(CompetitionEventView item) =>
         new(
