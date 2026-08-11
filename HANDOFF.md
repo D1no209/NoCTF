@@ -9,6 +9,21 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：平台供应链固定
+
+- 功能提交 `ebedac01` 将 Bun、Docker CLI、Alpine、.NET SDK/ASP.NET Runtime 构建基础，以及官方
+  Compose/Kubernetes 中的 PostgreSQL、Redis、MinIO 与 MinIO Client 全部固定为“精确版本标签 +
+  64 位多架构 manifest digest”；不再使用外部 `latest` 或只有可变 tag 的镜像。
+- Kompose 继续固定 `v1.38.0`，但下载后会按 BuildKit `TARGETARCH` 选择官方发布的 amd64、arm64 或 arm
+  SHA-256，并在赋予执行权限前用 `sha256sum -c -` 验证；未知架构 fail closed。
+- digest 通过 Docker Hub tag API、MCR OCI manifest HEAD 和 Kompose 官方 GitHub Release 元数据核对；
+  架构测试会拒绝漏掉 digest、重新引入外部 `latest` 或取消 Kompose checksum。生产自建 `noctf-*` 镜像
+  仍必须由发布流程按平台版本和构建产物 digest 重标，不能把本地示例 `latest` 当作生产身份。
+- 验证通过：Release solution build 0 警告/0 错误、DeploymentTopology 6/6、两份 Compose config
+  离线解析与 `git diff --check`。当前网络能读取官方元数据，但 `registry-1.docker.io` 拉取通道超时，故
+  没有伪报完整镜像构建；最终在线构建/扫描仍是发布门禁。无数据模型、migration、HTTP/OpenAPI、SDK
+  或版本号变化，尚未推送或部署。
+
 ## 2026-08-11 全量审计修复：Kubernetes PID 限制证明链
 
 - 功能提交 `953b68e9` 没有伪造 Kubernetes 不支持的 Pod 级 PID limit。运维确认 kubelet Pool-wide
