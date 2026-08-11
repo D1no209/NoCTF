@@ -5,12 +5,12 @@
 - 已用 EF CLI 重建 `InitialBaseline`，业务 schema 已按 GameplayFact 收敛为 16 张表；旧
   `submissions`/`scoring_events` 已由单一 `gameplay_facts` 当前事实表取代。
 - API、测试项目当前均可编译；EF model snapshot 与当前模型无 pending changes（2026-08-08 再次验证）。
-- OpenAPI 与 Nuxt 生成客户端曾在上一阶段完成同步；当前统一审计修复分支新增的 Runtime 镜像固定和
-  历史裁决协议变化尚未统一重新导出/生成，必须在 Registry SSRF 产品决策落定后一次完成并验证幂等。
+- OpenAPI 与 Nuxt 生成客户端曾在上一阶段完成同步；当前统一审计修复分支的历史裁决协议变化尚未
+  统一重新导出/生成，必须在最终收口时由工具完成并验证幂等。
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 上一完整测试基线为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等
   真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。
-  当前统一分支位于 `cdb22924`，最终 OpenAPI/SDK、`0.1.0-alpha.26`、全量门禁与 Microsoft Edge
+  当前统一分支功能基线位于 `623e66a4`，最终 OpenAPI/SDK、`0.1.0-alpha.26`、全量门禁与 Microsoft Edge
   浏览器验收仍待执行，不能把上一基线误报为当前分支最终结果。
 
 ## 2026-08-11 全量审计修复：历史裁决差异只读预览
@@ -48,27 +48,20 @@
   0 警告/0 错误、非 Integration 684/684、真实 Docker 定向测试 12/12、前端 game-config 7/7 与
   `git diff --check`。尚未推送、部署或操作生产 Runtime。
 
-## 2026-08-11 全量审计修复：题目镜像摘要固定与容量恢复
+## 2026-08-11 全量审计修复：可信题目镜像策略
 
-- 功能提交 `e4235b5f` 在题目发布、比赛启动和归档恢复前解析 Runtime、Checker 与 Compose 所引用的
-  OCI 镜像，将不可变 manifest digest 合并回既有 `Challenge.DefinitionJson` 并以 revision fence
-  持久化；没有新增镜像快照表。旧的可变 tag Claim、Provision 与 AWDP Fix 验证消息在 Runner 边界
-  fail closed，不能在排队后悄悄拉取另一份镜像。
-- 生命周期会先完成已经到期的比赛，再在共享的 60 秒固定预算内处理镜像解析；失败日志使用结构化且
-  脱敏的 Warning。OCI 响应、descriptor 和 digest 均有边界及格式校验，错误通过强类型失败结果返回，
-  不把 Registry 响应正文或凭据写入日志。
-- 同一提交修复失联 Runtime 的 Runner 容量恢复顺序：PostgreSQL CAS 先确定唯一权威状态，再使用既有
-  `RunnerAssignmentReleaseToken` 释放 Redis claim；覆盖 pinned-wins、mutable-wins、崩溃恢复和重复执行，
-  避免先释放后落库造成容量双占或错误复用。
-- 独立阶段验证通过：Release solution build 0 警告/0 错误、非 Integration 669/669、题目镜像固定相关
-  PostgreSQL/Redis 25/25、前端定向测试 4/4、typecheck、production build 与 EF model drift；完整
-  Integration 为 147/150，其中 Kubernetes/Libvirt 两项按外部环境缺失跳过，Wolverine 定时测试一次
-  超时后隔离重跑 1/1 通过。统一分支最终全量门禁仍须重跑。
-- 当前唯一尚未确定的产品决策是 Registry SSRF 信任边界：题目维护者可配置 Registry origin，而 OCI
-  Bearer challenge 还可能把认证请求引向另一个 origin。已通过 `$grill-me` 提供 A/B/C 方案，等待用户
-  选择“管理员显式 allowlist + DNS/私网边界”“仅公共 Registry”或“信任题目维护者”的策略；在答案前
-  不擅自改变产品权限。该决策落定后还须补齐实现/测试，再统一生成 OpenAPI/SDK。
-- 本阶段没有新增业务表、列、migration 或 snapshot；尚未推送、部署，也未解析或拉取生产题目镜像。
+- 用户最终明确选择信任 Organizer、题目 Owner/Manager 提供的 Runtime、Checker 与 Compose 镜像，
+  不要求把题目镜像 tag 解析或固定为 OCI digest，也不增加 Registry origin、认证源、DNS 或私网
+  allowlist。题目仍按现有 tag/digest 原样交给所选 Runtime provider；这是明确的产品信任边界。
+- `e4235b5f` 曾实现题目镜像 digest 固定，但该方案被用户明确否决；`623e66a4` 以可追溯 revert 完整删除
+  OCI resolver、发布/开赛/恢复门禁、Runner mutable-image guard、相关协议、前端提示与测试，没有留下
+  隐藏的固定逻辑或新增数据模型。平台自身构建基础和官方依赖镜像的可复现供应链固定不属于题目镜像
+  运行语义，本次没有回退。
+- 撤销后验证通过：Release solution build 0 警告/0 错误、Container Runtime handler 5/5、Compose
+  policy 16/16、AWDP execution fence PostgreSQL 3/3、真实 Docker lifecycle 12/12 与
+  `git diff --check`。日志轮转、AWDP durable replay fence、失联 Runtime 恢复和显式
+  `RunAsNonRoot` 校验仍保留。
+- 本阶段没有新增表、列、migration、snapshot、OpenAPI 或 SDK 变化；尚未推送、部署或操作生产镜像。
 
 ## 2026-08-11 全量审计修复：归档比赛工作人员永久历史
 
@@ -84,10 +77,10 @@
 
 ## 2026-08-11 当前统一收口状态
 
-- 当前功能基线为 `cdb22924`。以上最近阶段均为本地提交，没有新增数据表或 EF migration，也没有推送、
+- 当前功能基线为 `623e66a4`。以上最近阶段均为本地提交，没有新增数据表或 EF migration，也没有推送、
   部署或操作生产数据。
-- Registry SSRF 信任边界是唯一仍需用户作出的产品决策。其余待办是该决策后的工程收口：重新导出
-  OpenAPI、重新生成 TypeScript SDK 并验证二次生成无漂移；把平台版本递增为 `0.1.0-alpha.26`；运行
+- Registry/题目镜像信任边界已由用户选择，不再是阻塞项。剩余工作是工程收口：重新导出 OpenAPI、
+  重新生成 TypeScript SDK 并验证二次生成无漂移；把平台版本递增为 `0.1.0-alpha.26`；运行
   Release build、完整后端/真实依赖/四模式 E2E、EF drift、前端测试/typecheck/build 与
   `git diff --check`；最后只用 Microsoft Edge 和可丢弃本地数据做浏览器验收。
 - 未完成、被跳过或受外部环境阻塞的门禁不得报告为通过。完成上述收口前不得推送或部署。
