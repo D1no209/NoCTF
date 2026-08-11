@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Docker.DotNet;
+using Docker.DotNet.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +20,9 @@ using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Infrastructure.Runtime.Instances;
+using NoCTF.Runtime.Docker;
+using NoCTF.Runtime.Docker.Compose;
+using NoCTF.Runtime.Docker.Containers;
 using NoCTF.Runner.Composition;
 using NoCTF.Runner.Messages;
 using NoCTF.Worker;
@@ -1662,7 +1667,7 @@ public sealed class RunnerAssignmentReconciliationTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Resource_reconciliation_preserves_only_the_current_node_assignment(
+    public async Task Resource_reconciliation_preserves_current_assignment_and_removes_stale_identity_and_orphan(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -1719,6 +1724,125 @@ public sealed class RunnerAssignmentReconciliationTests
                     new RuntimeResourceIdentity(orphanId, 1)
                 ]);
             await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([orphanId]);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Shared_daemon_runners_across_pools_preserve_active_resources_and_only_owner_cleans_terminal_assignment(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                var otherActiveAssignment = await seed.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                otherActiveAssignment.RunnerId = "runner-b";
+                otherActiveAssignment.RunnerPool = "pool-b";
+                var otherTerminalAssignment = await seed.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.CompleteStopId,
+                    cancellationToken);
+                otherTerminalAssignment.State = RuntimeState.Stopped;
+                otherTerminalAssignment.RunnerPool = "pool-b";
+                await seed.SaveChangesAsync(cancellationToken);
+            }
+
+            var current = new RuntimeResourceIdentity(fixture.RedispatchId, 1);
+            var otherActive = new RuntimeResourceIdentity(fixture.RetainReceiptId, 1);
+            var otherTerminal = new RuntimeResourceIdentity(fixture.CompleteStopId, 1);
+            var orphan = new RuntimeResourceIdentity(Guid.CreateVersion7(), 1);
+            var identities = new[] { current, otherActive, otherTerminal, orphan };
+            var operationId = Guid.CreateVersion7();
+            var endpoint = DockerEndpoint();
+            var dockerOptions = new DockerRuntimeOptions(
+                endpoint,
+                $"noctf-reconciliation-unused-{operationId:N}",
+                "localhost");
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(endpoint))
+                .Build();
+            using var dockerReconciler = new DockerRuntimeResourceReconciler(
+                dockerOptions,
+                new DockerComposeRuntime(
+                    dockerOptions,
+                    workDirectory: Path.Combine(
+                        Path.GetTempPath(),
+                        $"noctf-reconciliation-unused-{operationId:N}")));
+            var reconciler = new IdentityScopedResourceReconciler(
+                dockerReconciler,
+                identities.ToHashSet());
+            var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Online);
+            try
+            {
+                foreach (var identity in identities)
+                {
+                    await docker.Networks.CreateNetworkAsync(
+                        new NetworksCreateParameters
+                        {
+                            Name =
+                                $"noctf-reconciliation-{operationId:N}-{identity.RuntimeInstanceId:N}",
+                            Labels = new Dictionary<string, string>
+                            {
+                                ["noctf.io/managed"] = "true",
+                                ["noctf.io/job-kind"] = "persistent-runtime",
+                                ["noctf.io/runtime-instance-id"] =
+                                    identity.RuntimeInstanceId.ToString("D"),
+                                ["noctf.io/generation"] = identity.Generation.ToString(
+                                    System.Globalization.CultureInfo.InvariantCulture)
+                            }
+                        },
+                        cancellationToken);
+                }
+
+                await using (var runnerADb = new NoCtfDbContext(options))
+                {
+                    var handler = new RuntimeResourceReconciliationHandler(
+                        runnerADb,
+                        [reconciler],
+                        RunnerConfiguration("runner-a"),
+                        capacity);
+                    await handler.Handle(
+                        new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now),
+                        cancellationToken);
+                }
+
+                await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
+                    .IsEquivalentTo([current, otherActive, otherTerminal]);
+                await Assert.That(capacity.ReleasedRuntimeIds)
+                    .IsEquivalentTo(new[] { orphan.RuntimeInstanceId });
+
+                await using (var runnerBDb = new NoCtfDbContext(options))
+                {
+                    var handler = new RuntimeResourceReconciliationHandler(
+                        runnerBDb,
+                        [reconciler],
+                        RunnerConfiguration("runner-b", "pool-b"),
+                        capacity);
+                    await handler.Handle(
+                        new ReconcileRuntimeResources("pool-b", "runner-b", fixture.Now),
+                        cancellationToken);
+                }
+
+                await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
+                    .IsEquivalentTo([current, otherActive]);
+                await Assert.That(capacity.ReleasedRuntimeIds)
+                    .IsEquivalentTo(new[] { orphan.RuntimeInstanceId, fixture.CompleteStopId });
+            }
+            finally
+            {
+                foreach (var identity in identities)
+                {
+                    await reconciler.DestroyByIdentityAsync(
+                        identity,
+                        CancellationToken.None);
+                }
+            }
         });
     }
 
@@ -1949,6 +2073,23 @@ public sealed class RunnerAssignmentReconciliationTests
             .WithUsername("postgres")
             .WithPassword("postgres")
             .Build();
+
+    private static IConfiguration RunnerConfiguration(
+        string runnerId,
+        string runnerPool = "pool-a") =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Runner:Pool"] = runnerPool,
+                ["Runner:Id"] = runnerId,
+                ["Runner:Provider"] = nameof(RuntimeProvider.Docker)
+            })
+            .Build();
+
+    private static string DockerEndpoint() => Environment.GetEnvironmentVariable("DOCKER_HOST") ??
+        (OperatingSystem.IsWindows()
+            ? "npipe://./pipe/docker_engine"
+            : "unix:///var/run/docker.sock");
 
     private static DbContextOptions<NoCtfDbContext> CreateOptions(string connectionString) =>
         new DbContextOptionsBuilder<NoCtfDbContext>()
@@ -2197,6 +2338,27 @@ public sealed class RunnerAssignmentReconciliationTests
                 ? Task.FromException(new InvalidOperationException("cleanup failed"))
                 : Task.CompletedTask;
         }
+    }
+
+    private sealed class IdentityScopedResourceReconciler(
+        IRuntimeManagedResourceReconciler inner,
+        IReadOnlySet<RuntimeResourceIdentity> identities) : IRuntimeManagedResourceReconciler
+    {
+        public RuntimeProvider Provider => inner.Provider;
+
+        public async Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
+            CancellationToken cancellationToken) =>
+            (await inner.ListManagedAsync(cancellationToken))
+            .Where(identities.Contains)
+            .ToArray();
+
+        public Task DestroyByIdentityAsync(
+            RuntimeResourceIdentity identity,
+            CancellationToken cancellationToken) =>
+            identities.Contains(identity)
+                ? inner.DestroyByIdentityAsync(identity, cancellationToken)
+                : throw new InvalidOperationException(
+                    "The integration reconciler cannot access resources outside its test scope.");
     }
 
     private sealed class UnusedRuntimeProviderCatalog : IRuntimeProviderCatalog
