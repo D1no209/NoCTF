@@ -67,10 +67,23 @@ public sealed class KubernetesRuntimePoolStartupCheckTests
         await Assert.That(exception!.Message).Contains("does not match Service");
     }
 
+    [Test]
+    public async Task Missing_ready_node_pids_attestation_refuses_runner_startup()
+    {
+        var check = CreateCheck(ValidPolicy(), attestedNodeAvailable: false);
+
+        var action = () => check.StartAsync(CancellationToken.None);
+
+        var exception = await Assert.That(action).Throws<InvalidOperationException>();
+        await Assert.That(exception!.Message)
+            .Contains("noctf.io/pod-pids-limit=512");
+    }
+
     private static KubernetesRuntimePoolStartupCheck CreateCheck(
         V1NetworkPolicy? policy,
         string ciliumEnforcementMode = "always",
-        string kubeDnsAddress = "10.96.0.10")
+        string kubeDnsAddress = "10.96.0.10",
+        bool attestedNodeAvailable = true)
     {
         var client = Substitute.For<IKubernetes>();
         var core = Substitute.For<ICoreV1Operations>();
@@ -111,6 +124,54 @@ public sealed class KubernetesRuntimePoolStartupCheckTests
                     }
                 }
             }));
+        core.ListNodeWithHttpMessagesAsync(
+                Arg.Any<bool?>(),
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                $"{KubernetesRuntimeOptions.PodPidsLimitNodeLabel}=512",
+                Arg.Any<int?>(),
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<int?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<bool?>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new HttpOperationResponse<V1NodeList>
+            {
+                Body = new V1NodeList
+                {
+                    Items = attestedNodeAvailable
+                        ?
+                        [
+                            new V1Node
+                            {
+                                Metadata = new V1ObjectMeta
+                                {
+                                    Name = "runtime-node",
+                                    Labels = new Dictionary<string, string>
+                                    {
+                                        [KubernetesRuntimeOptions.PodPidsLimitNodeLabel] = "512"
+                                    }
+                                },
+                                Spec = new V1NodeSpec { Unschedulable = false },
+                                Status = new V1NodeStatus
+                                {
+                                    Conditions =
+                                    [
+                                        new V1NodeCondition
+                                        {
+                                            Type = "Ready",
+                                            Status = "True"
+                                        }
+                                    ]
+                                }
+                            }
+                        ]
+                        : []
+                }
+            }));
         var call = networking.ReadNamespacedNetworkPolicyWithHttpMessagesAsync(
             KubernetesRuntimePoolStartupCheck.PolicyName,
             "runtime",
@@ -138,6 +199,7 @@ public sealed class KubernetesRuntimePoolStartupCheckTests
             client,
             new KubernetesRuntimeOptions(
                 Namespace: "runtime",
+                PodPidsLimit: 512,
                 ClusterDnsServiceAddress: "10.96.0.10"));
     }
 

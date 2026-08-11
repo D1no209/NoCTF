@@ -328,7 +328,9 @@ public sealed class KubernetesContainerLifecycleTests
             .Returns(Task.FromResult(new HttpOperationResponse<V1Pod> { Body = new V1Pod() }));
         var lifecycle = new KubernetesContainerLifecycle(
             client,
-            new KubernetesRuntimeOptions(ClusterDnsServiceAddress: "10.96.0.10"));
+            new KubernetesRuntimeOptions(
+                PodPidsLimit: 512,
+                ClusterDnsServiceAddress: "10.96.0.10"));
 
         _ = await lifecycle.CreateAsync(
             CheckerRequest() with { AllowInternalCallback = false }, CancellationToken.None);
@@ -337,6 +339,9 @@ public sealed class KubernetesContainerLifecycleTests
         await Assert.That(createdPod.Spec.AutomountServiceAccountToken).IsFalse();
         await Assert.That(createdPod.Spec.EnableServiceLinks).IsFalse();
         await Assert.That(createdPod.Spec.ServiceAccountName).IsNull();
+        await Assert.That(createdPod.Spec.NodeSelector[
+                KubernetesRuntimeOptions.PodPidsLimitNodeLabel])
+            .IsEqualTo("512");
     }
 
     [Test]

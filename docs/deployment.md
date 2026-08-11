@@ -81,7 +81,10 @@ Kubernetes 清单使用 StatefulSet Pod 名作为 RunnerId，使副本扩缩容�
 其他编排环境也必须为每个 Runner 副本提供唯一且可恢复的 RunnerId；不得让多个活动副本共享身份。
 
 `Runtime__Kubernetes__PodPidsLimit` 是 Runner 的容量与兼容校验值，必须与该 Pool
-kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。
+kubelet 实际统一配置的 `PodPidsLimit` 完全一致；应用配置本身不会修改 kubelet。运维核验节点配置后，
+必须给允许承载题目工作负载的节点设置精确的 `noctf.io/pod-pids-limit=<数值>` 标签。Runner 启动时以
+只读 Node 权限确认至少一个同值、Ready 且可调度的节点；所有单容器与 Compose Runtime Pod 同时强制
+使用该标签作为 `nodeSelector`。未核验或数值不同的新节点不会承载 Runtime。
 `NetworkPolicyRequired=true` 是部署契约，运维仍必须确认 CNI 实际执行 NetworkPolicy。
 `Runtime__Kubernetes__ProtectedCidrs` 至少包含一项；平台会额外内建拒绝 RFC1918、
 link-local、loopback、共享地址和其他特殊用途 IPv4 空间。Pool 必须补充所有不属于这些

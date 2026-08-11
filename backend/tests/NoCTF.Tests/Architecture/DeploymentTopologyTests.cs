@@ -144,6 +144,7 @@ public sealed class DeploymentTopologyTests
     {
         var networkPolicies = await ReadAsync("deploy", "k8s", "networkpolicy.yaml");
         var smtpExample = await ReadAsync("deploy", "k8s", "smtp-egress.example.yaml");
+        var runnerRbac = await ReadAsync("deploy", "k8s", "runner-rbac.yaml");
 
         var runnerApiPolicy = networkPolicies
             .Split("\n---", StringSplitOptions.RemoveEmptyEntries)
@@ -159,6 +160,10 @@ public sealed class DeploymentTopologyTests
         await Assert.That(smtpExample).DoesNotContain("matchPattern:");
         await Assert.That(smtpExample).DoesNotContain("0.0.0.0/0");
         await Assert.That(smtpExample).DoesNotContain("password");
+        await Assert.That(runnerRbac).Contains("kind: ClusterRole");
+        await Assert.That(runnerRbac).Contains("name: noctf-runner-node-attestation");
+        await Assert.That(runnerRbac).Contains("resources: [\"nodes\"]");
+        await Assert.That(runnerRbac).Contains("verbs: [\"get\", \"list\"]");
     }
 
     [Test]

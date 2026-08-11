@@ -90,6 +90,12 @@ public sealed class KubernetesContainerLifecycle(
             {
                 AutomountServiceAccountToken = false,
                 EnableServiceLinks = false,
+                NodeSelector = new Dictionary<string, string>
+                {
+                    [KubernetesRuntimeOptions.PodPidsLimitNodeLabel] =
+                        options.PodPidsLimit.ToString(
+                            System.Globalization.CultureInfo.InvariantCulture)
+                },
                 Containers =
                 [
                     new V1Container
