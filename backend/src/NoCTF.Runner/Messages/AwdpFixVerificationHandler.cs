@@ -70,6 +70,7 @@ public interface IAwdpCheckerExecutor
 public enum AwdpCheckerExecutionOutcome
 {
     Completed,
+    AbnormalExit,
     TimedOut
 }
 
@@ -78,6 +79,7 @@ public static class AwdpCheckerCompletionPolicy
     public static AwdpFixOutcome? ResultFor(AwdpCheckerExecutionOutcome outcome) => outcome switch
     {
         AwdpCheckerExecutionOutcome.Completed => null,
+        AwdpCheckerExecutionOutcome.AbnormalExit => AwdpFixOutcome.PlatformFailed,
         AwdpCheckerExecutionOutcome.TimedOut => AwdpFixOutcome.PlatformFailed,
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
     };
@@ -335,8 +337,10 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
         timeout.CancelAfter(work.Timeout);
         try
         {
-            _ = await providers.OneShot(work.Provider).RunAsync(request, timeout.Token);
-            return AwdpCheckerExecutionOutcome.Completed;
+            var result = await providers.OneShot(work.Provider).RunAsync(request, timeout.Token);
+            return result.ExitCode == 0
+                ? AwdpCheckerExecutionOutcome.Completed
+                : AwdpCheckerExecutionOutcome.AbnormalExit;
         }
         catch (OperationCanceledException) when (
             !cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)

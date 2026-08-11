@@ -1,8 +1,17 @@
+using System.Formats.Tar;
+using System.IO.Compression;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using NSubstitute;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Capacity;
+using NoCTF.Application.Runtime.Provisioning;
 using JasperFx;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
@@ -28,7 +37,13 @@ using Wolverine.Runtime;
 using LifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 using LifecycleMessage = NoCTF.Application.Messaging.AdvanceCompetitionLifecycle;
 using NoCTF.Application.Competitions.Koh;
+using NoCTF.Application.GameplayFacts.Processing;
+using NoCTF.Application.Runtime.Instances;
+using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.Infrastructure.GameplayFacts.Processing;
+using NoCTF.Runner.Composition;
+using NoCTF.Runner.Messages;
 
 namespace NoCTF.Tests.Integration.Messaging;
 
@@ -37,6 +52,63 @@ namespace NoCTF.Tests.Integration.Messaging;
 [NotInParallel]
 public sealed class WolverineTransactionalOutboxTests
 {
+    [Test]
+    [Category("AwdpFixFence")]
+    [Timeout(300_000)]
+    public async Task Awdp_nonzero_checker_exit_is_persisted_through_wolverine(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var fixture = AwdpFixExecutionFixture.Create(exitCode: 17);
+            using var host = BuildHost(
+                postgres.GetConnectionString(),
+                awdpFixExecution: fixture);
+            await SeedAwdpFixAsync(host, fixture, cancellationToken);
+            await host.StartAsync(cancellationToken);
+            try
+            {
+                var observation = AwdpFixResultObservation.Expect(fixture.GameplayFactId);
+                await host.Services.GetRequiredService<IMessageBus>()
+                    .SendAsync(fixture.Message);
+                var recorded = await observation.Task.WaitAsync(cancellationToken);
+
+                await WaitForGameplayFactStateAsync(
+                    host,
+                    fixture.GameplayFactId,
+                    GameplayFactState.PlatformFailed,
+                    cancellationToken);
+                await using var scope = host.Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+                var fact = await db.GameplayFacts.AsNoTracking()
+                    .SingleAsync(
+                        item => item.Id == fixture.GameplayFactId,
+                        cancellationToken);
+                var runtime = await db.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(
+                        item => item.Id == fixture.RuntimeInstanceId,
+                        cancellationToken);
+                await Assert.That(recorded.Message.Outcome)
+                    .IsEqualTo(AwdpFixOutcome.PlatformFailed);
+                await Assert.That(recorded.Disposition)
+                    .IsEqualTo(InternalResultDisposition.Applied);
+                await Assert.That(fixture.OneShotRunner.ExecutionCount).IsEqualTo(1);
+                await Assert.That(AwdpFixResultObservation.Count(fixture.GameplayFactId))
+                    .IsEqualTo(1);
+                await Assert.That(fact.FailureCode)
+                    .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
+                await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(runtime.ProcessingVersion).IsEqualTo(6);
+            }
+            finally
+            {
+                await host.StopAsync(cancellationToken);
+            }
+        });
+    }
+
     [Test]
     [Category("AwdpFixFence")]
     [Timeout(300_000)]
@@ -723,14 +795,172 @@ public sealed class WolverineTransactionalOutboxTests
         throw new TimeoutException($"Competition {competitionId} did not reach {expected}.");
     }
 
+    private static async Task WaitForGameplayFactStateAsync(
+        IHost host,
+        Guid gameplayFactId,
+        GameplayFactState expected,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            await using var scope = host.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+            var state = await db.GameplayFacts.AsNoTracking()
+                .Where(item => item.Id == gameplayFactId)
+                .Select(item => item.State)
+                .SingleAsync(cancellationToken);
+            if (state == expected)
+                return;
+            await Task.Delay(100, cancellationToken);
+        }
+        throw new TimeoutException(
+            $"Gameplay fact {gameplayFactId} did not reach {expected}.");
+    }
+
+    private static async Task SeedAwdpFixAsync(
+        IHost host,
+        AwdpFixExecutionFixture fixture,
+        CancellationToken cancellationToken)
+    {
+        var now = fixture.Now;
+        await using var scope = host.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        await db.Database.MigrateAsync(cancellationToken);
+        var ownerId = Guid.CreateVersion7();
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var teamId = Guid.CreateVersion7();
+        db.Users.Add(new User
+        {
+            Id = ownerId,
+            UserName = "awdp-result-owner",
+            NormalizedUserName = "AWDP-RESULT-OWNER",
+            Email = "awdp-result@example.test",
+            NormalizedEmail = "AWDP-RESULT@EXAMPLE.TEST",
+            PasswordHash = "test",
+            Kind = UserKind.Human,
+            Role = UserRole.User,
+            AccountStatus = UserAccountStatus.Active,
+            EmailVerifiedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            Title = "AWDP result outbox",
+            OwnerId = ownerId,
+            Mode = GameMode.Awdp,
+            ConfigurationRevision = 3,
+            ConfigurationUpdatedAt = now,
+            FlagDerivationSecret = new byte[32],
+            StartAt = now.AddMinutes(-1),
+            EndAt = now.AddHours(1),
+            Status = CompetitionStatus.Running,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.Challenges.Add(new Challenge
+        {
+            Id = challengeId,
+            OwnerId = ownerId,
+            Mode = GameMode.Awdp,
+            Title = "AWDP result target",
+            Visibility = ChallengeVisibility.Private,
+            Revision = 5,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.CompetitionChallenges.Add(new CompetitionChallenge
+        {
+            Id = fixture.CompetitionChallengeId,
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            BaseScore = 100,
+            IsPublished = true,
+            Revision = 7,
+            UpdatedAt = now
+        });
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = competitionId,
+            Name = "awdp-result-team",
+            NormalizedName = "AWDP-RESULT-TEAM",
+            CaptainId = ownerId,
+            MemberIds = [ownerId],
+            InvitationToken = new string('a', 32),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegisteredAt = now
+        });
+        db.GameplayFacts.Add(new GameplayFact
+        {
+            Id = fixture.GameplayFactId,
+            CompetitionId = competitionId,
+            CompetitionChallengeId = fixture.CompetitionChallengeId,
+            TeamId = teamId,
+            ActorUserId = ownerId,
+            Kind = GameplayFactKind.FixAttempt,
+            ReferenceKind = GameplayFactReferenceKind.PatchUpload,
+            ReferenceId = fixture.PatchUploadId,
+            State = GameplayFactState.Processing,
+            OccurredAt = now,
+            UpdatedAt = now
+        });
+        db.RuntimeInstances.Add(new RuntimeInstance
+        {
+            Id = fixture.RuntimeInstanceId,
+            CompetitionId = competitionId,
+            CompetitionChallengeId = fixture.CompetitionChallengeId,
+            TeamId = teamId,
+            Purpose = RuntimePurpose.AwdpTarget,
+            GameplayFactId = fixture.GameplayFactId,
+            SourceCompetitionConfigurationRevision = 3,
+            SourceCompetitionChallengeRevision = 7,
+            SourceChallengeDefinitionRevision = 5,
+            Generation = 1,
+            RuntimeKind = RuntimeKind.Container,
+            RuntimeProvider = RuntimeProvider.Docker,
+            RunnerPool = "test-pool",
+            RunnerId = "test-runner",
+            State = RuntimeState.Running,
+            ProcessingVersion = 5,
+            ProviderReceiptJson = "{}",
+            CreatedAt = now,
+            RunningAt = now,
+            ExpiresAt = now.AddMinutes(5)
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     private static IHost BuildHost(
         string connectionString,
-        string envelopeSchema = "wolverine_test")
+        string envelopeSchema = "wolverine_test",
+        AwdpFixExecutionFixture? awdpFixExecution = null)
     {
         var builder = Host.CreateApplicationBuilder();
+        if (awdpFixExecution is not null)
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Runner:Pool"] = awdpFixExecution.Message.RunnerPool,
+                ["Runner:Id"] = awdpFixExecution.Message.RunnerId
+            });
+            builder.Services.AddSingleton<IAwdpFixWorkReader>(awdpFixExecution.WorkReader);
+            builder.Services.AddSingleton<IRuntimeProviderCatalog>(awdpFixExecution.Providers);
+            builder.Services.AddSingleton<IOneShotRuntimeProviderCatalog>(
+                awdpFixExecution.OneShotProviders);
+            builder.Services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
+            builder.Services.AddSingleton(new AwdpFixArchiveDownloader(
+                awdpFixExecution.HttpClientFactory));
+            builder.Services.AddSingleton<FixArchivePreparer>();
+            builder.Services.AddSingleton(Substitute.For<IRunnerCapacityGate>());
+        }
         builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
             options => options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
         builder.Services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
+        builder.Services.AddScoped<IInternalResultStore, InternalResultStore>();
         builder.Services.AddScoped<ICompetitionLifecycleStore, EmptyLifecycleStore>();
         builder.Services.AddScoped<LifecycleAdvancer>();
         builder.Services.AddScoped<IAwdRoundCoordinator, PostgresAwdRoundCoordinator>();
@@ -754,6 +984,9 @@ public sealed class WolverineTransactionalOutboxTests
             options.Discovery.IncludeType<KohPollingHandler>();
             options.Discovery.IncludeType<KohObservationHandler>();
             options.Discovery.IncludeType<AwdpReplayProbeHandler>();
+            options.Discovery.IncludeType<AwdpFixResultProbeHandler>();
+            if (awdpFixExecution is not null)
+                options.Discovery.IncludeType<AwdpFixVerificationHandler>();
             options.PersistMessagesWithPostgresql(connectionString, envelopeSchema);
             options.UseEntityFrameworkCoreTransactions();
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
@@ -793,6 +1026,11 @@ public sealed class WolverineTransactionalOutboxTests
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<ReplayAwdpFixVerification>()
                 .ToPostgresqlQueue("outbox-probe");
+            options.PublishMessage<AwdpFixResult>()
+                .ToPostgresqlQueue("outbox-probe");
+            if (awdpFixExecution is not null)
+                options.PublishMessage<RunAwdpFixVerification>()
+                    .ToPostgresqlQueue("outbox-probe");
         });
         return builder.Build();
     }
@@ -829,6 +1067,193 @@ public sealed class WolverineTransactionalOutboxTests
             await Task.Delay(TimeSpan.FromMilliseconds(100), cancellationToken);
         }
         throw new TimeoutException("The Wolverine maintenance agent did not reach the expected state.");
+    }
+
+    private sealed class AwdpFixExecutionFixture
+    {
+        private AwdpFixExecutionFixture(
+            DateTimeOffset now,
+            Guid gameplayFactId,
+            Guid competitionChallengeId,
+            Guid patchUploadId,
+            Guid runtimeInstanceId,
+            RunAwdpFixVerification message,
+            IAwdpFixWorkReader workReader,
+            IRuntimeProviderCatalog providers,
+            IOneShotRuntimeProviderCatalog oneShotProviders,
+            ProbeOneShotRunner oneShotRunner,
+            IHttpClientFactory httpClientFactory)
+        {
+            Now = now;
+            GameplayFactId = gameplayFactId;
+            CompetitionChallengeId = competitionChallengeId;
+            PatchUploadId = patchUploadId;
+            RuntimeInstanceId = runtimeInstanceId;
+            Message = message;
+            WorkReader = workReader;
+            Providers = providers;
+            OneShotProviders = oneShotProviders;
+            OneShotRunner = oneShotRunner;
+            HttpClientFactory = httpClientFactory;
+        }
+
+        public DateTimeOffset Now { get; }
+        public Guid GameplayFactId { get; }
+        public Guid CompetitionChallengeId { get; }
+        public Guid PatchUploadId { get; }
+        public Guid RuntimeInstanceId { get; }
+        public RunAwdpFixVerification Message { get; }
+        public IAwdpFixWorkReader WorkReader { get; }
+        public IRuntimeProviderCatalog Providers { get; }
+        public IOneShotRuntimeProviderCatalog OneShotProviders { get; }
+        public ProbeOneShotRunner OneShotRunner { get; }
+        public IHttpClientFactory HttpClientFactory { get; }
+
+        public static AwdpFixExecutionFixture Create(int exitCode)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var gameplayFactId = Guid.CreateVersion7();
+            var competitionChallengeId = Guid.CreateVersion7();
+            var patchUploadId = Guid.CreateVersion7();
+            var runtimeInstanceId = Guid.CreateVersion7();
+            var message = new RunAwdpFixVerification(
+                gameplayFactId,
+                competitionChallengeId,
+                patchUploadId,
+                runtimeInstanceId,
+                1,
+                5,
+                now.AddMinutes(5),
+                "test-pool",
+                "test-runner");
+            var archiveBytes = CreateFixArchive();
+            var work = new AwdpFixWork(
+                5,
+                new(
+                    new Uri("https://api.example.test/fix-archive"),
+                    "archive-token",
+                    "fix.tar.gz",
+                    archiveBytes.LongLength,
+                    SHA256.HashData(archiveBytes)),
+                new(
+                    runtimeInstanceId,
+                    RuntimeProvider.Docker,
+                    "awdp-target",
+                    RuntimeStatus.Running,
+                    new Dictionary<int, int>(),
+                    null,
+                    "awdp-target",
+                    "awdp-network",
+                    runtimeInstanceId,
+                    1),
+                "fix.sh",
+                ["/bin/sh", "/noctf/fix/fix.sh"],
+                TimeSpan.FromMinutes(1),
+                new(
+                    runtimeInstanceId,
+                    1,
+                    RuntimeProvider.Docker,
+                    "checker:test",
+                    [],
+                    new Dictionary<string, string>(),
+                    "awdp-network",
+                    "awdp-target",
+                    5,
+                    new Uri("https://api.example.test/fix-result"),
+                    "callback-token",
+                    TimeSpan.FromMinutes(1)));
+            var reader = Substitute.For<IAwdpFixWorkReader>();
+            reader.ClaimAsync(message, Arg.Any<CancellationToken>())
+                .Returns(new AwdpFixWorkClaim(
+                    AwdpFixExecutionFenceDisposition.Execute,
+                    work));
+            var sandbox = Substitute.For<IContainerSandboxLifecycle>();
+            sandbox.CopyArchiveAsync(
+                    Arg.Any<ContainerReceipt>(),
+                    Arg.Any<Stream>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(Task.CompletedTask);
+            sandbox.ExecAsync(
+                    Arg.Any<ContainerReceipt>(),
+                    Arg.Any<IReadOnlyList<string>>(),
+                    Arg.Any<TimeSpan>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(new ContainerExecResult(0, false));
+            var providers = Substitute.For<IRuntimeProviderCatalog>();
+            providers.Sandbox(RuntimeProvider.Docker).Returns(sandbox);
+            var oneShotRunner = new ProbeOneShotRunner(exitCode);
+            var oneShotProviders = Substitute.For<IOneShotRuntimeProviderCatalog>();
+            oneShotProviders.OneShot(RuntimeProvider.Docker).Returns(oneShotRunner);
+            var httpClientFactory = new StaticHttpClientFactory(
+                new HttpClient(new StaticContentHandler(archiveBytes)));
+            return new(
+                now,
+                gameplayFactId,
+                competitionChallengeId,
+                patchUploadId,
+                runtimeInstanceId,
+                message,
+                reader,
+                providers,
+                oneShotProviders,
+                oneShotRunner,
+                httpClientFactory);
+        }
+
+        private static byte[] CreateFixArchive()
+        {
+            using var archive = new MemoryStream();
+            using (var gzip = new GZipStream(
+                       archive,
+                       CompressionMode.Compress,
+                       leaveOpen: true))
+            using (var tar = new TarWriter(gzip, leaveOpen: true))
+            {
+                tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "fix.sh")
+                {
+                    DataStream = new MemoryStream(Encoding.UTF8.GetBytes("#!/bin/sh\nexit 0\n"))
+                });
+            }
+            return archive.ToArray();
+        }
+    }
+
+    private sealed class ProbeOneShotRunner(int exitCode) : IOneShotJobRunner
+    {
+        private int executionCount;
+
+        public int ExecutionCount => Volatile.Read(ref executionCount);
+
+        public Task<OneShotResult> RunAsync(
+            ContainerRequest request,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref executionCount);
+            var now = DateTimeOffset.UtcNow;
+            return Task.FromResult(new OneShotResult(
+                "awdp-checker",
+                exitCode,
+                string.Empty,
+                "checker failed",
+                now,
+                now));
+        }
+    }
+
+    private sealed class StaticHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name) => client;
+    }
+
+    private sealed class StaticContentHandler(byte[] content) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(content)
+            });
     }
 
     public sealed class EmptyLifecycleStore : ICompetitionLifecycleStore
@@ -988,6 +1413,53 @@ public sealed class AwdpReplayProbeHandler
         if (AwdpReplayProbeObservation.RecordAttempt(message.GameplayFactId) == 1)
             throw new AwdpReplayProbeException();
         AwdpReplayProbeObservation.Complete(message.GameplayFactId, message);
+    }
+}
+
+public sealed class AwdpFixResultProbeHandler
+{
+    public static async Task Handle(
+        AwdpFixResult message,
+        IInternalResultStore results,
+        CancellationToken cancellationToken)
+    {
+        var disposition = await results.RecordAwdpAsync(message, cancellationToken);
+        AwdpFixResultObservation.Complete(message, disposition);
+    }
+
+    public static void Handle(StopContainerRuntime _) { }
+}
+
+public sealed record AwdpFixResultRecording(
+    AwdpFixResult Message,
+    InternalResultDisposition Disposition);
+
+public static class AwdpFixResultObservation
+{
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int>
+        DeliveryCounts = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid,
+        TaskCompletionSource<AwdpFixResultRecording>> Observations = new();
+
+    public static TaskCompletionSource<AwdpFixResultRecording> Expect(Guid gameplayFactId)
+    {
+        DeliveryCounts.TryRemove(gameplayFactId, out _);
+        var completion = new TaskCompletionSource<AwdpFixResultRecording>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        Observations[gameplayFactId] = completion;
+        return completion;
+    }
+
+    public static int Count(Guid gameplayFactId) =>
+        DeliveryCounts.GetValueOrDefault(gameplayFactId);
+
+    public static void Complete(
+        AwdpFixResult message,
+        InternalResultDisposition disposition)
+    {
+        DeliveryCounts.AddOrUpdate(message.GameplayFactId, 1, (_, count) => count + 1);
+        if (Observations.TryRemove(message.GameplayFactId, out var completion))
+            completion.TrySetResult(new(message, disposition));
     }
 }
 
