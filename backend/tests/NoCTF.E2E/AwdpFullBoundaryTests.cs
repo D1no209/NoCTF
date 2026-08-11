@@ -182,7 +182,7 @@ public sealed class AwdpFullBoundaryTests
             new { patchUploadId = reusablePatchId },
             HttpStatusCode.Conflict,
             cancellationToken);
-        await Assert.That(rejectedFix.GetProperty("code").GetString()).IsEqualTo("break_required");
+        await Assert.That(rejectedFix.GetProperty("code").GetString()).IsEqualTo("BreakRequired");
 
         var wrongBreakId = await SubmitBreakAsync(
             playerClient,
