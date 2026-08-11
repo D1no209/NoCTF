@@ -1,5 +1,23 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-12 头像图像处理迁移至 ImageSharp
+
+- 功能提交 `08e6a0f8` 将头像元数据识别、解码、居中裁剪、缩放与 WebP 编码从 SkiaSharp
+  迁移至纯托管 `SixLabors.ImageSharp 3.1.12`；依赖中已完全移除 `SkiaSharp` 与
+  `SkiaSharp.NativeAssets.Linux.NoDependencies`，DI 现在注册 `ImageSharpAvatarImageProcessor`。
+- 保留原有安全与产品语义：仅接受 JPEG、PNG、WebP；在像素解码前校验单边尺寸和总像素；拒绝
+  APNG、动画 WebP 和多帧图像；以图片中心裁成正方形，缩放到 512×512，并以质量 90 输出单帧
+  WebP。上传接口、失败码、对象存储格式和前端裁剪契约均未变化。
+- ImageSharp 4.0.0 会在构建阶段强制要求 Six Labors 许可证密钥，因此没有把许可证凭据或构建时
+  外部授权依赖引入仓库；采用仍可无密钥构建且 NuGet 未标记已知漏洞/弃用的最新 3.x 维护版
+  3.1.12。`dotnet list ... --vulnerable --include-transitive` 与 `--deprecated --include-transitive`
+  对全部 13 个项目均返回无问题。
+- 测试已随实现改为 ImageSharp，并新增居中裁剪像素断言。验证通过：头像定向测试 9/9；Release
+  solution build 0 警告/0 错误；非 Integration TUnit 708/708；analyzer verify、定向 whitespace
+  verify、`git diff --check` 及排除 `bin/obj` 的全后端 SkiaSharp 源码扫描均通过。
+- 发布提交 `a167993b` 将平台版本递增为 `0.1.0-alpha.28`。本阶段没有新增表、列、migration、
+  snapshot、HTTP/OpenAPI 或生成 SDK 变化；没有推送、部署或操作生产头像数据。
+
 ## 2026-08-12 全量审计修复最终收口
 
 - 最终功能基线为 `ebc22571`，分支为 `codex/fix-audit-findings-20260811`，平台版本为
