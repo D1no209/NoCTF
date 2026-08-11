@@ -37,6 +37,26 @@
 - 修复位于隔离分支 `codex/fix-audit-findings-20260811`；尚未推送、部署或操作生产数据。浏览器动态验收
   将在所有前端修复收口后统一使用 Microsoft Edge 执行。
 
+## 2026-08-11 全量审计修复：附件、管理员与提示解锁安全边界
+
+- 功能提交 `6755e3c8` 将全局题库附件的写权限检查移到文件暂存、哈希和对象存储登记之前；无权限用户
+  对任意 Challenge UUID 发起上传时不会先消耗临时磁盘或对象存储。最终建立附件引用时仍再次授权并
+  保留既有失败补偿，避免权限在上传期间变化造成 TOCTOU 绕过。
+- 功能提交 `16fe394e` 在 PostgreSQL 事务内串行化平台管理员角色降级；最后一名 Active Human
+  Administrator 无论自降级、被他人降级或与另一管理员并发互降级，都返回稳定冲突码
+  `LastAdministratorProtected`。Bot 不计入可保留管理员，成功变更仍递增 TokenVersion。
+- 功能提交 `8ae967ca` 在提示解锁接入事务、GameplayFact 初次异步评估和完成事务复评三个位置统一
+  要求比赛为 `Running`；Draft、Visible、Published、Paused、Finished 均拒绝，排队后暂停或结束也不会
+  继续扣分并解锁提示。
+- 管理员冲突码已由 OpenAPI 工具导出并重新生成 TypeScript SDK；其余两项没有 HTTP 契约变化。三项均
+  未新增数据表、列、migration 或 snapshot。
+- 原独立阶段验证通过：Release build 0 警告/0 错误；非 Integration TUnit 629/629；最后管理员与提示
+  生命周期 PostgreSQL 定向集成测试各 1/1；Platform Bot 协议测试 4/4；前端 typecheck、OpenAPI 导出、
+  SDK 二次生成和 `git diff --check` 均通过。合入统一修复分支后再次验证 Release build 0 警告/0 错误，
+  ClientApp typecheck 通过。
+- 尚未推送、部署或修改生产数据；合法上传本身的大小上限仍等待 grilling 决策，未借本阶段擅自改变
+  `docs/api-conventions.md` 的现行无限请求契约。
+
 ## 2026-08-11 全量审计修复：CTF 分值表达式全区间验证
 
 - 功能提交 `0a15357c` 修复 CTF 自定义分值表达式只验证 `solveCount=0`、`1` 和参赛队总数、
