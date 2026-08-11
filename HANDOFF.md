@@ -10,9 +10,11 @@
   上报时的 `Unknown`。新增连接/接收循环状态矩阵与 sender latch 测试；平台版本递增为
   `0.1.0-alpha.29`。没有表、列、migration、snapshot、HTTP/OpenAPI 或 SDK 变化。
 - 修复验证：`RoleReadinessHealthCheckTests` 13/13；完整非 Integration TUnit 716/716；Release
-  solution build 0 warning/0 error；analyzer verify 与 `git diff --check` 通过。此前 alpha.28 的完整
-  真实依赖门禁、四模式 Full E2E、167/167 前端测试、两轮 OpenAPI/SDK 幂等、EF model drift、
-  Compose 与 kubeconform 结果仍适用，本次变更不触及对应业务路径。
+  solution build 0 warning/0 error；analyzer verify 与 `git diff --check` 通过。最终 alpha.29 再次强制
+  执行全部真实 Docker/PostgreSQL/Redis/Wolverine 测试，共 881 项，879 通过、0 失败、2 项因未配置
+  真实 Kubernetes cluster 与 Libvirt disk path 按设计跳过。此前四模式 Full E2E、167/167 前端测试、
+  两轮 OpenAPI/SDK 幂等、EF model drift、Compose 与 kubeconform 结果仍适用，本次变更不触及对应
+  业务路径。
 - 生产数据库迁移容器返回 `No migrations were applied. The database is already up to date.`。随后仅重建
   API、Worker、Runner，保留 PostgreSQL、Redis、上传卷、证书与未跟踪的生产 override compose。
   alpha.29 切换后三个服务均为 running/healthy；公开 `/health/live`、`/health/ready` 和首页均返回
