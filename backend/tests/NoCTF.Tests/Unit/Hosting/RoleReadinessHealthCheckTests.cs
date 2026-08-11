@@ -6,7 +6,9 @@ using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
 using NSubstitute;
 using StackExchange.Redis;
+using Wolverine.Configuration;
 using Wolverine.Runtime;
+using Wolverine.Transports;
 
 namespace NoCTF.Tests.Unit.Hosting;
 
@@ -102,6 +104,48 @@ public sealed class RoleReadinessHealthCheckTests
         await Assert.That(registration.Tags).Contains("ready");
     }
 
+    [Test]
+    [Arguments(TransportConnectionState.Unknown, ReceiveLoopStatus.Unknown, false)]
+    [Arguments(TransportConnectionState.Connected, ReceiveLoopStatus.Running, false)]
+    [Arguments(TransportConnectionState.Disconnected, ReceiveLoopStatus.Running, true)]
+    [Arguments(TransportConnectionState.Reconnecting, ReceiveLoopStatus.Running, true)]
+    [Arguments(TransportConnectionState.Connected, ReceiveLoopStatus.NotStarted, true)]
+    [Arguments(TransportConnectionState.Connected, ReceiveLoopStatus.Stopped, true)]
+    [Arguments(TransportConnectionState.Connected, ReceiveLoopStatus.Faulted, true)]
+    public async Task Wolverine_readiness_accepts_unreported_health_but_rejects_explicit_failures(
+        TransportConnectionState connectionState,
+        ReceiveLoopStatus receiveLoopStatus,
+        bool expected)
+    {
+        var endpoint = CreateEndpointHealthSnapshot(
+            EndpointDirection.Listening,
+            connectionState,
+            receiveLoopStatus);
+
+        var dependency = CreateWolverineDependency(endpoint);
+        Func<Task> action = () => dependency.CheckAsync(CancellationToken.None);
+
+        if (expected)
+            await Assert.That(action).Throws<InvalidOperationException>();
+        else
+            await action();
+    }
+
+    [Test]
+    public async Task Wolverine_readiness_rejects_a_latched_sender()
+    {
+        var endpoint = CreateEndpointHealthSnapshot(
+            EndpointDirection.Sending,
+            TransportConnectionState.Unknown,
+            ReceiveLoopStatus.Unknown,
+            senderLatched: true);
+
+        var dependency = CreateWolverineDependency(endpoint);
+        Func<Task> action = () => dependency.CheckAsync(CancellationToken.None);
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+    }
+
     private static IReadOnlyList<IReadinessDependency> ResolveDependencies(HostRoles roles)
     {
         var services = new ServiceCollection();
@@ -115,6 +159,35 @@ public sealed class RoleReadinessHealthCheckTests
             roles);
         using var provider = services.BuildServiceProvider();
         return provider.GetServices<IReadinessDependency>().ToArray();
+    }
+
+    private static EndpointHealthSnapshot CreateEndpointHealthSnapshot(
+        EndpointDirection direction,
+        TransportConnectionState connectionState,
+        ReceiveLoopStatus receiveLoopStatus,
+        bool senderLatched = false) => new(
+            new Uri("stub://health-test"),
+            "health-test",
+            direction,
+            "test",
+            0,
+            null,
+            null,
+            senderLatched,
+            null,
+            null,
+            connectionState,
+            receiveLoopStatus,
+            null);
+
+    private static WolverineReadinessDependency CreateWolverineDependency(
+        EndpointHealthSnapshot endpoint)
+    {
+        var runtime = Substitute.For<IWolverineRuntime>();
+        var endpoints = Substitute.For<IEndpointCollection>();
+        runtime.Endpoints.Returns(endpoints);
+        endpoints.CollectEndpointHealth().Returns([endpoint]);
+        return new(runtime);
     }
 
     private sealed class StubDependency(

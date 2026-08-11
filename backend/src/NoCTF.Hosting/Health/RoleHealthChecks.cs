@@ -95,16 +95,22 @@ public sealed class WolverineReadinessDependency(IWolverineRuntime runtime)
     {
         cancellationToken.ThrowIfCancellationRequested();
         runtime.AssertHasStarted();
-        var unhealthy = runtime.Endpoints.CollectEndpointHealth().Any(endpoint =>
-            endpoint.SenderLatched
-            || endpoint.ConnectionState == TransportConnectionState.Disconnected
-            || (endpoint.Direction == EndpointDirection.Listening
-                && endpoint.ReceiveLoopStatus != ReceiveLoopStatus.Running));
+        var unhealthy = runtime.Endpoints.CollectEndpointHealth()
+            .Any(EndpointIsUnavailable);
         return unhealthy
             ? Task.FromException(new InvalidOperationException(
                 "One or more Wolverine endpoints are unavailable."))
             : Task.CompletedTask;
     }
+
+    private static bool EndpointIsUnavailable(EndpointHealthSnapshot endpoint) =>
+        endpoint.SenderLatched
+        || endpoint.ConnectionState is TransportConnectionState.Disconnected
+            or TransportConnectionState.Reconnecting
+        || (endpoint.Direction == EndpointDirection.Listening
+            && endpoint.ReceiveLoopStatus is ReceiveLoopStatus.NotStarted
+                or ReceiveLoopStatus.Stopped
+                or ReceiveLoopStatus.Faulted);
 }
 
 public sealed class RedisReadinessDependency(
