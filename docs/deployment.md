@@ -114,6 +114,12 @@ JWT signing key 可供 Access/Refresh/Internal 使用，但 audience/Scheme 隔�
 
 Runner Pool/Provider/resource max、Redis、Wolverine PostgreSQL transport、S3、CORS/Origin、Cookie Secure 是强类型 IOptions 并在进程启动时 ValidateOnStart。邮箱验证开关、密码找回有效期/冷却/账号限额、公开 URL 与 SMTP 投递参数由管理员页面写入数据库，API/Worker 动态读取；SMTP 密码只能整体替换，前端不回填也不持久化。密码找回不依赖注册邮箱验证开关，但没有完整 SMTP 投递配置时不会签发重置令牌。
 
+Kubernetes 的平台 Namespace 缺省拒绝全部外联。Runner 通过 Cilium 的 `kube-apiserver` 实体仅访问
+真实 Kubernetes API，不得以 `0.0.0.0/0` 放行 443/6443。SMTP 属于部署与管理员配置共同决定的可选
+外部依赖：启用邮件投递前，运维必须从 `deploy/k8s/smtp-egress.example.yaml` 生成只匹配当前 SMTP
+FQDN 与 TCP 端口的 Cilium policy；修改 SMTP 主机或端口时必须同步更新 policy。策略不得包含凭据、
+通配域名或任意地址放行。
+
 ## 健康与关闭
 
 Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL/Wolverine，API 另检查 Redis 的降级状态，Runner 检查 Provider/queue。Runtime 题目本身不使用平台 Health Probe。
