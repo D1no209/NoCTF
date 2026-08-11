@@ -39,9 +39,9 @@ provide(competitionContextKey, { competition, loading, error, refresh })
 
 const navGroups = computed<WorkspaceNavGroup[]>(() => {
   const base = `/competitions/${competitionId.value}`
-  const challengesVisible = competition.value?.status === CompetitionStatus.Running
-    || competition.value?.status === CompetitionStatus.Paused
-    || competition.value?.status === CompetitionStatus.Finished
+  const challengesVisible = competition.value?.status === 'Running'
+    || competition.value?.status === 'Paused'
+    || competition.value?.status === 'Finished'
   return [
     {
       label: translate("竞赛"),

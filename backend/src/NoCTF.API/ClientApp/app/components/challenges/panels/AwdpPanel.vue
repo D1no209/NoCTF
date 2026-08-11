@@ -27,8 +27,8 @@ async function checkBreak() {
   breakSucceeded.value = (data.items ?? []).some(
     (s) =>
       s.competitionChallengeId === props.challenge.id
-      && s.kind === GameplayFactKind.BreakAttempt
-      && s.result === GameplayFactResult.Correct,
+      && s.kind === 'BreakAttempt'
+      && s.result === 'Correct',
   )
 }
 

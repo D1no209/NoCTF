@@ -3,6 +3,7 @@ import { Flag, Users } from '@lucide/vue'
 import { getLeaderboardEndpoint, getMyTeamEndpoint, listChallengesEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
+  NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol,
   NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
 } from '~/api'
 import { bloodRankLabel, normalizeChallengeKey } from '~/components/leaderboard/types'
@@ -18,7 +19,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const leaderboardError = ref<string | null>(null)
 const leaderboardPending = ref(false)
-const dataScope = ref<string>(LeaderboardDataScope.Live)
+const dataScope = ref<NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol>('Live')
 const leaderboard = ref<NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null>(null)
 const myTeamId = ref<string | null>(null)
 
@@ -68,7 +69,7 @@ onMounted(async () => {
     return
   }
   items.value = (data.items ?? []).filter((c) => c.isPublished)
-  dataScope.value = data.dataScope ?? LeaderboardDataScope.Live
+  dataScope.value = data.dataScope ?? 'Live'
   if (!leaderboardReady) startLeaderboardPolling()
 })
 
@@ -95,7 +96,7 @@ interface ChallengeProgress {
 
 const progressByChallenge = computed(() => {
   const progress = new Map<string, ChallengeProgress>()
-  if (leaderboard.value?.dataScope === LeaderboardDataScope.Hidden)
+  if (leaderboard.value?.dataScope === 'Hidden')
     return progress
 
   for (const entry of leaderboard.value?.entries ?? []) {
@@ -121,7 +122,7 @@ const progressByChallenge = computed(() => {
 })
 
 function progressFor(challengeId?: string): ChallengeProgress | null {
-  if (!leaderboard.value || leaderboard.value.dataScope === LeaderboardDataScope.Hidden)
+  if (!leaderboard.value || leaderboard.value.dataScope === 'Hidden')
     return null
   return progressByChallenge.value.get(normalizeChallengeKey(challengeId))
     ?? { solveCount: 0, solvedByMyTeam: false, myScore: null, bloodRank: null }
@@ -136,7 +137,7 @@ const currentScoreByChallenge = computed(() => new Map(
 
 function currentScoreFor(challenge: Challenge): number | null {
   if (!leaderboard.value) return null
-  if (leaderboard.value.dataScope === LeaderboardDataScope.Hidden)
+  if (leaderboard.value.dataScope === 'Hidden')
     return challenge.baseScore ?? null
   const score = currentScoreByChallenge.value.get(normalizeChallengeKey(challenge.id))
   return score ?? challenge.baseScore ?? null
@@ -170,7 +171,7 @@ const groups = computed(() => {
         <Spinner class="size-3" /> {{ $t('记分板数据投影中,请稍候…') }}
       </AlertDescription>
     </Alert>
-    <Alert v-else-if="dataScope === LeaderboardDataScope.Frozen">
+    <Alert v-else-if="dataScope === 'Frozen'">
       <AlertDescription>{{ $t('排行榜已冻结,题目分数显示为冻结时快照。') }}</AlertDescription>
     </Alert>
 

@@ -25,7 +25,7 @@ describe('participant challenge progress', () => {
       new URL('../app/pages/competitions/[id].vue', import.meta.url),
     ).text()
 
-    expect(shell).toContain('competition.value?.status === CompetitionStatus.Running')
+    expect(shell).toContain("competition.value?.status === 'Running'")
     expect(shell).toContain('...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : [])')
   })
 

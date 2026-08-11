@@ -40,7 +40,7 @@ onMounted(async () => {
         </Avatar>
         <h2 class="text-xl font-semibold">{{ team.name }}</h2>
         <Badge
-          :variant="team.registrationStatus === TeamRegistrationStatus.Approved ? 'default' : team.registrationStatus === TeamRegistrationStatus.Rejected ? 'destructive' : 'secondary'"
+          :variant="team.registrationStatus === 'Approved' ? 'default' : team.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'"
         >
           {{ teamRegistrationStatusLabel(team.registrationStatus) }}
         </Badge>

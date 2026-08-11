@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { getGameplayFactStatusEndpoint, submitFlagEndpoint } from '~/api'
+import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '~/api'
 
-interface TrackedSubmission {
+type TrackedSubmission = Pick<
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
+  'state' | 'result' | 'failureCode'
+> & {
   id: string
-  state?: string
-  result?: string | null
-  failureCode?: string | null
 }
 
 const props = withDefaults(
@@ -71,7 +72,7 @@ async function refreshOne(id: string): Promise<void> {
   }
   if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id)) {
     toasted.add(id)
-    if (data.result === GameplayFactResult.Correct) {
+    if (data.result === 'Correct') {
       toast.success(translate("提交评测完成:正确"))
       celebrateCorrectFlag()
     }
@@ -106,7 +107,7 @@ async function submit() {
   ]
   for (const id of ids) {
     if (!tracked.value.some((t) => t.id === id)) {
-      tracked.value.unshift({ id, state: GameplayFactState.Pending, result: null })
+      tracked.value.unshift({ id, state: 'Pending', result: null })
     }
   }
   input.value = ''
@@ -133,7 +134,7 @@ onUnmounted(() => {
 })
 
 function resultVariant(result?: string | null) {
-  if (result === GameplayFactResult.Correct) return 'default' as const
+  if (result === 'Correct') return 'default' as const
   return 'destructive' as const
 }
 </script>

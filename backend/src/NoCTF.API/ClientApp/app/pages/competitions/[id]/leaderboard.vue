@@ -214,12 +214,12 @@ function exportCsv() {
         </div>
       </div>
 
-      <Alert v-if="leaderboard.dataScope === LeaderboardDataScope.Frozen">
+      <Alert v-if="leaderboard.dataScope === 'Frozen'">
         <AlertDescription>
           {{ $t('排行榜已冻结，以下为截至 {time} 的快照。', { time: formatDateTime(leaderboard.dataAsOf) }) }}
         </AlertDescription>
       </Alert>
-      <Empty v-if="leaderboard.dataScope === LeaderboardDataScope.Hidden" class="border py-12">
+      <Empty v-if="leaderboard.dataScope === 'Hidden'" class="border py-12">
         <EmptyHeader>
           <EmptyTitle>{{ $t('排行榜暂不公开') }}</EmptyTitle>
           <EmptyDescription>{{ $t('主办方当前隐藏了排行榜数据') }}</EmptyDescription>

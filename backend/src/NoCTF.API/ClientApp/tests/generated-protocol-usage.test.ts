@@ -8,4 +8,25 @@ describe('generated protocol usage', () => {
     expect(source).toContain("user.value?.role === 'Administrator'")
     expect(source).toContain("user.value?.role === 'Organizer'")
   })
+
+  test('does not mirror generated competition, team, runtime, or gameplay enums', async () => {
+    const labels = await Bun.file(new URL('../app/utils/labels.ts', import.meta.url)).text()
+    const gameConfig = await Bun.file(new URL('../app/utils/game-config.ts', import.meta.url)).text()
+
+    for (const name of [
+      'GameMode',
+      'CompetitionStatus',
+      'TeamRegistrationStatus',
+      'RuntimeState',
+      'GameplayFactKind',
+      'GameplayFactState',
+      'GameplayFactResult',
+      'LeaderboardDataScope',
+    ]) {
+      expect(labels).not.toContain(`export const ${name}`)
+    }
+    expect(gameConfig).toContain(
+      'export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol',
+    )
+  })
 })

@@ -52,7 +52,7 @@ onMounted(async () => {
   const { data, error } = await listCompetitionTeamsEndpoint({ path: { competitionId } })
   if (error || !data) return
   approvedTeamCount.value = (data.items ?? []).filter(
-    (team) => team.registrationStatus === TeamRegistrationStatus.Approved,
+    (team) => team.registrationStatus === 'Approved',
   ).length
 })
 
@@ -79,16 +79,16 @@ const countdown = computed(() => {
 
 const canParticipate = computed(
   () =>
-    myTeam.value?.registrationStatus === TeamRegistrationStatus.Approved
+    myTeam.value?.registrationStatus === 'Approved'
     && !myTeam.value?.isBanned
-    && competition.value?.status === CompetitionStatus.Running,
+    && competition.value?.status === 'Running',
 )
 
 const teamRegistrationOpen = computed(() => {
   const status = competition.value?.status
-  return status === CompetitionStatus.Visible
-    || status === CompetitionStatus.Published
-    || status === CompetitionStatus.Running
+  return status === 'Visible'
+    || status === 'Published'
+    || status === 'Running'
       && competition.value?.allowTeamRegistrationWhileRunning === true
 })
 
@@ -293,13 +293,13 @@ const isCaptain = computed(
     </Card>
 
     <!-- 我的队伍状态提示 -->
-    <Alert v-if="myTeam && myTeam.registrationStatus === TeamRegistrationStatus.Pending">
+    <Alert v-if="myTeam && myTeam.registrationStatus === 'Pending'">
       <ShieldCheck class="size-4" />
       <AlertDescription>
         {{ $t('队伍「{team}」报名已提交，等待主办方审核通过后即可参赛。', { team: myTeam.name ?? '-' }) }}
       </AlertDescription>
     </Alert>
-    <Alert v-else-if="myTeam && myTeam.registrationStatus === TeamRegistrationStatus.Rejected" variant="destructive">
+    <Alert v-else-if="myTeam && myTeam.registrationStatus === 'Rejected'" variant="destructive">
       <AlertDescription>
         队伍「{{ myTeam.name }}」报名被拒绝{{ isCaptain ? $t(',可在「我的队伍」页修改信息后重新提交') : '' }}。
       </AlertDescription>
