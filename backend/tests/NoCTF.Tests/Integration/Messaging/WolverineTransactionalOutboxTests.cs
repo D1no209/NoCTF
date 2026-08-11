@@ -804,6 +804,7 @@ public sealed class WolverineTransactionalOutboxTests
         builder.Services.AddSingularAgent<MaintenanceTickAgent>();
         builder.UseWolverine(options =>
         {
+            options.Discovery.DisableConventionalDiscovery();
             options.Discovery.IncludeType<MaintenanceTickProbeHandler>();
             options.PersistMessagesWithPostgresql(connectionString, "wolverine_maintenance_test");
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
@@ -893,6 +894,8 @@ public sealed class MaintenanceTickProbeHandler
 {
     public static void Handle(DispatchAwdCheckers _, MaintenanceHostIdentity host) =>
         MaintenanceTickObservation.RecordDispatch(host.Value);
+
+    public static void Handle(RefreshDirtyLeaderboards _) { }
 
     public static void Handle(ReconcileRunnerAssignments _) { }
 
