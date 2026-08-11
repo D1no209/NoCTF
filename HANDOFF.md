@@ -9,6 +9,23 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：GameplayFact 权威顺序与血榜幂等
+
+- 功能提交 `86cc092f` 让 GameplayFact 的裁决顺序由 `(OccurredAt, Id)` 决定，而不是由 Wolverine 消息
+  到达或 Worker 抢占顺序决定。CTF FlagAttempt 在 CompetitionChallenge 行上按题目串行；其余事实按
+  Team 行与比赛/题目/Kind 作用域串行。任一重复或乱序消息只负责触发 drain，不再改变权威先后。
+- 每个作用域至多存在一个 Processing；完成后自动派发下一条最早 Queued，AWDP 正常回调、超时和
+  Runtime 配置失败也会继续排空。PriorFacts 查询收窄为同队、同题、严格早于当前且 Correct 的必要事实，
+  不再为每个裁决物化整场永久事实历史。现有 AWD 同一 checker sequence 后写覆盖语义保持不变。
+- 功能提交 `766bceb5` 使结果未变化的 `Correct → Correct` 重判不再重复追加 BloodAwarded 消息或
+  First/Second/ThirdBloodAwarded 永久事件；普通首次正确与 `Wrong → Correct` 仍只产生一次奖励副作用。
+- 本阶段没有 HTTP/OpenAPI、生成 SDK、数据模型、数据表、migration、snapshot 或版本号变化。
+- 验证通过：真实 PostgreSQL 权威顺序测试 5/5（逆序、同时间 UUID tie-break、跨队并发一二三血、
+  1,000 条无关历史、无变化重判）；非 Integration TUnit 629/629；完整 Release build 0 警告/0 错误；
+  `git diff --check` 通过。
+- 尚未推送、部署或自动改写生产历史。`Correct → Wrong → Correct` 如何表达旧血榜恢复，以及已有乱序/重复
+  奖励历史是否纠正，仍等待 grilling；不会删除或改写不可变 CompetitionEvent。
+
 ## 2026-08-11 全量审计修复：通知历史精准深链
 
 - 功能提交 `8dd7a9aa` 修复消息中心只在已加载的前 50 条通知中查找 URL 里的 `notification`，导致旧消息
