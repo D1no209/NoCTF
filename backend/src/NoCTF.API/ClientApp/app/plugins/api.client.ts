@@ -1,4 +1,5 @@
 import { client } from '~/api/client.gen'
+import { shouldRefreshSession } from '~/lib/auth-refresh'
 import { getAccessToken, refreshSession } from '~/lib/session'
 import { statusErrorMessage } from '~/utils/api-error'
 
@@ -19,7 +20,7 @@ export default defineNuxtPlugin(() => {
   })
 
   client.interceptors.response.use(async (response, request, options) => {
-    if (response.status !== 401 || request.url.includes('/api/v1/auth/')) {
+    if (!shouldRefreshSession(response.status, request.url)) {
       return response
     }
     const refreshed = await refreshSession()
