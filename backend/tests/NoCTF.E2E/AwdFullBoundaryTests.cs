@@ -35,7 +35,7 @@ public sealed class AwdFullBoundaryTests
                 title = "AWD full-boundary E2E",
                 description = "Round, attack, checker, and runtime boundary verification",
                 mode = "Awd",
-                startTime = now.AddMinutes(10),
+                startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
@@ -118,13 +118,6 @@ public sealed class AwdFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/make-visible",
             HttpStatusCode.NoContent,
             cancellationToken);
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/publish",
-            HttpStatusCode.NoContent,
-            cancellationToken);
-
         var red = await RegisterTeamAsync(
             anonymous,
             baseUrl,
@@ -147,9 +140,10 @@ public sealed class AwdFullBoundaryTests
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/start",
+            $"/api/v1/admin/competitions/{competitionId}/publish",
             HttpStatusCode.NoContent,
             cancellationToken);
+        await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
 
         var runtimePath = $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime";
         var redRuntime = await PollOptionalJsonAsync(

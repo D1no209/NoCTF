@@ -43,7 +43,7 @@ public sealed class CtfFullBoundaryTests
                 title = "CTF full-boundary E2E",
                 description = "External process boundary verification",
                 mode = "Ctf",
-                startTime = now.AddMinutes(10),
+                startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
@@ -197,13 +197,6 @@ public sealed class CtfFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/make-visible",
             HttpStatusCode.NoContent,
             cancellationToken);
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/publish",
-            HttpStatusCode.NoContent,
-            cancellationToken);
-
         await SendJsonAsync(
             anonymous,
             HttpMethod.Post,
@@ -281,9 +274,10 @@ public sealed class CtfFullBoundaryTests
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/start",
+            $"/api/v1/admin/competitions/{competitionId}/publish",
             HttpStatusCode.NoContent,
             cancellationToken);
+        await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
 
         var listedAttachments = await GetJsonAsync(
             player,

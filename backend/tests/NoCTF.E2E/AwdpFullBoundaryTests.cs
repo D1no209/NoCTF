@@ -38,7 +38,7 @@ public sealed class AwdpFullBoundaryTests
                 title = "AWDP full-boundary E2E",
                 description = "Break, archive, disposable target, patch, and checker verification",
                 mode = "Awdp",
-                startTime = now.AddMinutes(10),
+                startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
@@ -135,13 +135,6 @@ public sealed class AwdpFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/make-visible",
             HttpStatusCode.NoContent,
             cancellationToken);
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/publish",
-            HttpStatusCode.NoContent,
-            cancellationToken);
-
         var player = await RegisterTeamAsync(
             anonymous,
             baseUrl,
@@ -151,9 +144,10 @@ public sealed class AwdpFullBoundaryTests
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/start",
+            $"/api/v1/admin/competitions/{competitionId}/publish",
             HttpStatusCode.NoContent,
             cancellationToken);
+        await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
 
         using (var invalidPatch = new MultipartFormDataContent())
         using (var invalidContent = new ByteArrayContent(Encoding.UTF8.GetBytes("not-a-tar-gzip")))
