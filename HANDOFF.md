@@ -1,5 +1,25 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-12 alpha.29 生产发布
+
+- 生产首次切换 alpha.28 后，API 存活正常，但 API/Worker/Runner 的 `/health/ready` 把 Wolverine
+  不提供端点健康信息时的 `Unknown` 当成故障，导致 Worker/Runner 长期 unhealthy、公开 ready 返回
+  503。根因不在 PostgreSQL、Redis 或消息代理；日志确认相应 Wolverine listener/agent 已正常启动。
+- 修复提交 `bf0aa251` 只把明确的 `Disconnected`、`Reconnecting`、`NotStarted`、`Stopped`、
+  `Faulted` 和 sender latch 视为不可用，保留依赖失败时的 fail-closed 行为，同时允许传输未实现健康
+  上报时的 `Unknown`。新增连接/接收循环状态矩阵与 sender latch 测试；平台版本递增为
+  `0.1.0-alpha.29`。没有表、列、migration、snapshot、HTTP/OpenAPI 或 SDK 变化。
+- 修复验证：`RoleReadinessHealthCheckTests` 13/13；完整非 Integration TUnit 716/716；Release
+  solution build 0 warning/0 error；analyzer verify 与 `git diff --check` 通过。此前 alpha.28 的完整
+  真实依赖门禁、四模式 Full E2E、167/167 前端测试、两轮 OpenAPI/SDK 幂等、EF model drift、
+  Compose 与 kubeconform 结果仍适用，本次变更不触及对应业务路径。
+- 生产数据库迁移容器返回 `No migrations were applied. The database is already up to date.`。随后仅重建
+  API、Worker、Runner，保留 PostgreSQL、Redis、上传卷、证书与未跟踪的生产 override compose。
+  alpha.29 切换后三个服务均为 running/healthy；公开 `/health/live`、`/health/ready` 和首页均返回
+  HTTP 200；启动后未发现新增 Error、Fatal、Unhandled 或 Exception；发布时活跃平台 Runtime 数为 0。
+- `main` 已前进至 `bf0aa2516ec05a3fbdf92da143cb0f433fd3eced`，服务器工作副本同步到同一提交。
+  alpha.28 前一版本和部署前版本均保留精确镜像标签用于回滚；未删除或修改生产业务数据。
+
 ## 2026-08-12 头像图像处理迁移至 ImageSharp
 
 - 功能提交 `08e6a0f8` 将头像元数据识别、解码、居中裁剪、缩放与 WebP 编码从 SkiaSharp
