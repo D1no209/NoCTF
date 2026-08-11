@@ -21,6 +21,12 @@ Frontend/reverse proxy
 `deploy/docker-compose.single.yml` 为全合一。生产环境可按负载运行单 API、N Worker、N Runner，
 或组合 API+Worker/Worker+Runner 等；N 表示多个进程或容器，不是在一个进程中重复注册角色。
 
+仓库中的第三方构建基础镜像、PostgreSQL、Redis、MinIO 与 MinIO Client 均同时固定可读版本标签和
+多架构 manifest digest；Kompose 固定版本下载后必须以官方发布的 SHA-256 校验通过才能执行。依赖更新
+必须在一次审阅中同时替换版本与 digest，并通过部署架构门禁，禁止 `latest` 或只有可变 tag 的外部镜像。
+`noctf-*` 是本地构建示例名；生产发布必须以平台预发布版本和构建产物 digest 标记，再由环境清单引用，
+不能把本地 `latest` 当作生产供应链身份。
+
 ## 进程权限
 
 - API：业务 DB、Wolverine Outbox、Redis、ObjectStorage、公开/内部 HTTP；无 Docker/Kubernetes/Libvirt 权限。

@@ -68,6 +68,20 @@ docker build -f backend/Dockerfile --target runner -t noctf-runner:latest .
 docker build -f backend/Dockerfile --target host -t noctf-host:latest .
 ```
 
+All third-party build bases and stateful-service images in the checked-in
+manifests use an exact version tag plus the multi-architecture manifest digest.
+Kompose is downloaded at the fixed version and verified against the official
+release SHA-256 for the BuildKit target architecture before it becomes
+executable. To update one of these dependencies, obtain the digest from its
+official registry, update the readable version tag and digest atomically, and
+run `DeploymentTopologyTests`; never move the tag without its digest or replace
+it with `latest`.
+
+The `noctf-*:latest` names below are local build outputs, not third-party pulls.
+Production delivery must retag those outputs with the platform pre-release
+version and immutable registry digest, then replace the three application image
+references in the environment-specific manifest before rollout.
+
 For local clusters (kind/minikube), load images:
 
 ```bash
