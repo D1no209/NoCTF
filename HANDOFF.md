@@ -9,6 +9,27 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：前端请求一致性与依赖安全
+
+- 功能提交 `fbf0a4a3` 使 i18n 资源覆盖测试在 Windows CRLF 和仓库 LF 下采用同一语义，消除与产品代码无关的换行误报。
+- 功能提交 `aad7d997` 将认证 401 处理改为精确识别匿名认证端点；`me`、个人资料、头像、修改密码、
+  全局注销和重发验证邮件等受保护端点现在可以使用有效 Refresh Cookie 单飞刷新，不再被 `/auth/*`
+  粗粒度跳过规则误伤。
+- 功能提交 `d46b8777` 删除管理端 GameplayFact 筛选中的不安全强制转换，改用生成 SDK 的
+  `FlagAttempt`、`BreakAttempt`、`FixAttempt` 协议值，并移除后端不存在的 `PlatformFailed` 结果。
+- 功能提交 `73e20c1a` 为作弊事件、咨询、通知和平台用户详情增加 latest-request 守卫；快速切换或关闭
+  详情后，旧响应不能覆盖当前选择，也不能让管理员在过期对象上继续执行处置。
+- 功能提交 `2c46a42f` 为游标分页增加请求代次；重置筛选后旧响应、旧错误和旧 `finally` 不再污染新页，
+  新的首页请求也不必等待已失效请求结束。
+- 功能提交 `d8608cbe` 通过 Bun overrides 将间接依赖 `js-yaml` 固定为已修复的 `4.3.1`，保持
+  `@hey-api/openapi-ts` 生成链不变；`bun audit` 从两个 High 降为 0。
+- 本阶段没有 HTTP/OpenAPI、生成 TypeScript SDK、数据模型、数据表、migration、snapshot 或版本号变化；
+  `app/api` 生成目录未被手工修改。
+- 验证通过：ClientApp `bun test` 106/106、`bun run typecheck`、`bun run build`、`bun audit`（0 漏洞）
+  和 `git diff --check`。生产构建仅保留既有大 chunk 和第三方 deprecation 警告。
+- 修复位于隔离分支 `codex/fix-audit-findings-20260811`；尚未推送、部署或操作生产数据。浏览器动态验收
+  将在所有前端修复收口后统一使用 Microsoft Edge 执行。
+
 ## 2026-08-11 全量审计修复：CTF 分值表达式全区间验证
 
 - 功能提交 `0a15357c` 修复 CTF 自定义分值表达式只验证 `solveCount=0`、`1` 和参赛队总数、
