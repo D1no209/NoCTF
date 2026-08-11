@@ -43,6 +43,7 @@ public sealed class UserAccountAdministrationStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable,
             ct);
+        await ActiveHumanAdministratorMutationGuard.AcquireAsync(db, ct);
         await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
         var user = await db.Users.Include(candidate => candidate.AvatarFile)
             .SingleOrDefaultAsync(candidate => candidate.Id == userId, ct);
@@ -203,12 +204,8 @@ public sealed class UserAccountAdministrationStore(
                     && entry.RelatedId == user.Id,
                 ct));
         var selfDeletionForbidden = user.Id == actorUserId;
-        var lastAdministratorProtected = user.Role == UserRole.Administrator
-            && user.AccountStatus == UserAccountStatus.Active
-            && await db.Users.CountAsync(candidate =>
-                candidate.Role == UserRole.Administrator
-                && candidate.AccountStatus == UserAccountStatus.Active,
-                ct) <= 1;
+        var lastAdministratorProtected = ActiveHumanAdministratorMutationGuard.Contains(user)
+            && await ActiveHumanAdministratorMutationGuard.CountAsync(db, ct) <= 1;
         var hasReferences = references.Count > 0;
         return new(
             user.Id,
