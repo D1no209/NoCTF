@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
@@ -30,6 +31,7 @@ public sealed record AwdpCheckerWork(
     TimeSpan Timeout);
 
 public sealed record AwdpFixWork(
+    long RuntimeProcessingVersion,
     AwdpFixArchive Archive,
     ContainerReceipt TargetReceipt,
     string PatchEntrypoint,
@@ -39,10 +41,24 @@ public sealed record AwdpFixWork(
 
 public interface IAwdpFixWorkReader
 {
-    Task<AwdpFixWork?> ReadAsync(
+    Task<AwdpFixWorkClaim> ClaimAsync(
         RunAwdpFixVerification message,
         CancellationToken cancellationToken);
 }
+
+public sealed record AwdpFixRecoveryWork(
+    Guid GameplayFactId,
+    Guid RuntimeInstanceId,
+    int Generation,
+    long RecoveryProcessingVersion,
+    RuntimeProvider Provider,
+    string RunnerPool,
+    string RunnerId);
+
+public sealed record AwdpFixWorkClaim(
+    AwdpFixExecutionFenceDisposition Disposition,
+    AwdpFixWork? Work = null,
+    AwdpFixRecoveryWork? Recovery = null);
 
 public interface IAwdpCheckerExecutor
 {
@@ -89,11 +105,38 @@ public sealed class AwdpFixWorkReader(
     IConfiguration configuration,
     TimeProvider timeProvider) : IAwdpFixWorkReader
 {
-    public async Task<AwdpFixWork?> ReadAsync(
+    public async Task<AwdpFixWorkClaim> ClaimAsync(
         RunAwdpFixVerification message,
         CancellationToken cancellationToken)
     {
         await using var scope = scopes.CreateAsyncScope();
+        var fence = scope.ServiceProvider.GetRequiredService<IAwdpFixExecutionFence>();
+        var fenceResult = await fence.AcquireAsync(new(
+            message.GameplayFactId,
+            message.CompetitionChallengeId,
+            message.PatchUploadId,
+            message.RuntimeInstanceId,
+            message.Generation,
+            message.RuntimeProcessingVersion,
+            message.Deadline,
+            message.RunnerPool,
+            message.RunnerId), cancellationToken);
+        if (fenceResult.Disposition == AwdpFixExecutionFenceDisposition.Superseded)
+            return new(AwdpFixExecutionFenceDisposition.Superseded);
+        if (fenceResult.Disposition == AwdpFixExecutionFenceDisposition.Recover)
+        {
+            return new(
+                AwdpFixExecutionFenceDisposition.Recover,
+                Recovery: new(
+                    message.GameplayFactId,
+                    fenceResult.RuntimeInstanceId,
+                    fenceResult.Generation,
+                    fenceResult.RuntimeProcessingVersion,
+                    fenceResult.Provider,
+                    fenceResult.RunnerPool,
+                    fenceResult.RunnerId));
+        }
+
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         var target = await db.GameplayFacts.AsNoTracking()
             .Where(submission => submission.Id == message.GameplayFactId
@@ -118,7 +161,7 @@ public sealed class AwdpFixWorkReader(
                         && runtime.Purpose == RuntimePurpose.AwdpTarget
                         && runtime.GameplayFactId == message.GameplayFactId
                         && runtime.Generation == message.Generation
-                        && runtime.ProcessingVersion == message.RuntimeProcessingVersion
+                        && runtime.ProcessingVersion == fenceResult.RuntimeProcessingVersion
                         && runtime.State == RuntimeState.Running
                         && runtime.RunnerPool == message.RunnerPool
                         && runtime.RunnerId == message.RunnerId),
@@ -176,19 +219,19 @@ public sealed class AwdpFixWorkReader(
         if (target is null
             || timeProvider.GetUtcNow() >= message.Deadline
             || string.IsNullOrWhiteSpace(target.Runtime.ProviderReceiptJson))
-            return null;
+            return new(AwdpFixExecutionFenceDisposition.Superseded);
 
         var settings = AwdpConfigurationResolver.Resolve(
             target.CompetitionConfigurationJson,
             target.ChallengeRulesJson,
             target.ChallengeDefinitionJson);
         if (settings.Checker is not { } checker)
-            return null;
+            return new(AwdpFixExecutionFenceDisposition.Superseded);
         var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
             target.Runtime.ProviderReceiptJson);
         if (receipt?.NetworkId is not { Length: > 0 } networkId
             || receipt.InternalHost is not { Length: > 0 } targetHost)
-            return null;
+            return new(AwdpFixExecutionFenceDisposition.Superseded);
 
         var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"];
         if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri)
@@ -205,7 +248,7 @@ public sealed class AwdpFixWorkReader(
         var now = timeProvider.GetUtcNow();
         var remaining = message.Deadline - now;
         if (remaining <= TimeSpan.Zero)
-            return null;
+            return new(AwdpFixExecutionFenceDisposition.Superseded);
         var checkerTimeout = TimeSpan.FromSeconds(checker.TimeoutSeconds);
         var timeout = checkerTimeout < remaining ? checkerTimeout : remaining;
         var callbackToken = tokens.IssueAwdpFixResult(new(
@@ -213,7 +256,7 @@ public sealed class AwdpFixWorkReader(
             message.GameplayFactId,
             message.RuntimeInstanceId,
             message.Generation,
-            message.RuntimeProcessingVersion,
+            fenceResult.RuntimeProcessingVersion,
             message.Deadline,
             now));
         var archiveToken = tokens.IssueFixArchiveRead(
@@ -225,31 +268,34 @@ public sealed class AwdpFixWorkReader(
             settings.PatchCommand,
             settings.PatchEntrypoint);
         return new(
+            AwdpFixExecutionFenceDisposition.Execute,
             new(
-                new Uri(
-                    baseUri,
-                    $"/api/internal/v1/awdp/fix-archives/{message.GameplayFactId:D}"),
-                archiveToken,
-                target.File.FileName,
-                target.File.ByteLength,
-                target.File.Sha256),
-            receipt,
-            settings.PatchEntrypoint,
-            patchCommand,
-            TimeSpan.FromSeconds(settings.PatchTimeoutSeconds),
-            new(
-                message.RuntimeInstanceId,
-                message.Generation,
-                target.Runtime.RuntimeProvider,
-                checker.Image,
-                checker.Command ?? [],
-                checker.Environment ?? new Dictionary<string, string>(),
-                networkId,
-                targetHost,
-                settings.ReadyTimeoutSeconds,
-                new Uri(baseUri, "/api/internal/v1/awdp/fix-results"),
-                callbackToken,
-                timeout));
+                fenceResult.RuntimeProcessingVersion,
+                new(
+                    new Uri(
+                        baseUri,
+                        $"/api/internal/v1/awdp/fix-archives/{message.GameplayFactId:D}"),
+                    archiveToken,
+                    target.File.FileName,
+                    target.File.ByteLength,
+                    target.File.Sha256),
+                receipt,
+                settings.PatchEntrypoint,
+                patchCommand,
+                TimeSpan.FromSeconds(settings.PatchTimeoutSeconds),
+                new(
+                    message.RuntimeInstanceId,
+                    message.Generation,
+                    target.Runtime.RuntimeProvider,
+                    checker.Image,
+                    checker.Command ?? [],
+                    checker.Environment ?? new Dictionary<string, string>(),
+                    networkId,
+                    targetHost,
+                    settings.ReadyTimeoutSeconds,
+                    new Uri(baseUri, "/api/internal/v1/awdp/fix-results"),
+                    callbackToken,
+                    timeout)));
     }
 }
 
@@ -317,6 +363,8 @@ public sealed class AwdpFixVerificationHandler(
     FixArchivePreparer preparer,
     IRuntimeProviderCatalog providers,
     IAwdpCheckerExecutor checker,
+    IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
+    IRunnerCapacityGate capacity,
     ITransactionalMessageOutbox outbox,
     IConfiguration configuration)
 {
@@ -329,10 +377,18 @@ public sealed class AwdpFixVerificationHandler(
             configuration["Runner:Pool"] ?? "default",
             configuration["Runner:Id"]
                 ?? throw new InvalidOperationException("Runner:Id is required."));
-        if (DateTimeOffset.UtcNow >= message.Deadline)
+        var claim = await reader.ClaimAsync(message, cancellationToken);
+        if (claim.Disposition == AwdpFixExecutionFenceDisposition.Recover)
+        {
+            await RecoverAsync(
+                claim.Recovery
+                    ?? throw new InvalidOperationException("AWDP recovery work is unavailable."),
+                cancellationToken);
             return;
-        var work = await reader.ReadAsync(message, cancellationToken);
-        if (work is null)
+        }
+        var work = claim.Work;
+        if (claim.Disposition != AwdpFixExecutionFenceDisposition.Execute
+            || work is null)
             return;
 
         AwdpFixOutcome? outcome = AwdpFixOutcome.PlatformFailed;
@@ -403,9 +459,58 @@ public sealed class AwdpFixVerificationHandler(
             message.GameplayFactId,
             message.RuntimeInstanceId,
             message.Generation,
-            message.RuntimeProcessingVersion,
+            work.RuntimeProcessingVersion,
             result,
             DateTimeOffset.UtcNow));
         await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private async Task RecoverAsync(
+        AwdpFixRecoveryWork recovery,
+        CancellationToken cancellationToken)
+    {
+        var reconciler = resourceReconcilers.SingleOrDefault(
+            candidate => candidate.Provider == recovery.Provider)
+            ?? throw new InvalidOperationException(
+                $"Runtime resource reconciliation is unavailable for '{recovery.Provider}'.");
+        var identity = new RuntimeResourceIdentity(
+            recovery.RuntimeInstanceId,
+            recovery.Generation);
+        await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+        var remaining = await reconciler.ListManagedAsync(cancellationToken);
+        if (remaining.Contains(identity))
+            throw new InvalidOperationException(
+                "AWDP verification resources remain after identity-based cleanup.");
+
+        DeleteOperationDirectory(recovery.GameplayFactId, recovery.RuntimeInstanceId);
+        var release = await capacity.ReleaseAsync(
+            recovery.RuntimeInstanceId,
+            recovery.RunnerId,
+            cancellationToken);
+        if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+            throw new InvalidOperationException(
+                "AWDP target capacity belongs to a different Runner assignment.");
+
+        await outbox.PublishAsync(new ReplayAwdpFixVerification(
+            recovery.GameplayFactId,
+            recovery.RuntimeInstanceId,
+            recovery.Generation,
+            recovery.RecoveryProcessingVersion,
+            recovery.RunnerPool,
+            recovery.RunnerId,
+            DateTimeOffset.UtcNow));
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private static void DeleteOperationDirectory(
+        Guid gameplayFactId,
+        Guid runtimeInstanceId)
+    {
+        var path = Path.Combine(
+            Path.GetTempPath(),
+            "noctf-awdp",
+            $"{gameplayFactId:N}-{runtimeInstanceId:N}");
+        if (Directory.Exists(path))
+            Directory.Delete(path, recursive: true);
     }
 }

@@ -52,6 +52,7 @@ public static class MessageRouting
         options.PublishMessage<ReleaseRunnerCapacity>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<BloodAwarded>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<AwdpFixResult>().ToPostgresqlQueue("noctf-worker");
+        options.PublishMessage<ReplayAwdpFixVerification>().ToPostgresqlQueue("noctf-worker");
         options.PublishMessage<ExpireAwdpFixVerification>().ToPostgresqlQueue("noctf-worker");
 
         if (!roles.Has(HostRole.Runner))

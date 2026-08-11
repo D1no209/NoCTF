@@ -38,6 +38,44 @@ namespace NoCTF.Tests.Integration.Messaging;
 public sealed class WolverineTransactionalOutboxTests
 {
     [Test]
+    [Category("AwdpFixFence")]
+    [Timeout(300_000)]
+    public async Task Awdp_replay_message_preserves_its_fence_across_wolverine_retry(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            using var host = BuildHost(postgres.GetConnectionString());
+            await host.StartAsync(cancellationToken);
+            try
+            {
+                var message = new ReplayAwdpFixVerification(
+                    Guid.NewGuid(),
+                    Guid.NewGuid(),
+                    3,
+                    12,
+                    "test-pool",
+                    "test-runner",
+                    DateTimeOffset.UtcNow);
+                var observation = AwdpReplayProbeObservation.Expect(message.GameplayFactId);
+
+                await host.Services.GetRequiredService<IMessageBus>().SendAsync(message);
+
+                var received = await observation.Task.WaitAsync(cancellationToken);
+                await Assert.That(received).IsEqualTo(message);
+                await Assert.That(AwdpReplayProbeObservation.Attempts(message.GameplayFactId))
+                    .IsEqualTo(2);
+            }
+            finally
+            {
+                await host.StopAsync(cancellationToken);
+            }
+        });
+    }
+
+    [Test]
     [Timeout(300_000)]
     public async Task Maintenance_ticks_are_single_active_and_fail_over_between_workers(
         CancellationToken cancellationToken)
@@ -715,6 +753,7 @@ public sealed class WolverineTransactionalOutboxTests
             options.Discovery.IncludeType<ObserveAwdInjectionHandler>();
             options.Discovery.IncludeType<KohPollingHandler>();
             options.Discovery.IncludeType<KohObservationHandler>();
+            options.Discovery.IncludeType<AwdpReplayProbeHandler>();
             options.PersistMessagesWithPostgresql(connectionString, envelopeSchema);
             options.UseEntityFrameworkCoreTransactions();
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
@@ -722,6 +761,7 @@ public sealed class WolverineTransactionalOutboxTests
             options.Policies.OnException<RollbackProbeException>().MoveToErrorQueue();
             options.Policies.OnException<DbUpdateConcurrencyException>().RetryTimes(5);
             options.Policies.OnException<LifecycleTransitionProbeException>().MoveToErrorQueue();
+            options.Policies.OnException<AwdpReplayProbeException>().RetryTimes(2);
             options.ListenToPostgresqlQueue("outbox-probe").UseDurableInbox();
             options.ListenToPostgresqlQueue(
                 NoCTF.Application.Runtime.Instances.RunnerNodeQueueName
@@ -750,6 +790,8 @@ public sealed class WolverineTransactionalOutboxTests
             options.PublishMessage<AdvanceAwdRound>()
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<GenerateAwdFlags>()
+                .ToPostgresqlQueue("outbox-probe");
+            options.PublishMessage<ReplayAwdpFixVerification>()
                 .ToPostgresqlQueue("outbox-probe");
         });
         return builder.Build();
@@ -933,6 +975,46 @@ public sealed class ObserveOutboxBusinessProbeHandler
             .SqlQuery<int>($"SELECT count(*)::int AS \"Value\" FROM outbox_business_probe WHERE id = {message.Id}")
             .SingleAsync(cancellationToken);
         OutboxProbeObservation.Complete(message.Id, count == 1);
+    }
+}
+
+public sealed class AwdpReplayProbeHandler
+{
+    public static void Handle(ReplayAwdpFixVerification message)
+    {
+        if (AwdpReplayProbeObservation.RecordAttempt(message.GameplayFactId) == 1)
+            throw new AwdpReplayProbeException();
+        AwdpReplayProbeObservation.Complete(message.GameplayFactId, message);
+    }
+}
+
+public sealed class AwdpReplayProbeException : Exception;
+
+public static class AwdpReplayProbeObservation
+{
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int>
+        DeliveryAttempts = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid,
+        TaskCompletionSource<ReplayAwdpFixVerification>> Observations = new();
+
+    public static TaskCompletionSource<ReplayAwdpFixVerification> Expect(Guid id)
+    {
+        DeliveryAttempts.TryRemove(id, out _);
+        var completion = new TaskCompletionSource<ReplayAwdpFixVerification>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        Observations[id] = completion;
+        return completion;
+    }
+
+    public static int RecordAttempt(Guid id) =>
+        DeliveryAttempts.AddOrUpdate(id, 1, (_, count) => count + 1);
+
+    public static int Attempts(Guid id) => DeliveryAttempts.GetValueOrDefault(id);
+
+    public static void Complete(Guid id, ReplayAwdpFixVerification message)
+    {
+        if (Observations.TryRemove(id, out var completion))
+            completion.TrySetResult(message);
     }
 }
 

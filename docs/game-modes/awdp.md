@@ -53,6 +53,22 @@ AWDP target 只支持单 Container，Provider Docker/Kubernetes；不支持 Comp
 
 Fix 永不修改比赛长期 Runtime。
 
+Fix 在复制和执行 archive 前，必须用一次 PostgreSQL 事务把 disposable target 的
+`ProcessingVersion` 从 provision fence 推进到 execution fence。只有这次成功认领的消息可以
+在该 target 上执行 Fix。Wolverine 重投或 Runner 崩溃后，只要结果仍不确定，就不得在同一
+target 上再次执行非幂等 Fix：先把旧 target 推进到 `Stopping` 并再次递增
+`ProcessingVersion`，使旧 callback、超时和迟到结果全部失效；Runner 再按
+`RuntimeInstanceId + Generation` 精确清理 target、checker、隔离网络和本地工作目录，确认
+Provider 中不存在该 identity，并完成 owner-checked capacity release。cleanup 任一步失败都
+保持 recovery fence 并由重投继续清理，禁止创建替代环境。
+
+只有清理确认成功后，Worker 才把旧 RuntimeInstance 记为 `Stopped`，创建新的 RuntimeInstance
+Id 和更高 Generation，并从原 GameplayFact 引用的不可变 PatchUpload 重新下载、解包和执行。
+若 Competition、CompetitionChallenge 或 Challenge definition revision 已变化，则按现有 revision
+规则把 GameplayFact 记为 PlatformFailed，不使用新配置隐式重跑。旧 generation 消息、旧
+callback、重复 cleanup completion 和重复 replay completion 都必须被 state + generation +
+processing-version fence 幂等忽略。
+
 创建 disposable target 时会固化 Competition configuration revision、
 CompetitionChallenge revision 和 Challenge definition revision。Fix 结果落库前再次核对
 这三个 revision；任一变化都把本次 Fix 记为 PlatformFailed，停止并清理即时 target，
