@@ -16176,10 +16176,12 @@
         "type": "string",
         "description": "",
         "x-enumNames": [
-          "ActiveOwnerOrManagerAssignments"
+          "ActiveOwnerOrManagerAssignments",
+          "LastAdministratorProtected"
         ],
         "enum": [
-          "ActiveOwnerOrManagerAssignments"
+          "ActiveOwnerOrManagerAssignments",
+          "LastAdministratorProtected"
         ]
       },
       "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest": {

@@ -42,4 +42,13 @@ public sealed class PlatformBotProtocolTests
 
         await Assert.That(json).IsEqualTo("\"ActiveOwnerOrManagerAssignments\"");
     }
+
+    [Test]
+    public async Task Last_administrator_conflict_code_serializes_as_a_named_enum()
+    {
+        var json = JsonSerializer.Serialize(
+            UpdatePlatformUserRoleConflictCode.LastAdministratorProtected);
+
+        await Assert.That(json).IsEqualTo("\"LastAdministratorProtected\"");
+    }
 }

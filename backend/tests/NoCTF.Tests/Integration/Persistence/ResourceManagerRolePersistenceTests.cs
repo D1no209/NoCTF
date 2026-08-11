@@ -22,6 +22,80 @@ public sealed class ResourceManagerRolePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Concurrent_administrator_downgrades_preserve_one_active_human_administrator(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(
+                "noctf_last_administrator",
+                cancellationToken);
+            var options = Options(postgres);
+            var now = DateTimeOffset.UtcNow;
+            var firstAdministratorId = Guid.CreateVersion7();
+            var secondAdministratorId = Guid.CreateVersion7();
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                await setup.Database.MigrateAsync(cancellationToken);
+                setup.Users.AddRange(
+                    User(firstAdministratorId, "first-admin", UserRole.Administrator, now),
+                    User(secondAdministratorId, "second-admin", UserRole.Administrator, now));
+                await setup.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var firstDeadLetters =
+                new WolverineProcessDeadLetters(postgres.GetConnectionString());
+            await using var secondDeadLetters =
+                new WolverineProcessDeadLetters(postgres.GetConnectionString());
+            await using var firstDb = new NoCtfDbContext(options);
+            await using var secondDb = new NoCtfDbContext(options);
+            var firstTask = new PlatformAdministrationStore(
+                    firstDb,
+                    firstDeadLetters,
+                    new PasswordHasher<User>())
+                .UpdateRoleAsync(
+                    firstAdministratorId,
+                    UserRole.User,
+                    now.AddMinutes(1),
+                    cancellationToken);
+            var secondTask = new PlatformAdministrationStore(
+                    secondDb,
+                    secondDeadLetters,
+                    new PasswordHasher<User>())
+                .UpdateRoleAsync(
+                    secondAdministratorId,
+                    UserRole.User,
+                    now.AddMinutes(1),
+                    cancellationToken);
+
+            var results = await Task.WhenAll(firstTask, secondTask);
+
+            await Assert.That(results.Count(result =>
+                    result.State == UpdatePlatformRoleState.Updated))
+                .IsEqualTo(1);
+            await Assert.That(results.Count(result =>
+                    result.State == UpdatePlatformRoleState.LastAdministratorProtected))
+                .IsEqualTo(1);
+            await using var verification = new NoCtfDbContext(options);
+            var users = await verification.Users.AsNoTracking()
+                .OrderBy(user => user.Id)
+                .ToArrayAsync(cancellationToken);
+            await Assert.That(users.Count(user =>
+                    user.Kind == UserKind.Human
+                    && user.Role == UserRole.Administrator
+                    && user.AccountStatus == UserAccountStatus.Active))
+                .IsEqualTo(1);
+            await Assert.That(users.Count(user =>
+                    user.Role == UserRole.User && user.TokenVersion == 1))
+                .IsEqualTo(1);
+            await Assert.That(users.Count(user =>
+                    user.Role == UserRole.Administrator && user.TokenVersion == 0))
+                .IsEqualTo(1);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Downgrade_reports_active_blockers_and_restore_revalidates_roles(
         CancellationToken cancellationToken)
     {

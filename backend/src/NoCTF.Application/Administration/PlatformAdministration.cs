@@ -20,7 +20,8 @@ public enum UpdatePlatformRoleState
     Updated,
     UserNotFound,
     InvalidBotRole,
-    ActiveOwnerOrManagerAssignments
+    ActiveOwnerOrManagerAssignments,
+    LastAdministratorProtected
 }
 
 public sealed record PlatformRoleAssignmentBlockers(
