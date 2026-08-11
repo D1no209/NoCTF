@@ -9,6 +9,38 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 Alpha.25 AWD、AWDP 与 KoH 运行链路恢复
+
+- 功能提交 `4cf4f6e2cf59d8c3accb19429a2d0146f2ca3ca9` 基于协作者最新 `main`
+  `b7e49b4c29a45e967638d4eb4d310d9af53bae6f` 制作；协作者的终端风格界面和分区式 Runtime
+  编辑器完整保留。发布提交只包含 6 个生产后端文件和 `backend/Directory.Build.props` 版本标记，
+  没有包含隔离测试分支中的 E2E、测试夹具、测试断言、测试 Dockerfile 或测试编排器。
+- AWDP 内部 JWT 权限与 GameplayFact 迁移后的契约重新对齐：下载与回写使用
+  `gameplay_fact_id`，不再要求已废弃的 `submission_id` / `processing_version`；Fix 工作读取从不可变
+  `files` 元数据取得归档文件名、长度与 SHA-256，避免继续读取已收敛的上传冗余字段。
+- AWD 自动环境创建不再在逐队事务中提前退出并遗留待发送消息；已应用的变更统一在循环后刷新
+  Wolverine outbox，同时保留比赛状态和容量上限的强类型终态。GameplayFact 处理不再在事务提交后
+  重复强制刷新 outbox，并以强类型生命周期 payload 计算 AWD 有效运行时间，恢复暂停/继续后的轮次
+  计分。Docker 一次性任务允许容器在首次检查前已正常退出，KoH/Checker/Fix 等快速任务不再被误判为
+  “未进入 Running”。
+- 平台版本由 `0.1.0-alpha.24` 递增为 `0.1.0-alpha.25`。本阶段没有 HTTP/OpenAPI 契约、生成
+  TypeScript SDK、数据模型、数据表、列、migration 或 snapshot 变化。
+- 隔离测试分支上的相同生产修复此前已完成 AWD、AWDP、KoH 三种模式完整 E2E，后端合计 762 通过、
+  2 个外部环境项按设计跳过、0 失败。合并最新 `main` 后重新验证：Release build 0 警告/0 错误；
+  非 Integration TUnit 627/627；`dotnet format ... analyzers --verify-no-changes`、EF pending-model
+  changes、ClientApp `typecheck`、`generate`、production `build` 和 `git diff --check` 通过。
+  ClientApp 84 项测试中 83 项通过；唯一失败是既有 `i18n.test.ts` 在 Windows 工作树中按字节要求 LF，
+  而 Git checkout 为 CRLF，实际 `ThemeToggle` 与 `LanguageToggle` 顺序正确。遵照“不要混入测试代码”
+  的发布要求，没有移植隔离分支中仅放宽换行判断的测试改动。
+- 一次全量真实依赖复验因 Docker 重置后重新拉取/启动依赖超过 300 秒门限而终止；精确留下的两个
+  `it-36410...` 测试容器和三张 `noctf-platform-it-*` 测试网络已逐一删除。未执行全局 prune，最终
+  本机测试容器、测试网络和数据卷均为零。
+- 下一步按当前授权将功能提交与本 HANDOFF 提交快进推送到远程 `main`，再通过带先决提交校验的
+  Git bundle 和 Alpha.25 `linux/amd64` 镜像更新生产 `/root/NoCTF`。部署需保留未跟踪的
+  `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、PostgreSQL/Redis/上传卷、题目镜像、Runtime
+  和比赛事实；Migration 应报告数据库已是最新，切换后验证 API/Runner healthy、Worker running、
+  HTTPS `/` 与 `/health` 为 200，并检查新进程日志无新增 Error/Fatal/Unhandled。
+
 ## 2026-08-10 Alpha.24 语言切换黑屏修复
 
 - 功能提交 `be97a8ec` 修复页头语言按钮短暂黑屏。根因是 `useLocale().switchLocale()` 在更新共享语言状态和
