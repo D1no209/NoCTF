@@ -9,6 +9,19 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：通知历史精准深链
+
+- 功能提交 `8dd7a9aa` 修复消息中心只在已加载的前 50 条通知中查找 URL 里的 `notification`，导致旧消息
+  深链静默打不开的问题。列表未包含目标时，前端现在直接调用生成 SDK 的线程读取接口，以 URL 中的
+  notification ID 取得经后端鉴权的完整线性线程，再选择精确消息并展示后续状态。
+- 深链读取期间显示详情骨架；通知不存在、已不可见或请求失败时显示可理解错误，不清空通知列表，也不会
+  回退成“请选择消息”。快速切换 URL 继续使用 latest-request 守卫，旧线程响应不能覆盖新选择。
+- 本阶段没有 HTTP/OpenAPI、生成 SDK、数据模型、数据表、migration、snapshot 或版本号变化；没有手写
+  URL、端点路径或 DTO。
+- 验证通过：通知路由与 i18n 定向测试 18/18，ClientApp 完整 `bun test` 130/130、
+  `bun run typecheck`、`bun run build` 和 `git diff --check`。仅保留既有构建警告。
+- 尚未推送、部署或操作生产数据；实际旧消息 URL 将在 Microsoft Edge 最终验收。
+
 ## 2026-08-11 全量审计修复：语言切换原地响应
 
 - 功能提交 `f206bc95` 移除根 `NuxtPage` 的 locale key；切换中文/英文不再销毁并重建当前路由，
