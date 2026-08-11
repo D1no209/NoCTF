@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import type { NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol } from '~/api'
 import type { BadgeVariants } from '~/components/ui/badge'
 
-const props = defineProps<{ status?: string | null }>()
+const props = defineProps<{ status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | null }>()
 
 const label = computed(() => enumLabel(CompetitionStatusLabel, props.status))
 const variant = computed<BadgeVariants['variant']>(() => {

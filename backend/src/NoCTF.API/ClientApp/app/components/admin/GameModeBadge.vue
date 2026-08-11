@@ -1,5 +1,7 @@
 <script setup lang="ts">
-const props = defineProps<{ mode?: string | null }>()
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '~/api'
+
+const props = defineProps<{ mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | null }>()
 
 const label = computed(() => enumLabel(GameModeLabel, props.mode))
 </script>
