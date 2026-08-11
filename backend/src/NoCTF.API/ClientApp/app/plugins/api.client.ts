@@ -6,7 +6,7 @@ import { statusErrorMessage } from '~/utils/api-error'
 /**
  * Configure the generated hey-api client:
  * - inject the in-memory Bearer token into every request;
- * - on 401 (outside /auth/*), single-flight refresh then retry the request once;
+ * - on 401 (except explicitly anonymous auth endpoints), single-flight refresh then retry once;
  * - when an error response carries no problem+json body (e.g. bare 401/403),
  *   synthesize a status-based message so callers never see a bare「请求失败」.
  */

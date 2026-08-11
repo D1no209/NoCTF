@@ -1,3 +1,6 @@
+import { refreshTokenEndpoint } from '~/api'
+import { accessTokenNeedsRefresh } from './auth-refresh'
+
 /**
  * In-memory access token store and refresh single-flight.
  *
@@ -19,23 +22,15 @@ let refreshPromise: Promise<boolean> | null = null
 
 /**
  * Exchange the refresh cookie for a new access token.
- * Uses a raw fetch instead of the generated SDK to avoid interceptor recursion.
+ * The generated refresh endpoint is explicitly excluded from 401 retry interception,
+ * so refresh remains recursion-safe without duplicating its route or response DTO.
  * Concurrent callers share a single in-flight request.
  */
 export function refreshSession(): Promise<boolean> {
   refreshPromise ??= (async () => {
     try {
-      const response = await fetch('/api/v1/auth/refresh', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      if (!response.ok) {
-        setAccessToken(null)
-        return false
-      }
-      const data = (await response.json()) as { accessToken?: string }
-      if (!data.accessToken) {
+      const { data, error } = await refreshTokenEndpoint()
+      if (error || !data?.accessToken) {
         setAccessToken(null)
         return false
       }
@@ -54,4 +49,11 @@ export function refreshSession(): Promise<boolean> {
     }
   })()
   return refreshPromise
+}
+
+/** Return a non-expiring token for SignalR connect/reconnect requests. */
+export async function getRealtimeAccessToken(): Promise<string> {
+  const current = getAccessToken()
+  if (current && !accessTokenNeedsRefresh(current)) return current
+  return await refreshSession() ? getAccessToken() ?? '' : ''
 }
