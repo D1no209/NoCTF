@@ -23,6 +23,8 @@ using NoCTF.Infrastructure.Caching;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Hosting.Health;
+using NoCTF.Application.GameplayFacts.Processing;
+using NoCTF.Infrastructure.GameplayFacts.Processing;
 
 namespace NoCTF.Runner.Composition;
 
@@ -37,6 +39,7 @@ public static class ServiceRegistration
     {
         ValidateRunnerScoringCallbackBaseUrl(configuration);
         services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
+        services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
         services.AddNoCtfLocalComputationCaching(configuration);
         services.AddHttpClient();
         var configuredProvider = configuration["Runner:Provider"];
