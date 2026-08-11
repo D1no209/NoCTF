@@ -9,6 +9,20 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：密码可见性控件
+
+- 功能提交 `d425a268` 新增统一 `PasswordInput`，在输入框右侧提供小型眼睛按钮，并覆盖登录、注册、
+  邮件重置密码及账户改密的全部密码与确认密码字段。按钮固定为 `type=button`，不会误触发表单提交；
+  切换只改变输入呈现，不改变密码值、浏览器 autocomplete 或既有校验流程。
+- 控件使用 `aria-label` 与 `aria-pressed` 明确表达“显示密码/隐藏密码”状态，图标对读屏隐藏；中英文资源
+  均已补齐，保持现有组件和视觉风格。
+- 本阶段没有 HTTP/OpenAPI、生成 TypeScript SDK、数据模型、数据表、migration、snapshot 或版本号变化；
+  `app/api` 生成目录未被修改。
+- 验证通过：相关表单与 i18n 定向测试 15/15，ClientApp 完整 `bun test` 131/131、
+  `bun run typecheck`、`bun run build` 和 `git diff --check`；构建只保留既有大 chunk、插件耗时与第三方
+  trailing-slash deprecation 警告。
+- 尚未推送、部署或操作生产数据；最终键盘、读屏标签与四类表单交互将在 Microsoft Edge 统一验收。
+
 ## 2026-08-11 全量审计修复：GameplayFact 权威顺序与血榜幂等
 
 - 功能提交 `86cc092f` 让 GameplayFact 的裁决顺序由 `(OccurredAt, Id)` 决定，而不是由 Wolverine 消息
