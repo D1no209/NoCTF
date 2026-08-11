@@ -142,20 +142,20 @@
 - 尚未推送、部署或操作生产文件；部署 overlay 如配置反向代理 body limit，必须不低于 Endpoint 的传输
   硬上限，否则会在应用强类型错误前被代理拒绝。
 
-## 2026-08-11 全量审计修复：AWD Flag 批次有界化
+## 2026-08-11 全量审计修复：AWD Flag 不限量批次语义
 
-- 用户通过 `/grilling` 选择“固定条数与总字节上限、仍按一次 HTTP 请求计限流”。功能提交
-  `994c4fff` 据此将 AWD `flags` 请求限制为最多 64 项，解码后 Flag UTF-8 正文合计最多 256 KiB；
-  单项仍维持 1–4096 UTF-8 bytes 且禁止 NUL。
-- 条数或总字节超限在读取比赛作用域及写入 GameplayFact 前返回稳定
-  `FlagBatchLimitExceeded`；任一单项格式错误仍返回 `FlagInvalid`。整批保持原子零写入，合法批次仍按
-  输入顺序一次持久化并为每项创建独立 GameplayFact；数据库不保存 Batch 实体。
-- 权威 API 与 AWD 文档已更新；批次仍只允许 AWD，CTF/AWDP 继续只接受单 Flag，Redis submission
-  rate limit 仍按一次 HTTP 请求计算。本阶段没有数据表、列、migration、snapshot 或版本号变化。
-- OpenAPI 已通过工具重新导出，TypeScript SDK 已重新生成并确认没有实质 diff（失败码位于 RFC 9457
-  extension，不形成重复 DTO）；生成目录没有手工修改。
-- 验证通过：批次边界应用测试 5/5、SubmitFlag 协议 5/5、OpenAPI 架构测试 1/1、完整 Release build
-  0 警告/0 错误及 `git diff --check`。尚未推送、部署或操作生产 GameplayFact。
+- 用户随后明确覆盖先前的批次上限选择。功能提交 `03d57937` 撤销 `994c4fff` 加入的 64 项/256 KiB
+  上限和 `FlagBatchLimitExceeded` 失败码；AWD `flags` 数组现在不限元素数量、无批次总字节上限。
+- 每个 Flag 仍必须为 1–4096 UTF-8 bytes 且禁止 NUL；任一元素非法时整批原子零写入并返回
+  `FlagInvalid`。合法批次按输入顺序一次持久化，每项创建独立 GameplayFact，不新增 Batch 实体。
+- 多 Flag 仍只属于 AWD；CTF/AWDP 继续要求单 Flag并返回 `FlagBatchNotSupported`。Redis submission
+  rate limit 仍按一次 HTTP 请求计费，未擅自改成逐项计费。
+- 权威 API/AWD 文档与测试已同步；没有数据表、列、migration、snapshot、OpenAPI/SDK 实质变化或
+  版本号变化。
+- 验证通过：FlagSubmissionBatch 6/6、SubmitFlagProtocol 5/5、真实 HTTP 限流 1/1、完整非
+  Integration 655/655、Release solution build 0 警告/0 错误。回归明确覆盖 65×4096-byte（超过旧
+  256 KiB）批次成功，以及单项 4097 bytes/NUL 仍零写入；OpenAPI 二次导出无制品漂移，
+  `git diff --check` 通过。尚未推送、部署或操作生产 GameplayFact。
 
 ## 2026-08-11 全量审计修复：无 receipt Runtime 恢复闭环
 
