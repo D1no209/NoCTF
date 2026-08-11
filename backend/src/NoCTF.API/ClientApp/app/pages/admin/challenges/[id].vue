@@ -384,7 +384,7 @@ function parseUserIds(text: string): string[] {
 }
 
 function conflictMessage(error: unknown): string {
-  const code = (error as { code?: string } | undefined)?.code
+  const code = parseApiError(error).code
   switch (code) {
     case 'RevisionConflict':
       return translate("模板已被他人修改,请刷新后重试")
@@ -414,7 +414,7 @@ async function savePermissions(): Promise<void> {
   permissionsSaving.value = false
   if (error) {
     toast.error(conflictMessage(error))
-    if ((error as { code?: string }).code === 'RevisionConflict') await loadTemplate()
+    if (isRevisionConflict(error)) await loadTemplate()
     return
   }
   if (data) template.value = data
@@ -434,7 +434,7 @@ async function transferOwner(): Promise<void> {
   transferring.value = false
   if (error) {
     toast.error(conflictMessage(error))
-    if ((error as { code?: string }).code === 'RevisionConflict') await loadTemplate()
+    if (isRevisionConflict(error)) await loadTemplate()
     return
   }
   transferOpen.value = false

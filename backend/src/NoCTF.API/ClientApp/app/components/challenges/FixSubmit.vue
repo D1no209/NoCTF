@@ -89,8 +89,8 @@ let unwatch: (() => void) | undefined
 onMounted(() => {
   unwatch = watchCompetition(props.competitionId, {
     gameplayFactStateChanged: (payload) => {
-      const id = (payload as { gameplayFactId?: unknown })?.gameplayFactId
-      if (typeof id === 'string' && id === gameplayFactId.value) {
+      const id = competitionHubString(payload, 'gameplayFactId')
+      if (id && id === gameplayFactId.value) {
         void getGameplayFactStatusEndpoint({
           path: { competitionId: props.competitionId, gameplayFactId: id },
         }).then(({ data }) => {

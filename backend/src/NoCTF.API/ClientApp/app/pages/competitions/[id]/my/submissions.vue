@@ -17,12 +17,12 @@ const challengeTitles = ref<Record<string, string>>({})
 
 const { items, loading, error, hasMore, initialized, loadMore } =
   useCursorPagination<Submission>(async (cursor) => {
-    const { data, error: err } = await listGameplayFactsEndpoint({
+    const { data, error: err, response } = await listGameplayFactsEndpoint({
       path: { competitionId },
       query: { cursor, limit: 50 },
     })
     // 未加入队伍时后端返回 404:视为没有提交记录,展示空态而不是报错。
-    if ((err as { status?: number } | undefined)?.status === 404) {
+    if (response?.status === 404) {
       return { items: [], nextCursor: null }
     }
     if (err || !data) throw err ?? new Error(translate("加载失败"))
