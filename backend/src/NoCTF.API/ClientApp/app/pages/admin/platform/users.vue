@@ -254,8 +254,13 @@ onMounted(() => {
           <TableRow
             v-for="user in filteredUsers"
             :key="user.id"
-            class="cursor-pointer"
+            class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('查看用户 {name} 详情', { name: user.userName ?? '' })"
             @click="openDetail(user)"
+            @keydown.enter="openDetail(user)"
+            @keydown.space.prevent="openDetail(user)"
           >
             <TableCell class="font-medium">
               {{ user.userName }}

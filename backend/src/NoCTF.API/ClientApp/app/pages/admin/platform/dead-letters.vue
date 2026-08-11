@@ -105,7 +105,17 @@ onMounted(() => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="item in items" :key="item.messageId" class="cursor-pointer" @click="openDetail(item)">
+          <TableRow
+            v-for="item in items"
+            :key="item.messageId"
+            class="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+            role="button"
+            tabindex="0"
+            :aria-label="$t('查看死信 {type} 详情', { type: item.messageType ?? '' })"
+            @click="openDetail(item)"
+            @keydown.enter="openDetail(item)"
+            @keydown.space.prevent="openDetail(item)"
+          >
             <TableCell class="max-w-64 truncate font-medium" :title="item.messageType">
               {{ item.messageType }}
             </TableCell>

@@ -286,8 +286,13 @@ function exportCsv() {
                     <TableRow
                       v-for="entry in pageItems"
                       :key="entry.teamId"
-                      :class="cn('cursor-pointer', (entry.rank ?? 99) <= 3 && 'bg-primary/5 hover:bg-primary/10')"
+                      :class="cn('cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset', (entry.rank ?? 99) <= 3 && 'bg-primary/5 hover:bg-primary/10')"
+                      role="button"
+                      tabindex="0"
+                      :aria-label="$t('查看队伍 {team} 详情', { team: entry.teamName ?? '' })"
                       @click="openDetail(entry)"
+                      @keydown.enter="openDetail(entry)"
+                      @keydown.space.prevent="openDetail(entry)"
                     >
                       <TableCell>
                         <Medal v-if="(entry.rank ?? 99) <= 3" :class="medalRankClass[entry.rank ?? 0]" class="size-5" />
@@ -337,11 +342,11 @@ function exportCsv() {
                 <span class="flex items-center gap-3">
                   {{ $t('共 {count} 支队伍，第 {page} / {total} 页', { count: entries.length, page, total: totalPages }) }}
                   <span class="flex items-center gap-1">
-                    <Button variant="outline" size="icon" :disabled="page <= 1" @click="page--">
-                      <ChevronLeft />
+                    <Button variant="outline" size="icon" :aria-label="$t('上一页')" :disabled="page <= 1" @click="page--">
+                      <ChevronLeft aria-hidden="true" />
                     </Button>
-                    <Button variant="outline" size="icon" :disabled="page >= totalPages" @click="page++">
-                      <ChevronRight />
+                    <Button variant="outline" size="icon" :aria-label="$t('下一页')" :disabled="page >= totalPages" @click="page++">
+                      <ChevronRight aria-hidden="true" />
                     </Button>
                   </span>
                 </span>
