@@ -9,18 +9,20 @@ namespace NoCTF.Tests.Refactor;
 public sealed class NoCtfDataModelTests
 {
     [Test]
-    public async Task Manual_adjustment_is_created_with_a_canonical_signed_int32()
+    [Arguments(-25)]
+    [Arguments(1_000_001)]
+    public async Task Manual_adjustment_is_created_with_a_canonical_signed_int32(int delta)
     {
         var store = new RecordingIntakeStore();
         var useCase = new CreateManualAdjustment(store);
         var result = await useCase.ExecuteAsync(new(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), -25, Guid.NewGuid(),
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), delta, Guid.NewGuid(),
             DateTimeOffset.UtcNow));
 
         await Assert.That(result.Succeeded).IsTrue();
-        await Assert.That(store.Received!.Delta).IsEqualTo(-25);
+        await Assert.That(store.Received!.Delta).IsEqualTo(delta);
         await Assert.That(store.Received.Delta.ToString(System.Globalization.CultureInfo.InvariantCulture))
-            .IsEqualTo("-25");
+            .IsEqualTo(delta.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
     [Test]
@@ -43,6 +45,28 @@ public sealed class NoCtfDataModelTests
         await Assert.That(cell.CompetitionChallengeId).IsEqualTo(challengeId);
         await Assert.That(cell.Score).IsEqualTo(-25);
         await Assert.That(cell.SolvedAt).IsNull();
+    }
+
+    [Test]
+    public async Task Leaderboard_total_is_not_capped_at_the_single_configured_value_limit()
+    {
+        var teamId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var at = DateTimeOffset.UtcNow;
+        var projection = new CtfLeaderboardProjector().Project(new(
+            Guid.NewGuid(),
+            GameMode.Ctf,
+            [new(teamId, "red", false, false, at)],
+            [
+                new(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.ManualAdjustment, at,
+                    GameplayFactState.Completed, GameplayFactResult.Applied, null, Value: "1000000"),
+                new(Guid.NewGuid(), teamId, challengeId, GameplayFactKind.ManualAdjustment,
+                    at.AddSeconds(1), GameplayFactState.Completed, GameplayFactResult.Applied,
+                    null, Value: "1000000")
+            ],
+            [new(challengeId, "web", "Web", false)]));
+
+        await Assert.That(projection.Entries.Single().Score).IsEqualTo(2_000_000);
     }
 
     private sealed class RecordingIntakeStore : IGameplayFactIntakeStore

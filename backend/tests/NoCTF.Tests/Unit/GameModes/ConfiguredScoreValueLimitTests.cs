@@ -185,6 +185,28 @@ public sealed class ConfiguredScoreValueLimitTests
             .IsNotEmpty();
     }
 
+    [Test]
+    public async Task Score_limit_does_not_apply_to_upload_bytes_durations_or_percentages()
+    {
+        var uploadConfiguration = CreateAwdpChallenge(100) with
+        {
+            MaximumPatchUploadBytes = OverMaximum
+        };
+        var durationConfiguration = AwdConfiguration.Default with
+        {
+            HardeningDurationSeconds = (int)OverMaximum,
+            RoundDurationSeconds = (int)OverMaximum
+        };
+        var percentageConfiguration = new CtfConfiguration(
+            CtfConfiguration.CurrentSchemaVersion,
+            new(500, 100, 10),
+            [new(BloodRewardPolicy.CurrentPointsPercentage, 100)]);
+
+        await Assert.That(AwdpConfigurationValidator.Validate(uploadConfiguration)).IsEmpty();
+        await Assert.That(AwdConfigurationValidator.Validate(durationConfiguration)).IsEmpty();
+        await Assert.That(CtfConfigurationValidator.Validate(percentageConfiguration)).IsEmpty();
+    }
+
     private static AwdpConfiguration CreateAwdpCompetition(long value) => new(
         AwdpConfiguration.CurrentSchemaVersion,
         RoundDurationSeconds: 300,
