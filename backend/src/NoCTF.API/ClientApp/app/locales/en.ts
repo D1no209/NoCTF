@@ -1520,7 +1520,7 @@ export const englishMessages: Record<string, string> = {
   "影响检查已确认该空竞赛没有永久历史或业务引用。物理删除不可恢复，确认继续？": "The impact check confirms that this empty competition has no permanent history or business references. Physical deletion cannot be undone. Continue?",
   "历史裁决差异预览": "Historical adjudication difference preview",
   "只读分析当前 GameplayFact 与不可变比赛事件，不会重判、纠正或改写任何记录。": "Read-only analysis of current GameplayFacts and immutable competition events. It never rejudges, corrects, or rewrites records.",
-  "当前仅分析 CTF Flag；AWD、AWDP、KoH 与其他事实类型不在此预览中。只读分析不会重判、纠正或改写任何记录。": "Only CTF flags are analyzed. AWD, AWDP, KoH, and other fact kinds are outside this preview. The read-only analysis never rejudges, corrects, or rewrites records.",
+  "当前分析 CTF Flag，并识别旧版本错误判为重复成就的 AWDP Break；AWD、KoH 与其他事实类型不在此预览中。只读分析不会重判、纠正或改写任何记录。": "This preview analyzes CTF Flag facts and AWDP Break facts that older versions incorrectly marked as duplicate achievements. AWD, KoH, and other fact types are excluded. This read-only analysis never rejudges, corrects, or rewrites records.",
   "重新分析": "Analyze again",
   "加载历史裁决差异失败": "Failed to load historical adjudication differences",
   "当前扫描范围内未发现裁决或血榜差异。": "No adjudication or blood-award differences were found in the scanned range.",
