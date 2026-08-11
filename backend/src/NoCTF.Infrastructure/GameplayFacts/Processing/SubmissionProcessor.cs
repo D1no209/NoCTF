@@ -606,10 +606,12 @@ public sealed class GameplayFactProcessor(
                     competition => competition.LeaderboardDirty,
                     true), cancellationToken);
         }
-        var bloodAward = await TryCreateBloodAwardAsync(
-            submission,
-            evaluation,
-            cancellationToken);
+        var bloodAward = previousGameplayFactResult == GameplayFactResult.Correct
+            ? null
+            : await TryCreateBloodAwardAsync(
+                submission,
+                evaluation,
+                cancellationToken);
         if (previousGameplayFactResult != GameplayFactResult.Correct)
         {
             await StopSolvedChallengeRuntimesAsync(

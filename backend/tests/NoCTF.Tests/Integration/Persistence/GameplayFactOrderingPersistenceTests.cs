@@ -170,6 +170,52 @@ public sealed class GameplayFactOrderingPersistenceTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Unchanged_correct_rejudge_does_not_append_another_blood_award(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(
+                "noctf_fact_unchanged_rejudge", cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 1, cancellationToken);
+            var factId = Guid.Parse("40000000-0000-0000-0000-000000000001");
+            await AddFactsAsync(options,
+            [
+                Fact(fixture, factId, fixture.TeamIds[0], fixture.Now)
+            ], cancellationToken);
+            var outbox = new RecordingOutbox();
+
+            await ProcessAsync(options, factId, outbox, cancellationToken);
+            await using (var rejudge = new NoCtfDbContext(options))
+            {
+                await rejudge.GameplayFacts.Where(fact => fact.Id == factId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(fact => fact.State, GameplayFactState.Queued)
+                        .SetProperty(fact => fact.UpdatedAt, DateTimeOffset.UtcNow),
+                        cancellationToken);
+            }
+
+            await ProcessAsync(options, factId, outbox, cancellationToken);
+
+            await using var verification = new NoCtfDbContext(options);
+            var fact = await verification.GameplayFacts.AsNoTracking()
+                .SingleAsync(item => item.Id == factId, cancellationToken);
+            await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
+            await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
+            await Assert.That(outbox.Messages.OfType<BloodAwarded>().Count()).IsEqualTo(1);
+            var bloodEvents = await verification.CompetitionEvents.AsNoTracking()
+                .CountAsync(@event =>
+                    @event.Kind == CompetitionEventKind.FirstBloodAwarded
+                    || @event.Kind == CompetitionEventKind.SecondBloodAwarded
+                    || @event.Kind == CompetitionEventKind.ThirdBloodAwarded,
+                    cancellationToken);
+            await Assert.That(bloodEvents).IsEqualTo(1);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Evaluation_materializes_only_relevant_stable_prior_facts(
         CancellationToken cancellationToken)
     {
