@@ -1100,7 +1100,7 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflic
     challengeIds?: Array<string>;
 };
 
-export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode = 'ActiveOwnerOrManagerAssignments';
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode = 'ActiveOwnerOrManagerAssignments' | 'LastAdministratorProtected';
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest = {
     role?: NoCtfapiEndpointsAuthenticationUserRoleProtocol;

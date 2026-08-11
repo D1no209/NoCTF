@@ -79,12 +79,28 @@ public sealed class PlatformAdministrationStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await AcquireAdministratorRoleMutationLockAsync(ct);
         await ResourceManagerRoleGuard.AcquireAsync(db, [userId], ct);
         var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
         if (user is null)
             return new(UpdatePlatformRoleState.UserNotFound);
         if (user.Kind == UserKind.Bot && role == UserRole.Administrator)
             return new(UpdatePlatformRoleState.InvalidBotRole);
+        if (user is
+            {
+                Kind: UserKind.Human,
+                Role: UserRole.Administrator,
+                AccountStatus: UserAccountStatus.Active
+            }
+            && role != UserRole.Administrator
+            && await db.Users.CountAsync(candidate =>
+                candidate.Kind == UserKind.Human
+                && candidate.Role == UserRole.Administrator
+                && candidate.AccountStatus == UserAccountStatus.Active,
+                ct) <= 1)
+        {
+            return new(UpdatePlatformRoleState.LastAdministratorProtected);
+        }
         if (role == UserRole.User && user.Role.CanManageResources())
         {
             var competitionIds = await db.Competitions.AsNoTracking()
@@ -114,6 +130,30 @@ public sealed class PlatformAdministrationStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new(UpdatePlatformRoleState.Updated, Map(user));
+    }
+
+    private async Task AcquireAdministratorRoleMutationLockAsync(CancellationToken ct)
+    {
+        while (true)
+        {
+            var lockUserId = await db.Users.AsNoTracking()
+                .Where(user =>
+                    user.Kind == UserKind.Human
+                    && user.Role == UserRole.Administrator
+                    && user.AccountStatus == UserAccountStatus.Active)
+                .OrderBy(user => user.Id)
+                .Select(user => (Guid?)user.Id)
+                .FirstOrDefaultAsync(ct);
+            if (lockUserId is null)
+                return;
+            var acquired = await db.Users
+                .Where(user => user.Id == lockUserId.Value)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    user => user.ConcurrencyVersion,
+                    user => user.ConcurrencyVersion + 1), ct);
+            if (acquired == 1)
+                return;
+        }
     }
 
     public async Task<PlatformUserView?> InvalidateTokensAsync(

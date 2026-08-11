@@ -23,7 +23,8 @@ public sealed class UpdatePlatformUserRoleValidator : Validator<UpdatePlatformUs
 [JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<UpdatePlatformUserRoleConflictCode>))]
 public enum UpdatePlatformUserRoleConflictCode
 {
-    ActiveOwnerOrManagerAssignments
+    ActiveOwnerOrManagerAssignments,
+    LastAdministratorProtected
 }
 
 public sealed record UpdatePlatformUserRoleConflictResponse(
@@ -78,6 +79,11 @@ public sealed class UpdatePlatformUserRoleEndpoint(ManagePlatform platform)
                     UpdatePlatformUserRoleConflictCode.ActiveOwnerOrManagerAssignments,
                     result.Blockers!.CompetitionIds,
                     result.Blockers.ChallengeIds)),
+            UpdatePlatformRoleState.LastAdministratorProtected =>
+                TypedResults.Conflict(new UpdatePlatformUserRoleConflictResponse(
+                    UpdatePlatformUserRoleConflictCode.LastAdministratorProtected,
+                    [],
+                    [])),
             UpdatePlatformRoleState.InvalidBotRole => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Role is not valid for a bot.",
