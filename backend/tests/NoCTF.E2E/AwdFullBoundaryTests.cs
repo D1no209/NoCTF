@@ -35,7 +35,7 @@ public sealed class AwdFullBoundaryTests
                 title = "AWD full-boundary E2E",
                 description = "Round, attack, checker, and runtime boundary verification",
                 mode = "Awd",
-                startTime = now.AddMinutes(-1),
+                startTime = now.AddMinutes(10),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
@@ -137,6 +137,7 @@ public sealed class AwdFullBoundaryTests
             "Blue Team",
             cancellationToken);
 
+        await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,

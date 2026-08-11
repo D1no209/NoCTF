@@ -43,7 +43,7 @@ public sealed class CtfFullBoundaryTests
                 title = "CTF full-boundary E2E",
                 description = "External process boundary verification",
                 mode = "Ctf",
-                startTime = now.AddMinutes(-1),
+                startTime = now.AddMinutes(10),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
@@ -271,6 +271,7 @@ public sealed class CtfFullBoundaryTests
         await Assert.That(memberIds.Length).IsEqualTo(2);
         var teammateId = memberIds.Single(id => id != captainId);
 
+        await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,

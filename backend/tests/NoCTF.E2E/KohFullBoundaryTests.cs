@@ -34,7 +34,7 @@ public sealed class KohFullBoundaryTests
                 title = "KoH full-boundary E2E",
                 description = "Shared Hill, control polling, lifecycle, and scoring verification",
                 mode = "Koh",
-                startTime = now.AddMinutes(-1),
+                startTime = now.AddMinutes(10),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
@@ -137,6 +137,7 @@ public sealed class KohFullBoundaryTests
         var blueFlag = byTeam[blue.TeamId].GetProperty("flag").GetString()!;
         await Assert.That(redFlag).IsNotEqualTo(blueFlag);
 
+        await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
         await SendWithoutBodyAsync(admin, HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/publish",
             HttpStatusCode.NoContent, cancellationToken);

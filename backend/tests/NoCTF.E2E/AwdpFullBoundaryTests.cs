@@ -38,7 +38,7 @@ public sealed class AwdpFullBoundaryTests
                 title = "AWDP full-boundary E2E",
                 description = "Break, archive, disposable target, patch, and checker verification",
                 mode = "Awdp",
-                startTime = now.AddMinutes(-1),
+                startTime = now.AddMinutes(10),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
@@ -141,6 +141,7 @@ public sealed class AwdpFullBoundaryTests
             competitionId,
             cancellationToken);
         using var playerClient = player.Client;
+        await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,
