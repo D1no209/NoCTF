@@ -2,12 +2,17 @@ import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse,
 } from '../app/api'
 import {
   competitionQuestionErrorMessage,
   competitionQuestionRoleLabel,
   competitionQuestionUnreadCount,
+  mergeCompetitionQuestions,
 } from '../app/lib/competition-question'
+import { useCursorPagination } from '../app/composables/useCursorPagination'
+
+type Question = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 const expectedFailureText = {
   InvalidRequest: '咨询内容或请求参数无效',
@@ -59,6 +64,73 @@ describe('competition question presentation state', () => {
   })
 })
 
+describe('competition question cursor collection', () => {
+  const baseTime = Date.parse('2026-08-11T12:00:00.000Z')
+  const question = (index: number, revision = 0): Question => ({
+    id: `00000000-0000-0000-0000-${index.toString().padStart(12, '0')}`,
+    title: `Question ${index}`,
+    revision,
+    updatedAt: new Date(baseTime - index * 1000).toISOString(),
+  })
+
+  test('merges 175 paged roots, deep links, refreshes, and replies without duplicates or loss', () => {
+    const serverItems = Array.from({ length: 175 }, (_, index) => question(index))
+    let visible = mergeCompetitionQuestions([], [serverItems[125]!])
+
+    for (let offset = 0; offset < serverItems.length; offset += 50) {
+      visible = mergeCompetitionQuestions(visible, serverItems.slice(offset, offset + 50))
+    }
+
+    expect(visible).toHaveLength(175)
+    expect(new Set(visible.map(item => item.id)).size).toBe(175)
+    expect(new Set(visible.map(item => item.id))).toEqual(new Set(serverItems.map(item => item.id)))
+
+    const created: Question = {
+      ...question(999),
+      id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      title: 'Created during refresh',
+      updatedAt: new Date(baseTime + 1000).toISOString(),
+    }
+    const replied: Question = {
+      ...serverItems[160],
+      title: 'Updated by reply',
+      revision: 1,
+      updatedAt: new Date(baseTime + 2000).toISOString(),
+    }
+    visible = mergeCompetitionQuestions(visible, [created, replied, ...serverItems.slice(0, 50)])
+
+    expect(visible).toHaveLength(176)
+    expect(new Set(visible.map(item => item.id)).size).toBe(176)
+    expect(visible[0]?.id).toBe(replied.id)
+    expect(visible.find(item => item.id === replied.id)?.title).toBe('Updated by reply')
+
+    visible = mergeCompetitionQuestions(visible, [serverItems[160]!])
+    expect(visible.find(item => item.id === replied.id)?.title).toBe('Updated by reply')
+  })
+
+  test('passes each signed cursor through all four pages of a 175 root result', async () => {
+    const serverItems = Array.from({ length: 175 }, (_, index) => question(index))
+    const cursors: Array<string | null> = []
+    const pagination = useCursorPagination<Question>(async (cursor) => {
+      cursors.push(cursor)
+      const offset = cursor ? Number.parseInt(cursor.slice('cursor-'.length), 10) : 0
+      const nextOffset = offset + 50
+      return {
+        items: serverItems.slice(offset, nextOffset),
+        nextCursor: nextOffset < serverItems.length ? `cursor-${nextOffset}` : null,
+      }
+    })
+
+    do {
+      await pagination.loadMore()
+    } while (pagination.hasMore.value)
+
+    expect(cursors).toEqual([null, 'cursor-50', 'cursor-100', 'cursor-150'])
+    expect(pagination.items.value).toHaveLength(175)
+    expect(new Set(pagination.items.value.map(item => item.id)).size).toBe(175)
+  })
+})
+
 describe('competition question page wiring', () => {
   test('keeps failed drafts and guards duplicate reply submissions', async () => {
     const page = await Bun.file(
@@ -69,8 +141,25 @@ describe('competition question page wiring', () => {
     expect(page).toContain('competitionQuestionErrorMessage(error, translate("发送失败"))')
     expect(page).toContain('finally {')
     expect(page).toContain('replyPending.value = false')
-    expect(page).toContain('upsertQuestion(data)')
-    expect(page).toContain('markRead(data)')
+    expect(page).toContain('applyDetailQuestion(data)')
+    expect(page).toContain('if (markAsRead) markRead(fresh)')
     expect(page).toContain('participantMessagesRemaining')
+  })
+
+  test('uses generated signed cursors and exposes load-more without truncating older threads', async () => {
+    const page = await Bun.file(
+      new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
+    ).text()
+
+    expect(page).toContain('useCursorPagination<Question>(fetchQuestionPage)')
+    expect(page).toContain('query: { cursor, limit: 50 }')
+    expect(page).toContain('nextCursor: data.nextCursor ?? null')
+    expect(page).toContain('mergeCompetitionQuestions(questions.value, page.items ?? [])')
+    expect(page).toContain('const refreshList = createTrailingRefresh(async () =>')
+    expect(page).toContain('const refreshSelectedDetail = createTrailingRefresh(async () =>')
+    expect(page).toContain('competitionEventChanged: () => void refreshFromServer()')
+    expect(page).toContain('v-if="hasMore"')
+    expect(page).toContain('@click="loadMoreQuestions"')
+    expect(page).not.toContain('query: { limit: 100 }')
   })
 })

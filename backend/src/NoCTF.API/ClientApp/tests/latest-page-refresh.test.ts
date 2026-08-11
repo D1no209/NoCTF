@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { createLatestPageRefresh } from '../app/lib/latest-page-refresh'
+import { createLatestPageRefresh, createTrailingRefresh } from '../app/lib/latest-page-refresh'
 
 function deferred() {
   let resolve!: () => void
@@ -85,5 +85,30 @@ describe('createLatestPageRefresh', () => {
     await latest.refreshLatest()
 
     expect(loads).toBe(2)
+  })
+})
+
+describe('createTrailingRefresh', () => {
+  test('runs one final refresh when live invalidations arrive in flight', async () => {
+    const firstRun = deferred()
+    let runs = 0
+    const refresh = createTrailingRefresh(async () => {
+      runs += 1
+      if (runs === 1) await firstRun.promise
+    })
+
+    const firstRefresh = refresh()
+    await Promise.resolve()
+    const secondRefresh = refresh()
+    const thirdRefresh = refresh()
+
+    expect(secondRefresh).toBe(firstRefresh)
+    expect(thirdRefresh).toBe(firstRefresh)
+    expect(runs).toBe(1)
+
+    firstRun.resolve()
+    await firstRefresh
+
+    expect(runs).toBe(2)
   })
 })
