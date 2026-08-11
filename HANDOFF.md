@@ -9,6 +9,20 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：Kubernetes 平台出站边界
+
+- 功能提交 `ac628036` 移除 Runner 对 `0.0.0.0/0:443,6443` 的宽泛出站放行。官方清单已要求
+  Cilium，因此改用 `CiliumNetworkPolicy` 的 `kube-apiserver` 实体，只允许 Runner 到真实 Kubernetes
+  API 身份的 443/6443，不能再借这两个端口访问任意 Internet 地址。
+- 平台 Namespace 继续默认拒绝外联。新增不随默认清单直接应用的 `smtp-egress.example.yaml`：启用邮箱
+  验证或密码找回投递前，运维必须在仓库外复制并将示例值替换为平台设置中的精确 SMTP FQDN 与 TCP
+  端口，再应用该 Cilium policy；Backend 的测试邮件和 Worker 的实际投递都被同一精确边界覆盖。
+- SMTP 主机或端口变化时必须同步替换 policy；文档明确禁止通配 FQDN、`0.0.0.0/0` 与提交生产地址或
+  凭据。未配置 policy 时邮件保持 fail closed，而不是静默开放整段 Internet。
+- 本阶段只有部署清单、权威文档和架构门禁变化，没有业务表、列、migration、snapshot、HTTP/OpenAPI、
+  SDK 或版本号变化。DeploymentTopology 5/5 与 `git diff --check` 通过；尚未推送、部署或读取生产 SMTP
+  配置，最终 K8s smoke 需使用部署环境的实际 API identity 和运维生成的非敏感 policy。
+
 ## 2026-08-11 全量审计修复：AWDP Fix 崩溃重放栅栏
 
 - 功能提交 `bfb71721` 使 AWDP Fix 的一次性验证在任何外部副作用前，先于 PostgreSQL 行锁事务中推进
