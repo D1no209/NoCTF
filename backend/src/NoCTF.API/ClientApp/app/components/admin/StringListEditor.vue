@@ -8,7 +8,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   placeholder: '',
-  addLabel: translate("添加一项"),
+  addLabel: '添加一项',
   disabled: false,
 })
 
@@ -59,7 +59,7 @@ function add(): void {
       @click="add"
     >
       <Plus data-icon="inline-start" />
-      {{ addLabel }}
+      {{ $t(addLabel) }}
     </Button>
   </div>
 </template>

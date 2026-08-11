@@ -16,10 +16,10 @@ const error = ref<string | null>(null)
 const includeDeleted = ref(route.query.includeDeleted === 'true')
 
 const RoleLabel: Record<CompetitionAdminRole, string> = {
-  owner: translate("负责人"),
-  manager: translate("管理员"),
-  judge: translate("裁判"),
-  observer: translate("观察员"),
+  owner: '负责人',
+  manager: '管理员',
+  judge: '裁判',
+  observer: '观察员',
 }
 
 function adminRole(competition: NoCtfapiEndpointsCompetitionsCompetitionResponse): CompetitionAdminRole {
@@ -106,7 +106,7 @@ onMounted(load)
         </CardHeader>
         <CardContent class="flex items-center justify-between font-mono text-sm tabular-nums text-muted-foreground">
           <span>{{ adminFormatDateTime(c.startTime) }} ~ {{ adminFormatDateTime(c.endTime) }}</span>
-          <Badge variant="outline">{{ c.id && roles[c.id] ? RoleLabel[roles[c.id]!] : '…' }}</Badge>
+          <Badge variant="outline">{{ c.id && roles[c.id] ? $t(RoleLabel[roles[c.id]!]!) : '…' }}</Badge>
         </CardContent>
         <CardFooter>
           <Button variant="outline" size="sm" as-child class="w-full">

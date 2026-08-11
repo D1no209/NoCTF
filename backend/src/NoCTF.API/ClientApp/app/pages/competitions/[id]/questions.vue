@@ -259,7 +259,7 @@ const statusVariant = (status?: string) =>
 const statusLabel = (status?: string) =>
   ({ Pending: translate("待回复"), Replied: translate("已回复"), Resolved: translate("已解决"), Closed: translate("已关闭") })[status ?? ''] ?? status
 const roleLabel = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
-  role ? competitionQuestionRoleLabel[role] : translate("未知角色")
+  role ? translate(competitionQuestionRoleLabel[role]) : translate("未知角色")
 const isHandlerRole = (role?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode) =>
   isCompetitionQuestionHandlerRole(role)
 const participantLimitReached = computed(() =>
@@ -376,7 +376,7 @@ const participantLimitReached = computed(() =>
               </div>
             </div>
             <p class="mt-1 text-xs text-muted-foreground">
-              {{ q.subject === 'Challenge' ? `题目 · ${q.challengeTitle ?? '未知题目'}` : $t('平台 / 赛事') }}
+              {{ q.subject === 'Challenge' ? $t('题目 · {title}', { title: q.challengeTitle ?? $t('未知题目') }) : $t('平台 / 赛事') }}
             </p>
             <p class="mt-1 truncate text-xs text-muted-foreground">
               {{ $t('最近由 {role} {actor} 更新 · {time}', { role: roleLabel(q.lastActorRole), actor: q.lastActorDisplayName ?? '-', time: formatDateTime(q.updatedAt) }) }}
@@ -400,7 +400,7 @@ const participantLimitReached = computed(() =>
             <Badge :variant="statusVariant(detail.status)">{{ statusLabel(detail.status) }}</Badge>
           </div>
           <CardDescription>
-            {{ detail.subject === 'Challenge' ? `题目咨询 · ${detail.challengeTitle ?? '未知题目'}` : $t('平台 / 赛事咨询') }}
+            {{ detail.subject === 'Challenge' ? $t('题目咨询 · {title}', { title: detail.challengeTitle ?? $t('未知题目') }) : $t('平台 / 赛事咨询') }}
             · {{ detail.teamDisplayName ?? detail.askerDisplayName }}
           </CardDescription>
         </CardHeader>

@@ -39,10 +39,10 @@ const upcomingCount = computed(
 )
 
 const modes = [
-  { key: GameMode.Ctf, icon: Flag, title: translate("CTF 解题赛"), description: translate("Web、Pwn、Crypto、Reverse 多方向题目,解题夺旗累计积分"), featured: true },
-  { key: GameMode.Awd, icon: Swords, title: translate("AWD 攻防赛"), description: translate("攻防一体的实时对抗,漏洞利用与服务防御双重考验"), featured: false },
-  { key: GameMode.Awdp, icon: Crosshair, title: translate("AWDP 攻防增强"), description: translate("在 AWD 之上引入修复环节,攻击 Break 与补丁 Fix 分开计分"), featured: false },
-  { key: GameMode.Koh, icon: Mountain, title: translate("KoH 占山为王"), description: translate("持续占领目标,随时间累积积分,考验持久控制力"), featured: true },
+  { key: GameMode.Ctf, icon: Flag, title: 'CTF 解题赛', description: 'Web、Pwn、Crypto、Reverse 多方向题目,解题夺旗累计积分', featured: true },
+  { key: GameMode.Awd, icon: Swords, title: 'AWD 攻防赛', description: '攻防一体的实时对抗,漏洞利用与服务防御双重考验', featured: false },
+  { key: GameMode.Awdp, icon: Crosshair, title: 'AWDP 攻防增强', description: '在 AWD 之上引入修复环节,攻击 Break 与补丁 Fix 分开计分', featured: false },
+  { key: GameMode.Koh, icon: Mountain, title: 'KoH 占山为王', description: '持续占领目标,随时间累积积分,考验持久控制力', featured: true },
 ]
 </script>
 
@@ -147,8 +147,8 @@ const modes = [
               <span class="mb-2 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <component :is="mode.icon" class="size-5" />
               </span>
-              <CardTitle class="text-base">{{ mode.title }}</CardTitle>
-              <CardDescription class="max-w-md leading-relaxed">{{ mode.description }}</CardDescription>
+              <CardTitle class="text-base">{{ $t(mode.title) }}</CardTitle>
+              <CardDescription class="max-w-md leading-relaxed">{{ $t(mode.description) }}</CardDescription>
             </CardHeader>
           </Card>
         </div>

@@ -37,10 +37,10 @@ const announcementPending = ref(false)
 const announcementError = ref<string | null>(null)
 
 const RoleLabel: Record<CompetitionAdminRole, string> = {
-  owner: translate("负责人"),
-  manager: translate("管理员"),
-  judge: translate("裁判"),
-  observer: translate("观察员"),
+  owner: '负责人',
+  manager: '管理员',
+  judge: '裁判',
+  observer: '观察员',
 }
 
 async function refresh() {
@@ -165,7 +165,7 @@ onMounted(async () => {
           <h1 class="text-display text-2xl">{{ competition.title }}</h1>
           <GameModeBadge :mode="competition.mode" />
           <CompetitionStatusBadge :status="competition.status" />
-          <Badge variant="outline">{{ $t('我的角色：{role}', { role: RoleLabel[role] }) }}</Badge>
+          <Badge variant="outline">{{ $t('我的角色：{role}', { role: $t(RoleLabel[role]) }) }}</Badge>
         </div>
         <Button v-if="canAnnounce" variant="outline" @click="announcementOpen = true">
           <Megaphone data-icon="inline-start" /> {{ $t('发布通知') }} </Button>

@@ -13,11 +13,11 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   exposureOptions: () => [
-    { value: UrlExposure.OwnerOnly, label: translate("仅队伍自己可见") },
-    { value: UrlExposure.Participants, label: translate("所有参赛者可见") },
+    { value: UrlExposure.OwnerOnly, label: '仅队伍自己可见' },
+    { value: UrlExposure.Participants, label: '所有参赛者可见' },
   ],
   showServiceName: false,
-  addLabel: translate("添加访问入口"),
+  addLabel: '添加访问入口',
   disabled: false,
 })
 
@@ -77,7 +77,7 @@ function add(): void {
               <SelectContent>
                 <SelectGroup>
                   <SelectItem v-for="option in exposureOptions" :key="option.value" :value="String(option.value)">
-                    {{ option.label }}
+                    {{ $t(option.label) }}
                   </SelectItem>
                 </SelectGroup>
               </SelectContent>
@@ -126,7 +126,7 @@ function add(): void {
       @click="add"
     >
       <Plus data-icon="inline-start" />
-      {{ addLabel }}
+      {{ $t(addLabel) }}
     </Button>
     <p class="text-xs text-muted-foreground"> {{ $t('URL 模板只允许 {HOST} 与 {PORT} 占位符;{PORT} 为平台分配的随机主机端口。') }} </p>
   </div>

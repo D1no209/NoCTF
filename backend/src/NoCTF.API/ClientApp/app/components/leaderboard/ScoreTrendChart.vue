@@ -15,6 +15,7 @@ const props = withDefaults(
 )
 
 const el = ref<HTMLElement | null>(null)
+const { locale } = useLocale()
 let chart: echarts.ECharts | null = null
 
 function buildOption(): echarts.EChartsCoreOption {
@@ -90,7 +91,7 @@ onMounted(() => {
   render()
 })
 
-watch(() => [props.series, props.rangeStart, props.rangeEnd, props.title], render, { deep: true })
+watch(() => [props.series, props.rangeStart, props.rangeEnd, props.title, locale.value], render, { deep: true })
 
 const onResize = () => chart?.resize()
 let observer: ResizeObserver | null = null

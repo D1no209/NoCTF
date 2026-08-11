@@ -4,7 +4,7 @@ import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
 
 definePageMeta({ middleware: 'platform-admin' })
 
-const navGroups: WorkspaceNavGroup[] = [
+const navGroups = computed<WorkspaceNavGroup[]>(() => [
   {
     label: translate("平台"),
     items: [
@@ -22,7 +22,7 @@ const navGroups: WorkspaceNavGroup[] = [
       { to: '/admin/platform/dead-letters', label: translate("死信队列"), icon: Inbox },
     ],
   },
-]
+])
 </script>
 
 <template>

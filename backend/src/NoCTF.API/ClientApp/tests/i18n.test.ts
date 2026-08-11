@@ -3,7 +3,11 @@ import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { effect, stop } from 'vue'
+import { bloodRankLabel } from '../app/components/leaderboard/types'
+import { competitionQuestionRoleLabel } from '../app/lib/competition-question'
 import { englishMessages } from '../app/locales/en'
+import { CompetitionStatusLabel, enumLabel } from '../app/utils/admin-format'
+import { ATTACK_REWARD_MODES, competitionConfigFields } from '../app/utils/game-config'
 import { localeTag, setLocale, translate } from '../app/utils/i18n'
 
 function sourceFiles(directory: string): string[] {
@@ -52,6 +56,26 @@ describe('platform locale', () => {
     stop(runner)
   })
 
+  test('evaluates reusable labels in the current locale without reloading their modules', () => {
+    setLocale('zh-CN')
+    const rendered: string[][] = []
+    const runner = effect(() => rendered.push([
+      enumLabel(CompetitionStatusLabel, 'Draft'),
+      bloodRankLabel('First'),
+      translate(ATTACK_REWARD_MODES[0].label),
+      competitionConfigFields('Ctf')[0]?.label ?? '',
+      translate(competitionQuestionRoleLabel.Judge),
+    ]))
+
+    setLocale('en')
+
+    expect(rendered).toEqual([
+      ['草稿', '一血', '每次攻击固定得分', '默认分值曲线', '裁判'],
+      ['Draft', 'First Blood', 'Fixed score for each attack', 'Default score curve', 'Judge'],
+    ])
+    stop(runner)
+  })
+
   test('provides English resources for every localized Chinese UI key', async () => {
     const files = sourceFiles(fileURLToPath(new URL('../app', import.meta.url)))
     const callPattern = /(?:translate|\$t|\bt)\(\s*(['"])((?:\\.|(?!\1).)*)\1/g
@@ -93,5 +117,24 @@ describe('locale switch placement', () => {
     expect(app).toContain('<NuxtPage />')
     expect(app).not.toContain('const { locale } = useLocale()')
     expect(app).not.toMatch(/<NuxtPage\s+[^>]*:key=/)
+  })
+
+  test('renders localized dynamic labels and question subjects after switching', async () => {
+    const configInput = await Bun.file(
+      new URL('../app/components/admin/ConfigFieldInput.vue', import.meta.url),
+    ).text()
+    const questions = await Bun.file(
+      new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
+    ).text()
+    const scoreTrend = await Bun.file(
+      new URL('../app/components/leaderboard/ScoreTrendChart.vue', import.meta.url),
+    ).text()
+
+    expect(configInput).toContain('{{ $t(option.label) }}')
+    expect(questions).toContain("$t('题目 · {title}'")
+    expect(questions).toContain("$t('题目咨询 · {title}'")
+    expect(questions).not.toContain('`题目 · ${')
+    expect(questions).not.toContain('`题目咨询 · ${')
+    expect(scoreTrend).toContain('props.title, locale.value')
   })
 })

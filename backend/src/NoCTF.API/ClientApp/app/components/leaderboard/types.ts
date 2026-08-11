@@ -51,7 +51,12 @@ export function normalizeChallengeKey(value?: string | null): string {
   return (value ?? '').replace(/[^0-9a-f]/gi, '').toLowerCase()
 }
 
-export const bloodRankLabel: Record<string, string> = { First: translate("一血"), Second: translate("二血"), Third: translate("三血") }
+const bloodRankLabelKey: Record<string, string> = { First: '一血', Second: '二血', Third: '三血' }
+
+export function bloodRankLabel(rank?: string | null): string {
+  const key = rank ? bloodRankLabelKey[rank] : undefined
+  return key ? translate(key) : ''
+}
 
 const bloodRankOrder = ['First', 'Second', 'Third'] as const
 

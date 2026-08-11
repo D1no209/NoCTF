@@ -236,7 +236,7 @@ const groups = computed(() => {
                       <Badge v-if="progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
                         <Flag class="size-3" />
                         {{ progressFor(challenge.id)?.bloodRank
-                          ? bloodRankLabel[String(progressFor(challenge.id)?.bloodRank)]
+                          ? bloodRankLabel(progressFor(challenge.id)?.bloodRank)
                           : $t('已解出') }}
                       </Badge>
                       <span

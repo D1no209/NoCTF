@@ -14,7 +14,7 @@ definePageMeta({ middleware: 'platform-admin' })
 type PlatformLog = NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse
 
 const LEVEL_LABELS: Record<string, string> = {
-  Trace: translate("跟踪"), Debug: translate("调试"), Information: translate("信息"), Warning: translate("警告"), Error: translate("错误"), Critical: translate("严重"),
+  Trace: '跟踪', Debug: '调试', Information: '信息', Warning: '警告', Error: '错误', Critical: '严重',
 }
 const SERVICE_LABELS: Record<string, string> = {
   Api: 'API', Worker: 'Worker', Runner: 'Runner', Host: 'Host',
@@ -237,7 +237,7 @@ onMounted(() => {
             </TableCell>
             <TableCell>
               <Badge :variant="levelOrdinal(log.level) >= 4 ? 'destructive' : log.level === 'Warning' ? 'secondary' : 'outline'">
-                {{ LEVEL_LABELS[String(log.level)] ?? log.level }}
+                {{ LEVEL_LABELS[String(log.level)] ? $t(LEVEL_LABELS[String(log.level)]!) : log.level }}
               </Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">{{ SERVICE_LABELS[String(log.service)] ?? log.service }}</TableCell>

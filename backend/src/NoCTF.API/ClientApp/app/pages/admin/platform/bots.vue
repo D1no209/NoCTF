@@ -16,7 +16,7 @@ definePageMeta({ middleware: 'platform-admin' })
 
 type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 
-const ROLE_LABELS: Record<string, string> = { User: translate("用户"), Organizer: translate("组织者"), Administrator: translate("管理员") }
+const ROLE_LABELS: Record<string, string> = { User: '用户', Organizer: '组织者', Administrator: '管理员' }
 
 const bots = ref<PlatformUser[]>([])
 const loading = ref(true)
@@ -152,7 +152,7 @@ onMounted(() => {
             </TableCell>
             <TableCell>
               <Badge :variant="bot.role === 'Administrator' ? 'default' : 'secondary'">
-                {{ ROLE_LABELS[String(bot.role)] ?? bot.role }}
+                {{ ROLE_LABELS[String(bot.role)] ? $t(ROLE_LABELS[String(bot.role)]!) : bot.role }}
               </Badge>
             </TableCell>
             <TableCell>

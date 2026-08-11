@@ -152,7 +152,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
     <SelectContent>
       <SelectGroup>
         <SelectItem v-for="option in field.options ?? []" :key="String(option.value)" :value="option.value">
-          {{ option.label }}
+          {{ $t(option.label) }}
         </SelectItem>
       </SelectGroup>
     </SelectContent>
@@ -203,7 +203,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
         <SelectContent>
           <SelectGroup>
             <SelectItem v-for="option in AWARD_SETTLEMENTS" :key="String(option.value)" :value="option.value">
-              {{ option.label }}
+              {{ $t(option.label) }}
             </SelectItem>
           </SelectGroup>
         </SelectContent>
@@ -234,7 +234,7 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
         <SelectContent>
           <SelectGroup>
             <SelectItem v-for="option in BLOOD_REWARD_POLICIES" :key="String(option.value)" :value="option.value">
-              {{ option.label }}
+              {{ $t(option.label) }}
             </SelectItem>
           </SelectGroup>
         </SelectContent>

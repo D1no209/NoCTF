@@ -134,9 +134,9 @@ async function transfer() {
 }
 
 const roles = [
-  { key: 'manager' as const, label: translate("管理员(Manager)"), list: managerIds },
-  { key: 'judge' as const, label: translate("裁判(Judge)"), list: judgeIds },
-  { key: 'observer' as const, label: translate("观察员(Observer)"), list: observerIds },
+  { key: 'manager' as const, label: '管理员(Manager)', list: managerIds },
+  { key: 'judge' as const, label: '裁判(Judge)', list: judgeIds },
+  { key: 'observer' as const, label: '观察员(Observer)', list: observerIds },
 ]
 
 onMounted(load)
@@ -162,7 +162,7 @@ onMounted(load)
         </CardHeader>
         <CardContent class="flex flex-col gap-6">
           <div v-for="r in roles" :key="r.key" class="flex flex-col gap-2">
-            <h3 class="text-sm font-medium">{{ r.label }}</h3>
+            <h3 class="text-sm font-medium">{{ $t(r.label) }}</h3>
             <div class="flex flex-wrap items-center gap-2">
               <Badge v-for="id in r.list.value" :key="id" variant="secondary" class="gap-1">
                 {{ candidateName(id) }}
