@@ -320,6 +320,9 @@ public sealed class KubernetesContainerLifecycleTests
             CheckerRequest() with { AllowInternalCallback = false }, CancellationToken.None);
 
         await Assert.That(createdPod!.Metadata.Labels.ContainsKey("noctf.io/expires-at")).IsFalse();
+        await Assert.That(createdPod.Spec.AutomountServiceAccountToken).IsFalse();
+        await Assert.That(createdPod.Spec.EnableServiceLinks).IsFalse();
+        await Assert.That(createdPod.Spec.ServiceAccountName).IsNull();
     }
 
     [Test]
