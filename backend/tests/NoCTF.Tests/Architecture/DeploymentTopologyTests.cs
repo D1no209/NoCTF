@@ -167,6 +167,49 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task External_deployment_artifacts_are_immutable_and_verified()
+    {
+        var dockerfile = await ReadAsync("backend", "Dockerfile");
+        var deploymentFiles = new[]
+        {
+            await ReadAsync("deploy", "docker-compose.yml"),
+            await ReadAsync("deploy", "docker-compose.single.yml"),
+            await ReadAsync("deploy", "k8s", "postgres-deployment.yaml"),
+            await ReadAsync("deploy", "k8s", "redis-deployment.yaml"),
+            await ReadAsync("deploy", "k8s", "minio-deployment.yaml"),
+            await ReadAsync("deploy", "k8s", "minio-init-job.yaml")
+        };
+
+        var externalBaseImages = dockerfile.Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("FROM ", StringComparison.Ordinal)
+                && !line.StartsWith("FROM runtime ", StringComparison.Ordinal))
+            .ToArray();
+        await Assert.That(externalBaseImages).Count().IsEqualTo(5);
+        await Assert.That(externalBaseImages.All(line =>
+            System.Text.RegularExpressions.Regex.IsMatch(
+                line,
+                "^FROM [^ ]+@sha256:[a-f0-9]{64} AS [^ ]+$"))).IsTrue();
+        await Assert.That(dockerfile).Contains("sha256sum -c -");
+        await Assert.That(dockerfile).Contains("KOMPOSE_SHA256=");
+
+        var externalRuntimeImages = deploymentFiles
+            .SelectMany(content => content.Split('\n'))
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("image: postgres:", StringComparison.Ordinal)
+                || line.StartsWith("image: redis:", StringComparison.Ordinal)
+                || line.StartsWith("image: minio/", StringComparison.Ordinal))
+            .ToArray();
+        await Assert.That(externalRuntimeImages).Count().IsEqualTo(9);
+        await Assert.That(externalRuntimeImages.All(line =>
+            System.Text.RegularExpressions.Regex.IsMatch(
+                line,
+                "^image: [^ ]+@sha256:[a-f0-9]{64}$"))).IsTrue();
+        await Assert.That(externalRuntimeImages.Any(line =>
+            line.Contains(":latest", StringComparison.Ordinal))).IsFalse();
+    }
+
+    [Test]
     public async Task E2e_orchestrator_is_portable_and_uses_docker_assigned_ports()
     {
         var orchestrator = await ReadAsync("backend", "tests", "e2e.cs");
