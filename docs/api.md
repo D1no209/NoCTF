@@ -210,15 +210,17 @@ PatchUpload、DataExport、Notification、PosterFile 及永久 CompetitionEvent�
 内定时应用。Frozen 在生效时按精确截止时间重建并持久化快照；新配置会淘汰旧的定时消息。每次
 实际切换记录 Actor、原因、发生时间和冻结截止时间。Finished 只接受 Normal。
 
-比赛事件使用不可变的单表事实流，保留期与比赛一致。公共参与者只能读取公开事件，已审批且
-未封禁队伍还能读取本队事件，Administrator 与该比赛的 Owner/Manager/Judge/Observer 可读取
-完整的安全摘要。查询时间窗最大 31 天并使用签名 keyset cursor；JSONL 导出最多 50,000 条，
-仅 Administrator、Owner、Manager 可用。实时通知只携带事件 Id、类型、级别与发生时间，客户端
-收到后通过本 GET 重新读取，不通过 SignalR 传输敏感正文。
+比赛事件使用永久、不可变的单表事实流。活动比赛的公共参与者只能读取公开事件，已审批且
+未封禁队伍还能读取本队事件；其查询必须提供最长 31 天的时间窗。Administrator 与该比赛的
+Owner/Manager/Judge/Observer 可以省略时间窗，通过签名 keyset cursor 分页读取完整历史，比赛
+软删除归档后仍保留这一只读能力；参赛者不能借归档状态继续读取或扩大可见范围。JSONL 导出仍
+要求有界时间窗、最多 50,000 条，且仅 Administrator、Owner、Manager 可用。实时通知只携带事件
+Id、类型、级别与发生时间，客户端收到后通过本 GET 重新读取，不通过 SignalR 传输敏感正文。
 
 跨队 Flag 线索以触发 ForeignTeamFlagDetected 的 GameplayFactId 为身份，并结合 CompetitionEvent 处置事件推导，不新增独立业务表。
-Observer 可读取不含 Flag 的列表，Judge 可显式读取完整 Flag 并驳回线索；每次完整证据读取都会写入
-审计事件且响应禁止缓存。只有 Administrator、Owner、Manager 可确认并封禁，或纠正误判并解封。
+Observer 可读取不含 Flag 的列表，Judge 可显式读取完整 Flag 并驳回线索；归档后 Administrator、
+Owner、Manager、Judge 仍可显式读取完整 Flag。每次完整证据读取都会写入审计事件且响应禁止缓存。
+只有 Administrator、Owner、Manager 可确认并封禁，或纠正误判并解封。
 驳回不通知参赛者；确认与纠错只发送不含 Flag 和工作人员原因的全场通用通知。误判纠错允许在
 Finished 后执行，只恢复历史计分投影，不重启 Runtime。
 

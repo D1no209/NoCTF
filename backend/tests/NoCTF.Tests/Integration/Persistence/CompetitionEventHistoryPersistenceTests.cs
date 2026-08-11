@@ -16,7 +16,7 @@ public sealed class CompetitionEventHistoryPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Staff_can_page_permanent_history_while_participants_require_a_bounded_window(
+    public async Task Staff_can_page_active_and_archived_history_while_participants_require_an_active_bounded_window(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -33,6 +33,10 @@ public sealed class CompetitionEventHistoryPersistenceTests
                 .Options;
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7();
+            var managerId = Guid.CreateVersion7();
+            var judgeId = Guid.CreateVersion7();
+            var observerId = Guid.CreateVersion7();
+            var administratorId = Guid.CreateVersion7();
             var participantId = Guid.CreateVersion7();
             var competitionId = Guid.CreateVersion7();
 
@@ -41,11 +45,18 @@ public sealed class CompetitionEventHistoryPersistenceTests
                 await setup.Database.MigrateAsync(cancellationToken);
                 setup.Users.AddRange(
                     Human(ownerId, "history-owner", UserRole.Organizer, now),
+                    Human(managerId, "history-manager", UserRole.Organizer, now),
+                    Human(judgeId, "history-judge", UserRole.Organizer, now),
+                    Human(observerId, "history-observer", UserRole.Organizer, now),
+                    Human(administratorId, "history-admin", UserRole.Administrator, now),
                     Human(participantId, "history-participant", UserRole.User, now));
                 setup.Competitions.Add(new Competition
                 {
                     Id = competitionId,
                     OwnerId = ownerId,
+                    ManagerIds = [managerId],
+                    JudgeIds = [judgeId],
+                    ObserverIds = [observerId],
                     Title = "Permanent event history",
                     Mode = GameMode.Ctf,
                     ConfigurationJson = """{"schemaVersion":1}""",
@@ -138,6 +149,52 @@ public sealed class CompetitionEventHistoryPersistenceTests
                     null,
                     limit: 50), cancellationToken)).State)
                 .IsEqualTo(CompetitionEventReadState.InvalidQuery);
+
+            await db.Competitions.Where(item => item.Id == competitionId)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(item => item.DeletedAt, now),
+                    cancellationToken);
+            foreach (var staffId in new[]
+                     {
+                         ownerId,
+                         managerId,
+                         judgeId,
+                         observerId,
+                         administratorId
+                     })
+            {
+                var archivedHistory = await store.QueryAsync(Query(
+                    competitionId,
+                    staffId,
+                    null,
+                    null,
+                    limit: 50), cancellationToken);
+                await Assert.That(archivedHistory.State)
+                    .IsEqualTo(CompetitionEventReadState.Available);
+                await Assert.That(archivedHistory.AccessLevel)
+                    .IsEqualTo(CompetitionEventAccessLevel.Staff);
+                await Assert.That(archivedHistory.CanAccessGameplayFactValues)
+                    .IsEqualTo(staffId != observerId);
+                await Assert.That(archivedHistory.Items!.Select(item => item.Id))
+                    .IsEquivalentTo([oldEventId, recentEventId]);
+            }
+
+            var archivedParticipant = await store.QueryAsync(Query(
+                competitionId,
+                participantId,
+                now.AddDays(-30),
+                now,
+                limit: 50), cancellationToken);
+            await Assert.That(archivedParticipant.State)
+                .IsEqualTo(CompetitionEventReadState.CompetitionNotFound);
+            var missingCompetition = await store.QueryAsync(Query(
+                Guid.NewGuid(),
+                ownerId,
+                null,
+                null,
+                limit: 50), cancellationToken);
+            await Assert.That(missingCompetition.State)
+                .IsEqualTo(CompetitionEventReadState.CompetitionNotFound);
         });
     }
 

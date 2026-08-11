@@ -35,7 +35,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
     {
         var competitionId = Guid.NewGuid();
         var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
-        authorizer.CanObserveAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>())
+        authorizer.CanReadHistoricalAuditAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>())
             .Returns(true, false);
         await using var app = await CreateApplicationAsync(authorizer);
         using var client = app.GetTestClient();
@@ -59,7 +59,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
     {
         var competitionId = Guid.NewGuid();
         var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
-        authorizer.CanObserveAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>())
+        authorizer.CanReadHistoricalAuditAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>())
             .Returns(true);
         var store = Substitute.For<IHistoricalAdjudicationEvidenceStore>();
         store.ReadAsync(
@@ -93,7 +93,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         var firstUserId = Guid.NewGuid();
         var secondUserId = Guid.NewGuid();
         var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
-        authorizer.CanObserveAsync(
+        authorizer.CanReadHistoricalAuditAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<Guid>(),
                 Arg.Any<CancellationToken>())
@@ -163,7 +163,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
     {
         var competitionId = Guid.NewGuid();
         var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
-        authorizer.CanObserveAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>())
+        authorizer.CanReadHistoricalAuditAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>())
             .Returns(true);
         var store = Substitute.For<IHistoricalAdjudicationEvidenceStore>();
         store.ReadAsync(

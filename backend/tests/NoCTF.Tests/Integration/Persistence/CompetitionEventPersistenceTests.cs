@@ -262,10 +262,60 @@ public sealed class CompetitionEventPersistenceTests
             await Assert.That(flagAudit.Reason).Contains("[REDACTED]");
             await Assert.That(flagAudit.Reason).DoesNotContain("competition-event-secret");
 
+            await db.Competitions.Where(item => item.Id == ids.CompetitionId)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(item => item.DeletedAt, now),
+                    ct);
+            var archivedAccessedAt = now.AddMinutes(1);
+            var archivedValueReaders = new[]
+            {
+                ids.AdministratorId,
+                ids.OwnerId,
+                ids.ManagerId,
+                ids.JudgeId
+            };
+            foreach (var readerId in archivedValueReaders)
+            {
+                var archivedFlag = await store.AccessGameplayFactValueAsync(new(
+                    ids.CompetitionId,
+                    ids.GameplayFactId,
+                    readerId,
+                    "Archived incident evidence review",
+                    archivedAccessedAt), ct);
+                await Assert.That(archivedFlag.State)
+                    .IsEqualTo(CompetitionEventReadState.Available);
+                await Assert.That(archivedFlag.View!.Value)
+                    .IsEqualTo("flag{competition-event-secret}");
+            }
+
+            var archivedObserverFlag = await store.AccessGameplayFactValueAsync(new(
+                ids.CompetitionId,
+                ids.GameplayFactId,
+                ids.ObserverId,
+                "Archived incident evidence review",
+                archivedAccessedAt), ct);
+            await Assert.That(archivedObserverFlag.State)
+                .IsEqualTo(CompetitionEventReadState.Forbidden);
+            var archivedParticipantFlag = await store.AccessGameplayFactValueAsync(new(
+                ids.CompetitionId,
+                ids.GameplayFactId,
+                ids.ParticipantId,
+                "Archived incident evidence review",
+                archivedAccessedAt), ct);
+            await Assert.That(archivedParticipantFlag.State)
+                .IsEqualTo(CompetitionEventReadState.CompetitionNotFound);
+            var archivedValueAudits = await db.CompetitionEvents.AsNoTracking()
+                .Where(item =>
+                    item.Kind == CompetitionEventKind.ProtectedGameplayFactValueAccessed
+                    && item.OccurredAt == archivedAccessedAt)
+                .ToListAsync(ct);
+            await Assert.That(archivedValueAudits.Select(item => item.ActorUserId!.Value))
+                .IsEquivalentTo(archivedValueReaders);
+
             var bot = await store.QueryAsync(Query(ids, ids.BotId, now), ct);
             await Assert.That(bot.State).IsEqualTo(CompetitionEventReadState.Forbidden);
             await Assert.That(outbox.Messages.OfType<CompetitionEventCommitted>()).Count()
-                .IsEqualTo(6);
+                .IsEqualTo(10);
 
             var immutable = await db.CompetitionEvents.SingleAsync(
                 item => item.Id == eventIds[0], ct);

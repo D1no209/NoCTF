@@ -44,4 +44,21 @@ public sealed class CompetitionModerationAuthorizer(NoCtfDbContext db) : ICompet
                         || competition.ObserverIds.Contains(userId)),
                 cancellationToken);
     }
+
+    public async Task<bool> CanReadHistoricalAuditAsync(
+        Guid userId,
+        Guid competitionId,
+        CancellationToken cancellationToken)
+    {
+        var privileged = await db.Users.AsNoTracking().AnyAsync(user =>
+            user.Id == userId && user.Role == UserRole.Administrator, cancellationToken);
+        return privileged
+            || await db.Competitions.IgnoreQueryFilters().AsNoTracking().AnyAsync(competition =>
+                competition.Id == competitionId
+                    && (competition.OwnerId == userId
+                        || competition.ManagerIds.Contains(userId)
+                        || competition.JudgeIds.Contains(userId)
+                        || competition.ObserverIds.Contains(userId)),
+                cancellationToken);
+    }
 }
