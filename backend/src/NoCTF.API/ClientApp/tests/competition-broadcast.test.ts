@@ -84,7 +84,7 @@ describe('competition administration role label', () => {
       new URL('../app/pages/admin/competitions/index.vue', import.meta.url),
     ).text()
 
-    expect(page).toContain("competition.administrationRole === 'Judge'")
+    expect(page).toContain("return competition.administrationRole ?? 'Observer'")
     expect(page).not.toContain('adminListCheatIncidents')
     expect(page).not.toContain('probeRole')
   })
