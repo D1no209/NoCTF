@@ -28,7 +28,7 @@ public sealed class AwdRuntimeProvisioningTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_awd_runtime_quota")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
@@ -158,7 +158,7 @@ public sealed class AwdRuntimeProvisioningTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_awd_runtime_cleanup")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
@@ -318,7 +318,7 @@ public sealed class AwdRuntimeProvisioningTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_awd_runtime")
                 .WithUsername("postgres")
                 .WithPassword("postgres")

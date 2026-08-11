@@ -253,6 +253,94 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task Ci_and_test_infrastructure_dependencies_are_immutable()
+    {
+        var ci = await ReadAsync(".github", "workflows", "ci.yml");
+        var actionReferences = ci.Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal))
+            .ToArray();
+        await Assert.That(actionReferences).Count().IsEqualTo(4);
+        await Assert.That(actionReferences.All(line =>
+            System.Text.RegularExpressions.Regex.IsMatch(
+                line,
+                "^- uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
+
+        foreach (var action in new[]
+                 {
+                     "actions/checkout", "actions/setup-dotnet",
+                     "actions/setup-node", "oven-sh/setup-bun"
+                 })
+        {
+            await Assert.That(actionReferences.Count(line =>
+                line.StartsWith($"- uses: {action}@", StringComparison.Ordinal))).IsEqualTo(1);
+        }
+
+        var ciServiceImages = ci.Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("image: postgres:", StringComparison.Ordinal)
+                || line.StartsWith("image: redis:", StringComparison.Ordinal))
+            .ToArray();
+        await Assert.That(ciServiceImages).Count().IsEqualTo(2);
+        await Assert.That(ciServiceImages.All(line => IsImmutableTestImage(line["image: ".Length..])))
+            .IsTrue();
+
+        var e2eDirectory = Path.Combine(RepositoryRoot, "backend", "tests", "NoCTF.E2E");
+        var e2eComposeFiles = Directory.GetFiles(
+                e2eDirectory,
+                "docker-compose.*.yml",
+                SearchOption.TopDirectoryOnly)
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToArray();
+        await Assert.That(e2eComposeFiles).Count().IsEqualTo(4);
+        var e2eServiceImages = (await Task.WhenAll(
+                e2eComposeFiles.Select(path => File.ReadAllTextAsync(path))))
+            .SelectMany(content => content.Split('\n'))
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("image: postgres:", StringComparison.Ordinal)
+                || line.StartsWith("image: redis:", StringComparison.Ordinal)
+                || line.StartsWith("image: minio/minio:", StringComparison.Ordinal))
+            .Select(line => line["image: ".Length..])
+            .ToArray();
+        await Assert.That(e2eServiceImages).Count().IsEqualTo(16);
+        await Assert.That(e2eServiceImages.All(IsImmutableTestImage)).IsTrue();
+
+        var e2eRunnerDockerfile = await ReadAsync(
+            "backend", "tests", "NoCTF.E2E", "Dockerfile.runner");
+        var e2eRunnerBaseImages = e2eRunnerDockerfile.Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("FROM ", StringComparison.Ordinal))
+            .ToArray();
+        await Assert.That(e2eRunnerBaseImages).Count().IsEqualTo(3);
+        await Assert.That(e2eRunnerBaseImages.All(line =>
+            System.Text.RegularExpressions.Regex.IsMatch(
+                line,
+                "^FROM [^ ]+:[^ @]+@sha256:[a-f0-9]{64}(?: AS [^ ]+)?$"))).IsTrue();
+
+        var testSourceFiles = Directory.GetFiles(
+                Path.Combine(RepositoryRoot, "backend", "tests", "NoCTF.Tests"),
+                "*.cs",
+                SearchOption.AllDirectories)
+            .Where(path => !path.Contains(
+                $"{Path.DirectorySeparatorChar}Architecture{Path.DirectorySeparatorChar}",
+                StringComparison.Ordinal))
+            .ToArray();
+        var testSources = string.Join('\n', await Task.WhenAll(
+            testSourceFiles.Select(path => File.ReadAllTextAsync(path))));
+        var builderCount = System.Text.RegularExpressions.Regex.Matches(
+            testSources,
+            "new (?:PostgreSqlBuilder|RedisBuilder)\\(").Count;
+        var pinnedBuilders = System.Text.RegularExpressions.Regex.Matches(
+            testSources,
+            "new (?:PostgreSqlBuilder|RedisBuilder)\\(\\s*\"(?<image>[^\"]+)\"");
+        await Assert.That(builderCount).IsGreaterThan(0);
+        await Assert.That(pinnedBuilders).Count().IsEqualTo(builderCount);
+        await Assert.That(pinnedBuilders
+            .Select(match => match.Groups["image"].Value)
+            .All(IsImmutableTestImage)).IsTrue();
+    }
+
+    [Test]
     public async Task E2e_orchestrator_is_portable_and_uses_docker_assigned_ports()
     {
         var orchestrator = await ReadAsync("backend", "tests", "e2e.cs");
@@ -277,6 +365,11 @@ public sealed class DeploymentTopologyTests
 
     private static Task<string> ReadAsync(params string[] segments) =>
         File.ReadAllTextAsync(Path.Combine([RepositoryRoot, .. segments]));
+
+    private static bool IsImmutableTestImage(string image) =>
+        System.Text.RegularExpressions.Regex.IsMatch(
+            image,
+            "^(?:postgres|redis|minio/minio):[A-Za-z0-9._-]+@sha256:[a-f0-9]{64}$");
 
     private static string FindRepositoryRoot()
     {

@@ -29,7 +29,7 @@ public sealed class OwnershipTransferPersistenceTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_ownership_transfer")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
@@ -229,7 +229,7 @@ public sealed class OwnershipTransferPersistenceTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_competition_transfer_concurrency")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
@@ -344,7 +344,7 @@ public sealed class OwnershipTransferPersistenceTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_challenge_reference_concurrency")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
@@ -466,7 +466,7 @@ public sealed class OwnershipTransferPersistenceTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_attachment_revision_concurrency")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
@@ -582,7 +582,7 @@ public sealed class OwnershipTransferPersistenceTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_competition_restore_hard_delete")
                 .WithUsername("postgres")
                 .WithPassword("postgres")

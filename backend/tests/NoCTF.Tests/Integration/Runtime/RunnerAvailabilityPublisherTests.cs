@@ -29,12 +29,12 @@ public sealed class RunnerAvailabilityPublisherTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
                 .WithDatabase("noctf_runner_availability")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
                 .Build();
-            await using var redisContainer = new RedisBuilder("redis:7-alpine").Build();
+            await using var redisContainer = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await Task.WhenAll(
                 postgres.StartAsync(cancellationToken),
                 redisContainer.StartAsync(cancellationToken));
