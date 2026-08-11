@@ -143,9 +143,10 @@ kubectl apply -f networkpolicy.yaml
 
 Email delivery is optional and remains fail-closed under the default-deny policy.
 Before enabling email verification or password reset delivery, copy
-`smtp-egress.example.yaml` outside the repository, replace `smtp.example.com`
-and `587` with the exact FQDN and TCP port configured in Platform Settings, and
-apply that copy. Reapply the policy whenever the SMTP endpoint changes. Add a
+`smtp-egress.example.yaml` outside the repository, replace both occurrences of
+`smtp.example.com` and port `587` with the exact FQDN and TCP port configured in
+Platform Settings, and apply that copy. Reapply the policy whenever the SMTP
+endpoint changes. Add a
 second exact `matchName` or port entry only when the configured mail service
 actually requires it; do not use a wildcard FQDN, `0.0.0.0/0`, or commit the
 production endpoint or credentials.

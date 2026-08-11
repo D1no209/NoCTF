@@ -157,6 +157,9 @@ public sealed class DeploymentTopologyTests
 
         await Assert.That(smtpExample).Contains("kind: CiliumNetworkPolicy");
         await Assert.That(smtpExample).Contains("matchName: smtp.example.com");
+        await Assert.That(smtpExample).Contains("\"k8s:k8s-app\": kube-dns");
+        await Assert.That(smtpExample).Contains("rules:");
+        await Assert.That(smtpExample).Contains("dns:");
         await Assert.That(smtpExample).DoesNotContain("matchPattern:");
         await Assert.That(smtpExample).DoesNotContain("0.0.0.0/0");
         await Assert.That(smtpExample).DoesNotContain("password");
