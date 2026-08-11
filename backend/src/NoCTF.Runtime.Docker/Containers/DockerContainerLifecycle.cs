@@ -431,7 +431,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         if (request.Purpose == ContainerNetworkPurpose.AwdpVerification
             && request.TargetPort is not (>= 1 and <= 65535))
             throw new ArgumentOutOfRangeException(nameof(request));
-        if (request.EgressPolicy != RuntimeEgressPolicy.DenyAll)
+        if (request.EgressPolicy != RuntimeEgressPolicy.Isolated)
             throw new InvalidOperationException(
                 "Docker container runtimes do not support InternetOnly egress.");
         var name = request.Purpose == ContainerNetworkPurpose.AwdpVerification

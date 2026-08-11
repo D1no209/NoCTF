@@ -189,7 +189,7 @@ public static class ComposeRuntimeDefinitionPolicy
             throw new ArgumentOutOfRangeException(nameof(logMaxSizeBytes));
         if (logMaxFiles <= 0)
             throw new ArgumentOutOfRangeException(nameof(logMaxFiles));
-        if (request.EgressPolicy != RuntimeEgressPolicy.DenyAll)
+        if (request.EgressPolicy != RuntimeEgressPolicy.Isolated)
             throw new InvalidOperationException(
                 "Docker Compose does not support InternetOnly egress.");
         var document = LoadValidated(
@@ -232,7 +232,7 @@ public static class ComposeRuntimeDefinitionPolicy
                         $"{port.HostPort.ToString(CultureInfo.InvariantCulture)}:{port.ContainerPort.ToString(CultureInfo.InvariantCulture)}"));
         }
 
-        ApplyInternalNetworkPolicy(document, request.Labels);
+        ApplyRuntimeNetworkIsolation(document, request.Labels);
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
         new YamlStream(new YamlDocument(document)).Save(writer, assignAnchors: false);
         return writer.ToString();
@@ -704,7 +704,7 @@ public static class ComposeRuntimeDefinitionPolicy
             MergeMappingValues(service, "environment", overrides);
     }
 
-    private static void ApplyInternalNetworkPolicy(
+    private static void ApplyRuntimeNetworkIsolation(
         YamlMappingNode document,
         IReadOnlyDictionary<string, string> labels)
     {

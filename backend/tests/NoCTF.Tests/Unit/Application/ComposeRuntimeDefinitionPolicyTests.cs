@@ -102,7 +102,7 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
     }
 
     [Test]
-    public async Task Prepare_overrides_platform_values_and_publishes_only_bound_ports()
+    public async Task Docker_isolated_network_remains_routed_and_publishes_only_bound_ports()
     {
         var request = new ComposeRequest(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),

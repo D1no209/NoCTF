@@ -96,7 +96,7 @@ Environment: map<string,string>
 FlagEnvironmentVariableName: string?     // PerTeam 时必填
 UrlBindings[]
 Resources: CpuCores, MemoryBytes, PidsLimit, EphemeralStorageBytes
-EgressPolicy: DenyAll | InternetOnly
+EgressPolicy: Isolated | InternetOnly
 RuntimeLifetimeSeconds
 OperationTimeoutSeconds
 FlagSource: Static | PerTeam
@@ -109,15 +109,16 @@ Command null 使用镜像默认。`FlagSource=PerTeam` 时
 ## EgressPolicy 与 Runtime 网络
 
 `ContainerRuntimeDefinition` 与 `ComposeRuntimeDefinition` 使用强类型
-`EgressPolicy: DenyAll | InternetOnly`，省略时为 `DenyAll`。OVA/Libvirt 首版不接受该字段。
+`EgressPolicy: Isolated | InternetOnly`，省略时为 `Isolated`。OVA/Libvirt 首版不接受该字段。
 
-- Docker Container/Compose：首版只支持 `DenyAll`。每个长期 Runtime 使用独立
-  独立 bridge network；Compose 中所有题目 network（包括平台补出的 default
+- Docker Container/Compose：首版只支持 `Isolated`。每个长期 Runtime 使用独立
+  bridge network；Compose 中所有题目 network（包括平台补出的 default
   network）都不连接平台网络。同一 Runtime 内仍可互通；若存在公开 URL Binding，题目 service/container 自身直接发布声明的 TCP
   端口，宿主端口使用 `0`，由 Docker 分配随机端口。不得创建或使用 HAProxy/ingress
-  proxy；Runner 直接从 Docker 返回的端口映射展开公开 URL。`InternetOnly` 在保存校验和 Runner 执行边界均直接拒绝；当前
-  没有通过 `DOCKER-USER` 修改宿主防火墙，也没有部署 Egress Gateway。
-- Kubernetes Container/Compose：每 Runtime 创建 NetworkPolicy。`DenyAll` 只放行同一
+  proxy；Runner 直接从 Docker 返回的端口映射展开公开 URL。Docker bridge 默认 NAT 外联仍然存在，
+  因此 `Isolated` 只承诺实例/平台网络隔离，不承诺禁止公网、宿主或局域网出站。`InternetOnly` 在保存
+  校验和 Runner 执行边界均直接拒绝；当前没有通过 `DOCKER-USER` 修改宿主防火墙，也没有部署 Egress Gateway。
+- Kubernetes Container/Compose：每 Runtime 创建 NetworkPolicy。`Isolated` 只放行同一
   不可变 Runtime selector 的 Pod 互通、集群 DNS，以及平台声明的公开/内部检查端口入站。
   `InternetOnly` 在此基础上只增加 `0.0.0.0/0` IPv4 egress，并通过 `except` 排除平台
   内建特殊/私有地址和 Runner Pool 的 `ProtectedCidrs`；不生成 IPv6 放行规则。
@@ -127,8 +128,9 @@ Command null 使用镜像默认。`FlagSource=PerTeam` 时
 非法/IPv6 CIDR，但不会自动发现集群网络。`NetworkPolicyRequired=true` 只是运维声明，
 不是 CNI 能力探测；CNI 必须实际执行 NetworkPolicy。
 
-该策略只表达地址级的 `DenyAll`/公网 IPv4 二选一，不提供域名、FQDN、目的端口白名单，
-也不把 DNS 命名隔离视为安全边界。
+`Isolated` 是跨 Provider 的最低共同能力名称，不代表不同 Provider 的 egress 等价：Kubernetes 由
+NetworkPolicy 实施缺省拒绝，Docker 只创建独立 bridge。`InternetOnly` 只在 Kubernetes 提供公网
+IPv4 选项；策略不提供域名、FQDN 或目的端口白名单，也不把 DNS 命名隔离视为安全边界。
 
 本阶段威胁模型信任平台管理员和管理员配置，不防管理员内鬼；题目业务容器和选手输入
 仍按不可信处理。Checker 是平台信任、由管理员配置的容器，可按任务需要同时连接题目
@@ -252,9 +254,13 @@ Runner 在目标 Container/Compose service 执行 `/bin/sh -c`。`${FLAG}` 直�
 
 ## 网络安全
 
-每个 Team/题/Generation 独立网络。永久禁止平台 API/Worker/Runner 管理地址、PostgreSQL、Redis、对象存储内网、云元数据、其他 Team Runtime。Compose 内同实例服务可互通。
+每个 Team/题/Generation 使用独立 Runtime 网络，Compose 内同实例服务可互通。Kubernetes 通过
+NetworkPolicy 禁止访问平台 API/Worker/Runner 管理地址、PostgreSQL、Redis、对象存储内网、云元数据
+和其他 Team Runtime；Docker 只通过不接入平台网络的独立 bridge 阻断容器名/网络直连，不能宣称对
+宿主、局域网、云元数据或经宿主路由的基础设施具备同等 egress 阻断能力。
 
-EgressPolicy 默认 DenyAll；InternetOnly 仅公网+DNS，仍阻断私网与平台。入站只通过 URL Binding。
+EgressPolicy 默认 Isolated。Kubernetes 的 Isolated 缺省拒绝出站，InternetOnly 仅公网+DNS且仍阻断
+私网与平台；Docker 的 Isolated 仅隔离 Runtime bridge，不承诺阻断外联。入站只通过 URL Binding。
 
 永久禁止 privileged、host namespace、Docker socket、host mount、device 与 SYS_ADMIN/SYS_MODULE 等高危 capability。默认 no-new-privileges/drop all；特殊高权限环境使用隔离 VM。
 

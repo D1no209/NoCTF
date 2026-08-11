@@ -19,7 +19,7 @@ export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { C
 // ---------- 配置 JSON 内的整数枚举 ----------
 
 export const RuntimeAllocation = { Shared: 0, PerTeam: 1 } as const
-export const EgressPolicy = { DenyAll: 0, InternetOnly: 1 } as const
+export const EgressPolicy = { Isolated: 0, InternetOnly: 1 } as const
 export const FlagSource = { Static: 0, PerTeam: 1, AwdRotation: 2 } as const
 export const UrlExposure = { OwnerOnly: 0, Participants: 1 } as const
 export const BloodRewardPolicy = {
@@ -469,8 +469,8 @@ function serializeRuntimeDefinition(definition: RuntimeDefinitionModel): JsonObj
   const security = serializeSecurity(definition.security)
   if (security) obj.security = security
   putString(obj, 'flagEnvironmentVariableName', definition.flagEnvironmentVariableName)
-  // 模板层只允许 DenyAll(0),InternetOnly 会被后端拒绝。
-  obj.egressPolicy = EgressPolicy.DenyAll
+  // 可移植模板只声明隔离网络(0)；InternetOnly 会被后端拒绝。
+  obj.egressPolicy = EgressPolicy.Isolated
   putNumberArray(obj, 'internalPorts', definition.internalPorts)
   return obj
 }

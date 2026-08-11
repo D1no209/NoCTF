@@ -775,7 +775,7 @@ public sealed class DockerContainerLifecycleTests
         new(
             new RuntimeResourceIdentity(operationId, 1),
             ContainerNetworkPurpose.AwdpVerification,
-            RuntimeEgressPolicy.DenyAll,
+            RuntimeEgressPolicy.Isolated,
             [],
             8080);
 
