@@ -33,6 +33,9 @@ public sealed class GameplayFactProcessor(
     ICompetitionEventRecorder? eventRecorder = null,
     ILogger<GameplayFactProcessor>? logger = null) : IGameplayFactProcessor
 {
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     public GameplayFactProcessor(
         NoCtfDbContext db,
         IGameplayFactEvaluatorCatalog evaluatorCatalog,
@@ -93,7 +96,6 @@ public sealed class GameplayFactProcessor(
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
         db.ChangeTracker.Clear();
         return true;
     }
@@ -192,21 +194,23 @@ public sealed class GameplayFactProcessor(
                     && @event.OccurredAt <= submission.OccurredAt)
                 .OrderBy(@event => @event.OccurredAt)
                 .ToListAsync(cancellationToken);
-            var lifecycle = lifecycleEvents.Select(@event =>
-            {
-                using var payload = JsonDocument.Parse(@event.PayloadJson);
-                return new CompetitionLifecycleTransition
-                {
-                    Id = @event.Id,
-                    CompetitionId = @event.CompetitionId,
-                    From = Enum.Parse<CompetitionStatus>(payload.RootElement.GetProperty("from").GetString()!, true),
-                    To = Enum.Parse<CompetitionStatus>(payload.RootElement.GetProperty("to").GetString()!, true),
-                    ActorId = @event.ActorUserId,
-                    OccurredAt = @event.OccurredAt
-                };
-            }).ToList();
             effectiveRunningTime = AwdEffectiveRunningClock.Calculate(
-                lifecycle, submission.OccurredAt);
+                lifecycleEvents.Select(@event =>
+                {
+                    var payload = JsonSerializer.Deserialize<LifecyclePayload>(
+                        @event.PayloadJson,
+                        JsonOptions)!;
+                    return new CompetitionLifecycleTransition
+                    {
+                        Id = @event.Id,
+                        CompetitionId = @event.CompetitionId,
+                        From = payload.From,
+                        To = payload.To,
+                        ActorId = @event.ActorUserId,
+                        OccurredAt = @event.OccurredAt
+                    };
+                }).ToList(),
+                submission.OccurredAt);
         }
         var decision = evaluatorCatalog.Get(configuration.Competition.Mode).Evaluate(new(
             submission,
@@ -761,4 +765,11 @@ public sealed class GameplayFactProcessor(
         int CompetitionRevision,
         int CompetitionChallengeRevision,
         int ChallengeDefinitionRevision);
+
+    private sealed record LifecyclePayload(
+        int SchemaVersion,
+        CompetitionStatus From,
+        CompetitionStatus To,
+        bool Automatic,
+        string? Reason);
 }

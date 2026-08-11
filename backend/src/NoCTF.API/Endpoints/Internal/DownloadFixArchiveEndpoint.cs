@@ -30,7 +30,7 @@ public sealed class DownloadFixArchiveEndpoint(
     {
         var routeId = Route<Guid>("gameplayFactId");
         if (!Guid.TryParse(
-                User.FindFirstValue("submission_id"),
+                User.FindFirstValue("gameplay_fact_id"),
                 out var claimedId)
             || claimedId != routeId)
             return TypedResults.Unauthorized();
