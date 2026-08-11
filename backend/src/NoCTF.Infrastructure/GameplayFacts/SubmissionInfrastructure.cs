@@ -39,6 +39,7 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<IGameplayFactProcessor, GameplayFactProcessor>();
         services.AddScoped<BloodRankCriticalSection>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();
+        services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
         services.AddScoped<RecordInternalResult>();
         services.AddSingleton<IGameplayFactEvaluatorCatalog, GameModeGameplayFactEvaluatorCatalog>();
         services.AddSingleton<IGameplayFactAdmissionModePolicy, GameModeGameplayFactAdmissionPolicy>();

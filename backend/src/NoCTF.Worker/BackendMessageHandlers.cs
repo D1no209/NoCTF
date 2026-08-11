@@ -471,6 +471,157 @@ public static class BackendMessageHandlers
         results.RecordAwdpAsync(message, cancellationToken);
 
     public static async Task Handle(
+        ReplayAwdpFixVerification message,
+        NoCtfDbContext db,
+        IRuntimePlacementPolicy placementPolicy,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken,
+        ICompetitionEventRecorder? events = null)
+    {
+        events ??= NullCompetitionEventRecorder.Instance;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var previous = await db.RuntimeInstances
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM runtime_instances
+                WHERE id = {message.PreviousRuntimeInstanceId}
+                FOR UPDATE
+                """)
+            .SingleOrDefaultAsync(cancellationToken);
+        var fact = await db.GameplayFacts.SingleOrDefaultAsync(
+            candidate => candidate.Id == message.GameplayFactId,
+            cancellationToken);
+        if (previous is null
+            || fact is null
+            || previous.Purpose != RuntimePurpose.AwdpTarget
+            || previous.GameplayFactId != fact.Id
+            || previous.Generation != message.PreviousGeneration
+            || previous.State != RuntimeState.Stopping
+            || previous.ProcessingVersion != message.RecoveryProcessingVersion
+            || !string.Equals(previous.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
+            || !string.Equals(previous.RunnerId, message.RunnerId, StringComparison.Ordinal))
+            return;
+
+        previous.State = RuntimeState.Stopped;
+        previous.StoppedAt = message.CleanedAt;
+        previous.ProcessingVersion = checked(previous.ProcessingVersion + 1);
+        await RecordRuntimeStateAsync(
+            events,
+            previous,
+            CompetitionEventLevel.Warning,
+            message.CleanedAt,
+            cancellationToken);
+
+        if (fact.State != GameplayFactState.Processing)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var context = await db.CompetitionChallenges
+            .Where(challenge => challenge.Id == fact.CompetitionChallengeId)
+            .Join(
+                db.Competitions,
+                challenge => challenge.CompetitionId,
+                competition => competition.Id,
+                (challenge, competition) => new { Challenge = challenge, Competition = competition })
+            .Join(
+                db.Challenges,
+                scope => scope.Challenge.ChallengeId,
+                challenge => challenge.Id,
+                (scope, challenge) => new
+                {
+                    scope.Challenge,
+                    scope.Competition,
+                    Template = challenge
+                })
+            .SingleAsync(cancellationToken);
+        var revisionChanged =
+            previous.SourceCompetitionConfigurationRevision
+                != context.Competition.ConfigurationRevision
+            || previous.SourceCompetitionChallengeRevision != context.Challenge.Revision
+            || previous.SourceChallengeDefinitionRevision != context.Template.Revision;
+        RuntimeInstance? replacement = null;
+        if (!revisionChanged)
+        {
+            try
+            {
+                var configuration = AwdpConfigurationResolver.Resolve(
+                    context.Competition.ConfigurationJson,
+                    context.Challenge.RulesJson,
+                    context.Template.DefinitionJson);
+                if (configuration.Runtime is { } template)
+                {
+                    var placement = placementPolicy.Resolve(template.RuntimeKind);
+                    var generation = checked((await db.RuntimeInstances
+                        .Where(instance => instance.GameplayFactId == fact.Id)
+                        .MaxAsync(instance => (int?)instance.Generation, cancellationToken) ?? 0) + 1);
+                    var targetId = Guid.CreateVersion7(message.CleanedAt);
+                    _ = AwdpTargetDefinitionFactory.Create(
+                        targetId,
+                        generation,
+                        template,
+                        placement.Provider,
+                        message.CleanedAt);
+                    replacement = AwdpTargetRuntimeFactory.Create(
+                        fact.Id,
+                        fact.CompetitionId,
+                        fact.CompetitionChallengeId,
+                        targetId,
+                        template,
+                        placement,
+                        generation,
+                        context.Competition.ConfigurationRevision,
+                        context.Challenge.Revision,
+                        context.Template.Revision,
+                        message.CleanedAt);
+                    replacement.ReplacesRuntimeInstanceId = previous.Id;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                replacement = null;
+            }
+        }
+
+        if (replacement is null)
+        {
+            fact.State = GameplayFactState.PlatformFailed;
+            fact.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
+            fact.UpdatedAt = message.CleanedAt;
+            await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
+            await QueueNextGameplayFactAsync(fact, db, outbox, cancellationToken);
+        }
+        else
+        {
+            fact.UpdatedAt = message.CleanedAt;
+            db.RuntimeInstances.Add(replacement);
+            await outbox.PublishAsync(new DispatchRuntime(
+                replacement.Id,
+                replacement.ProcessingVersion));
+            await events.RecordAsync(new(
+                replacement.CompetitionId,
+                CompetitionEventKind.RuntimeCreated,
+                CompetitionEventLevel.Warning,
+                CompetitionEventVisibility.Team,
+                message.CleanedAt,
+                TeamId: fact.TeamId,
+                CompetitionChallengeId: replacement.CompetitionChallengeId,
+                RuntimeInstanceId: replacement.Id,
+                GameplayFactId: fact.Id,
+                RuntimeState: replacement.State,
+                RuntimeGeneration: replacement.Generation), cancellationToken);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    public static async Task Handle(
         ExpireAwdpFixVerification message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,

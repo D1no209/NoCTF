@@ -308,3 +308,11 @@ Namespace selector 与 API Pod selector，并只开放 callback URL 的 TCP 端�
 policy 反向只接受 Runtime Namespace 中 `awd-checker` / `awdp-checker` purpose 的 Pod。
 
 Runtime/Checker 定义更新不热改存量 Runtime；下一次 Start/Reset 使用 Challenge 最新定义。RuntimeInstance 不保存 Challenge 定义版本，也不自动升级。
+
+AWDP disposable target 额外使用两级 `ProcessingVersion` fence：Provider Running 后的首次 Fix
+消息先持久认领 execution fence，结果不确定的重投再持久认领 recovery fence。recovery fence
+必须先于 Provider cleanup，因此旧 checker callback 即使与清理并发也不能发布权威结果。
+Runner 只有在 exact RuntimeInstanceId+Generation 的 Provider 资源已确认不存在、对应容量已按
+Runner owner 释放后，才发布 replay-ready；Worker 再以新 RuntimeInstanceId/Generation 创建
+替代 target。该流程复用 RuntimeInstance、GameplayFact、Wolverine outbox 和 provider receipt，
+不建立 operation/result-history 表。

@@ -56,6 +56,11 @@ public sealed class RawSqlPersistenceRulesTests
                 "ExecuteSqlInterpolated",
                 "pg_advisory_"
             ],
+            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/AwdpFixExecutionFence.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Scoring/Leaderboard/FusionLeaderboardCache.cs"] =
             [
                 "ExecuteSqlInterpolated",
