@@ -173,6 +173,7 @@ GET  /api/v1/admin/competitions/{competitionId}/leaderboard-visibility
 PUT  /api/v1/admin/competitions/{competitionId}/leaderboard-visibility
 DELETE /api/v1/admin/competitions/{competitionId}
 POST /api/v1/admin/competitions/{competitionId}/restore
+GET  /api/v1/admin/competitions/{competitionId}/hard-delete-preview
 DELETE /api/v1/admin/competitions/{competitionId}/hard-delete
 POST /api/v1/admin/competitions/{competitionId}/publish
 POST /api/v1/admin/competitions/{competitionId}/make-visible
@@ -199,6 +200,12 @@ POST /api/v1/admin/competitions/{competitionId}/cheat-incidents/{gameplayFactId}
 ```
 
 Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍是独立文件/路由/TypedResults。
+
+普通删除是可恢复的软删除，恢复不会清理任何历史。物理删除是独立操作，不要求先软删除；调用方应先读取
+`hard-delete-preview`。预览以稳定引用码和数量报告 Team、CompetitionChallenge、GameplayFact、Runtime、
+PatchUpload、DataExport、Notification、PosterFile 及永久 CompetitionEvent。任意引用都会阻止物理删除并
+由 DELETE 返回同一强类型 409 预览；不存在或无权访问返回 404。CompetitionEvent 永久不可删除，存在
+任何历史事件的比赛因此永远不能物理删除。
 
 排行榜可见性 PUT 使用独立 `expectedRevision` 栅栏，可立即应用 Frozen/Blackout，也可在比赛时间窗
 内定时应用。Frozen 在生效时按精确截止时间重建并持久化快照；新配置会淘汰旧的定时消息。每次

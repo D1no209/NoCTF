@@ -659,7 +659,8 @@ public sealed class OwnershipTransferPersistenceTests
 
             await Assert.That((await restoreTask).State)
                 .IsEqualTo(CompetitionRestoreState.Restored);
-            await Assert.That(await hardDeleteTask).IsFalse();
+            await Assert.That((await hardDeleteTask).State)
+                .IsEqualTo(CompetitionHardDeleteState.NotFound);
             db.ChangeTracker.Clear();
             var persisted = await db.Competitions.IgnoreQueryFilters()
                 .AsNoTracking()
