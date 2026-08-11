@@ -3,6 +3,7 @@ import type {
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode,
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse,
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode,
+  NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse,
 } from '../api'
 import { parseApiError } from '../utils/api-error'
 import { translate } from '../utils/i18n'
@@ -11,6 +12,7 @@ type FailureCode = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailur
 type FailurePayload = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureResponse
 type ParticipantRole = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode
 type QuestionAccess = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionAccessCode
+type CompetitionQuestion = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 const staticFailureMessages = {
   InvalidRequest: '咨询内容或请求参数无效，请检查后重试。',
@@ -66,6 +68,50 @@ export function competitionQuestionUnreadCount(
     return Math.max(0, current - seenRevision)
 
   return access === 'Asker' && isCompetitionQuestionHandlerRole(lastActorRole) ? 1 : 0
+}
+
+/**
+ * Merge cursor pages and independently fetched thread details without
+ * duplicating a question. Revision is authoritative; UpdatedAt orders equal
+ * revisions and keeps recently active threads at the top.
+ */
+export function mergeCompetitionQuestions(
+  current: readonly CompetitionQuestion[],
+  incoming: readonly CompetitionQuestion[],
+): CompetitionQuestion[] {
+  const byId = new Map<string, CompetitionQuestion>()
+  const withoutId: CompetitionQuestion[] = []
+
+  for (const question of [...current, ...incoming]) {
+    if (!question.id) {
+      withoutId.push(question)
+      continue
+    }
+
+    const existing = byId.get(question.id)
+    if (!existing || isFresherQuestion(question, existing))
+      byId.set(question.id, question)
+  }
+
+  return [...byId.values(), ...withoutId].sort((left, right) => {
+    const timeDelta = questionTimestamp(right) - questionTimestamp(left)
+    if (timeDelta !== 0) return timeDelta
+    return (right.id ?? '').localeCompare(left.id ?? '')
+  })
+}
+
+function isFresherQuestion(
+  candidate: CompetitionQuestion,
+  current: CompetitionQuestion,
+): boolean {
+  const revisionDelta = (candidate.revision ?? 0) - (current.revision ?? 0)
+  if (revisionDelta !== 0) return revisionDelta > 0
+  return questionTimestamp(candidate) > questionTimestamp(current)
+}
+
+function questionTimestamp(question: CompetitionQuestion): number {
+  const value = Date.parse(question.updatedAt ?? '')
+  return Number.isFinite(value) ? value : 0
 }
 
 function asFailurePayload(error: unknown): FailurePayload | null {

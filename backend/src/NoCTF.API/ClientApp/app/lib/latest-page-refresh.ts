@@ -4,6 +4,32 @@ export interface LatestPageRefreshOptions {
 }
 
 /**
+ * Coalesces live invalidations while guaranteeing one trailing refresh after
+ * an in-flight request. The callback owns its error presentation so a failed
+ * refresh can preserve the currently rendered state.
+ */
+export function createTrailingRefresh(run: () => Promise<void>) {
+  let refresh: Promise<void> | null = null
+  let refreshRequested = false
+
+  return function refreshTrailing(): Promise<void> {
+    refreshRequested = true
+    if (refresh) return refresh
+
+    refresh = (async () => {
+      do {
+        refreshRequested = false
+        await run()
+      } while (refreshRequested)
+    })().finally(() => {
+      refresh = null
+    })
+
+    return refresh
+  }
+}
+
+/**
  * Serializes pagination and first-page refreshes. Repeated refresh requests
  * received during an active request are coalesced into one final reload so the
  * caller always settles on the newest first page without racing load-more.

@@ -19,7 +19,9 @@ import {
   competitionQuestionErrorMessage,
   competitionQuestionRoleLabel,
   isCompetitionQuestionHandlerRole,
+  mergeCompetitionQuestions,
 } from '~/lib/competition-question'
+import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 import {
   maximumQuestionBodyLength,
   maximumQuestionTitleLength,
@@ -38,39 +40,54 @@ const competitionId = route.params.id as string
 const { markRead, unreadCount } = useCompetitionQuestionReadState(competitionId)
 
 // 列表
-const questions = ref<Question[]>([])
-const loading = ref(true)
-const listError = ref<string | null>(null)
+const refreshError = ref<string | null>(null)
 
-async function loadList() {
-  loading.value = true
-  listError.value = null
-  try {
-    const { data, error } = await listCompetitionQuestions({
-      path: { competitionId },
-      query: { limit: 100 },
-    })
-    if (error || !data) {
-      listError.value = parseApiError(error, translate("加载咨询列表失败")).message
-      return
-    }
-    questions.value = data.items ?? []
-  }
-  catch (error) {
-    listError.value = parseApiError(error, translate("加载咨询列表失败")).message
-  }
-  finally {
-    loading.value = false
-  }
+async function fetchQuestionPage(cursor: string | null) {
+  const { data, error } = await listCompetitionQuestions({
+    path: { competitionId },
+    query: { cursor, limit: 50 },
+  })
+  if (error || !data)
+    throw parseApiError(error, translate("加载咨询列表失败"))
+  return { items: data.items ?? [], nextCursor: data.nextCursor ?? null }
 }
 
+const {
+  items: questions,
+  loading,
+  error: paginationError,
+  hasMore,
+  initialized,
+  loadMore,
+} = useCursorPagination<Question>(fetchQuestionPage)
+
+const listError = computed(() => refreshError.value ?? paginationError.value?.message ?? null)
+
+async function loadMoreQuestions() {
+  refreshError.value = null
+  await loadMore()
+  questions.value = mergeCompetitionQuestions([], questions.value)
+}
+
+const refreshList = createTrailingRefresh(async () => {
+  if (!initialized.value) {
+    await loadMoreQuestions()
+    return
+  }
+
+  refreshError.value = null
+  try {
+    const page = await fetchQuestionPage(null)
+    questions.value = mergeCompetitionQuestions(questions.value, page.items ?? [])
+    paginationError.value = null
+  }
+  catch (error) {
+    refreshError.value = parseApiError(error, translate("加载咨询列表失败")).message
+  }
+})
+
 function upsertQuestion(question: Question) {
-  const index = questions.value.findIndex(item => item.id === question.id)
-  if (index === -1) questions.value.unshift(question)
-  else questions.value.splice(index, 1, question)
-  questions.value.sort((left, right) =>
-    new Date(right.updatedAt ?? 0).getTime() - new Date(left.updatedAt ?? 0).getTime(),
-  )
+  questions.value = mergeCompetitionQuestions(questions.value, [question])
 }
 
 // 新建
@@ -147,6 +164,15 @@ const detail = ref<Question | null>(null)
 const detailLoading = ref(false)
 const detailRequests = createLatestRequestGuard()
 
+function applyDetailQuestion(question: Question, markAsRead = true) {
+  const currentDetail = detail.value
+  const current = currentDetail && currentDetail.id === question.id ? [currentDetail] : []
+  const fresh = mergeCompetitionQuestions(current, [question])[0] ?? question
+  detail.value = fresh
+  upsertQuestion(fresh)
+  if (markAsRead) markRead(fresh)
+}
+
 async function select(id: string, syncRoute = true) {
   if (detailLoading.value && selectedId.value === id) return
   const request = detailRequests.begin()
@@ -157,14 +183,12 @@ async function select(id: string, syncRoute = true) {
   }
   try {
     const { data, error } = await getCompetitionQuestion({ path: { competitionId, questionId: id } })
-    if (!detailRequests.isCurrent(request)) return
+    if (!detailRequests.isCurrent(request) || selectedId.value !== id) return
     if (error || !data) {
       toast.error(parseApiError(error, translate("加载咨询详情失败")).message)
       return
     }
-    detail.value = data
-    upsertQuestion(data)
-    markRead(data)
+    applyDetailQuestion(data)
   }
   catch (error) {
     if (detailRequests.isCurrent(request))
@@ -176,16 +200,48 @@ async function select(id: string, syncRoute = true) {
   }
 }
 
-onMounted(async () => {
-  await loadList()
-  const questionId = typeof route.query.question === 'string' ? route.query.question : null
-  if (questionId) await select(questionId, false)
-})
-
 watch(() => route.query.question, async (value) => {
   const questionId = typeof value === 'string' ? value : null
   if (questionId && questionId !== selectedId.value)
     await select(questionId, false)
+})
+
+const refreshSelectedDetail = createTrailingRefresh(async () => {
+  const questionId = selectedId.value
+  if (!questionId) return
+
+  try {
+    const { data, error } = await getCompetitionQuestion({ path: { competitionId, questionId } })
+    if (error || !data || selectedId.value !== questionId) return
+    applyDetailQuestion(data, document.visibilityState === 'visible')
+  }
+  catch {
+    // Background refresh failures keep the currently displayed thread intact.
+  }
+})
+
+async function refreshFromServer() {
+  await Promise.all([refreshList(), refreshSelectedDetail()])
+}
+
+let unwatchCompetition: (() => void) | undefined
+let disposed = false
+onMounted(async () => {
+  const questionId = typeof route.query.question === 'string' ? route.query.question : null
+  await Promise.all([
+    loadMoreQuestions(),
+    questionId ? select(questionId, false) : Promise.resolve(),
+  ])
+  if (disposed) return
+  unwatchCompetition = watchCompetition(competitionId, {
+    competitionEventChanged: () => void refreshFromServer(),
+    onReconnected: () => void refreshFromServer(),
+  })
+})
+onUnmounted(() => {
+  disposed = true
+  detailRequests.invalidate()
+  unwatchCompetition?.()
 })
 
 // 追加消息
@@ -207,9 +263,7 @@ async function submitReply() {
       toast.error(replyError.value)
       return
     }
-    detail.value = data
-    upsertQuestion(data)
-    markRead(data)
+    applyDetailQuestion(data)
     reply.value = ''
     toast.success(translate("消息已发送"))
   }
@@ -237,9 +291,7 @@ async function changeStatus(status: 'Resolved' | 'Closed') {
       toast.error(competitionQuestionErrorMessage(error, translate("状态更新失败")))
       return
     }
-    detail.value = data
-    upsertQuestion(data)
-    markRead(data)
+    applyDetailQuestion(data)
     toast.success(status === 'Resolved' ? translate("咨询已标记为已解决") : translate("咨询已关闭"))
   }
   catch (error) {
@@ -351,14 +403,14 @@ const participantLimitReached = computed(() =>
       <Alert v-if="listError" variant="destructive">
         <AlertDescription>{{ listError }}</AlertDescription>
       </Alert>
-      <Skeleton v-else-if="loading" class="h-40 w-full" />
-      <Empty v-else-if="!questions.length" class="border py-8">
+      <Skeleton v-if="loading && !initialized" class="h-40 w-full" />
+      <Empty v-else-if="initialized && !questions.length" class="border py-8">
         <EmptyHeader>
           <EmptyTitle>{{ $t('暂无咨询') }}</EmptyTitle>
           <EmptyDescription>{{ $t('遇到问题?向主办方发起咨询') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
-      <ul v-else class="flex flex-col gap-2">
+      <ul v-else-if="questions.length" class="flex flex-col gap-2">
         <li v-for="q in questions" :key="q.id">
           <button
             type="button"
@@ -384,6 +436,14 @@ const participantLimitReached = computed(() =>
           </button>
         </li>
       </ul>
+      <div v-if="!initialized && listError" class="flex justify-center">
+        <Button variant="outline" :disabled="loading" @click="loadMoreQuestions">
+          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('重新加载') }} </Button>
+      </div>
+      <div v-if="hasMore" class="flex justify-center">
+        <Button variant="outline" :disabled="loading" @click="loadMoreQuestions">
+          <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('加载更多') }} </Button>
+      </div>
     </div>
 
     <div class="lg:col-span-3">
