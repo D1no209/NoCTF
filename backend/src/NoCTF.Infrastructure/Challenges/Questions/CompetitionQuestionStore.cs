@@ -190,13 +190,14 @@ public sealed class CompetitionQuestionStore(
             ct));
     }
 
-    public async Task<IReadOnlyList<CompetitionQuestionView>> ListAsync(
+    public async Task<CompetitionQuestionPage> ListAsync(
         CompetitionQuestionQuery query,
         CancellationToken ct)
     {
         var actor = await ResolveActorContextAsync(query.CompetitionId, query.ActorUserId, ct);
         if (actor is null)
-            return [];
+            return new([], null);
+        var limit = Math.Clamp(query.Limit, 1, CompetitionQuestionRules.MaximumListLimit);
         var ownedChallengeIds = await ResolveOwnedCompetitionChallengeIdsAsync(
             query.CompetitionId,
             query.ActorUserId,
@@ -215,7 +216,14 @@ public sealed class CompetitionQuestionStore(
                 input.Question,
                 input.Resolution!.Value.Access))
             .ToArray();
-        return await BuildViewsAsync(visible, false, ct);
+        var hasMore = visible.Length > limit;
+        var page = visible.Take(limit).ToArray();
+        var items = await BuildViewsAsync(page, false, ct);
+        return new(
+            items,
+            hasMore && items.Length > 0
+                ? new(items[^1].UpdatedAt, items[^1].Id)
+                : null);
     }
 
     public async Task<CompetitionQuestionView?> FindAsync(
@@ -597,7 +605,10 @@ public sealed class CompetitionQuestionStore(
         IReadOnlyCollection<Guid> ownedChallengeIds,
         CancellationToken ct)
     {
-        var limit = Math.Clamp(query.Limit, 1, CompetitionQuestionRules.MaximumListLimit);
+        var limit = checked(Math.Clamp(
+            query.Limit,
+            1,
+            CompetitionQuestionRules.MaximumListLimit) + 1);
         if (!db.Database.IsRelational())
         {
             var candidates = await db.Notifications.AsNoTracking()
@@ -608,10 +619,9 @@ public sealed class CompetitionQuestionStore(
             var aggregates = await LoadAggregatesAsync(candidates, ct);
             return aggregates
                 .Where(aggregate => MatchesQuery(aggregate, query)
-                    && ResolveAccess(aggregate, actor, ownedChallengeIds) is not null)
-                .OrderByDescending(aggregate => aggregate.Nodes.Count == 0
-                    ? aggregate.RootNotification.SentAt
-                    : aggregate.Nodes[^1].SentAt)
+                    && ResolveAccess(aggregate, actor, ownedChallengeIds) is not null
+                    && IsBeforePosition(aggregate, query.Position))
+                .OrderByDescending(aggregate => aggregate.UpdatedAt)
                 .ThenByDescending(aggregate => aggregate.RootNotification.Id)
                 .Take(limit)
                 .Select(aggregate => aggregate.RootNotification)
@@ -627,6 +637,9 @@ public sealed class CompetitionQuestionStore(
         var subject = query.Subject?.ToString() ?? string.Empty;
         var status = query.Status?.ToString() ?? string.Empty;
         var competitionChallengeId = query.CompetitionChallengeId?.ToString() ?? string.Empty;
+        var hasPosition = query.Position is not null;
+        var positionUpdatedAt = query.Position?.UpdatedAt ?? DateTimeOffset.MinValue;
+        var positionId = query.Position?.Id ?? Guid.Empty;
         return await db.Notifications.FromSqlInterpolated($$"""
             WITH RECURSIVE question_thread AS (
                 SELECT root.id AS root_id,
@@ -666,6 +679,9 @@ public sealed class CompetitionQuestionStore(
             FROM notifications AS root
             JOIN question_head AS head ON head.root_id = root.id
             WHERE ({{query.Status is null}} OR head.status = {{status}})
+              AND ({{!hasPosition}}
+                   OR head.updated_at < {{positionUpdatedAt}}
+                   OR (head.updated_at = {{positionUpdatedAt}} AND root.id < {{positionId}}))
             ORDER BY head.updated_at DESC, root.id DESC
             LIMIT {{limit}}
             """).AsNoTracking().ToArrayAsync(ct);
@@ -975,6 +991,14 @@ public sealed class CompetitionQuestionStore(
         && (query.Subject is null || aggregate.Root.Subject == query.Subject)
         && (query.Status is null || aggregate.Status == query.Status);
 
+    private static bool IsBeforePosition(
+        QuestionAggregate aggregate,
+        CompetitionQuestionPagePosition? position) =>
+        position is null
+        || aggregate.UpdatedAt < position.UpdatedAt
+        || aggregate.UpdatedAt == position.UpdatedAt
+        && aggregate.RootNotification.Id.CompareTo(position.Id) < 0;
+
     private static AccessResolution? ResolveAccess(
         QuestionAggregate question,
         ActorContext actor,
@@ -1280,6 +1304,10 @@ public sealed class CompetitionQuestionStore(
         List<Notification> Nodes)
     {
         public int Revision => Nodes.Count;
+
+        public DateTimeOffset UpdatedAt => Nodes.Count == 0
+            ? RootNotification.SentAt
+            : Nodes[^1].SentAt;
 
         public CompetitionQuestionStatus Status => Nodes.Count == 0
             ? Root.Status

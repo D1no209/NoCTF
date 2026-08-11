@@ -3164,6 +3164,14 @@
             }
           },
           {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": true,
@@ -14436,6 +14444,10 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse"
             }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
