@@ -193,7 +193,10 @@ public sealed class GameplayFactIntakeStore(
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var valid = await db.CompetitionChallenges.AnyAsync(item =>
+        var valid = await db.Competitions.AnyAsync(item =>
+            item.Id == received.CompetitionId
+            && item.Status == CompetitionStatus.Running, cancellationToken)
+            && await db.CompetitionChallenges.AnyAsync(item =>
             item.Id == received.CompetitionChallengeId
             && item.CompetitionId == received.CompetitionId, cancellationToken)
             && await db.Teams.AnyAsync(item =>

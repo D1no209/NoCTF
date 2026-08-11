@@ -135,6 +135,7 @@ public sealed class GameplayFactProcessor(
         {
             var special = await EvaluateSpecialAsync(
                 submission,
+                configuration.Competition.Status,
                 configuration.CompetitionChallenge,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
@@ -230,6 +231,7 @@ public sealed class GameplayFactProcessor(
 
     private async Task<GameplayFactDecision> EvaluateSpecialAsync(
         GameplayFact submission,
+        CompetitionStatus competitionStatus,
         NoCTF.Domain.Challenges.CompetitionChallenge challenge,
         DateTimeOffset projectedAt,
         CancellationToken ct)
@@ -254,6 +256,10 @@ public sealed class GameplayFactProcessor(
                 null,
                 submission.OccurredAt);
         }
+
+        if (competitionStatus != CompetitionStatus.Running)
+            return new(GameplayFactResult.Rejected,
+                GameplayFactFailureCode.HintUnavailable, submission.OccurredAt);
 
         if (submission.ReferenceKind != GameplayFactReferenceKind.Hint
             || submission.ReferenceId is not Guid hintId)
@@ -348,6 +354,7 @@ public sealed class GameplayFactProcessor(
             {
                 Decision = await EvaluateSpecialAsync(
                     submission,
+                    specialScope.Competition.Status,
                     specialScope.Challenge,
                     now,
                     cancellationToken),
