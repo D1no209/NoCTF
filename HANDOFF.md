@@ -15,8 +15,20 @@
 - 测试已随实现改为 ImageSharp，并新增居中裁剪像素断言。验证通过：头像定向测试 9/9；Release
   solution build 0 警告/0 错误；非 Integration TUnit 708/708；analyzer verify、定向 whitespace
   verify、`git diff --check` 及排除 `bin/obj` 的全后端 SkiaSharp 源码扫描均通过。
+- 最终发布门禁在统一分支重新完成：强制真实 Docker 的完整 TUnit 共 873 项，871 通过、0 失败、
+  2 项因未配置真实 Kubernetes cluster 与 Libvirt disk path 按设计跳过；PostgreSQL、Redis、Docker
+  Container/Compose 与 Wolverine 场景均通过。四模式 Full E2E 串行结果为 CTF 1/1（54.782s）、AWD
+  1/1（1m32.481s）、AWDP 1/1（1m30.002s）、KoH 1/1（1m16.460s）。`2fb4b69c` 将 KoH
+  排行榜断言窗口从恰好等于 15 秒维护周期改为 30 秒；保留的失败现场证明控制事实、Dirty 标记和后续
+  投影均正确，没有修改产品计分逻辑。
+- 最终前端门禁为 167/167（1300 assertions）、typecheck、production build 与 `bun audit` 全通过。
+  OpenAPI 和生成 TypeScript SDK 连续两轮工具生成均无漂移；EF CLI 10.0.9 确认模型无 pending
+  changes；Release build、analyzer、NuGet vulnerable/deprecated 审计、API/Host/Worker/Runner publish
+  均通过，API/Host 发布包均包含 SPA fallback。两份 Compose config 通过；kubeconform 严格校验
+  49 个资源为 46 valid、0 invalid/error、3 个预期 Cilium CRD schema skip。
 - 发布提交 `a167993b` 将平台版本递增为 `0.1.0-alpha.28`。本阶段没有新增表、列、migration、
-  snapshot、HTTP/OpenAPI 或生成 SDK 变化；没有推送、部署或操作生产头像数据。
+  snapshot、HTTP/OpenAPI 或生成 SDK 变化。最终同步确认 `origin/main` 是当前 HEAD 的祖先，没有待合并的
+  远程提交或冲突；截至本记录仍未推送、部署或操作生产头像数据。
 
 ## 2026-08-12 全量审计修复最终收口
 
