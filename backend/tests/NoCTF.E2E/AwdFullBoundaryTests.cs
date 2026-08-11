@@ -34,7 +34,7 @@ public sealed class AwdFullBoundaryTests
             {
                 title = "AWD full-boundary E2E",
                 description = "Round, attack, checker, and runtime boundary verification",
-                mode = 1,
+                mode = "Awd",
                 startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
@@ -70,8 +70,8 @@ public sealed class AwdFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
-                mode = 1,
-                visibility = 0,
+                mode = "Awd",
+                visibility = "Private",
                 title = "Rotating AWD Service",
                 description = "Exposes rotating Flags and a controllable health endpoint.",
                 direction = "Pwn",
@@ -154,13 +154,13 @@ public sealed class AwdFullBoundaryTests
         var redRuntime = await PollOptionalJsonAsync(
             red.Client,
             runtimePath,
-            value => value.GetProperty("state").GetInt32() == 2,
+            value => value.GetProperty("state").GetString() == "Running",
             TimeSpan.FromSeconds(90),
             cancellationToken);
         var blueRuntime = await PollOptionalJsonAsync(
             blue.Client,
             runtimePath,
-            value => value.GetProperty("state").GetInt32() == 2,
+            value => value.GetProperty("state").GetString() == "Running",
             TimeSpan.FromSeconds(90),
             cancellationToken);
         var redRuntimeId = redRuntime.GetProperty("id").GetGuid();
@@ -186,7 +186,10 @@ public sealed class AwdFullBoundaryTests
             competitionId,
             hardeningGameplayFactId,
             cancellationToken);
-        await AssertSubmissionAsync(hardeningSubmission, result: 5, failureCode: 23);
+        await AssertSubmissionAsync(
+            hardeningSubmission,
+            result: "Rejected",
+            failureCode: "HardeningActive");
 
         await PollJsonAsync(
             red.Client,
@@ -239,8 +242,8 @@ public sealed class AwdFullBoundaryTests
             competitionId,
             batchIds[1],
             cancellationToken);
-        await AssertSubmissionAsync(correctBatchSubmission, result: 0, failureCode: null);
-        await AssertSubmissionAsync(wrongBatchSubmission, result: 1, failureCode: null);
+        await AssertSubmissionAsync(correctBatchSubmission, result: "Correct", failureCode: null);
+        await AssertSubmissionAsync(wrongBatchSubmission, result: "Wrong", failureCode: null);
 
         var duplicateId = await SubmitSingleFlagAsync(
             red.Client,
@@ -253,7 +256,10 @@ public sealed class AwdFullBoundaryTests
             competitionId,
             duplicateId,
             cancellationToken);
-        await AssertSubmissionAsync(duplicate, result: 2, failureCode: 14);
+        await AssertSubmissionAsync(
+            duplicate,
+            result: "Duplicate",
+            failureCode: "DuplicateAttack");
 
         var blueRoundTwoFlag = await PollFixtureTextAsync(
             blueRuntimeUrl,
@@ -328,7 +334,7 @@ public sealed class AwdFullBoundaryTests
             competitionId,
             expiredId,
             cancellationToken);
-        await AssertSubmissionAsync(expired, result: 1, failureCode: 21);
+        await AssertSubmissionAsync(expired, result: "Wrong", failureCode: "FlagExpired");
 
         JsonElement finalLeaderboard = default;
         var recoveryBaseline = scoringBaseline;
@@ -384,7 +390,7 @@ public sealed class AwdFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/runtimes?competitionChallengeId={competitionChallengeId}",
             value => value.GetProperty("items").GetArrayLength() == 2
                 && value.GetProperty("items").EnumerateArray()
-                    .All(item => item.GetProperty("state").GetInt32() == 4),
+                    .All(item => item.GetProperty("state").GetString() == "Stopped"),
             TimeSpan.FromSeconds(90),
             cancellationToken);
     }
@@ -504,22 +510,22 @@ public sealed class AwdFullBoundaryTests
         CancellationToken cancellationToken) =>
         PollJsonAsync(
             client,
-            $"/api/v1/competitions/{competitionId}/submissions/{gameplayFactId}",
-            value => value.GetProperty("evaluationState").GetInt32() == 3,
+            $"/api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}",
+            value => value.GetProperty("state").GetString() == "Completed",
             TimeSpan.FromSeconds(30),
             cancellationToken);
 
     private static async Task AssertSubmissionAsync(
         JsonElement submission,
-        int result,
-        int? failureCode)
+        string result,
+        string? failureCode)
     {
-        await Assert.That(submission.GetProperty("result").GetInt32()).IsEqualTo(result);
+        await Assert.That(submission.GetProperty("result").GetString()).IsEqualTo(result);
         var failure = submission.GetProperty("failureCode");
         if (failureCode is null)
             await Assert.That(failure.ValueKind).IsEqualTo(JsonValueKind.Null);
         else
-            await Assert.That(failure.GetInt32()).IsEqualTo(failureCode.Value);
+            await Assert.That(failure.GetString()).IsEqualTo(failureCode);
     }
 
     private static async Task AssertSingleTargetAsync(JsonElement response, Guid teamId)

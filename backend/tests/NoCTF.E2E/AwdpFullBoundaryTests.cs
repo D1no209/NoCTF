@@ -37,7 +37,7 @@ public sealed class AwdpFullBoundaryTests
             {
                 title = "AWDP full-boundary E2E",
                 description = "Break, archive, disposable target, patch, and checker verification",
-                mode = 2,
+                mode = "Awdp",
                 startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
@@ -76,11 +76,11 @@ public sealed class AwdpFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
-                visibility = 0,
+                visibility = "Private",
                 title = "Disposable Patch Target",
                 description = "Accepts an isolated patch and reports its fixed state.",
                 direction = "Pwn",
-                mode = 2,
+                mode = "Awdp",
                 definitionJson = BuildDefinition(targetImage, checkerImage)
             },
             HttpStatusCode.Created,
@@ -195,7 +195,11 @@ public sealed class AwdpFullBoundaryTests
             wrongBreakId,
             TimeSpan.FromSeconds(30),
             cancellationToken);
-        await AssertSubmissionAsync(wrongBreak, kind: 1, result: 1, failureCode: null);
+        await AssertSubmissionAsync(
+            wrongBreak,
+            kind: "BreakAttempt",
+            result: "Wrong",
+            failureCode: null);
 
         var correctBreakId = await SubmitBreakAsync(
             playerClient,
@@ -209,7 +213,11 @@ public sealed class AwdpFullBoundaryTests
             correctBreakId,
             TimeSpan.FromSeconds(30),
             cancellationToken);
-        await AssertSubmissionAsync(correctBreak, kind: 1, result: 0, failureCode: null);
+        await AssertSubmissionAsync(
+            correctBreak,
+            kind: "BreakAttempt",
+            result: "Correct",
+            failureCode: null);
 
         var fixedGameplayFactId = await SubmitFixAsync(
             playerClient,
@@ -223,8 +231,12 @@ public sealed class AwdpFullBoundaryTests
             fixedGameplayFactId,
             TimeSpan.FromSeconds(90),
             cancellationToken);
-        await AssertSubmissionAsync(fixedSubmission, kind: 2, result: 0, failureCode: null);
-        var fixedProcessingVersion = fixedSubmission.GetProperty("processingVersion").GetInt64();
+        await AssertSubmissionAsync(
+            fixedSubmission,
+            kind: "FixAttempt",
+            result: "Correct",
+            failureCode: null);
+        var fixedAt = fixedSubmission.GetProperty("updatedAt").GetDateTimeOffset();
         var firstRuntimes = await PollStoppedRuntimesAsync(
             admin,
             competitionId,
@@ -260,7 +272,11 @@ public sealed class AwdpFullBoundaryTests
             failedGameplayFactId,
             TimeSpan.FromSeconds(90),
             cancellationToken);
-        await AssertSubmissionAsync(failedSubmission, kind: 2, result: 1, failureCode: 25);
+        await AssertSubmissionAsync(
+            failedSubmission,
+            kind: "FixAttempt",
+            result: "Wrong",
+            failureCode: "AwdpPatchFailed");
         _ = await PollStoppedRuntimesAsync(
             admin,
             competitionId,
@@ -275,20 +291,28 @@ public sealed class AwdpFullBoundaryTests
             TimeSpan.FromSeconds(30),
             cancellationToken);
 
-        await SendWithoutBodyAsync(
-            admin,
-            HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/submissions/{fixedGameplayFactId}/rejudge",
+        using var rejudgeResponse = await admin.PostAsync(
+            $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/{fixedGameplayFactId}/rejudge",
+            null,
+            cancellationToken);
+        var rejudgeAccepted = await ReadExpectedJsonAsync(
+            rejudgeResponse,
             HttpStatusCode.Accepted,
             cancellationToken);
+        var rejudgeCutoff = rejudgeAccepted.GetProperty("cutoff").GetDateTimeOffset();
+        await Assert.That(rejudgeCutoff).IsGreaterThanOrEqualTo(fixedAt);
         var rejudged = await PollJsonAsync(
             playerClient,
-            $"/api/v1/competitions/{competitionId}/submissions/{fixedGameplayFactId}",
-            value => value.GetProperty("evaluationState").GetInt32() == 3
-                && value.GetProperty("processingVersion").GetInt64() > fixedProcessingVersion,
+            $"/api/v1/competitions/{competitionId}/gameplay-facts/{fixedGameplayFactId}",
+            value => value.GetProperty("state").GetString() == "Completed"
+                && value.GetProperty("updatedAt").GetDateTimeOffset() >= rejudgeCutoff,
             TimeSpan.FromSeconds(90),
             cancellationToken);
-        await AssertSubmissionAsync(rejudged, kind: 2, result: 0, failureCode: null);
+        await AssertSubmissionAsync(
+            rejudged,
+            kind: "FixAttempt",
+            result: "Correct",
+            failureCode: null);
         var finalRuntimes = await PollStoppedRuntimesAsync(
             admin,
             competitionId,
@@ -477,24 +501,24 @@ public sealed class AwdpFullBoundaryTests
         CancellationToken cancellationToken) =>
         PollJsonAsync(
             client,
-            $"/api/v1/competitions/{competitionId}/submissions/{gameplayFactId}",
-            value => value.GetProperty("evaluationState").GetInt32() == 3,
+            $"/api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}",
+            value => value.GetProperty("state").GetString() == "Completed",
             timeout,
             cancellationToken);
 
     private static async Task AssertSubmissionAsync(
         JsonElement submission,
-        int kind,
-        int result,
-        int? failureCode)
+        string kind,
+        string result,
+        string? failureCode)
     {
-        await Assert.That(submission.GetProperty("kind").GetInt32()).IsEqualTo(kind);
-        await Assert.That(submission.GetProperty("result").GetInt32()).IsEqualTo(result);
+        await Assert.That(submission.GetProperty("kind").GetString()).IsEqualTo(kind);
+        await Assert.That(submission.GetProperty("result").GetString()).IsEqualTo(result);
         var failure = submission.GetProperty("failureCode");
         if (failureCode is null)
             await Assert.That(failure.ValueKind).IsEqualTo(JsonValueKind.Null);
         else
-            await Assert.That(failure.GetInt32()).IsEqualTo(failureCode.Value);
+            await Assert.That(failure.GetString()).IsEqualTo(failureCode);
     }
 
     private static Task<JsonElement> PollStoppedRuntimesAsync(
@@ -508,7 +532,7 @@ public sealed class AwdpFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/runtimes?competitionChallengeId={competitionChallengeId}",
             value => value.GetProperty("items").GetArrayLength() == expectedCount
                 && value.GetProperty("items").EnumerateArray()
-                    .All(item => item.GetProperty("state").GetInt32() == 4),
+                    .All(item => item.GetProperty("state").GetString() == "Stopped"),
             TimeSpan.FromSeconds(90),
             cancellationToken);
 

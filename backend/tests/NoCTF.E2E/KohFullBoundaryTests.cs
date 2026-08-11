@@ -33,7 +33,7 @@ public sealed class KohFullBoundaryTests
             {
                 title = "KoH full-boundary E2E",
                 description = "Shared Hill, control polling, lifecycle, and scoring verification",
-                mode = 3,
+                mode = "Koh",
                 startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
@@ -65,11 +65,11 @@ public sealed class KohFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
-                visibility = 0,
+                visibility = "Private",
                 title = "Shared KoH Hill",
                 description = "Returns the current controlling Team Flag as a raw response body.",
                 direction = "Pwn",
-                mode = 3,
+                mode = "Koh",
                 definitionJson = BuildDefinition(runtimeImage)
             },
             HttpStatusCode.Created,
@@ -133,7 +133,7 @@ public sealed class KohFullBoundaryTests
             .ToDictionary(item => item.GetProperty("teamId").GetGuid(), item => item.Clone());
         await Assert.That(byTeam).Count().IsEqualTo(2);
         await Assert.That(byTeam.Values.All(item =>
-            item.GetProperty("specificationKind").GetInt32() == 2
+            item.GetProperty("specificationKind").GetString() == "RuntimeDefinition"
             && item.GetProperty("specificationId").GetGuid() == competitionChallengeId)).IsTrue();
         var redFlag = byTeam[red.TeamId].GetProperty("flag").GetString()!;
         var blueFlag = byTeam[blue.TeamId].GetProperty("flag").GetString()!;
@@ -148,7 +148,7 @@ public sealed class KohFullBoundaryTests
             admin,
             runtimePath,
             value => value.GetProperty("items").GetArrayLength() == 1
-                && value.GetProperty("items")[0].GetProperty("state").GetInt32() == 2,
+                && value.GetProperty("items")[0].GetProperty("state").GetString() == "Running",
             TimeSpan.FromSeconds(90),
             cancellationToken);
         var runtime = runtimeList.GetProperty("items")[0];
@@ -214,8 +214,8 @@ public sealed class KohFullBoundaryTests
         var pausedRuntime = await GetJsonAsync(admin, runtimePath, cancellationToken);
         await Assert.That(pausedRuntime.GetProperty("items")[0].GetProperty("id").GetGuid())
             .IsEqualTo(runtimeId);
-        await Assert.That(pausedRuntime.GetProperty("items")[0].GetProperty("state").GetInt32())
-            .IsEqualTo(2);
+        await Assert.That(pausedRuntime.GetProperty("items")[0].GetProperty("state").GetString())
+            .IsEqualTo("Running");
         var pausedDetail = await GetJsonAsync(blue.Client, detailPath, cancellationToken);
         await Assert.That(pausedDetail.GetProperty("controlFlag").ValueKind)
             .IsEqualTo(JsonValueKind.Null);
@@ -246,7 +246,7 @@ public sealed class KohFullBoundaryTests
         await PollJsonAsync(
             admin,
             runtimePath,
-            value => value.GetProperty("items")[0].GetProperty("state").GetInt32() == 4,
+            value => value.GetProperty("items")[0].GetProperty("state").GetString() == "Stopped",
             TimeSpan.FromSeconds(90),
             cancellationToken);
     }
@@ -316,7 +316,7 @@ public sealed class KohFullBoundaryTests
             {
                 teamId = original.GetProperty("teamId").GetGuid(),
                 flag,
-                specificationKind = 2,
+                specificationKind = "RuntimeDefinition",
                 specificationId = competitionChallengeId
             },
             HttpStatusCode.OK,
