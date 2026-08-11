@@ -12,7 +12,7 @@ import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
 } from '~/api'
-import { downloadProtectedFile } from '~/utils/download'
+import { downloadSdkFile } from '~/utils/download'
 
 definePageMeta({ middleware: 'platform-admin' })
 
@@ -125,8 +125,8 @@ async function downloadExport(item: DataExport): Promise<void> {
   if (!dataExportId) return
   downloadingId.value = dataExportId
   try {
-    await downloadProtectedFile(
-      () => adminDownloadDataExport({
+    await downloadSdkFile(
+      adminDownloadDataExport({
         path: { dataExportId },
         parseAs: 'blob',
       }),

@@ -8,6 +8,7 @@ import {
 } from '~/api'
 import type { NoCtfapiEndpointsAdministrationDataExportsDataExportResponse } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
+import { downloadSdkFile } from '~/utils/download'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -27,8 +28,8 @@ async function exportEvents() {
   }
   exportingEvents.value = true
   try {
-    await downloadProtectedFile(
-      () => adminExportCompetitionEvents({
+    await downloadSdkFile(
+      adminExportCompetitionEvents({
         path: { competitionId },
         query: { from, to },
         parseAs: 'blob',
@@ -95,8 +96,8 @@ async function downloadExport(item: NoCtfapiEndpointsAdministrationDataExportsDa
   if (!dataExportId) return
   downloadingId.value = dataExportId
   try {
-    await downloadProtectedFile(
-      () => adminDownloadDataExport({
+    await downloadSdkFile(
+      adminDownloadDataExport({
         path: { dataExportId },
         parseAs: 'blob',
       }),

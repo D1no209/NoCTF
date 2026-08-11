@@ -11,6 +11,7 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
 } from '~/api'
+import { downloadSdkFile } from '~/utils/download'
 
 const route = useRoute()
 const competitionId = route.params.id as string
@@ -56,8 +57,8 @@ const downloading = ref(false)
 async function downloadAttachment(attachmentId: string, fileName: string) {
   downloading.value = true
   try {
-    await downloadProtectedFile(
-      () => downloadChallengeAttachmentEndpoint({
+    await downloadSdkFile(
+      downloadChallengeAttachmentEndpoint({
         path: { competitionId, competitionChallengeId, attachmentId },
         parseAs: 'blob',
       }),
@@ -75,8 +76,8 @@ async function downloadAttachment(attachmentId: string, fileName: string) {
 async function downloadRandom() {
   downloading.value = true
   try {
-    await downloadProtectedFile(
-      () => downloadRandomChallengeAttachmentEndpoint({
+    await downloadSdkFile(
+      downloadRandomChallengeAttachmentEndpoint({
         path: { competitionId, competitionChallengeId },
         parseAs: 'blob',
       }),
