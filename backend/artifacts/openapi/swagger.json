@@ -8496,8 +8496,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Permanently deletes an empty soft-deleted competition.",
-        "description": "Restrict foreign keys prevent deleting a competition that owns durable facts.",
+        "summary": "Permanently deletes an empty competition without history.",
+        "description": "Historical competition events and all other reported references block physical deletion. Soft deletion is a separate operation and is not a prerequisite.",
         "operationId": "AdminHardDeleteCompetition",
         "parameters": [
           {
@@ -8513,21 +8513,24 @@
           "204": {
             "description": "No Content"
           },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
-          },
-          "409": {
-            "description": "",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FastEndpointsErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -8672,6 +8675,52 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/competitions/{competitionId}/hard-delete-preview": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Previews the impact of permanently deleting a competition.",
+        "description": "Reports immutable historical events and other references that prevent physical deletion. The preview does not modify the competition.",
+        "operationId": "AdminPreviewCompetitionHardDelete",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -16860,6 +16909,70 @@
             "format": "int32"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "isSoftDeleted": {
+            "type": "boolean"
+          },
+          "canHardDelete": {
+            "type": "boolean"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "HistoricalEvent",
+          "Team",
+          "CompetitionChallenge",
+          "GameplayFact",
+          "RuntimeInstance",
+          "PatchUpload",
+          "DataExport",
+          "Notification",
+          "PosterFile"
+        ],
+        "enum": [
+          "HistoricalEvent",
+          "Team",
+          "CompetitionChallenge",
+          "GameplayFact",
+          "RuntimeInstance",
+          "PatchUpload",
+          "DataExport",
+          "Notification",
+          "PosterFile"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsAdminCompetitionListResponse": {
         "type": "object",

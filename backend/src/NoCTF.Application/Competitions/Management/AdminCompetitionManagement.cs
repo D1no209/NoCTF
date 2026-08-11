@@ -1,5 +1,3 @@
-using NoCTF.Application.Common;
-
 namespace NoCTF.Application.Competitions.Management;
 
 public enum CompetitionRestoreState
@@ -24,10 +22,40 @@ public enum CompetitionOwnerTransferState
     RoleNotEligible
 }
 
-public enum HardDeleteCompetitionFailureCode
+public enum CompetitionHardDeleteReferenceKind
 {
-    HardDeleteConflict
+    HistoricalEvent,
+    Team,
+    CompetitionChallenge,
+    GameplayFact,
+    RuntimeInstance,
+    PatchUpload,
+    DataExport,
+    Notification,
+    PosterFile
 }
+
+public sealed record CompetitionHardDeleteReference(
+    CompetitionHardDeleteReferenceKind Kind,
+    int Count);
+
+public sealed record CompetitionHardDeletePreview(
+    Guid CompetitionId,
+    string Title,
+    bool IsSoftDeleted,
+    bool CanHardDelete,
+    IReadOnlyList<CompetitionHardDeleteReference> References);
+
+public enum CompetitionHardDeleteState
+{
+    Deleted,
+    NotFound,
+    Blocked
+}
+
+public sealed record CompetitionHardDeleteResult(
+    CompetitionHardDeleteState State,
+    CompetitionHardDeletePreview? Preview = null);
 
 public sealed record CompetitionOwnerTransferResult(
     CompetitionOwnerTransferState State,
@@ -53,7 +81,12 @@ public interface IAdminCompetitionStore
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task<bool> HardDeleteAsync(
+    Task<CompetitionHardDeletePreview?> PreviewHardDeleteAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken cancellationToken);
+    Task<CompetitionHardDeleteResult> HardDeleteAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
@@ -101,16 +134,22 @@ public sealed class RestoreCompetition(IAdminCompetitionStore store)
 
 public sealed class HardDeleteCompetition(IAdminCompetitionStore store)
 {
-    public async Task<OperationResult<HardDeleteCompetitionFailureCode>> ExecuteAsync(
+    public Task<CompetitionHardDeleteResult> ExecuteAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
         CancellationToken ct = default) =>
-        await store.HardDeleteAsync(competitionId, actorId, isAdministrator, ct)
-            ? OperationResult<HardDeleteCompetitionFailureCode>.Success()
-            : OperationResult<HardDeleteCompetitionFailureCode>.Failure(
-                HardDeleteCompetitionFailureCode.HardDeleteConflict,
-                "Competition was not found, still has dependent facts, or access was denied.");
+        store.HardDeleteAsync(competitionId, actorId, isAdministrator, ct);
+}
+
+public sealed class PreviewCompetitionHardDelete(IAdminCompetitionStore store)
+{
+    public Task<CompetitionHardDeletePreview?> ExecuteAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct = default) =>
+        store.PreviewHardDeleteAsync(competitionId, actorId, isAdministrator, ct);
 }
 
 public sealed class TransferCompetitionOwner(IAdminCompetitionStore store)

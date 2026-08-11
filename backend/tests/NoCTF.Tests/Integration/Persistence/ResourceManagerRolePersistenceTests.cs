@@ -214,12 +214,12 @@ public sealed class ResourceManagerRolePersistenceTests
                 now.AddMinutes(4),
                 cancellationToken);
             await Assert.That(managerRestore.State).IsEqualTo(CompetitionRestoreState.NotFound);
-            await Assert.That(await new AdminCompetitionStore(db).HardDeleteAsync(
+            await Assert.That((await new AdminCompetitionStore(db).HardDeleteAsync(
                     deletedCompetitionId,
                     ordinaryUserId,
                     false,
-                    cancellationToken))
-                .IsFalse();
+                    cancellationToken)).State)
+                .IsEqualTo(CompetitionHardDeleteState.NotFound);
 
             var competitionRestore = await new AdminCompetitionStore(db).RestoreAsync(
                 deletedCompetitionId,

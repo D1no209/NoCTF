@@ -1261,6 +1261,21 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsRes
     permissionRevision?: number;
 };
 
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse = {
+    competitionId?: string;
+    title?: string;
+    isSoftDeleted?: boolean;
+    canHardDelete?: boolean;
+    references?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse = {
+    code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode;
+    count?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'DataExport' | 'Notification' | 'PosterFile';
+
 export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionListResponse = {
     items?: Array<NoCtfapiEndpointsCompetitionsCompetitionResponse>;
 };
@@ -6329,7 +6344,11 @@ export type AdminHardDeleteCompetitionErrors = {
      * Forbidden
      */
     403: unknown;
-    409: FastEndpointsErrorResponse;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse;
 };
 
 export type AdminHardDeleteCompetitionError = AdminHardDeleteCompetitionErrors[keyof AdminHardDeleteCompetitionErrors];
@@ -6447,6 +6466,39 @@ export type AdminPauseCompetitionResponses = {
 };
 
 export type AdminPauseCompetitionResponse = AdminPauseCompetitionResponses[keyof AdminPauseCompetitionResponses];
+
+export type AdminPreviewCompetitionHardDeleteData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/hard-delete-preview';
+};
+
+export type AdminPreviewCompetitionHardDeleteErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminPreviewCompetitionHardDeleteResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse;
+};
+
+export type AdminPreviewCompetitionHardDeleteResponse = AdminPreviewCompetitionHardDeleteResponses[keyof AdminPreviewCompetitionHardDeleteResponses];
 
 export type AdminPublishCompetitionData = {
     body?: never;

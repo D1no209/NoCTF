@@ -2,6 +2,8 @@ using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Administration;
 
 namespace NoCTF.Infrastructure.Competitions.Administration;
@@ -106,44 +108,114 @@ public sealed class AdminCompetitionStore(
         return new(CompetitionRestoreState.Restored);
     }
 
-    public async Task<bool> HardDeleteAsync(
+    public async Task<CompetitionHardDeletePreview?> PreviewHardDeleteAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(item =>
+                item.Id == competitionId &&
+                (isAdministrator || item.OwnerId == actorId))
+            .Select(item => new
+            {
+                item.Id,
+                item.Title,
+                IsSoftDeleted = item.DeletedAt != null,
+                item.PosterFileId
+            })
+            .SingleOrDefaultAsync(ct);
+        return competition is null
+            ? null
+            : await BuildHardDeletePreviewAsync(
+                competition.Id,
+                competition.Title,
+                competition.IsSoftDeleted,
+                competition.PosterFileId,
+                ct);
+    }
+
+    public async Task<CompetitionHardDeleteResult> HardDeleteAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var observed = await db.Competitions.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(competition =>
+                competition.Id == competitionId
+                && (isAdministrator || competition.OwnerId == actorId))
+            .Select(competition => new { competition.DeletedAt })
+            .SingleOrDefaultAsync(ct);
+        if (observed is null)
+            return new(CompetitionHardDeleteState.NotFound);
+        await LockForHardDeleteAsync(
+            competitionId,
+            actorId,
+            isAdministrator,
+            ct);
         var entity = await db.Competitions.IgnoreQueryFilters()
             .SingleOrDefaultAsync(competition =>
                 competition.Id == competitionId &&
-                competition.DeletedAt != null &&
                 (isAdministrator || competition.OwnerId == actorId), ct);
         if (entity is null)
-            return false;
-        var hasDependents =
-            await db.Teams.IgnoreQueryFilters().AnyAsync(team => team.CompetitionId == competitionId, ct) ||
-            await db.CompetitionChallenges.IgnoreQueryFilters().AnyAsync(
-                challenge => challenge.CompetitionId == competitionId, ct) ||
-            await db.GameplayFacts.IgnoreQueryFilters().AnyAsync(
-                submission => submission.CompetitionId == competitionId, ct) ||
-            await db.RuntimeInstances.AnyAsync(runtime => runtime.CompetitionId == competitionId, ct) ||
-            await db.CompetitionEvents.AnyAsync(item => item.CompetitionId == competitionId, ct);
-        if (hasDependents)
-            return false;
+            return new(CompetitionHardDeleteState.NotFound);
+        if (entity.DeletedAt != observed.DeletedAt)
+            return new(CompetitionHardDeleteState.NotFound);
+        var preview = await BuildHardDeletePreviewAsync(
+            entity.Id,
+            entity.Title,
+            entity.DeletedAt is not null,
+            entity.PosterFileId,
+            ct);
+        if (!preview.CanHardDelete)
+            return new(CompetitionHardDeleteState.Blocked, preview);
+        var expectedDeletedAt = observed.DeletedAt;
         db.Entry(entity).State = EntityState.Detached;
         var deleted = await db.Competitions
             .IgnoreQueryFilters()
             .Where(competition =>
                 competition.Id == competitionId
-                && competition.DeletedAt != null
+                && competition.DeletedAt == expectedDeletedAt
                 && (isAdministrator || competition.OwnerId == actorId))
             .ExecuteDeleteAsync(ct);
         if (deleted == 0)
-            return false;
+            return new(CompetitionHardDeleteState.NotFound);
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(competitionId, ct);
-        return true;
+        return new(CompetitionHardDeleteState.Deleted);
+    }
+
+    private Task LockForHardDeleteAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        // PostgreSQL's row lock serializes the impact check with foreign-key inserts.
+        // A committed competition event is therefore visible before deletion is decided.
+        return isAdministrator
+            ? db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 SELECT 1
+                 FROM competitions
+                 WHERE id = {competitionId}
+                 FOR UPDATE
+                 """,
+                ct)
+            : db.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 SELECT 1
+                 FROM competitions
+                 WHERE id = {competitionId} AND owner_id = {actorId}
+                 FOR UPDATE
+                 """,
+                ct);
     }
 
     public async Task<CompetitionOwnerTransferResult> TransferOwnerAsync(
@@ -235,5 +307,89 @@ public sealed class AdminCompetitionStore(
             competition.LeaderboardVisibility, competition.LeaderboardVisibilityStartsAt,
             competition.AllowTeamRegistrationWhileRunning,
             competition.DeletedAt);
+
+    private async Task<CompetitionHardDeletePreview> BuildHardDeletePreviewAsync(
+        Guid competitionId,
+        string title,
+        bool isSoftDeleted,
+        Guid? posterFileId,
+        CancellationToken ct)
+    {
+        var references = new List<CompetitionHardDeleteReference>();
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.HistoricalEvent,
+            await db.CompetitionEvents.CountAsync(
+                item => item.CompetitionId == competitionId,
+                ct));
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.Team,
+            await db.Teams.IgnoreQueryFilters().CountAsync(
+                item => item.CompetitionId == competitionId,
+                ct));
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.CompetitionChallenge,
+            await db.CompetitionChallenges.IgnoreQueryFilters().CountAsync(
+                item => item.CompetitionId == competitionId,
+                ct));
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.GameplayFact,
+            await db.GameplayFacts.IgnoreQueryFilters().CountAsync(
+                item => item.CompetitionId == competitionId,
+                ct));
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.RuntimeInstance,
+            await db.RuntimeInstances.CountAsync(
+                item => item.CompetitionId == competitionId,
+                ct));
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.PatchUpload,
+            await db.PatchUploads.CountAsync(
+                item => item.CompetitionId == competitionId,
+                ct));
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.DataExport,
+            await db.DataExports.CountAsync(
+                item => item.CompetitionId == competitionId,
+                ct));
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.Notification,
+            await db.Notifications.CountAsync(
+                item =>
+                    (item.RelatedType == EntityReferenceKind.Competition
+                        && item.RelatedId == competitionId)
+                    || (item.SourceType == NotificationSourceType.Competition
+                        && item.SourceId == competitionId)
+                    || ((item.TargetType == NotificationTargetType.CompetitionCollaborators
+                            || item.TargetType == NotificationTargetType.CompetitionParticipants)
+                        && item.TargetId == competitionId),
+                ct));
+        AddReference(
+            references,
+            CompetitionHardDeleteReferenceKind.PosterFile,
+            posterFileId.HasValue ? 1 : 0);
+        return new(
+            competitionId,
+            title,
+            isSoftDeleted,
+            references.Count == 0,
+            references);
+    }
+
+    private static void AddReference(
+        ICollection<CompetitionHardDeleteReference> references,
+        CompetitionHardDeleteReferenceKind kind,
+        int count)
+    {
+        if (count > 0)
+            references.Add(new(kind, count));
+    }
 
 }
