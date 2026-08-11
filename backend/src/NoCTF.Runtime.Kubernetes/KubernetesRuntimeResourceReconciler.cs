@@ -11,9 +11,16 @@ namespace NoCTF.Runtime.Kubernetes;
 
 public sealed class KubernetesRuntimeResourceReconciler(
     IKubernetes client,
-    KubernetesRuntimeOptions options) : IRuntimeManagedResourceReconciler
+    KubernetesRuntimeOptions options) : IRuntimeManagedResourceReconciler,
+    IRuntimeProviderAvailabilityProbe
 {
     public RuntimeProvider Provider => RuntimeProvider.Kubernetes;
+
+    public async Task CheckAvailabilityAsync(CancellationToken cancellationToken)
+    {
+        using var response = await client.CoreV1.GetAPIResourcesWithHttpMessagesAsync(
+            cancellationToken: cancellationToken);
+    }
 
     public async Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
         CancellationToken cancellationToken)

@@ -107,7 +107,7 @@ services:
         - -ec
         - >-
           exec 3<>/dev/tcp/127.0.0.1/8080;
-          printf "GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3;
+          printf "GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3;
           IFS= read -r status <&3;
           [[ "$$status" == *" 200 "* ]]
       interval: 10s
@@ -161,6 +161,7 @@ services:
         ALL_PROXY: ${ALL_PROXY:-}
     restart: unless-stopped
     environment:
+      ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__PostgreSql: >-
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
@@ -182,6 +183,22 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=128m,mode=1777
+    expose:
+      - "8080"
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -ec
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080;
+          printf "GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3;
+          IFS= read -r status <&3;
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 3s
+      start_period: 15s
+      retries: 6
     depends_on:
       migration:
         condition: service_completed_successfully

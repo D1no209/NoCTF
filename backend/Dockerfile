@@ -45,6 +45,7 @@ WORKDIR /app
 COPY --from=build /app/worker .
 RUN mkdir -p /app/uploads && chown -R 1654:1654 /app/uploads
 USER 1654
+EXPOSE 8080
 ENTRYPOINT ["dotnet", "NoCTF.Worker.dll"]
 
 FROM runtime AS runner

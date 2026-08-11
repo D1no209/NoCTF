@@ -1,4 +1,5 @@
 using NoCTF.Hosting;
+using NoCTF.Hosting.Health;
 using NoCTF.Runner;
 using NoCTF.Runner.Composition;
 using Wolverine;
@@ -14,18 +15,10 @@ builder.UseWolverine(options =>
     options.ConfigureNoCtfMessageRouting(builder.Configuration, roles);
     options.ConfigureNoCtfRunnerMessaging(builder.Configuration);
 });
+builder.Services.AddNoCtfRoleHealthChecks(builder.Configuration, roles);
 
 var app = builder.Build();
-var runnerPool = builder.Configuration["Runner:Pool"] ?? "default";
-var runnerId = builder.Configuration["Runner:Id"]
-    ?? throw new InvalidOperationException("Runner:Id is required.");
-app.MapGet("/health/live", () => TypedResults.Ok(new { status = "live" }));
-app.MapGet("/health/ready", () => TypedResults.Ok(new
-{
-    status = "ready",
-    runnerPool,
-    runnerId
-}));
+app.MapNoCtfHealthChecks();
 app.Run();
 
 public partial class Program;

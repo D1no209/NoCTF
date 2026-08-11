@@ -6,6 +6,7 @@ using NoCTF.API.Security;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Hosting;
+using NoCTF.Hosting.Health;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Runner;
@@ -51,6 +52,10 @@ builder.UseWolverine(options =>
         options.ConfigureNoCtfMessageRouting(builder.Configuration, roles);
     }
 });
+builder.Services.AddNoCtfRoleHealthChecks(
+    builder.Configuration,
+    roles,
+    development || exportSwagger);
 
 var app = builder.Build();
 if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))
@@ -64,6 +69,7 @@ if (development)
     await app.Services.InitializeNoCtfAsync();
 app.UseNoCtfPipeline();
 app.UseNoCtfEndpoints();
+app.MapNoCtfHealthChecks();
 if (exportSwagger)
 {
     await app.StartAsync();
