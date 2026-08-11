@@ -3,20 +3,24 @@ using System.IO.Compression;
 using System.IO.Hashing;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Infrastructure.Authentication;
-using SkiaSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace NoCTF.Tests.Unit.Infrastructure;
 
-public sealed class SkiaAvatarImageProcessorTests
+public sealed class ImageSharpAvatarImageProcessorTests
 {
-    private readonly SkiaAvatarImageProcessor processor = new();
+    private readonly ImageSharpAvatarImageProcessor processor = new();
 
     [Test]
-    [Arguments(SKEncodedImageFormat.Jpeg, "image/jpeg")]
-    [Arguments(SKEncodedImageFormat.Png, "image/png")]
-    [Arguments(SKEncodedImageFormat.Webp, "image/webp")]
+    [Arguments(AvatarTestFormat.Jpeg, "image/jpeg")]
+    [Arguments(AvatarTestFormat.Png, "image/png")]
+    [Arguments(AvatarTestFormat.Webp, "image/webp")]
     public async Task Supported_images_are_normalized_to_square_webp(
-        SKEncodedImageFormat format,
+        AvatarTestFormat format,
         string expectedSourceContentType)
     {
         var source = CreateEncodedImage(640, 480, format);
@@ -29,23 +33,45 @@ public sealed class SkiaAvatarImageProcessorTests
         await Assert.That(result.Image.Extension).IsEqualTo("webp");
         await Assert.That(result.Image.SourceContentType).IsEqualTo(expectedSourceContentType);
 
-        using var data = SKData.CreateCopy(result.Image.Content.ToArray());
-        using var codec = SKCodec.Create(data);
-        await Assert.That(codec).IsNotNull();
-        await Assert.That(codec!.EncodedFormat).IsEqualTo(SKEncodedImageFormat.Webp);
-        await Assert.That(codec.Info.Width).IsEqualTo(UserProfileRules.AvatarOutputSize);
-        await Assert.That(codec.Info.Height).IsEqualTo(UserProfileRules.AvatarOutputSize);
-        await Assert.That(codec.FrameCount).IsLessThanOrEqualTo(1);
+        var metadata = Image.Identify(result.Image.Content.Span);
+        await Assert.That(metadata).IsNotNull();
+        await Assert.That(metadata!.Metadata.DecodedImageFormat).IsTypeOf<WebpFormat>();
+        await Assert.That(metadata.Width).IsEqualTo(UserProfileRules.AvatarOutputSize);
+        await Assert.That(metadata.Height).IsEqualTo(UserProfileRules.AvatarOutputSize);
+
+        using var decoded = Image.Load<Rgba32>(result.Image.Content.Span);
+        await Assert.That(decoded.Frames.Count).IsEqualTo(1);
     }
 
     [Test]
     public async Task Truncated_image_is_rejected()
     {
-        var source = CreateEncodedImage(64, 64, SKEncodedImageFormat.Png);
+        var source = CreateEncodedImage(64, 64, AvatarTestFormat.Png);
 
         var result = processor.Process(source.AsMemory(0, source.Length / 2));
 
         await Assert.That(result.Failure).IsEqualTo(AvatarImageFailure.MalformedImage);
+    }
+
+    [Test]
+    public async Task Landscape_image_is_center_cropped_before_resizing()
+    {
+        using var sourceImage = new Image<Rgba32>(6, 2, new Rgba32(255, 0, 0));
+        for (var y = 0; y < sourceImage.Height; y++)
+        {
+            sourceImage[2, y] = new Rgba32(0, 0, 255);
+            sourceImage[3, y] = new Rgba32(0, 0, 255);
+        }
+
+        using var source = new MemoryStream();
+        sourceImage.Save(source, new PngEncoder());
+
+        var result = processor.Process(source.ToArray());
+
+        await Assert.That(result.Failure).IsNull();
+        using var output = Image.Load<Rgba32>(result.Image!.Content.Span);
+        var center = output[output.Width / 2, output.Height / 2];
+        await Assert.That(center.B).IsGreaterThan(center.R);
     }
 
     [Test]
@@ -90,26 +116,31 @@ public sealed class SkiaAvatarImageProcessorTests
     private static byte[] CreateEncodedImage(
         int width,
         int height,
-        SKEncodedImageFormat format)
+        AvatarTestFormat format)
     {
-        using var bitmap = new SKBitmap(new SKImageInfo(
-            width,
-            height,
-            SKColorType.Rgba8888,
-            SKAlphaType.Premul));
-        using (var canvas = new SKCanvas(bitmap))
+        using var image = new Image<Rgba32>(width, height, Color.CornflowerBlue);
+        using var output = new MemoryStream();
+        switch (format)
         {
-            canvas.Clear(SKColors.CornflowerBlue);
-            canvas.Flush();
+            case AvatarTestFormat.Jpeg:
+                image.Save(output, new JpegEncoder { Quality = 90 });
+                break;
+            case AvatarTestFormat.Png:
+                image.Save(output, new PngEncoder());
+                break;
+            case AvatarTestFormat.Webp:
+                image.Save(output, new WebpEncoder { Quality = 90 });
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(format));
         }
 
-        using var encoded = bitmap.Encode(format, 90);
-        return encoded.ToArray();
+        return output.ToArray();
     }
 
     private static byte[] CreatePngWithDimensions(int width, int height)
     {
-        var png = CreateEncodedImage(1, 1, SKEncodedImageFormat.Png);
+        var png = CreateEncodedImage(1, 1, AvatarTestFormat.Png);
         BinaryPrimitives.WriteInt32BigEndian(png.AsSpan(16, 4), width);
         BinaryPrimitives.WriteInt32BigEndian(png.AsSpan(20, 4), height);
         var checksum = Crc32.HashToUInt32(png.AsSpan(12, 17));
@@ -182,5 +213,12 @@ public sealed class SkiaAvatarImageProcessorTests
         Span<byte> checksum = stackalloc byte[4];
         BinaryPrimitives.WriteUInt32BigEndian(checksum, Crc32.HashToUInt32(checksumData));
         stream.Write(checksum);
+    }
+
+    public enum AvatarTestFormat
+    {
+        Jpeg,
+        Png,
+        Webp
     }
 }
