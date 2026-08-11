@@ -1,4 +1,5 @@
 using NoCTF.Application.Common;
+using NoCTF.Application.Scoring;
 
 namespace NoCTF.Application.Challenges.Hints;
 
@@ -124,9 +125,10 @@ public sealed class ManageChallengeHints(IChallengeHintStore store)
         if (string.IsNullOrWhiteSpace(command.Content))
             return OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Failure(
                 ChallengeHintFailureCode.InvalidHint, "Hint content is required.");
-        if (command.Cost < 0)
+        if (command.Cost is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
             return OperationResult<ChallengeHintView, ChallengeHintFailureCode>.Failure(
-                ChallengeHintFailureCode.InvalidHintCost, "Hint cost cannot be negative.");
+                ChallengeHintFailureCode.InvalidHintCost,
+                $"Hint cost must be between zero and {ScoreValueLimits.MaximumConfiguredValue}.");
         var result = await store.SaveAsync(command with { Content = command.Content.Trim() }, ct);
         return result.Failure switch
         {

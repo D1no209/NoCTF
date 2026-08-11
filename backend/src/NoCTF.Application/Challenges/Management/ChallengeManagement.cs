@@ -1,4 +1,5 @@
 using NoCTF.Application.Challenges.Configuration;
+using NoCTF.Application.Scoring;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Challenges.Management;
@@ -111,7 +112,7 @@ public sealed class CreateChallenge(
     {
         if (command.ChallengeId == Guid.Empty)
             return new(null, ChallengeMutationFailure.InvalidChallengeId);
-        if (command.BaseScore < 0)
+        if (command.BaseScore is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
             return new(null, ChallengeMutationFailure.InvalidBaseScore);
         if (command.Order < 0)
             return new(null, ChallengeMutationFailure.InvalidOrder);
@@ -159,7 +160,7 @@ public sealed class UpdateChallenge(IChallengeManagementStore store)
         UpdateCompetitionChallengeCommand command,
         CancellationToken ct = default)
     {
-        if (command.BaseScore < 0)
+        if (command.BaseScore is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
             return new(null, ChallengeMutationFailure.InvalidBaseScore);
         if (command.Order < 0)
             return new(null, ChallengeMutationFailure.InvalidOrder);

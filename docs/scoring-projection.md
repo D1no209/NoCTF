@@ -38,6 +38,6 @@ FusionCache 提供 L1，生产环境使用 Redis L2 与 backplane。排行榜业
 
 ## 数值与 CTF 表达式
 
-Points、Penalty、Hint Cost、ManualAdjustment 和最终分数使用 checked signed Int64；溢出使整场投影失败并保留旧快照。CTF DynamicExpresso 只注入 `initialPoints`、`minimumPoints`、`solveCount`、`eligibleTeamCount`、`decayParameter`，禁止 Reflection、assignment、额外程序集和复杂对象。Correct solve 及血奖顺序统一按 `(OccurredAt, GameplayFactId)`。
+Points、Penalty、Hint Cost、ManualAdjustment 和最终分数使用 checked signed Int64；溢出使整场投影失败并保留旧快照。所有可配置的单项 Points、Penalty、CompetitionChallenge BaseScore 与 Hint Cost 必须位于 0–1,000,000；CTF InitialPoints 最小为 1。百分比血奖仍使用 0–100。该边界不改变 ManualAdjustment 的规范 Int32 文本边界，也不截断最终聚合分数。CTF DynamicExpresso 只注入 `initialPoints`、`minimumPoints`、`solveCount`、`eligibleTeamCount`、`decayParameter`，禁止 Reflection、assignment、额外程序集和复杂对象。Correct solve 及血奖顺序统一按 `(OccurredAt, GameplayFactId)`。
 
 公共响应仍是 `challenges[]` 与排序后的 `entries[]` 稀疏矩阵，保留 GeneratedAt、DataScope、DataAsOf、Visibility、Entries、Challenges。

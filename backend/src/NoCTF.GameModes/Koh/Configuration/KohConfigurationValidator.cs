@@ -1,4 +1,5 @@
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Scoring;
 
 namespace NoCTF.GameModes.Koh.Configuration;
 
@@ -9,6 +10,8 @@ public static class KohConfigurationValidator
         var errors = new List<string>();
         if (configuration.PollIntervalSeconds <= 0) errors.Add("PollIntervalSeconds must be positive.");
         if (configuration.ControlPointsPerInterval < 0) errors.Add("ControlPointsPerInterval cannot be negative.");
+        if (configuration.ControlPointsPerInterval > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"ControlPointsPerInterval cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         return errors;
     }
 
@@ -19,6 +22,8 @@ public static class KohConfigurationValidator
             errors.Add("PollIntervalSeconds must be positive when configured.");
         if (configuration.ControlPointsPerInterval is < 0)
             errors.Add("ControlPointsPerInterval cannot be negative when configured.");
+        if (configuration.ControlPointsPerInterval > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"ControlPointsPerInterval cannot exceed {ScoreValueLimits.MaximumConfiguredValue} when configured.");
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(
             configuration.Runtime,
             allowControlCheckUrlBinding: true));

@@ -1,5 +1,6 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Challenges.Management;
+using NoCTF.Application.Scoring;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -23,6 +24,7 @@ public class ChallengeManagementTests
 
     [Test]
     [Arguments(-1L, 0, ChallengeMutationFailure.InvalidBaseScore)]
+    [Arguments(ScoreValueLimits.MaximumConfiguredValue + 1, 0, ChallengeMutationFailure.InvalidBaseScore)]
     [Arguments(100L, -1, ChallengeMutationFailure.InvalidOrder)]
     public async Task CreateChallenge_InvalidDefinition_ReturnsTypedFailure(
         long baseScore,
@@ -54,6 +56,21 @@ public class ChallengeManagementTests
         var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(CreateCommand());
 
         await Assert.That(result.Failure).IsEqualTo(expectedFailure);
+    }
+
+    [Test]
+    [Arguments(-1L)]
+    [Arguments(ScoreValueLimits.MaximumConfiguredValue + 1)]
+    public async Task UpdateChallenge_InvalidBaseScore_IsRejectedBeforeStore(long baseScore)
+    {
+        var store = new Store();
+
+        var result = await new UpdateChallenge(store).ExecuteAsync(
+            UpdateCommand() with { BaseScore = baseScore });
+
+        await Assert.That(result.Failure)
+            .IsEqualTo(ChallengeMutationFailure.InvalidBaseScore);
+        await Assert.That(store.MutationCalls).IsEqualTo(0);
     }
 
     [Test]

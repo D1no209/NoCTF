@@ -1,6 +1,7 @@
 using NoCTF.GameModes.Ctf.Scoring;
 using DynamicExpresso.Exceptions;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Scoring;
 using NoCTF.GameModes.Flags;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
@@ -14,14 +15,17 @@ public static class CtfConfigurationValidator
     public static IReadOnlyList<string> Validate(CtfConfiguration configuration, int eligibleTeamCount)
     {
         var errors = ValidatePoints(configuration.DefaultPoints).ToList();
-        if (configuration.WrongSubmissionPenalty < 0)
-            errors.Add("WrongSubmissionPenalty cannot be negative.");
+        if (configuration.WrongSubmissionPenalty is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"WrongSubmissionPenalty must be between zero and {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.BloodRewards.Count > 3)
             errors.Add("At most three blood rewards are supported.");
         foreach (var reward in configuration.BloodRewards)
         {
             if (reward.Value < 0)
                 errors.Add("Blood reward values cannot be negative.");
+            if (reward.Policy == BloodRewardPolicy.FixedPoints
+                && reward.Value > ScoreValueLimits.MaximumConfiguredValue)
+                errors.Add($"Fixed blood rewards cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
             if (reward.Policy != BloodRewardPolicy.FixedPoints && reward.Value > 100)
                 errors.Add("Blood reward percentages cannot exceed 100.");
         }
@@ -41,8 +45,8 @@ public static class CtfConfigurationValidator
         var errors = configuration.Points is null
             ? []
             : ValidatePoints(configuration.Points).ToList();
-        if (configuration.WrongSubmissionPenalty is < 0)
-            errors.Add("WrongSubmissionPenalty cannot be negative.");
+        if (configuration.WrongSubmissionPenalty is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"WrongSubmissionPenalty must be between zero and {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.BloodRewards is { } rewards)
         {
             if (rewards.Count > 3)
@@ -51,6 +55,9 @@ public static class CtfConfigurationValidator
             {
                 if (reward.Value < 0)
                     errors.Add("Blood reward values cannot be negative.");
+                if (reward.Policy == BloodRewardPolicy.FixedPoints
+                    && reward.Value > ScoreValueLimits.MaximumConfiguredValue)
+                    errors.Add($"Fixed blood rewards cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
                 if (reward.Policy != BloodRewardPolicy.FixedPoints && reward.Value > 100)
                     errors.Add("Blood reward percentages cannot exceed 100.");
             }
@@ -105,6 +112,10 @@ public static class CtfConfigurationValidator
     {
         var errors = new List<string>();
         if (points.InitialPoints <= 0) errors.Add("InitialPoints must be positive.");
+        if (points.InitialPoints > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"InitialPoints cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
+        if (points.MinimumPoints > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"MinimumPoints cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (points.MinimumPoints < 0 || points.MinimumPoints > points.InitialPoints)
             errors.Add("MinimumPoints must be between zero and InitialPoints.");
         if (points.DecayFactor <= 1) errors.Add("DecayFactor must be greater than one.");
