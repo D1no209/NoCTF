@@ -61,7 +61,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         CreateContainerResponse? response = null;
         try
         {
-            await EnsureImageAvailableAsync(request.Image, cancellationToken);
+            var image = await EnsureImageAvailableAsync(request.Image, cancellationToken);
+            ValidateRunAsNonRoot(request.Security, image.Config?.User);
             var labels = BuildLabels(request);
             response = await client.Containers.CreateContainerAsync(new CreateContainerParameters
             {
@@ -241,14 +242,13 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             Generation: request.Generation);
     }
 
-    private async Task EnsureImageAvailableAsync(
+    private async Task<ImageInspectResponse> EnsureImageAvailableAsync(
         string image,
         CancellationToken cancellationToken)
     {
         try
         {
-            _ = await client.Images.InspectImageAsync(image, cancellationToken);
-            return;
+            return await client.Images.InspectImageAsync(image, cancellationToken);
         }
         catch (DockerImageNotFoundException)
         {
@@ -266,7 +266,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             throw new InvalidOperationException(
                 $"Docker image pull failed: {progress.Error.Message}");
         }
-        _ = await client.Images.InspectImageAsync(image, cancellationToken);
+        return await client.Images.InspectImageAsync(image, cancellationToken);
     }
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
@@ -874,6 +874,34 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             || !HasPublishedPortBindings(container.NetworkSettings?.Ports, request.PortMappings))
             throw new InvalidOperationException(
                 $"Docker Container '{resourceName}' has a different ownership identity, purpose, or published port contract.");
+        ValidateRunAsNonRoot(request.Security, container.Config?.User);
+    }
+
+    private static void ValidateRunAsNonRoot(
+        ContainerSecurityPolicy security,
+        string? imageUser)
+    {
+        if (!security.RunAsNonRoot)
+            return;
+
+        var parts = imageUser?.Split(':', StringSplitOptions.None);
+        if (parts is not { Length: 1 or 2 }
+            || !uint.TryParse(
+                parts[0],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var uid)
+            || uid == 0
+            || parts.Length == 2
+            && !uint.TryParse(
+                parts[1],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out _))
+        {
+            throw new RuntimeConfigurationException(
+                "Docker RunAsNonRoot requires the image Config.User to be a numeric non-zero UID or UID:GID.");
+        }
     }
 
     private static bool HasPublishedPortBindings(

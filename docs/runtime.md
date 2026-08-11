@@ -98,6 +98,7 @@ Environment: map<string,string>
 FlagEnvironmentVariableName: string?     // PerTeam 时必填
 UrlBindings[]
 Resources: CpuCores, MemoryBytes, PidsLimit, EphemeralStorageBytes
+Security: NoNewPrivileges, ReadonlyRootfs, RunAsNonRoot, CapDrop, CapAdd
 EgressPolicy: Isolated | InternetOnly
 RuntimeLifetimeSeconds
 OperationTimeoutSeconds
@@ -107,6 +108,13 @@ FlagSource: Static | PerTeam
 Command null 使用镜像默认。`FlagSource=PerTeam` 时
 `FlagEnvironmentVariableName` 必填；Static 时必须省略。环境变量名合法且不能使用
 `NOCTF_`。Image 可为 tag/digest，不强制 pin；配置变化只影响新 Generation。
+
+Container 的 `Security` 省略时使用兼容旧镜像的 trusted profile：三个布尔开关均为 `false`，
+capability 列表为空。显式配置的 `NoNewPrivileges` 与 `ReadonlyRootfs` 会由 Docker/Kubernetes
+照值执行。`RunAsNonRoot=true` 在 Kubernetes 映射为 Pod security context；Docker 会在拉取并
+inspect 镜像后要求镜像默认 `Config.User` 是非零数字 UID，格式只允许 `uid` 或 `uid:gid`，否则在
+创建容器前以 `InvalidConfiguration` 失败。`RunAsNonRoot=false` 保留依赖镜像默认用户的兼容行为。
+Compose 继续使用独立的现有加固策略，不从 Container `Security` 派生新 schema。
 
 ## EgressPolicy 与 Runtime 网络
 

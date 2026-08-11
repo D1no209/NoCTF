@@ -88,6 +88,10 @@ public sealed class RuntimeProviderHandler(
                             .ToArray()
                         : null);
         }
+        catch (RuntimeConfigurationException)
+        {
+            failureCode = RuntimeFailureCode.InvalidConfiguration;
+        }
         catch (TimeoutException)
         {
             failureCode = RuntimeFailureCode.ProvisionTimeout;

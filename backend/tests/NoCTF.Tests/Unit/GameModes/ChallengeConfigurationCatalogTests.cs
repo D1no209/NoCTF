@@ -393,6 +393,24 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Runtime_template_allows_explicit_trusted_boolean_opt_outs()
+    {
+        var configurations = new GameModeChallengeConfigurationCatalog();
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                Security: new(false, false, false, ["ALL"], [])),
+            Limits: new(268_435_456, 500_000_000, 128));
+
+        var errors = configurations.Validate(
+            GameMode.Ctf,
+            WithRuntime(configurations.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors).IsEmpty();
+    }
+
+    [Test]
     public async Task Runtime_template_serialization_has_no_provider_field()
     {
         var runtime = new ChallengeRuntimeTemplate(
