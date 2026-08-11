@@ -1,0 +1,25 @@
+# Copy this file outside the repository, replace the example FQDN and port with
+# the exact endpoint configured in Platform Settings, then apply that copy.
+# Do not commit production SMTP endpoints or credentials.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: noctf-smtp-egress
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  endpointSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - backend
+          - worker
+  egress:
+    - toFQDNs:
+        - matchName: smtp.example.com
+      toPorts:
+        - ports:
+            - port: "587"
+              protocol: TCP

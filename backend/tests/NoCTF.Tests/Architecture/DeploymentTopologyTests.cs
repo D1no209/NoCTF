@@ -140,6 +140,28 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task Kubernetes_platform_egress_is_explicit_and_fail_closed()
+    {
+        var networkPolicies = await ReadAsync("deploy", "k8s", "networkpolicy.yaml");
+        var smtpExample = await ReadAsync("deploy", "k8s", "smtp-egress.example.yaml");
+
+        var runnerApiPolicy = networkPolicies
+            .Split("\n---", StringSplitOptions.RemoveEmptyEntries)
+            .Single(document => document.Contains(
+                "name: runner-to-kubernetes-api",
+                StringComparison.Ordinal));
+        await Assert.That(runnerApiPolicy).Contains("kind: CiliumNetworkPolicy");
+        await Assert.That(runnerApiPolicy).Contains("- kube-apiserver");
+        await Assert.That(runnerApiPolicy).DoesNotContain("0.0.0.0/0");
+
+        await Assert.That(smtpExample).Contains("kind: CiliumNetworkPolicy");
+        await Assert.That(smtpExample).Contains("matchName: smtp.example.com");
+        await Assert.That(smtpExample).DoesNotContain("matchPattern:");
+        await Assert.That(smtpExample).DoesNotContain("0.0.0.0/0");
+        await Assert.That(smtpExample).DoesNotContain("password");
+    }
+
+    [Test]
     public async Task E2e_orchestrator_is_portable_and_uses_docker_assigned_ports()
     {
         var orchestrator = await ReadAsync("backend", "tests", "e2e.cs");

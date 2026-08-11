@@ -127,6 +127,15 @@ kubectl apply -f ingress.yaml
 kubectl apply -f networkpolicy.yaml
 ```
 
+Email delivery is optional and remains fail-closed under the default-deny policy.
+Before enabling email verification or password reset delivery, copy
+`smtp-egress.example.yaml` outside the repository, replace `smtp.example.com`
+and `587` with the exact FQDN and TCP port configured in Platform Settings, and
+apply that copy. Reapply the policy whenever the SMTP endpoint changes. Add a
+second exact `matchName` or port entry only when the configured mail service
+actually requires it; do not use a wildcard FQDN, `0.0.0.0/0`, or commit the
+production endpoint or credentials.
+
 Do not replace the staged sequence with a single directory-wide apply when this
 cluster hosts Kubernetes Runner Pools. The `runtime` Namespace and
 `noctf-runtime-baseline-deny` policy must exist before the Runner starts and before
@@ -237,7 +246,12 @@ The `networkpolicy.yaml` enforces a default-deny posture:
 - All ingress/egress is denied by default
 - Backend can reach PostgreSQL (5432), Redis (6379), and MinIO (9000)
 - Worker can reach PostgreSQL (5432), Redis (6379), and MinIO (9000)
-- Runner can reach PostgreSQL (5432), Redis (6379), and the Kubernetes API
+- Runner can reach PostgreSQL (5432), Redis (6379), and Cilium's exact
+  `kube-apiserver` identity on 443/6443; those ports are no longer open to
+  arbitrary Internet addresses
+- Backend and Worker can reach an external SMTP server only after the operator
+  applies an exact-FQDN/port `CiliumNetworkPolicy` derived from
+  `smtp-egress.example.yaml`
 - A composable Host needs the union of its selected role policies; do not grant Runner RBAC to an
   API/Worker-only Host
 - Backend accepts traffic only from the ingress-nginx namespace and serves both API and SPA static files
