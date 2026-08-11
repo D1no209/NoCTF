@@ -289,7 +289,7 @@ onMounted(() => {
       <CardHeader class="flex flex-row items-start justify-between gap-4">
         <div class="space-y-1">
           <CardTitle>{{ $t('历史裁决差异预览') }}</CardTitle>
-          <CardDescription>{{ $t('当前仅分析 CTF Flag；AWD、AWDP、KoH 与其他事实类型不在此预览中。只读分析不会重判、纠正或改写任何记录。') }}</CardDescription>
+          <CardDescription>{{ $t('当前分析 CTF Flag，并识别旧版本错误判为重复成就的 AWDP Break；AWD、KoH 与其他事实类型不在此预览中。只读分析不会重判、纠正或改写任何记录。') }}</CardDescription>
         </div>
         <Button variant="outline" size="sm" :disabled="previewLoading" @click="loadPreview(true)">
           <Spinner v-if="previewLoading" data-icon="inline-start" /> {{ $t('重新分析') }}

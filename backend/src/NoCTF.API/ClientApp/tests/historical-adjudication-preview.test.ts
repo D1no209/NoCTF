@@ -27,7 +27,7 @@ describe('historical adjudication difference preview', () => {
     expect(previewTemplate).not.toContain('纠正按钮')
   })
 
-  test('states that only CTF flag facts are analyzed', () => {
-    expect(source).toContain('当前仅分析 CTF Flag；AWD、AWDP、KoH 与其他事实类型不在此预览中。')
+  test('describes the narrow legacy AWDP break analysis accurately', () => {
+    expect(source).toContain('当前分析 CTF Flag，并识别旧版本错误判为重复成就的 AWDP Break；AWD、KoH 与其他事实类型不在此预览中。')
   })
 })
