@@ -63,9 +63,27 @@ describe('notificationTargetPath', () => {
       .toBe('/competitions/competition-1/events?kind=CompetitionLifecycleChanged')
   })
 
-  test('keeps notifications without a competition on the notification page', () => {
+  test('keeps notification-only kinds out of competition event filters', () => {
+    for (const kind of ['StartGateFailed', 'ManagementFailure', 'DataExportReady', 'DataExportFailed'] as const) {
+      const path = notificationTargetPath(notification(kind, 'competition-1'))
+      expect(path).toBe('/notifications?notification=notification-1')
+      expect(path).not.toContain('/events?kind=')
+    }
+  })
+
+  test('falls back to notification detail when a precise target is missing or unknown', () => {
+    expect(notificationTargetPath(notification('ChallengePublished', 'competition-1')))
+      .toBe('/notifications?notification=notification-1')
+    expect(notificationTargetPath({
+      ...notification('ManagementFailure', 'competition-1'),
+      kind: 'FutureNotificationKind' as never,
+    }))
+      .toBe('/notifications?notification=notification-1')
+  })
+
+  test('opens notification detail when there is no competition target', () => {
     expect(notificationTargetPath(notification('UserAccountLifecycleChanged')))
-      .toBe('/notifications')
+      .toBe('/notifications?notification=notification-1')
   })
 
   test('keeps official competition announcements in the global message center', () => {

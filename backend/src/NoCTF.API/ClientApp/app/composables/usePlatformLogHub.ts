@@ -1,7 +1,8 @@
-import { HubConnectionBuilder, HttpTransportType, LogLevel } from '@microsoft/signalr'
+import { HubConnectionBuilder, HubConnectionState, HttpTransportType, LogLevel } from '@microsoft/signalr'
 import type { HubConnection } from '@microsoft/signalr'
 import type { NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse } from '~/api'
 import { getRealtimeAccessToken } from '~/lib/session'
+import { startRealtimeWithRetry } from '~/lib/realtime-retry'
 
 export type PlatformLogHubState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 
@@ -15,10 +16,10 @@ export function usePlatformLogHub(
 ) {
   const state = ref<PlatformLogHubState>('disconnected')
   let connection: HubConnection | null = null
+  let startPromise: Promise<void> | null = null
+  let startAbortController: AbortController | null = null
 
-  async function start(): Promise<void> {
-    if (connection) return
-    state.value = 'connecting'
+  function createConnection(): HubConnection {
     const hub = new HubConnectionBuilder()
       .withUrl('/hubs/v1/admin/platform-logs', {
         accessTokenFactory: getRealtimeAccessToken,
@@ -33,27 +34,56 @@ export function usePlatformLogHub(
     connection = hub
     hub.on('platformLogReceived', onLog)
     hub.onreconnecting(() => {
-      state.value = 'reconnecting'
+      if (connection === hub) state.value = 'reconnecting'
     })
     hub.onreconnected(() => {
-      state.value = 'connected'
+      if (connection === hub) state.value = 'connected'
     })
     hub.onclose(() => {
+      if (connection !== hub) return
       state.value = 'disconnected'
+      void start()
     })
-    try {
-      await hub.start()
+    return hub
+  }
+
+  async function start(): Promise<void> {
+    const hub = connection ?? createConnection()
+    connection = hub
+    if (hub.state === HubConnectionState.Connected) {
       state.value = 'connected'
+      return
     }
-    catch {
-      connection = null
-      state.value = 'disconnected'
-    }
+    if (startPromise) return startPromise
+    if (hub.state !== HubConnectionState.Disconnected) return
+
+    const abortController = new AbortController()
+    startAbortController = abortController
+    const task = (async () => {
+      const started = await startRealtimeWithRetry(
+        async () => {
+          state.value = 'connecting'
+          if (hub.state === HubConnectionState.Disconnected) await hub.start()
+        },
+        abortController.signal,
+        () => connection === hub,
+      )
+      if (started && connection === hub) state.value = 'connected'
+    })()
+    startPromise = task.finally(() => {
+      if (startAbortController !== abortController) return
+      startAbortController = null
+      startPromise = null
+    })
+    await startPromise
   }
 
   async function stop(): Promise<void> {
     const current = connection
+    startAbortController?.abort()
+    startAbortController = null
     connection = null
+    startPromise = null
     if (current) {
       try {
         await current.stop()
@@ -62,7 +92,7 @@ export function usePlatformLogHub(
         // Ignore teardown failures.
       }
     }
-    state.value = 'disconnected'
+    if (!connection) state.value = 'disconnected'
   }
 
   onScopeDispose(() => {

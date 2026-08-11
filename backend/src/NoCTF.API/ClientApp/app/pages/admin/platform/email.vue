@@ -266,7 +266,7 @@ onMounted(() => {
         <FieldGroup>
           <Field>
             <FieldLabel for="smtp-password">{{ $t('新密码') }}</FieldLabel>
-            <Input id="smtp-password" v-model="newPassword" type="password" required autocomplete="new-password" />
+            <PasswordInput id="smtp-password" v-model="newPassword" required autocomplete="new-password" />
           </Field>
         </FieldGroup>
         <DialogFooter>
