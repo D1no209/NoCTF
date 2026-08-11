@@ -43,7 +43,7 @@ function toIso(local: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
-const { items, loading, hasMore, initialized, loadMore, reset } = useCursorPagination<AuditLog>(async (cursor) => {
+const { items, loading, error: listError, hasMore, initialized, loadMore, reset } = useCursorPagination<AuditLog>(async (cursor) => {
   const { data, error } = await adminPlatformListAuditLogs({
     query: {
       kind: kind.value === 'all'
@@ -62,7 +62,7 @@ const { items, loading, hasMore, initialized, loadMore, reset } = useCursorPagin
 })
 
 function applyFilters(): void {
-  reset()
+  reset({ preserveItems: true })
   void loadMore()
 }
 
@@ -86,6 +86,7 @@ function detailText(log: AuditLog): string {
 // ---------- 数据导出 ----------
 const exports_ = ref<DataExport[]>([])
 const exportsLoading = ref(false)
+const exportsError = ref<string | null>(null)
 const creatingExport = ref(false)
 const downloadingId = ref<string | null>(null)
 
@@ -93,11 +94,12 @@ async function loadExports(): Promise<void> {
   exportsLoading.value = true
   const { data, error } = await adminListPlatformAuditDataExports()
   exportsLoading.value = false
-  if (error) {
-    toast.error(parseApiError(error).message)
+  if (error || !data) {
+    exportsError.value = parseApiError(error).message
     return
   }
-  exports_.value = data?.items ?? []
+  exportsError.value = null
+  exports_.value = data.items ?? []
 }
 
 async function createExport(): Promise<void> {
@@ -181,20 +183,24 @@ onMounted(() => {
         <Button @click="applyFilters">{{ $t('查询') }}</Button>
       </div>
 
+      <Alert v-if="listError" variant="destructive">
+        <AlertDescription>{{ listError.message }}</AlertDescription>
+      </Alert>
+
       <Card v-if="loading && items.length === 0">
         <CardContent class="flex flex-col gap-3 pt-6">
           <Skeleton v-for="i in 6" :key="i" class="h-10 w-full" />
         </CardContent>
       </Card>
 
-      <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
+      <Empty v-else-if="!listError && initialized && items.length === 0" class="border border-dashed py-12">
         <EmptyHeader>
           <EmptyTitle>{{ $t('没有匹配的审计记录') }}</EmptyTitle>
           <EmptyDescription>{{ $t('调整类型、时间范围或筛选条件。') }}</EmptyDescription>
         </EmptyHeader>
       </Empty>
 
-      <Card v-else>
+      <Card v-else-if="items.length > 0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -249,15 +255,18 @@ onMounted(() => {
         </div>
       </CardHeader>
       <CardContent>
+        <Alert v-if="exportsError" variant="destructive" class="mb-3">
+          <AlertDescription>{{ exportsError }}</AlertDescription>
+        </Alert>
         <div v-if="exportsLoading && exports_.length === 0" class="flex flex-col gap-2">
           <Skeleton v-for="i in 2" :key="i" class="h-10 w-full" />
         </div>
-        <Empty v-else-if="exports_.length === 0" class="border border-dashed py-12">
+        <Empty v-else-if="!exportsError && exports_.length === 0" class="border border-dashed py-12">
           <EmptyHeader>
             <EmptyTitle>{{ $t('暂无导出任务') }}</EmptyTitle>
           </EmptyHeader>
         </Empty>
-        <Table v-else>
+        <Table v-else-if="exports_.length > 0">
           <TableHeader>
             <TableRow>
               <TableHead>{{ $t('申请时间') }}</TableHead>

@@ -133,6 +133,7 @@ async function submitBan() {
 // ---- Appeals ----
 const appeals = ref<NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse[]>([])
 const appealsLoading = ref(true)
+const appealsError = ref<string | null>(null)
 const appealDialog = ref<{ banCase: NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse; mode: 'accept' | 'uphold' } | null>(null)
 const appealReason = ref('')
 const appealPending = ref(false)
@@ -140,7 +141,13 @@ const appealPending = ref(false)
 async function loadAppeals() {
   appealsLoading.value = true
   const { data, error } = await adminListTeamBanAppeals({ path: { competitionId } })
-  if (!error) appeals.value = data?.items ?? []
+  if (error || !data) {
+    appealsError.value = parseApiError(error).message
+  }
+  else {
+    appealsError.value = null
+    appeals.value = data.items ?? []
+  }
   appealsLoading.value = false
 }
 
@@ -241,13 +248,16 @@ onMounted(() => {
 
     <div class="flex flex-col gap-4">
       <h2 class="text-lg font-semibold">{{ $t('封禁申诉') }}</h2>
+      <Alert v-if="appealsError" variant="destructive">
+        <AlertDescription>{{ appealsError }}</AlertDescription>
+      </Alert>
       <Skeleton v-if="appealsLoading" class="h-32 w-full" />
-      <Empty v-else-if="appeals.length === 0" class="border border-dashed py-12">
+      <Empty v-else-if="!appealsError && appeals.length === 0" class="border border-dashed py-12">
         <EmptyHeader>
           <EmptyTitle>{{ $t('暂无申诉') }}</EmptyTitle>
         </EmptyHeader>
       </Empty>
-      <div v-else class="flex flex-col gap-3">
+      <div v-else-if="appeals.length > 0" class="flex flex-col gap-3">
         <Card v-for="a in appeals" :key="a.banEventId">
           <CardHeader>
             <div class="flex items-center justify-between gap-2">

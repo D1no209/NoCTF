@@ -36,7 +36,7 @@ function toIso(local: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
-const { items, loading, hasMore, initialized, loadMore, reset } = useCursorPagination<PlatformLog>(async (cursor) => {
+const { items, loading, error: listError, hasMore, initialized, loadMore, reset } = useCursorPagination<PlatformLog>(async (cursor) => {
   const { data, error } = await adminPlatformListLogs({
     query: {
       minimumLevel: minimumLevel.value,
@@ -55,7 +55,7 @@ const { items, loading, hasMore, initialized, loadMore, reset } = useCursorPagin
 })
 
 function applyFilters(): void {
-  reset()
+  reset({ preserveItems: true })
   void loadMore()
 }
 
@@ -202,20 +202,24 @@ onMounted(() => {
       <Badge :variant="hubStateBadge.variant">{{ hubStateBadge.label }}</Badge>
     </div>
 
+    <Alert v-if="listError" variant="destructive">
+      <AlertDescription>{{ listError.message }}</AlertDescription>
+    </Alert>
+
     <Card v-if="loading && items.length === 0">
       <CardContent class="flex flex-col gap-3 pt-6">
         <Skeleton v-for="i in 8" :key="i" class="h-8 w-full" />
       </CardContent>
     </Card>
 
-    <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
+    <Empty v-else-if="!listError && initialized && items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('没有匹配的日志') }}</EmptyTitle>
         <EmptyDescription>{{ $t('调整级别、时间范围或搜索关键字。') }}</EmptyDescription>
       </EmptyHeader>
     </Empty>
 
-    <Card v-else>
+    <Card v-else-if="items.length > 0">
       <Table>
         <TableHeader>
           <TableRow>

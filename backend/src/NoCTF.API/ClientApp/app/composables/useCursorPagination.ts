@@ -8,6 +8,10 @@ export interface CursorPage<T> {
   nextCursor?: string | null
 }
 
+export interface CursorResetOptions {
+  preserveItems?: boolean
+}
+
 /**
  * Signed-keyset "load more" pagination.
  * The cursor is bound to endpoint + filters by the backend, so callers must
@@ -21,6 +25,7 @@ export function useCursorPagination<T>(fetcher: (cursor: string | null) => Promi
   const initialized = ref(false)
   let generation = 0
   let loadingGeneration: number | null = null
+  let replaceOnNextPage = false
 
   const hasMore = computed(() => initialized.value && nextCursor.value !== null)
 
@@ -36,7 +41,13 @@ export function useCursorPagination<T>(fetcher: (cursor: string | null) => Promi
     try {
       const page = await fetcher(cursor)
       if (requestGeneration !== generation) return
-      items.value.push(...(page.items ?? []))
+      if (replaceOnNextPage && cursor === null) {
+        items.value = page.items ?? []
+        replaceOnNextPage = false
+      }
+      else {
+        items.value.push(...(page.items ?? []))
+      }
       nextCursor.value = page.nextCursor ?? null
       initialized.value = true
     }
@@ -52,10 +63,12 @@ export function useCursorPagination<T>(fetcher: (cursor: string | null) => Promi
     }
   }
 
-  function reset(): void {
+  function reset(options: CursorResetOptions = {}): void {
     generation += 1
     loadingGeneration = null
-    items.value = []
+    replaceOnNextPage = options.preserveItems === true && items.value.length > 0
+    if (!options.preserveItems)
+      items.value = []
     nextCursor.value = null
     loading.value = false
     error.value = null
