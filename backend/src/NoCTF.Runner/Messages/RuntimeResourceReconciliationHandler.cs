@@ -96,21 +96,21 @@ public sealed class RuntimeResourceReconciliationHandler(
         {
             if (failedIdentities.Contains(resource))
                 continue;
-            var isOwned = assignments.TryGetValue(resource.RuntimeInstanceId, out var assignment)
+            assignments.TryGetValue(resource.RuntimeInstanceId, out var assignment);
+            var matchesAssignment = assignment is not null
                 && assignment.Generation == resource.Generation
-                && assignment.RuntimeProvider == configuredProvider
-                && assignment.State is RuntimeState.Provisioning
+                && assignment.RuntimeProvider == configuredProvider;
+            var hasActiveAssignment = matchesAssignment
+                && assignment!.State is RuntimeState.Provisioning
                     or RuntimeState.Running
-                    or RuntimeState.Stopping
-                && string.Equals(
-                    assignment.RunnerPool,
-                    message.RunnerPool,
-                    StringComparison.Ordinal)
-                && string.Equals(
+                    or RuntimeState.Stopping;
+            var belongsToAnotherRunner = matchesAssignment
+                && assignment!.RunnerId is not null
+                && !string.Equals(
                     assignment.RunnerId,
                     message.RunnerId,
                     StringComparison.Ordinal);
-            if (isOwned)
+            if (hasActiveAssignment || belongsToAnotherRunner)
                 continue;
             try
             {
