@@ -14,24 +14,29 @@ spec:
     - Egress
 
 ---
-# 2. Allow DNS egress from all pods (required for service discovery)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+# 2. Allow only cluster-service DNS lookups by default. External names require
+# an explicit exact-FQDN Cilium policy such as smtp-egress.example.yaml.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
 metadata:
-  name: allow-dns-egress
+  name: allow-cluster-dns-egress
   namespace: noctf
   labels:
     app.kubernetes.io/part-of: noctf
 spec:
-  podSelector: {}
-  policyTypes:
-    - Egress
+  endpointSelector: {}
   egress:
-    - ports:
-        - port: 53
-          protocol: UDP
-        - port: 53
-          protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s:k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*.svc.cluster.local"
 
 ---
 # 3. Allow egress from backend to postgres (5432)
