@@ -9,6 +9,23 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：无 receipt Runtime 恢复闭环
+
+- 功能提交 `347ca7e8` 修复 `Provisioning`、`Running` 或 `Stopping` 实例保留 `runner_id`、但缺少
+  provider receipt 时被 Worker 直接写成 `Stopped` 的资源泄漏路径。此类实例现在必须由原 Runner 按
+  RuntimeInstanceId 与 Generation 幂等检查并清理实际资源；清理确认前不写终态、不释放容量、不派发
+  replacement。
+- 清理成功后先执行 owner-checked 容量释放，再接受同时携带 generation、pool 与 runner 栅栏的回执并
+  派发替代实例。错误 owner/generation 回执不能推进状态；重复清理或重复回执只释放和派发一次。
+- 清理失败会保留原 owner/容量事实，并把旧实例及 replacement 明确置为 `Failed`；后续 Start 会先重试
+  尚未清理的 ancestor，避免在同一身份上叠加新资源。
+- 本阶段只调整既有 RuntimeInstance 与 Wolverine/Runner 内部消息状态机；没有新增表、列、migration、
+  snapshot、HTTP/OpenAPI、生成 SDK 或版本号变化。
+- 原独立阶段验证受影响 8 个测试类共 80/80，通过真实 PostgreSQL + Redis 的 receipt 丢失、重复消息、
+  容量与 replacement 顺序及 owner/generation 栅栏场景。合入统一分支后完整 Release build 为 0 警告/
+  0 错误，RunnerAssignmentReconciliation PostgreSQL 定向测试 16/16 与 `git diff --check` 通过。
+- 尚未推送、部署或操作生产 Runtime；部署前应继续用可丢弃实例做 Runner 进程中断与消息重投验收。
+
 ## 2026-08-11 全量审计修复：Runtime 管理操作响应性
 
 - 功能提交 `3e82ca7e` 将管理端 Runtime 启动、重置、终止和强制终结改为按实例协调：同一实例单飞防止
