@@ -112,7 +112,19 @@ public static class ServiceRegistration
             configuration["Runtime:Docker:PublicHost"] ?? "localhost",
             configuration["Runtime:Docker:CallbackContainer"] ?? "noctf-awdp-callback",
             configuration["Runtime:Docker:CallbackContainerLabelKey"] ?? "noctf.io/internal-role",
-            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback-gateway");
+            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback-gateway",
+            ReadPositiveLongOrDefault(
+                configuration,
+                "Runtime:Docker:RuntimeLogMaxSizeBytes",
+                10_485_760),
+            ReadPositiveIntOrDefault(
+                configuration,
+                "Runtime:Docker:RuntimeLogMaxFiles",
+                3),
+            ReadPositiveIntOrDefault(
+                configuration,
+                "Runtime:Docker:OneShotOutputLimitBytesPerStream",
+                1_048_576));
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
         services.AddSingleton<DockerComposeRuntime>();
@@ -255,6 +267,25 @@ public static class ServiceRegistration
         string key)
     {
         var value = configuration[key];
+        if (!int.TryParse(
+                value,
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed)
+            || parsed <= 0)
+            throw new InvalidOperationException(
+                $"{key} must be configured as a positive integer.");
+        return parsed;
+    }
+
+    private static int ReadPositiveIntOrDefault(
+        IConfiguration configuration,
+        string key,
+        int defaultValue)
+    {
+        var value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+            return defaultValue;
         if (!int.TryParse(
                 value,
                 System.Globalization.NumberStyles.None,

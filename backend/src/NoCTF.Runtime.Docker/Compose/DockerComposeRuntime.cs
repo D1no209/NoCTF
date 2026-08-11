@@ -27,7 +27,10 @@ public sealed class DockerComposeRuntime(
             throw new ArgumentOutOfRangeException(
                 nameof(request),
                 "Docker Compose public endpoints must request Docker-assigned host ports.");
-        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(
+            request,
+            options.RuntimeLogMaxSizeBytes,
+            options.RuntimeLogMaxFiles);
         Directory.CreateDirectory(workDirectory);
         var directory = Path.Combine(workDirectory, request.OperationId.ToString("N"));
         Directory.CreateDirectory(directory);

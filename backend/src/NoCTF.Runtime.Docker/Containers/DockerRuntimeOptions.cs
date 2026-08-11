@@ -8,4 +8,7 @@ public sealed record DockerRuntimeOptions(
     string PublicHost = "localhost",
     string CallbackContainerName = "noctf-awdp-callback",
     string CallbackContainerLabelKey = "noctf.io/internal-role",
-    string CallbackContainerLabelValue = "awdp-callback-gateway");
+    string CallbackContainerLabelValue = "awdp-callback-gateway",
+    long RuntimeLogMaxSizeBytes = 10_485_760,
+    int RuntimeLogMaxFiles = 3,
+    int OneShotOutputLimitBytesPerStream = 1_048_576);
