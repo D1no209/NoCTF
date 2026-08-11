@@ -1,14 +1,17 @@
 using System.Buffers.Binary;
 using NoCTF.Application.Authentication.Account;
-using SkiaSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace NoCTF.Infrastructure.Authentication;
 
-public sealed class SkiaAvatarImageProcessor : IAvatarImageProcessor
+public sealed class ImageSharpAvatarImageProcessor : IAvatarImageProcessor
 {
-    private static readonly SKSamplingOptions Sampling =
-        new(SKFilterMode.Linear, SKMipmapMode.Linear);
-
     public AvatarImageProcessingResult Process(ReadOnlyMemory<byte> content)
     {
         if (content.IsEmpty)
@@ -16,82 +19,57 @@ public sealed class SkiaAvatarImageProcessor : IAvatarImageProcessor
 
         try
         {
-            using var data = SKData.CreateCopy(content.ToArray());
-            using var metadataCodec = SKCodec.Create(data);
-            if (metadataCodec is null)
-                return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage);
-
-            var sourceContentType = SourceContentType(metadataCodec.EncodedFormat);
+            var sourceFormat = Image.DetectFormat(content.Span);
+            var sourceContentType = SourceContentType(sourceFormat);
             if (sourceContentType is null)
                 return AvatarImageProcessingResult.Rejected(AvatarImageFailure.UnsupportedFormat);
 
-            var info = metadataCodec.Info;
-            if (info.Width <= 0 || info.Height <= 0
-                || info.Width > UserProfileRules.MaximumAvatarDimension
-                || info.Height > UserProfileRules.MaximumAvatarDimension)
+            if (HasAnimationPayload(content.Span, sourceFormat))
+                return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MultipleFrames);
+
+            var metadata = Image.Identify(content.Span);
+            if (metadata is null)
+                return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage);
+
+            if (metadata.Width <= 0 || metadata.Height <= 0
+                || metadata.Width > UserProfileRules.MaximumAvatarDimension
+                || metadata.Height > UserProfileRules.MaximumAvatarDimension)
             {
                 return AvatarImageProcessingResult.Rejected(
                     AvatarImageFailure.InvalidDimensions);
             }
 
-            if ((long)info.Width * info.Height > UserProfileRules.MaximumAvatarPixels)
+            if ((long)metadata.Width * metadata.Height > UserProfileRules.MaximumAvatarPixels)
             {
                 return AvatarImageProcessingResult.Rejected(
                     AvatarImageFailure.PixelLimitExceeded);
             }
 
-            if (metadataCodec.FrameCount > 1
-                || HasAnimationPayload(content.Span, metadataCodec.EncodedFormat))
+            using var image = Image.Load<Rgba32>(content.Span);
+            if (image.Frames.Count > 1)
                 return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MultipleFrames);
 
-            using var decodeCodec = SKCodec.Create(data);
-            if (decodeCodec is null)
-                return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage);
-
-            var decodedInfo = new SKImageInfo(
-                info.Width,
-                info.Height,
-                SKColorType.Rgba8888,
-                SKAlphaType.Premul);
-            using var decoded = new SKBitmap(decodedInfo);
-            var decodeResult = decodeCodec.GetPixels(decodedInfo, decoded.GetPixels());
-            if (decodeResult != SKCodecResult.Success)
-                return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage);
-
-            using var output = new SKBitmap(new SKImageInfo(
-                UserProfileRules.AvatarOutputSize,
-                UserProfileRules.AvatarOutputSize,
-                SKColorType.Rgba8888,
-                SKAlphaType.Premul));
-            using (var canvas = new SKCanvas(output))
-            {
-                canvas.Clear(SKColors.Transparent);
-                var sourceSide = Math.Min(decoded.Width, decoded.Height);
-                var sourceLeft = (decoded.Width - sourceSide) / 2F;
-                var sourceTop = (decoded.Height - sourceSide) / 2F;
-                canvas.DrawBitmap(
-                    decoded,
-                    new SKRect(
-                        sourceLeft,
-                        sourceTop,
-                        sourceLeft + sourceSide,
-                        sourceTop + sourceSide),
-                    new SKRect(
-                        0,
-                        0,
+            var sourceSide = Math.Min(image.Width, image.Height);
+            var sourceLeft = (image.Width - sourceSide) / 2;
+            var sourceTop = (image.Height - sourceSide) / 2;
+            image.Mutate(context => context
+                .Crop(new Rectangle(sourceLeft, sourceTop, sourceSide, sourceSide))
+                .Resize(new ResizeOptions
+                {
+                    Size = new Size(
                         UserProfileRules.AvatarOutputSize,
                         UserProfileRules.AvatarOutputSize),
-                    Sampling,
-                    null);
-                canvas.Flush();
-            }
+                    Mode = ResizeMode.Stretch,
+                    Sampler = KnownResamplers.Triangle
+                }));
 
-            using var encoded = output.Encode(SKEncodedImageFormat.Webp, 90);
-            if (encoded is null || encoded.Size == 0)
+            using var output = new MemoryStream();
+            image.Save(output, new WebpEncoder { Quality = 90 });
+            if (output.Length == 0)
                 return AvatarImageProcessingResult.Rejected(AvatarImageFailure.MalformedImage);
 
             return AvatarImageProcessingResult.Success(new(
-                encoded.ToArray(),
+                output.ToArray(),
                 "image/webp",
                 "webp",
                 sourceContentType));
@@ -102,22 +80,22 @@ public sealed class SkiaAvatarImageProcessor : IAvatarImageProcessor
         }
     }
 
-    private static string? SourceContentType(SKEncodedImageFormat format) =>
+    private static string? SourceContentType(IImageFormat? format) =>
         format switch
         {
-            SKEncodedImageFormat.Jpeg => "image/jpeg",
-            SKEncodedImageFormat.Png => "image/png",
-            SKEncodedImageFormat.Webp => "image/webp",
+            JpegFormat => "image/jpeg",
+            PngFormat => "image/png",
+            WebpFormat => "image/webp",
             _ => null
         };
 
     private static bool HasAnimationPayload(
         ReadOnlySpan<byte> content,
-        SKEncodedImageFormat format) =>
+        IImageFormat? format) =>
         format switch
         {
-            SKEncodedImageFormat.Png => HasPngAnimationControl(content),
-            SKEncodedImageFormat.Webp => HasWebpAnimationChunk(content),
+            PngFormat => HasPngAnimationControl(content),
+            WebpFormat => HasWebpAnimationChunk(content),
             _ => false
         };
 
