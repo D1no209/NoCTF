@@ -197,35 +197,25 @@ public sealed class CompetitionQuestionStore(
         var actor = await ResolveActorContextAsync(query.CompetitionId, query.ActorUserId, ct);
         if (actor is null)
             return [];
-        var roots = await db.Notifications.AsNoTracking()
-            .Where(notification => notification.Kind == NotificationKind.QuestionOpened
-                && notification.TargetType == NotificationTargetType.CompetitionCollaborators
-                && notification.TargetId == query.CompetitionId)
-            .OrderByDescending(notification => notification.SentAt)
-            .ThenByDescending(notification => notification.Id)
-            .ToArrayAsync(ct);
-        var views = new List<CompetitionQuestionView>();
-        foreach (var rootNotification in roots)
-        {
-            var root = ParseRoot(rootNotification.ContentJson);
-            if (root is null
-                || query.CompetitionChallengeId is not null
-                    && root.CompetitionChallengeId != query.CompetitionChallengeId
-                || query.Subject is not null && root.Subject != query.Subject)
-                continue;
-            var aggregate = await LoadAggregateAsync(rootNotification, root, ct);
-            if (query.Status is not null && aggregate.Status != query.Status)
-                continue;
-            var access = await ResolveAccessAsync(aggregate, query.ActorUserId, actor, ct);
-            if (access is null)
-                continue;
-            views.Add(await BuildViewAsync(aggregate, access.Value.Access, false, ct));
-        }
-        return views
-            .OrderByDescending(view => view.UpdatedAt)
-            .ThenByDescending(view => view.Id)
-            .Take(query.Limit)
+        var ownedChallengeIds = await ResolveOwnedCompetitionChallengeIdsAsync(
+            query.CompetitionId,
+            query.ActorUserId,
+            actor,
+            ct);
+        var roots = await LoadQuestionRootsAsync(query, actor, ownedChallengeIds, ct);
+        var aggregates = await LoadAggregatesAsync(roots, ct);
+        var visible = aggregates
+            .Select(aggregate => new
+            {
+                Question = aggregate,
+                Resolution = ResolveAccess(aggregate, actor, ownedChallengeIds)
+            })
+            .Where(input => input.Resolution is not null)
+            .Select(input => new QuestionViewInput(
+                input.Question,
+                input.Resolution!.Value.Access))
             .ToArray();
+        return await BuildViewsAsync(visible, false, ct);
     }
 
     public async Task<CompetitionQuestionView?> FindAsync(
@@ -601,6 +591,186 @@ public sealed class CompetitionQuestionStore(
         return root is null || payload is null ? null : await LoadAggregateAsync(root, payload, ct);
     }
 
+    private async Task<Notification[]> LoadQuestionRootsAsync(
+        CompetitionQuestionQuery query,
+        ActorContext actor,
+        IReadOnlyCollection<Guid> ownedChallengeIds,
+        CancellationToken ct)
+    {
+        var limit = Math.Clamp(query.Limit, 1, CompetitionQuestionRules.MaximumListLimit);
+        if (!db.Database.IsRelational())
+        {
+            var candidates = await db.Notifications.AsNoTracking()
+                .Where(notification => notification.Kind == NotificationKind.QuestionOpened
+                    && notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                    && notification.TargetId == query.CompetitionId)
+                .ToArrayAsync(ct);
+            var aggregates = await LoadAggregatesAsync(candidates, ct);
+            return aggregates
+                .Where(aggregate => MatchesQuery(aggregate, query)
+                    && ResolveAccess(aggregate, actor, ownedChallengeIds) is not null)
+                .OrderByDescending(aggregate => aggregate.Nodes.Count == 0
+                    ? aggregate.RootNotification.SentAt
+                    : aggregate.Nodes[^1].SentAt)
+                .ThenByDescending(aggregate => aggregate.RootNotification.Id)
+                .Take(limit)
+                .Select(aggregate => aggregate.RootNotification)
+                .ToArray();
+        }
+
+        var broadAccess = actor.IsPlatformAdministrator
+            || actor.IsCompetitionManager
+            || actor.IsJudge
+            || actor.IsObserver;
+        var teamId = actor.TeamId?.ToString() ?? string.Empty;
+        var challengeIds = ownedChallengeIds.Select(id => id.ToString()).ToArray();
+        var subject = query.Subject?.ToString() ?? string.Empty;
+        var status = query.Status?.ToString() ?? string.Empty;
+        var competitionChallengeId = query.CompetitionChallengeId?.ToString() ?? string.Empty;
+        return await db.Notifications.FromSqlInterpolated($$"""
+            WITH RECURSIVE question_thread AS (
+                SELECT root.id AS root_id,
+                       root.id AS node_id,
+                       root.sent_at AS updated_at,
+                       root.content_json ->> 'status' AS status,
+                       0 AS depth
+                FROM notifications AS root
+                WHERE root.kind = {{(short)NotificationKind.QuestionOpened}}
+                  AND root.target_type = {{(short)NotificationTargetType.CompetitionCollaborators}}
+                  AND root.target_id = {{query.CompetitionId}}
+                  AND ({{query.Subject is null}}
+                       OR root.content_json ->> 'subject' = {{subject}})
+                  AND ({{query.CompetitionChallengeId is null}}
+                       OR root.content_json ->> 'competitionChallengeId' = {{competitionChallengeId}})
+                  AND ({{broadAccess}}
+                       OR root.content_json ->> 'teamId' = {{teamId}}
+                       OR root.content_json ->> 'competitionChallengeId' = ANY ({{challengeIds}}))
+                UNION ALL
+                SELECT parent.root_id,
+                       child.id,
+                       child.sent_at,
+                       COALESCE(child.content_json ->> 'to', parent.status),
+                       parent.depth + 1
+                FROM notifications AS child
+                JOIN question_thread AS parent ON child.reply_to_id = parent.node_id
+            ),
+            question_head AS (
+                SELECT DISTINCT ON (root_id)
+                       root_id,
+                       updated_at,
+                       status
+                FROM question_thread
+                ORDER BY root_id, depth DESC
+            )
+            SELECT root.*
+            FROM notifications AS root
+            JOIN question_head AS head ON head.root_id = root.id
+            WHERE ({{query.Status is null}} OR head.status = {{status}})
+            ORDER BY head.updated_at DESC, root.id DESC
+            LIMIT {{limit}}
+            """).AsNoTracking().ToArrayAsync(ct);
+    }
+
+    private async Task<QuestionAggregate[]> LoadAggregatesAsync(
+        IReadOnlyCollection<Notification> roots,
+        CancellationToken ct)
+    {
+        if (roots.Count == 0)
+            return [];
+        var rootPayloads = roots
+            .Select(root => new { Notification = root, Payload = ParseRoot(root.ContentJson) })
+            .Where(item => item.Payload is not null)
+            .ToDictionary(item => item.Notification.Id, item => item);
+        if (rootPayloads.Count == 0)
+            return [];
+
+        Notification[] descendants;
+        if (!db.Database.IsRelational())
+        {
+            var all = await db.Notifications.AsNoTracking().ToArrayAsync(ct);
+            var includedIds = rootPayloads.Keys.ToHashSet();
+            var pending = true;
+            while (pending)
+            {
+                pending = false;
+                foreach (var notification in all)
+                {
+                    if (notification.ReplyToId is not { } parentId
+                        || !includedIds.Contains(parentId)
+                        || !includedIds.Add(notification.Id))
+                        continue;
+                    pending = true;
+                }
+            }
+            descendants = all
+                .Where(notification => !rootPayloads.ContainsKey(notification.Id)
+                    && includedIds.Contains(notification.Id))
+                .ToArray();
+        }
+        else
+        {
+            var rootIds = rootPayloads.Keys.ToArray();
+            descendants = await db.Notifications.FromSqlInterpolated($$"""
+                WITH RECURSIVE thread AS (
+                    SELECT child.*
+                    FROM notifications AS child
+                    WHERE child.reply_to_id = ANY ({{rootIds}})
+                    UNION ALL
+                    SELECT child.*
+                    FROM notifications AS child
+                    JOIN thread AS parent ON child.reply_to_id = parent.id
+                )
+                SELECT * FROM thread
+                """).AsNoTracking().ToArrayAsync(ct);
+        }
+
+        var rootByNode = rootPayloads.Keys.ToDictionary(id => id, id => id);
+        var byId = descendants.ToDictionary(notification => notification.Id);
+        Guid ResolveRoot(Notification notification)
+        {
+            if (rootByNode.TryGetValue(notification.Id, out var knownRoot))
+                return knownRoot;
+            var path = new List<Guid>();
+            var current = notification;
+            while (true)
+            {
+                path.Add(current.Id);
+                if (current.ReplyToId is not { } parentId)
+                    return Guid.Empty;
+                if (rootByNode.TryGetValue(parentId, out knownRoot))
+                {
+                    foreach (var id in path)
+                        rootByNode[id] = knownRoot;
+                    return knownRoot;
+                }
+                if (!byId.TryGetValue(parentId, out var parent))
+                    return Guid.Empty;
+                current = parent;
+            }
+        }
+
+        var nodesByRoot = rootPayloads.Keys.ToDictionary(id => id, _ => new List<Notification>());
+        foreach (var descendant in descendants)
+        {
+            var rootId = ResolveRoot(descendant);
+            if (nodesByRoot.TryGetValue(rootId, out var nodes))
+                nodes.Add(descendant);
+        }
+        return rootPayloads.Values
+            .Select(item => new QuestionAggregate(
+                item.Notification,
+                item.Payload!,
+                nodesByRoot[item.Notification.Id]
+                    .OrderBy(node => node.SentAt)
+                    .ThenBy(node => node.Id)
+                    .ToList()))
+            .OrderByDescending(aggregate => aggregate.Nodes.Count == 0
+                ? aggregate.RootNotification.SentAt
+                : aggregate.Nodes[^1].SentAt)
+            .ThenByDescending(aggregate => aggregate.RootNotification.Id)
+            .ToArray();
+    }
+
     private async Task<QuestionAggregate> LoadAggregateAsync(
         Notification root,
         QuestionRootPayload payload,
@@ -652,24 +822,58 @@ public sealed class CompetitionQuestionStore(
         Guid teamId,
         CancellationToken ct)
     {
-        var roots = await db.Notifications.AsNoTracking()
-            .Where(notification =>
-                notification.Kind == NotificationKind.QuestionOpened
-                && notification.TargetType == NotificationTargetType.CompetitionCollaborators
-                && notification.TargetId == competitionId)
-            .ToArrayAsync(ct);
-        var count = 0;
-        foreach (var rootNotification in roots)
+        if (!db.Database.IsRelational())
         {
-            var root = ParseRoot(rootNotification.ContentJson);
-            if (root is null || root.TeamId != teamId)
-                continue;
-            var aggregate = await LoadAggregateAsync(rootNotification, root, ct);
-            if (aggregate.Status is CompetitionQuestionStatus.Pending
-                or CompetitionQuestionStatus.Replied)
-                count++;
+            var roots = await db.Notifications.AsNoTracking()
+                .Where(notification =>
+                    notification.Kind == NotificationKind.QuestionOpened
+                    && notification.TargetType == NotificationTargetType.CompetitionCollaborators
+                    && notification.TargetId == competitionId)
+                .ToArrayAsync(ct);
+            return (await LoadAggregatesAsync(roots, ct)).Count(aggregate =>
+                aggregate.Root.TeamId == teamId
+                && aggregate.Status is CompetitionQuestionStatus.Pending
+                    or CompetitionQuestionStatus.Replied);
         }
-        return count;
+
+        var active = new[]
+        {
+            CompetitionQuestionStatus.Pending.ToString(),
+            CompetitionQuestionStatus.Replied.ToString()
+        };
+        var team = teamId.ToString();
+        var rootsWithActiveHeads = await db.Notifications.FromSqlInterpolated($$"""
+            WITH RECURSIVE question_thread AS (
+                SELECT root.id AS root_id,
+                       root.id AS node_id,
+                       root.content_json ->> 'status' AS status,
+                       0 AS depth
+                FROM notifications AS root
+                WHERE root.kind = {{(short)NotificationKind.QuestionOpened}}
+                  AND root.target_type = {{(short)NotificationTargetType.CompetitionCollaborators}}
+                  AND root.target_id = {{competitionId}}
+                  AND root.content_json ->> 'teamId' = {{team}}
+                UNION ALL
+                SELECT parent.root_id,
+                       child.id,
+                       COALESCE(child.content_json ->> 'to', parent.status),
+                       parent.depth + 1
+                FROM notifications AS child
+                JOIN question_thread AS parent ON child.reply_to_id = parent.node_id
+            ),
+            question_head AS (
+                SELECT DISTINCT ON (root_id)
+                       root_id,
+                       status
+                FROM question_thread
+                ORDER BY root_id, depth DESC
+            )
+            SELECT root.*
+            FROM notifications AS root
+            JOIN question_head AS head ON head.root_id = root.id
+            WHERE head.status = ANY ({{active}})
+            """).AsNoTracking().ToArrayAsync(ct);
+        return rootsWithActiveHeads.Length;
     }
 
     private static int CountParticipantMessagesSinceHandlerReply(
@@ -737,6 +941,74 @@ public sealed class CompetitionQuestionStore(
             competition.AllowChallengeOwnersToHandleQuestions);
     }
 
+    private async Task<Guid[]> ResolveOwnedCompetitionChallengeIdsAsync(
+        Guid competitionId,
+        Guid actorUserId,
+        ActorContext actor,
+        CancellationToken ct)
+    {
+        if (!actor.AllowChallengeOwnersToHandleQuestions
+            || actor.IsPlatformAdministrator
+            || actor.IsCompetitionManager
+            || actor.IsJudge
+            || actor.IsObserver)
+            return [];
+        return await db.CompetitionChallenges.AsNoTracking()
+            .Where(binding => binding.CompetitionId == competitionId)
+            .Join(
+                db.Challenges.AsNoTracking(),
+                binding => binding.ChallengeId,
+                challenge => challenge.Id,
+                (binding, challenge) => new { binding.Id, challenge.OwnerId, challenge.ManagerIds })
+            .Where(item => item.OwnerId == actorUserId
+                || item.ManagerIds.Contains(actorUserId))
+            .OrderBy(item => item.Id)
+            .Select(item => item.Id)
+            .ToArrayAsync(ct);
+    }
+
+    private static bool MatchesQuery(
+        QuestionAggregate aggregate,
+        CompetitionQuestionQuery query) =>
+        (query.CompetitionChallengeId is null
+            || aggregate.Root.CompetitionChallengeId == query.CompetitionChallengeId)
+        && (query.Subject is null || aggregate.Root.Subject == query.Subject)
+        && (query.Status is null || aggregate.Status == query.Status);
+
+    private static AccessResolution? ResolveAccess(
+        QuestionAggregate question,
+        ActorContext actor,
+        IReadOnlyCollection<Guid> ownedChallengeIds)
+    {
+        if (actor.IsPlatformAdministrator)
+            return new(
+                CompetitionQuestionAccess.Handler,
+                CompetitionQuestionParticipantRole.PlatformAdministrator);
+        if (actor.IsCompetitionManager)
+            return new(
+                CompetitionQuestionAccess.Handler,
+                CompetitionQuestionParticipantRole.CompetitionManager);
+        if (actor.IsJudge)
+            return new(
+                CompetitionQuestionAccess.Handler,
+                CompetitionQuestionParticipantRole.Judge);
+        if (actor.IsObserver)
+            return new(
+                CompetitionQuestionAccess.Observer,
+                CompetitionQuestionParticipantRole.Handler);
+        if (actor.TeamId == question.Root.TeamId)
+            return new(
+                CompetitionQuestionAccess.Asker,
+                CompetitionQuestionParticipantRole.Participant);
+        if (actor.AllowChallengeOwnersToHandleQuestions
+            && question.Root.CompetitionChallengeId is { } challengeId
+            && ownedChallengeIds.Contains(challengeId))
+            return new(
+                CompetitionQuestionAccess.Handler,
+                CompetitionQuestionParticipantRole.ChallengeOwner);
+        return null;
+    }
+
     private async Task<AccessResolution?> ResolveAccessAsync(
         QuestionAggregate question,
         Guid actorUserId,
@@ -781,36 +1053,74 @@ public sealed class CompetitionQuestionStore(
         QuestionAggregate question,
         CompetitionQuestionAccess access,
         bool includeEntries,
+        CancellationToken ct) =>
+        (await BuildViewsAsync([new(question, access)], includeEntries, ct))[0];
+
+    private async Task<CompetitionQuestionView[]> BuildViewsAsync(
+        IReadOnlyList<QuestionViewInput> questions,
+        bool includeEntries,
         CancellationToken ct)
     {
-        var askerId = question.RootNotification.SourceId!.Value;
-        var actorIds = question.Nodes.Select(node => node.SourceId)
+        if (questions.Count == 0)
+            return [];
+        var actorIds = questions.SelectMany(input => input.Question.Nodes)
+            .Select(node => node.SourceId)
             .Where(id => id is not null)
             .Select(id => id!.Value)
-            .Append(askerId)
+            .Concat(questions.Select(input => input.Question.RootNotification.SourceId!.Value))
             .Distinct()
             .ToArray();
         var names = await db.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(user => actorIds.Contains(user.Id))
             .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
-        var teamName = await db.Teams.IgnoreQueryFilters().AsNoTracking()
-            .Where(team => team.Id == question.Root.TeamId)
-            .Select(team => team.Name)
-            .SingleOrDefaultAsync(ct);
-        var challengeTitle = question.Root.CompetitionChallengeId is not { } challengeId
-            ? null
-            : await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
-                .Where(binding => binding.Id == challengeId)
-                .Join(
-                    db.Challenges.IgnoreQueryFilters().AsNoTracking(),
-                    binding => binding.ChallengeId,
-                    challenge => challenge.Id,
-                    (_, challenge) => challenge.Title)
-                .SingleOrDefaultAsync(ct);
-        var maximumParticipantMessages = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
-            .Where(competition => competition.Id == question.RootNotification.TargetId)
-            .Select(competition => competition.MaxParticipantMessagesBeforeHandlerReply)
-            .SingleAsync(ct);
+        var teamIds = questions.Select(input => input.Question.Root.TeamId).Distinct().ToArray();
+        var teamNames = await db.Teams.IgnoreQueryFilters().AsNoTracking()
+            .Where(team => teamIds.Contains(team.Id))
+            .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
+        var challengeIds = questions
+            .Select(input => input.Question.Root.CompetitionChallengeId)
+            .Where(id => id is not null)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToArray();
+        var challengeTitles = await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking()
+            .Where(binding => challengeIds.Contains(binding.Id))
+            .Join(
+                db.Challenges.IgnoreQueryFilters().AsNoTracking(),
+                binding => binding.ChallengeId,
+                challenge => challenge.Id,
+                (binding, challenge) => new { binding.Id, challenge.Title })
+            .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
+        var competitionIds = questions
+            .Select(input => input.Question.RootNotification.TargetId)
+            .Distinct()
+            .ToArray();
+        var participantMessageLimits = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
+            .Where(competition => competitionIds.Contains(competition.Id))
+            .ToDictionaryAsync(
+                competition => competition.Id,
+                competition => competition.MaxParticipantMessagesBeforeHandlerReply,
+                ct);
+        return questions.Select(input => BuildView(
+            input.Question,
+            input.Access,
+            includeEntries,
+            names,
+            teamNames,
+            challengeTitles,
+            participantMessageLimits[input.Question.RootNotification.TargetId])).ToArray();
+    }
+
+    private static CompetitionQuestionView BuildView(
+        QuestionAggregate question,
+        CompetitionQuestionAccess access,
+        bool includeEntries,
+        IReadOnlyDictionary<Guid, string> names,
+        IReadOnlyDictionary<Guid, string> teamNames,
+        IReadOnlyDictionary<Guid, string> challengeTitles,
+        int maximumParticipantMessages)
+    {
+        var askerId = question.RootNotification.SourceId!.Value;
         var lastNode = question.Nodes.LastOrDefault();
         var lastActorId = lastNode?.SourceId ?? askerId;
         var lastActorRole = lastNode is null
@@ -842,10 +1152,12 @@ public sealed class CompetitionQuestionStore(
             question.Root.TeamId,
             askerId,
             names.GetValueOrDefault(askerId, "已删除用户"),
-            teamName,
+            teamNames.GetValueOrDefault(question.Root.TeamId),
             question.Root.GameplayFactId,
             question.Root.Subject,
-            challengeTitle,
+            question.Root.CompetitionChallengeId is { } challengeId
+                ? challengeTitles.GetValueOrDefault(challengeId)
+                : null,
             question.Root.Title,
             question.Root.Body,
             question.Status,
@@ -934,6 +1246,10 @@ public sealed class CompetitionQuestionStore(
     private readonly record struct AccessResolution(
         CompetitionQuestionAccess Access,
         CompetitionQuestionParticipantRole ActorRole);
+
+    private readonly record struct QuestionViewInput(
+        QuestionAggregate Question,
+        CompetitionQuestionAccess Access);
 
     private sealed record QuestionRootPayload(
         int SchemaVersion,
