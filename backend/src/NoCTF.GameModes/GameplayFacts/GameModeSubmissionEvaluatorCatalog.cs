@@ -135,20 +135,8 @@ public sealed class AwdpGameplayFactEvaluator(IGameplayFactEvaluator inner) : IG
         if (submission.Kind != GameplayFactKind.BreakAttempt)
             return inner.Evaluate(context);
 
-        var normalDecision = HasCorrectPrior(context, submission.Kind)
-            ? new GameplayFactDecision(GameplayFactResult.Duplicate,
-                GameplayFactFailureCode.DuplicateAchievement, submission.OccurredAt)
-            : inner.Evaluate(context);
+        var normalDecision = inner.Evaluate(context with { PriorFacts = [] });
         return ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(context, normalDecision);
-    }
-
-    private static bool HasCorrectPrior(GameplayFactProcessingContext context, GameplayFactKind kind)
-    {
-        return context.PriorFacts.Any(item =>
-            item.TeamId == context.GameplayFact.TeamId
-                && item.CompetitionChallengeId == context.GameplayFact.CompetitionChallengeId
-                && item.Kind == kind
-            && item.Result == GameplayFactResult.Correct);
     }
 }
 
