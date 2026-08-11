@@ -470,9 +470,19 @@ public sealed class CtfFullBoundaryTests
                 player,
                 HttpMethod.Post,
                 $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/hints/{hintId}/unlock",
-                HttpStatusCode.Created,
+                HttpStatusCode.Accepted,
                 cancellationToken);
-            await Assert.That(unlockedHint.GetProperty("cost").GetInt64()).IsEqualTo(50);
+            var hintFactId = unlockedHint.GetProperty("gameplayFactId").GetGuid();
+            var hintFact = await PollJsonAsync(
+                player,
+                $"/api/v1/competitions/{competitionId}/gameplay-facts/{hintFactId}",
+                value => value.GetProperty("state").GetString() == "Completed",
+                TimeSpan.FromSeconds(60),
+                cancellationToken);
+            await Assert.That(hintFact.GetProperty("kind").GetString()).IsEqualTo("HintUnlock");
+            await Assert.That(hintFact.GetProperty("result").GetString()).IsEqualTo("Unlocked");
+            await Assert.That(hintFact.GetProperty("failureCode").ValueKind)
+                .IsEqualTo(JsonValueKind.Null);
             await PollLeaderboardAsync(
                 anonymous,
                 competitionId,
