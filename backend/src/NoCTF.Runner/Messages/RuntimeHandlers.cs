@@ -649,11 +649,34 @@ public static class RuntimeWriteBackHandler
             || instance.RuntimeProvider != message.Provider)
             return;
 
+        if (!TryNormalizeAccessUrls(
+                message.Urls,
+                message.ParticipantUrlIndexes,
+                out var normalizedUrls))
+        {
+            instance.ProviderReceiptJson = message.ProviderReceiptJson;
+            instance.Urls = [];
+            instance.ParticipantUrlIndexes = [];
+            instance.ControlCheckUrl = null;
+            instance.State = RuntimeState.Stopping;
+            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+            await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
+            await RecordRuntimeStateAsync(
+                events,
+                instance,
+                CompetitionEventLevel.Error,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            await outbox.FlushOutgoingMessagesAsync();
+            return;
+        }
+
         var runningAt = DateTimeOffset.UtcNow;
         instance.RunnerId = message.RunnerId;
         instance.RunnerAssignmentReleaseToken = null;
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
-        instance.Urls = [.. message.Urls];
+        instance.Urls = normalizedUrls;
         instance.ParticipantUrlIndexes = [.. message.ParticipantUrlIndexes];
         instance.ControlCheckUrl = message.ControlCheckUrl;
         instance.AwdCheckerTargetHost = message.AwdCheckerTargetHost;
@@ -1209,4 +1232,22 @@ public static class RuntimeWriteBackHandler
             _ => throw new InvalidOperationException(
                 $"Unsupported runtime kind '{instance.RuntimeKind}'.")
         };
+
+    private static bool TryNormalizeAccessUrls(
+        IReadOnlyList<string> urls,
+        IReadOnlyList<int> participantUrlIndexes,
+        out string[] normalizedUrls)
+    {
+        normalizedUrls = new string[urls.Count];
+        for (var index = 0; index < urls.Count; index++)
+        {
+            if (!RuntimeAccessUrl.TryCreate(urls[index], out var accessUrl))
+                return false;
+            normalizedUrls[index] = accessUrl.Value;
+        }
+
+        var normalizedUrlCount = normalizedUrls.Length;
+        return participantUrlIndexes.All(index => index >= 0 && index < normalizedUrlCount)
+            && participantUrlIndexes.Distinct().Count() == participantUrlIndexes.Count;
+    }
 }

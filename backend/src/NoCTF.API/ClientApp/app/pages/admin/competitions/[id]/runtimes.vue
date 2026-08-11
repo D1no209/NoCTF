@@ -459,7 +459,7 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
           <template v-if="detail.urls?.length">
             <Separator />
             <p class="text-muted-foreground">{{ $t('访问地址') }}</p>
-            <a v-for="u in detail.urls" :key="u" :href="u" target="_blank" rel="noopener" class="font-mono text-xs underline break-all">{{ u }}</a>
+            <RuntimeAccessUrl v-for="url in detail.urls" :key="url" :url="url" />
           </template>
           <template v-if="detail.publishedPorts?.length">
             <Separator />

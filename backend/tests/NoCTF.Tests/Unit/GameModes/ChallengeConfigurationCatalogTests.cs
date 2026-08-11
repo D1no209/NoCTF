@@ -829,6 +829,32 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Runtime_access_url_binding_rejects_unsupported_scheme()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "registry.example/challenge:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
+            UrlBindings:
+            [
+                new(
+                    "javascript://{HOST}:{PORT}/unsafe",
+                    RuntimeExposure.OwnerOnly,
+                    ContainerPort: 8080)
+            ]);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains(
+                "Runtime access URL bindings only allow http, https, tcp, udp, and ssh schemes.");
+    }
+
+    [Test]
     public async Task Runtime_url_binding_null_template_returns_validation_error()
     {
         var runtime = new ChallengeRuntimeTemplate(

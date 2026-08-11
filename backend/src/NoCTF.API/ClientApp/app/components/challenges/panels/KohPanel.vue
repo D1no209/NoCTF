@@ -35,16 +35,11 @@ async function copyControlFlag(flag: string) {
       </CardHeader>
       <CardContent>
         <div v-if="challenge.urls?.length" class="flex flex-col gap-1">
-          <a
+          <RuntimeAccessUrl
             v-for="url in challenge.urls"
             :key="url"
-            :href="url"
-            target="_blank"
-            rel="noopener"
-            class="break-all font-mono text-sm text-primary underline"
-          >
-            {{ url }}
-          </a>
+            :url="url"
+          />
         </div>
         <p v-else class="text-sm text-muted-foreground">{{ $t('山头入口尚未开放,请留意竞赛动态。') }}</p>
       </CardContent>

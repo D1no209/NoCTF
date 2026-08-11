@@ -180,16 +180,11 @@ const stateVariant = computed(() => {
         <template v-if="!loadError && runtime">
           <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
             <span class="text-sm text-muted-foreground">{{ $t('访问地址') }}</span>
-            <a
+            <RuntimeAccessUrl
               v-for="url in runtime.urls"
               :key="url"
-              :href="url"
-              target="_blank"
-              rel="noopener"
-              class="break-all font-mono text-sm text-primary underline"
-            >
-              {{ url }}
-            </a>
+              :url="url"
+            />
           </div>
 
           <div v-if="isRunning && ttl" class="text-sm"> {{ $t('剩余时间:') }}<span class="font-mono font-medium tabular-nums">{{ ttl }}</span>

@@ -68,16 +68,11 @@ onMounted(async () => {
               <TableCell class="font-medium">{{ target.teamName }}</TableCell>
               <TableCell>
                 <div class="flex flex-col gap-1">
-                  <a
+                  <RuntimeAccessUrl
                     v-for="url in target.urls ?? []"
                     :key="url"
-                    :href="url"
-                    target="_blank"
-                    rel="noopener"
-                    class="break-all font-mono text-sm text-primary underline"
-                  >
-                    {{ url }}
-                  </a>
+                    :url="url"
+                  />
                 </div>
               </TableCell>
             </TableRow>

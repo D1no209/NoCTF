@@ -33,6 +33,55 @@ public sealed class RunnerAssignmentReconciliationTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Provision_writeback_rejects_unsafe_access_url_and_schedules_cleanup(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            var outbox = new RecordingTransactionalOutbox();
+
+            await using (var db = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    new RuntimeProvisioned(
+                        fixture.RedispatchId,
+                        7,
+                        1,
+                        "runner-a",
+                        RuntimeProvider.Docker,
+                        "{\"resourceId\":\"unsafe-runtime\"}",
+                        ["javascript:alert(1)"],
+                        [0],
+                        null),
+                    db,
+                    outbox,
+                    cancellationToken);
+            }
+
+            await using var verify = new NoCtfDbContext(options);
+            var runtime = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
+                item => item.Id == fixture.RedispatchId,
+                cancellationToken);
+            await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
+            await Assert.That(runtime.FailureCode).IsNull();
+            await Assert.That(runtime.Urls).IsEmpty();
+            await Assert.That(runtime.ParticipantUrlIndexes).IsEmpty();
+            await Assert.That(JsonDocument.Parse(runtime.ProviderReceiptJson!).RootElement
+                    .GetProperty("resourceId")
+                    .GetString())
+                .IsEqualTo("unsafe-runtime");
+            var stop = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>().Single();
+            await Assert.That(stop.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
+            await Assert.That(stop.ProcessingVersion).IsEqualTo(8);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Offline_provisioning_without_receipt_routes_owner_cleanup_before_capacity_release(
         CancellationToken cancellationToken)
     {

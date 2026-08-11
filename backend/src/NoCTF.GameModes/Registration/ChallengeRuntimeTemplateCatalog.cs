@@ -118,12 +118,13 @@ internal static class ChallengeRuntimeTemplateValidator
             errors.Add("Runtime resource limits must be positive.");
         if (runtime.UrlBindings?.Any(binding => binding is null) == true)
             errors.Add("Runtime URL bindings cannot contain null entries.");
-        var urlBindings = (runtime.UrlBindings ?? [])
-            .Append(runtime.ControlCheckUrlBinding)
+        var urlBindings = new List<(RuntimeUrlBinding Binding, bool IsAccessUrl)>();
+        urlBindings.AddRange((runtime.UrlBindings ?? [])
             .Where(binding => binding is not null)
-            .Select(binding => binding!)
-            .ToArray();
-        foreach (var binding in urlBindings)
+            .Select(binding => (binding!, true)));
+        if (runtime.ControlCheckUrlBinding is { } controlCheckUrlBinding)
+            urlBindings.Add((controlCheckUrlBinding, false));
+        foreach (var (binding, isAccessUrl) in urlBindings)
         {
             if (!Enum.IsDefined(binding.Exposure) || string.IsNullOrWhiteSpace(binding.UrlTemplate))
                 errors.Add("Runtime URL bindings require a valid exposure and template.");
@@ -139,6 +140,12 @@ internal static class ChallengeRuntimeTemplateValidator
                     .Replace("{PORT}", "1", StringComparison.Ordinal);
                 if (!Uri.TryCreate(expandedTemplate, UriKind.Absolute, out _))
                     errors.Add("Runtime URL bindings must expand to an absolute URI.");
+                else if (isAccessUrl
+                    && !RuntimeAccessUrl.TryCreate(expandedTemplate, out _))
+                {
+                    errors.Add(
+                        "Runtime access URL bindings only allow http, https, tcp, udp, and ssh schemes.");
+                }
             }
             if (binding.ContainerPort is < 1 or > 65535
                 || binding.GuestPort is < 1 or > 65535)
@@ -177,7 +184,7 @@ internal static class ChallengeRuntimeTemplateValidator
         }
         if (runtime.Definition is ContainerRuntimeDefinition containerDefinition)
         {
-            foreach (var binding in urlBindings)
+            foreach (var (binding, _) in urlBindings)
             {
                 if (binding.ContainerPort is not int containerPort)
                     continue;

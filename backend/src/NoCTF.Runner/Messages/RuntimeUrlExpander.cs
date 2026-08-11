@@ -1,5 +1,6 @@
 using System.Globalization;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Messages;
 
@@ -59,7 +60,7 @@ public static class RuntimeUrlExpander
                 || publicPort is < 1 or > 65535)
                 throw new InvalidOperationException(
                     "Compose URL binding has no dynamic public port.");
-            var url = Expand(binding.UrlTemplate, receipt.PublicHost, publicPort);
+            var url = ExpandAccessUrl(binding.UrlTemplate, receipt.PublicHost, publicPort);
             if (binding.Exposure == RuntimeExposure.Participants)
                 participantIndexes.Add(urls.Count);
             urls.Add(url);
@@ -100,7 +101,7 @@ public static class RuntimeUrlExpander
         foreach (var binding in bindings ?? [])
         {
             var machine = FindOvaVirtualMachine(receipt, binding);
-            var url = ExpandOvaBinding(machine, binding);
+            var url = ExpandOvaBinding(machine, binding, requireAccessScheme: true);
             if (binding.Exposure == RuntimeExposure.Participants)
                 participantIndexes.Add(urls.Count);
             urls.Add(url);
@@ -110,7 +111,8 @@ public static class RuntimeUrlExpander
             ? null
             : ExpandOvaBinding(
                 FindOvaVirtualMachine(receipt, controlCheckBinding),
-                controlCheckBinding);
+                controlCheckBinding,
+                requireAccessScheme: false);
         return new(urls, participantIndexes, controlCheckUrl, null);
     }
 
@@ -157,7 +159,8 @@ public static class RuntimeUrlExpander
 
     private static string ExpandOvaBinding(
         OvaVirtualMachineReceipt machine,
-        RuntimeUrlBinding binding)
+        RuntimeUrlBinding binding,
+        bool requireAccessScheme)
     {
         if (string.IsNullOrWhiteSpace(machine.Address))
             throw new InvalidOperationException(
@@ -180,7 +183,9 @@ public static class RuntimeUrlExpander
         if (!Uri.TryCreate(expanded, UriKind.Absolute, out _))
             throw new InvalidOperationException(
                 "OVA URL binding did not expand to an absolute URI.");
-        return expanded;
+        return requireAccessScheme
+            ? NormalizeAccessUrl(expanded)
+            : expanded;
     }
 
     private static string ExpandPublicContainerBinding(
@@ -192,7 +197,7 @@ public static class RuntimeUrlExpander
         if (!receipt.PortMappings.TryGetValue(containerPort, out var publicPort)
             || publicPort is < 1 or > 65535)
             throw new InvalidOperationException("Container URL binding has no dynamic public port.");
-        return Expand(
+        return ExpandAccessUrl(
             binding.UrlTemplate,
             receipt.PublicHost,
             publicPort);
@@ -224,6 +229,15 @@ public static class RuntimeUrlExpander
             throw new InvalidOperationException("Runtime URL binding did not expand to an absolute URI.");
         return expanded;
     }
+
+    private static string ExpandAccessUrl(string template, string? host, int port) =>
+        NormalizeAccessUrl(Expand(template, host, port));
+
+    private static string NormalizeAccessUrl(string value) =>
+        RuntimeAccessUrl.TryCreate(value, out var accessUrl)
+            ? accessUrl.Value
+            : throw new InvalidOperationException(
+                "Runtime URL binding uses an unsupported access URL scheme.");
 
     private static string RequireHost(string? host) =>
         !string.IsNullOrWhiteSpace(host)
