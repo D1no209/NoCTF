@@ -88,6 +88,8 @@ public sealed class KubernetesContainerLifecycle(
             },
             Spec = new V1PodSpec
             {
+                AutomountServiceAccountToken = false,
+                EnableServiceLinks = false,
                 Containers =
                 [
                     new V1Container
