@@ -658,7 +658,7 @@ public sealed class CtfFullBoundaryTests
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(response.Content.Headers.ContentType?.MediaType).IsEqualTo("text/html");
         await Assert.That(await response.Content.ReadAsStringAsync(cancellationToken))
-            .Contains("<div id=\"app\"></div>");
+            .Contains("<div id=\"__nuxt\"></div>");
     }
 
     private static async Task<string> LoginAsync(
