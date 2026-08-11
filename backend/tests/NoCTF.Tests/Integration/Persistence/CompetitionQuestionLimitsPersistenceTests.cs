@@ -1,4 +1,8 @@
+using System.Data.Common;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application.Challenges.Questions;
 using NoCTF.Application.Messaging;
@@ -104,6 +108,29 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 platform.Question!.Id,
                 fixture.ChallengeOwnerId,
                 ct)).IsNull();
+            var authorList = await store.ListAsync(new(
+                fixture.CompetitionId,
+                fixture.ChallengeOwnerId,
+                null,
+                null,
+                null,
+                20), ct);
+            await Assert.That(authorList.Select(item => item.Id))
+                .IsEquivalentTo([questionId]);
+            await Assert.That(await store.ListAsync(new(
+                fixture.CompetitionId,
+                fixture.OtherChallengeOwnerId,
+                null,
+                null,
+                null,
+                20), ct)).IsEmpty();
+            await Assert.That(await store.ListAsync(new(
+                fixture.CompetitionId,
+                fixture.ObserverId,
+                null,
+                null,
+                CompetitionQuestionStatus.Pending,
+                20), ct)).Count().IsEqualTo(2);
 
             var competition = await db.Competitions.SingleAsync(
                 candidate => candidate.Id == fixture.CompetitionId,
@@ -321,6 +348,92 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             .IsEqualTo(1);
     }, ct);
 
+    [Test]
+    [Timeout(300_000)]
+    public Task List_projects_only_the_requested_page_from_long_history(
+        CancellationToken ct) => RunAsync(async fixture =>
+    {
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            Converters = { new JsonStringEnumConverter() }
+        };
+        await using (var setup = fixture.CreateDbContext())
+        {
+            for (var index = 0; index < 250; index++)
+            {
+                var sentAt = fixture.Now.AddDays(-30).AddMinutes(index);
+                var root = new Notification
+                {
+                    Id = Guid.CreateVersion7(sentAt),
+                    SourceType = NotificationSourceType.User,
+                    SourceId = fixture.MemberOneId,
+                    TargetType = NotificationTargetType.CompetitionCollaborators,
+                    TargetId = fixture.CompetitionId,
+                    Kind = NotificationKind.QuestionOpened,
+                    ContentJson = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        subject = CompetitionQuestionSubject.Platform,
+                        title = $"历史咨询 {index}",
+                        body = "已经关闭的历史咨询不应逐条加载完整线程。",
+                        teamId = fixture.TeamId,
+                        competitionChallengeId = (Guid?)null,
+                        gameplayFactId = (Guid?)null,
+                        status = CompetitionQuestionStatus.Pending
+                    }, jsonOptions),
+                    SentAt = sentAt
+                };
+                setup.Notifications.AddRange(root, new Notification
+                {
+                    Id = Guid.CreateVersion7(sentAt.AddSeconds(1)),
+                    SourceType = NotificationSourceType.User,
+                    SourceId = fixture.ManagerId,
+                    TargetType = root.TargetType,
+                    TargetId = root.TargetId,
+                    Kind = NotificationKind.QuestionStatusChanged,
+                    ContentJson = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        from = CompetitionQuestionStatus.Pending,
+                        to = CompetitionQuestionStatus.Closed,
+                        actorRole = CompetitionQuestionParticipantRole.CompetitionManager
+                    }, jsonOptions),
+                    SentAt = sentAt.AddSeconds(1),
+                    ReplyToId = root.Id
+                });
+            }
+            await setup.SaveChangesAsync(ct);
+        }
+
+        var counter = new QueryCounter();
+        await using var db = fixture.CreateDbContext(counter);
+        var store = CreateStore(db);
+        var listed = await store.ListAsync(new(
+            fixture.CompetitionId,
+            fixture.ManagerId,
+            null,
+            CompetitionQuestionSubject.Platform,
+            CompetitionQuestionStatus.Closed,
+            20), ct);
+
+        await Assert.That(listed).Count().IsEqualTo(20);
+        await Assert.That(listed.All(question =>
+            question.Status == CompetitionQuestionStatus.Closed)).IsTrue();
+        await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(10);
+
+        counter.Reset();
+        var created = await store.CreateAsync(Command(
+            fixture,
+            fixture.MemberOneId,
+            CompetitionQuestionSubject.Platform,
+            null,
+            "长历史后的新咨询",
+            "活跃数量检查必须使用集合查询，而不是逐条读取历史线程。",
+            1000), ct);
+        await Assert.That(created.Failure).IsNull();
+        await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(14);
+    }, ct);
+
     private static CreateCompetitionQuestionCommand Command(
         Fixture fixture,
         Guid actorId,
@@ -384,12 +497,13 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
         public Guid MemberOneId { get; } = Guid.CreateVersion7();
         public Guid MemberTwoId { get; } = Guid.CreateVersion7();
         public Guid OtherMemberId { get; } = Guid.CreateVersion7();
-        private Guid TeamId { get; } = Guid.CreateVersion7();
+        public Guid TeamId { get; } = Guid.CreateVersion7();
 
-        public NoCtfDbContext CreateDbContext() => new(
+        public NoCtfDbContext CreateDbContext(params IInterceptor[] interceptors) => new(
             new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention()
+                .AddInterceptors(interceptors)
                 .Options);
 
         public async Task InitializeAsync(CancellationToken ct)
@@ -483,16 +597,16 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             Guid challengeId,
             bool published,
             int order) => new()
-        {
-            Id = id,
-            CompetitionId = competitionId,
-            ChallengeId = challengeId,
-            BaseScore = 500,
-            Order = order,
-            IsPublished = published,
-            RulesJson = """{"schemaVersion":1}""",
-            UpdatedAt = Now
-        };
+            {
+                Id = id,
+                CompetitionId = competitionId,
+                ChallengeId = challengeId,
+                BaseScore = 500,
+                Order = order,
+                IsPublished = published,
+                RulesJson = """{"schemaVersion":1}""",
+                UpdatedAt = Now
+            };
 
         private static Team Team(
             Guid id,
@@ -500,17 +614,17 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             string name,
             Guid captainId,
             Guid[] members) => new()
-        {
-            Id = id,
-            CompetitionId = competitionId,
-            Name = name,
-            NormalizedName = name.ToUpperInvariant(),
-            CaptainId = captainId,
-            MemberIds = members,
-            InvitationToken = Guid.NewGuid().ToString("N"),
-            RegistrationStatus = TeamRegistrationStatus.Approved,
-            RegisteredAt = DateTimeOffset.UtcNow
-        };
+            {
+                Id = id,
+                CompetitionId = competitionId,
+                Name = name,
+                NormalizedName = name.ToUpperInvariant(),
+                CaptainId = captainId,
+                MemberIds = members,
+                InvitationToken = Guid.NewGuid().ToString("N"),
+                RegistrationStatus = TeamRegistrationStatus.Approved,
+                RegisteredAt = DateTimeOffset.UtcNow
+            };
     }
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
@@ -531,5 +645,31 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
             ValueTask.CompletedTask;
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+    }
+
+    private sealed class QueryCounter : DbCommandInterceptor
+    {
+        public int ReaderCount { get; private set; }
+
+        public void Reset() => ReaderCount = 0;
+
+        public override DbDataReader ReaderExecuted(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            DbDataReader result)
+        {
+            ReaderCount++;
+            return result;
+        }
+
+        public override ValueTask<DbDataReader> ReaderExecutedAsync(
+            DbCommand command,
+            CommandExecutedEventData eventData,
+            DbDataReader result,
+            CancellationToken cancellationToken = default)
+        {
+            ReaderCount++;
+            return ValueTask.FromResult(result);
+        }
     }
 }
