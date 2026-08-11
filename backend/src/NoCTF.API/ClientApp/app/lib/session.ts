@@ -1,4 +1,5 @@
 import { refreshTokenEndpoint } from '~/api'
+import { createClient } from '~/api/client'
 import { accessTokenNeedsRefresh } from './auth-refresh'
 
 /**
@@ -22,14 +23,14 @@ let refreshPromise: Promise<boolean> | null = null
 
 /**
  * Exchange the refresh cookie for a new access token.
- * The generated refresh endpoint is explicitly excluded from 401 retry interception,
- * so refresh remains recursion-safe without duplicating its route or response DTO.
+ * Uses an isolated generated client to avoid interceptor recursion.
  * Concurrent callers share a single in-flight request.
  */
 export function refreshSession(): Promise<boolean> {
   refreshPromise ??= (async () => {
     try {
-      const { data, error } = await refreshTokenEndpoint()
+      const refreshClient = createClient({ credentials: 'same-origin', fetch: globalThis.fetch })
+      const { data, error } = await refreshTokenEndpoint({ client: refreshClient })
       if (error || !data?.accessToken) {
         setAccessToken(null)
         return false

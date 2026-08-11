@@ -6,7 +6,7 @@ import { statusErrorMessage } from '~/utils/api-error'
 /**
  * Configure the generated hey-api client:
  * - inject the in-memory Bearer token into every request;
- * - on 401 (except explicitly anonymous auth endpoints), single-flight refresh then retry once;
+ * - on 401 for a request that carried the in-memory token, single-flight refresh then retry once;
  * - when an error response carries no problem+json body (e.g. bare 401/403),
  *   synthesize a status-based message so callers never see a bare「请求失败」.
  */
@@ -20,7 +20,7 @@ export default defineNuxtPlugin(() => {
   })
 
   client.interceptors.response.use(async (response, request, options) => {
-    if (!shouldRefreshSession(response.status, request.url)) {
+    if (!shouldRefreshSession(response.status, request.headers)) {
       return response
     }
     const refreshed = await refreshSession()
