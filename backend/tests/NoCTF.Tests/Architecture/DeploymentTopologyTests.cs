@@ -210,6 +210,50 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task Ci_deployment_validation_keeps_standard_schemas_strict_and_supplies_required_secrets()
+    {
+        var ci = await ReadAsync(".github", "workflows", "ci.yml");
+
+        await Assert.That(ci).Contains(
+            "-strict -ignore-missing-schemas -summary /manifests");
+        await Assert.That(ci).DoesNotContain("-skip");
+
+        var standardApiVersions = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "v1",
+            "apps/v1",
+            "batch/v1",
+            "networking.k8s.io/v1",
+            "rbac.authorization.k8s.io/v1"
+        };
+        var kubernetesManifestContents = await Task.WhenAll(
+            Directory.GetFiles(
+                    Path.Combine(RepositoryRoot, "deploy", "k8s"),
+                    "*.yaml",
+                    SearchOption.TopDirectoryOnly)
+                .Select(path => File.ReadAllTextAsync(path)));
+        var customResources = kubernetesManifestContents
+            .SelectMany(content => System.Text.RegularExpressions.Regex.Matches(
+                content,
+                "(?m)^apiVersion: (?<apiVersion>\\S+)\\r?\\nkind: (?<kind>\\S+)"))
+            .Where(match => !standardApiVersions.Contains(
+                match.Groups["apiVersion"].Value))
+            .Select(match =>
+                $"{match.Groups["apiVersion"].Value}:{match.Groups["kind"].Value}")
+            .ToArray();
+        await Assert.That(customResources).Count().IsEqualTo(3);
+        await Assert.That(customResources.All(resource =>
+            resource == "cilium.io/v2:CiliumNetworkPolicy")).IsTrue();
+
+        var encryptionKeyMatch = System.Text.RegularExpressions.Regex.Match(
+            ci,
+            "EMAIL_VERIFICATION_ENCRYPTION_KEY: (?<key>[A-Za-z0-9+/]+={0,2})");
+        await Assert.That(encryptionKeyMatch.Success).IsTrue();
+        await Assert.That(Convert.FromBase64String(
+            encryptionKeyMatch.Groups["key"].Value).Length).IsEqualTo(32);
+    }
+
+    [Test]
     public async Task External_deployment_artifacts_are_immutable_and_verified()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
