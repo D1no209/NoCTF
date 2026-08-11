@@ -9,6 +9,20 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：语言切换原地响应
+
+- 功能提交 `f206bc95` 移除根 `NuxtPage` 的 locale key；切换中文/英文不再销毁并重建当前路由，
+  因此不会产生页面黑屏，也不会丢失未提交表单、筛选条件、滚动位置或在途组件状态。
+- 功能提交 `b77638c8` 将管理格式、比赛配置选项、血榜标签、咨询角色/失败信息、题库规格、事件筛选、
+  首页模式卡、编辑器默认标签和 ECharts 趋势等模块级翻译改为渲染/调用时求值；语言状态变化后标签会在
+  原组件中立即更新，不再依赖整页重挂载。咨询页的裸中文题目插值也已改为参数化翻译并补齐英文资源。
+- 本阶段没有 HTTP/OpenAPI、生成 TypeScript SDK、数据模型、数据表、migration、snapshot 或版本号变化；
+  `app/api` 生成目录未被手工修改。
+- 合入统一修复分支后验证通过：ClientApp `bun test` 130/130、`bun run typecheck`、
+  `bun run build` 和 `git diff --check`。生产构建只保留既有大 chunk、插件耗时与第三方
+  trailing-slash deprecation 警告；仓库仍没有 lint 脚本。
+- 尚未推送、部署或操作生产数据；最终中英双向切换和页面状态保持将在 Microsoft Edge 统一验收。
+
 ## 2026-08-11 全量审计修复：咨询历史查询有界化
 
 - 功能提交 `e1654323` 保留现有 append-only `notifications`、`reply_to_id` 与 `ContentJson` 模型，
