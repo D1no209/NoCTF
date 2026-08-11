@@ -5,25 +5,92 @@
 - 已用 EF CLI 重建 `InitialBaseline`，业务 schema 已按 GameplayFact 收敛为 16 张表；旧
   `submissions`/`scoring_events` 已由单一 `gameplay_facts` 当前事实表取代。
 - API、测试项目当前均可编译；EF model snapshot 与当前模型无 pending changes（2026-08-08 再次验证）。
-- OpenAPI 已重新导出，Nuxt 生成客户端已更新。
+- OpenAPI 与 Nuxt 生成客户端曾在上一阶段完成同步；当前统一审计修复分支新增的 Runtime 镜像固定和
+  历史裁决协议变化尚未统一重新导出/生成，必须在 Registry SSRF 产品决策落定后一次完成并验证幂等。
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
-- 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
+- 上一完整测试基线为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等
+  真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。
+  当前统一分支位于 `cdb22924`，最终 OpenAPI/SDK、`0.1.0-alpha.26`、全量门禁与 Microsoft Edge
+  浏览器验收仍待执行，不能把上一基线误报为当前分支最终结果。
 
 ## 2026-08-11 全量审计修复：历史裁决差异只读预览
 
-- 功能提交 `93d3c245` 新增强类型管理端只读 API 与比赛“提交”页预览。它按权威
-  `(OccurredAt, Id)` 顺序重新计算 CTF Flag 与 AWDP Break 的确定性期望结果，并报告当前结果、当前
-  血榜记录、`Deterministic` 或 `NeedsReview` 差异；不提供应用更正、重判或写入按钮。
+- 功能提交 `93d3c245` 新增强类型管理端只读 API 与比赛“提交”页预览；`99b64880` 随后把推导收紧为
+  保守的历史分析。当前只完整重算 CTF Flag 的确定性期望结果；AWDP 不做一般性重放，只由
+  `e2bfb7f0` 识别旧实现留下的 `BreakAttempt + DuplicateAchievement + Duplicate` 这一种确定性缺陷，
+  其正确期望为 `Correct`。合法的后续/跨轮 Correct、其他 Duplicate、AWD 与 KoH 均不会被擅自推断。
+- 预览按权威 `(OccurredAt, Id)` 顺序读取。缺少裁决记录、队伍资格历史无法证明、冲突历史以及
+  Correct→Wrong→Correct 等情形统一标记 `NeedsReview`；只有证据完备的差异标记 `Deterministic`。
+  API 对不存在的比赛返回强类型 404，不提供应用更正、重判或写入按钮。
 - 查询使用签名 keyset cursor、可选题目筛选和 1..100 页大小；每页证据读取有 500 条硬边界。Cursor
-  绑定 endpoint、比赛、调用人和筛选，不能跨比赛、跨角色或跨筛选复用。冲突历史以及
-  Correct→Wrong→Correct 一律只标记人工复核，不擅自改写不可变事件。
-- Owner、Manager、Judge、Observer 与平台管理员可读，参赛者不可读；响应只包含工作人员原本有权查看
-  的事实元数据与受保护值。真实 PostgreSQL 测试验证预览前后 GameplayFact、CompetitionEvent 和
-  Notification 数量均不变。
-- OpenAPI 两份产物和 TypeScript SDK 已由工具生成并二次验证幂等；没有新增表、列、migration 或
-  snapshot。独立阶段验证：Release tests build 0 警告、PostgreSQL 1/1、HTTP 1/1、非 Integration
-  669/669、前端 152/152、typecheck、production build、EF model drift 与 `git diff --check` 均通过。
-  尚未推送、部署或修改任何生产历史；实际历史纠正仍须先生成预览并由用户逐比赛明确批准。
+  绑定 endpoint、比赛、调用人和筛选，不能跨比赛、跨角色或跨筛选复用；读取在 Repeatable Read 快照
+  中完成，并以集合查询判断首次正确事实，避免分页内部产生自相矛盾的视图。
+- Owner、Manager、Judge、Observer 与平台管理员可读，参赛者不可读；`24e2be9d` 进一步保留已归档比赛
+  的工作人员永久历史与裁决预览访问，不因 `DeletedAt` 误报 404，也没有扩大参赛者权限。响应只包含
+  工作人员原本有权查看的事实元数据与受保护值，预览前后不修改 GameplayFact、CompetitionEvent 或
+  Notification。
+- `cdb22924` 仅修正管理端中英文说明和测试断言，使界面准确描述“CTF 完整预览 + 仅旧
+  DuplicateAchievement AWDP Break 缺陷”，没有扩大后端推导范围。该提交验证：定向前端测试 3/3
+  （11 assertions）、typecheck 与 `git diff --check` 通过。
+- 本阶段没有新增表、列、migration 或 snapshot。历史阶段曾生成过 OpenAPI/SDK，但上述合并后的最新
+  协议仍须在统一收口阶段重新由工具生成。尚未推送、部署或修改任何生产历史；实际历史纠正仍须先
+  生成预览并由用户逐比赛明确批准。
+
+## 2026-08-11 全量审计修复：可信容器安全兼容开关
+
+- 功能提交 `003983a5` 落实用户确认的可信兼容策略：缺省的
+  `NoNewPrivileges`、`RunAsNonRoot` 与 `ReadOnlyRootFilesystem` 均按 `false` 处理；题目显式关闭时
+  Docker 不再伪装成已启用该限制，允许可信旧镜像按原有用户和可写根文件系统运行。
+- 当 Docker 题目显式要求 `RunAsNonRoot=true` 时，Runner 会在创建容器前检查镜像 `Config.User`，只接受
+  数字形式的非零 `uid` 或 `uid:gid`；空值、root、名称形式或无法证明的用户都会 fail closed。
+  Kubernetes 保留既有 securityContext 行为，Compose 的兼容边界未被暗中改变。
+- 本阶段没有新增表、列、migration、snapshot、OpenAPI 或 SDK 变化。验证通过：Release solution build
+  0 警告/0 错误、非 Integration 684/684、真实 Docker 定向测试 12/12、前端 game-config 7/7 与
+  `git diff --check`。尚未推送、部署或操作生产 Runtime。
+
+## 2026-08-11 全量审计修复：题目镜像摘要固定与容量恢复
+
+- 功能提交 `e4235b5f` 在题目发布、比赛启动和归档恢复前解析 Runtime、Checker 与 Compose 所引用的
+  OCI 镜像，将不可变 manifest digest 合并回既有 `Challenge.DefinitionJson` 并以 revision fence
+  持久化；没有新增镜像快照表。旧的可变 tag Claim、Provision 与 AWDP Fix 验证消息在 Runner 边界
+  fail closed，不能在排队后悄悄拉取另一份镜像。
+- 生命周期会先完成已经到期的比赛，再在共享的 60 秒固定预算内处理镜像解析；失败日志使用结构化且
+  脱敏的 Warning。OCI 响应、descriptor 和 digest 均有边界及格式校验，错误通过强类型失败结果返回，
+  不把 Registry 响应正文或凭据写入日志。
+- 同一提交修复失联 Runtime 的 Runner 容量恢复顺序：PostgreSQL CAS 先确定唯一权威状态，再使用既有
+  `RunnerAssignmentReleaseToken` 释放 Redis claim；覆盖 pinned-wins、mutable-wins、崩溃恢复和重复执行，
+  避免先释放后落库造成容量双占或错误复用。
+- 独立阶段验证通过：Release solution build 0 警告/0 错误、非 Integration 669/669、题目镜像固定相关
+  PostgreSQL/Redis 25/25、前端定向测试 4/4、typecheck、production build 与 EF model drift；完整
+  Integration 为 147/150，其中 Kubernetes/Libvirt 两项按外部环境缺失跳过，Wolverine 定时测试一次
+  超时后隔离重跑 1/1 通过。统一分支最终全量门禁仍须重跑。
+- 当前唯一尚未确定的产品决策是 Registry SSRF 信任边界：题目维护者可配置 Registry origin，而 OCI
+  Bearer challenge 还可能把认证请求引向另一个 origin。已通过 `$grill-me` 提供 A/B/C 方案，等待用户
+  选择“管理员显式 allowlist + DNS/私网边界”“仅公共 Registry”或“信任题目维护者”的策略；在答案前
+  不擅自改变产品权限。该决策落定后还须补齐实现/测试，再统一生成 OpenAPI/SDK。
+- 本阶段没有新增业务表、列、migration 或 snapshot；尚未推送、部署，也未解析或拉取生产题目镜像。
+
+## 2026-08-11 全量审计修复：归档比赛工作人员永久历史
+
+- 功能提交 `24e2be9d` 修复软删除比赛后工作人员历史入口被 `DeletedAt` 提前过滤的问题。Owner、Manager、
+  Judge、Observer 与平台管理员仍可分页读取归档比赛的永久 `competition_events`，并可运行只读历史
+  裁决预览；参赛者窗口和权限没有扩大，不存在的比赛继续返回强类型 404。
+- 事件读取、比赛管理授权和历史预览共用归档感知授权语义，避免一个页面可读、另一个页面误报不存在；
+  受保护 GameplayFact 值与审计可见性仍按原角色边界执行。
+- 本阶段没有新增表、列、migration、snapshot、OpenAPI 或 SDK 变化。验证通过：Release solution build
+  0 警告/0 错误、非 Integration 722/722、CompetitionEventHistory PostgreSQL 1/1、受保护
+  GameplayFact value + 审计 PostgreSQL 1/1、HistoricalAdjudicationPreview PostgreSQL 3/3、Preview
+  HTTP 4/4 与 `git diff --check`。尚未推送、部署或读取生产归档历史。
+
+## 2026-08-11 当前统一收口状态
+
+- 当前功能基线为 `cdb22924`。以上最近阶段均为本地提交，没有新增数据表或 EF migration，也没有推送、
+  部署或操作生产数据。
+- Registry SSRF 信任边界是唯一仍需用户作出的产品决策。其余待办是该决策后的工程收口：重新导出
+  OpenAPI、重新生成 TypeScript SDK 并验证二次生成无漂移；把平台版本递增为 `0.1.0-alpha.26`；运行
+  Release build、完整后端/真实依赖/四模式 E2E、EF drift、前端测试/typecheck/build 与
+  `git diff --check`；最后只用 Microsoft Edge 和可丢弃本地数据做浏览器验收。
+- 未完成、被跳过或受外部环境阻塞的门禁不得报告为通过。完成上述收口前不得推送或部署。
 
 ## 2026-08-11 全量审计修复：SMTP 精确 DNS 策略
 
