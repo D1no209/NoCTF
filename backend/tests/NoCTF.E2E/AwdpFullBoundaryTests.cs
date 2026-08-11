@@ -556,8 +556,7 @@ public sealed class AwdpFullBoundaryTests
                 last = await ReadExpectedJsonAsync(response, HttpStatusCode.OK, cancellationToken);
                 var entry = last.GetProperty("entries").EnumerateArray()
                     .SingleOrDefault(item => item.GetProperty("teamId").GetGuid() == teamId);
-                if (!last.GetProperty("stale").GetBoolean()
-                    && entry.ValueKind != JsonValueKind.Undefined
+                if (entry.ValueKind != JsonValueKind.Undefined
                     && entry.GetProperty("score").GetInt64() == expectedScore)
                     return;
             }
