@@ -1193,6 +1193,14 @@ public sealed class KubernetesContainerLifecycle(
                         [
                             new V1NetworkPolicyPeer
                             {
+                                NamespaceSelector = new V1LabelSelector
+                                {
+                                    MatchLabels = new Dictionary<string, string>
+                                    {
+                                        [options.CallbackNamespaceLabelKey] =
+                                            options.CallbackNamespaceLabelValue
+                                    }
+                                },
                                 PodSelector = new V1LabelSelector
                                 {
                                     MatchLabels = new Dictionary<string, string>
@@ -1353,8 +1361,14 @@ public sealed class KubernetesContainerLifecycle(
             return false;
         var peer = rule.To[0];
         var port = rule.Ports[0];
-        return peer.NamespaceSelector is null
-            && peer.IpBlock is null
+        return peer.IpBlock is null
+            && HasExactSelector(
+                peer.NamespaceSelector,
+                new Dictionary<string, string>
+                {
+                    [options.CallbackNamespaceLabelKey] =
+                        options.CallbackNamespaceLabelValue
+                })
             && HasExactSelector(
                 peer.PodSelector,
                 new Dictionary<string, string>

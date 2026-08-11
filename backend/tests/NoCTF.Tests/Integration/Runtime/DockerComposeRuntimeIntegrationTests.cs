@@ -29,7 +29,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     "/bin/sh",
                     "-c",
                     "mkdir -p /www && echo callback > /www/index.html && exec httpd -f -p 8080 -h /www")
-                .WithLabel("noctf.io/internal-role", "awdp-callback-gateway")
+                .WithLabel("noctf.io/internal-role", "scoring-callback-gateway")
                 .Build();
             await callback.StartAsync(cancellationToken);
             var operationId = Guid.NewGuid();

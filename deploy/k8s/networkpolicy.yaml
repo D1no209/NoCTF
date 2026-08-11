@@ -106,6 +106,38 @@ spec:
           protocol: TCP
 
 ---
+# 5b. Allow trusted one-shot scoring checkers to call the internal JWT endpoint.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-scoring-callback-to-backend
+  namespace: noctf
+  labels:
+    app.kubernetes.io/part-of: noctf
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+      noctf.io/internal-role: scoring-callback-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: runtime
+          podSelector:
+            matchExpressions:
+              - key: noctf.io/purpose
+                operator: In
+                values:
+                  - awd-checker
+                  - awdp-checker
+      ports:
+        - port: 8080
+          protocol: TCP
+
+---
 # 6. Allow backend to reach MinIO (S3 storage)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

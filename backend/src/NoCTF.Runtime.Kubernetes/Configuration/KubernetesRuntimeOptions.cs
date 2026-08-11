@@ -10,4 +10,6 @@ public sealed record KubernetesRuntimeOptions(
     string ClusterDomain = "",
     string ClusterDnsServiceAddress = "",
     bool NetworkPolicyRequired = true,
-    IReadOnlyList<string>? ProtectedCidrs = null);
+    IReadOnlyList<string>? ProtectedCidrs = null,
+    string CallbackNamespaceLabelKey = "kubernetes.io/metadata.name",
+    string CallbackNamespaceLabelValue = "noctf");

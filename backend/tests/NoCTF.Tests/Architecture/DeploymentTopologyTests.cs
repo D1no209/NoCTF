@@ -97,6 +97,47 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task Stock_manifests_give_scoring_checkers_a_reachable_callback_identity()
+    {
+        var compose = await ReadAsync("deploy", "docker-compose.yml");
+        var singleCompose = await ReadAsync("deploy", "docker-compose.single.yml");
+        var kubernetesConfig = await ReadAsync("deploy", "k8s", "configmap.yaml");
+        var backendDeployment = await ReadAsync(
+            "deploy",
+            "k8s",
+            "backend-deployment.yaml");
+        var networkPolicies = await ReadAsync("deploy", "k8s", "networkpolicy.yaml");
+
+        await Assert.That(compose)
+            .Contains("noctf.io/internal-role: scoring-callback-gateway");
+        await Assert.That(compose)
+            .Contains("Runtime__Docker__CallbackContainerLabelValue: scoring-callback-gateway");
+        await Assert.That(compose)
+            .Contains("RunnerScoring__CallbackBaseUrl: http://backend:8080");
+        await Assert.That(singleCompose)
+            .Contains("noctf.io/internal-role: scoring-callback-gateway");
+        await Assert.That(singleCompose)
+            .Contains("Runtime__Docker__CallbackContainerLabelValue: scoring-callback-gateway");
+        await Assert.That(singleCompose)
+            .Contains("RunnerScoring__CallbackBaseUrl: http://noctf:8080");
+
+        await Assert.That(kubernetesConfig).Contains(
+            "RunnerScoring__CallbackBaseUrl: \"http://backend-service.noctf.svc.cluster.local:8080\"");
+        await Assert.That(kubernetesConfig).Contains(
+            "Runtime__Kubernetes__CallbackNamespaceLabelValue: \"noctf\"");
+        await Assert.That(kubernetesConfig).Contains(
+            "Runtime__Kubernetes__CallbackPodLabelValue: \"scoring-callback-gateway\"");
+        await Assert.That(backendDeployment)
+            .Contains("noctf.io/internal-role: scoring-callback-gateway");
+        await Assert.That(networkPolicies)
+            .Contains("name: allow-scoring-callback-to-backend");
+        await Assert.That(networkPolicies)
+            .Contains("kubernetes.io/metadata.name: runtime");
+        await Assert.That(networkPolicies).Contains("- awd-checker");
+        await Assert.That(networkPolicies).Contains("- awdp-checker");
+    }
+
+    [Test]
     public async Task E2e_orchestrator_is_portable_and_uses_docker_assigned_ports()
     {
         var orchestrator = await ReadAsync("backend", "tests", "e2e.cs");

@@ -166,6 +166,12 @@ Important ConfigMap values:
 - `Runtime__Kubernetes__ClusterDnsServiceAddress`: exact IPv4 ClusterIP of
   `kube-system/kube-dns`; the checked-in `10.43.0.10` is the k3s default and must
   be changed for clusters that use another Service CIDR
+- `RunnerScoring__CallbackBaseUrl`: full API Service FQDN; update its final DNS
+  suffix when the cluster domain is not `cluster.local`
+- `Runtime__Kubernetes__CallbackNamespaceLabelKey/Value`: exact label selector
+  for the Namespace containing the API callback Pod
+- `Runtime__Kubernetes__CallbackPodLabelKey/Value`: exact label selector for
+  the API callback Pod; it must match `backend-deployment.yaml`
 - `Runtime__Kubernetes__PodPidsLimit`: must equal the kubelet Pool-wide value
 - `Runtime__Kubernetes__NetworkPolicyRequired`: must be `true`
 - `Runtime__Kubernetes__ProtectedCidrs__*`: every Pod, Service, node-management,
@@ -235,6 +241,8 @@ The `networkpolicy.yaml` enforces a default-deny posture:
 - A composable Host needs the union of its selected role policies; do not grant Runner RBAC to an
   API/Worker-only Host
 - Backend accepts traffic only from the ingress-nginx namespace and serves both API and SPA static files
+- Backend accepts internal scoring callbacks only from the `runtime` Namespace
+  and Pods whose purpose is `awd-checker` or `awdp-checker`, on TCP 8080
 - Runtime workloads are isolated by the baseline and per-Runtime policies in the `runtime` namespace
 - DNS (port 53) egress is allowed for all pods
 
