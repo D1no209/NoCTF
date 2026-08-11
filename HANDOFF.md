@@ -9,6 +9,25 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：Runtime 访问地址协议边界
+
+- 功能提交 `44b585e7` 新增 Domain 强类型 `RuntimeAccessUrl` / `RuntimeAccessScheme`，按用户确认的
+  allowlist 只接受绝对的 `http`、`https`、`tcp`、`udp` 与 `ssh` 地址；统一 trim、host/authority 和
+  URI 规范化校验，拒绝 `javascript:`、`data:`、`file:`、`mailto:` 与相对地址。
+- 同一校验覆盖题目 Runtime 模板保存、Runner 占位符展开和 Provider 最终回写三道边界。Runner 回写
+  非法地址时不会持久化或公开该 URL；实例保留 provider receipt 后进入 `Stopping`，并向原 Runner
+  派发清理，避免“拒绝恶意 URL”同时泄漏实际容器资源。
+- 前端新增统一 `RuntimeAccessUrl` 组件并替换选手 Runtime 卡、AWD、KoH 与管理员 Runtime 四处直接
+  链接。仅 `http/https` 使用可点击链接；`tcp/udp/ssh` 显示为可选择、可复制文本，不交给浏览器导航。
+- 本阶段没有新增表、列、migration、snapshot、HTTP/OpenAPI 或生成 SDK 变化；Runtime 权威文档已
+  同步 allowlist 与前端点击边界。
+- 验证通过：RuntimeAccessUrl 11/11、RuntimeUrlExpander 4/4、前端 Runtime URL/卡片 6/6；根分支
+  ClientApp typecheck、Release solution build（0 警告/0 错误）与 `git diff --check` 通过。独立阶段还
+  验证 Challenge configuration 47/47、恶意回写真实 PostgreSQL 1/1、非 Integration 662/662、前端
+  146/146 及 production build。
+- 尚未推送、部署或操作生产 Runtime；最终 Edge 验收只使用可丢弃实例，并分别核对 Web 链接与 TCP
+  文本呈现。
+
 ## 2026-08-11 全量审计修复：归档与永久删除边界
 
 - 功能提交 `69d1a4c5` 和 `492bc7f4` 落实用户确认的永久历史不变量：软删除/恢复是可逆归档操作；
