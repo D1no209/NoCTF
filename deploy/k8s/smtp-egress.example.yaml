@@ -17,6 +17,20 @@ spec:
           - backend
           - worker
   egress:
+    # Cilium must observe the exact DNS answer before toFQDNs can admit the
+    # resolved address. Keep this scoped to cluster DNS and the configured
+    # SMTP name; do not replace matchName with a wildcard.
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": kube-system
+            "k8s:k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchName: smtp.example.com
     - toFQDNs:
         - matchName: smtp.example.com
       toPorts:

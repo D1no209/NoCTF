@@ -126,7 +126,8 @@ Runner Pool/Provider/resource max、Redis、Wolverine PostgreSQL transport、S3�
 Kubernetes 的平台 Namespace 缺省拒绝全部外联。Runner 通过 Cilium 的 `kube-apiserver` 实体仅访问
 真实 Kubernetes API，不得以 `0.0.0.0/0` 放行 443/6443。SMTP 属于部署与管理员配置共同决定的可选
 外部依赖：启用邮件投递前，运维必须从 `deploy/k8s/smtp-egress.example.yaml` 生成只匹配当前 SMTP
-FQDN 与 TCP 端口的 Cilium policy；修改 SMTP 主机或端口时必须同步更新 policy。策略不得包含凭据、
+FQDN 与 TCP 端口的 Cilium policy，并以同一精确 FQDN 限制集群 DNS 观察规则；修改 SMTP 主机或
+端口时必须同步更新 policy。策略不得包含凭据、
 通配域名或任意地址放行。
 
 ## 健康与关闭
