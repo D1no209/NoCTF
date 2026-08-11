@@ -34,7 +34,7 @@ public sealed class KohFullBoundaryTests
                 title = "KoH full-boundary E2E",
                 description = "Shared Hill, control polling, lifecycle, and scoring verification",
                 mode = "Koh",
-                startTime = now.AddMinutes(10),
+                startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
@@ -109,9 +109,6 @@ public sealed class KohFullBoundaryTests
         await SendWithoutBodyAsync(admin, HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/make-visible",
             HttpStatusCode.NoContent, cancellationToken);
-        await SendWithoutBodyAsync(admin, HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/publish",
-            HttpStatusCode.NoContent, cancellationToken);
         using var red = await RegisterTeamAsync(
             anonymous, baseUrl, competitionId,
             "koh-red", "red@koh-e2e.test", "koh-red-password", "Red Team", cancellationToken);
@@ -141,8 +138,9 @@ public sealed class KohFullBoundaryTests
         await Assert.That(redFlag).IsNotEqualTo(blueFlag);
 
         await SendWithoutBodyAsync(admin, HttpMethod.Post,
-            $"/api/v1/admin/competitions/{competitionId}/start",
+            $"/api/v1/admin/competitions/{competitionId}/publish",
             HttpStatusCode.NoContent, cancellationToken);
+        await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
         var runtimePath =
             $"/api/v1/admin/competitions/{competitionId}/runtimes?competitionChallengeId={competitionChallengeId}";
         var runtimeList = await PollJsonAsync(
