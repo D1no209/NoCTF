@@ -4,6 +4,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Scoring;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
@@ -23,6 +24,123 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("CompetitionLifecycle")]
 public sealed class CompetitionLifecyclePersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Start_gate_rejects_persisted_base_score_and_hint_cost_above_the_limit(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+                .WithDatabase("noctf_score_start_gate")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            var ownerId = Guid.CreateVersion7(now);
+            var competitionId = Guid.CreateVersion7(now);
+            var challengeId = Guid.CreateVersion7(now);
+            var competitionChallengeId = Guid.CreateVersion7(now);
+            var teamId = Guid.CreateVersion7(now);
+            var configurations = new GameModeChallengeConfigurationCatalog();
+
+            await using (var seed = new NoCtfDbContext(options))
+            {
+                await seed.Database.MigrateAsync(cancellationToken);
+                seed.Users.Add(new User
+                {
+                    Id = ownerId,
+                    UserName = "score-owner",
+                    NormalizedUserName = "SCORE-OWNER",
+                    Email = "score-owner@example.test",
+                    NormalizedEmail = "SCORE-OWNER@EXAMPLE.TEST",
+                    PasswordHash = "test",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                seed.Competitions.Add(new Competition
+                {
+                    Id = competitionId,
+                    Title = "Score start gate",
+                    OwnerId = ownerId,
+                    Mode = GameMode.Ctf,
+                    Status = CompetitionStatus.Published,
+                    ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
+                    StartAt = now.AddMinutes(-1),
+                    EndAt = now.AddHours(1),
+                    FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
+                    CreatedAt = now,
+                    UpdatedAt = now,
+                    ConfigurationUpdatedAt = now
+                });
+                seed.Challenges.Add(new Challenge
+                {
+                    Id = challengeId,
+                    OwnerId = ownerId,
+                    Mode = GameMode.Ctf,
+                    Title = "Persisted score limit",
+                    DefinitionJson = configurations.GetDefaultDefinitionJson(GameMode.Ctf),
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                seed.CompetitionChallenges.Add(new CompetitionChallenge
+                {
+                    Id = competitionChallengeId,
+                    CompetitionId = competitionId,
+                    ChallengeId = challengeId,
+                    BaseScore = ScoreValueLimits.MaximumConfiguredValue + 1,
+                    IsPublished = true,
+                    RulesJson = configurations.GetDefaultJson(GameMode.Ctf),
+                    Hints =
+                    [
+                        new CompetitionChallengeHint
+                        {
+                            Id = Guid.CreateVersion7(now),
+                            Content = "Persisted over-limit hint",
+                            Cost = ScoreValueLimits.MaximumConfiguredValue + 1
+                        }
+                    ],
+                    UpdatedAt = now
+                });
+                seed.Teams.Add(new Team
+                {
+                    Id = teamId,
+                    CompetitionId = competitionId,
+                    Name = "Score Team",
+                    NormalizedName = "SCORE TEAM",
+                    CaptainId = ownerId,
+                    MemberIds = [ownerId],
+                    InvitationToken = new string('s', 32),
+                    RegistrationStatus = TeamRegistrationStatus.Approved,
+                    RegisteredAt = now
+                });
+                await seed.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var db = new NoCtfDbContext(options);
+            var errors = await new CompetitionStartGate(
+                    new CompetitionStartGateStore(db),
+                    new GameModeCompetitionConfigurationValidator(),
+                    configurations)
+                .ValidateAsync(competitionId, cancellationToken);
+
+            await Assert.That(errors).IsNotNull();
+            await Assert.That(errors!.Any(error =>
+                    error.Code == StartGateFailureCode.ChallengeRulesInvalid
+                    && error.Message.Contains("BaseScore", StringComparison.Ordinal)))
+                .IsTrue();
+            await Assert.That(errors.Any(error =>
+                    error.Code == StartGateFailureCode.ChallengeRulesInvalid
+                    && error.Message.Contains("Hint cost", StringComparison.Ordinal)))
+                .IsTrue();
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Awd_start_rejects_a_published_challenge_without_a_runtime(

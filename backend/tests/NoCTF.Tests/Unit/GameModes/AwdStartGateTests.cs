@@ -26,8 +26,8 @@ public sealed class AwdStartGateTests
                 CompetitionStatus.Published,
                 GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awd),
                 [
-                    new(firstChallengeId, GameMode.Awd, rules, definition, true),
-                    new(secondChallengeId, GameMode.Awd, rules, definition, true)
+                    new(firstChallengeId, GameMode.Awd, rules, definition, true, 100, []),
+                    new(secondChallengeId, GameMode.Awd, rules, definition, true, 100, [])
                 ],
                 ApprovedTeamCount: 1,
                 MaxConcurrentRuntimeInstancesPerTeam: 1)),

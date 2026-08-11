@@ -1,5 +1,6 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Competitions.Configuration;
+using NoCTF.Application.Scoring;
 using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Application.Competitions.Lifecycle;
@@ -9,7 +10,9 @@ public sealed record StartGateChallenge(
     GameMode ChallengeMode,
     string RulesJson,
     string DefinitionJson,
-    bool Published);
+    bool Published,
+    long BaseScore,
+    IReadOnlyList<long> HintCosts);
 
 public sealed record CompetitionStartGateSnapshot(
     Guid CompetitionId,
@@ -96,6 +99,21 @@ public sealed class CompetitionStartGate(
         }
         foreach (var challenge in snapshot.Challenges.Where(item => item.Published))
         {
+            if (challenge.BaseScore is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
+            {
+                errors.Add(new(
+                    StartGateFailureCode.ChallengeRulesInvalid,
+                    challenge.CompetitionChallengeId,
+                    $"BaseScore must be between zero and {ScoreValueLimits.MaximumConfiguredValue}."));
+            }
+            if (challenge.HintCosts.Any(cost =>
+                    cost is < 0 or > ScoreValueLimits.MaximumConfiguredValue))
+            {
+                errors.Add(new(
+                    StartGateFailureCode.ChallengeRulesInvalid,
+                    challenge.CompetitionChallengeId,
+                    $"Hint cost must be between zero and {ScoreValueLimits.MaximumConfiguredValue}."));
+            }
             if (challenge.ChallengeMode != snapshot.Mode)
             {
                 errors.Add(new(
