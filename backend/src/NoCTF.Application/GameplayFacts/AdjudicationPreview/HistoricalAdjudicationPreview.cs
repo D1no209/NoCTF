@@ -1,4 +1,5 @@
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.GameplayFacts.AdjudicationPreview;
@@ -12,6 +13,7 @@ public enum AdjudicationDifferenceCertainty : short
 public enum AdjudicationDifferenceKind : short
 {
     CurrentCorrectShouldBeDuplicate,
+    CurrentDuplicateShouldBeCorrect,
     DuplicateWithoutCurrentPredecessor,
     HistoricalResultChanged,
     MissingAdjudicationRecord,
@@ -58,8 +60,10 @@ public sealed record HistoricalAdjudicationEvidence(
     string ChallengeTitle,
     Guid? TeamId,
     string? TeamName,
+    GameMode GameMode,
     GameplayFactKind GameplayFactKind,
     GameplayFactResult? CurrentResult,
+    GameplayFactFailureCode? CurrentFailureCode,
     DateTimeOffset OccurredAt,
     bool HasEarlierCorrect,
     int EarlierCorrectTeamCount,
@@ -123,7 +127,7 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
                 evidence.TeamName,
                 evidence.GameplayFactKind,
                 evidence.CurrentResult,
-                ShouldBeDuplicate(evidence) ? GameplayFactResult.Duplicate : null,
+                ExpectedResult(evidence),
                 ExpectedBloodRank(evidence),
                 evidence.RecordedBloodRanks,
                 evidence.OccurredAt,
@@ -152,7 +156,14 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
                 AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate,
                 AdjudicationDifferenceCertainty.Deterministic));
         }
-        else if (evidence.CurrentResult == GameplayFactResult.Duplicate
+        else if (ShouldBeCorrect(evidence))
+        {
+            issues.Add(new(
+                AdjudicationDifferenceKind.CurrentDuplicateShouldBeCorrect,
+                AdjudicationDifferenceCertainty.Deterministic));
+        }
+        else if (evidence.GameMode == GameMode.Ctf
+            && evidence.CurrentResult == GameplayFactResult.Duplicate
             && !evidence.HasEarlierCorrect)
         {
             issues.Add(new(
@@ -215,14 +226,29 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
     }
 
     private static bool ShouldBeDuplicate(HistoricalAdjudicationEvidence evidence) =>
-        evidence.CurrentResult == GameplayFactResult.Correct
+        evidence.GameMode == GameMode.Ctf
+        && evidence.CurrentResult == GameplayFactResult.Correct
         && evidence.HasEarlierCorrect
         && evidence.GameplayFactKind == GameplayFactKind.FlagAttempt;
+
+    private static bool ShouldBeCorrect(HistoricalAdjudicationEvidence evidence) =>
+        evidence.GameMode == GameMode.Awdp
+        && evidence.GameplayFactKind == GameplayFactKind.BreakAttempt
+        && evidence.CurrentResult == GameplayFactResult.Duplicate
+        && evidence.CurrentFailureCode == GameplayFactFailureCode.DuplicateAchievement;
+
+    private static GameplayFactResult? ExpectedResult(HistoricalAdjudicationEvidence evidence)
+    {
+        if (ShouldBeDuplicate(evidence))
+            return GameplayFactResult.Duplicate;
+        return ShouldBeCorrect(evidence) ? GameplayFactResult.Correct : null;
+    }
 
     private static LeaderboardBloodRank? ExpectedBloodRank(
         HistoricalAdjudicationEvidence evidence)
     {
-        if (evidence.GameplayFactKind != GameplayFactKind.FlagAttempt
+        if (evidence.GameMode != GameMode.Ctf
+            || evidence.GameplayFactKind != GameplayFactKind.FlagAttempt
             || evidence.CurrentResult != GameplayFactResult.Correct
             || evidence.HasEarlierCorrect
             || evidence.BloodEligibilityHistoryRequiresReview)

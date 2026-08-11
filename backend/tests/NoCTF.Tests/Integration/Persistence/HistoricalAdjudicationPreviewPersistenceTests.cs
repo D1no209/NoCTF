@@ -12,6 +12,7 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
+using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.Infrastructure.GameplayFacts.AdjudicationPreview;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Teams.Moderation;
@@ -158,7 +159,30 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 .ExecuteDeleteAsync(cancellationToken);
             var breakPreview = await preview.ExecuteAsync(
                 fixture.CompetitionId, null, null, null, 20, cancellationToken);
-            await Assert.That(breakPreview.Items).IsEmpty();
+            await Assert.That(breakPreview.Items
+                    .SelectMany(item => item.Differences)
+                    .Select(difference => difference.Kind))
+                .DoesNotContain(AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate);
+            await Assert.That(breakPreview.Items
+                    .SelectMany(item => item.Differences)
+                    .Select(difference => difference.Kind))
+                .DoesNotContain(AdjudicationDifferenceKind.DuplicateWithoutCurrentPredecessor);
+            await Assert.That(breakPreview.Items
+                    .SelectMany(item => item.Differences)
+                    .Select(difference => difference.Kind))
+                .DoesNotContain(AdjudicationDifferenceKind.MissingBloodAward);
+            await Assert.That(breakPreview.Items
+                    .SelectMany(item => item.Differences)
+                    .Select(difference => difference.Kind))
+                .DoesNotContain(AdjudicationDifferenceKind.UnexpectedBloodAward);
+            await Assert.That(breakPreview.Items
+                    .Single(item => item.GameplayFactId == fixture.LaterFactId)
+                    .Differences.Select(difference => difference.Kind))
+                .Contains(AdjudicationDifferenceKind.HistoricalResultChanged);
+            await Assert.That(breakPreview.Items
+                    .Single(item => item.GameplayFactId == fixture.EarlierFactId)
+                    .Differences.Select(difference => difference.Kind))
+                .Contains(AdjudicationDifferenceKind.MissingAdjudicationRecord);
 
             foreach (var unsupportedMode in new[] { GameMode.Awd, GameMode.Koh })
             {
@@ -194,6 +218,62 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 fixture.CompetitionId, null, null, null, 20, cancellationToken);
             await Assert.That(deletedCompetition.State)
                 .IsEqualTo(HistoricalAdjudicationPreviewReadState.CompetitionNotFound);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Preview_marks_only_legacy_awdp_duplicate_achievements_as_correct_without_writing(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(cancellationToken);
+            var options = Options(postgres);
+            await using (var migrationDb = new NoCtfDbContext(options))
+                await migrationDb.Database.MigrateAsync(cancellationToken);
+            var fixtures = new[]
+            {
+                await SeedAwdpHistoryAsync(
+                    options, AchievementSettlement.Milestone, 'm', cancellationToken),
+                await SeedAwdpHistoryAsync(
+                    options, AchievementSettlement.PerRound, 'p', cancellationToken)
+            };
+
+            foreach (var fixture in fixtures)
+            {
+                await using var db = new NoCtfDbContext(options);
+                var before = await CountsAsync(db, cancellationToken);
+                var preview = new PreviewHistoricalAdjudicationDifferences(
+                    new HistoricalAdjudicationPreviewStore(db));
+
+                var page = await preview.ExecuteAsync(
+                    fixture.CompetitionId, null, null, null, 20, cancellationToken);
+
+                await Assert.That(await CountsAsync(db, cancellationToken)).IsEqualTo(before);
+                await Assert.That(page.Items.Select(item => item.GameplayFactId).ToHashSet())
+                    .IsEquivalentTo(new HashSet<Guid>
+                    {
+                        fixture.SameRoundLegacyDuplicateFactId,
+                        fixture.CrossRoundLegacyDuplicateFactId
+                    });
+                foreach (var item in page.Items)
+                {
+                    await Assert.That(item.GameplayFactKind)
+                        .IsEqualTo(GameplayFactKind.BreakAttempt);
+                    await Assert.That(item.CurrentResult)
+                        .IsEqualTo(GameplayFactResult.Duplicate);
+                    await Assert.That(item.DeterministicExpectedResult)
+                        .IsEqualTo(GameplayFactResult.Correct);
+                    await Assert.That(item.DeterministicExpectedBloodRank).IsNull();
+                    await Assert.That(item.RecordedBloodRanks).IsEmpty();
+                    await Assert.That(item.Differences).Count().IsEqualTo(1);
+                    await Assert.That(item.Differences[0].Kind)
+                        .IsEqualTo(AdjudicationDifferenceKind.CurrentDuplicateShouldBeCorrect);
+                    await Assert.That(item.Differences[0].Certainty)
+                        .IsEqualTo(AdjudicationDifferenceCertainty.Deterministic);
+                }
+            }
         });
     }
 
@@ -276,6 +356,168 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 fixture.Now.AddSeconds(2), GameplayFactResult.Wrong));
         await db.SaveChangesAsync(ct);
     }
+
+    private static async Task<AwdpFixture> SeedAwdpHistoryAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        AchievementSettlement settlement,
+        char tokenCharacter,
+        CancellationToken ct)
+    {
+        var now = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var ownerId = Guid.CreateVersion7();
+        var userId = Guid.CreateVersion7();
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var competitionChallengeId = Guid.CreateVersion7();
+        var teamId = Guid.CreateVersion7();
+        var initialCorrectId = Guid.CreateVersion7(now);
+        var sameRoundDuplicateId = Guid.CreateVersion7(now.AddSeconds(30));
+        var crossRoundDuplicateId = Guid.CreateVersion7(now.AddSeconds(90));
+        var currentCorrectId = Guid.CreateVersion7(now.AddSeconds(120));
+        var otherDuplicateId = Guid.CreateVersion7(now.AddSeconds(150));
+        var suffix = settlement.ToString().ToLowerInvariant();
+        var configuration = new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            60,
+            new(settlement, 50),
+            new(settlement, 50));
+        await using var db = new NoCtfDbContext(options);
+        db.Users.AddRange(
+            User(ownerId, $"awdp-preview-owner-{suffix}", UserRole.Organizer, now),
+            User(userId, $"awdp-preview-player-{suffix}", UserRole.User, now));
+        db.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            OwnerId = ownerId,
+            Title = $"AWDP {settlement} adjudication preview",
+            Mode = GameMode.Awdp,
+            ConfigurationJson = JsonSerializer.Serialize(configuration),
+            ConfigurationUpdatedAt = now,
+            FlagDerivationSecret = new byte[32],
+            StartAt = now,
+            EndAt = now.AddHours(2),
+            Status = CompetitionStatus.Running,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = competitionId,
+            Name = $"AWDP {settlement} Team",
+            NormalizedName = $"AWDP {settlement} TEAM".ToUpperInvariant(),
+            CaptainId = userId,
+            MemberIds = [userId],
+            InvitationToken = new string(tokenCharacter, 32),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            RegisteredAt = now
+        });
+        db.Challenges.Add(new Challenge
+        {
+            Id = challengeId,
+            OwnerId = ownerId,
+            Mode = GameMode.Awdp,
+            Title = $"AWDP {settlement} challenge",
+            Direction = "Pwn",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.CompetitionChallenges.Add(new CompetitionChallenge
+        {
+            Id = competitionChallengeId,
+            CompetitionId = competitionId,
+            ChallengeId = challengeId,
+            BaseScore = 100,
+            IsPublished = true,
+            UpdatedAt = now
+        });
+        var facts = new[]
+        {
+            AwdpFact(initialCorrectId, GameplayFactResult.Correct, null, now),
+            AwdpFact(
+                sameRoundDuplicateId,
+                GameplayFactResult.Duplicate,
+                GameplayFactFailureCode.DuplicateAchievement,
+                now.AddSeconds(30)),
+            AwdpFact(
+                crossRoundDuplicateId,
+                GameplayFactResult.Duplicate,
+                GameplayFactFailureCode.DuplicateAchievement,
+                now.AddSeconds(90)),
+            AwdpFact(currentCorrectId, GameplayFactResult.Correct, null, now.AddSeconds(120)),
+            AwdpFact(
+                otherDuplicateId,
+                GameplayFactResult.Duplicate,
+                GameplayFactFailureCode.DuplicateAttack,
+                now.AddSeconds(150))
+        };
+        db.GameplayFacts.AddRange(facts);
+        db.CompetitionEvents.AddRange(facts.Select(fact => AdjudicationEvent(
+            competitionId,
+            competitionChallengeId,
+            teamId,
+            fact.Id,
+            fact.OccurredAt,
+            fact.Result!.Value)));
+        await db.SaveChangesAsync(ct);
+        return new(
+            competitionId,
+            sameRoundDuplicateId,
+            crossRoundDuplicateId,
+            currentCorrectId,
+            otherDuplicateId);
+
+        GameplayFact AwdpFact(
+            Guid factId,
+            GameplayFactResult result,
+            GameplayFactFailureCode? failureCode,
+            DateTimeOffset occurredAt)
+        {
+            var value = $"flag{{awdp-preview-{suffix}-{factId:N}}}";
+            return new()
+            {
+                Id = factId,
+                CompetitionId = competitionId,
+                CompetitionChallengeId = competitionChallengeId,
+                TeamId = teamId,
+                ActorUserId = userId,
+                Kind = GameplayFactKind.BreakAttempt,
+                Value = value,
+                ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(value)),
+                State = GameplayFactState.Completed,
+                Result = result,
+                FailureCode = failureCode,
+                OccurredAt = occurredAt,
+                UpdatedAt = occurredAt
+            };
+        }
+    }
+
+    private static CompetitionEvent AdjudicationEvent(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid teamId,
+        Guid factId,
+        DateTimeOffset occurredAt,
+        GameplayFactResult result) => new()
+    {
+        Id = Guid.CreateVersion7(occurredAt),
+        CompetitionId = competitionId,
+        Kind = CompetitionEventKind.GameplayFactAdjudicated,
+        Level = CompetitionEventLevel.Information,
+        Visibility = CompetitionEventVisibility.Staff,
+        SubjectType = EntityReferenceKind.GameplayFact,
+        SubjectId = factId,
+        RelatedType = EntityReferenceKind.Team,
+        RelatedId = teamId,
+        PayloadJson = JsonSerializer.Serialize(new
+        {
+            schemaVersion = 1,
+            gameplayFactResult = result.ToString(),
+            competitionChallengeId
+        }),
+        OccurredAt = occurredAt
+    };
 
     private static async Task SeedIneligibleEarlierTeamAsync(
         DbContextOptions<NoCtfDbContext> options,
@@ -584,4 +826,11 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         Guid AdministratorId,
         Guid EarlierFactId,
         Guid LaterFactId);
+
+    private sealed record AwdpFixture(
+        Guid CompetitionId,
+        Guid SameRoundLegacyDuplicateFactId,
+        Guid CrossRoundLegacyDuplicateFactId,
+        Guid CurrentCorrectFactId,
+        Guid OtherDuplicateFactId);
 }

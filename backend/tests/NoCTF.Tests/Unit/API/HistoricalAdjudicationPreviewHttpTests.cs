@@ -14,11 +14,13 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Administration.GameplayFacts;
+using NoCTF.API.Endpoints.GameplayFacts;
 using NoCTF.API.Security;
 using NoCTF.Application.GameplayFacts.AdjudicationPreview;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 
@@ -156,6 +158,44 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         await Assert.That(tamperedCursor.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
     }
 
+    [Test]
+    public async Task Legacy_awdp_duplicate_is_mapped_to_a_deterministic_correct_preview()
+    {
+        var competitionId = Guid.NewGuid();
+        var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
+        authorizer.CanObserveAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>())
+            .Returns(true);
+        var store = Substitute.For<IHistoricalAdjudicationEvidenceStore>();
+        store.ReadAsync(
+                competitionId,
+                Arg.Any<Guid?>(),
+                Arg.Any<DateTimeOffset?>(),
+                Arg.Any<Guid?>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new HistoricalAdjudicationEvidencePage(
+                HistoricalAdjudicationPreviewReadState.Available,
+                [LegacyAwdpDuplicateEvidence(DateTimeOffset.UtcNow)]));
+        await using var app = await CreateApplicationAsync(authorizer, store);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, Guid.NewGuid().ToString());
+
+        using var response = await client.GetAsync(
+            $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences");
+        var payload = await response.Content
+            .ReadFromJsonAsync<HistoricalAdjudicationDifferencePageResponse>();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        var item = payload!.Items.Single();
+        await Assert.That(item.DeterministicExpectedResult)
+            .IsEqualTo(GameplayFactResultProtocol.Correct);
+        await Assert.That(item.Differences.Single().Kind)
+            .IsEqualTo(AdjudicationDifferenceKindProtocol.CurrentDuplicateShouldBeCorrect);
+        await Assert.That(item.Differences.Single().Certainty)
+            .IsEqualTo(AdjudicationDifferenceCertaintyProtocol.Deterministic);
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
         ICompetitionModerationAuthorizer authorizer,
         IHistoricalAdjudicationEvidenceStore? store = null,
@@ -222,13 +262,33 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         "Challenge",
         Guid.NewGuid(),
         "Team",
+        GameMode.Ctf,
         GameplayFactKind.FlagAttempt,
         GameplayFactResult.Correct,
+        null,
         occurredAt,
         true,
         0,
         false,
         [GameplayFactResult.Correct],
+        []);
+
+    private static HistoricalAdjudicationEvidence LegacyAwdpDuplicateEvidence(
+        DateTimeOffset occurredAt) => new(
+        Guid.NewGuid(),
+        Guid.NewGuid(),
+        "AWDP challenge",
+        Guid.NewGuid(),
+        "Team",
+        GameMode.Awdp,
+        GameplayFactKind.BreakAttempt,
+        GameplayFactResult.Duplicate,
+        GameplayFactFailureCode.DuplicateAchievement,
+        occurredAt,
+        false,
+        0,
+        false,
+        [GameplayFactResult.Duplicate],
         []);
 
     private sealed class MutableUserContext(Guid userId) : IUserContext

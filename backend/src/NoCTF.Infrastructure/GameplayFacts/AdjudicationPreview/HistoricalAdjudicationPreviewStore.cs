@@ -41,7 +41,13 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
             await transaction.CommitAsync(ct);
             return new(HistoricalAdjudicationPreviewReadState.CompetitionNotFound, []);
         }
-        if (competition.Mode != GameMode.Ctf)
+        var gameplayFactKind = competition.Mode switch
+        {
+            GameMode.Ctf => GameplayFactKind.FlagAttempt,
+            GameMode.Awdp => GameplayFactKind.BreakAttempt,
+            _ => (GameplayFactKind?)null
+        };
+        if (gameplayFactKind is null)
         {
             await transaction.CommitAsync(ct);
             return new(HistoricalAdjudicationPreviewReadState.Available, []);
@@ -49,7 +55,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
 
         var query = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId
-                && fact.Kind == GameplayFactKind.FlagAttempt);
+                && fact.Kind == gameplayFactKind.Value);
         if (competitionChallengeId is Guid challengeId)
             query = query.Where(fact => fact.CompetitionChallengeId == challengeId);
         if (beforeOccurredAt is DateTimeOffset occurredAt && beforeId is Guid id)
@@ -68,6 +74,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
                 fact.TeamId,
                 fact.Kind,
                 fact.Result,
+                fact.FailureCode,
                 fact.OccurredAt))
             .ToArrayAsync(ct);
         if (facts.Length == 0)
@@ -77,31 +84,34 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
         }
 
         var challengeIds = facts.Select(fact => fact.CompetitionChallengeId).Distinct().ToArray();
-        var firstCorrects = await db.GameplayFacts.AsNoTracking()
-            .Where(fact => fact.CompetitionId == competitionId
-                && challengeIds.Contains(fact.CompetitionChallengeId)
-                && fact.TeamId != null
-                && fact.Kind == GameplayFactKind.FlagAttempt
-                && fact.Result == GameplayFactResult.Correct)
-            .GroupBy(fact => new { fact.CompetitionChallengeId, fact.TeamId })
-            .Select(group => group
-                .OrderBy(fact => fact.OccurredAt)
-                .ThenBy(fact => fact.Id)
-                .Select(fact => new FirstCorrectFact(
-                    fact.Id,
-                    fact.CompetitionChallengeId,
-                    fact.TeamId!.Value,
-                    fact.OccurredAt))
-                .First())
-            .ToArrayAsync(ct);
+        FirstCorrectFact[] firstCorrects = competition.Mode == GameMode.Ctf
+            ? await db.GameplayFacts.AsNoTracking()
+                .Where(fact => fact.CompetitionId == competitionId
+                    && challengeIds.Contains(fact.CompetitionChallengeId)
+                    && fact.TeamId != null
+                    && fact.Kind == GameplayFactKind.FlagAttempt
+                    && fact.Result == GameplayFactResult.Correct)
+                .GroupBy(fact => new { fact.CompetitionChallengeId, fact.TeamId })
+                .Select(group => group
+                    .OrderBy(fact => fact.OccurredAt)
+                    .ThenBy(fact => fact.Id)
+                    .Select(fact => new FirstCorrectFact(
+                        fact.Id,
+                        fact.CompetitionChallengeId,
+                        fact.TeamId!.Value,
+                        fact.OccurredAt))
+                    .First())
+                .ToArrayAsync(ct)
+            : [];
 
         var factIds = facts.Select(fact => fact.Id).ToArray();
+        var includeBloodAwards = competition.Mode == GameMode.Ctf;
         var eventGroups = await db.CompetitionEvents.AsNoTracking()
             .Where(@event => @event.CompetitionId == competitionId
                 && @event.SubjectType == EntityReferenceKind.GameplayFact
                 && factIds.Contains(@event.SubjectId)
                 && (@event.Kind == CompetitionEventKind.GameplayFactAdjudicated
-                    || BloodKinds.Contains(@event.Kind)))
+                    || includeBloodAwards && BloodKinds.Contains(@event.Kind)))
             .GroupBy(@event => new { @event.SubjectId, @event.Kind, @event.PayloadJson })
             .Select(group => new EventGroup(
                 group.Key.SubjectId,
@@ -152,8 +162,10 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
                 .ToArray();
             var candidateIsEligible = fact.TeamId is Guid factTeamId
                 && IsEligible(teams.GetValueOrDefault(factTeamId));
-            var eligibilityRequiresReview = !candidateIsEligible
-                || earlierOtherTeams.Any(first => !IsEligible(teams.GetValueOrDefault(first.TeamId)));
+            var eligibilityRequiresReview = competition.Mode == GameMode.Ctf
+                && (!candidateIsEligible
+                    || earlierOtherTeams.Any(first => !IsEligible(
+                        teams.GetValueOrDefault(first.TeamId))));
             var factEvents = eventGroups.Where(group => group.GameplayFactId == fact.Id).ToArray();
             var historicalResults = factEvents
                 .Where(group => group.Kind == CompetitionEventKind.GameplayFactAdjudicated)
@@ -175,8 +187,10 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
                 fact.TeamId is Guid teamId
                     ? teams.GetValueOrDefault(teamId)?.Name ?? teamId.ToString()
                     : null,
+                competition.Mode,
                 fact.Kind,
                 fact.Result,
+                fact.FailureCode,
                 fact.OccurredAt,
                 hasEarlierCorrect,
                 earlierOtherTeams.Count(first => IsEligible(teams.GetValueOrDefault(first.TeamId))),
@@ -237,6 +251,7 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
         Guid? TeamId,
         GameplayFactKind Kind,
         GameplayFactResult? Result,
+        GameplayFactFailureCode? FailureCode,
         DateTimeOffset OccurredAt);
 
     private sealed record FirstCorrectFact(

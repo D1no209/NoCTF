@@ -37,14 +37,21 @@ ForeignTeamFlagDetected 作弊事件直接以 GameplayFactId 为身份；Confirm
 
 ## 历史差异预览
 
-比赛工作人员可读取有界、游标分页的历史裁决差异预览。该预览当前只分析 CTF 的 `FlagAttempt`；AWD、AWDP、KoH 及其他事实类型返回空结果。AWDP Break 的 Milestone/PerRound 唯一性由排行榜投影负责，预览不得把仍然正确的历史 Break 伪装为 `Duplicate`。该预览不会排队评测、修改 `GameplayFact`、追加 `competition_event` 或发布消息。
+比赛工作人员可读取有界、游标分页的历史裁决差异预览。该预览分析 CTF 的
+`FlagAttempt`，并额外识别 AWDP `BreakAttempt` 中当前结果恰为
+`Duplicate / DuplicateAchievement` 的旧版本异常；AWD、KoH 及其他事实类型返回空结果。
+AWDP Break 的 Milestone/PerRound 唯一性仍由排行榜投影负责，当前合法的 Correct
+Break 不会被预览标为 Duplicate；同轮、跨轮旧异常都只读报告
+`CurrentDuplicateShouldBeCorrect`，确定性预期结果为 Correct，且不分析 CTF 血榜。
+该预览不会排队评测、修改 `GameplayFact`、追加 `competition_event` 或发布消息。
 
 预览把当前 `GameplayFact` 与不可变事件流作为证据，而不是擅自补全已经不存在的历史：
 
 - CTF 重复 Flag 与血榜名次按权威 `(OccurredAt, Id)` 顺序比较；
+- AWDP 仅按当前 `Result` 与稳定 `FailureCode` 识别上述旧异常，不尝试从当前配置重建历史 Milestone/PerRound 首次成就；
 - 缺失、名次错误、意外出现及重复的血榜事件只报告、不修改；
 - 当前 `Correct` Flag 之前仍存在同队当前 `Correct` 属于确定性差异；
-- 当前结果存在但缺少对应 `GameplayFactAdjudicated` 事件，标记为 `NeedsReview`；
+- 当前结果存在但缺少对应 `GameplayFactAdjudicated` 事件，标记为 `NeedsReview`；该历史完整性检查同样适用于纳入预览的 AWDP Break；
 - 若当前队伍或会影响血榜名次的前序队伍已不是 Approved、已封禁或已删除，现有事件不足以无歧义重建发生时资格，因此不报告确定性血榜名次并标记为 `NeedsReview`；同一事实的重复血榜事件仍是确定性差异；
 - 不可变事件中存在互相冲突的裁决结果，或当前 `Duplicate` 的前序事实已不再为 `Correct`，标记为 `NeedsReview`，因为旧配置、旧 Flag 归属和完整旧结果均未保存；
 - 尤其不得静默推断或修复 `Correct → Wrong → Correct`。
