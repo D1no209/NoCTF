@@ -9,6 +9,21 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：AWD Flag 批次有界化
+
+- 用户通过 `/grilling` 选择“固定条数与总字节上限、仍按一次 HTTP 请求计限流”。功能提交
+  `994c4fff` 据此将 AWD `flags` 请求限制为最多 64 项，解码后 Flag UTF-8 正文合计最多 256 KiB；
+  单项仍维持 1–4096 UTF-8 bytes 且禁止 NUL。
+- 条数或总字节超限在读取比赛作用域及写入 GameplayFact 前返回稳定
+  `FlagBatchLimitExceeded`；任一单项格式错误仍返回 `FlagInvalid`。整批保持原子零写入，合法批次仍按
+  输入顺序一次持久化并为每项创建独立 GameplayFact；数据库不保存 Batch 实体。
+- 权威 API 与 AWD 文档已更新；批次仍只允许 AWD，CTF/AWDP 继续只接受单 Flag，Redis submission
+  rate limit 仍按一次 HTTP 请求计算。本阶段没有数据表、列、migration、snapshot 或版本号变化。
+- OpenAPI 已通过工具重新导出，TypeScript SDK 已重新生成并确认没有实质 diff（失败码位于 RFC 9457
+  extension，不形成重复 DTO）；生成目录没有手工修改。
+- 验证通过：批次边界应用测试 5/5、SubmitFlag 协议 5/5、OpenAPI 架构测试 1/1、完整 Release build
+  0 警告/0 错误及 `git diff --check`。尚未推送、部署或操作生产 GameplayFact。
+
 ## 2026-08-11 全量审计修复：无 receipt Runtime 恢复闭环
 
 - 功能提交 `347ca7e8` 修复 `Provisioning`、`Running` 或 `Stopping` 实例保留 `runner_id`、但缺少
