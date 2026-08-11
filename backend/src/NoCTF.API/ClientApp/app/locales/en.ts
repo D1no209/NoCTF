@@ -1492,5 +1492,20 @@ export const englishMessages: Record<string, string> = {
   "显示密码": "Show password",
   "完整历史": "Full history",
   "最近 30 天": "Last 30 days",
-  "无法确认动态历史访问范围，当前仅显示最近 30 天。": "Could not confirm access to the full event history. Showing the last 30 days only."
+  "无法确认动态历史访问范围，当前仅显示最近 30 天。": "Could not confirm access to the full event history. Showing the last 30 days only.",
+  "永久比赛事件": "Permanent competition events",
+  "比赛题目": "Competition challenges",
+  "通知与咨询": "Notifications and questions",
+  "比赛海报": "Competition poster",
+  "未知引用": "Unknown reference",
+  "竞赛仍有永久历史或业务引用，无法彻底删除。": "The competition still has permanent history or business references and cannot be physically deleted.",
+  "此竞赛已于 {time} 软删除。恢复不会丢失历史数据。": "This competition was soft-deleted at {time}. Restoring it will not discard historical data.",
+  "软删除可恢复；物理删除是独立操作，只适用于从未产生历史和业务引用的空竞赛。": "Soft deletion is reversible. Physical deletion is a separate operation available only for an empty competition that has never produced history or business references.",
+  "软删除竞赛": "Soft-delete competition",
+  "正在检查永久删除影响": "Checking permanent-deletion impact",
+  "永久删除受保护": "Permanent deletion is protected",
+  "以下永久历史或业务引用仍然存在，因此不能物理删除该竞赛。软删除与恢复不影响这些记录。": "The following permanent history or business references still exist, so this competition cannot be physically deleted. Soft deletion and restoration do not affect these records.",
+  "比赛事件永久保留，不能清理或修改。": "Competition events are retained permanently and cannot be removed or modified.",
+  "影响检查通过：该竞赛没有永久历史或业务引用，可直接物理删除，无需先软删除。": "Impact check passed: this competition has no permanent history or business references and may be physically deleted without soft-deleting it first.",
+  "影响检查已确认该空竞赛没有永久历史或业务引用。物理删除不可恢复，确认继续？": "The impact check confirms that this empty competition has no permanent history or business references. Physical deletion cannot be undone. Continue?"
 }

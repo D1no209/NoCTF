@@ -7,13 +7,18 @@ import {
   adminHardDeleteCompetition,
   adminMakeCompetitionVisible,
   adminPauseCompetition,
+  adminPreviewCompetitionHardDelete,
   adminPublishCompetition,
   adminRestoreCompetition,
   adminResumeCompetition,
   adminStartCompetition,
   adminValidateCompetitionStart,
 } from '~/api'
-import type { NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse } from '~/api'
+import type {
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse,
+  NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode,
+  NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse,
+} from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
@@ -161,6 +166,61 @@ const deleting = ref(false)
 const restoring = ref(false)
 const hardDeleting = ref(false)
 const deleteConfirm = ref<'soft' | 'hard' | null>(null)
+const hardDeletePreview = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse | null>(null)
+const hardDeletePreviewLoading = ref(false)
+const hardDeletePreviewError = ref<string | null>(null)
+let hardDeletePreviewRequest = 0
+
+const hardDeleteReferenceLabels: Record<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode, string> = {
+  HistoricalEvent: '永久比赛事件',
+  Team: '队伍',
+  CompetitionChallenge: '比赛题目',
+  GameplayFact: '比赛事实',
+  RuntimeInstance: '运行环境',
+  PatchUpload: '补丁上传',
+  DataExport: '数据导出',
+  Notification: '通知与咨询',
+  PosterFile: '比赛海报',
+}
+
+function hardDeleteReferenceLabel(code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode) {
+  return code ? translate(hardDeleteReferenceLabels[code]) : translate('未知引用')
+}
+
+function isHardDeletePreview(value: unknown): value is NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse {
+  return !!value && typeof value === 'object' && 'canHardDelete' in value && 'references' in value
+}
+
+async function loadHardDeletePreview() {
+  const request = ++hardDeletePreviewRequest
+  if (!canManagePermissions.value || !competition.value) {
+    hardDeletePreview.value = null
+    hardDeletePreviewError.value = null
+    hardDeletePreviewLoading.value = false
+    return
+  }
+  hardDeletePreviewLoading.value = true
+  hardDeletePreviewError.value = null
+  try {
+    const { data, error } = await adminPreviewCompetitionHardDelete({ path: { competitionId } })
+    if (error) throw error
+    if (request === hardDeletePreviewRequest) hardDeletePreview.value = data ?? null
+  }
+  catch (error) {
+    if (request === hardDeletePreviewRequest) {
+      hardDeletePreviewError.value = parseApiError(error).message
+    }
+  }
+  finally {
+    if (request === hardDeletePreviewRequest) hardDeletePreviewLoading.value = false
+  }
+}
+
+watch(
+  [() => competition.value?.id, canManagePermissions],
+  () => { void loadHardDeletePreview() },
+  { immediate: true },
+)
 
 async function softDelete() {
   deleting.value = true
@@ -169,6 +229,7 @@ async function softDelete() {
     if (error) throw error
     toast.success(translate("竞赛已删除"))
     await refresh()
+    await loadHardDeletePreview()
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -186,6 +247,7 @@ async function restore() {
     if (error) throw error
     toast.success(translate("竞赛已恢复"))
     await refresh()
+    await loadHardDeletePreview()
   }
   catch (e) {
     toast.error(parseApiError(e).message)
@@ -204,7 +266,13 @@ async function hardDelete() {
     await navigateTo('/admin/competitions')
   }
   catch (e) {
-    toast.error(parseApiError(e).message)
+    if (isHardDeletePreview(e)) {
+      hardDeletePreview.value = e
+      toast.error(translate('竞赛仍有永久历史或业务引用，无法彻底删除。'))
+    }
+    else {
+      toast.error(parseApiError(e).message)
+    }
   }
   finally {
     hardDeleting.value = false
@@ -299,16 +367,49 @@ async function submitDelete() {
       <CardHeader>
         <CardTitle class="text-destructive">{{ $t('危险区') }}</CardTitle>
         <CardDescription v-if="isDeleted">
-          {{ $t('此竞赛已于 {time} 删除。恢复不会丢失历史数据；彻底删除受历史引用保护。', { time: adminFormatDateTime(competition.deletedAt) }) }}
+          {{ $t('此竞赛已于 {time} 软删除。恢复不会丢失历史数据。', { time: adminFormatDateTime(competition.deletedAt) }) }}
         </CardDescription>
+        <CardDescription v-else>{{ $t('软删除可恢复；物理删除是独立操作，只适用于从未产生历史和业务引用的空竞赛。') }}</CardDescription>
       </CardHeader>
-      <CardContent class="flex flex-wrap items-center gap-2">
-        <Button v-if="!isDeleted" variant="outline" size="sm" :disabled="deleting" @click="deleteConfirm = 'soft'"> {{ $t('删除竞赛') }} </Button>
-        <template v-if="isDeleted && canManagePermissions">
-          <Button variant="outline" size="sm" :disabled="restoring" @click="restore">
-            <Spinner v-if="restoring" data-icon="inline-start" /> {{ $t('恢复已删除竞赛') }} </Button>
-          <Button variant="destructive" size="sm" :disabled="hardDeleting" @click="deleteConfirm = 'hard'"> {{ $t('彻底删除') }} </Button>
-        </template>
+      <CardContent class="flex flex-col items-start gap-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <Button v-if="!isDeleted" variant="outline" size="sm" :disabled="deleting" @click="deleteConfirm = 'soft'"> {{ $t('软删除竞赛') }} </Button>
+          <template v-if="isDeleted && canManagePermissions">
+            <Button variant="outline" size="sm" :disabled="restoring" @click="restore">
+              <Spinner v-if="restoring" data-icon="inline-start" /> {{ $t('恢复已删除竞赛') }} </Button>
+          </template>
+          <Button
+            v-if="canManagePermissions && hardDeletePreview?.canHardDelete"
+            variant="destructive"
+            size="sm"
+            :disabled="hardDeleting"
+            @click="deleteConfirm = 'hard'"
+          > {{ $t('彻底删除') }} </Button>
+        </div>
+
+        <div v-if="canManagePermissions && hardDeletePreviewLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner data-icon="inline-start" /> {{ $t('正在检查永久删除影响') }}
+        </div>
+        <Alert v-else-if="canManagePermissions && hardDeletePreviewError" variant="destructive" class="w-full">
+          <AlertDescription>{{ hardDeletePreviewError }}</AlertDescription>
+        </Alert>
+        <Alert v-else-if="canManagePermissions && hardDeletePreview && !hardDeletePreview.canHardDelete" class="w-full">
+          <AlertTitle>{{ $t('永久删除受保护') }}</AlertTitle>
+          <AlertDescription class="flex flex-col gap-2">
+            <span>{{ $t('以下永久历史或业务引用仍然存在，因此不能物理删除该竞赛。软删除与恢复不影响这些记录。') }}</span>
+            <span v-if="hardDeletePreview.references?.some(reference => reference.code === 'HistoricalEvent')" class="font-medium">
+              {{ $t('比赛事件永久保留，不能清理或修改。') }}
+            </span>
+            <span class="flex flex-wrap gap-2">
+              <Badge v-for="reference in hardDeletePreview.references" :key="reference.code" variant="outline">
+                {{ hardDeleteReferenceLabel(reference.code) }} · {{ reference.count ?? 0 }}
+              </Badge>
+            </span>
+          </AlertDescription>
+        </Alert>
+        <Alert v-else-if="canManagePermissions && hardDeletePreview?.canHardDelete" class="w-full">
+          <AlertDescription>{{ $t('影响检查通过：该竞赛没有永久历史或业务引用，可直接物理删除，无需先软删除。') }}</AlertDescription>
+        </Alert>
       </CardContent>
     </Card>
 
@@ -339,7 +440,7 @@ async function submitDelete() {
           <AlertDialogTitle>{{ deleteConfirm === 'hard' ? $t('彻底删除竞赛') : $t('删除竞赛') }}</AlertDialogTitle>
           <AlertDialogDescription>
             {{ deleteConfirm === 'hard'
-              ? $t('彻底删除不可恢复,仅适用于没有任何持久数据的空竞赛。确认继续?')
+              ? $t('影响检查已确认该空竞赛没有永久历史或业务引用。物理删除不可恢复，确认继续？')
               : $t('删除后竞赛将对选手不可见,可稍后恢复。确认删除?') }}
           </AlertDialogDescription>
         </AlertDialogHeader>

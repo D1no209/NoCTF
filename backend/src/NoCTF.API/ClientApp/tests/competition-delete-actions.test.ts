@@ -12,7 +12,7 @@ describe('competition deletion actions', () => {
     expect(page).toContain(':disabled="deleting || hardDeleting"')
   })
 
-  test('shows mutually exclusive delete and restore controls from server state', async () => {
+  test('separates soft deletion from server-authorized permanent deletion', async () => {
     const detailPage = await Bun.file(
       new URL('../app/pages/admin/competitions/[id]/index.vue', import.meta.url),
     ).text()
@@ -22,7 +22,10 @@ describe('competition deletion actions', () => {
 
     expect(detailPage).toContain('const isDeleted = computed(() => !!competition.value?.deletedAt)')
     expect(detailPage).toContain('v-if="!isDeleted"')
-    expect(detailPage).toContain('v-if="isDeleted && canManagePermissions"')
+    expect(detailPage).toContain('adminPreviewCompetitionHardDelete')
+    expect(detailPage).toContain('hardDeletePreview?.canHardDelete')
+    expect(detailPage).toContain("reference.code === 'HistoricalEvent'")
+    expect(detailPage).toContain('无需先软删除')
     expect(listPage).toContain('query: { includeDeleted: includeDeleted.value }')
     expect(listPage).toContain('<Badge v-if="c.deletedAt" variant="destructive">{{ $t(\'已删除\') }}</Badge>')
   })
