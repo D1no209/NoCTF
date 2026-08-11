@@ -193,6 +193,12 @@ public sealed class ChallengeHintStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var competitionIsRunning = await db.Competitions.AsNoTracking().AnyAsync(
+            competition => competition.Id == competitionId
+                && competition.Status == CompetitionStatus.Running,
+            ct);
+        if (!competitionIsRunning)
+            return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
         var teamId = await db.Teams.AsNoTracking()
             .Where(team =>
                 team.CompetitionId == competitionId &&
