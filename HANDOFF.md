@@ -9,6 +9,22 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：Runtime 隔离网络语义校正
+
+- 用户在 `/grilling` 中明确选择保留 Docker 当前 bridge 行为，不增加宿主防火墙或 Egress Gateway。
+  功能提交 `682dae90` 因而将跨 Provider 的 `RuntimeEgressPolicy.DenyAll` 更名为
+  `RuntimeEgressPolicy.Isolated`；枚举数值仍为 0，既有 DefinitionJson 与前端配置保持兼容。
+- Docker Container/Compose 的 `Isolated` 使用每个 Runtime 独立、且不接入平台网络的 routed bridge；
+  它隔离其他 Runtime 和平台容器网络，但 Docker 默认 NAT 外联仍存在，不能声称阻断公网、宿主、局域网
+  或云元数据。`InternetOnly` 继续在保存和执行边界拒绝。Compose 生成结果继续显式
+  `internal: false`，并由测试锁定，避免未来再次把名称误解为断网保证。
+- Kubernetes 的同名 `Isolated` 仍由每 Runtime NetworkPolicy 实施缺省拒绝，只放行同一 Runtime、DNS、
+  精确回调与声明的入站；`InternetOnly` 仍仅增加排除受保护网段后的公网 IPv4。权威 Runtime 文档已明确
+  两个 Provider 的最低共同能力名称不代表 egress 等价。
+- 没有新增表、列、migration、snapshot、HTTP/OpenAPI、生成 SDK 或版本号变化。验证：Release solution
+  build 0 警告/0 错误；Compose policy 16/16、Runtime claim 11/11、Kubernetes lifecycle 24/24，
+  ClientApp game-config 5/5 与 `git diff --check` 通过。尚未推送、部署或操作生产 Runtime。
+
 ## 2026-08-11 全量审计修复：前端生成契约边界与咨询历史分页
 
 - `5c204b03`、`99ae4e65`、`d579509e`、`3b1d3aab`、`fddbaf8a`、`dee9fa63`、
