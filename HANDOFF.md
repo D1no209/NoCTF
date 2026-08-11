@@ -9,6 +9,28 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：前端生成契约边界与咨询历史分页
+
+- `5c204b03`、`99ae4e65`、`d579509e`、`3b1d3aab`、`fddbaf8a`、`dee9fa63`、
+  `878dae75`、`c8c07953`、`c0528d35`、`4e79f9f3` 与 `e77bd322` 收敛前端协议边界：认证刷新使用
+  隔离的生成 Client 与生成 Endpoint，是否刷新只由请求是否携带 Access Token 判定；角色、比赛模式、
+  状态、GameplayFact 筛选和标签映射均使用生成协议类型，不再维护漂移的手写枚举或 DTO。
+- 题目附件、随机附件、平台日志、平台审计、比赛事件和数据归档下载全部由生成 SDK 构造请求并以 Blob
+  解析；统一下载工具只负责校验生成客户端响应、解析文件名和触发浏览器保存，不再拼接 API 路径或自行
+  读取 Token。平台 Logo 使用后端返回的带 revision URL。新增边界测试递归禁止产品源码出现手写 REST
+  路径或 `$fetch`；唯一保留的 raw `fetch` 只用于重放生成 SDK 已构造且携带认证的 `Request`。
+- `6e8c93b5` 将参赛者咨询列表接入后端签名游标，每页 50 条并提供明确“加载更多”。首屏列表与
+  `?question=` 深链详情并行读取；列表、详情、创建、回复及状态变化按 id、revision、更新时间合并，
+  快速切换详情使用 latest-request fence，SignalR 连续失效使用 trailing refresh，旧响应不能覆盖新事实。
+  失败时保留已加载列表、详情与输入，后台不可见时不会误把新回复标记为已读。
+- 合并时保留既有 cursor generation、列表错误态和 SignalR 提前刷新逻辑，并以 `bf31eae2` 修正隔离
+  生成刷新客户端对应的测试断言；没有修改手写 OpenAPI/SDK 产物、数据模型、表、migration、snapshot
+  或版本号。
+- 统一分支验证：ClientApp `bun test` 144/144、`bun run typecheck`、`bun run build` 和
+  `git diff --check` 通过；Nuxt 只保留既有大 chunk、插件耗时和第三方 trailing-slash deprecation
+  Warning。尚未推送、部署或操作生产通知/咨询数据；浏览器动态验收留到所有审计修复合并后使用
+  Microsoft Edge 与可丢弃数据统一进行。
+
 ## 2026-08-11 全量审计修复：用途级上传上限与 AWDP Fix 配置
 
 - 用户通过 `/grilling` 选择用途级上传上限，并明确要求 Fix 包可在题目管理中配置。功能提交
