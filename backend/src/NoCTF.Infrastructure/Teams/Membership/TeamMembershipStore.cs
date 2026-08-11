@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Membership;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Infrastructure.Teams;
 
 namespace NoCTF.Infrastructure.Teams.Membership;
 
@@ -24,8 +26,15 @@ public sealed class TeamMembershipStore(
         DateTimeOffset now,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await AcquireMembershipLockAsync(competitionId, userId, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted,
+            ct);
+        var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
+            db,
+            competitionId,
+            ct);
+        if (competition is null)
+            return TeamMembershipFailure.CompetitionNotFound;
         var team = await db.Teams.SingleOrDefaultAsync(
             item => item.CompetitionId == competitionId
                 && item.InvitationToken == invitationToken
@@ -42,11 +51,6 @@ public sealed class TeamMembershipStore(
                 ct))
             return TeamMembershipFailure.UserAlreadyRegistered;
 
-        var competition = await db.Competitions.SingleOrDefaultAsync(
-            item => item.Id == competitionId,
-            ct);
-        if (competition is null)
-            return TeamMembershipFailure.CompetitionNotFound;
         if (TeamMembershipPolicy.IsMembershipChangeLocked(competition.Status))
             return TeamMembershipFailure.MembershipLocked;
         if (team.MemberIds.Length >= competition.MaxTeamMembers)
@@ -62,8 +66,8 @@ public sealed class TeamMembershipStore(
             ActorUserId: userId,
             RelatedUserId: userId,
             TeamId: team.Id), ct);
+        competition.LeaderboardDirty = true;
         await db.SaveChangesAsync(ct);
-        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;
@@ -76,10 +80,19 @@ public sealed class TeamMembershipStore(
         string token,
         CancellationToken ct)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted,
+            ct);
+        var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
+            db,
+            competitionId,
+            ct);
+        if (competition is null)
+            return (null, TeamMembershipFailure.CompetitionNotFound);
         var team = await LoadAsync(competitionId, teamId, ct);
         if (team is null)
             return (null, TeamMembershipFailure.TeamNotFound);
-        if (team.CaptainId != actorId && !await IsManagerAsync(competitionId, actorId, ct))
+        if (team.CaptainId != actorId && !IsManager(competition, actorId))
             return (null, TeamMembershipFailure.TeamForbidden);
 
         team.InvitationToken = token;
@@ -92,6 +105,7 @@ public sealed class TeamMembershipStore(
             ActorUserId: actorId,
             TeamId: teamId), ct);
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return (token, null);
     }
@@ -103,14 +117,21 @@ public sealed class TeamMembershipStore(
         Guid actorId,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await AcquireMembershipLockAsync(competitionId, targetUserId, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted,
+            ct);
+        var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
+            db,
+            competitionId,
+            ct);
+        if (competition is null)
+            return TeamMembershipFailure.CompetitionNotFound;
         var team = await LoadAsync(competitionId, teamId, ct);
         if (team is null)
             return TeamMembershipFailure.TeamNotFound;
         if (team.CaptainId == targetUserId)
             return TeamMembershipFailure.CaptainCannotBeRemoved;
-        if (team.CaptainId != actorId && !await IsManagerAsync(competitionId, actorId, ct))
+        if (team.CaptainId != actorId && !IsManager(competition, actorId))
             return TeamMembershipFailure.TeamForbidden;
         if (!team.MemberIds.Contains(targetUserId))
             return TeamMembershipFailure.MemberNotFound;
@@ -125,8 +146,8 @@ public sealed class TeamMembershipStore(
             ActorUserId: actorId,
             RelatedUserId: targetUserId,
             TeamId: teamId), ct);
+        competition.LeaderboardDirty = true;
         await db.SaveChangesAsync(ct);
-        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;
@@ -137,8 +158,15 @@ public sealed class TeamMembershipStore(
         Guid userId,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await AcquireMembershipLockAsync(competitionId, userId, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted,
+            ct);
+        var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
+            db,
+            competitionId,
+            ct);
+        if (competition is null)
+            return TeamMembershipFailure.CompetitionNotFound;
         var team = await db.Teams.SingleOrDefaultAsync(
             item => item.CompetitionId == competitionId
                 && item.DeletedAt == null
@@ -159,8 +187,8 @@ public sealed class TeamMembershipStore(
             ActorUserId: userId,
             RelatedUserId: userId,
             TeamId: team.Id), ct);
+        competition.LeaderboardDirty = true;
         await db.SaveChangesAsync(ct);
-        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;
@@ -173,8 +201,15 @@ public sealed class TeamMembershipStore(
         Guid newCaptainId,
         CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        await AcquireMembershipLockAsync(competitionId, newCaptainId, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted,
+            ct);
+        var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
+            db,
+            competitionId,
+            ct);
+        if (competition is null)
+            return TeamMembershipFailure.CompetitionNotFound;
         var team = await LoadAsync(competitionId, teamId, ct);
         if (team is null)
             return TeamMembershipFailure.TeamNotFound;
@@ -193,8 +228,8 @@ public sealed class TeamMembershipStore(
             ActorUserId: actorId,
             RelatedUserId: newCaptainId,
             TeamId: teamId), ct);
+        competition.LeaderboardDirty = true;
         await db.SaveChangesAsync(ct);
-        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;
@@ -210,21 +245,6 @@ public sealed class TeamMembershipStore(
                 && item.DeletedAt == null,
             ct);
 
-    private Task<bool> IsManagerAsync(Guid competitionId, Guid userId, CancellationToken ct) =>
-        db.Competitions.AsNoTracking().AnyAsync(
-            competition => competition.Id == competitionId
-                && (competition.OwnerId == userId || competition.ManagerIds.Contains(userId)),
-            ct);
-
-    private async Task AcquireMembershipLockAsync(
-        Guid competitionId,
-        Guid userId,
-        CancellationToken ct)
-    {
-        var user = await db.Users.SingleOrDefaultAsync(
-            candidate => candidate.Id == userId,
-            ct);
-        if (user is not null)
-            user.ConcurrencyVersion = checked(user.ConcurrencyVersion + 1);
-    }
+    private static bool IsManager(Competition competition, Guid userId) =>
+        competition.OwnerId == userId || competition.ManagerIds.Contains(userId);
 }

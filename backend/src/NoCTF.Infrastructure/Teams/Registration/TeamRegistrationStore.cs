@@ -7,6 +7,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Infrastructure.Teams;
 
 namespace NoCTF.Infrastructure.Teams.Registration;
 
@@ -32,15 +33,13 @@ public sealed class TeamRegistrationStore(
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
     {
         var name = command.Name.Trim();
-        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, ct);
-        var competition = await db.Competitions.AsNoTracking()
-            .Where(item => item.Id == command.CompetitionId && item.DeletedAt == null)
-            .Select(item => new
-            {
-                item.Status,
-                item.AllowTeamRegistrationWhileRunning
-            })
-            .SingleOrDefaultAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            System.Data.IsolationLevel.ReadCommitted,
+            ct);
+        var competition = await CompetitionTeamMutationCriticalSection.AcquireAsync(
+            db,
+            command.CompetitionId,
+            ct);
         if (competition is null) return new(null, TeamRegistrationFailure.CompetitionNotFound);
         if (competition.Status is CompetitionStatus.Paused or CompetitionStatus.Finished
             || competition.Status == CompetitionStatus.Running
@@ -76,19 +75,19 @@ public sealed class TeamRegistrationStore(
             RelatedUserId: command.UserId,
             TeamId: team.Id,
             TeamRegistrationStatus: status), ct);
+        competition.LeaderboardDirty = true;
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardDirty.MarkAsync(db, command.CompetitionId, ct);
-            await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
-            return new(Map(team), null);
         }
         catch (DbUpdateException)
         {
             await transaction.RollbackAsync(ct);
             return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
         }
+        await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(Map(team), null);
     }
 
     public async Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken ct) =>
