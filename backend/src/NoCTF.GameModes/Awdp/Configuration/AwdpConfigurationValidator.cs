@@ -41,6 +41,12 @@ public static class AwdpConfigurationValidator
             errors.Add("PatchTimeoutSeconds must be positive when configured.");
         if (configuration.ReadyTimeoutSeconds is <= 0)
             errors.Add("ReadyTimeoutSeconds must be positive when configured.");
+        if (configuration.MaximumPatchUploadBytes is <= 0
+            or > NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.HardMaximumArchiveBytes)
+        {
+            errors.Add(
+                $"MaximumPatchUploadBytes must be between 1 and {NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.HardMaximumArchiveBytes} bytes when configured.");
+        }
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(configuration.Checker, "Checker"));
         ValidateRuntime(configuration.Runtime, errors);
@@ -67,6 +73,12 @@ public static class AwdpConfigurationValidator
             errors.Add("PatchTimeoutSeconds must be positive.");
         if (configuration.ReadyTimeoutSeconds <= 0)
             errors.Add("ReadyTimeoutSeconds must be positive.");
+        if (configuration.MaximumPatchUploadBytes is <= 0
+            or > NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.HardMaximumArchiveBytes)
+        {
+            errors.Add(
+                $"MaximumPatchUploadBytes must be between 1 and {NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.HardMaximumArchiveBytes} bytes.");
+        }
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(
             configuration.Runtime));
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(

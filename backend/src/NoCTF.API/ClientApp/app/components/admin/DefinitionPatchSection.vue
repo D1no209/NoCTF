@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import type { DefinitionModel } from '~/utils/game-config'
+import {
+  bytesToMib,
+  HARD_MAXIMUM_PATCH_UPLOAD_BYTES,
+  mibToBytes,
+} from '~/utils/game-config'
 
 withDefaults(defineProps<{
   model: DefinitionModel
@@ -55,6 +60,19 @@ withDefaults(defineProps<{
           <FieldDescription>{{ $t('补丁应用后等待服务就绪的时间。') }}</FieldDescription>
         </Field>
       </div>
+      <Field>
+        <FieldLabel>{{ $t('Fix 包上传上限(MiB)') }}</FieldLabel>
+        <NullableNumberInput
+          :model-value="bytesToMib(model.maximumPatchUploadBytes)"
+          :min="1"
+          :max="bytesToMib(HARD_MAXIMUM_PATCH_UPLOAD_BYTES) ?? undefined"
+          :disabled="disabled"
+          @update:model-value="model.maximumPatchUploadBytes = mibToBytes($event)"
+        />
+        <FieldDescription>
+          {{ $t('限制选手上传的压缩包大小；默认 256 MiB，最大 1024 MiB。') }}
+        </FieldDescription>
+      </Field>
     </FieldGroup>
   </FieldSet>
 </template>

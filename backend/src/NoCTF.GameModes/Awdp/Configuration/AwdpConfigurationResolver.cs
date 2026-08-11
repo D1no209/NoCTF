@@ -41,7 +41,9 @@ public static class AwdpConfigurationResolver
             definition.PatchCommand,
             definition.PatchTimeoutSeconds ?? DefaultPatchTimeoutSeconds,
             definition.Checker,
-            definition.ReadyTimeoutSeconds ?? DefaultReadyTimeoutSeconds);
+            definition.ReadyTimeoutSeconds ?? DefaultReadyTimeoutSeconds,
+            definition.MaximumPatchUploadBytes
+                ?? NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.DefaultMaximumArchiveBytes);
 
     public static AwdpEffectiveConfiguration Resolve(
         AwdpConfiguration competition,

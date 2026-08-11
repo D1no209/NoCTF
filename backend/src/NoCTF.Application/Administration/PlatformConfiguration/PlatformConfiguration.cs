@@ -6,7 +6,6 @@ public static class PlatformConfigurationRules
 {
     public const int MaximumNameLength = 100;
     public const int MaximumDescriptionLength = 500;
-    public const int MaximumLogoBytes = 5 * 1024 * 1024;
 }
 
 public sealed record PlatformConfigurationView(
@@ -106,8 +105,25 @@ public sealed class ManagePlatformConfiguration(
         long expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default)
+        => await ReplaceLogoAsync(
+            fileName,
+            contentType,
+            content,
+            FileUploadLimits.Default.MaximumLogoBytes,
+            expectedRevision,
+            now,
+            ct);
+
+    public async Task<PlatformLogoUpdateResult> ReplaceLogoAsync(
+        string fileName,
+        string contentType,
+        ReadOnlyMemory<byte> content,
+        long maximumBytes,
+        long expectedRevision,
+        DateTimeOffset now,
+        CancellationToken ct = default)
     {
-        if (content.IsEmpty || content.Length > PlatformConfigurationRules.MaximumLogoBytes)
+        if (content.IsEmpty || content.Length > maximumBytes)
             return new(PlatformLogoUpdateState.InvalidSize);
 
         var image = DetectImage(content.Span);

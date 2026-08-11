@@ -98,7 +98,7 @@ URL，Stop/Reset/失败回滚按 Runtime identity 清理容器、Compose project
 
 ## 请求大小
 
-NoCTF 应用层不设置 Payload Too Large，不主动返回 413：Kestrel `MaxRequestBodySize=null`，multipart `MultipartBodyLengthLimit=long.MaxValue`，Endpoint 不附加 RequestSizeLimit。部署代理若设置外部上限属于运维策略，必须与产品方明确，不能被应用文档误称为业务规则。Flag 单项/解包安全限制仍在业务/Runner 层执行；无效 JSON/Flag 是 400，无法处理的 archive 是 422，均不是 413。
+NoCTF 继续让 Kestrel 的全局 `MaxRequestBodySize=null`、multipart `MultipartBodyLengthLimit=long.MaxValue`，但每个上传 Endpoint 都设置“用途文件上限 + 64 KiB multipart 开销”的请求硬上限，防止在模型绑定前无限写临时盘。应用随后执行精确文件上限，超过上限返回带稳定失败码的 413，并在对象存储写入前终止。反向代理的外部上限不得低于 Endpoint 硬上限，否则会破坏应用错误契约。
 
 ## 配置/Secret
 

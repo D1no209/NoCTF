@@ -6,8 +6,6 @@ namespace NoCTF.Application.Authentication.Account;
 public static class UserProfileRules
 {
     public const int MaximumDescriptionLength = 500;
-    public const int MaximumAvatarBytes = 3 * 1024 * 1024;
-    public const int MaximumAvatarRequestBytes = MaximumAvatarBytes + 64 * 1024;
     public const int AvatarOutputSize = 512;
     public const int MaximumAvatarDimension = 8192;
     public const long MaximumAvatarPixels = 32_000_000;
@@ -89,8 +87,25 @@ public sealed class ReplaceCurrentUserAvatar(
         ReadOnlyMemory<byte> content,
         DateTimeOffset now,
         CancellationToken ct = default)
+        => await ExecuteAsync(
+            userId,
+            fileName,
+            contentType,
+            content,
+            FileUploadLimits.Default.MaximumAvatarBytes,
+            now,
+            ct);
+
+    public async Task<AvatarReplacementResult> ExecuteAsync(
+        Guid userId,
+        string fileName,
+        string contentType,
+        ReadOnlyMemory<byte> content,
+        long maximumBytes,
+        DateTimeOffset now,
+        CancellationToken ct = default)
     {
-        if (content.IsEmpty || content.Length > UserProfileRules.MaximumAvatarBytes)
+        if (content.IsEmpty || content.Length > maximumBytes)
             return AvatarReplacementResult.Rejected(AvatarImageFailure.SizeInvalid);
 
         var processing = imageProcessor.Process(content);

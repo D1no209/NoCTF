@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Attachments;
+using NoCTF.Application.Storage;
 
 namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 
@@ -26,7 +27,8 @@ public sealed class UploadChallengeAttachmentValidator : Validator<UploadChallen
 
 public sealed class UploadChallengeAttachmentEndpoint(
     ManageChallengeAttachments attachments,
-    IUserContext user)
+    IUserContext user,
+    FileUploadLimits uploadLimits)
     : Endpoint<UploadChallengeAttachmentRequest, Results<Created<ChallengeAttachmentResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
@@ -34,7 +36,12 @@ public sealed class UploadChallengeAttachmentEndpoint(
         Post("/admin/challenges/{challengeId}/attachments");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.WithName("AdminChallengeBankUploadAttachment"));
+        MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
+            uploadLimits.MaximumAttachmentBytes));
+        Description(builder => builder
+            .WithName("AdminChallengeBankUploadAttachment")
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status413PayloadTooLarge));
         Summary(summary =>
         {
             summary.Summary = "Uploads a challenge template attachment.";
@@ -46,6 +53,15 @@ public sealed class UploadChallengeAttachmentEndpoint(
         UploadChallengeAttachmentRequest request,
         CancellationToken ct)
     {
+        if (request.File.Length > uploadLimits.MaximumAttachmentBytes)
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status413PayloadTooLarge,
+                title: "Attachment is too large.",
+                detail: $"Attachment uploads cannot exceed {uploadLimits.MaximumAttachmentBytes} bytes.",
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()
+                });
         await using var content = request.File.OpenReadStream();
         var result = await attachments.UploadAsync(
             Route<Guid>("challengeId"),

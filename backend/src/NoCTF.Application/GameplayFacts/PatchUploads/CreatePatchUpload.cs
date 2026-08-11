@@ -9,7 +9,14 @@ public sealed record PatchUploadScope(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid TeamId,
-    Guid UserId);
+    Guid UserId,
+    long MaximumArchiveBytes = PatchUploadRules.DefaultMaximumArchiveBytes);
+
+public static class PatchUploadRules
+{
+    public const long DefaultMaximumArchiveBytes = 256L * 1024 * 1024;
+    public const long HardMaximumArchiveBytes = 1024L * 1024 * 1024;
+}
 
 public sealed record CreatedPatchUpload(Guid PatchUploadId);
 
@@ -17,6 +24,7 @@ public enum PatchUploadFailureCode
 {
     PatchUploadNotAvailable,
     ArchiveStreamNotSeekable,
+    ArchiveTooLarge,
     ArchiveInvalid,
     PatchUploadConflict
 }
@@ -64,6 +72,10 @@ public sealed class CreatePatchUpload(
             return OperationResult<CreatedPatchUpload, PatchUploadFailureCode>.Failure(
                 PatchUploadFailureCode.ArchiveStreamNotSeekable,
                 "The archive stream must support validation before storage.");
+        if (content.Length > scope.MaximumArchiveBytes)
+            return OperationResult<CreatedPatchUpload, PatchUploadFailureCode>.Failure(
+                PatchUploadFailureCode.ArchiveTooLarge,
+                $"The archive exceeds the configured {scope.MaximumArchiveBytes}-byte upload limit.");
 
         var validation = ValidateArchive(content);
         content.Position = 0;

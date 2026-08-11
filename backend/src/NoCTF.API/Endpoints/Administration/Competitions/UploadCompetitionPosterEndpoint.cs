@@ -1,6 +1,7 @@
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Http;
 using NoCTF.API.Security;
 using NoCTF.Application.Storage;
 
@@ -18,7 +19,7 @@ public sealed class UploadCompetitionPosterValidator : Validator<UploadCompetiti
     public UploadCompetitionPosterValidator()
     {
         RuleFor(request => request.File).NotNull();
-        RuleFor(request => request.File.Length).InclusiveBetween(1, 20 * 1024 * 1024)
+        RuleFor(request => request.File.Length).GreaterThan(0)
             .When(request => request.File is not null);
         RuleFor(request => request.File.ContentType)
             .Must(value => ContentTypes.Contains(value, StringComparer.OrdinalIgnoreCase))
@@ -31,16 +32,22 @@ public sealed record CompetitionPosterResponse(Guid FileId, string ContentType);
 
 public sealed class UploadCompetitionPosterEndpoint(
     ManageBusinessImages images,
-    IUserContext user)
+    IUserContext user,
+    FileUploadLimits uploadLimits)
     : Endpoint<UploadCompetitionPosterRequest,
-        Results<Ok<CompetitionPosterResponse>, NotFound, ForbidHttpResult>>
+        Results<Ok<CompetitionPosterResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/poster");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        Description(builder => builder.WithName("AdminCompetitionPoster_Replace"));
+        MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
+            uploadLimits.MaximumPosterBytes));
+        Description(builder => builder
+            .WithName("AdminCompetitionPoster_Replace")
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status413PayloadTooLarge));
         Summary(summary =>
         {
             summary.Summary = "Replaces a competition poster.";
@@ -49,9 +56,18 @@ public sealed class UploadCompetitionPosterEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<CompetitionPosterResponse>, NotFound, ForbidHttpResult>>
+    public override async Task<Results<Ok<CompetitionPosterResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
         ExecuteAsync(UploadCompetitionPosterRequest request, CancellationToken ct)
     {
+        if (request.File.Length > uploadLimits.MaximumPosterBytes)
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status413PayloadTooLarge,
+                title: "Poster is too large.",
+                detail: $"Poster uploads cannot exceed {uploadLimits.MaximumPosterBytes} bytes.",
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()
+                });
         await using var content = request.File.OpenReadStream();
         var result = await images.ReplaceCompetitionPosterAsync(
             user.UserId,

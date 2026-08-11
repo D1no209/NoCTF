@@ -1727,6 +1727,7 @@ export type TeamAvatarReplaceErrors = {
      * Not Found
      */
     404: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type TeamAvatarReplaceError = TeamAvatarReplaceErrors[keyof TeamAvatarReplaceErrors];
@@ -2845,6 +2846,7 @@ export type UploadPatchEndpointErrors = {
      * Not Found
      */
     404: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
     422: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
@@ -3807,6 +3809,7 @@ export type AuthenticationUploadMyAvatarErrors = {
      * Not Found
      */
     404: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type AuthenticationUploadMyAvatarError = AuthenticationUploadMyAvatarErrors[keyof AuthenticationUploadMyAvatarErrors];
@@ -5348,6 +5351,7 @@ export type AdminPlatformUploadLogoErrors = {
      * Forbidden
      */
     403: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type AdminPlatformUploadLogoError = AdminPlatformUploadLogoErrors[keyof AdminPlatformUploadLogoErrors];
@@ -5798,6 +5802,7 @@ export type AdminCompetitionPosterReplaceErrors = {
      * Not Found
      */
     404: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type AdminCompetitionPosterReplaceError = AdminCompetitionPosterReplaceErrors[keyof AdminCompetitionPosterReplaceErrors];
@@ -8070,6 +8075,7 @@ export type AdminChallengeBankUploadAttachmentErrors = {
      * Not Found
      */
     404: unknown;
+    413: MicrosoftAspNetCoreMvcProblemDetails;
 };
 
 export type AdminChallengeBankUploadAttachmentError = AdminChallengeBankUploadAttachmentErrors[keyof AdminChallengeBankUploadAttachmentErrors];

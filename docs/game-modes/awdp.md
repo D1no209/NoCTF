@@ -13,7 +13,7 @@ MaxBreakSubmissions / MaxFixSubmissions: int       // <=0 无限
 EvaluationDispatchMode: Automatic | ManualBatch
 ```
 
-覆盖数值 0 是显式 0，只有 null 表示继承。Runtime、Checker、Patch 和 ReadyTimeoutSeconds 只属于 Challenge.DefinitionJson，Competition 配置和 CompetitionChallenge.RulesJson 均不得声明或覆盖。复用 Challenge 模板即复用相同判题定义。所有 JSON 带 schemaVersion，未知版本拒绝。
+覆盖数值 0 是显式 0，只有 null 表示继承。Runtime、Checker、Patch、ReadyTimeoutSeconds 和 `MaximumPatchUploadBytes` 只属于 Challenge.DefinitionJson，Competition 配置和 CompetitionChallenge.RulesJson 均不得声明或覆盖。`MaximumPatchUploadBytes` 默认 256 MiB，可在题目管理中调整，允许范围为 1 byte 至 1 GiB。复用 Challenge 模板即复用相同判题定义。所有 JSON 带 schemaVersion，未知版本拒绝。
 
 ## 基本模型
 

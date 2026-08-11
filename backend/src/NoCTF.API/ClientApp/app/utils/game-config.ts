@@ -149,7 +149,11 @@ export interface DefinitionModel {
   patchCommand: string[]
   patchTimeoutSeconds: number | null
   readyTimeoutSeconds: number | null
+  maximumPatchUploadBytes: number | null
 }
+
+export const DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES = 256 * 1024 * 1024
+export const HARD_MAXIMUM_PATCH_UPLOAD_BYTES = 1024 * 1024 * 1024
 
 export function emptyContainerDefinition(): ContainerDefinitionModel {
   return {
@@ -205,6 +209,7 @@ export function emptyDefinition(mode: GameModeValue): DefinitionModel {
     patchCommand: [],
     patchTimeoutSeconds: null,
     readyTimeoutSeconds: null,
+    maximumPatchUploadBytes: mode === 'Awdp' ? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES : null,
   }
 }
 
@@ -385,6 +390,8 @@ export function parseDefinition(json: string | null | undefined): DefinitionMode
   model.patchCommand = asStringArray(obj.patchCommand)
   model.patchTimeoutSeconds = asNumber(obj.patchTimeoutSeconds)
   model.readyTimeoutSeconds = asNumber(obj.readyTimeoutSeconds)
+  model.maximumPatchUploadBytes = asNumber(obj.maximumPatchUploadBytes)
+    ?? DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES
   return model
 }
 
@@ -543,6 +550,7 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
     putNumber(obj, 'patchTimeoutSeconds', model.patchTimeoutSeconds)
     if (model.checkerJob) obj.checker = serializeRunnerJob(model.checkerJob)
     putNumber(obj, 'readyTimeoutSeconds', model.readyTimeoutSeconds)
+    putNumber(obj, 'maximumPatchUploadBytes', model.maximumPatchUploadBytes)
   }
   return JSON.stringify(obj, null, 2)
 }

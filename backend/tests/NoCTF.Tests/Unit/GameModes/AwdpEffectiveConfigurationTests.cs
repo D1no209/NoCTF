@@ -1,4 +1,5 @@
 using NoCTF.Application.Competitions.Lifecycle;
+using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
@@ -30,6 +31,8 @@ public sealed class AwdpEffectiveConfigurationTests
         await Assert.That(effective.PatchEntrypoint).IsEqualTo("fix.sh");
         await Assert.That(effective.PatchTimeoutSeconds).IsEqualTo(60);
         await Assert.That(effective.ReadyTimeoutSeconds).IsEqualTo(30);
+        await Assert.That(effective.MaximumPatchUploadBytes)
+            .IsEqualTo(PatchUploadRules.DefaultMaximumArchiveBytes);
     }
 
     [Test]

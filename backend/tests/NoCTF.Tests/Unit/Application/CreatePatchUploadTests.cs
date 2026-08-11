@@ -10,6 +10,31 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class CreatePatchUploadTests
 {
     [Test]
+    public async Task Oversized_archive_is_rejected_before_storage()
+    {
+        var store = new RejectingPatchUploadStore(maximumArchiveBytes: 1);
+        var objects = new RecordingObjectStorage();
+        var registry = new RecordingUploadRegistry();
+        var useCase = new CreatePatchUpload(
+            store,
+            new ManagedFileUploads(registry, objects));
+        await using var archive = new MemoryStream(CreatePatchArchive());
+
+        var result = await useCase.ExecuteAsync(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            "fix.tar.gz",
+            "application/gzip",
+            archive,
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.FailureCode).IsEqualTo(PatchUploadFailureCode.ArchiveTooLarge);
+        await Assert.That(registry.RegisteredFileId).IsNull();
+        await Assert.That(objects.StoredObjectKey).IsNull();
+    }
+
+    [Test]
     public async Task Rejected_database_save_deletes_the_new_object()
     {
         var store = new RejectingPatchUploadStore();
@@ -81,7 +106,8 @@ public sealed class CreatePatchUploadTests
         return output.ToArray();
     }
 
-    private sealed class RejectingPatchUploadStore : IPatchUploadStore
+    private sealed class RejectingPatchUploadStore(
+        long maximumArchiveBytes = PatchUploadRules.DefaultMaximumArchiveBytes) : IPatchUploadStore
     {
         public Task<PatchUploadScope?> ResolveScopeAsync(
             Guid competitionId,
@@ -92,7 +118,8 @@ public sealed class CreatePatchUploadTests
                 competitionId,
                 competitionChallengeId,
                 Guid.CreateVersion7(),
-                userId));
+                userId,
+                maximumArchiveBytes));
 
         public Task<bool> SaveAsync(
             Guid patchUploadId,

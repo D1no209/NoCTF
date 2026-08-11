@@ -35,6 +35,23 @@ public static class ServiceRegistration
         bool development = false,
         IReadOnlyCollection<System.Reflection.Assembly>? endpointAssemblies = null)
     {
+        var uploadLimits = new FileUploadLimits(
+            configuration.GetValue(
+                "Uploads:MaximumAvatarBytes",
+                FileUploadLimits.Default.MaximumAvatarBytes),
+            configuration.GetValue(
+                "Uploads:MaximumLogoBytes",
+                FileUploadLimits.Default.MaximumLogoBytes),
+            configuration.GetValue(
+                "Uploads:MaximumPosterBytes",
+                FileUploadLimits.Default.MaximumPosterBytes),
+            configuration.GetValue(
+                "Uploads:MaximumAttachmentBytes",
+                FileUploadLimits.Default.MaximumAttachmentBytes));
+        var uploadLimitErrors = uploadLimits.Validate();
+        if (uploadLimitErrors.Count > 0)
+            throw new InvalidOperationException(string.Join(" ", uploadLimitErrors));
+        services.AddSingleton(uploadLimits);
         services.AddProblemDetails();
         if (endpointAssemblies is null)
             services.AddFastEndpoints();

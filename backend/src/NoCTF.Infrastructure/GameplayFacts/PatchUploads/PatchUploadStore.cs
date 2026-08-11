@@ -9,6 +9,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.GameplayFacts.Intake;
+using NoCTF.GameModes.Awdp.Configuration;
 
 namespace NoCTF.Infrastructure.GameplayFacts.PatchUploads;
 
@@ -52,14 +53,36 @@ public sealed class PatchUploadStore(
                 challenge => challenge.CompetitionId,
                 competition => competition.Id,
                 (challenge, competition) => new { challenge, competition })
-            .AnyAsync(item => item.challenge.Id == competitionChallengeId
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.challenge.ChallengeId,
+                challenge => challenge.Id,
+                (item, challenge) => new { item.challenge, item.competition, template = challenge })
+            .Where(item => item.challenge.Id == competitionChallengeId
                 && item.challenge.CompetitionId == competitionId
                 && item.challenge.DeletedAt == null
                 && item.competition.Mode == GameMode.Awdp
-                && item.competition.Status == CompetitionStatus.Running,
-                ct);
-        return available
-            ? new(competitionId, competitionChallengeId, team.Id, userId)
+                && item.competition.Status == CompetitionStatus.Running)
+            .Select(item => new
+            {
+                item.competition.ConfigurationJson,
+                item.challenge.RulesJson,
+                item.template.DefinitionJson
+            })
+            .SingleOrDefaultAsync(ct);
+        if (available is null)
+            return null;
+        var configuration = AwdpConfigurationResolver.Resolve(
+            available.ConfigurationJson,
+            available.RulesJson,
+            available.DefinitionJson);
+        return configuration.MaximumPatchUploadBytes > 0
+            ? new(
+                competitionId,
+                competitionChallengeId,
+                team.Id,
+                userId,
+                configuration.MaximumPatchUploadBytes)
             : null;
     }
 

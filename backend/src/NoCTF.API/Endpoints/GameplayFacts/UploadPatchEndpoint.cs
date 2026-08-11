@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.GameplayFacts.PatchUploads;
+using NoCTF.Application.Storage;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
@@ -26,13 +27,20 @@ public sealed class UploadPatchEndpoint(
     CreatePatchUpload upload,
     IUserContext user)
     : Endpoint<UploadPatchRequest,
-        Results<Created<UploadPatchResponse>, NotFound, UnprocessableEntity<Microsoft.AspNetCore.Mvc.ProblemDetails>>>
+        Results<Created<UploadPatchResponse>, NotFound, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload");
         AuthSchemes("Bearer");
         AllowFileUploads();
+        MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
+            PatchUploadRules.HardMaximumArchiveBytes));
+        Description(builder => builder
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status413PayloadTooLarge)
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status422UnprocessableEntity));
         Summary(summary =>
         {
             summary.Summary = "Upload an AWDP patch archive";
@@ -41,8 +49,7 @@ public sealed class UploadPatchEndpoint(
     }
 
     public override async Task<
-        Results<Created<UploadPatchResponse>, NotFound,
-            UnprocessableEntity<Microsoft.AspNetCore.Mvc.ProblemDetails>>> ExecuteAsync(
+        Results<Created<UploadPatchResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
         UploadPatchRequest request,
         CancellationToken ct)
     {
@@ -61,13 +68,18 @@ public sealed class UploadPatchEndpoint(
         if (result.FailureCode == PatchUploadFailureCode.PatchUploadNotAvailable)
             return TypedResults.NotFound();
         if (!result.Succeeded)
-            return TypedResults.UnprocessableEntity(new Microsoft.AspNetCore.Mvc.ProblemDetails
-            {
-                Status = StatusCodes.Status422UnprocessableEntity,
-                Title = "Patch archive was rejected.",
-                Detail = result.ErrorMessage,
-                Extensions = { ["code"] = result.FailureCode?.ToString() }
-            });
+            return TypedResults.Problem(
+                statusCode: result.FailureCode == PatchUploadFailureCode.ArchiveTooLarge
+                    ? StatusCodes.Status413PayloadTooLarge
+                    : StatusCodes.Status422UnprocessableEntity,
+                title: result.FailureCode == PatchUploadFailureCode.ArchiveTooLarge
+                    ? "Patch archive is too large."
+                    : "Patch archive was rejected.",
+                detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = result.FailureCode?.ToString()
+                });
         return TypedResults.Created(
             $"/api/v1/competitions/{request.CompetitionId}/challenges/{request.CompetitionChallengeId}/patch-upload",
             new UploadPatchResponse(result.Value!.PatchUploadId));
