@@ -8,7 +8,12 @@ import {
   stopRuntimeEndpoint,
 } from '~/api'
 import type { NoCtfapiEndpointsRuntimeRuntimeResponse } from '~/api'
-import { normalizePlayerRuntime, shouldPollPlayerRuntime } from '~/utils/player-runtime'
+import {
+  classifyPlayerRuntimeLookup,
+  normalizePlayerRuntime,
+  shouldPollPlayerRuntime,
+  type PlayerRuntimeLookupOutcome,
+} from '~/utils/player-runtime'
 
 type Runtime = NoCtfapiEndpointsRuntimeRuntimeResponse
 
@@ -24,27 +29,41 @@ const props = withDefaults(
 
 const runtime = ref<Runtime | null>(null)
 const loading = ref(true)
+const loadError = ref<string | null>(null)
 const acting = ref(false)
 const extendMinutes = ref(30)
 const now = ref(Date.now())
 
-async function load(): Promise<void> {
-  const { data, error } = await getRuntimeEndpoint({
+async function load(): Promise<PlayerRuntimeLookupOutcome> {
+  const { data, error, response } = await getRuntimeEndpoint({
     path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
   })
-  runtime.value = error || !data ? null : normalizePlayerRuntime(data)
+  const outcome = classifyPlayerRuntimeLookup(response?.status, Boolean(error), Boolean(data))
+  if (outcome === 'missing') {
+    runtime.value = null
+    loadError.value = null
+    return outcome
+  }
+  if (outcome === 'failed') {
+    loadError.value = parseApiError(error, translate("加载环境状态失败")).message
+    return outcome
+  }
+
+  runtime.value = normalizePlayerRuntime(data ?? null)
+  loadError.value = null
+  return outcome
 }
 
 onMounted(async () => {
-  await load()
+  const outcome = await load()
   loading.value = false
-  if (shouldPollPlayerRuntime(runtime.value, now.value)) startPolling()
+  if (outcome === 'available' && shouldPollPlayerRuntime(runtime.value, now.value)) startPolling()
 })
 
 const { polling, timedOut, start: startPolling } = usePolling(
   async () => {
-    await load()
-    return !shouldPollPlayerRuntime(runtime.value, now.value)
+    const outcome = await load()
+    return outcome === 'failed' || !shouldPollPlayerRuntime(runtime.value, now.value)
   },
   { interval: 2000, timeout: 120_000 },
 )
@@ -52,10 +71,18 @@ const { polling, timedOut, start: startPolling } = usePolling(
 watch(
   () => shouldPollPlayerRuntime(runtime.value, now.value),
   (needsPolling) => {
-    if (needsPolling && runtime.value?.state === RuntimeState.Running && !polling.value)
+    if (!loadError.value && needsPolling && runtime.value?.state === RuntimeState.Running && !polling.value)
       startPolling()
   },
 )
+
+async function retryLoad(): Promise<void> {
+  loading.value = true
+  const outcome = await load()
+  loading.value = false
+  if (outcome === 'available' && shouldPollPlayerRuntime(runtime.value, now.value))
+    startPolling()
+}
 
 async function act(action: () => Promise<{ error?: unknown }>, failMessage: string) {
   acting.value = true
@@ -135,15 +162,22 @@ const stateVariant = computed(() => {
       <Skeleton v-if="loading" class="h-16 w-full" />
 
       <template v-else>
-        <Alert v-if="timedOut">
+        <Alert v-if="loadError" variant="destructive">
+          <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
+            <span>{{ loadError }}</span>
+            <Button size="sm" variant="outline" @click="retryLoad">{{ $t('重试') }}</Button>
+          </AlertDescription>
+        </Alert>
+
+        <Alert v-else-if="timedOut">
           <AlertDescription>{{ $t('环境状态更新超时,请稍后手动刷新。') }}</AlertDescription>
         </Alert>
 
-        <div v-if="!runtime" class="text-sm text-muted-foreground">
+        <div v-if="!loadError && !runtime" class="text-sm text-muted-foreground">
           {{ controls === 'full' ? $t('环境尚未启动,点击「启动环境」获取你的专属实例。') : $t('平台尚未为本队发放环境。') }}
         </div>
 
-        <template v-else>
+        <template v-if="!loadError && runtime">
           <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
             <span class="text-sm text-muted-foreground">{{ $t('访问地址') }}</span>
             <a
@@ -162,7 +196,7 @@ const stateVariant = computed(() => {
           </div>
         </template>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div v-if="!loadError" class="flex flex-wrap items-center gap-2">
           <template v-if="controls === 'full'">
             <Button v-if="!runtime || runtime.state === RuntimeState.Stopped || runtime.state === RuntimeState.Failed" :disabled="busy" @click="start">
               <Spinner v-if="busy && polling" data-icon="inline-start" /> {{ $t('启动环境') }} </Button>

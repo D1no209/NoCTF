@@ -4,6 +4,8 @@ import { RuntimeState } from './labels'
 type PlayerRuntime = NoCtfapiEndpointsRuntimeRuntimeResponse
 type RuntimeStateValue = NonNullable<PlayerRuntime['state']>
 
+export type PlayerRuntimeLookupOutcome = 'available' | 'missing' | 'failed'
+
 const TRANSITIONAL_STATES = new Set<RuntimeStateValue>([
   RuntimeState.Queued,
   RuntimeState.Provisioning,
@@ -12,6 +14,16 @@ const TRANSITIONAL_STATES = new Set<RuntimeStateValue>([
 
 export function normalizePlayerRuntime(runtime: PlayerRuntime | null): PlayerRuntime | null {
   return runtime?.state === RuntimeState.Stopped ? null : runtime
+}
+
+export function classifyPlayerRuntimeLookup(
+  status: number | undefined,
+  hasError: boolean,
+  hasData: boolean,
+): PlayerRuntimeLookupOutcome {
+  if (status === 404) return 'missing'
+  if (hasError || !hasData) return 'failed'
+  return 'available'
 }
 
 export function shouldPollPlayerRuntime(runtime: PlayerRuntime | null, now: number): boolean {
