@@ -54,7 +54,7 @@ onMounted(async () => {
                 <CardTitle class="text-base">{{ team.name }}</CardTitle>
                 <div class="flex items-center gap-2">
                   <Badge
-                    :variant="team.registrationStatus === TeamRegistrationStatus.Approved ? 'default' : team.registrationStatus === TeamRegistrationStatus.Rejected ? 'destructive' : 'secondary'"
+                    :variant="team.registrationStatus === 'Approved' ? 'default' : team.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'"
                   >
                     {{ teamRegistrationStatusLabel(team.registrationStatus) }}
                   </Badge>

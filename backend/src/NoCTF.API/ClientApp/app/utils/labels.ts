@@ -25,78 +25,51 @@ export interface CompetitionContext {
 
 export const competitionContextKey: InjectionKey<CompetitionContext> = Symbol('competition-context')
 
-/** 竞赛模式(NoCTF.Domain.Competitions.GameMode)。 */
-export const GameMode = { Ctf: 'Ctf', Awd: 'Awd', Awdp: 'Awdp', Koh: 'Koh' } as const
-
-/** 竞赛生命周期(NoCTF.Domain.Competitions.CompetitionStatus)。 */
-export const CompetitionStatus = {
-  Draft: 'Draft', Visible: 'Visible', Published: 'Published', Running: 'Running', Paused: 'Paused', Finished: 'Finished',
-} as const
-
-/** 队伍报名状态(NoCTF.Domain.Teams.TeamRegistrationStatus)。 */
-export const TeamRegistrationStatus = { Pending: 'Pending', Approved: 'Approved', Rejected: 'Rejected' } as const
-
-/** 运行时状态(NoCTF.Domain.Runtime.RuntimeState)。 */
-export const RuntimeState = {
-  Queued: 'Queued', Provisioning: 'Provisioning', Running: 'Running', Stopping: 'Stopping', Stopped: 'Stopped', Failed: 'Failed',
-} as const
-
-/** 比赛客观行为类型。 */
-export const GameplayFactKind = {
-  FlagAttempt: 'FlagAttempt', BreakAttempt: 'BreakAttempt', FixAttempt: 'FixAttempt',
-  HintUnlock: 'HintUnlock', ManualAdjustment: 'ManualAdjustment',
-  AwdServiceTransition: 'AwdServiceTransition', KohControlObservation: 'KohControlObservation',
-} as const
-
-/** GameplayFact 当前处理状态。 */
-export const GameplayFactState = {
-  Pending: 'Pending', Queued: 'Queued', Processing: 'Processing', Completed: 'Completed', PlatformFailed: 'PlatformFailed',
-} as const
-
-/** GameplayFact 当前结果。 */
-export const GameplayFactResult = {
-  Correct: 'Correct', Wrong: 'Wrong', Duplicate: 'Duplicate', AttemptsExhausted: 'AttemptsExhausted', Rejected: 'Rejected',
-  Unlocked: 'Unlocked', Applied: 'Applied', ServiceUp: 'ServiceUp', ServiceDown: 'ServiceDown',
-  Controlled: 'Controlled', Uncontrolled: 'Uncontrolled',
-} as const
-
-/** 排行榜数据范围(NoCTF.Application.Scoring.Leaderboard.LeaderboardDataScope)。 */
-export const LeaderboardDataScope = { Live: 'Live', Frozen: 'Frozen', Hidden: 'Hidden' } as const
-
-export function gameModeLabel(mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol | string | number): string {
-  return ({ Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH' } as Record<string, string>)[String(mode)] ?? translate('未知')
+export function gameModeLabel(mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol): string {
+  if (!mode) return translate('未知')
+  const labels = { Ctf: 'CTF', Awd: 'AWD', Awdp: 'AWDP', Koh: 'KoH' } satisfies Record<NoCtfapiEndpointsCompetitionsGameModeProtocol, string>
+  return labels[mode]
 }
 
-export function competitionStatusLabel(status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol | string | number): string {
-  return ({ Draft: translate('草稿'), Visible: translate('即将发布'), Published: translate('即将开始'), Running: translate('进行中'), Paused: translate('已暂停'), Finished: translate('已结束') } as Record<string, string>)[String(status)] ?? translate('未知')
+export function competitionStatusLabel(status?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol): string {
+  if (!status) return translate('未知')
+  const labels = { Draft: translate('草稿'), Visible: translate('即将发布'), Published: translate('即将开始'), Running: translate('进行中'), Paused: translate('已暂停'), Finished: translate('已结束') } satisfies Record<NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol, string>
+  return labels[status]
 }
 
-export function teamRegistrationStatusLabel(status?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol | string | number): string {
-  return ({ Pending: translate('待审核'), Approved: translate('已通过'), Rejected: translate('已拒绝') } as Record<string, string>)[String(status)] ?? translate('未知')
+export function teamRegistrationStatusLabel(status?: NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol): string {
+  if (!status) return translate('未知')
+  const labels = { Pending: translate('待审核'), Approved: translate('已通过'), Rejected: translate('已拒绝') } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol, string>
+  return labels[status]
 }
 
-export function runtimeStateLabel(state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | string | number): string {
-  return ({ Queued: translate('排队中'), Provisioning: translate('部署中'), Running: translate('运行中'), Stopping: translate('停止中'), Stopped: translate('已停止'), Failed: translate('失败') } as Record<string, string>)[String(state)] ?? translate('未知')
+export function runtimeStateLabel(state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol): string {
+  if (!state) return translate('未知')
+  const labels = { Queued: translate('排队中'), Provisioning: translate('部署中'), Running: translate('运行中'), Stopping: translate('停止中'), Stopped: translate('已停止'), Failed: translate('失败') } satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>
+  return labels[state]
 }
 
-export function gameplayFactKindLabel(kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol | string | number): string {
-  return ({ FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: translate('提示解锁'), ManualAdjustment: translate('人工调分'), AwdServiceTransition: translate('AWD 服务状态'), KohControlObservation: translate('KoH 控制观测') } as Record<string, string>)[String(kind)] ?? translate('比赛事实')
+export function gameplayFactKindLabel(kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol): string {
+  if (!kind) return translate('比赛事实')
+  const labels = { FlagAttempt: 'Flag', BreakAttempt: 'Break', FixAttempt: 'Fix', HintUnlock: translate('提示解锁'), ManualAdjustment: translate('人工调分'), AwdServiceTransition: translate('AWD 服务状态'), KohControlObservation: translate('KoH 控制观测') } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol, string>
+  return labels[kind]
 }
 
-export function gameplayFactStateLabel(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | string | number): string {
-  return ({ Pending: translate('待评测'), Queued: translate('排队中'), Processing: translate('评测中'), Completed: translate('已完成'), PlatformFailed: translate('平台故障') } as Record<string, string>)[String(state)] ?? translate('未知')
+export function gameplayFactStateLabel(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol): string {
+  if (!state) return translate('未知')
+  const labels = { Pending: translate('待评测'), Queued: translate('排队中'), Processing: translate('评测中'), Completed: translate('已完成'), PlatformFailed: translate('平台故障') } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol, string>
+  return labels[state]
 }
 
-export function gameplayFactResultLabel(result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | string | number | null): string {
+export function gameplayFactResultLabel(result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null): string {
   if (result === null || result === undefined) return translate('评测中')
-  return (
-    { Correct: translate("正确"), Wrong: translate("错误"), Duplicate: translate("重复"), AttemptsExhausted: translate("次数耗尽"), Rejected: translate("已拒绝"), Unlocked: translate("已解锁"), Applied: translate("已应用"), ServiceUp: translate("服务正常"), ServiceDown: translate("服务异常"), Controlled: translate("已控制"), Uncontrolled: translate("未控制") } as Record<string, string>
-  )[String(result)] ?? translate('未知')
+  const labels = { Correct: translate("正确"), Wrong: translate("错误"), Duplicate: translate("重复"), AttemptsExhausted: translate("次数耗尽"), Rejected: translate("已拒绝"), Unlocked: translate("已解锁"), Applied: translate("已应用"), ServiceUp: translate("服务正常"), ServiceDown: translate("服务异常"), Controlled: translate("已控制"), Uncontrolled: translate("未控制") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
+  return labels[result]
 }
 
 /** 评测是否仍在进行中(需要继续轮询)。 */
-export function isGameplayFactPending(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | string | number): boolean {
-  return state === 'Pending' || state === 'Queued' || state === 'Processing' || state === 0 || state === 1 || state === 2
+export function isGameplayFactPending(state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol): boolean {
+  return state === 'Pending' || state === 'Queued' || state === 'Processing'
 }
 
 export function formatDateTime(value?: string | null): string {
@@ -136,17 +109,17 @@ export function competitionEventText(
   const actor = event.actorDisplayName ?? translate('系统')
   const team = event.teamDisplayName ?? translate('某队伍')
   const challenge = event.challengeTitle ?? translate('某题目')
-  const templates: Record<string, string> = {
+  const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
     CompetitionCreated: translate('竞赛已创建'), CompetitionUpdated: translate('竞赛信息已更新'), CompetitionLifecycleChanged: translate('竞赛生命周期变更'),
     LeaderboardVisibilityChanged: translate('排行榜可见性已变更'), ChallengeCreated: translate('题目「{challenge}」已加入竞赛', { challenge }), ChallengeUpdated: translate('题目「{challenge}」已更新', { challenge }),
     ChallengePublished: translate('题目「{challenge}」已发布', { challenge }), ChallengeDescriptionUpdated: translate('题目「{challenge}」已更新描述', { challenge }), ChallengeUnpublished: translate('题目「{challenge}」已下线', { challenge }), HintPublished: translate('题目「{challenge}」发布了新提示', { challenge }),
     HintUnlocked: translate('队伍「{team}」解锁了题目「{challenge}」的提示', { team, challenge }), TeamRegistered: translate('队伍「{team}」报名参赛', { team }), TeamRegistrationChanged: translate('队伍「{team}」的报名状态已变更', { team }),
-    TeamMemberJoined: translate('队伍「{team}」加入了新成员', { team }), TeamBanned: translate('队伍「{team}」被封禁', { team }), TeamUnbanned: translate('队伍「{team}」已解除封禁', { team }), TeamBanCorrectionPublished: translate('队伍「{team}」的封禁纠正已发布', { team }), SubmissionReceived: translate('队伍「{team}」提交了题目「{challenge}」', { team, challenge }),
+    TeamMemberJoined: translate('队伍「{team}」加入了新成员', { team }), TeamBanned: translate('队伍「{team}」被封禁', { team }), TeamUnbanned: translate('队伍「{team}」已解除封禁', { team }), TeamBanCorrectionPublished: translate('队伍「{team}」的封禁纠正已发布', { team }), GameplayFactReceived: translate('队伍「{team}」提交了题目「{challenge}」', { team, challenge }),
     GameplayFactAdjudicated: translate('队伍「{team}」在题目「{challenge}」的提交已评测', { team, challenge }), FirstBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的一血', { team, challenge }), SecondBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的二血', { team, challenge }),
     ThirdBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的三血', { team, challenge }), RuntimeCreated: translate('队伍「{team}」申请了题目「{challenge}」的环境', { team, challenge }), RuntimeStateChanged: translate('队伍「{team}」的题目「{challenge}」环境状态已变更', { team, challenge }),
-    AnnouncementPublished: translate('官方发布了一条公告'), QuestionOpened: translate('{actor}提出了咨询', { actor }), QuestionReplied: translate('咨询已有回复'), QuestionStatusChanged: translate('咨询状态已变更'), QuestionPublished: translate('一条咨询已公开'),
+    AnnouncementPublished: translate('官方发布了一条公告'), QuestionOpened: translate('{actor}提出了咨询', { actor }), QuestionReplied: translate('咨询已有回复'), QuestionStatusChanged: translate('咨询状态已变更'),
   }
-  return templates[String(event.kind)] ?? translate('发生了一条竞赛动态')
+  return event.kind ? templates[event.kind] ?? translate('发生了一条竞赛动态') : translate('发生了一条竞赛动态')
 }
 
 function notificationContent(
@@ -284,7 +257,7 @@ export function notificationText(
   const announcement = announcementBody
     ? `${announcementTitle}：${announcementBody}`
     : announcementTitle
-  const templates: Record<string, string> = {
+  const templates: Partial<Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, string>> = {
     CompetitionLifecycleChanged: translate('竞赛{title}的生命周期已变更', { title }), TeamRegistrationChanged: translate('你的队伍{team}报名状态已变更', { team }), GameplayFactAdjudicated: translate('你在{challenge}的提交已完成评测', { challenge }),
     RuntimeStateChanged: translate('{challenge}的运行环境状态已变更', { challenge }), StartGateFailed: translate('竞赛{title}启动检查未通过', { title }), ManagementFailure: translate('竞赛{title}出现管理侧故障', { title }),
     BloodAwarded: translate('恭喜，你在{challenge}拿下了血榜名次', { challenge }), ChallengePublished: translate('竞赛{title}发布了新题目{challenge}', { title, challenge }), HintPublished: translate('{challenge}发布了新提示', { challenge }),
@@ -292,5 +265,5 @@ export function notificationText(
     QuestionStatusChanged: translate("你的咨询状态已变更"), CheatIncidentDetected: translate("检测到疑似作弊行为"), TeamBanCorrected: translate("队伍封禁已被纠正"), DataExportReady: translate("数据导出已就绪"), DataExportFailed: translate("数据导出失败"),
     UserAccountLifecycleChanged: translate("用户账号状态已变更"), CompetitionAnnouncement: announcement,
   }
-  return templates[String(notification.kind)] ?? translate('你有一条新通知')
+  return notification.kind ? templates[notification.kind] ?? translate('你有一条新通知') : translate('你有一条新通知')
 }

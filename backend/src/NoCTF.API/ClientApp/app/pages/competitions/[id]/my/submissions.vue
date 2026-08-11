@@ -79,7 +79,7 @@ onUnmounted(() => unwatch?.())
 
 function resultVariant(submission: Submission) {
   if (isGameplayFactPending(submission.state)) return 'secondary' as const
-  return submission.result === GameplayFactResult.Correct ? ('default' as const) : ('destructive' as const)
+  return submission.result === 'Correct' ? ('default' as const) : ('destructive' as const)
 }
 
 function resultText(submission: Submission) {

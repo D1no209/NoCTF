@@ -1,3 +1,4 @@
+import type { NoCtfapiEndpointsCompetitionsGameModeProtocol } from '../api'
 import { translate } from './i18n'
 
 /**
@@ -8,7 +9,7 @@ import { translate } from './i18n'
  * 参考:GameModeChallengeConfigurationCatalog / GameModeCompetitionConfigurationValidator。
  */
 
-export type GameModeValue = 'Ctf' | 'Awd' | 'Awdp' | 'Koh'
+export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 /** 各 JSON 区域当前的 schemaVersion(更高的版本或无 upgrader 的旧版本会被后端拒绝)。 */
 export const DEFINITION_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 1, Koh: 1 }

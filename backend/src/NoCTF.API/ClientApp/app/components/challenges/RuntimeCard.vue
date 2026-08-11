@@ -71,7 +71,7 @@ const { polling, timedOut, start: startPolling } = usePolling(
 watch(
   () => shouldPollPlayerRuntime(runtime.value, now.value),
   (needsPolling) => {
-    if (!loadError.value && needsPolling && runtime.value?.state === RuntimeState.Running && !polling.value)
+    if (!loadError.value && needsPolling && runtime.value?.state === 'Running' && !polling.value)
       startPolling()
   },
 )
@@ -131,15 +131,15 @@ const ttl = computed(() => {
   return remaining > 0 ? formatDuration(remaining) : translate("已到期")
 })
 
-const isRunning = computed(() => runtime.value?.state === RuntimeState.Running)
+const isRunning = computed(() => runtime.value?.state === 'Running')
 const busy = computed(() => acting.value || polling.value)
 const stateVariant = computed(() => {
   switch (runtime.value?.state) {
-    case RuntimeState.Running:
+    case 'Running':
       return 'default' as const
-    case RuntimeState.Failed:
+    case 'Failed':
       return 'destructive' as const
-    case RuntimeState.Stopped:
+    case 'Stopped':
       return 'secondary' as const
     default:
       return 'outline' as const
@@ -198,7 +198,7 @@ const stateVariant = computed(() => {
 
         <div v-if="!loadError" class="flex flex-wrap items-center gap-2">
           <template v-if="controls === 'full'">
-            <Button v-if="!runtime || runtime.state === RuntimeState.Stopped || runtime.state === RuntimeState.Failed" :disabled="busy" @click="start">
+            <Button v-if="!runtime || runtime.state === 'Stopped' || runtime.state === 'Failed'" :disabled="busy" @click="start">
               <Spinner v-if="busy && polling" data-icon="inline-start" /> {{ $t('启动环境') }} </Button>
             <Button v-if="isRunning" variant="outline" :disabled="busy" @click="stop"> {{ $t('停止') }} </Button>
           </template>

@@ -20,17 +20,17 @@ onMounted(async () => {
 
 const running = computed(() =>
   items.value
-    .filter((c) => c.status === CompetitionStatus.Running || c.status === CompetitionStatus.Paused)
+    .filter((c) => c.status === 'Running' || c.status === 'Paused')
     .sort((a, b) => (a.endTime ?? '').localeCompare(b.endTime ?? '')),
 )
 const upcoming = computed(() =>
   items.value
-    .filter((c) => c.status === CompetitionStatus.Published || c.status === CompetitionStatus.Visible)
+    .filter((c) => c.status === 'Published' || c.status === 'Visible')
     .sort((a, b) => (a.startTime ?? '').localeCompare(b.startTime ?? '')),
 )
 const finished = computed(() =>
   items.value
-    .filter((c) => c.status === CompetitionStatus.Finished)
+    .filter((c) => c.status === 'Finished')
     .sort((a, b) => (b.endTime ?? '').localeCompare(a.endTime ?? '')),
 )
 

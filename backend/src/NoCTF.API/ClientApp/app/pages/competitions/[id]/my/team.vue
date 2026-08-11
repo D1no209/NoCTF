@@ -267,7 +267,7 @@ function setAppealOpen(open: boolean) {
             </Avatar>
             <CardTitle class="text-xl">{{ team.name }}</CardTitle>
             <Badge
-              :variant="team.registrationStatus === TeamRegistrationStatus.Approved ? 'default' : team.registrationStatus === TeamRegistrationStatus.Rejected ? 'destructive' : 'secondary'"
+              :variant="team.registrationStatus === 'Approved' ? 'default' : team.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'"
             >
               {{ teamRegistrationStatusLabel(team.registrationStatus) }}
             </Badge>
@@ -277,7 +277,7 @@ function setAppealOpen(open: boolean) {
           <CardDescription>{{ $t('报名时间：{time}', { time: formatDateTime(team.registeredAt) }) }}</CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
-          <Alert v-if="team.registrationStatus === TeamRegistrationStatus.Rejected">
+          <Alert v-if="team.registrationStatus === 'Rejected'">
             <AlertDescription class="flex flex-wrap items-center gap-2">
               报名被拒绝。{{ isCaptain ? $t('修改信息后可重新提交:') : $t('请联系队长重新提交报名。') }}
               <Button v-if="isCaptain" size="sm" :disabled="acting" @click="resubmit">

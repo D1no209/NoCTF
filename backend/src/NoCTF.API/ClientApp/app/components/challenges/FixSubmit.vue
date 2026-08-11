@@ -5,6 +5,7 @@ import {
   submitFixEndpoint,
   uploadPatchEndpoint,
 } from '~/api'
+import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '~/api'
 
 const props = defineProps<{
   competitionId: string
@@ -19,7 +20,8 @@ const emit = defineEmits<{ evaluated: [] }>()
 const file = ref<File | null>(null)
 const pending = ref(false)
 const stage = ref<'idle' | 'uploading' | 'submitting' | 'evaluating'>('idle')
-const result = ref<{ state?: string, result?: string | null } | null>(null)
+type EvaluationResult = Pick<NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse, 'state' | 'result'>
+const result = ref<EvaluationResult | null>(null)
 
 function onFileChange(event: Event) {
   const target = event.target as HTMLInputElement
@@ -35,7 +37,7 @@ const { start: startPolling, stop: stopPolling } = usePolling(
     if (error || !data) return false
     result.value = { state: data.state, result: data.result }
     if (!isGameplayFactPending(data.state)) {
-      if (data.result === GameplayFactResult.Correct) toast.success(translate("Fix 评测完成:修复生效"))
+      if (data.result === 'Correct') toast.success(translate("Fix 评测完成:修复生效"))
       else toast.error(translate('Fix 评测完成：{result}', { result: gameplayFactResultLabel(data.result) }))
       emit('evaluated')
       return true
@@ -72,7 +74,7 @@ async function submit() {
       return
     }
     gameplayFactId.value = accepted.gameplayFactId
-    result.value = { state: GameplayFactState.Pending, result: null }
+    result.value = { state: 'Pending', result: null }
     stage.value = 'evaluating'
     toast.success(translate("Fix 已受理,等待评测"))
     startPolling()
@@ -137,7 +139,7 @@ onUnmounted(() => {
         </FieldGroup>
       </form>
 
-      <Alert v-if="result" class="mt-4" :variant="isGameplayFactPending(result.state) ? 'default' : result.result === GameplayFactResult.Correct ? 'default' : 'destructive'">
+      <Alert v-if="result" class="mt-4" :variant="isGameplayFactPending(result.state) ? 'default' : result.result === 'Correct' ? 'default' : 'destructive'">
         <AlertDescription class="flex items-center gap-2">
           <Spinner v-if="isGameplayFactPending(result.state)" class="size-3" />
           <span v-if="isGameplayFactPending(result.state)">{{ gameplayFactStateLabel(result.state) }}…</span>

@@ -14,10 +14,10 @@ onMounted(async () => {
 })
 
 const activeStatuses: string[] = [
-  CompetitionStatus.Running,
-  CompetitionStatus.Paused,
-  CompetitionStatus.Published,
-  CompetitionStatus.Visible,
+  'Running',
+  'Paused',
+  'Published',
+  'Visible',
 ]
 
 const recent = computed(() =>
@@ -28,21 +28,21 @@ const recent = computed(() =>
 )
 
 const liveCount = computed(
-  () => items.value.filter((c) => String(c.status) === CompetitionStatus.Running).length,
+  () => items.value.filter((c) => c.status === 'Running').length,
 )
 
 const upcomingCount = computed(
   () =>
     items.value.filter((c) =>
-      [CompetitionStatus.Published as string, CompetitionStatus.Visible as string].includes(String(c.status)),
+      c.status === 'Published' || c.status === 'Visible',
     ).length,
 )
 
 const modes = [
-  { key: GameMode.Ctf, icon: Flag, title: 'CTF 解题赛', description: 'Web、Pwn、Crypto、Reverse 多方向题目,解题夺旗累计积分', featured: true },
-  { key: GameMode.Awd, icon: Swords, title: 'AWD 攻防赛', description: '攻防一体的实时对抗,漏洞利用与服务防御双重考验', featured: false },
-  { key: GameMode.Awdp, icon: Crosshair, title: 'AWDP 攻防增强', description: '在 AWD 之上引入修复环节,攻击 Break 与补丁 Fix 分开计分', featured: false },
-  { key: GameMode.Koh, icon: Mountain, title: 'KoH 占山为王', description: '持续占领目标,随时间累积积分,考验持久控制力', featured: true },
+  { key: 'Ctf', icon: Flag, title: 'CTF 解题赛', description: 'Web、Pwn、Crypto、Reverse 多方向题目,解题夺旗累计积分', featured: true },
+  { key: 'Awd', icon: Swords, title: 'AWD 攻防赛', description: '攻防一体的实时对抗,漏洞利用与服务防御双重考验', featured: false },
+  { key: 'Awdp', icon: Crosshair, title: 'AWDP 攻防增强', description: '在 AWD 之上引入修复环节,攻击 Break 与补丁 Fix 分开计分', featured: false },
+  { key: 'Koh', icon: Mountain, title: 'KoH 占山为王', description: '持续占领目标,随时间累积积分,考验持久控制力', featured: true },
 ]
 </script>
 

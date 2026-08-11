@@ -163,22 +163,22 @@ const mode = computed(() => ctx.competition.value?.mode)
 
       <template v-if="ctx.competition.value">
         <CtfPanel
-          v-if="mode === GameMode.Ctf"
+          v-if="mode === 'Ctf'"
           :competition="ctx.competition.value"
           :challenge="challenge"
         />
         <AwdPanel
-          v-else-if="mode === GameMode.Awd"
+          v-else-if="mode === 'Awd'"
           :competition="ctx.competition.value"
           :challenge="challenge"
         />
         <AwdpPanel
-          v-else-if="mode === GameMode.Awdp"
+          v-else-if="mode === 'Awdp'"
           :competition="ctx.competition.value"
           :challenge="challenge"
         />
         <KohPanel
-          v-else-if="mode === GameMode.Koh"
+          v-else-if="mode === 'Koh'"
           :competition="ctx.competition.value"
           :challenge="challenge"
         />
