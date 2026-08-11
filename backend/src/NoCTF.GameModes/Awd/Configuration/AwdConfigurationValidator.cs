@@ -2,6 +2,7 @@ namespace NoCTF.GameModes.Awd.Configuration;
 
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Configuration;
+using NoCTF.Application.Scoring;
 using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Flags;
 
@@ -16,6 +17,11 @@ public static class AwdConfigurationValidator
         if (configuration.AttackPoints < 0 || configuration.VictimDefensePoolPoints < 0
             || configuration.ServiceHealthyPoints < 0 || configuration.ServiceUnhealthyPenalty < 0)
             errors.Add("Scoring values cannot be negative.");
+        if (configuration.AttackPoints > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.VictimDefensePoolPoints > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceHealthyPoints > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceUnhealthyPenalty > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"Scoring values cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.FlagTemplate is { } flagTemplate
             && !PerTeamFlagGenerator.IsValidTemplate(flagTemplate))
             errors.Add("FlagTemplate is invalid.");
@@ -28,6 +34,11 @@ public static class AwdConfigurationValidator
         if (configuration.AttackPoints < 0 || configuration.VictimDefensePoolPoints < 0
             || configuration.ServiceHealthyPoints < 0 || configuration.ServiceUnhealthyPenalty < 0)
             errors.Add("Scoring overrides cannot be negative.");
+        if (configuration.AttackPoints > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.VictimDefensePoolPoints > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceHealthyPoints > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceUnhealthyPenalty > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"Scoring overrides cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.CheckerIntervalSeconds is <= 0)
             errors.Add("CheckerIntervalSeconds must be positive when configured.");
         if (configuration.FlagTemplate is { } flagTemplate

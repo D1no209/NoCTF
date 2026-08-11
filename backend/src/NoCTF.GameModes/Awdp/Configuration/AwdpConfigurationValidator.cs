@@ -1,5 +1,7 @@
 namespace NoCTF.GameModes.Awdp.Configuration;
 
+using NoCTF.Application.Scoring;
+
 public static class AwdpConfigurationValidator
 {
     public static IReadOnlyList<string> Validate(AwdpConfiguration configuration)
@@ -12,11 +14,19 @@ public static class AwdpConfigurationValidator
             errors.Add("Fix achievement configuration is required.");
         if (configuration.Break?.Points < 0 || configuration.Fix?.Points < 0)
             errors.Add("Achievement points cannot be negative.");
+        if (configuration.Break?.Points > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.Fix?.Points > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.BreakWrongPenalty < 0
             || configuration.FixFailurePenalty < 0
             || configuration.ViolationPenalty < 0
             || configuration.ServiceDownPenalty < 0)
             errors.Add("Penalty values cannot be negative.");
+        if (configuration.BreakWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.FixFailurePenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ViolationPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceDownPenalty > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"Penalty values cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (!Enum.IsDefined(configuration.EvaluationDispatchMode))
             errors.Add("EvaluationDispatchMode is invalid.");
         return errors;
@@ -27,11 +37,19 @@ public static class AwdpConfigurationValidator
         var errors = new List<string>();
         if (configuration.Break?.Points < 0 || configuration.Fix?.Points < 0)
             errors.Add("Achievement points cannot be negative.");
+        if (configuration.Break?.Points > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.Fix?.Points > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.BreakWrongPenalty is < 0
             || configuration.FixFailurePenalty is < 0
             || configuration.ViolationPenalty is < 0
             || configuration.ServiceDownPenalty is < 0)
             errors.Add("Penalty values cannot be negative.");
+        if (configuration.BreakWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.FixFailurePenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ViolationPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceDownPenalty > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"Penalty values cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.EvaluationDispatchMode is { } dispatchMode
             && !Enum.IsDefined(dispatchMode))
             errors.Add("EvaluationDispatchMode is invalid.");
@@ -61,11 +79,19 @@ public static class AwdpConfigurationValidator
             errors.Add("RoundDurationSeconds must be positive.");
         if (configuration.Break.Points < 0 || configuration.Fix.Points < 0)
             errors.Add("Achievement points cannot be negative.");
+        if (configuration.Break.Points > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.Fix.Points > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.BreakWrongPenalty < 0
             || configuration.FixFailurePenalty < 0
             || configuration.ViolationPenalty < 0
             || configuration.ServiceDownPenalty < 0)
             errors.Add("Penalty values cannot be negative.");
+        if (configuration.BreakWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.FixFailurePenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ViolationPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceDownPenalty > ScoreValueLimits.MaximumConfiguredValue)
+            errors.Add($"Penalty values cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (!Enum.IsDefined(configuration.EvaluationDispatchMode))
             errors.Add("EvaluationDispatchMode is invalid.");
         ValidatePatchEntrypoint(configuration.PatchEntrypoint, errors);
