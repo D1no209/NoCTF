@@ -9,6 +9,7 @@ using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Application.Challenges.Images;
 
 namespace NoCTF.Runner.Messages;
 
@@ -42,6 +43,14 @@ public sealed class RuntimeProviderHandler(
                 message.ProcessingVersion,
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
+        }
+        if (!ChallengeImagePinningPolicy.IsPinnedImage(message.Definition.Image))
+        {
+            return await CompleteProvisionFailureAsync(
+                message,
+                message.Definition.Provider,
+                RuntimeFailureCode.InvalidConfiguration,
+                cancellationToken);
         }
         RuntimeFailureCode? failureCode = null;
         try
@@ -227,6 +236,15 @@ public sealed class RuntimeProviderHandler(
                 message.ProcessingVersion,
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
+        }
+        if (!ChallengeImagePinningPolicy.AreComposeImagesPinned(
+                message.Definition.ComposeYaml))
+        {
+            return await CompleteProvisionFailureAsync(
+                message,
+                message.Definition.Provider,
+                RuntimeFailureCode.InvalidConfiguration,
+                cancellationToken);
         }
         RuntimeFailureCode? failureCode = null;
         try
@@ -882,6 +900,7 @@ public static class RuntimeWriteBackHandler
     {
         instance.State = RuntimeState.Failed;
         instance.FailureCode = failureCode;
+        instance.RunnerAssignmentReleaseToken = null;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.GameplayFactId is Guid gameplayFactId)

@@ -47,6 +47,19 @@ public sealed class DevelopmentRunnerCapacityGate(IConfiguration configuration)
         CancellationToken cancellationToken) =>
         ReleaseCore(runtimeInstanceId, runnerId, cancellationToken);
 
+    public Task<RunnerCapacityReleaseOutcome> ReleaseOrphanedAsync(
+        Guid runtimeInstanceId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (sync)
+        {
+            return Task.FromResult(claims.Remove(runtimeInstanceId)
+                ? RunnerCapacityReleaseOutcome.Released
+                : RunnerCapacityReleaseOutcome.AlreadyReleased);
+        }
+    }
+
     private Task<RunnerCapacityClaim> TryClaimCore(
         RunnerCapacityRequest request,
         string candidateRunnerId,

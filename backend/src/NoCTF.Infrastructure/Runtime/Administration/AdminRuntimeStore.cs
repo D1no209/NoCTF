@@ -1,6 +1,7 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Flags;
+using NoCTF.Application.Challenges.Images;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -443,7 +444,8 @@ public sealed class AdminRuntimeStore(
                     RuntimeGeneration: cleanupTarget.Generation), ct);
             }
             var template = templates.Get(scope.Competition.Mode, scope.Template.DefinitionJson);
-            if (template is null)
+            if (template is null
+                || !ChallengeImagePinningPolicy.AreRuntimeImagesPinned(template))
                 return new(null, RuntimeMutationFailure.ConfigurationInvalid);
             if (scope.Competition.Mode == GameMode.Ctf
                 && template.FlagSource == RuntimeFlagSource.PerTeam

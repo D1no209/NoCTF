@@ -104,7 +104,7 @@ async function loadTemplate(): Promise<void> {
 async function save(): Promise<void> {
   if (!template.value) return
   saving.value = true
-  const { data, error, response } = await adminChallengeBankUpdateTemplate({
+  const { data, error } = await adminChallengeBankUpdateTemplate({
     path: { challengeId },
     body: {
       title: form.title.trim(),
@@ -118,7 +118,11 @@ async function save(): Promise<void> {
   })
   saving.value = false
   if (error) {
-    if (response?.status === 409) {
+    const imageMessage = imagePinningErrorMessage(error)
+    if (imageMessage) {
+      toast.error(imageMessage)
+    }
+    else if (isRevisionConflict(error)) {
       toast.error(translate("模板已被他人修改,请刷新后重试"))
       await loadTemplate()
     }

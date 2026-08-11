@@ -10,13 +10,16 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Infrastructure.Messaging;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using NoCTF.Application.Challenges.Images;
 
 namespace NoCTF.Infrastructure.Challenges.Bank;
 
 public sealed class ChallengeBankStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox? messageOutbox = null,
-    ICompetitionEventRecorder? eventRecorder = null) : IChallengeBankStore
+    ICompetitionEventRecorder? eventRecorder = null,
+    IChallengeImagePinningStore? imagePinning = null,
+    IChallengeImageDefinitionCatalog? imageDefinitions = null) : IChallengeBankStore
 {
     private readonly ITransactionalMessageOutbox outbox =
         messageOutbox ?? new OpenApiTransactionalMessageOutbox();
@@ -117,6 +120,25 @@ public sealed class ChallengeBankStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (imagePinning is not null && imageDefinitions is not null)
+        {
+            var definition = imageDefinitions.Read(command.Mode, command.DefinitionJson);
+            if (definition.Succeeded
+                && definition.Images!.Any(image =>
+                    !ContainerImageReference.TryParse(image.Image, out var parsed)
+                    || !parsed.IsDigest))
+            {
+                var boundary = await imagePinning.LockTemplateWriteBoundaryAsync(
+                    command.ChallengeId,
+                    ct);
+                if (boundary.RequiresPinnedDefinition)
+                {
+                    return new(
+                        ChallengeTemplateWriteState.RuntimeImageNotPinned,
+                        Detail: "Every Runtime and Checker image must use a sha256 digest while a published competition references this template.");
+                }
+            }
+        }
         var entity = await WriteAuthorized(db.Challenges, command.ActorId, command.IsAdministrator)
             .SingleOrDefaultAsync(challenge => challenge.Id == command.ChallengeId, ct);
         if (entity is null)

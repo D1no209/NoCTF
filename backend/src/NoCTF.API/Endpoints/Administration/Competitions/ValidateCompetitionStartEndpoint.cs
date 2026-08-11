@@ -18,7 +18,8 @@ public enum StartGateFailureCodeProtocol
     RuntimeQuotaInsufficient,
     ChallengeModeMismatch,
     ChallengeRulesInvalid,
-    RuntimeDefinitionInvalid
+    RuntimeDefinitionInvalid,
+    RuntimeImageNotPinned
 }
 
 public sealed record StartGateErrorResponse(

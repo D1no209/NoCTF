@@ -80,7 +80,14 @@ public sealed class RestoreChallengeEndpoint(
                 or ChallengeMutationFailure.TemplateNotFound
                 or ChallengeMutationFailure.TemplateModeMismatch
                 or ChallengeMutationFailure.ChallengeOrderConflict
-                or ChallengeMutationFailure.ChallengeTemplateConflict =>
+                or ChallengeMutationFailure.ChallengeTemplateConflict
+                or ChallengeMutationFailure.RuntimeImageNotPinned
+                or ChallengeMutationFailure.InvalidImageReference
+                or ChallengeMutationFailure.RegistryAuthenticationRequired
+                or ChallengeMutationFailure.RegistryAuthenticationFailed
+                or ChallengeMutationFailure.RegistryUnavailable
+                or ChallengeMutationFailure.RegistryManifestNotFound
+                or ChallengeMutationFailure.RegistryManifestInvalid =>
                 TypedResults.Conflict(
                     CompetitionChallengeConflictMapper.ToResponse(result.Value)),
             ChallengeMutationFailure.InvalidRevision =>

@@ -5,12 +5,15 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Administration;
+using NoCTF.Application.Challenges.Images;
 
 namespace NoCTF.Infrastructure.Competitions.Administration;
 
 public sealed class AdminCompetitionStore(
     NoCtfDbContext db,
-    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null,
+    IChallengeImagePinningStore? imagePinning = null,
+    IChallengeImageDefinitionCatalog? imageDefinitions = null)
     : IAdminCompetitionStore
 {
     public async Task<IReadOnlyList<CompetitionView>> ListAsync(
@@ -66,9 +69,75 @@ public sealed class AdminCompetitionStore(
         Guid actorId,
         bool isAdministrator,
         DateTimeOffset now,
+        CancellationToken ct) =>
+        await RestoreInternalAsync(
+            competitionId,
+            actorId,
+            isAdministrator,
+            now,
+            expectedChallengeRevisions: null,
+            ct);
+
+    public Task<CompetitionRestoreResult> RestoreWithChallengeFenceAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
+        CancellationToken ct) =>
+        RestoreInternalAsync(
+            competitionId,
+            actorId,
+            isAdministrator,
+            now,
+            expectedChallengeRevisions,
+            ct);
+
+    private async Task<CompetitionRestoreResult> RestoreInternalAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        IReadOnlyDictionary<Guid, int>? expectedChallengeRevisions,
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (imagePinning is not null && imageDefinitions is not null)
+        {
+            var boundary = await imagePinning.LockCompetitionPublicationBoundaryAsync(
+                competitionId,
+                includeDeleted: true,
+                ct);
+            if (!boundary.CompetitionExists)
+                return new(CompetitionRestoreState.NotFound);
+            if (expectedChallengeRevisions is not null
+                && (boundary.Challenges.Count != expectedChallengeRevisions.Count
+                    || boundary.Challenges.Any(challenge =>
+                        !expectedChallengeRevisions.TryGetValue(
+                            challenge.ChallengeId,
+                            out var revision)
+                        || challenge.Revision != revision)))
+            {
+                return new(
+                    CompetitionRestoreState.ChallengeDefinitionRevisionConflict,
+                    Detail: "Challenge definition changed after its images were resolved.");
+            }
+            if (boundary.Challenges.Any(challenge =>
+            {
+                var definition = imageDefinitions.Read(
+                    challenge.Mode,
+                    challenge.DefinitionJson);
+                return !definition.Succeeded
+                    || definition.Images!.Any(image =>
+                        !ContainerImageReference.TryParse(image.Image, out var parsed)
+                        || !parsed.IsDigest);
+            }))
+            {
+                return new(
+                    CompetitionRestoreState.ChallengeImageInvalid,
+                    Detail: "Every Runtime and Checker image must use a sha256 digest before restoring this competition.");
+            }
+        }
         var entity = await db.Competitions.IgnoreQueryFilters()
             .SingleOrDefaultAsync(competition =>
                 competition.Id == competitionId &&
