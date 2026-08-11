@@ -42,7 +42,7 @@ public sealed class CtfFullBoundaryTests
             {
                 title = "CTF full-boundary E2E",
                 description = "External process boundary verification",
-                mode = 0,
+                mode = "Ctf",
                 startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
@@ -58,8 +58,8 @@ public sealed class CtfFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
-                mode = 0,
-                visibility = 0,
+                mode = "Ctf",
+                visibility = "Private",
                 title = "Injected Flag Runtime",
                 description = "Reads a generated per-team Flag from a real Docker runtime.",
                 direction = "Web",
@@ -132,8 +132,8 @@ public sealed class CtfFullBoundaryTests
             "/api/v1/admin/challenges",
             new
             {
-                mode = 0,
-                visibility = 0,
+                mode = "Ctf",
+                visibility = "Private",
                 title = "Compose Injected Flag Runtime",
                 description = "Reads a generated per-team Flag from a real multi-service Docker Compose runtime.",
                 direction = "Web",
@@ -308,7 +308,7 @@ public sealed class CtfFullBoundaryTests
             var runtime = await PollJsonAsync(
                 player,
                 $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime",
-                value => value.GetProperty("state").GetInt32() == 2,
+                value => value.GetProperty("state").GetString() == "Running",
                 TimeSpan.FromSeconds(90),
                 cancellationToken);
             var runtimeUrl = runtime.GetProperty("urls")[0].GetString()
@@ -328,7 +328,7 @@ public sealed class CtfFullBoundaryTests
             var composeRuntime = await PollJsonAsync(
                 player,
                 $"/api/v1/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/runtime",
-                value => value.GetProperty("state").GetInt32() == 2,
+                value => value.GetProperty("state").GetString() == "Running",
                 TimeSpan.FromSeconds(90),
                 cancellationToken);
             var composeRuntimeUrl = composeRuntime.GetProperty("urls")[0].GetString()
@@ -353,11 +353,11 @@ public sealed class CtfFullBoundaryTests
                 .GetGuid();
             var wrongSubmission = await PollJsonAsync(
                 teammate,
-                $"/api/v1/competitions/{competitionId}/submissions/{wrongGameplayFactId}",
-                value => value.GetProperty("evaluationState").GetInt32() == 3,
+                $"/api/v1/competitions/{competitionId}/gameplay-facts/{wrongGameplayFactId}",
+                value => value.GetProperty("state").GetString() == "Completed",
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
-            await Assert.That(wrongSubmission.GetProperty("result").GetInt32()).IsEqualTo(1);
+            await Assert.That(wrongSubmission.GetProperty("result").GetString()).IsEqualTo("Wrong");
             var unsolvedLeaderboard = await PollLeaderboardAsync(
                 anonymous,
                 competitionId,
@@ -381,12 +381,12 @@ public sealed class CtfFullBoundaryTests
             var gameplayFactId = submissionAccepted.GetProperty("gameplayFactId").GetGuid();
             var submission = await PollJsonAsync(
                 player,
-                $"/api/v1/competitions/{competitionId}/submissions/{gameplayFactId}",
-                value => value.GetProperty("evaluationState").GetInt32() == 3,
+                $"/api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}",
+                value => value.GetProperty("state").GetString() == "Completed",
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
-            await Assert.That(submission.GetProperty("result").GetInt32()).IsEqualTo(0);
-            var evaluatedVersion = submission.GetProperty("processingVersion").GetInt64();
+            await Assert.That(submission.GetProperty("result").GetString()).IsEqualTo("Correct");
+            var evaluatedAt = submission.GetProperty("updatedAt").GetDateTimeOffset();
 
             var solvedLeaderboard = await PollLeaderboardAsync(
                 anonymous,
@@ -406,7 +406,7 @@ public sealed class CtfFullBoundaryTests
                 competitionId,
                 items => items.Any(item =>
                     item.GetProperty("id").GetGuid() == gameplayFactId
-                    && item.GetProperty("result").GetInt32() == 0),
+                    && item.GetProperty("result").GetString() == "Correct"),
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
             var sharedCorrectSubmission = teammateSubmissions.Single(item =>
@@ -417,7 +417,7 @@ public sealed class CtfFullBoundaryTests
                     .GetProperty("competitionChallengeId")
                     .GetGuid())
                 .IsEqualTo(competitionChallengeId);
-            await Assert.That(sharedCorrectSubmission.GetProperty("submittedByUserId").GetGuid())
+            await Assert.That(sharedCorrectSubmission.GetProperty("actorUserId").GetGuid())
                 .IsEqualTo(captainId);
 
             var duplicateGameplayFactAccepted = await SendJsonAsync(
@@ -432,25 +432,25 @@ public sealed class CtfFullBoundaryTests
                 .GetGuid();
             var duplicateSubmission = await PollJsonAsync(
                 teammate,
-                $"/api/v1/competitions/{competitionId}/submissions/{duplicateGameplayFactId}",
-                value => value.GetProperty("evaluationState").GetInt32() == 3,
+                $"/api/v1/competitions/{competitionId}/gameplay-facts/{duplicateGameplayFactId}",
+                value => value.GetProperty("state").GetString() == "Completed",
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
-            await Assert.That(duplicateSubmission.GetProperty("result").GetInt32()).IsEqualTo(2);
+            await Assert.That(duplicateSubmission.GetProperty("result").GetString()).IsEqualTo("Duplicate");
             var submissionsAfterDuplicate = await PollTeamSubmissionsAsync(
                 teammate,
                 competitionId,
                 items => items.Any(item =>
                         item.GetProperty("id").GetGuid() == gameplayFactId
-                        && item.GetProperty("result").GetInt32() == 0)
+                        && item.GetProperty("result").GetString() == "Correct")
                     && items.Any(item =>
                         item.GetProperty("id").GetGuid() == duplicateGameplayFactId
-                        && item.GetProperty("result").GetInt32() == 2),
+                        && item.GetProperty("result").GetString() == "Duplicate"),
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
             var sharedDuplicateSubmission = submissionsAfterDuplicate.Single(item =>
                 item.GetProperty("id").GetGuid() == duplicateGameplayFactId);
-            await Assert.That(sharedDuplicateSubmission.GetProperty("submittedByUserId").GetGuid())
+            await Assert.That(sharedDuplicateSubmission.GetProperty("actorUserId").GetGuid())
                 .IsEqualTo(teammateId);
             var leaderboardAfterDuplicate = await PollLeaderboardAsync(
                 anonymous,
@@ -479,17 +479,19 @@ public sealed class CtfFullBoundaryTests
                 expectedScore: 475,
                 cancellationToken);
 
-            await SendWithoutBodyForJsonAsync(
+            var rejudgeAccepted = await SendWithoutBodyForJsonAsync(
                 admin,
                 HttpMethod.Post,
-                $"/api/v1/admin/competitions/{competitionId}/submissions/{gameplayFactId}/rejudge",
+                $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/rejudge",
                 HttpStatusCode.Accepted,
                 cancellationToken);
+            var rejudgeCutoff = rejudgeAccepted.GetProperty("cutoff").GetDateTimeOffset();
+            await Assert.That(rejudgeCutoff).IsGreaterThanOrEqualTo(evaluatedAt);
             await PollJsonAsync(
                 player,
-                $"/api/v1/competitions/{competitionId}/submissions/{gameplayFactId}",
-                value => value.GetProperty("evaluationState").GetInt32() == 3
-                    && value.GetProperty("processingVersion").GetInt64() > evaluatedVersion,
+                $"/api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}",
+                value => value.GetProperty("state").GetString() == "Completed"
+                    && value.GetProperty("updatedAt").GetDateTimeOffset() >= rejudgeCutoff,
                 TimeSpan.FromSeconds(60),
                 cancellationToken);
             await PollLeaderboardAsync(
@@ -518,7 +520,7 @@ public sealed class CtfFullBoundaryTests
                     await PollJsonAsync(
                         player,
                         $"/api/v1/competitions/{competitionId}/challenges/{runtime.ChallengeId}/runtime",
-                        value => value.GetProperty("state").GetInt32() == 4,
+                        value => value.GetProperty("state").GetString() == "Stopped",
                         TimeSpan.FromSeconds(60),
                         CancellationToken.None);
                 }
@@ -792,7 +794,7 @@ public sealed class CtfFullBoundaryTests
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        var path = $"/api/v1/competitions/{competitionId}/submissions?limit=50";
+        var path = $"/api/v1/competitions/{competitionId}/gameplay-facts?limit=50";
         var deadline = DateTimeOffset.UtcNow.Add(timeout);
         IReadOnlyList<JsonElement> last = [];
         while (DateTimeOffset.UtcNow < deadline)
