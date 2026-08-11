@@ -26,4 +26,8 @@ describe('historical adjudication difference preview', () => {
     expect(previewTemplate).not.toContain('rejudge')
     expect(previewTemplate).not.toContain('纠正按钮')
   })
+
+  test('states that only CTF flag facts are analyzed', () => {
+    expect(source).toContain('当前仅分析 CTF Flag；AWD、AWDP、KoH 与其他事实类型不在此预览中。')
+  })
 })

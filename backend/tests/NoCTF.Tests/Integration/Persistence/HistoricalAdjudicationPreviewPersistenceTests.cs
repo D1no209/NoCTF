@@ -1,7 +1,9 @@
+using System.Data.Common;
 using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using NoCTF.Application.GameplayFacts.AdjudicationPreview;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
@@ -67,6 +69,11 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             var after = await CountsAsync(db, cancellationToken);
             await Assert.That(after).IsEqualTo(before);
             var later = page.Items.Single(item => item.GameplayFactId == fixture.LaterFactId);
+            var earlier = page.Items.Single(item => item.GameplayFactId == fixture.EarlierFactId);
+            await Assert.That(earlier.OccurredAt).IsEqualTo(later.OccurredAt);
+            await Assert.That(string.CompareOrdinal(
+                fixture.EarlierFactId.ToString("N"),
+                fixture.LaterFactId.ToString("N"))).IsLessThan(0);
             await Assert.That(later.Differences.Select(item => item.Kind))
                 .Contains(AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate);
             await Assert.That(later.Differences.Select(item => item.Kind))
@@ -79,6 +86,9 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(page.Items.Single(item => item.GameplayFactId == fixture.EarlierFactId)
                 .Differences.Select(item => item.Kind))
                 .Contains(AdjudicationDifferenceKind.MissingBloodAward);
+            await Assert.That(page.Items.Single(item => item.GameplayFactId == fixture.EarlierFactId)
+                .Differences.Select(item => item.Kind))
+                .Contains(AdjudicationDifferenceKind.MissingAdjudicationRecord);
 
             var firstPage = await preview.ExecuteAsync(
                 fixture.CompetitionId, null, null, null, 1, cancellationToken);
@@ -97,6 +107,44 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 .Select(item => item.GameplayFactId)
                 .Distinct()).Count().IsEqualTo(2);
 
+            await db.Teams.Where(item => item.Id == fixture.FirstTeamId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsBanned, true),
+                    cancellationToken);
+            var ineligiblePreview = await preview.ExecuteAsync(
+                fixture.CompetitionId, null, null, null, 20, cancellationToken);
+            var ineligibleEarlier = ineligiblePreview.Items
+                .Single(item => item.GameplayFactId == fixture.EarlierFactId);
+            await Assert.That(ineligibleEarlier.DeterministicExpectedBloodRank).IsNull();
+            await Assert.That(ineligibleEarlier.Differences.Select(item => item.Kind))
+                .Contains(AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview);
+            await Assert.That(ineligibleEarlier.Differences.Select(item => item.Kind))
+                .DoesNotContain(AdjudicationDifferenceKind.MissingBloodAward);
+            await db.Teams.Where(item => item.Id == fixture.FirstTeamId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsBanned, false),
+                    cancellationToken);
+
+            await SeedIneligibleEarlierTeamAsync(options, fixture, cancellationToken);
+            var priorEligibilityPreview = await preview.ExecuteAsync(
+                fixture.CompetitionId, null, null, null, 20, cancellationToken);
+            var priorAffected = priorEligibilityPreview.Items
+                .Single(item => item.GameplayFactId == fixture.EarlierFactId);
+            await Assert.That(priorAffected.DeterministicExpectedBloodRank).IsNull();
+            await Assert.That(priorAffected.Differences.Select(item => item.Kind))
+                .Contains(AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview);
+            await Assert.That(priorAffected.Differences.Select(item => item.Kind))
+                .DoesNotContain(AdjudicationDifferenceKind.MissingBloodAward);
+
+            await db.GameplayFacts.Where(item => item.Id == fixture.LaterFactId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    item => item.Kind, GameplayFactKind.BreakAttempt), cancellationToken);
+            var crossKindPreview = await preview.ExecuteAsync(
+                fixture.CompetitionId, null, null, null, 20, cancellationToken);
+            await Assert.That(crossKindPreview.Items.Select(item => item.GameplayFactId))
+                .DoesNotContain(fixture.LaterFactId);
+            await db.GameplayFacts.Where(item => item.Id == fixture.LaterFactId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    item => item.Kind, GameplayFactKind.FlagAttempt), cancellationToken);
+
             await db.Competitions.Where(item => item.Id == fixture.CompetitionId)
                 .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Mode, GameMode.Awdp),
                     cancellationToken);
@@ -110,10 +158,93 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 .ExecuteDeleteAsync(cancellationToken);
             var breakPreview = await preview.ExecuteAsync(
                 fixture.CompetitionId, null, null, null, 20, cancellationToken);
-            await Assert.That(breakPreview.Items
-                .Single(item => item.GameplayFactId == fixture.LaterFactId)
-                .Differences.Select(item => item.Kind))
-                .Contains(AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate);
+            await Assert.That(breakPreview.Items).IsEmpty();
+
+            foreach (var unsupportedMode in new[] { GameMode.Awd, GameMode.Koh })
+            {
+                await db.Competitions.Where(item => item.Id == fixture.CompetitionId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(
+                        item => item.Mode, unsupportedMode), cancellationToken);
+                var unsupportedPreview = await preview.ExecuteAsync(
+                    fixture.CompetitionId, null, null, null, 20, cancellationToken);
+                await Assert.That(unsupportedPreview.Items).IsEmpty();
+            }
+
+            var missingCompetition = await preview.ExecuteAsync(
+                Guid.NewGuid(), null, null, null, 20, cancellationToken);
+            await Assert.That(missingCompetition.State)
+                .IsEqualTo(HistoricalAdjudicationPreviewReadState.CompetitionNotFound);
+            await db.Competitions.Where(item => item.Id == fixture.CompetitionId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    item => item.DeletedAt, fixture.Now), cancellationToken);
+            await Assert.That(await authorizer.CanObserveAsync(
+                fixture.AdministratorId, fixture.CompetitionId, cancellationToken)).IsTrue();
+            foreach (var deletedCollaboratorId in new[]
+                     {
+                         fixture.OwnerId,
+                         fixture.ManagerId,
+                         fixture.JudgeId,
+                         fixture.ObserverId
+                     })
+            {
+                await Assert.That(await authorizer.CanObserveAsync(
+                    deletedCollaboratorId, fixture.CompetitionId, cancellationToken)).IsFalse();
+            }
+            var deletedCompetition = await preview.ExecuteAsync(
+                fixture.CompetitionId, null, null, null, 20, cancellationToken);
+            await Assert.That(deletedCompetition.State)
+                .IsEqualTo(HistoricalAdjudicationPreviewReadState.CompetitionNotFound);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Preview_uses_one_repeatable_snapshot_and_a_bounded_query_count(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, cancellationToken);
+            var pause = new EventQueryPauseInterceptor();
+            var snapshotOptions = Options(postgres, pause);
+
+            await using var previewDb = new NoCtfDbContext(snapshotOptions);
+            var preview = new PreviewHistoricalAdjudicationDifferences(
+                new HistoricalAdjudicationPreviewStore(previewDb));
+            var previewTask = preview.ExecuteAsync(
+                fixture.CompetitionId, null, null, null, 20, cancellationToken);
+            await pause.EventQueryStarting.WaitAsync(cancellationToken);
+
+            await using (var writer = new NoCtfDbContext(options))
+            {
+                await writer.GameplayFacts.Where(fact => fact.Id == fixture.LaterFactId)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(
+                        fact => fact.Result, GameplayFactResult.Wrong), cancellationToken);
+                writer.CompetitionEvents.Add(Event(
+                    fixture,
+                    fixture.LaterFactId,
+                    CompetitionEventKind.GameplayFactAdjudicated,
+                    fixture.Now.AddSeconds(2),
+                    GameplayFactResult.Wrong));
+                await writer.SaveChangesAsync(cancellationToken);
+            }
+
+            pause.Continue();
+            var snapshotPage = await previewTask;
+            await Assert.That(snapshotPage.Items).IsEmpty();
+
+            await SeedLargeHistoryAsync(options, fixture, cancellationToken);
+            var counter = new QueryCountingInterceptor();
+            await using var countedDb = new NoCtfDbContext(Options(postgres, counter));
+            var countedPreview = new PreviewHistoricalAdjudicationDifferences(
+                new HistoricalAdjudicationPreviewStore(countedDb));
+            var countedPage = await countedPreview.ExecuteAsync(
+                fixture.CompetitionId, null, null, null, 20, cancellationToken);
+
+            await Assert.That(countedPage.Items).Count().IsEqualTo(20);
+            await Assert.That(counter.ReaderCommandCount).IsLessThanOrEqualTo(6);
         });
     }
 
@@ -135,14 +266,87 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes("flag{preview}")),
             State = GameplayFactState.Completed,
             Result = GameplayFactResult.Correct,
-            OccurredAt = fixture.Now,
-            UpdatedAt = fixture.Now
+            OccurredAt = fixture.Now.AddSeconds(1),
+            UpdatedAt = fixture.Now.AddSeconds(1)
         });
         db.CompetitionEvents.AddRange(
             Event(fixture, fixture.LaterFactId, CompetitionEventKind.FirstBloodAwarded,
                 fixture.Now.AddSeconds(1), GameplayFactResult.Correct),
             Event(fixture, fixture.LaterFactId, CompetitionEventKind.GameplayFactAdjudicated,
                 fixture.Now.AddSeconds(2), GameplayFactResult.Wrong));
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task SeedIneligibleEarlierTeamAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        CancellationToken ct)
+    {
+        var teamId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var factId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+        await using var db = new NoCtfDbContext(options);
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CompetitionId = fixture.CompetitionId,
+            Name = "Ineligible prior team",
+            NormalizedName = "INELIGIBLE PRIOR TEAM",
+            CaptainId = fixture.OwnerId,
+            MemberIds = [fixture.OwnerId],
+            InvitationToken = new string('b', 32),
+            RegistrationStatus = TeamRegistrationStatus.Approved,
+            IsBanned = true,
+            RegisteredAt = fixture.Now
+        });
+        db.GameplayFacts.Add(new GameplayFact
+        {
+            Id = factId,
+            CompetitionId = fixture.CompetitionId,
+            CompetitionChallengeId = fixture.CompetitionChallengeId,
+            TeamId = teamId,
+            ActorUserId = fixture.OwnerId,
+            Kind = GameplayFactKind.FlagAttempt,
+            Value = "flag{ineligible-prior}",
+            ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes("flag{ineligible-prior}")),
+            State = GameplayFactState.Completed,
+            Result = GameplayFactResult.Correct,
+            OccurredAt = fixture.Now,
+            UpdatedAt = fixture.Now
+        });
+        db.CompetitionEvents.Add(Event(
+            fixture,
+            factId,
+            CompetitionEventKind.GameplayFactAdjudicated,
+            fixture.Now,
+            GameplayFactResult.Correct));
+        await db.SaveChangesAsync(ct);
+    }
+
+    private static async Task SeedLargeHistoryAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        CancellationToken ct)
+    {
+        await using var db = new NoCtfDbContext(options);
+        for (var index = 0; index < 600; index++)
+        {
+            var value = $"flag{{bounded-query-{index}}}";
+            db.GameplayFacts.Add(new GameplayFact
+            {
+                Id = Guid.CreateVersion7(),
+                CompetitionId = fixture.CompetitionId,
+                CompetitionChallengeId = fixture.CompetitionChallengeId,
+                TeamId = fixture.FirstTeamId,
+                ActorUserId = fixture.FirstUserId,
+                Kind = GameplayFactKind.FlagAttempt,
+                Value = value,
+                ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(value)),
+                State = GameplayFactState.Completed,
+                Result = GameplayFactResult.Wrong,
+                OccurredAt = fixture.Now.AddMinutes(index + 1),
+                UpdatedAt = fixture.Now.AddMinutes(index + 1)
+            });
+        }
         await db.SaveChangesAsync(ct);
     }
 
@@ -310,11 +514,62 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         return postgres;
     }
 
-    private static DbContextOptions<NoCtfDbContext> Options(PostgreSqlContainer postgres) =>
-        new DbContextOptionsBuilder<NoCtfDbContext>()
+    private static DbContextOptions<NoCtfDbContext> Options(
+        PostgreSqlContainer postgres,
+        params IInterceptor[] interceptors)
+    {
+        var builder = new DbContextOptionsBuilder<NoCtfDbContext>()
             .UseNpgsql(postgres.GetConnectionString())
-            .UseSnakeCaseNamingConvention()
-            .Options;
+            .UseSnakeCaseNamingConvention();
+        if (interceptors.Length > 0)
+            builder.AddInterceptors(interceptors);
+        return builder.Options;
+    }
+
+    private sealed class EventQueryPauseInterceptor : DbCommandInterceptor
+    {
+        private readonly TaskCompletionSource eventQueryStarting = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource continuation = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        private int paused;
+
+        public Task EventQueryStarting => eventQueryStarting.Task;
+
+        public void Continue() => continuation.TrySetResult();
+
+        public override async ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (command.CommandText.Contains("competition_events", StringComparison.OrdinalIgnoreCase)
+                && Interlocked.CompareExchange(ref paused, 1, 0) == 0)
+            {
+                eventQueryStarting.TrySetResult();
+                await continuation.Task.WaitAsync(cancellationToken);
+            }
+            return result;
+        }
+    }
+
+    private sealed class QueryCountingInterceptor : DbCommandInterceptor
+    {
+        private int readerCommandCount;
+
+        public int ReaderCommandCount => Volatile.Read(ref readerCommandCount);
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref readerCommandCount);
+            return ValueTask.FromResult(result);
+        }
+    }
 
     private sealed record Fixture(
         DateTimeOffset Now,

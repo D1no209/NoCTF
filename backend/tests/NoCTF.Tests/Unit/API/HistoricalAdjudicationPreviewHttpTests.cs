@@ -19,7 +19,7 @@ using NoCTF.Application.GameplayFacts.AdjudicationPreview;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Authentication.EmailVerification;
-using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 
 namespace NoCTF.Tests.Unit.API;
@@ -52,8 +52,114 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         await Assert.That(participant.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
     }
 
+    [Test]
+    public async Task Authorized_missing_competition_returns_not_found()
+    {
+        var competitionId = Guid.NewGuid();
+        var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
+        authorizer.CanObserveAsync(Arg.Any<Guid>(), competitionId, Arg.Any<CancellationToken>())
+            .Returns(true);
+        var store = Substitute.For<IHistoricalAdjudicationEvidenceStore>();
+        store.ReadAsync(
+                competitionId,
+                Arg.Any<Guid?>(),
+                Arg.Any<DateTimeOffset?>(),
+                Arg.Any<Guid?>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new HistoricalAdjudicationEvidencePage(
+                HistoricalAdjudicationPreviewReadState.CompetitionNotFound,
+                []));
+        await using var app = await CreateApplicationAsync(authorizer, store);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, Guid.NewGuid().ToString());
+
+        using var response = await client.GetAsync(
+            $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+    }
+
+    [Test]
+    public async Task Cursor_is_bound_to_competition_user_and_challenge_filter_and_rejects_tampering()
+    {
+        var competitionId = Guid.NewGuid();
+        var otherCompetitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var otherChallengeId = Guid.NewGuid();
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        var authorizer = Substitute.For<ICompetitionModerationAuthorizer>();
+        authorizer.CanObserveAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid>(),
+                Arg.Any<CancellationToken>())
+            .Returns(true);
+        var store = Substitute.For<IHistoricalAdjudicationEvidenceStore>();
+        store.ReadAsync(
+                Arg.Any<Guid>(),
+                Arg.Any<Guid?>(),
+                Arg.Any<DateTimeOffset?>(),
+                Arg.Any<Guid?>(),
+                Arg.Any<int>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new HistoricalAdjudicationEvidencePage(
+                HistoricalAdjudicationPreviewReadState.Available,
+                [
+                    DifferenceEvidence(DateTimeOffset.UtcNow),
+                    DifferenceEvidence(DateTimeOffset.UtcNow.AddMinutes(-1))
+                ]));
+        var user = new MutableUserContext(firstUserId);
+        await using var app = await CreateApplicationAsync(authorizer, store, user);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, firstUserId.ToString());
+        var route = $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences"
+            + $"?competitionChallengeId={challengeId}&limit=1";
+        using var first = await client.GetAsync(route);
+        var rawPage = await first.Content.ReadAsStringAsync();
+        var page = await first.Content
+            .ReadFromJsonAsync<HistoricalAdjudicationDifferencePageResponse>();
+        await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(rawPage).DoesNotContain("\"value\"");
+        await Assert.That(page).IsNotNull();
+        await Assert.That(page!.NextCursor).IsNotNull();
+        var cursor = Uri.EscapeDataString(page.NextCursor!);
+
+        using var otherCompetition = await client.GetAsync(
+            $"/api/v1/admin/competitions/{otherCompetitionId}/gameplay-facts/adjudication-differences"
+            + $"?competitionChallengeId={challengeId}&limit=1&cursor={cursor}");
+        using var otherFilter = await client.GetAsync(
+            $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences"
+            + $"?competitionChallengeId={otherChallengeId}&limit=1&cursor={cursor}");
+
+        user.UserId = secondUserId;
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, secondUserId.ToString());
+        using var otherUser = await client.GetAsync(
+            $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences"
+            + $"?competitionChallengeId={challengeId}&limit=1&cursor={cursor}");
+
+        user.UserId = firstUserId;
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(BearerScheme, firstUserId.ToString());
+        var tampered = Uri.EscapeDataString(page.NextCursor![..^1]
+            + (page.NextCursor[^1] == 'A' ? "B" : "A"));
+        using var tamperedCursor = await client.GetAsync(
+            $"/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences"
+            + $"?competitionChallengeId={challengeId}&limit=1&cursor={tampered}");
+
+        await Assert.That(otherCompetition.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(otherFilter.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(otherUser.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(tamperedCursor.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
-        ICompetitionModerationAuthorizer authorizer)
+        ICompetitionModerationAuthorizer authorizer,
+        IHistoricalAdjudicationEvidenceStore? store = null,
+        IUserContext? user = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -75,19 +181,23 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
             .AddScheme<AuthenticationSchemeOptions, TestBearerHandler>(BearerScheme, _ => { });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton(authorizer);
-        var store = Substitute.For<IHistoricalAdjudicationEvidenceStore>();
-        store.ReadAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<Guid?>(),
-                Arg.Any<DateTimeOffset?>(),
-                Arg.Any<Guid?>(),
-                Arg.Any<int>(),
-                Arg.Any<CancellationToken>())
-            .Returns(new HistoricalAdjudicationEvidencePage(GameMode.Ctf, []));
+        if (store is null)
+        {
+            store = Substitute.For<IHistoricalAdjudicationEvidenceStore>();
+            store.ReadAsync(
+                    Arg.Any<Guid>(),
+                    Arg.Any<Guid?>(),
+                    Arg.Any<DateTimeOffset?>(),
+                    Arg.Any<Guid?>(),
+                    Arg.Any<int>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(new HistoricalAdjudicationEvidencePage(
+                    HistoricalAdjudicationPreviewReadState.Available,
+                    []));
+        }
         builder.Services.AddSingleton(store);
         builder.Services.AddSingleton<PreviewHistoricalAdjudicationDifferences>();
-        var user = Substitute.For<IUserContext>();
-        user.UserId.Returns(Guid.NewGuid());
+        user ??= new MutableUserContext(Guid.NewGuid());
         builder.Services.AddSingleton(user);
         var emailConfiguration = Substitute.For<IEmailVerificationConfigurationStore>();
         emailConfiguration.GetAsync(Arg.Any<CancellationToken>()).Returns(
@@ -103,6 +213,28 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
         app.UseNoCtfEndpoints();
         await app.StartAsync();
         return app;
+    }
+
+    private static HistoricalAdjudicationEvidence DifferenceEvidence(
+        DateTimeOffset occurredAt) => new(
+        Guid.NewGuid(),
+        Guid.NewGuid(),
+        "Challenge",
+        Guid.NewGuid(),
+        "Team",
+        GameplayFactKind.FlagAttempt,
+        GameplayFactResult.Correct,
+        occurredAt,
+        true,
+        0,
+        false,
+        [GameplayFactResult.Correct],
+        []);
+
+    private sealed class MutableUserContext(Guid userId) : IUserContext
+    {
+        public Guid UserId { get; set; } = userId;
+        public bool IsAdministrator => false;
     }
 
     private sealed class TestBearerHandler(
