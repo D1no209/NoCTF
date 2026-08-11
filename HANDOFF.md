@@ -9,6 +9,22 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：历史裁决差异只读预览
+
+- 功能提交 `93d3c245` 新增强类型管理端只读 API 与比赛“提交”页预览。它按权威
+  `(OccurredAt, Id)` 顺序重新计算 CTF Flag 与 AWDP Break 的确定性期望结果，并报告当前结果、当前
+  血榜记录、`Deterministic` 或 `NeedsReview` 差异；不提供应用更正、重判或写入按钮。
+- 查询使用签名 keyset cursor、可选题目筛选和 1..100 页大小；每页证据读取有 500 条硬边界。Cursor
+  绑定 endpoint、比赛、调用人和筛选，不能跨比赛、跨角色或跨筛选复用。冲突历史以及
+  Correct→Wrong→Correct 一律只标记人工复核，不擅自改写不可变事件。
+- Owner、Manager、Judge、Observer 与平台管理员可读，参赛者不可读；响应只包含工作人员原本有权查看
+  的事实元数据与受保护值。真实 PostgreSQL 测试验证预览前后 GameplayFact、CompetitionEvent 和
+  Notification 数量均不变。
+- OpenAPI 两份产物和 TypeScript SDK 已由工具生成并二次验证幂等；没有新增表、列、migration 或
+  snapshot。独立阶段验证：Release tests build 0 警告、PostgreSQL 1/1、HTTP 1/1、非 Integration
+  669/669、前端 152/152、typecheck、production build、EF model drift 与 `git diff --check` 均通过。
+  尚未推送、部署或修改任何生产历史；实际历史纠正仍须先生成预览并由用户逐比赛明确批准。
+
 ## 2026-08-11 全量审计修复：SMTP 精确 DNS 策略
 
 - 功能提交 `f55a930c` 补齐 Cilium `toFQDNs` 的 DNS 观察前提：示例 policy 仅允许 Backend/Worker
