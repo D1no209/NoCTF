@@ -40,6 +40,8 @@ public enum AdjudicationDifferenceKindProtocol
     CurrentCorrectShouldBeDuplicate,
     DuplicateWithoutCurrentPredecessor,
     HistoricalResultChanged,
+    MissingAdjudicationRecord,
+    TeamEligibilityHistoryRequiresReview,
     MissingBloodAward,
     UnexpectedBloodAward,
     WrongBloodRank,
@@ -82,7 +84,7 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
     : Endpoint<PreviewHistoricalAdjudicationDifferencesRequest,
-        Results<Ok<HistoricalAdjudicationDifferencePageResponse>, ForbidHttpResult, ProblemHttpResult>>
+        Results<Ok<HistoricalAdjudicationDifferencePageResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
     private const string CursorEndpoint = "gameplay-facts.adjudication-differences.preview";
 
@@ -94,18 +96,18 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Previews historical gameplay adjudication differences.";
-            summary.Description = "Returns a bounded, read-only analysis of current gameplay results and recorded blood awards. It never applies corrections.";
+            summary.Description = "Returns a bounded, read-only analysis of CTF Flag results and recorded blood awards. It never applies corrections.";
         });
     }
 
-    public override async Task<Results<Ok<HistoricalAdjudicationDifferencePageResponse>, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Ok<HistoricalAdjudicationDifferencePageResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
         PreviewHistoricalAdjudicationDifferencesRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
-        var filterKey = request.CompetitionChallengeId?.ToString() ?? string.Empty;
+        var filterKey = FilterKey(competitionId, user.UserId, request.CompetitionChallengeId);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
             return TypedResults.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Invalid cursor.");
 
@@ -116,6 +118,8 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
             position?.Id,
             request.Limit,
             ct);
+        if (page.State == HistoricalAdjudicationPreviewReadState.CompetitionNotFound)
+            return TypedResults.NotFound();
         var nextCursor = page.NextBeforeOccurredAt is DateTimeOffset nextAt
             && page.NextBeforeId is Guid nextId
                 ? cursors.Encode(CursorEndpoint, filterKey, new(nextAt, nextId))
@@ -153,6 +157,10 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
                 AdjudicationDifferenceKindProtocol.DuplicateWithoutCurrentPredecessor,
             AdjudicationDifferenceKind.HistoricalResultChanged =>
                 AdjudicationDifferenceKindProtocol.HistoricalResultChanged,
+            AdjudicationDifferenceKind.MissingAdjudicationRecord =>
+                AdjudicationDifferenceKindProtocol.MissingAdjudicationRecord,
+            AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview =>
+                AdjudicationDifferenceKindProtocol.TeamEligibilityHistoryRequiresReview,
             AdjudicationDifferenceKind.MissingBloodAward =>
                 AdjudicationDifferenceKindProtocol.MissingBloodAward,
             AdjudicationDifferenceKind.UnexpectedBloodAward =>
@@ -181,4 +189,12 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
         LeaderboardBloodRank.Third => LeaderboardBloodRankProtocol.Third,
         _ => throw new ArgumentOutOfRangeException(nameof(rank), rank, null)
     };
+
+    private static string FilterKey(
+        Guid competitionId,
+        Guid userId,
+        Guid? competitionChallengeId) => string.Join('|',
+        competitionId.ToString("N"),
+        userId.ToString("N"),
+        competitionChallengeId?.ToString("N") ?? "-");
 }

@@ -1,5 +1,4 @@
 using NoCTF.Application.Scoring.Leaderboard;
-using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.GameplayFacts.AdjudicationPreview;
@@ -15,6 +14,8 @@ public enum AdjudicationDifferenceKind : short
     CurrentCorrectShouldBeDuplicate,
     DuplicateWithoutCurrentPredecessor,
     HistoricalResultChanged,
+    MissingAdjudicationRecord,
+    TeamEligibilityHistoryRequiresReview,
     MissingBloodAward,
     UnexpectedBloodAward,
     WrongBloodRank,
@@ -40,9 +41,16 @@ public sealed record HistoricalAdjudicationDifferenceItem(
     IReadOnlyList<AdjudicationDifference> Differences);
 
 public sealed record HistoricalAdjudicationPreviewPage(
+    HistoricalAdjudicationPreviewReadState State,
     IReadOnlyList<HistoricalAdjudicationDifferenceItem> Items,
     DateTimeOffset? NextBeforeOccurredAt,
     Guid? NextBeforeId);
+
+public enum HistoricalAdjudicationPreviewReadState : short
+{
+    Available,
+    CompetitionNotFound
+}
 
 public sealed record HistoricalAdjudicationEvidence(
     Guid GameplayFactId,
@@ -55,11 +63,12 @@ public sealed record HistoricalAdjudicationEvidence(
     DateTimeOffset OccurredAt,
     bool HasEarlierCorrect,
     int EarlierCorrectTeamCount,
+    bool BloodEligibilityHistoryRequiresReview,
     IReadOnlyList<GameplayFactResult> HistoricalResults,
     IReadOnlyList<LeaderboardBloodRank> RecordedBloodRanks);
 
 public sealed record HistoricalAdjudicationEvidencePage(
-    GameMode? Mode,
+    HistoricalAdjudicationPreviewReadState State,
     IReadOnlyList<HistoricalAdjudicationEvidence> Items);
 
 public interface IHistoricalAdjudicationEvidenceStore
@@ -92,15 +101,17 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
             beforeId,
             scanLimit,
             cancellationToken);
-        if (evidencePage.Mode is not { } mode || evidencePage.Items.Count == 0)
-            return new([], null, null);
+        if (evidencePage.State != HistoricalAdjudicationPreviewReadState.Available)
+            return new(evidencePage.State, [], null, null);
+        if (evidencePage.Items.Count == 0)
+            return new(HistoricalAdjudicationPreviewReadState.Available, [], null, null);
 
         var differences = new List<HistoricalAdjudicationDifferenceItem>(limit);
         var processed = 0;
         foreach (var evidence in evidencePage.Items)
         {
             processed++;
-            var issues = Analyze(evidence, mode);
+            var issues = Analyze(evidence);
             if (issues.Count == 0)
                 continue;
 
@@ -112,8 +123,8 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
                 evidence.TeamName,
                 evidence.GameplayFactKind,
                 evidence.CurrentResult,
-                ShouldBeDuplicate(evidence, mode) ? GameplayFactResult.Duplicate : null,
-                ExpectedBloodRank(evidence, mode),
+                ShouldBeDuplicate(evidence) ? GameplayFactResult.Duplicate : null,
+                ExpectedBloodRank(evidence),
                 evidence.RecordedBloodRanks,
                 evidence.OccurredAt,
                 issues));
@@ -125,17 +136,17 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
             || evidencePage.Items.Count == scanLimit;
         var last = evidencePage.Items[processed - 1];
         return new(
+            HistoricalAdjudicationPreviewReadState.Available,
             differences,
             hasMore ? last.OccurredAt : null,
             hasMore ? last.GameplayFactId : null);
     }
 
     private static IReadOnlyList<AdjudicationDifference> Analyze(
-        HistoricalAdjudicationEvidence evidence,
-        GameMode mode)
+        HistoricalAdjudicationEvidence evidence)
     {
         var issues = new List<AdjudicationDifference>();
-        if (ShouldBeDuplicate(evidence, mode))
+        if (ShouldBeDuplicate(evidence))
         {
             issues.Add(new(
                 AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate,
@@ -156,8 +167,20 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
                 AdjudicationDifferenceKind.HistoricalResultChanged,
                 AdjudicationDifferenceCertainty.NeedsReview));
         }
+        if (evidence.CurrentResult is not null && evidence.HistoricalResults.Count == 0)
+        {
+            issues.Add(new(
+                AdjudicationDifferenceKind.MissingAdjudicationRecord,
+                AdjudicationDifferenceCertainty.NeedsReview));
+        }
 
-        var expectedBloodRank = ExpectedBloodRank(evidence, mode);
+        if (evidence.BloodEligibilityHistoryRequiresReview)
+        {
+            issues.Add(new(
+                AdjudicationDifferenceKind.TeamEligibilityHistoryRequiresReview,
+                AdjudicationDifferenceCertainty.NeedsReview));
+        }
+        var expectedBloodRank = ExpectedBloodRank(evidence);
         if (evidence.RecordedBloodRanks.GroupBy(rank => rank).Any(group => group.Count() > 1))
         {
             issues.Add(new(
@@ -179,7 +202,8 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
                     AdjudicationDifferenceCertainty.Deterministic));
             }
         }
-        else if (evidence.RecordedBloodRanks.Count > 0)
+        else if (!evidence.BloodEligibilityHistoryRequiresReview
+            && evidence.RecordedBloodRanks.Count > 0)
         {
             issues.Add(new(
                 AdjudicationDifferenceKind.UnexpectedBloodAward,
@@ -190,20 +214,18 @@ public sealed class PreviewHistoricalAdjudicationDifferences(
         return issues;
     }
 
-    private static bool ShouldBeDuplicate(HistoricalAdjudicationEvidence evidence, GameMode mode) =>
+    private static bool ShouldBeDuplicate(HistoricalAdjudicationEvidence evidence) =>
         evidence.CurrentResult == GameplayFactResult.Correct
         && evidence.HasEarlierCorrect
-        && (mode == GameMode.Ctf && evidence.GameplayFactKind == GameplayFactKind.FlagAttempt
-            || mode == GameMode.Awdp && evidence.GameplayFactKind == GameplayFactKind.BreakAttempt);
+        && evidence.GameplayFactKind == GameplayFactKind.FlagAttempt;
 
     private static LeaderboardBloodRank? ExpectedBloodRank(
-        HistoricalAdjudicationEvidence evidence,
-        GameMode mode)
+        HistoricalAdjudicationEvidence evidence)
     {
-        if (mode != GameMode.Ctf
-            || evidence.GameplayFactKind != GameplayFactKind.FlagAttempt
+        if (evidence.GameplayFactKind != GameplayFactKind.FlagAttempt
             || evidence.CurrentResult != GameplayFactResult.Correct
-            || evidence.HasEarlierCorrect)
+            || evidence.HasEarlierCorrect
+            || evidence.BloodEligibilityHistoryRequiresReview)
             return null;
         var rank = evidence.EarlierCorrectTeamCount + 1;
         return rank is >= 1 and <= 3 ? (LeaderboardBloodRank)rank : null;
