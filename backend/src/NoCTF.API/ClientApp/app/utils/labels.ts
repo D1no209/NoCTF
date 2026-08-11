@@ -151,6 +151,77 @@ export function notificationThreadRootId(
   return notificationContentId(notification, 'questionId') ?? notification.id ?? null
 }
 
+interface NotificationTargetContext {
+  detailPath: string
+  competitionId: string | null
+  challengeId: string | null
+  questionId: string | null
+  gameplayFactId: string | null
+}
+
+type NotificationTargetResolver = (context: NotificationTargetContext) => string
+
+function notificationDetailPath(
+  notification: NoCtfapiEndpointsNotificationsNotificationResponse,
+): string {
+  return notification.id ? `/notifications?notification=${notification.id}` : '/notifications'
+}
+
+function competitionEventTarget(
+  context: NotificationTargetContext,
+  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+): string {
+  return context.competitionId
+    ? `/competitions/${context.competitionId}/events?kind=${kind}`
+    : context.detailPath
+}
+
+const notificationTargetResolvers = {
+  Message: context => context.competitionId && context.questionId
+    ? `/competitions/${context.competitionId}/questions?question=${context.questionId}`
+    : context.detailPath,
+  CompetitionAnnouncement: context => context.detailPath,
+  QuestionOpened: context => context.competitionId && context.questionId
+    ? `/competitions/${context.competitionId}/questions?question=${context.questionId}`
+    : context.detailPath,
+  QuestionStatusChanged: context => context.competitionId && context.questionId
+    ? `/competitions/${context.competitionId}/questions?question=${context.questionId}`
+    : context.detailPath,
+  CompetitionLifecycleChanged: context => competitionEventTarget(context, 'CompetitionLifecycleChanged'),
+  TeamRegistrationChanged: context => context.competitionId
+    ? `/competitions/${context.competitionId}/my/team`
+    : context.detailPath,
+  GameplayFactAdjudicated: context => context.competitionId && context.gameplayFactId
+    ? `/competitions/${context.competitionId}/my/submissions`
+    : context.detailPath,
+  RuntimeStateChanged: context => context.competitionId && context.challengeId
+    ? `/competitions/${context.competitionId}/challenges/${context.challengeId}`
+    : context.detailPath,
+  StartGateFailed: context => context.detailPath,
+  ManagementFailure: context => context.detailPath,
+  BloodAwarded: context => context.competitionId && context.challengeId
+    ? `/competitions/${context.competitionId}/challenges/${context.challengeId}`
+    : context.detailPath,
+  ChallengePublished: context => context.competitionId && context.challengeId
+    ? `/competitions/${context.competitionId}/challenges/${context.challengeId}`
+    : context.detailPath,
+  HintPublished: context => context.competitionId && context.challengeId
+    ? `/competitions/${context.competitionId}/challenges/${context.challengeId}`
+    : context.detailPath,
+  TeamBanned: context => context.competitionId
+    ? `/competitions/${context.competitionId}/my/team#ban-appeal`
+    : context.detailPath,
+  CheatIncidentDetected: context => context.competitionId && context.gameplayFactId
+    ? `/admin/competitions/${context.competitionId}/cheats?incident=${context.gameplayFactId}`
+    : context.detailPath,
+  TeamBanCorrected: context => context.competitionId
+    ? `/competitions/${context.competitionId}/my/team#ban-appeal`
+    : context.detailPath,
+  DataExportReady: context => context.detailPath,
+  DataExportFailed: context => context.detailPath,
+  UserAccountLifecycleChanged: context => context.detailPath,
+} satisfies Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, NotificationTargetResolver>
+
 export function notificationTargetPath(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
@@ -159,46 +230,19 @@ export function notificationTargetPath(
     || notification.kind === 'QuestionStatusChanged'
   const competitionId = notificationCompetitionId(notification)
     ?? (isQuestionActivity ? notification.relatedId ?? null : null)
-  if (!competitionId)
-    return '/notifications'
+  const detailPath = notificationDetailPath(notification)
+  const kind = notification.kind
+  if (!kind) return detailPath
 
-  const challengeId = notificationContentId(notification, 'competitionChallengeId')
-  const questionId = notificationContentId(notification, 'questionId')
-    ?? (notification.kind === 'QuestionOpened' ? notification.id ?? null : null)
-  const gameplayFactId = notificationContentId(notification, 'gameplayFactId')
-  switch (notification.kind) {
-    case 'BloodAwarded':
-    case 'ChallengePublished':
-    case 'HintPublished':
-      return challengeId
-        ? `/competitions/${competitionId}/challenges/${challengeId}`
-        : `/competitions/${competitionId}/challenges`
-    case 'QuestionOpened':
-    case 'Message':
-    case 'QuestionStatusChanged':
-      return questionId
-        ? `/competitions/${competitionId}/questions?question=${questionId}`
-        : `/competitions/${competitionId}/questions`
-    case 'TeamBanned':
-    case 'TeamBanCorrected':
-      return `/competitions/${competitionId}/my/team#ban-appeal`
-    case 'CheatIncidentDetected':
-      return gameplayFactId
-        ? `/admin/competitions/${competitionId}/cheats?incident=${gameplayFactId}`
-        : `/admin/competitions/${competitionId}/cheats`
-    case 'GameplayFactAdjudicated':
-      return `/competitions/${competitionId}/my/submissions`
-    case 'RuntimeStateChanged':
-      return challengeId
-        ? `/competitions/${competitionId}/challenges/${challengeId}`
-        : `/competitions/${competitionId}/challenges`
-    case 'TeamRegistrationChanged':
-      return `/competitions/${competitionId}/my/team`
-    case 'CompetitionAnnouncement':
-      return `/notifications?notification=${notification.id ?? ''}`
-    default:
-      return `/competitions/${competitionId}/events?kind=${notification.kind}`
+  const context: NotificationTargetContext = {
+    detailPath,
+    competitionId,
+    challengeId: notificationContentId(notification, 'competitionChallengeId'),
+    questionId: notificationContentId(notification, 'questionId')
+      ?? (kind === 'QuestionOpened' ? notification.id ?? null : null),
+    gameplayFactId: notificationContentId(notification, 'gameplayFactId'),
   }
+  return notificationTargetResolvers[kind]?.(context) ?? detailPath
 }
 
 export function notificationTitle(
@@ -227,21 +271,28 @@ export function notificationBody(
 export function notificationActionLabel(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string {
-  switch (notification.kind) {
-    case 'BloodAwarded':
-    case 'ChallengePublished':
-    case 'HintPublished':
-    case 'RuntimeStateChanged': return translate("查看题目")
-    case 'QuestionOpened':
-    case 'Message':
-    case 'QuestionStatusChanged': return translate("查看咨询")
-    case 'TeamBanned':
-    case 'TeamBanCorrected': return translate("查看封禁与申诉")
-    case 'CheatIncidentDetected': return translate("查看作弊事件")
-    case 'GameplayFactAdjudicated': return translate("查看提交")
-    case 'TeamRegistrationChanged': return translate("查看我的队伍")
-    default: return translate("查看比赛动态")
-  }
+  const labels = {
+    Message: '查看咨询',
+    CompetitionAnnouncement: '查看通知详情',
+    QuestionOpened: '查看咨询',
+    QuestionStatusChanged: '查看咨询',
+    CompetitionLifecycleChanged: '查看比赛动态',
+    TeamRegistrationChanged: '查看我的队伍',
+    GameplayFactAdjudicated: '查看提交',
+    RuntimeStateChanged: '查看题目',
+    StartGateFailed: '查看通知详情',
+    ManagementFailure: '查看通知详情',
+    BloodAwarded: '查看题目',
+    ChallengePublished: '查看题目',
+    HintPublished: '查看题目',
+    TeamBanned: '查看封禁与申诉',
+    CheatIncidentDetected: '查看作弊事件',
+    TeamBanCorrected: '查看封禁与申诉',
+    DataExportReady: '查看通知详情',
+    DataExportFailed: '查看通知详情',
+    UserAccountLifecycleChanged: '查看通知详情',
+  } satisfies Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, string>
+  return translate(notification.kind ? labels[notification.kind] : '查看通知详情')
 }
 
 /** 通知文案(NoCTF.Domain.Notifications.NotificationKind),content 为松散 JSON。 */

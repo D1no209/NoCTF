@@ -1,5 +1,6 @@
 import * as signalR from '@microsoft/signalr'
 import { getAccessToken, getRealtimeAccessToken } from '~/lib/session'
+import { startRealtimeWithRetry } from '~/lib/realtime-retry'
 
 /**
  * 竞赛实时 hub(/hubs/v1/competitions)。
@@ -33,6 +34,7 @@ const HEARTBEAT_MS = 45_000
 
 let connection: signalR.HubConnection | null = null
 let startPromise: Promise<void> | null = null
+let startAbortController: AbortController | null = null
 const subscribers = new Map<symbol, Subscriber>()
 const heartbeats = new Map<string, ReturnType<typeof setInterval>>()
 /** 已成功 Join 的竞赛(用于断线重连后恢复)。 */
@@ -79,11 +81,13 @@ function ensureConnection(): signalR.HubConnection {
   hub.on('gameplayFactStateChanged', (payload: unknown) => dispatch('gameplayFactStateChanged', payload, true))
 
   hub.onreconnected(() => {
-    void rejoinAll()
+    if (connection === hub) void rejoinAll()
   })
   hub.onclose(() => {
+    if (connection !== hub) return
     joined.clear()
     stopAllHeartbeats()
+    if (subscribers.size > 0) void ensureStarted()
   })
   connection = hub
   return hub
@@ -107,7 +111,8 @@ function startHeartbeat(competitionId: string): void {
 }
 
 async function join(competitionId: string): Promise<void> {
-  const hub = ensureConnection()
+  const hub = connection
+  if (!hub) return
   if (hub.state !== signalR.HubConnectionState.Connected) return
   if (joined.has(competitionId)) return
   await hub.invoke('JoinCompetition', competitionId)
@@ -130,26 +135,42 @@ async function rejoinAll(): Promise<void> {
 }
 
 async function ensureStarted(): Promise<void> {
-  // 匿名用户没有 access token,hub 需要 [Authorize],直接跳过。
-  if (!getAccessToken()) return
+  // 首次匿名访问不建立 hub；已认证连接丢失 token 时仍让
+  // accessTokenFactory 使用 refresh cookie 恢复连接。
+  if (!getAccessToken() && !connection) return
   const hub = ensureConnection()
-  if (hub.state !== signalR.HubConnectionState.Disconnected) {
+  if (hub.state === signalR.HubConnectionState.Connected) {
     await rejoinAll()
     return
   }
-  startPromise ??= hub
-    .start()
-    .then(() => rejoinAll())
-    .catch(() => undefined)
-    .finally(() => {
-      startPromise = null
-    })
+  if (startPromise) return startPromise
+  if (hub.state !== signalR.HubConnectionState.Disconnected) return
+
+  const abortController = new AbortController()
+  startAbortController = abortController
+  const task = (async () => {
+    const started = await startRealtimeWithRetry(
+      async () => {
+        if (hub.state === signalR.HubConnectionState.Disconnected) await hub.start()
+      },
+      abortController.signal,
+      () => connection === hub && subscribers.size > 0,
+    )
+    if (started && connection === hub) await rejoinAll()
+  })()
+  startPromise = task.finally(() => {
+    if (startAbortController !== abortController) return
+    startAbortController = null
+    startPromise = null
+  })
   await startPromise
 }
 
 async function teardownIfIdle(): Promise<void> {
   if (subscribers.size > 0 || !connection) return
   const hub = connection
+  startAbortController?.abort()
+  startAbortController = null
   connection = null
   startPromise = null
   joined.clear()
@@ -167,7 +188,9 @@ export function watchCompetition(
 ): () => void {
   const key = Symbol('competition-watch')
   subscribers.set(key, { competitionId, handlers })
-  void ensureStarted().then(() => join(competitionId)).catch(() => undefined)
+  void ensureStarted()
+    .then(() => subscribers.has(key) ? join(competitionId) : undefined)
+    .catch(() => undefined)
 
   return () => {
     subscribers.delete(key)

@@ -88,9 +88,10 @@ function remove(index: number): void {
         variant="ghost"
         size="icon"
         class="shrink-0"
+        :aria-label="$t('移除第 {index} 项', { index: index + 1 })"
         @click="remove(index)"
       >
-        <X class="size-4" />
+        <X class="size-4" aria-hidden="true" />
       </Button>
     </div>
     <Button

@@ -23,7 +23,7 @@ const LEVEL_ORDER = ['Trace', 'Debug', 'Information', 'Warning', 'Error', 'Criti
 const levelOrdinal = (level?: string | number) => typeof level === 'number' ? level : LEVEL_ORDER.indexOf(level as typeof LEVEL_ORDER[number])
 const LIVE_LIMIT = 200
 
-const minimumLevel = ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Information')
+const minimumLevel = ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Warning')
 const service = ref<'all' | NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol>('all')
 const search = ref('')
 const from = ref('')
