@@ -38,4 +38,16 @@ describe('generated protocol usage', () => {
     )
     expect(source).not.toContain("'owner' | 'manager' | 'judge' | 'observer'")
   })
+
+  test('constrains admin label maps to generated protocol unions', async () => {
+    const source = await Bun.file(new URL('../app/utils/admin-format.ts', import.meta.url)).text()
+
+    expect(source).not.toContain('Record<string, string> =')
+    expect(source).toContain(
+      'satisfies Record<NoCtfapiEndpointsRuntimeRuntimeStateProtocol, string>',
+    )
+    expect(source).toContain(
+      'satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>',
+    )
+  })
 })
