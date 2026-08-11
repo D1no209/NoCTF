@@ -9,6 +9,21 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：CTF 分值表达式全区间验证
+
+- 功能提交 `0a15357c` 修复 CTF 自定义分值表达式只验证 `solveCount=0`、`1` 和参赛队总数、
+  因而漏过中间解题人数除零或溢出的缺陷。保存比赛/题目配置时现在会验证从 `0` 到
+  `eligibleTeamCount` 的每个可达整数值，避免比赛进行到中间解题人数后使整场排行榜投影失败。
+- 同时拒绝负数 `eligibleTeamCount`，并补充中间奇点拒绝与默认表达式全区间通过测试。
+- 本阶段没有 HTTP/OpenAPI、TypeScript SDK、数据模型、数据表、migration、snapshot 或版本号变化。
+- 验证通过：
+  - `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj -c Release --no-restore --treenode-filter "/*/*/CtfScoreExpressionTests/*"`：5/5；
+  - `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj -c Release --no-restore --treenode-filter "/*/*/ChallengeConfigurationCatalogTests/*"`：46/46；
+  - `dotnet build backend/src/NoCTF.GameModes/NoCTF.GameModes.csproj -c Release --no-restore`：0 警告、0 错误；
+  - `git diff --check`：通过。
+- 该提交只保证以后保存的表达式安全；尚未自动修改生产配置或历史排行榜。后续继续处理
+  GameplayFact 稳定时序、重判副作用幂等及其历史差异预览，禁止直接改写不可变比赛事件。
+
 ## 2026-08-11 Alpha.25 AWD、AWDP 与 KoH 运行链路恢复
 
 - 功能提交 `4cf4f6e2cf59d8c3accb19429a2d0146f2ca3ca9` 基于协作者最新 `main`
