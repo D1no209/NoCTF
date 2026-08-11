@@ -13,6 +13,7 @@ const selected = ref<Notification | null>(null)
 const thread = ref<Notification[]>([])
 const threadLoading = ref(false)
 const threadError = ref<string | null>(null)
+const routeError = ref<string | null>(null)
 const threadRequests = createLatestRequestGuard()
 
 const { items, loading, error, hasMore, initialized, loadMore } =
@@ -75,6 +76,7 @@ async function openNotification(notification: Notification, updateRoute = true):
   selected.value = notification
   thread.value = []
   threadError.value = null
+  routeError.value = null
   threadLoading.value = false
   if (updateRoute) {
     await router.replace({
@@ -109,6 +111,7 @@ async function closeDetail(): Promise<void> {
   selected.value = null
   thread.value = []
   threadError.value = null
+  routeError.value = null
   threadLoading.value = false
   const query = { ...route.query }
   delete query.notification
@@ -121,7 +124,36 @@ async function openFromRoute(): Promise<void> {
     : null
   if (!selectedId || selected.value?.id === selectedId) return
   const notification = items.value.find(item => item.id === selectedId)
-  if (notification) await openNotification(notification, false)
+  if (notification) {
+    await openNotification(notification, false)
+    return
+  }
+
+  const request = threadRequests.begin()
+  selected.value = null
+  thread.value = []
+  threadError.value = null
+  routeError.value = null
+  threadLoading.value = true
+  try {
+    const { data, error: requestError } = await readNotificationThreadEndpoint({
+      path: { notificationId: selectedId },
+    })
+    if (!threadRequests.isCurrent(request)) return
+    if (requestError || !data) throw requestError ?? new Error(translate('加载通知详情失败'))
+    const routedNotification = data.items?.find(item => item.id === selectedId)
+    if (!routedNotification) throw new Error(translate('通知不存在或你无权查看'))
+    selected.value = routedNotification
+    thread.value = data.items ?? []
+  }
+  catch (requestError) {
+    if (threadRequests.isCurrent(request))
+      routeError.value = parseApiError(requestError, translate('加载通知详情失败')).message
+  }
+  finally {
+    if (threadRequests.isCurrent(request))
+      threadLoading.value = false
+  }
 }
 
 onMounted(async () => {
@@ -153,6 +185,9 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
 
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error.message }}</AlertDescription>
+    </Alert>
+    <Alert v-if="routeError" variant="destructive">
+      <AlertDescription>{{ routeError }}</AlertDescription>
     </Alert>
 
     <div class="grid min-h-96 items-start gap-6 lg:grid-cols-[minmax(18rem,2fr)_minmax(24rem,3fr)]">
@@ -199,7 +234,12 @@ const showAction = computed(() => selected.value?.kind !== 'CompetitionAnnouncem
       </section>
 
       <section :aria-label="$t('通知详情')" class="min-w-0 rounded-xl border bg-card">
-        <Empty v-if="!selected" class="py-16">
+        <div v-if="threadLoading && !selected" class="flex flex-col gap-3 p-5" aria-live="polite">
+          <Skeleton class="h-6 w-2/3" />
+          <Skeleton class="h-4 w-1/3" />
+          <Skeleton class="mt-3 h-28 w-full" />
+        </div>
+        <Empty v-else-if="!selected" class="py-16">
           <EmptyHeader>
             <EmptyMedia variant="icon"><Mail /></EmptyMedia>
             <EmptyTitle>{{ $t('选择一条消息查看详情') }}</EmptyTitle>
