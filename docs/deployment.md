@@ -133,7 +133,9 @@ FQDN 与 TCP 端口的 Cilium policy，并以同一精确 FQDN 限制集群 DNS 
 
 ## 健康与关闭
 
-Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL/Wolverine，API 另检查 Redis 的降级状态，Runner 检查 Provider/queue。Runtime 题目本身不使用平台 Health Probe。
+Liveness 只表示进程事件循环；Readiness 检查进程所需 PostgreSQL/Wolverine。API 将 Redis
+不可用报告为降级；Worker 和 Runner 将 Redis 视为必要依赖，因为排行榜投影、通知、平台日志及
+Runner 容量事实均依赖 Redis。Runtime 题目本身不使用平台 Health Probe。
 
 优雅关闭先停止接收/claim 新消息，等待当前短事务/Provider 操作到部署超时；未完成消息依 Wolverine lease 恢复。不得依赖内存 drain 状态。
 

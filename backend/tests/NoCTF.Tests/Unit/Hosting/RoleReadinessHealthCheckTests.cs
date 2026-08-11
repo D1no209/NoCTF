@@ -63,7 +63,7 @@ public sealed class RoleReadinessHealthCheckTests
     }
 
     [Test]
-    public async Task Role_registration_distinguishes_optional_api_and_required_runner_redis()
+    public async Task Role_registration_distinguishes_optional_api_and_required_worker_runner_redis()
     {
         var apiDependencies = ResolveDependencies(HostRoles.Only(HostRole.Api));
         var runnerDependencies = ResolveDependencies(HostRoles.Only(HostRole.Runner));
@@ -75,8 +75,9 @@ public sealed class RoleReadinessHealthCheckTests
         await Assert.That(runnerDependencies.OfType<RedisReadinessDependency>().Single()
                 .FailureIsCritical)
             .IsTrue();
-        await Assert.That(workerDependencies.OfType<RedisReadinessDependency>())
-            .IsEmpty();
+        await Assert.That(workerDependencies.OfType<RedisReadinessDependency>().Single()
+                .FailureIsCritical)
+            .IsTrue();
         await Assert.That(workerDependencies.OfType<PostgreSqlReadinessDependency>())
             .HasSingleItem();
         await Assert.That(workerDependencies.OfType<WolverineReadinessDependency>())

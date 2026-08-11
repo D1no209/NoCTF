@@ -140,12 +140,15 @@ public static class RoleHealthCheckRegistration
             services.AddSingleton<IReadinessDependency>(
                 new PostgreSqlReadinessDependency(postgres));
             services.AddSingleton<IReadinessDependency, WolverineReadinessDependency>();
-            if (roles.Has(HostRole.Api) || roles.Has(HostRole.Runner))
+            if (roles.Has(HostRole.Api)
+                || roles.Has(HostRole.Worker)
+                || roles.Has(HostRole.Runner))
             {
                 services.AddSingleton<IReadinessDependency>(provider =>
                     new RedisReadinessDependency(
                         provider.GetRequiredService<IConnectionMultiplexer>(),
-                        failureIsCritical: roles.Has(HostRole.Runner)));
+                        failureIsCritical: roles.Has(HostRole.Worker)
+                            || roles.Has(HostRole.Runner)));
             }
         }
 
