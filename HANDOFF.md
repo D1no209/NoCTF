@@ -35,11 +35,22 @@
 - 一次全量真实依赖复验因 Docker 重置后重新拉取/启动依赖超过 300 秒门限而终止；精确留下的两个
   `it-36410...` 测试容器和三张 `noctf-platform-it-*` 测试网络已逐一删除。未执行全局 prune，最终
   本机测试容器、测试网络和数据卷均为零。
-- 下一步按当前授权将功能提交与本 HANDOFF 提交快进推送到远程 `main`，再通过带先决提交校验的
-  Git bundle 和 Alpha.25 `linux/amd64` 镜像更新生产 `/root/NoCTF`。部署需保留未跟踪的
-  `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、PostgreSQL/Redis/上传卷、题目镜像、Runtime
-  和比赛事实；Migration 应报告数据库已是最新，切换后验证 API/Runner healthy、Worker running、
-  HTTPS `/` 与 `/health` 为 200，并检查新进程日志无新增 Error/Fatal/Unhandled。
+- 用户明确授权后，协作者提交 `b7e49b4c`、功能提交 `4cf4f6e2` 和部署前 HANDOFF 提交
+  `b0e1fcb2` 已快进推送到远程 `main`；发布差异自动检查未包含任何隔离分支测试文件。生产
+  `/root/NoCTF` 从 `4e2f03d9` 通过带先决提交校验的 60,190 字节 Git bundle 快进到
+  `b0e1fcb2`。Bundle SHA-256 为
+  `2551c191033f1e719bb6c9f8ddf8ffb3f59d892c0f0482ba371e2afe202f8f46`；683,999,232 字节镜像归档
+  SHA-256 为 `680d69636d304af0d7a9ac5a900b2ff22c82fb705535090554fb91b2b542f557`，本地和服务器端一致。
+- Alpha.25 API/Migration、Worker、Runner 的 `linux/amd64` 镜像 ID 分别为 `b4600bc4dfa0`、
+  `ec1b263c62b4`、`8a1e63c6ef1a`，OCI revision 均为 `b0e1fcb2c79cee128cdeca79c77ed9b35a0d7f18`，
+  镜像和三个运行中程序集均确认包含 `0.1.0-alpha.25`。Migration 明确报告数据库已是最新；随后只以
+  `--no-build --no-deps` 重建 API、Worker 和 Runner，没有重建 PostgreSQL/Redis，也没有修改上传卷、
+  HTTPS 证书、题目镜像、Runtime 或比赛事实。
+- 稳定后 API/Runner healthy、Worker running，三个服务 restart count 均为 0；外网 HTTPS `/`、
+  `/auth/login` 和 `/health` 均返回 200。10 分钟部署日志中 Error、Exception、Fatal、Unhandled、
+  OutOfMemory 和 ArgumentNullException 均为 0；Warning 仅为既有 DataProtection 临时密钥与 Hosting
+  端口覆盖类别。服务器端精确传输目录和 Alpha.23 三个旧服务镜像已删除，Alpha.24 保留为即时回滚；
+  未执行全局 Docker prune。根分区最终恢复到 68% 使用、约 14 GB 可用。
 
 ## 2026-08-10 Alpha.24 语言切换黑屏修复
 
