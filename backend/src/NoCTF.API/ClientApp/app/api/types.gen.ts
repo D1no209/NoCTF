@@ -1140,6 +1140,41 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsListAdminGameplayFactsRe
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse = {
+    items?: Array<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse>;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse = {
+    gameplayFactId?: string;
+    competitionChallengeId?: string;
+    challengeTitle?: string;
+    teamId?: string | null;
+    teamName?: string | null;
+    gameplayFactKind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol;
+    currentResult?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
+    deterministicExpectedResult?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
+    deterministicExpectedBloodRank?: NoCtfapiEndpointsAdministrationGameplayFactsLeaderboardBloodRankProtocol | null;
+    recordedBloodRanks?: Array<NoCtfapiEndpointsAdministrationGameplayFactsLeaderboardBloodRankProtocol>;
+    occurredAt?: string;
+    differences?: Array<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsLeaderboardBloodRankProtocol = 'First' | 'Second' | 'Third';
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceResponse = {
+    kind?: NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol;
+    certainty?: NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceCertaintyProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol = 'CurrentCorrectShouldBeDuplicate' | 'DuplicateWithoutCurrentPredecessor' | 'HistoricalResultChanged' | 'MissingBloodAward' | 'UnexpectedBloodAward' | 'WrongBloodRank' | 'DuplicateBloodAward';
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceCertaintyProtocol = 'Deterministic' | 'NeedsReview';
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsPreviewHistoricalAdjudicationDifferencesRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationGameplayFactsQueueGameplayFactWorkResponse = {
     competitionChallengeId?: string;
     cutoff?: string;
@@ -5499,6 +5534,45 @@ export type AdminListGameplayFactsResponses = {
 };
 
 export type AdminListGameplayFactsResponse = AdminListGameplayFactsResponses[keyof AdminListGameplayFactsResponses];
+
+export type AdminPreviewHistoricalAdjudicationDifferencesData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query: {
+        competitionChallengeId?: string | null;
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences';
+};
+
+export type AdminPreviewHistoricalAdjudicationDifferencesErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPreviewHistoricalAdjudicationDifferencesError = AdminPreviewHistoricalAdjudicationDifferencesErrors[keyof AdminPreviewHistoricalAdjudicationDifferencesErrors];
+
+export type AdminPreviewHistoricalAdjudicationDifferencesResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse;
+};
+
+export type AdminPreviewHistoricalAdjudicationDifferencesResponse = AdminPreviewHistoricalAdjudicationDifferencesResponses[keyof AdminPreviewHistoricalAdjudicationDifferencesResponses];
 
 export type AdminQueueGameplayFactEvaluationData = {
     body: NoCtfapiEndpointsAdministrationGameplayFactsQueueGameplayFactWorkRequest;
