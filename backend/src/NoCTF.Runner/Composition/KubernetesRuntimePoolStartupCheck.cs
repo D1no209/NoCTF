@@ -81,6 +81,26 @@ public sealed class KubernetesRuntimePoolStartupCheck(
                 + $"'{KubeDnsServiceNamespace}/{KubeDnsServiceName}'.");
         }
 
+        var pidsLimitLabelSelector =
+            $"{KubernetesRuntimeOptions.PodPidsLimitNodeLabel}="
+            + options.PodPidsLimit.ToString(
+                System.Globalization.CultureInfo.InvariantCulture);
+        var attestedNodes = await client.CoreV1.ListNodeAsync(
+            labelSelector: pidsLimitLabelSelector,
+            cancellationToken: cancellationToken);
+        var hasReadySchedulableNode = attestedNodes.Items.Any(node =>
+            node.Spec?.Unschedulable != true
+            && node.Status?.Conditions?.Any(condition =>
+                string.Equals(condition.Type, "Ready", StringComparison.Ordinal)
+                && string.Equals(condition.Status, "True", StringComparison.Ordinal)) == true);
+        if (!hasReadySchedulableNode)
+        {
+            throw new InvalidOperationException(
+                "Kubernetes Runner Pool requires at least one Ready, schedulable Node "
+                + $"labeled '{pidsLimitLabelSelector}' after its kubelet PodPidsLimit "
+                + "has been verified by the operator.");
+        }
+
         V1NetworkPolicy policy;
         try
         {

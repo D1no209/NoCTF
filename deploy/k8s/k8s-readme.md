@@ -187,10 +187,26 @@ Important ConfigMap values:
   platform-infrastructure, and other non-public IPv4 CIDR that challenge workloads
   must never reach
 
+Before starting a Runner, verify the kubelet `PodPidsLimit` on every node that
+may host challenge workloads, then attest the exact value with a node label. For
+the checked-in value of `512`:
+
+```bash
+kubectl label node <runtime-node> noctf.io/pod-pids-limit=512 --overwrite
+```
+
+The Runner startup check requires at least one Ready, schedulable node carrying
+the exact configured label, and every platform-created Runtime Pod has the same
+label as a mandatory `nodeSelector`. A new or replacement node therefore cannot
+host challenge workloads until an operator verifies its kubelet configuration
+and labels it. The label is an explicit operator attestation; it does not change
+the kubelet setting.
+
 The Runner image contains Kompose `v1.38.0` at `/usr/local/bin/kompose`.
 The cluster must use Cilium with `policyEnforcementMode=always`; the Runner checks
 the resulting Cilium ConfigMap and kube-dns Service through read-only,
-resource-name-scoped RBAC grants.
+resource-name-scoped RBAC grants. Node PID attestation adds read-only `get/list`
+access to Node metadata; the Runner cannot modify Nodes.
 `NetworkPolicyRequired` remains an operator attestation rather than a dataplane
 probe. `ProtectedCidrs` is required even though the runtime also blocks common
 private and special-use IPv4 ranges; add all cluster-specific ranges that are not

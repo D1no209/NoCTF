@@ -154,7 +154,12 @@ public static class KubernetesComposeManifestPolicy
             pod.ServiceAccount = null;
             pod.ServiceAccountName = null;
             pod.NodeName = null;
-            pod.NodeSelector = null;
+            pod.NodeSelector = new Dictionary<string, string>
+            {
+                [KubernetesRuntimeOptions.PodPidsLimitNodeLabel] =
+                    options.PodPidsLimit.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture)
+            };
             pod.RuntimeClassName = null;
             pod.HostAliases = null;
             pod.HostNetwork = false;

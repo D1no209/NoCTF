@@ -183,6 +183,9 @@ public sealed class KubernetesComposeManifestPolicyTests
         await Assert.That(deployment.Spec.Template.Spec.DnsConfig.Searches.Single())
             .IsEqualTo($"{plan.RuntimeName}.runtime.svc.internal.example");
         await Assert.That(deployment.Spec.Template.Spec.AutomountServiceAccountToken).IsFalse();
+        await Assert.That(deployment.Spec.Template.Spec.NodeSelector[
+                KubernetesRuntimeOptions.PodPidsLimitNodeLabel])
+            .IsEqualTo("512");
         var container = deployment.Spec.Template.Spec.Containers.Single();
         await Assert.That(container.SecurityContext!.AllowPrivilegeEscalation).IsFalse();
         await Assert.That(container.SecurityContext.Capabilities!.Drop).IsEquivalentTo(["ALL"]);
