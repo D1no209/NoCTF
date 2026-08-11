@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using NoCTF.Application.Administration.PlatformConfiguration;
+using NoCTF.Application.Storage;
 
 namespace NoCTF.API.Endpoints.Administration.Platform;
 
@@ -22,7 +23,7 @@ public sealed class UploadPlatformLogoValidator : Validator<UploadPlatformLogoRe
     {
         RuleFor(request => request.File).NotNull();
         RuleFor(request => request.File.Length)
-            .InclusiveBetween(1, PlatformConfigurationRules.MaximumLogoBytes)
+            .GreaterThan(0)
             .When(request => request.File is not null);
         RuleFor(request => request.File.ContentType)
             .Must(contentType => SupportedContentTypes.Contains(
@@ -36,7 +37,8 @@ public sealed class UploadPlatformLogoValidator : Validator<UploadPlatformLogoRe
 
 public sealed class UploadPlatformLogoEndpoint(
     ManagePlatformConfiguration configuration,
-    LinkGenerator links)
+    LinkGenerator links,
+    FileUploadLimits uploadLimits)
     : Endpoint<UploadPlatformLogoRequest,
         Results<Ok<PlatformConfigurationResponse>, ProblemHttpResult>>
 {
@@ -46,7 +48,12 @@ public sealed class UploadPlatformLogoEndpoint(
         AuthSchemes("Bearer");
         Roles("Administrator");
         AllowFileUploads();
-        Description(builder => builder.WithName("AdminPlatformUploadLogo"));
+        MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
+            uploadLimits.MaximumLogoBytes));
+        Description(builder => builder
+            .WithName("AdminPlatformUploadLogo")
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status413PayloadTooLarge));
         Summary(summary =>
         {
             summary.Summary = "Replaces the public platform logo.";
@@ -59,12 +66,22 @@ public sealed class UploadPlatformLogoEndpoint(
         UploadPlatformLogoRequest request,
         CancellationToken ct)
     {
+        if (request.File.Length > uploadLimits.MaximumLogoBytes)
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status413PayloadTooLarge,
+                title: "Logo is too large.",
+                detail: $"Logo uploads cannot exceed {uploadLimits.MaximumLogoBytes} bytes.",
+                extensions: new Dictionary<string, object?>
+                {
+                    ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()
+                });
         await using var content = new MemoryStream((int)request.File.Length);
         await request.File.CopyToAsync(content, ct);
         var result = await configuration.ReplaceLogoAsync(
             request.File.FileName,
             request.File.ContentType,
             content.ToArray(),
+            uploadLimits.MaximumLogoBytes,
             request.ExpectedRevision!.Value,
             DateTimeOffset.UtcNow,
             ct);

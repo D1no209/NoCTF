@@ -50,7 +50,7 @@
 ## 上传与下载
 
 - Multipart Endpoint 用 DTO `IFormFile` 与 AllowFileUploads；不得直接读 HttpContext.Request.Body。
-- NoCTF 应用不设置 Payload Too Large/文件大小上限，也不主动返回 413；启动配置显式取消 Kestrel/multipart body length limit，Endpoint 不调用 RequestSizeLimit。单项 Flag 字节数与 Runner 解包安全限制仍生效，并映射 400/422 而非 413。
+- 上传按用途执行显式业务上限；超过上限返回带稳定失败码的 413，且不得进入对象存储或创建业务记录。Kestrel/multipart 的全局上限仍保持开放；各上传 Endpoint 同时设置“文件上限 + 64 KiB multipart 开销”的传输硬上限，防止在绑定前无限落盘。单项 Flag 字节数、AWD 批次和 Runner 解包安全限制分别执行各自的强类型边界。
 - 用户 FileName/MIME 不可信，ObjectKey 由服务端生成；流和 CancellationToken 正确传递。
 - Patch 上传与触发是两个 API；不是预签名上传会话。
 - 下载先授权；S3 返回 typed `RedirectHttpResult`（60 秒预签名 302），LocalFileSystem 返回 typed `FileStreamHttpResult`。二者必须出现在 Endpoint `Results<...>` 中，不以 SendStreamAsync/HttpResponse 手写。

@@ -152,6 +152,16 @@
           "404": {
             "description": "Not Found"
           },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -2037,10 +2047,20 @@
           "404": {
             "description": "Not Found"
           },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
           "422": {
             "description": "",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
@@ -3794,6 +3814,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAuthenticationAvatarUploadFailureResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
                 }
               }
             }
@@ -6759,6 +6789,16 @@
               }
             }
           },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -7612,6 +7652,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -11467,6 +11517,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"

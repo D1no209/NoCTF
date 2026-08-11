@@ -31,7 +31,7 @@
 - 每个 Endpoint ExecuteAsync/集成请求的 Typed Result 类型、body/status/content-type；
 - Validator 400、401/403/404 隔离、409 revision/state、422 archive、429 Retry-After；
 - OpenAPI 声明与实际 union；
-- multipart Patch/Attachment、Refresh Cookie 精确 `/api/v1/auth` Path/SameSite/Origin、cursor 签名、应用不产生 413；
+- multipart Patch/Attachment 的用途级上限与稳定 413、Refresh Cookie 精确 `/api/v1/auth` Path/SameSite/Origin、cursor 签名；
 - 玩家不能读取其他队/原始正确 Flag；管理权限矩阵。
 
 ## Runner Contract

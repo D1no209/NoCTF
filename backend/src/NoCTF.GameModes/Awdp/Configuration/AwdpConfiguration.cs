@@ -46,7 +46,8 @@ public sealed record AwdpChallengeConfiguration(
     long? FixFailurePenalty = null,
     long? ViolationPenalty = null,
     long? ServiceDownPenalty = null,
-    EvaluationDispatchMode? EvaluationDispatchMode = null)
+    EvaluationDispatchMode? EvaluationDispatchMode = null,
+    long? MaximumPatchUploadBytes = null)
 {
     public const int CurrentSchemaVersion = 1;
 }
@@ -68,4 +69,5 @@ public sealed record AwdpEffectiveConfiguration(
     IReadOnlyList<string>? PatchCommand,
     int PatchTimeoutSeconds,
     RunnerJobConfiguration? Checker,
-    int ReadyTimeoutSeconds);
+    int ReadyTimeoutSeconds,
+    long MaximumPatchUploadBytes);

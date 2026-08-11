@@ -82,6 +82,32 @@ public sealed class UserProfileManagementTests
     }
 
     [Test]
+    public async Task Avatar_honors_the_configured_byte_limit_before_decoding()
+    {
+        var users = Substitute.For<IUserAuthenticationStore>();
+        var objects = Substitute.For<IObjectStorage>();
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
+        var images = Substitute.For<IAvatarImageProcessor>();
+        var replace = new ReplaceCurrentUserAvatar(
+            users,
+            new ManagedFileUploads(registry, objects),
+            images);
+
+        var result = await replace.ExecuteAsync(
+            UserId,
+            "avatar.png",
+            "image/png",
+            new byte[] { 1, 2 },
+            maximumBytes: 1,
+            Now);
+
+        await Assert.That(result.Failure).IsEqualTo(AvatarImageFailure.SizeInvalid);
+        images.DidNotReceiveWithAnyArgs().Process(default);
+        await objects.DidNotReceiveWithAnyArgs()
+            .PutAsync(default!, default!, default!, default!, default);
+    }
+
+    [Test]
     public async Task Avatar_rejects_content_when_signature_and_content_type_do_not_match()
     {
         var users = Substitute.For<IUserAuthenticationStore>();

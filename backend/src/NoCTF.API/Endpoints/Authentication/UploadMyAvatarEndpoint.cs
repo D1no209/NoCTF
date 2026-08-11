@@ -2,10 +2,12 @@ using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 using NoCTF.API.Security;
 using NoCTF.Application.Authentication.Account;
+using NoCTF.Application.Storage;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
@@ -36,27 +38,33 @@ public sealed record AvatarUploadFailureResponse(AvatarUploadFailureCode Code);
 public sealed class UploadMyAvatarEndpoint(
     ReplaceCurrentUserAvatar replace,
     IUserContext user,
-    LinkGenerator links)
+    LinkGenerator links,
+    FileUploadLimits uploadLimits)
     : Endpoint<UploadMyAvatarRequest,
-        Results<Ok<CurrentUserResponse>, NotFound, BadRequest<AvatarUploadFailureResponse>>>
+        Results<Ok<CurrentUserResponse>, NotFound, BadRequest<AvatarUploadFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/auth/me/avatar");
         AuthSchemes("Bearer");
         AllowFileUploads();
-        MaxRequestBodySize(UserProfileRules.MaximumAvatarRequestBytes);
+        MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
+            uploadLimits.MaximumAvatarBytes));
         Description(builder => builder
             .WithName("Authentication_UploadMyAvatar")
-            .WithMetadata(new EnableRateLimitingAttribute("avatar")));
+            .WithMetadata(new EnableRateLimitingAttribute("avatar"))
+            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
+                StatusCodes.Status413PayloadTooLarge));
         Summary(summary => summary.Summary = "Replaces the current user's cropped avatar.");
     }
 
     public override async Task<Results<Ok<CurrentUserResponse>, NotFound,
-        BadRequest<AvatarUploadFailureResponse>>> ExecuteAsync(
+        BadRequest<AvatarUploadFailureResponse>, ProblemHttpResult>> ExecuteAsync(
         UploadMyAvatarRequest request,
         CancellationToken ct)
     {
+        if (request.File.Length > uploadLimits.MaximumAvatarBytes)
+            return UploadTooLarge(uploadLimits.MaximumAvatarBytes);
         await using var content = new MemoryStream((int)request.File.Length);
         await request.File.CopyToAsync(content, ct);
         var result = await replace.ExecuteAsync(
@@ -64,6 +72,7 @@ public sealed class UploadMyAvatarEndpoint(
             request.File.FileName,
             request.File.ContentType,
             content.ToArray(),
+            uploadLimits.MaximumAvatarBytes,
             DateTimeOffset.UtcNow,
             ct);
         if (result.UserNotFound)
@@ -74,6 +83,16 @@ public sealed class UploadMyAvatarEndpoint(
 
         return TypedResults.Ok(CurrentUserMapping.ToResponse(result.Profile!, links, HttpContext));
     }
+
+    private static ProblemHttpResult UploadTooLarge(long maximumBytes) =>
+        TypedResults.Problem(
+            statusCode: StatusCodes.Status413PayloadTooLarge,
+            title: "Avatar is too large.",
+            detail: $"Avatar uploads cannot exceed {maximumBytes} bytes.",
+            extensions: new Dictionary<string, object?>
+            {
+                ["code"] = FileUploadFailureCode.UploadTooLarge.ToString()
+            });
 
     private static AvatarUploadFailureCode ToProtocolFailure(AvatarImageFailure failure) =>
         failure switch

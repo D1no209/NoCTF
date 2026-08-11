@@ -7,6 +7,7 @@ import {
   emptyFlagTemplate,
   emptyDefinition,
   emptyRuntimeTemplate,
+  parseDefinition,
   serializeDefinition,
 } from '../app/utils/game-config'
 
@@ -57,5 +58,17 @@ describe('dynamic flag templates', () => {
     model.runtime.flagSource = FlagSource.Static
     const staticDefinition = JSON.parse(serializeDefinition('Ctf', model))
     expect(staticDefinition.flagTemplate).toBeUndefined()
+  })
+})
+
+describe('AWDP patch upload limits', () => {
+  test('keeps the visible default and serializes challenge-managed bytes', () => {
+    const model = emptyDefinition('Awdp')
+    expect(model.maximumPatchUploadBytes).toBe(256 * 1024 * 1024)
+    model.maximumPatchUploadBytes = 512 * 1024 * 1024
+
+    const json = serializeDefinition('Awdp', model)
+    expect(JSON.parse(json).maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
+    expect(parseDefinition(json)?.maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
   })
 })

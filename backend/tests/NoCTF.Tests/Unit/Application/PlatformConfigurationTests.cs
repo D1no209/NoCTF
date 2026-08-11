@@ -46,6 +46,33 @@ public sealed class PlatformConfigurationTests
     }
 
     [Test]
+    public async Task Logo_honors_the_configured_byte_limit_before_storage()
+    {
+        var objects = Substitute.For<IObjectStorage>();
+        var registry = Substitute.For<IManagedFileUploadRegistry>();
+        var configuration = new ManagePlatformConfiguration(
+            Substitute.For<IPlatformConfigurationStore>(),
+            objects,
+            new ManagedFileUploads(registry, objects));
+
+        var result = await configuration.ReplaceLogoAsync(
+            "logo.png",
+            "image/png",
+            new byte[] { 1, 2 },
+            maximumBytes: 1,
+            expectedRevision: 1,
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.State).IsEqualTo(PlatformLogoUpdateState.InvalidSize);
+        await objects.DidNotReceiveWithAnyArgs().PutAsync(
+            default!,
+            default!,
+            default!,
+            default!,
+            default);
+    }
+
+    [Test]
     public async Task Logo_replacement_rejects_mismatched_content_without_storage_write()
     {
         var objects = Substitute.For<IObjectStorage>();

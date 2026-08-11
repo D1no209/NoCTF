@@ -68,6 +68,8 @@ export const englishMessages: Record<string, string> = {
   "驳回作弊事件": "Dismiss cheating incident",
   "补丁(Fix)": "Fix",
   "补丁超时(秒)": "Patch timeout (seconds)",
+  "Fix 包上传上限(MiB)": "Fix archive upload limit (MiB)",
+  "限制选手上传的压缩包大小；默认 256 MiB，最大 1024 MiB。": "Limits participant Fix archives; the default is 256 MiB and the maximum is 1024 MiB.",
   "补丁入口": "Patch entrance",
   "补丁上传": "Patch upload",
   "补丁上传失败": "Patch upload failed",
