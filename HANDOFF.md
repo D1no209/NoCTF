@@ -9,6 +9,18 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：键盘导航与图标按钮语义
+
+- 功能提交 `2700814a` 让平台用户、死信队列和参赛者排行榜的整行详情入口可通过 Tab 聚焦，并支持
+  Enter 或 Space 打开；焦点状态清晰可见，读屏标签包含当前用户、消息类型或队伍名称。
+- 排行榜上一页/下一页、通用 Dialog 与 Sheet 关闭按钮补齐本地化 `aria-label`；纯装饰图标对读屏隐藏，
+  关闭按钮的隐藏文本也不再写死英文。
+- 本阶段没有 HTTP/OpenAPI、生成 TypeScript SDK、数据模型、数据表、migration、snapshot 或版本号变化；
+  `app/api` 生成目录未被修改。
+- 验证通过：无障碍与 i18n 定向测试 11/11，ClientApp 完整 `bun test` 133/133、
+  `bun run typecheck`、`bun run build` 和 `git diff --check`；构建只保留既有警告。
+- 尚未推送、部署或操作生产数据；最终键盘焦点顺序和视觉焦点环将在 Microsoft Edge 统一验收。
+
 ## 2026-08-11 全量审计修复：密码可见性控件
 
 - 功能提交 `d425a268` 新增统一 `PasswordInput`，在输入框右侧提供小型眼睛按钮，并覆盖登录、注册、
