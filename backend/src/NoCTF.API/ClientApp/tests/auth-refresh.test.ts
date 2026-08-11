@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { accessTokenNeedsRefresh, shouldRefreshSession } from '../app/lib/auth-refresh'
+import { statusErrorMessage } from '../app/utils/api-error'
 
 function accessToken(exp: number): string {
   const payload = btoa(JSON.stringify({ exp }))
@@ -41,5 +42,12 @@ describe('authentication response refresh', () => {
     expect(session).not.toContain("fetch('/api/v1/auth/refresh'")
     expect(competitionHub).toContain('accessTokenFactory: getRealtimeAccessToken')
     expect(platformHub).toContain('accessTokenFactory: getRealtimeAccessToken')
+  })
+})
+
+describe('authentication status errors', () => {
+  test('classifies unauthorized responses by attached credentials instead of endpoint paths', () => {
+    expect(statusErrorMessage(401, false)).toBe('用户名或密码错误')
+    expect(statusErrorMessage(401, true)).toBe('登录状态已失效,请重新登录')
   })
 })
