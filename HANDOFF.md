@@ -1,17 +1,63 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-12 全量审计修复最终收口
+
+- 最终功能基线为 `ebc22571`，分支为 `codex/fix-audit-findings-20260811`，平台版本为
+  `0.1.0-alpha.27`。本轮没有新增业务表、列、EF migration 或 snapshot，也没有手工修改生成 SDK、
+  migration 或 OpenAPI。原始工作区的 `TODO.md`、本地端口清单与其他用户/协作者文件始终未被覆盖。
+- 最后一轮安全和一致性修复包括：题目附件下载严格绑定已授权模板作用域（`9ef17b6f`）；角色变更、
+  删除与匿名化共用最后一名 Active Human Administrator 的 PostgreSQL 临界区（`80671199`）；Worker
+  readiness 纳入 Redis（`daf7f47c`）；分值配置与历史/导入数据的开赛门禁均有有界校验
+  （`ba60a42e`、`04c655f3`）；排行榜按完整快照渐进展示（`f29c20ac`）；前端 SignalR 重连、通知精准
+  目标、Warning 日志默认值、可访问性与密码控件收口（`f46397a3`）。
+- 部署和测试基础修复包括：默认拒绝网络策略在工作负载前应用（`d8696ea1`）；官方 CI、Action、
+  Testcontainers 与 E2E 基础依赖固定且部署门禁可执行（`bea86496`、`a96046d7`、`66339ffb`）；Wolverine
+  maintenance failover 测试宿主关闭误扫描（`4bf41151`）。题目 Runtime、Checker、Compose 镜像仍按用户
+  最终确认，信任出题人输入的 tag 或 digest 原样运行；没有恢复 OCI digest 固定或 registry allowlist。
+- 四模式 E2E 已更新为当前字符串协议、异步投影与生命周期契约，并把报名、题目和 Flag 配置全部放在
+  `Visible` 阶段完成，随后把日程变为到期、发布并显式启动，避免测试编排器与真实生命周期代理竞争
+  （`2cdf8a2e` 至 `822aa8cb`、`ee4d48e7`）。共享 Docker daemon 的 Runner 对其他活跃 assignment 不再
+  误判为孤儿资源（`7d69cef5`）。Standalone Runner 已注册 AWDP Fix execution fence，非零 Checker
+  exit 会稳定落为 PlatformFailed，成功 exit 仍只接受认证 callback（`629333cd`、`b48487e3`）。
+- 队伍创建与全部成员变更现在于 Read Committed 事务第一步锁定对应 Competition 行；报名、邀请加入、
+  离队、移除、转让队长和邀请令牌轮换共享同一临界区，避免排行榜维护导致 SQLSTATE 40001/HTTP 500，
+  并保证同用户并发创建/加入只能成功一次。`LeaderboardDirty` 在唯一 SaveChanges 前写入，提交后才刷新
+  Wolverine Outbox（`ebc22571`）。真实 PostgreSQL 红测已在旧实现稳定复现 40001，并验证修复后的
+  refresh-vs-create、双创建、create-vs-join、成员数组并发更新与 dirty=false→true。
+- OpenAPI 两份制品已由工具导出，TypeScript SDK 已由 `bun run api:gen` 生成；连续两轮导出/生成均无
+  diff，OpenAPI SHA-256 为
+  `7D35FCCE6F2FC2BD226404BBA6CC3567407EB6DA1C31D07857D3D19422A3311E`。EF CLI 10.0.9 的
+  `migrations has-pending-model-changes` 返回无变化。
+- 最终后端门禁：Release solution build 0 warning/0 error；analyzer verify 通过；完整 TUnit 共 872 项，
+  870 通过、0 失败、2 项按环境缺失跳过（真实 Kubernetes cluster、Libvirt disk path）。强制真实
+  PostgreSQL、Redis、Docker Container/Compose、Wolverine Integration 均通过。四模式 Full E2E 串行
+  结果为 CTF 1/1（1m00.710s）、AWD 1/1（1m31.406s）、AWDP 1/1（1m29.959s）、KoH 1/1
+  （1m16.513s）；所有临时容器、网络、卷和本地测试镜像均精确清理。
+- 最终前端门禁：`bun test` 167/167（1300 assertions）、typecheck、production build 与 `bun audit`
+  全部通过；只有既有的大 chunk 与第三方 Node exports 弃用 warning。API、Host、Worker、Runner Release
+  publish 均成功，API/Host 包含 SPA fallback 文件。两份 Compose config 通过；kubeconform 严格校验
+  49 个资源为 46 valid、0 invalid/error、3 个预期的 Cilium CRD schema skip。
+- 灾备门禁：全部 `deploy/recovery/*.sh` 先通过 `bash -n`；`rehearse.sh` 随后完成加密签名备份、隔离
+  restore，并确认 PostgreSQL rows、Wolverine schemas、对象 key、内容与 metadata 一致；演练容器、网络
+  和临时镜像已清理。
+- 浏览器验收只使用 Microsoft Edge `msedge` channel 与可丢弃本地数据。已验证管理员登录、登录密码
+  明文切换、语言/主题切换不导航、不替换当前 main/input 且保留表单值、通知中心空态、平台日志默认
+  Warning 且实时流连接、账户资料、竞赛永久删除影响预览、停止后的 Runtime 操作页，以及提交筛选和
+  历史裁决预览。最后一轮有效页面访问为 0 个 HTTP >=400、0 个 request failure、0 个 console error。
+- 本轮尚未推送、部署或操作生产数据。真实 Kubernetes/Libvirt 验收仍是明确的外部环境阻塞项，不能
+  报告为通过；历史裁决纠正继续只提供只读预览，任何生产分数/血榜变化都需要逐比赛明确批准。
+
 ## 当前状态
 
 - 已用 EF CLI 重建 `InitialBaseline`，业务 schema 已按 GameplayFact 收敛为 16 张表；旧
   `submissions`/`scoring_events` 已由单一 `gameplay_facts` 当前事实表取代。
-- API、测试项目当前均可编译；EF model snapshot 与当前模型无 pending changes（2026-08-08 再次验证）。
-- OpenAPI 与 Nuxt 生成客户端曾在上一阶段完成同步；当前统一审计修复分支的历史裁决协议变化尚未
-  统一重新导出/生成，必须在最终收口时由工具完成并验证幂等。
+- API、测试与四个发布入口当前均可编译/发布；EF model snapshot 与当前模型无 pending changes
+  （2026-08-12 使用 EF CLI 10.0.9 再次验证）。
+- OpenAPI 与 Nuxt 生成客户端已在最终统一分支完成同步，并通过连续两次工具生成幂等检查。
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
-- 上一完整测试基线为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等
-  真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。
-  当前统一分支功能基线位于 `623e66a4`，最终 OpenAPI/SDK、`0.1.0-alpha.26`、全量门禁与 Microsoft Edge
-  浏览器验收仍待执行，不能把上一基线误报为当前分支最终结果。
+- 当前完整测试基线为 870 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 与
+  Wolverine 真实依赖场景已强制执行，四模式 Full E2E、灾备演练、发布与 Edge 验收均已完成。只有
+  未配置真实 Kubernetes cluster 与 Libvirt disk path 的两项外部集成按设计跳过。
 
 ## 2026-08-11 全量审计修复：历史裁决差异只读预览
 
