@@ -14,6 +14,8 @@ using NoCTF.Infrastructure.GameplayFacts.PatchUploads;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.GameplayFacts.Status;
 using NoCTF.Infrastructure.GameplayFacts.CheatIncidents;
+using NoCTF.Application.GameplayFacts.AdjudicationPreview;
+using NoCTF.Infrastructure.GameplayFacts.AdjudicationPreview;
 
 namespace NoCTF.Infrastructure.GameplayFacts;
 
@@ -36,6 +38,8 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<ListCheatIncidents>();
         services.AddScoped<AccessCheatIncident>();
         services.AddScoped<ResolveCheatIncident>();
+        services.AddScoped<IHistoricalAdjudicationEvidenceStore, HistoricalAdjudicationPreviewStore>();
+        services.AddScoped<PreviewHistoricalAdjudicationDifferences>();
         services.AddScoped<IGameplayFactProcessor, GameplayFactProcessor>();
         services.AddScoped<BloodRankCriticalSection>();
         services.AddScoped<IInternalResultStore, InternalResultStore>();

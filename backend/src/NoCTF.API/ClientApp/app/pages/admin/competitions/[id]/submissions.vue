@@ -5,6 +5,7 @@ import {
   adminGetGameplayFact,
   adminListCompetitionChallenges,
   adminListGameplayFacts,
+  adminPreviewHistoricalAdjudicationDifferences,
   adminListTeams,
   adminQueueGameplayFactEvaluation,
   adminRejudgeGameplayFact,
@@ -16,6 +17,8 @@ import type {
   NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
   NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
   NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol,
+  NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse,
+  NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
@@ -74,6 +77,69 @@ const filterState = ref<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol 
 const filterResult = ref<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | ''>('')
 const filterFlag = ref('')
 
+// ---- Read-only historical adjudication difference preview ----
+const previewItems = ref<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse[]>([])
+const previewCursor = ref<string | null>(null)
+const previewLoading = ref(false)
+const previewError = ref<string | null>(null)
+const previewInitialized = ref(false)
+let previewGeneration = 0
+
+const differenceLabels: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
+  CurrentCorrectShouldBeDuplicate: '当前正确结果按权威顺序应为重复',
+  DuplicateWithoutCurrentPredecessor: '当前重复结果缺少仍为正确的前序事实',
+  HistoricalResultChanged: '历史裁决与当前结果不一致或曾发生变化',
+  MissingBloodAward: '缺少确定应有的血榜奖励',
+  UnexpectedBloodAward: '存在当前结果无法支持的血榜奖励',
+  WrongBloodRank: '记录的血榜名次与权威顺序不一致',
+  DuplicateBloodAward: '同一提交存在重复血榜奖励',
+}
+
+const bloodRankLabel = (rank?: string | null) => rank === 'First'
+  ? translate('一血')
+  : rank === 'Second'
+    ? translate('二血')
+    : rank === 'Third'
+      ? translate('三血')
+      : '-'
+
+async function loadPreview(reset = false) {
+  if (previewLoading.value && !reset) return
+  if (reset) {
+    previewGeneration++
+    previewItems.value = []
+    previewCursor.value = null
+  }
+  const generation = previewGeneration
+  const cursor = previewCursor.value
+  previewLoading.value = true
+  previewError.value = null
+  try {
+    const { data, error } = await adminPreviewHistoricalAdjudicationDifferences({
+      path: { competitionId },
+      query: {
+        competitionChallengeId: filterChallenge.value || null,
+        cursor,
+        limit: 30,
+      },
+    })
+    if (error || !data) throw parseApiError(error)
+    if (generation !== previewGeneration) return
+    previewItems.value.push(...(data.items ?? []))
+    previewCursor.value = data.nextCursor ?? null
+  }
+  catch (requestError) {
+    if (generation !== previewGeneration) return
+    previewError.value = parseApiError(requestError, translate('加载历史裁决差异失败')).message
+  }
+  finally {
+    if (generation === previewGeneration) {
+      previewLoading.value = false
+      previewInitialized.value = true
+    }
+  }
+}
+
 const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
   NoCtfapiEndpointsGameplayFactsGameplayFactListItemResponse
 >(async (cursor) => {
@@ -97,6 +163,7 @@ const { items, loading, error: listError, hasMore, loadMore, reset, initialized 
 function applyFilters() {
   reset({ preserveItems: true })
   void loadMore()
+  void loadPreview(true)
 }
 
 // ---- Detail sheet ----
@@ -212,11 +279,59 @@ async function accessFlag() {
 onMounted(() => {
   void loadRefs()
   void loadMore()
+  void loadPreview(true)
 })
 </script>
 
 <template>
   <div class="flex flex-col gap-4">
+    <Card>
+      <CardHeader class="flex flex-row items-start justify-between gap-4">
+        <div class="space-y-1">
+          <CardTitle>{{ $t('历史裁决差异预览') }}</CardTitle>
+          <CardDescription>{{ $t('只读分析当前 GameplayFact 与不可变比赛事件，不会重判、纠正或改写任何记录。') }}</CardDescription>
+        </div>
+        <Button variant="outline" size="sm" :disabled="previewLoading" @click="loadPreview(true)">
+          <Spinner v-if="previewLoading" data-icon="inline-start" /> {{ $t('重新分析') }}
+        </Button>
+      </CardHeader>
+      <CardContent class="flex flex-col gap-3">
+        <Alert v-if="previewError" variant="destructive">
+          <AlertDescription>{{ previewError }}</AlertDescription>
+        </Alert>
+        <Skeleton v-else-if="previewLoading && !previewInitialized" class="h-24 w-full" />
+        <Alert v-else-if="previewInitialized && previewItems.length === 0">
+          <AlertDescription>{{ $t('当前扫描范围内未发现裁决或血榜差异。') }}</AlertDescription>
+        </Alert>
+        <div v-for="item in previewItems" :key="item.gameplayFactId" class="rounded-lg border p-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="font-medium">{{ item.challengeTitle }} · {{ item.teamName ?? '-' }}</p>
+              <p class="mt-1 font-mono text-xs text-muted-foreground">{{ item.gameplayFactId }} · {{ adminFormatDateTime(item.occurredAt) }}</p>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <Badge v-for="difference in item.differences" :key="`${difference.kind}-${difference.certainty}`" :variant="difference.certainty === 'Deterministic' ? 'destructive' : 'secondary'">
+                {{ difference.certainty === 'Deterministic' ? $t('确定性差异') : $t('需人工复核') }}
+              </Badge>
+            </div>
+          </div>
+          <div class="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+            <p><span class="text-muted-foreground">{{ $t('当前结果') }}：</span>{{ item.currentResult ? enumLabel(GameplayFactResultLabel, item.currentResult) : '-' }}</p>
+            <p><span class="text-muted-foreground">{{ $t('确定性预期') }}：</span>{{ item.deterministicExpectedResult ? enumLabel(GameplayFactResultLabel, item.deterministicExpectedResult) : '-' }}</p>
+            <p><span class="text-muted-foreground">{{ $t('血榜记录') }}：</span>{{ item.recordedBloodRanks?.map(bloodRankLabel).join('、') || '-' }}</p>
+          </div>
+          <ul class="mt-3 list-disc space-y-1 pl-5 text-sm">
+            <li v-for="difference in item.differences" :key="difference.kind">
+              {{ $t(differenceLabels[difference.kind!]) }}
+            </li>
+          </ul>
+        </div>
+        <Button v-if="previewCursor" variant="outline" :disabled="previewLoading" @click="loadPreview(false)">
+          <Spinner v-if="previewLoading" data-icon="inline-start" /> {{ $t('继续扫描更早记录') }}
+        </Button>
+      </CardContent>
+    </Card>
+
     <Card>
       <CardContent class="flex flex-col gap-3 pt-6">
         <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">

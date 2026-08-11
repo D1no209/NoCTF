@@ -335,6 +335,7 @@ transaction lock，并在同一事务内递增父聚合 revision 与 leaderboard
 
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts
+GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/queue-evaluation

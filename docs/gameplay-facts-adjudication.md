@@ -34,3 +34,17 @@ ForeignTeamFlagDetected 作弊事件直接以 GameplayFactId 为身份；Confirm
 玩家查询 `/competitions/{competitionId}/gameplay-facts` 及单项状态，只能读取自己 Team 的 FlagAttempt、BreakAttempt、FixAttempt、HintUnlock，且不返回 Value。系统事实、管理员事实及其他队事实不可见。
 
 管理路由统一位于 `/admin/competitions/{competitionId}/gameplay-facts`，支持 Challenge、Team、VictimTeam、Actor、Kind、State、Result、FailureCode、时间、Value 精确匹配和 Reference 筛选；排序固定为 `(OccurredAt desc, Id desc)` 的 signed keyset pagination。
+
+## 历史差异预览
+
+比赛工作人员可读取有界、游标分页的历史裁决差异预览。该预览不会排队评测、修改 `GameplayFact`、追加 `competition_event` 或发布消息。
+
+预览把当前 `GameplayFact` 与不可变事件流作为证据，而不是擅自补全已经不存在的历史：
+
+- 重复成就与 CTF 血榜名次按权威 `(OccurredAt, Id)` 顺序比较；
+- 缺失、名次错误、意外出现及重复的血榜事件只报告、不修改；
+- 在成就唯一的模式中，当前 `Correct` 之前仍存在当前 `Correct` 属于确定性差异；
+- 不可变事件中存在互相冲突的裁决结果，或当前 `Duplicate` 的前序事实已不再为 `Correct`，标记为 `NeedsReview`，因为旧配置、旧 Flag 归属和完整旧结果均未保存；
+- 尤其不得静默推断或修复 `Correct → Wrong → Correct`。
+
+Observer、Judge、Manager、Owner 与平台管理员均可读取；参赛者不可访问。此功能刻意不提供“应用纠正”操作。

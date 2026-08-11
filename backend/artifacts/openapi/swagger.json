@@ -7148,6 +7148,85 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Previews historical gameplay adjudication differences.",
+        "description": "Returns a bounded, read-only analysis of current gameplay results and recorded blood awards. It never applies corrections.",
+        "operationId": "AdminPreviewHistoricalAdjudicationDifferences",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/gameplay-facts/queue-evaluation": {
       "post": {
         "tags": [
@@ -16425,6 +16504,155 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationGameplayFactsListAdminGameplayFactsRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse"
+            }
+          },
+          "nextCursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "challengeTitle": {
+            "type": "string"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "teamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "gameplayFactKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol"
+          },
+          "currentResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol"
+              }
+            ]
+          },
+          "deterministicExpectedResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol"
+              }
+            ]
+          },
+          "deterministicExpectedBloodRank": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsLeaderboardBloodRankProtocol"
+              }
+            ]
+          },
+          "recordedBloodRanks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsLeaderboardBloodRankProtocol"
+            }
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "differences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsLeaderboardBloodRankProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "First",
+          "Second",
+          "Third"
+        ],
+        "enum": [
+          "First",
+          "Second",
+          "Third"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol"
+          },
+          "certainty": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceCertaintyProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "CurrentCorrectShouldBeDuplicate",
+          "DuplicateWithoutCurrentPredecessor",
+          "HistoricalResultChanged",
+          "MissingBloodAward",
+          "UnexpectedBloodAward",
+          "WrongBloodRank",
+          "DuplicateBloodAward"
+        ],
+        "enum": [
+          "CurrentCorrectShouldBeDuplicate",
+          "DuplicateWithoutCurrentPredecessor",
+          "HistoricalResultChanged",
+          "MissingBloodAward",
+          "UnexpectedBloodAward",
+          "WrongBloodRank",
+          "DuplicateBloodAward"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAdjudicationDifferenceCertaintyProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Deterministic",
+          "NeedsReview"
+        ],
+        "enum": [
+          "Deterministic",
+          "NeedsReview"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsPreviewHistoricalAdjudicationDifferencesRequest": {
         "type": "object",
         "additionalProperties": false
       },
