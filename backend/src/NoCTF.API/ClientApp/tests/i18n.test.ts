@@ -77,7 +77,7 @@ describe('locale switch placement', () => {
       new URL('../app/layouts/default.vue', import.meta.url),
     ).text()
 
-    expect(layout).toContain('<ThemeToggle />\n          <LanguageToggle />')
+    expect(layout.replaceAll('\r\n', '\n')).toContain('<ThemeToggle />\n          <LanguageToggle />')
   })
 
   test('switches the selected locale without reloading the SPA', async () => {
