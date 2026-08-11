@@ -40,6 +40,62 @@ public sealed class FlagSubmissionBatchTests
         await Assert.That(store.LastFlags).IsEquivalentTo(["flag{one}", "flag{two}"]);
     }
 
+    [Test]
+    public async Task Batch_over_item_limit_is_rejected_before_store_write()
+    {
+        var store = new Store();
+        var useCase = new SubmitFlag(store, new Policy());
+
+        var result = await useCase.ExecuteBatchAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Enumerable.Repeat("flag{valid}", SubmitFlag.MaximumBatchFlagCount + 1).ToArray(),
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(GameplayFactAdmissionFailureCode.FlagBatchLimitExceeded);
+        await Assert.That(store.BatchWrites).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Batch_over_total_byte_limit_is_rejected_before_individual_validation()
+    {
+        var store = new Store();
+        var useCase = new SubmitFlag(store, new Policy());
+        var oversizedItem = new string('a', 4097);
+
+        var result = await useCase.ExecuteBatchAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Enumerable.Repeat(oversizedItem, SubmitFlag.MaximumBatchFlagCount).ToArray(),
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(GameplayFactAdmissionFailureCode.FlagBatchLimitExceeded);
+        await Assert.That(store.BatchWrites).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Batch_at_both_limits_is_accepted_atomically()
+    {
+        var store = new Store();
+        var useCase = new SubmitFlag(store, new Policy());
+        var maximumItem = new string('a', 4096);
+
+        var result = await useCase.ExecuteBatchAsync(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            Enumerable.Repeat(maximumItem, SubmitFlag.MaximumBatchFlagCount).ToArray(),
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.BatchWrites).IsEqualTo(1);
+        await Assert.That(store.LastFlags.Count).IsEqualTo(SubmitFlag.MaximumBatchFlagCount);
+    }
+
     private sealed class Store : IGameplayFactIntakeStore
     {
         public int BatchWrites { get; private set; }
