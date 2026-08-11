@@ -9,6 +9,16 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：SMTP 精确 DNS 策略
+
+- 功能提交 `f55a930c` 补齐 Cilium `toFQDNs` 的 DNS 观察前提：示例 policy 仅允许 Backend/Worker
+  向集群 `kube-dns` 查询配置的精确 SMTP FQDN，并只允许该解析结果上的精确 SMTP TCP 端口。
+- 运维生成 policy 时必须同时替换 DNS 规则与目标规则中的两处示例主机名；仍禁止通配域名、任意地址
+  放行与把生产 SMTP 地址或凭据提交进仓库。默认未应用 policy 时邮件投递继续 fail closed。
+- 本阶段没有业务表、列、migration、snapshot、HTTP/OpenAPI、SDK 或版本号变化。验证通过：
+  DeploymentTopology 6/6 与 `git diff --check`；当前环境没有 Kubernetes API，未伪报实集群 smoke。
+  尚未推送或部署。
+
 ## 2026-08-11 全量审计修复：平台供应链固定
 
 - 功能提交 `ebedac01` 将 Bun、Docker CLI、Alpine、.NET SDK/ASP.NET Runtime 构建基础，以及官方
