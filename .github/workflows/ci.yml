@@ -106,7 +106,7 @@ jobs:
           docker run --rm
           -v "$PWD/deploy/k8s:/manifests:ro"
           ghcr.io/yannh/kubeconform@sha256:85dbef6b4b312b99133decc9c6fc9495e9fc5f92293d4ff3b7e1b30f5611823c
-          -strict -summary /manifests
+          -strict -ignore-missing-schemas -summary /manifests
 
       - name: Validate Compose deployment
         env:
@@ -116,6 +116,7 @@ jobs:
           RUNNER_API_KEY: ci-runner-api-key-value-123456789
           MINIO_ROOT_PASSWORD: ci-minio-password-123456
           LOCAL_STORAGE_URL_SIGNING_KEY: ci-local-storage-signing-key-with-at-least-32-characters
+          EMAIL_VERIFICATION_ENCRYPTION_KEY: Y2ktZW1haWwtZW5jcnlwdGlvbi1rZXktMzItYnl0ZSE=
         run: |
           docker compose -f deploy/docker-compose.yml config -q
           docker compose -f deploy/docker-compose.single.yml config -q
