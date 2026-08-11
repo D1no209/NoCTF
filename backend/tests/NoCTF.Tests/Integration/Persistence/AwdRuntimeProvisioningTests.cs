@@ -245,7 +245,12 @@ public sealed class AwdRuntimeProvisioningTests
                 && runtime.Generation == 2);
             var acknowledgementOutbox = new RecordingOutbox();
             await RuntimeWriteBackHandler.Handle(
-                new RuntimeStopped(acknowledgedOld.Id, acknowledgedOld.ProcessingVersion),
+                new RuntimeStopped(
+                    acknowledgedOld.Id,
+                    acknowledgedOld.ProcessingVersion,
+                    acknowledgedOld.Generation,
+                    acknowledgedOld.RunnerPool,
+                    acknowledgedOld.RunnerId!),
                 db,
                 acknowledgementOutbox,
                 cancellationToken);
@@ -253,6 +258,9 @@ public sealed class AwdRuntimeProvisioningTests
                 new RuntimeStopFailed(
                     failedOld.Id,
                     failedOld.ProcessingVersion,
+                    failedOld.Generation,
+                    failedOld.RunnerPool,
+                    failedOld.RunnerId!,
                     RuntimeFailureCode.CleanupFailed),
                 db,
                 cancellationToken);

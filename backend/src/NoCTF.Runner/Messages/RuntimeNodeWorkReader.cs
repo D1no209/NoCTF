@@ -50,9 +50,13 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
+        // Pre-fence durable stop messages deserialize Generation as zero. The immutable instance id,
+        // processing version and original owner still fence the lookup; the returned work supplies
+        // the persisted generation for identity cleanup and the fenced acknowledgement.
         return await db.RuntimeInstances.AsNoTracking()
             .Where(candidate => candidate.Id == message.RuntimeInstanceId
                 && candidate.ProcessingVersion == message.ProcessingVersion
+                && (message.Generation == 0 || candidate.Generation == message.Generation)
                 && candidate.State == RuntimeState.Stopping
                 && candidate.RunnerPool == message.RunnerPool
                 && candidate.RunnerId == message.RunnerId)

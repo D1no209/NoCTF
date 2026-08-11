@@ -234,6 +234,7 @@ public sealed class ComposeRuntimeHandlerTests
         var message = new StopComposeRuntime(
             receipt.OperationId,
             8,
+            3,
             "default",
             "runner-a");
 
@@ -261,6 +262,7 @@ public sealed class ComposeRuntimeHandlerTests
         var message = new StopComposeRuntime(
             receipt.OperationId,
             8,
+            3,
             "default",
             "runner-a");
 

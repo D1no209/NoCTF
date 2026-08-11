@@ -43,7 +43,8 @@ public sealed class RuntimeResourceReconciliationHandler(
 
         var failedAssignments = await db.RuntimeInstances
             .Where(instance => instance.State == RuntimeState.Failed
-                && instance.ProviderReceiptJson != null
+                && (instance.ProviderReceiptJson != null
+                    || instance.FailureCode == RuntimeFailureCode.CleanupFailed)
                 && instance.RuntimeProvider == configuredProvider
                 && instance.RunnerPool == message.RunnerPool
                 && instance.RunnerId == message.RunnerId)

@@ -39,6 +39,7 @@ public sealed class ContainerRuntimeHandlerTests
         var message = new StopContainerRuntime(
             runtimeInstanceId,
             8,
+            3,
             "default",
             "runner-a");
 
@@ -46,6 +47,10 @@ public sealed class ContainerRuntimeHandlerTests
 
         await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
         await Assert.That(result).IsNotTypeOf<RuntimeStopped>();
+        var failure = (RuntimeStopFailed)result;
+        await Assert.That(failure.Generation).IsEqualTo(message.Generation);
+        await Assert.That(failure.RunnerPool).IsEqualTo(message.RunnerPool);
+        await Assert.That(failure.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(lifecycle.Destroyed).IsEquivalentTo([receipt]);
         await Assert.That(sandbox.DeletedNetworks).IsEquivalentTo(["network-1"]);
         await Assert.That(capacity.ReleasedRuntimeIds)
@@ -70,12 +75,17 @@ public sealed class ContainerRuntimeHandlerTests
         var message = new StopContainerRuntime(
             runtimeInstanceId,
             8,
+            3,
             "default",
             "runner-a");
 
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopped>();
+        var acknowledgement = (RuntimeStopped)result;
+        await Assert.That(acknowledgement.Generation).IsEqualTo(message.Generation);
+        await Assert.That(acknowledgement.RunnerPool).IsEqualTo(message.RunnerPool);
+        await Assert.That(acknowledgement.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(reconciler.Destroyed)
             .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);

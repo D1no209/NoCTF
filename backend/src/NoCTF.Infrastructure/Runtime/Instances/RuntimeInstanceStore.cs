@@ -123,7 +123,9 @@ public sealed class RuntimeInstanceStore(
                         instance.Purpose == RuntimePurpose.Player &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Failed &&
-                        instance.ProviderReceiptJson != null)
+                        instance.RunnerId != null &&
+                        (instance.ProviderReceiptJson != null
+                            || instance.FailureCode == RuntimeFailureCode.CleanupFailed))
                     .OrderByDescending(instance => instance.Generation)
                     .FirstOrDefaultAsync(ct);
                 if (cleanupTarget is not null)

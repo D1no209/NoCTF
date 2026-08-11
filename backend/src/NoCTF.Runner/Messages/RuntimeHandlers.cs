@@ -108,11 +108,12 @@ public sealed class RuntimeProviderHandler(
         CancellationToken cancellationToken)
     {
         ValidateAssignment(message);
+        RuntimeStopWork? work = null;
         try
         {
-            var work = await workReader.ReadStopAsync(message, cancellationToken);
+            work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is null)
-                return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+                return StopSucceeded(message, work);
             if (work.ProviderReceiptJson is { } receiptJson)
             {
                 var receipt = JsonSerializer.Deserialize<ContainerReceipt>(receiptJson)
@@ -133,14 +134,11 @@ public sealed class RuntimeProviderHandler(
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
-            return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+            return StopSucceeded(message, work);
         }
         catch (InvalidOperationException)
         {
-            return new RuntimeStopFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.CleanupFailed);
+            return StopFailed(message, work);
         }
     }
 
@@ -290,11 +288,12 @@ public sealed class RuntimeProviderHandler(
         CancellationToken cancellationToken)
     {
         ValidateAssignment(message);
+        RuntimeStopWork? work = null;
         try
         {
-            var work = await workReader.ReadStopAsync(message, cancellationToken);
+            work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is null)
-                return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+                return StopSucceeded(message, work);
             if (work.ProviderReceiptJson is { } receiptJson)
             {
                 var receipt = JsonSerializer.Deserialize<ComposeReceipt>(receiptJson)
@@ -311,14 +310,11 @@ public sealed class RuntimeProviderHandler(
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
-            return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+            return StopSucceeded(message, work);
         }
         catch (InvalidOperationException)
         {
-            return new RuntimeStopFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.CleanupFailed);
+            return StopFailed(message, work);
         }
     }
 
@@ -405,11 +401,12 @@ public sealed class RuntimeProviderHandler(
         CancellationToken cancellationToken)
     {
         ValidateAssignment(message);
+        RuntimeStopWork? work = null;
         try
         {
-            var work = await workReader.ReadStopAsync(message, cancellationToken);
+            work = await workReader.ReadStopAsync(message, cancellationToken);
             if (work is null)
-                return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+                return StopSucceeded(message, work);
             if (work.Provider != RuntimeProvider.Libvirt)
                 throw new InvalidOperationException("OVA Runtime receipt provider is invalid.");
             if (work.ProviderReceiptJson is { } receiptJson)
@@ -428,14 +425,11 @@ public sealed class RuntimeProviderHandler(
             await ReleaseStopCapacityOrThrowAsync(
                 message.RuntimeInstanceId,
                 cancellationToken);
-            return new RuntimeStopped(message.RuntimeInstanceId, message.ProcessingVersion);
+            return StopSucceeded(message, work);
         }
         catch (InvalidOperationException)
         {
-            return new RuntimeStopFailed(
-                message.RuntimeInstanceId,
-                message.ProcessingVersion,
-                RuntimeFailureCode.CleanupFailed);
+            return StopFailed(message, work);
         }
     }
 
@@ -507,6 +501,27 @@ public sealed class RuntimeProviderHandler(
                 "Runtime resources remain after identity-based cleanup.");
         }
     }
+
+    private static RuntimeStopped StopSucceeded(
+        IRuntimeStopMessage message,
+        RuntimeStopWork? work) =>
+        new(
+            message.RuntimeInstanceId,
+            message.ProcessingVersion,
+            work is { Generation: > 0 } ? work.Generation : message.Generation,
+            message.RunnerPool,
+            message.RunnerId);
+
+    private static RuntimeStopFailed StopFailed(
+        IRuntimeStopMessage message,
+        RuntimeStopWork? work) =>
+        new(
+            message.RuntimeInstanceId,
+            message.ProcessingVersion,
+            work is { Generation: > 0 } ? work.Generation : message.Generation,
+            message.RunnerPool,
+            message.RunnerId,
+            RuntimeFailureCode.CleanupFailed);
 
     private static RuntimeForceTerminated ForceTerminationSucceeded(
         ForceTerminateRuntime message,
@@ -671,6 +686,7 @@ public static class RuntimeWriteBackHandler
                 await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
+                    instance.Generation,
                     instance.RunnerPool,
                     message.RunnerId));
                 await RecordRuntimeStateAsync(
@@ -880,7 +896,10 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         if (instance is null
             || instance.ProcessingVersion != message.ProcessingVersion
-            || instance.State != RuntimeState.Stopping)
+            || instance.State != RuntimeState.Stopping
+            || instance.Generation != message.Generation
+            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
+            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return;
 
         instance.State = RuntimeState.Stopped;
@@ -998,7 +1017,10 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         if (instance is null
             || instance.ProcessingVersion != message.ProcessingVersion
-            || instance.State != RuntimeState.Stopping)
+            || instance.State != RuntimeState.Stopping
+            || instance.Generation != message.Generation
+            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
+            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return;
 
         instance.State = RuntimeState.Failed;
@@ -1167,18 +1189,21 @@ public static class RuntimeWriteBackHandler
                 new StopContainerRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
+                    instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
                 new StopComposeRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
+                    instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             RuntimeKind.OvaVm => outbox.PublishToRunnerNodeAsync(
                 new StopOvaRuntime(
                     instance.Id,
                     instance.ProcessingVersion,
+                    instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             _ => throw new InvalidOperationException(
