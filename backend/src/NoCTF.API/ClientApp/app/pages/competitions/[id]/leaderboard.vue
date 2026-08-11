@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import {
-  ChevronLeft,
-  ChevronRight,
   Download,
   Medal,
   Trophy,
@@ -130,19 +128,23 @@ const hasAnySeries = computed(() => entries.value.some(entry =>
   (entry.cells?.length ?? 0) > 0 || (entry.score ?? 0) !== 0,
 ))
 
-// ---- 分页 ----
-const pageSize = ref(20)
-const page = ref(1)
-
+// ---- 完整快照上的渐进渲染 ----
+const entryBatchSize = 50
 const entries = computed<MatrixEntry[]>(() => (leaderboard.value?.entries ?? []) as MatrixEntry[])
-const totalPages = computed(() => Math.max(1, Math.ceil(entries.value.length / pageSize.value)))
-const pageItems = computed(() =>
-  entries.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
+const visibleEntryCount = ref(entryBatchSize)
+const visibleEntries = computed(() =>
+  entries.value.slice(0, visibleEntryCount.value),
 )
+const hasMoreEntries = computed(() => visibleEntryCount.value < entries.value.length)
 
-watch([entries, pageSize], () => {
-  if (page.value > totalPages.value) page.value = totalPages.value
-})
+watch(entries, () => { visibleEntryCount.value = entryBatchSize })
+
+function showMoreEntries() {
+  visibleEntryCount.value = Math.min(
+    visibleEntryCount.value + entryBatchSize,
+    entries.value.length,
+  )
+}
 
 // ---- 队伍详情弹窗 ----
 const detailOpen = ref(false)
@@ -284,7 +286,7 @@ function exportCsv() {
                   </TableHeader>
                   <TableBody>
                     <TableRow
-                      v-for="entry in pageItems"
+                      v-for="entry in visibleEntries"
                       :key="entry.teamId"
                       :class="cn('cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset', (entry.rank ?? 99) <= 3 && 'bg-primary/5 hover:bg-primary/10')"
                       role="button"
@@ -326,30 +328,12 @@ function exportCsv() {
               </div>
 
               <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                <label class="flex items-center gap-2"> {{ $t('每页显示:') }} <Select v-model="pageSize">
-                    <SelectTrigger class="w-20">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem v-for="size in [10, 20, 50, 100]" :key="size" :value="size">
-                          {{ size }}
-                        </SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </label>
-                <span class="flex items-center gap-3">
-                  {{ $t('共 {count} 支队伍，第 {page} / {total} 页', { count: entries.length, page, total: totalPages }) }}
-                  <span class="flex items-center gap-1">
-                    <Button variant="outline" size="icon" :aria-label="$t('上一页')" :disabled="page <= 1" @click="page--">
-                      <ChevronLeft aria-hidden="true" />
-                    </Button>
-                    <Button variant="outline" size="icon" :aria-label="$t('下一页')" :disabled="page >= totalPages" @click="page++">
-                      <ChevronRight aria-hidden="true" />
-                    </Button>
-                  </span>
+                <span>
+                  {{ $t('已显示 {visible} / {count} 支队伍', { visible: visibleEntries.length, count: entries.length }) }}
                 </span>
+                <Button v-if="hasMoreEntries" variant="outline" @click="showMoreEntries">
+                  {{ $t('加载更多') }}
+                </Button>
               </div>
             </template>
           </CardContent>

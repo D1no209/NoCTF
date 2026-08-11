@@ -1401,6 +1401,7 @@ export const englishMessages: Record<string, string> = {
   "修订版本 {revision}": "Revision {revision}",
   "修订版本：{revision}": "Revision: {revision}",
   "共 {count} 支队伍，第 {page} / {total} 页": "{count} teams · page {page} of {total}",
+  "已显示 {visible} / {count} 支队伍": "showing {visible} of {count} teams",
   "删除「{title}」后选手将无法看到该题，可稍后恢复。确认删除？": "Participants will no longer see “{title}”. You can restore it later. Delete it?",
   "删除用户「{user}」": "Delete user “{user}”",
   "即将开始（{count}）": "Upcoming ({count})",

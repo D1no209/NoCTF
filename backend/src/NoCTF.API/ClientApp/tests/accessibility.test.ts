@@ -21,14 +21,11 @@ describe('keyboard and icon accessibility', () => {
     }
   })
 
-  test('labels dialog close and leaderboard pagination icon buttons', async () => {
+  test('labels dialog and sheet close buttons', async () => {
     const dialog = await source('../app/components/ui/dialog/DialogContent.vue')
     const sheet = await source('../app/components/ui/sheet/SheetContent.vue')
-    const leaderboard = await source('../app/pages/competitions/[id]/leaderboard.vue')
 
     expect(dialog).toContain(':aria-label="$t(\'关闭\')"')
     expect(sheet).toContain(':aria-label="$t(\'关闭\')"')
-    expect(leaderboard).toContain(':aria-label="$t(\'上一页\')"')
-    expect(leaderboard).toContain(':aria-label="$t(\'下一页\')"')
   })
 })
