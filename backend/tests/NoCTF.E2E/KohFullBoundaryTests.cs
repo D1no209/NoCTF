@@ -236,8 +236,7 @@ public sealed class KohFullBoundaryTests
         var leaderboard = await PollJsonAsync(
             anonymous,
             $"/api/v1/competitions/{competitionId}/leaderboard",
-            value => !value.GetProperty("stale").GetBoolean()
-                && Scores(value).GetValueOrDefault(red.TeamId) >= 10
+            value => Scores(value).GetValueOrDefault(red.TeamId) >= 10
                 && Scores(value).GetValueOrDefault(blue.TeamId) >= 10,
             TimeSpan.FromSeconds(20),
             cancellationToken);

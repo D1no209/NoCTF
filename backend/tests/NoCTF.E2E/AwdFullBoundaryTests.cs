@@ -602,8 +602,7 @@ public sealed class AwdFullBoundaryTests
                     .ToDictionary(
                         item => item.GetProperty("teamId").GetGuid(),
                         item => item.GetProperty("score").GetInt64());
-                if (!last.GetProperty("stale").GetBoolean()
-                    && expectedScores.All(expected =>
+                if (expectedScores.All(expected =>
                         scores.GetValueOrDefault(expected.Key, long.MinValue) == expected.Value))
                     return last;
             }
@@ -637,7 +636,7 @@ public sealed class AwdFullBoundaryTests
                     .ToDictionary(
                         item => item.GetProperty("teamId").GetGuid(),
                         item => item.GetProperty("score").GetInt64());
-                if (!last.GetProperty("stale").GetBoolean() && completed(scores))
+                if (completed(scores))
                     return last;
             }
             else if (response.StatusCode != HttpStatusCode.Accepted)

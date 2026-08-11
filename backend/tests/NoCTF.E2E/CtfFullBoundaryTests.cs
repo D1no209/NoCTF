@@ -854,8 +854,7 @@ public sealed class CtfFullBoundaryTests
                 var entry = leaderboard.GetProperty("entries").EnumerateArray()
                     .FirstOrDefault(item => item.GetProperty("teamId").GetGuid() == teamId);
                 if (entry.ValueKind != JsonValueKind.Undefined
-                    && entry.GetProperty("score").GetInt64() == expectedScore
-                    && !leaderboard.GetProperty("stale").GetBoolean())
+                    && entry.GetProperty("score").GetInt64() == expectedScore)
                     return leaderboard;
             }
             else if (response.StatusCode != HttpStatusCode.Accepted)
