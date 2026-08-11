@@ -106,16 +106,20 @@ kubectl apply -f namespace.yaml
 kubectl apply -f 00-runtime-namespace.yaml
 kubectl apply -f 01-runtime-networkpolicy.yaml
 
-# 2. Config and secrets
+# 2. Enforce the platform Namespace default-deny and exact allow rules before
+#    creating any workload Pod
+kubectl apply -f networkpolicy.yaml
+
+# 3. Config and secrets
 kubectl apply -f secret.yaml
 kubectl apply -f configmap.yaml
 
-# 3. Storage
+# 4. Storage
 kubectl apply -f postgres-pvc.yaml
 kubectl apply -f redis-pvc.yaml
 kubectl apply -f minio-pvc.yaml
 
-# 4. Stateful services
+# 5. Stateful services
 kubectl apply -f postgres-deployment.yaml
 kubectl apply -f postgres-service.yaml
 kubectl apply -f redis-deployment.yaml
@@ -124,11 +128,11 @@ kubectl apply -f minio-deployment.yaml
 kubectl apply -f minio-service.yaml
 kubectl apply -f minio-init-job.yaml
 
-# 5. Database migration
+# 6. Database migration
 kubectl apply -f migration-job.yaml
 kubectl wait --for=condition=complete job/noctf-db-migrate -n noctf --timeout=300s
 
-# 6. The distributed application-role topology
+# 7. The distributed application-role topology
 kubectl apply -f backend-deployment.yaml
 kubectl apply -f backend-service.yaml
 kubectl apply -f worker-deployment.yaml
@@ -136,9 +140,8 @@ kubectl apply -f runner-rbac.yaml
 kubectl apply -f runner-service.yaml
 kubectl apply -f runner-deployment.yaml
 
-# 7. Networking
+# 8. Public ingress (the internal policies are already active)
 kubectl apply -f ingress.yaml
-kubectl apply -f networkpolicy.yaml
 ```
 
 Email delivery is optional and remains fail-closed under the default-deny policy.
@@ -153,10 +156,11 @@ second exact `matchName` or port entry only when the configured mail service
 actually requires it; do not use a wildcard FQDN, `0.0.0.0/0`, or commit the
 production endpoint or credentials.
 
-Do not replace the staged sequence with a single directory-wide apply when this
-cluster hosts Kubernetes Runner Pools. The `runtime` Namespace and
-`noctf-runtime-baseline-deny` policy must exist before the Runner starts and before
-any challenge workload is created.
+Do not replace the staged sequence with a single directory-wide apply. The
+platform `networkpolicy.yaml` must be active before any `noctf` workload Pod is
+created. When this cluster hosts Kubernetes Runner Pools, the `runtime`
+Namespace and `noctf-runtime-baseline-deny` policy must likewise exist before
+the Runner starts and before any challenge workload is created.
 
 ## Verify Deployment
 

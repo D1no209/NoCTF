@@ -181,6 +181,35 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task Kubernetes_installation_enforces_network_policies_before_workloads()
+    {
+        var readme = await ReadAsync("deploy", "k8s", "k8s-readme.md");
+        var networkPolicyIndex = readme.IndexOf(
+            "kubectl apply -f networkpolicy.yaml",
+            StringComparison.Ordinal);
+
+        await Assert.That(networkPolicyIndex).IsGreaterThanOrEqualTo(0);
+        foreach (var workload in new[]
+                 {
+                     "postgres-deployment.yaml",
+                     "redis-deployment.yaml",
+                     "minio-deployment.yaml",
+                     "migration-job.yaml",
+                     "backend-deployment.yaml",
+                     "worker-deployment.yaml",
+                     "runner-deployment.yaml"
+                 })
+        {
+            await Assert.That(readme.IndexOf(
+                $"kubectl apply -f {workload}",
+                StringComparison.Ordinal)).IsGreaterThan(networkPolicyIndex);
+        }
+
+        await Assert.That(readme).Contains(
+            "Do not replace the staged sequence with a single directory-wide apply.");
+    }
+
+    [Test]
     public async Task External_deployment_artifacts_are_immutable_and_verified()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
