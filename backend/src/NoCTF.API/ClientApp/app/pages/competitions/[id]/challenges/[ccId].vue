@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { Dice5, Download, FileDown } from '@lucide/vue'
-import { getChallengeEndpoint, listChallengeAttachmentsEndpoint } from '~/api'
+import {
+  downloadChallengeAttachmentEndpoint,
+  downloadRandomChallengeAttachmentEndpoint,
+  getChallengeEndpoint,
+  listChallengeAttachmentsEndpoint,
+} from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
@@ -52,7 +57,10 @@ async function downloadAttachment(attachmentId: string, fileName: string) {
   downloading.value = true
   try {
     await downloadProtectedFile(
-      `/api/v1/competitions/${competitionId}/challenges/${competitionChallengeId}/attachments/${attachmentId}`,
+      () => downloadChallengeAttachmentEndpoint({
+        path: { competitionId, competitionChallengeId, attachmentId },
+        parseAs: 'blob',
+      }),
       fileName,
     )
   }
@@ -68,7 +76,10 @@ async function downloadRandom() {
   downloading.value = true
   try {
     await downloadProtectedFile(
-      `/api/v1/competitions/${competitionId}/challenges/${competitionChallengeId}/attachment`,
+      () => downloadRandomChallengeAttachmentEndpoint({
+        path: { competitionId, competitionChallengeId },
+        parseAs: 'blob',
+      }),
       'attachment',
     )
   }

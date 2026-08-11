@@ -1326,6 +1326,7 @@ export const englishMessages: Record<string, string> = {
   "{count} 分": "{count}m",
   "{count} 秒": "{count}s",
   "下载失败（HTTP {status}）": "Download failed (HTTP {status})",
+  "下载响应格式无效": "The download response format is invalid",
   "你的队伍{team}已被封禁": "Your team {team} has been banned",
   "你的队伍{team}报名状态已变更": "Your team {team}'s registration status has changed",
   "你在{challenge}的提交已完成评测": "Your submission for {challenge} has been judged",

@@ -3,6 +3,7 @@ import { Download, FilePlus2, RefreshCw } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   adminCreatePlatformAuditDataExport,
+  adminDownloadDataExport,
   adminListPlatformAuditDataExports,
   adminPlatformListAuditLogs,
 } from '~/api'
@@ -113,10 +114,17 @@ async function createExport(): Promise<void> {
 }
 
 async function downloadExport(item: DataExport): Promise<void> {
-  if (!item.id) return
-  downloadingId.value = item.id
+  const dataExportId = item.id
+  if (!dataExportId) return
+  downloadingId.value = dataExportId
   try {
-    await downloadProtectedFile(`/api/v1/admin/data-exports/${item.id}/download`, item.fileName ?? 'platform-audit-export.zip')
+    await downloadProtectedFile(
+      () => adminDownloadDataExport({
+        path: { dataExportId },
+        parseAs: 'blob',
+      }),
+      item.fileName ?? 'platform-audit-export.zip',
+    )
     toast.success(translate("导出文件已开始下载"))
   }
   catch (e) {
