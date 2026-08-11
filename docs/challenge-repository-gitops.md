@@ -1,5 +1,10 @@
 # 比赛题目 GitHub 仓库与 GitOps 管理设计
 
+> 当前平台契约：题目 Runtime、Checker 和 Compose service 镜像由受信任的出题人配置，tag 与
+> digest 均可直接保存和运行；NoCTF 不解析 tag、不强制固定 digest，也不设置 Registry allowlist。
+> 本文后续的 digest 解析是可选 GitOps 工作流自身采用的严格构建策略，不是 NoCTF API、发布或
+> 开赛门禁。未启用该仓库策略时，管理员可以继续使用普通镜像 tag。
+
 ## 目标与边界
 
 一场比赛对应一个独立 GitHub 仓库。仓库保存本场比赛的题目模板、比赛题目清单、题面、静态附件、明文静态 Flag、Runtime 与 Checker 源码以及构建说明。GitHub Pull Request 是题目审核入口，`main` 是仓库期望状态。
@@ -840,7 +845,8 @@ registry.example.com/noctf-2027/web-sql-notes-runtime
 sha-<full-git-commit-sha>
 ```
 
-可以额外推送 `latest` 方便人工拉取，但 NoCTF 永远不引用可变 tag。NoCTF 接收：
+该可选 GitOps 工作流可以额外推送 `latest` 方便人工拉取，但写入 NoCTF 时选择构建所得 digest；
+这不代表 NoCTF 平台拒绝或改写由管理员直接配置的可变 tag。该工作流写入示例：
 
 ```text
 ghcr.io/noctf/noctf-2027/web-sql-notes-runtime@sha256:...
