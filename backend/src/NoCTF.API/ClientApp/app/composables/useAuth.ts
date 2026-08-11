@@ -9,20 +9,15 @@ import { getAccessToken, refreshSession, setAccessToken } from '~/lib/session'
 
 export type CurrentUser = NoCtfapiEndpointsAuthenticationCurrentUserResponse
 
-/** Platform roles — mirrors NoCTF.Domain.Identity.UserRole. */
-export const UserRole = {
-  User: 'User', Organizer: 'Organizer', Administrator: 'Administrator',
-} as const
-
 export function useAuth() {
   const user = useState<CurrentUser | null>('auth:user', () => null)
   /** Whether the initial session restore attempt has finished. */
   const ready = useState<boolean>('auth:ready', () => false)
 
   const isLoggedIn = computed(() => user.value !== null)
-  const isAdministrator = computed(() => user.value?.role === UserRole.Administrator)
+  const isAdministrator = computed(() => user.value?.role === 'Administrator')
   const canOrganize = computed(
-    () => user.value?.role === UserRole.Organizer || user.value?.role === UserRole.Administrator,
+    () => user.value?.role === 'Organizer' || user.value?.role === 'Administrator',
   )
 
   async function fetchMe(): Promise<void> {
