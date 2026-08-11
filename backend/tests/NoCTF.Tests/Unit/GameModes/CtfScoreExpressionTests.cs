@@ -46,4 +46,34 @@ public sealed class CtfScoreExpressionTests
 
         await Assert.That(score).IsEqualTo(1000L);
     }
+
+    [Test]
+    public async Task Validation_checks_every_possible_solve_count()
+    {
+        var evaluator = new CtfScoreExpression();
+
+        var action = () => evaluator.Validate(
+            "1m / (solveCount - 2)",
+            initialPoints: 1000m,
+            minimumPoints: 100m,
+            decayParameter: 10m,
+            eligibleTeamCount: 5);
+
+        await Assert.That(action).ThrowsException();
+    }
+
+    [Test]
+    public async Task Validation_accepts_the_default_expression_for_every_possible_solve_count()
+    {
+        var evaluator = new CtfScoreExpression();
+
+        var action = () => evaluator.Validate(
+            DefaultExpression,
+            initialPoints: 1000m,
+            minimumPoints: 100m,
+            decayParameter: 10m,
+            eligibleTeamCount: 100);
+
+        await Assert.That(action).ThrowsNothing();
+    }
 }
