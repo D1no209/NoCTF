@@ -268,3 +268,10 @@ public interface IRuntimeManagedResourceReconciler
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken);
 }
+
+public interface IRuntimeProviderAvailabilityProbe
+{
+    RuntimeProvider Provider { get; }
+
+    Task CheckAvailabilityAsync(CancellationToken cancellationToken);
+}

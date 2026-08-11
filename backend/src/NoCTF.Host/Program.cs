@@ -5,6 +5,7 @@ using NoCTF.API.Security;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Hosting;
+using NoCTF.Hosting.Health;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Runner;
@@ -83,6 +84,7 @@ builder.UseWolverine(options =>
         options.ConfigureNoCtfMessageRouting(builder.Configuration, roles);
     }
 });
+builder.Services.AddNoCtfRoleHealthChecks(builder.Configuration, roles, development);
 
 var app = builder.Build();
 if (development && (roles.Has(HostRole.Api) || roles.Has(HostRole.Worker)))
@@ -95,18 +97,7 @@ if (roles.Has(HostRole.Api))
     app.MapHub<PlatformLogHub>("/hubs/v1/admin/platform-logs");
 }
 
-app.MapGet("/health/live", () => TypedResults.Ok(new
-{
-    status = "live",
-    roles = roles.Values.Select(role => role.ToString())
-}));
-app.MapGet("/health/ready", () => TypedResults.Ok(new
-{
-    status = "ready",
-    roles = roles.Values.Select(role => role.ToString()),
-    runnerPool = roles.Has(HostRole.Runner) ? builder.Configuration["Runner:Pool"] : null,
-    runnerId = roles.Has(HostRole.Runner) ? builder.Configuration["Runner:Id"] : null
-}));
+app.MapNoCtfHealthChecks();
 app.Run();
 
 public partial class Program;

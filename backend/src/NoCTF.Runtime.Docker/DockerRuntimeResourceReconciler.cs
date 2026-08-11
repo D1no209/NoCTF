@@ -11,13 +11,17 @@ namespace NoCTF.Runtime.Docker;
 
 public sealed class DockerRuntimeResourceReconciler(
     DockerRuntimeOptions options,
-    DockerComposeRuntime compose) : IRuntimeManagedResourceReconciler, IDisposable
+    DockerComposeRuntime compose) : IRuntimeManagedResourceReconciler,
+    IRuntimeProviderAvailabilityProbe, IDisposable
 {
     private readonly DockerClient client = new DockerClientBuilder()
         .WithEndpoint(new Uri(options.Endpoint))
         .Build();
 
     public RuntimeProvider Provider => RuntimeProvider.Docker;
+
+    public async Task CheckAvailabilityAsync(CancellationToken cancellationToken) =>
+        await client.System.PingAsync(cancellationToken);
 
     public async Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
         CancellationToken cancellationToken)

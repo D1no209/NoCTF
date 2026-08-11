@@ -33,7 +33,6 @@ public sealed class DeploymentTopologyTests
         await Assert.That(singleCompose).Contains("  noctf:");
         await Assert.That(singleCompose).Contains("target: host");
         await Assert.That(singleCompose).Contains("Hosting__Roles__0: Api");
-        await Assert.That(compose).Contains("GET /health HTTP/1.1");
         await Assert.That(compose).Contains("GET /health/ready HTTP/1.1");
         await Assert.That(compose).Contains("[[ \"$$status\" == *\" 200 \"* ]]");
         await Assert.That(File.Exists(workerDeployment)).IsTrue();
@@ -69,6 +68,31 @@ public sealed class DeploymentTopologyTests
         {
             await Assert.That(compose).DoesNotContain(legacySetting);
             await Assert.That(kubernetesConfig).DoesNotContain(legacySetting);
+        }
+    }
+
+    [Test]
+    public async Task Deployment_manifests_use_role_aware_health_probes()
+    {
+        var dockerfile = await ReadAsync("backend", "Dockerfile");
+        var compose = await ReadAsync("deploy", "docker-compose.yml");
+        var backend = await ReadAsync("deploy", "k8s", "backend-deployment.yaml");
+        var worker = await ReadAsync("deploy", "k8s", "worker-deployment.yaml");
+        var runner = await ReadAsync("deploy", "k8s", "runner-deployment.yaml");
+        var workerImageStage = dockerfile
+            .Split("FROM runtime AS worker", 2, StringSplitOptions.None)[1]
+            .Split("FROM runtime AS runner", 2, StringSplitOptions.None)[0];
+        var workerComposeService = compose
+            .Split("\n  worker:", 2, StringSplitOptions.None)[1]
+            .Split("\n  runner:", 2, StringSplitOptions.None)[0];
+
+        await Assert.That(workerImageStage).Contains("EXPOSE 8080");
+        await Assert.That(workerComposeService).Contains("ASPNETCORE_URLS: http://+:8080");
+        await Assert.That(workerComposeService).Contains("GET /health/ready HTTP/1.1");
+        foreach (var manifest in new[] { backend, worker, runner })
+        {
+            await Assert.That(manifest).Contains("path: /health/live");
+            await Assert.That(manifest).Contains("path: /health/ready");
         }
     }
 

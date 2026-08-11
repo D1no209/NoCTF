@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Builder;
 using NoCTF.Hosting;
+using NoCTF.Hosting.Health;
 using NoCTF.Infrastructure;
 using NoCTF.Worker;
 using Wolverine;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddNoCtfInfrastructure(builder.Configuration);
 builder.Services.AddNoCtfWorkerRole();
 builder.Services.AddNoCtfWorkerLogging(builder.Configuration);
@@ -14,5 +16,8 @@ builder.UseWolverine(options =>
     options.ConfigureNoCtfMessageRouting(builder.Configuration, roles);
     options.ConfigureNoCtfWorkerMessaging();
 });
+builder.Services.AddNoCtfRoleHealthChecks(builder.Configuration, roles);
 
-await builder.Build().RunAsync();
+var app = builder.Build();
+app.MapNoCtfHealthChecks();
+await app.RunAsync();
