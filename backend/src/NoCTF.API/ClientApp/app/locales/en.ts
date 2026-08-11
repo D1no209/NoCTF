@@ -417,6 +417,7 @@ export const englishMessages: Record<string, string> = {
   "加载题目失败": "Failed to load question",
   "加载通知失败": "Failed to load notification",
   "加载通知详情失败": "Failed to load notification details",
+  "通知不存在或你无权查看": "The notification does not exist or you are not allowed to view it",
   "加载中…": "Loading…",
   "加载咨询列表失败": "Failed to load consultation list",
   "加载咨询详情失败": "Failed to load consultation details",
