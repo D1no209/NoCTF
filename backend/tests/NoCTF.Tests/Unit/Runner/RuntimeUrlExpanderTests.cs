@@ -62,6 +62,25 @@ public sealed class RuntimeUrlExpanderTests
     }
 
     [Test]
+    public async Task Public_bindings_reject_unsupported_access_schemes()
+    {
+        var receipt = new ContainerReceipt(
+            Guid.CreateVersion7(),
+            RuntimeProvider.Docker,
+            "container-1",
+            RuntimeStatus.Running,
+            new Dictionary<int, int> { [8080] = 32000 },
+            "runner.example",
+            "container-1");
+
+        await Assert.That(() => RuntimeUrlExpander.ExpandContainer(
+                receipt,
+                [new("javascript://{HOST}:{PORT}/unsafe", RuntimeExposure.OwnerOnly, ContainerPort: 8080)],
+                null))
+            .Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task Compose_bindings_resolve_the_named_service()
     {
         var receipt = new ComposeReceipt(

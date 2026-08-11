@@ -81,7 +81,9 @@ CTF PerTeamRuntime 不预创建。首次 Start 时创建，每个 Team/Competiti
 
 `Exposure` 只有 `OwnerOnly | Participants`。本队 Runtime GET 返回两类；AWD targets 对其他队只返回 Participants 且必须等加固期结束；KoH challenge detail 只返回 Participants；OwnerOnly 永不跨队。CTF 只允许 OwnerOnly，KoH 至少一个 Participants。Runner 展开时把全部 URL 与 Participants 的 0-based indexes 一起固化到 RuntimeInstance，因此之后配置变化不改变当前 Generation。响应仍只是按配置顺序筛选后的 `urls: string[]`，不暴露 Binding 元数据。
 
-占位符大小写敏感：`{HOST}`、`{PORT}`。直接原文替换，不 URL encode；未知占位符拒绝保存。Container/Compose 必须声明目标端口并使用动态映射；模板应使用 HOST/PORT。OVA 的 GuestPort 可空：空时不得用 PORT，Runner 直接以 VM 可访问地址展开 HOST，不做端口转发；模板也可使用固定绝对 URL。展开后必须是绝对 URI。
+占位符大小写敏感：`{HOST}`、`{PORT}`。直接原文替换，不 URL encode；未知占位符拒绝保存。Container/Compose 必须声明目标端口并使用动态映射；模板应使用 HOST/PORT。OVA 的 GuestPort 可空：空时不得用 PORT，Runner 直接以 VM 可访问地址展开 HOST，不做端口转发；模板也可使用固定绝对 URL。展开后必须是绝对 URI，且公开访问地址只允许 `http`、`https`、`tcp`、`udp`、`ssh`。配置保存、Runner 展开和持久化回写三处都执行同一协议白名单；其他协议不得进入 RuntimeInstance。
+
+前端只把 `http` 与 `https` 地址渲染为可导航链接。`tcp`、`udp`、`ssh` 以不可点击文本显示并提供复制按钮，避免浏览器把非 Web 协议交给外部处理器；历史异常值同样不得成为链接。
 
 只有 Running 向本队/管理者返回 URL。URL 可含凭据，不建 RuntimeCredential；停止后隐藏历史 URL。
 
