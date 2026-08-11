@@ -46,7 +46,8 @@ public sealed class CtfFullBoundaryTests
                 startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
-                maxTeamMembers = 5
+                maxTeamMembers = 5,
+                maxConcurrentRuntimeInstancesPerTeam = 2
             },
             HttpStatusCode.Created,
             cancellationToken);

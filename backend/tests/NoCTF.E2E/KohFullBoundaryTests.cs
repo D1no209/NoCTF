@@ -37,7 +37,8 @@ public sealed class KohFullBoundaryTests
                 startTime = now.AddMinutes(-1),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
-                maxTeamMembers = 5
+                maxTeamMembers = 5,
+                maxConcurrentRuntimeInstancesPerTeam = 1
             },
             HttpStatusCode.Created,
             cancellationToken);
