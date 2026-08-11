@@ -30,7 +30,7 @@ public sealed class AwdpCheckerExecutorTests
             "callback-token",
             TimeSpan.FromSeconds(20));
 
-        await executor.ExecuteAsync(work, CancellationToken.None);
+        var outcome = await executor.ExecuteAsync(work, CancellationToken.None);
 
         var request = runner.Request!;
         await Assert.That(request.NetworkName).IsEqualTo("network-1");
@@ -44,6 +44,18 @@ public sealed class AwdpCheckerExecutorTests
             .IsEqualTo(ContainerNetworkPurpose.AwdpVerification);
         await Assert.That(request.PortMappings).IsEmpty();
         await Assert.That(request.AllowInternalCallback).IsTrue();
+        await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.Completed);
+    }
+
+    [Test]
+    public async Task Checker_nonzero_exit_is_reported_as_an_abnormal_exit()
+    {
+        var runner = new RecordingOneShotRunner { ExitCode = 17 };
+        var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
+
+        var outcome = await executor.ExecuteAsync(Work(), CancellationToken.None);
+
+        await Assert.That(outcome).IsEqualTo(AwdpCheckerExecutionOutcome.AbnormalExit);
     }
 
     [Test]
@@ -65,6 +77,9 @@ public sealed class AwdpCheckerExecutorTests
         await Assert.That(AwdpCheckerCompletionPolicy.ResultFor(
                 AwdpCheckerExecutionOutcome.Completed))
             .IsNull();
+        await Assert.That(AwdpCheckerCompletionPolicy.ResultFor(
+                AwdpCheckerExecutionOutcome.AbnormalExit))
+            .IsEqualTo(NoCTF.Domain.Gameplay.AwdpFixOutcome.PlatformFailed);
         await Assert.That(AwdpCheckerCompletionPolicy.ResultFor(
                 AwdpCheckerExecutionOutcome.TimedOut))
             .IsEqualTo(NoCTF.Domain.Gameplay.AwdpFixOutcome.PlatformFailed);
@@ -94,6 +109,7 @@ public sealed class AwdpCheckerExecutorTests
     private sealed class RecordingOneShotRunner : IOneShotJobRunner
     {
         public ContainerRequest? Request { get; private set; }
+        public int ExitCode { get; init; }
         public bool WaitForCancellation { get; init; }
         public bool ObservedCancellation { get; private set; }
 
@@ -115,7 +131,13 @@ public sealed class AwdpCheckerExecutorTests
                 }
             }
             var now = DateTimeOffset.UtcNow;
-            return new OneShotResult("checker", 0, string.Empty, string.Empty, now, now);
+            return new OneShotResult(
+                "checker",
+                ExitCode,
+                string.Empty,
+                string.Empty,
+                now,
+                now);
         }
     }
 }

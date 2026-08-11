@@ -1,5 +1,9 @@
-using Microsoft.Extensions.Configuration;
+using System.Formats.Tar;
+using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Messaging;
@@ -76,6 +80,90 @@ public sealed class AwdpFixVerificationRecoveryTests
         var result = outbox.Messages.OfType<AwdpFixResult>().Single();
         await Assert.That(result.RuntimeProcessingVersion).IsEqualTo(11);
         await Assert.That(result.Outcome).IsEqualTo(AwdpFixOutcome.PlatformFailed);
+    }
+
+    [Test]
+    public async Task Successful_checker_completion_relies_on_callback_without_duplicate_result()
+    {
+        var message = Message();
+        var archive = CreateFixArchive();
+        var reader = Substitute.For<IAwdpFixWorkReader>();
+        reader.ClaimAsync(message, Arg.Any<CancellationToken>()).Returns(new AwdpFixWorkClaim(
+            AwdpFixExecutionFenceDisposition.Execute,
+            new(
+                11,
+                new(
+                    new Uri("https://api.example/fix"),
+                    "archive-token",
+                    "fix.tar.gz",
+                    archive.LongLength,
+                    SHA256.HashData(archive)),
+                new(
+                    message.RuntimeInstanceId,
+                    RuntimeProvider.Docker,
+                    "target",
+                    RuntimeStatus.Running,
+                    new Dictionary<int, int>(),
+                    null,
+                    "target",
+                    "network",
+                    message.RuntimeInstanceId,
+                    message.Generation),
+                "fix.sh",
+                ["/bin/sh", "/noctf/fix/fix.sh"],
+                TimeSpan.FromMinutes(1),
+                new(
+                    message.RuntimeInstanceId,
+                    message.Generation,
+                    RuntimeProvider.Docker,
+                    "checker:latest",
+                    [],
+                    new Dictionary<string, string>(),
+                    "network",
+                    "target",
+                    30,
+                    new Uri("https://api.example/fix-results"),
+                    "callback-token",
+                    TimeSpan.FromMinutes(1)))));
+        var sandbox = Substitute.For<IContainerSandboxLifecycle>();
+        sandbox.CopyArchiveAsync(
+                Arg.Any<ContainerReceipt>(),
+                Arg.Any<Stream>(),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        sandbox.ExecAsync(
+                Arg.Any<ContainerReceipt>(),
+                Arg.Any<IReadOnlyList<string>>(),
+                Arg.Any<TimeSpan>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new ContainerExecResult(0, false));
+        var providers = Substitute.For<IRuntimeProviderCatalog>();
+        providers.Sandbox(RuntimeProvider.Docker).Returns(sandbox);
+        var checker = Substitute.For<IAwdpCheckerExecutor>();
+        checker.ExecuteAsync(
+                Arg.Any<AwdpCheckerWork>(),
+                Arg.Any<CancellationToken>())
+            .Returns(AwdpCheckerExecutionOutcome.Completed);
+        var outbox = new RecordingOutbox();
+        var configuration = Configuration(message);
+        var handler = new AwdpFixVerificationHandler(
+            reader,
+            new AwdpFixArchiveDownloader(new StaticHttpClientFactory(
+                new HttpClient(new StaticContentHandler(archive)))),
+            new FixArchivePreparer(configuration),
+            providers,
+            checker,
+            [],
+            Substitute.For<IRunnerCapacityGate>(),
+            outbox,
+            configuration);
+
+        await handler.Handle(message, CancellationToken.None);
+
+        await checker.Received(1).ExecuteAsync(
+            Arg.Any<AwdpCheckerWork>(),
+            Arg.Any<CancellationToken>());
+        await Assert.That(outbox.Messages.OfType<AwdpFixResult>()).IsEmpty();
     }
 
     [Test]
@@ -162,10 +250,10 @@ public sealed class AwdpFixVerificationRecoveryTests
     }
 
     private static RunAwdpFixVerification Message() => new(
-            Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            Guid.Parse("22222222-2222-2222-2222-222222222222"),
-            Guid.Parse("33333333-3333-3333-3333-333333333333"),
-            Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
             3,
             10,
             DateTimeOffset.UtcNow.AddMinutes(5),
@@ -180,6 +268,23 @@ public sealed class AwdpFixVerificationRecoveryTests
                 ["Runner:Id"] = message.RunnerId
             })
             .Build();
+
+    private static byte[] CreateFixArchive()
+    {
+        using var archive = new MemoryStream();
+        using (var gzip = new GZipStream(
+                   archive,
+                   CompressionMode.Compress,
+                   leaveOpen: true))
+        using (var tar = new TarWriter(gzip, leaveOpen: true))
+        {
+            tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "fix.sh")
+            {
+                DataStream = new MemoryStream(Encoding.UTF8.GetBytes("#!/bin/sh\nexit 0\n"))
+            });
+        }
+        return archive.ToArray();
+    }
 
     private sealed record TestContext(
         AwdpFixVerificationHandler Handler,
@@ -199,6 +304,17 @@ public sealed class AwdpFixVerificationRecoveryTests
             HttpRequestMessage request,
             CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+    }
+
+    private sealed class StaticContentHandler(byte[] content) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(content)
+            });
     }
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
