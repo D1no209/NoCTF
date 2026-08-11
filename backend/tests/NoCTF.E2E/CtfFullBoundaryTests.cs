@@ -43,7 +43,7 @@ public sealed class CtfFullBoundaryTests
                 title = "CTF full-boundary E2E",
                 description = "External process boundary verification",
                 mode = "Ctf",
-                startTime = now.AddMinutes(-1),
+                startTime = now.AddMinutes(10),
                 endTime = now.AddHours(1),
                 teamRegistrationAutoApprove = true,
                 maxTeamMembers = 5,
