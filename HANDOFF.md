@@ -9,6 +9,26 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：比赛事件永久历史导航
+
+- 功能提交 `11734de9` 按用户确认的保留策略区分事件读取窗口：参赛者和队伍仍必须提交最多 31 天的
+  `from/to`，前端默认显示最近 30 天；Owner、Manager、Judge、Observer 与平台管理员可以省略日期，
+  通过现有签名 keyset cursor 遍历该比赛永久保留的完整 `competition_events`。未授权用户尝试无界读取
+  会得到强类型 403，不会因省略日期绕过可见性过滤。
+- 游标签名现在同时绑定比赛、调用用户、事件筛选与日期窗口；工作人员的游标不能跨用户复用，参赛者
+  的有界游标也不能切换成无界历史。导出仍强制显式的 0–31 天窗口，避免把永久历史一次性装入内存；
+  本阶段只扩展分页浏览，不改变受保护事实值和 Team/Staff 事件的可见性规则。
+- 参赛者动态页通过生成 SDK 判断现有比赛协作者身份。工作人员显示“完整历史”并可持续加载更多；
+  其他用户显示“最近 30 天”。身份探测遇到非 403/404 的故障时明确告警并安全降级到最近 30 天，
+  不会静默把服务错误表现成完整历史。没有手写 URL、DTO 或协议枚举。
+- OpenAPI 两份制品已由后端工具重新导出，TypeScript SDK 已重新生成；`from/to` 由必填改为成对可选。
+  没有新增数据表、列、migration、snapshot 或版本号变化。
+- 验证通过：Release solution build 0 警告/0 错误；真实 PostgreSQL 永久历史与权限测试 1/1；请求验证
+  单测 1/1；ClientApp `bun test` 148/148、`bun run typecheck`、`bun run build` 与 `git diff --check`
+  通过。OpenAPI 与 SDK 二次工具生成成功；Nuxt 仅保留既有大 chunk、插件耗时和第三方弃用警告。
+- 尚未推送、部署或读取生产比赛历史；工作人员/参赛者两种浏览器角色将在所有审计阶段收束后使用
+  Microsoft Edge 和可丢弃本地数据统一验收。
+
 ## 2026-08-11 全量审计修复：官方 Checker 回调拓扑
 
 - 功能提交 `fccd9101` 修复官方 Docker/Kubernetes 部署没有可工作的 AWD/AWDP Checker 回调路径。
