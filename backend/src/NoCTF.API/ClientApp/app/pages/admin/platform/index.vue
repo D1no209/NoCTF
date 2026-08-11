@@ -27,12 +27,7 @@ const saving = ref(false)
 
 const logoInput = ref<HTMLInputElement | null>(null)
 const logoUploading = ref(false)
-/** Bumped after each successful logo upload to bust the preview cache. */
-const logoVersion = ref(0)
-
-const logoSrc = computed(() =>
-  configuration.value?.logoUrl ? `/api/v1/platform/logo?v=${logoVersion.value}` : null,
-)
+const logoSrc = computed(() => configuration.value?.logoUrl ?? null)
 
 async function load(): Promise<void> {
   loading.value = true
@@ -102,7 +97,6 @@ async function uploadLogo(event: Event): Promise<void> {
     configuration.value = data
     globalConfiguration.value = data
   }
-  logoVersion.value += 1
   toast.success(translate("Logo 已更新"))
 }
 
