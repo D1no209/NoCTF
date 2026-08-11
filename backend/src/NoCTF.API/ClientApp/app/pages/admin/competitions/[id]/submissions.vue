@@ -87,8 +87,11 @@ let previewGeneration = 0
 
 const differenceLabels: Record<NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol, string> = {
   CurrentCorrectShouldBeDuplicate: '当前正确结果按权威顺序应为重复',
+  CurrentDuplicateShouldBeCorrect: '当前重复结果来自旧版错误，应恢复为正确',
   DuplicateWithoutCurrentPredecessor: '当前重复结果缺少仍为正确的前序事实',
   HistoricalResultChanged: '历史裁决与当前结果不一致或曾发生变化',
+  MissingAdjudicationRecord: '当前结果缺少不可变裁决事件',
+  TeamEligibilityHistoryRequiresReview: '队伍当前资格无法证明发生时血榜资格',
   MissingBloodAward: '缺少确定应有的血榜奖励',
   UnexpectedBloodAward: '存在当前结果无法支持的血榜奖励',
   WrongBloodRank: '记录的血榜名次与权威顺序不一致',
