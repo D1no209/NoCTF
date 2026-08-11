@@ -20,14 +20,14 @@ const competitionId = route.params.id as string
 const { user, isAdministrator } = useAuth()
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
-const role = ref<CompetitionAdminRole>('observer')
+const role = ref<CompetitionAdminRole>('Observer')
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const canWrite = computed(() => role.value === 'owner' || role.value === 'manager')
-const canJudge = computed(() => role.value !== 'observer')
-const canManagePermissions = computed(() => role.value === 'owner')
-const canAnnounce = computed(() => role.value !== 'observer')
+const canWrite = computed(() => role.value === 'Owner' || role.value === 'Manager')
+const canJudge = computed(() => role.value !== 'Observer')
+const canManagePermissions = computed(() => role.value === 'Owner')
+const canAnnounce = computed(() => role.value !== 'Observer')
 
 const announcementOpen = ref(false)
 const announcementTitle = ref('')
@@ -37,10 +37,10 @@ const announcementPending = ref(false)
 const announcementError = ref<string | null>(null)
 
 const RoleLabel: Record<CompetitionAdminRole, string> = {
-  owner: '负责人',
-  manager: '管理员',
-  judge: '裁判',
-  observer: '观察员',
+  Owner: '负责人',
+  Manager: '管理员',
+  Judge: '裁判',
+  Observer: '观察员',
 }
 
 async function refresh() {
@@ -55,17 +55,11 @@ async function refresh() {
 
 async function resolveRole() {
   if (isAdministrator.value || (user.value?.userId && competition.value?.ownerId === user.value.userId)) {
-    role.value = 'owner'
+    role.value = 'Owner'
     return
   }
   const protocolRole = competition.value?.administrationRole
-  role.value = protocolRole === 'Manager'
-    ? 'manager'
-    : protocolRole === 'Judge'
-      ? 'judge'
-      : protocolRole === 'Owner'
-        ? 'owner'
-        : 'observer'
+  role.value = protocolRole ?? 'Observer'
 }
 
 async function publishAnnouncement() {

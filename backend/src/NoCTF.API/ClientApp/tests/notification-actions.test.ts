@@ -38,7 +38,7 @@ describe('competition announcement access', () => {
       new URL('../../Endpoints/Administration/Competitions/CreateCompetitionAnnouncementEndpoint.cs', import.meta.url),
     ).text()
 
-    expect(page).toContain("const canAnnounce = computed(() => role.value !== 'observer')")
+    expect(page).toContain("const canAnnounce = computed(() => role.value !== 'Observer')")
     expect(page).toContain("adminCreateCompetitionAnnouncement({")
     expect(page).toContain("('Participants')")
     expect(endpoint).toContain('authorizer.CanJudgeAsync(')
