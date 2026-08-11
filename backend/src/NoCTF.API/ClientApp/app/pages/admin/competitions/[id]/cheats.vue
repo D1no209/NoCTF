@@ -12,6 +12,7 @@ import type {
 import type { CheatIncidentResolutionRequest } from '~/composables/useCheatIncidentResolution'
 import { useCheatIncidentResolution } from '~/composables/useCheatIncidentResolution'
 import { watchCompetition } from '~/composables/useCompetitionHub'
+import { createLatestRequestGuard } from '~/lib/latest-request'
 import {
   defaultCheatIncidentQueryRange,
   resolveCheatIncidentQueryRange,
@@ -74,14 +75,23 @@ const detail = ref<NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDet
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const showFlag = ref(false)
+const detailRequests = createLatestRequestGuard()
+
+watch(detailOpen, (open) => {
+  if (open) return
+  detailRequests.invalidate()
+  detailLoading.value = false
+})
 
 async function openDetail(gameplayFactId?: string) {
   if (!gameplayFactId) return
+  const request = detailRequests.begin()
   detailOpen.value = true
   detailLoading.value = true
   detail.value = null
   showFlag.value = false
   const { data, error } = await adminGetCheatIncident({ path: { competitionId, gameplayFactId } })
+  if (!detailRequests.isCurrent(request)) return
   if (error) toast.error(parseApiError(error).message)
   else detail.value = data ?? null
   detailLoading.value = false

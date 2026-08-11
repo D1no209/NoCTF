@@ -2,6 +2,7 @@
 import { ArrowRight, Bell, Mail } from '@lucide/vue'
 import { listNotificationsEndpoint, readNotificationThreadEndpoint } from '~/api'
 import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '~/api'
+import { createLatestRequestGuard } from '~/lib/latest-request'
 
 type Notification = NoCtfapiEndpointsNotificationsNotificationResponse
 
@@ -12,6 +13,7 @@ const selected = ref<Notification | null>(null)
 const thread = ref<Notification[]>([])
 const threadLoading = ref(false)
 const threadError = ref<string | null>(null)
+const threadRequests = createLatestRequestGuard()
 
 const { items, loading, error, hasMore, initialized, loadMore } =
   useCursorPagination<Notification>(async (cursor) => {
@@ -69,13 +71,16 @@ function threadText(notification: Notification): string {
 }
 
 async function openNotification(notification: Notification, updateRoute = true): Promise<void> {
+  const request = threadRequests.begin()
   selected.value = notification
   thread.value = []
   threadError.value = null
+  threadLoading.value = false
   if (updateRoute) {
     await router.replace({
       query: { ...route.query, notification: notification.id },
     })
+    if (!threadRequests.isCurrent(request)) return
   }
 
   const rootId = notificationThreadRootId(notification)
@@ -85,21 +90,26 @@ async function openNotification(notification: Notification, updateRoute = true):
     const { data, error: requestError } = await readNotificationThreadEndpoint({
       path: { notificationId: rootId },
     })
+    if (!threadRequests.isCurrent(request)) return
     if (requestError || !data) throw requestError ?? new Error(translate("加载通知详情失败"))
     thread.value = data.items ?? []
   }
   catch (requestError) {
-    threadError.value = parseApiError(requestError, translate("加载通知详情失败")).message
+    if (threadRequests.isCurrent(request))
+      threadError.value = parseApiError(requestError, translate("加载通知详情失败")).message
   }
   finally {
-    threadLoading.value = false
+    if (threadRequests.isCurrent(request))
+      threadLoading.value = false
   }
 }
 
 async function closeDetail(): Promise<void> {
+  threadRequests.invalidate()
   selected.value = null
   thread.value = []
   threadError.value = null
+  threadLoading.value = false
   const query = { ...route.query }
   delete query.notification
   await router.replace({ query })
