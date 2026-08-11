@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Download, Radio } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { adminPlatformListLogs } from '~/api'
+import { adminPlatformExportLogs, adminPlatformListLogs } from '~/api'
 import { downloadProtectedFile } from '~/utils/download'
 import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse,
@@ -24,7 +24,7 @@ const levelOrdinal = (level?: string | number) => typeof level === 'number' ? le
 const LIVE_LIMIT = 200
 
 const minimumLevel = ref<NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol>('Information')
-const service = ref('all')
+const service = ref<'all' | NoCtfapiEndpointsAdministrationPlatformPlatformLogServiceProtocol>('all')
 const search = ref('')
 const from = ref('')
 const to = ref('')
@@ -108,14 +108,19 @@ async function exportLogs(): Promise<void> {
   }
   exporting.value = true
   try {
-    const params = new URLSearchParams({
-      minimumLevel: minimumLevel.value,
-      from: fromIso,
-      to: toIsoValue,
-    })
-    if (service.value !== 'all') params.set('service', service.value)
-    if (search.value.trim()) params.set('search', search.value.trim())
-    await downloadProtectedFile(`/api/v1/admin/platform/logs/export?${params.toString()}`, 'platform-logs.jsonl')
+    await downloadProtectedFile(
+      () => adminPlatformExportLogs({
+        query: {
+          minimumLevel: minimumLevel.value,
+          service: service.value === 'all' ? null : service.value,
+          from: fromIso,
+          to: toIsoValue,
+          search: search.value.trim() || null,
+        },
+        parseAs: 'blob',
+      }),
+      'platform-logs.jsonl',
+    )
     toast.success(translate("日志导出已开始下载"))
   }
   catch (e) {

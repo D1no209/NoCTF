@@ -2,42 +2,16 @@
 import { toast } from 'vue-sonner'
 import {
   adminCreateCompetitionDataExport,
+  adminDownloadDataExport,
+  adminExportCompetitionEvents,
   adminListCompetitionDataExports,
 } from '~/api'
 import type { NoCtfapiEndpointsAdministrationDataExportsDataExportResponse } from '~/api'
-import { getAccessToken } from '~/lib/session'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
 
 const { competitionId, canWrite } = useCompetitionAdmin()
-
-// ---- Authenticated file download helper ----
-async function downloadFile(url: string, fallbackName: string) {
-  const token = getAccessToken()
-  const response = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    credentials: 'same-origin',
-  })
-  if (!response.ok) {
-    let message = translate('下载失败（{status}）', { status: response.status })
-    try {
-      const problem = await response.json()
-      message = problem.detail ?? problem.title ?? message
-    }
-    catch { /* not json */ }
-    throw new Error(message)
-  }
-  const blob = await response.blob()
-  const disposition = response.headers.get('Content-Disposition') ?? ''
-  const match = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(disposition)
-  const name = match?.[1] ? decodeURIComponent(match[1]) : fallbackName
-  const link = document.createElement('a')
-  link.href = URL.createObjectURL(blob)
-  link.download = name
-  link.click()
-  URL.revokeObjectURL(link.href)
-}
 
 // ---- Events JSONL export ----
 const eventsFrom = ref('')
@@ -53,9 +27,12 @@ async function exportEvents() {
   }
   exportingEvents.value = true
   try {
-    const params = new URLSearchParams({ from, to })
-    await downloadFile(
-      `/api/v1/admin/competitions/${competitionId}/events/export?${params}`,
+    await downloadProtectedFile(
+      () => adminExportCompetitionEvents({
+        path: { competitionId },
+        query: { from, to },
+        parseAs: 'blob',
+      }),
       `competition-${competitionId}-events.jsonl`,
     )
     toast.success(translate("事件导出已开始下载"))
@@ -107,10 +84,17 @@ async function createExport() {
 }
 
 async function downloadExport(item: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse) {
-  if (!item.id) return
-  downloadingId.value = item.id
+  const dataExportId = item.id
+  if (!dataExportId) return
+  downloadingId.value = dataExportId
   try {
-    await downloadFile(`/api/v1/admin/data-exports/${item.id}/download`, item.fileName ?? `export-${item.id}.zip`)
+    await downloadProtectedFile(
+      () => adminDownloadDataExport({
+        path: { dataExportId },
+        parseAs: 'blob',
+      }),
+      item.fileName ?? `export-${item.id}.zip`,
+    )
   }
   catch (e) {
     toast.error(e instanceof Error ? e.message : translate("下载失败"))
