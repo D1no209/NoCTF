@@ -73,13 +73,4 @@ public interface IRunnerCapacityGate
         Guid runtimeInstanceId,
         string runnerId,
         CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Releases a capacity claim whose owner may predate the current Runner assignment.
-    /// This is only for fail-closed orphan recovery keyed by RuntimeInstanceId.
-    /// </summary>
-    Task<RunnerCapacityReleaseOutcome> ReleaseOrphanedAsync(
-        Guid runtimeInstanceId,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(RunnerCapacityReleaseOutcome.AlreadyReleased);
 }

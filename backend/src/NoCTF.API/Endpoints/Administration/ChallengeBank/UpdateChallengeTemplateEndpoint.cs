@@ -98,8 +98,7 @@ public static class ChallengeTemplateUpdateResponseMapper
             ChallengeTemplateWriteState.NotFoundOrForbidden =>
                 TypedResults.NotFound(),
             ChallengeTemplateWriteState.RevisionConflict
-                or ChallengeTemplateWriteState.ActiveCompetitionModeConflict
-                or ChallengeTemplateWriteState.RuntimeImageNotPinned =>
+                or ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
                 TypedResults.Conflict(
                     ChallengeTemplateWriteResponseMapper.ToConflict(result)),
             ChallengeTemplateWriteState.InvalidRequest

@@ -383,9 +383,7 @@ public sealed class RuntimeQuotaPersistenceTests
         var templateId = Guid.CreateVersion7();
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "registry.example/quota@sha256:"
-                + new string('a', 64)),
+            new ContainerRuntimeDefinition("registry.example/quota:v1"),
             new RuntimeResourceLimits(67_108_864, 100_000_000, 64));
         db.Challenges.Add(new Challenge
         {

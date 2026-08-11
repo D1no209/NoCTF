@@ -6,7 +6,6 @@ using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
-using NoCTF.Application.Challenges.Images;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
@@ -226,8 +225,7 @@ public sealed class AwdpFixWorkReader(
             target.CompetitionConfigurationJson,
             target.ChallengeRulesJson,
             target.ChallengeDefinitionJson);
-        if (settings.Checker is not { } checker
-            || !ChallengeImagePinningPolicy.IsPinnedImage(checker.Image))
+        if (settings.Checker is not { } checker)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
         var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
             target.Runtime.ProviderReceiptJson);

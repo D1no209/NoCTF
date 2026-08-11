@@ -102,7 +102,7 @@ async function execute(action: LifecycleAction) {
     await refresh()
   }
   catch (e) {
-    actionError.value = imagePinningErrorMessage(e) ?? parseApiError(e).message
+    actionError.value = parseApiError(e).message
   }
   finally {
     pendingAction.value = null
@@ -132,7 +132,7 @@ async function validateStart() {
     if (validationErrors.value.length === 0) toast.success(translate("启动前检查通过"))
   }
   catch (e) {
-    toast.error(imagePinningErrorMessage(e) ?? parseApiError(e).message)
+    toast.error(parseApiError(e).message)
   }
   finally {
     validating.value = false
@@ -250,7 +250,7 @@ async function restore() {
     await loadHardDeletePreview()
   }
   catch (e) {
-    toast.error(imagePinningErrorMessage(e) ?? parseApiError(e).message)
+    toast.error(parseApiError(e).message)
   }
   finally {
     restoring.value = false
@@ -331,7 +331,7 @@ async function submitDelete() {
           <Alert v-for="(ve, i) in validationErrors" :key="i" variant="destructive">
             <AlertDescription>
               <span class="font-mono text-xs">{{ ve.code }}</span>
-              · {{ startGateErrorMessage(ve) }}
+              · {{ ve.message }}
               <NuxtLink
                 v-if="ve.competitionChallengeId"
                 class="underline"

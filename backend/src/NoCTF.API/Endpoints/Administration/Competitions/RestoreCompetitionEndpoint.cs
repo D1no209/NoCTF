@@ -2,29 +2,8 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Management;
-using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 
 namespace NoCTF.API.Endpoints.Administration.Competitions;
-
-[JsonConverter(typeof(NoCTF.API.Serialization.StrictPascalCaseEnumConverter<CompetitionRestoreConflictCodeProtocol>))]
-public enum CompetitionRestoreConflictCodeProtocol
-{
-    UserNotFound,
-    RoleNotEligible,
-    ChallengeImageInvalid,
-    RegistryAuthenticationRequired,
-    RegistryAuthenticationFailed,
-    RegistryUnavailable,
-    RegistryManifestNotFound,
-    RegistryManifestInvalid,
-    ChallengeDefinitionRevisionConflict
-}
-
-public sealed record CompetitionRestoreConflictResponse(
-    [property: Required, JsonRequired] CompetitionRestoreConflictCodeProtocol Code,
-    [property: Required, JsonRequired] IReadOnlyList<Guid> UserIds,
-    string? Detail = null);
 
 public sealed class RestoreCompetitionEndpoint(
     RestoreCompetition restore,
@@ -33,7 +12,7 @@ public sealed class RestoreCompetitionEndpoint(
         Results<
             NoContent,
             NotFound,
-            Conflict<CompetitionRestoreConflictResponse>>>
+            Conflict<CompetitionResourceManagerConflictResponse>>>
 {
     public override void Configure()
     {
@@ -51,7 +30,7 @@ public sealed class RestoreCompetitionEndpoint(
         Results<
             NoContent,
             NotFound,
-            Conflict<CompetitionRestoreConflictResponse>>> ExecuteAsync(
+            Conflict<CompetitionResourceManagerConflictResponse>>> ExecuteAsync(
         CancellationToken ct)
     {
         var result = await restore.ExecuteAsync(
@@ -64,47 +43,18 @@ public sealed class RestoreCompetitionEndpoint(
         {
             CompetitionRestoreState.Restored => TypedResults.NoContent(),
             CompetitionRestoreState.NotFound => TypedResults.NotFound(),
-            CompetitionRestoreState.UserNotFound
-                or CompetitionRestoreState.RoleNotEligible
-                or CompetitionRestoreState.ChallengeImageInvalid
-                or CompetitionRestoreState.RegistryAuthenticationRequired
-                or CompetitionRestoreState.RegistryAuthenticationFailed
-                or CompetitionRestoreState.RegistryUnavailable
-                or CompetitionRestoreState.RegistryManifestNotFound
-                or CompetitionRestoreState.RegistryManifestInvalid
-                or CompetitionRestoreState.ChallengeDefinitionRevisionConflict =>
-                TypedResults.Conflict(ToConflict(result)),
+            CompetitionRestoreState.UserNotFound =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.UserNotFound,
+                        result.UserIds)),
+            CompetitionRestoreState.RoleNotEligible =>
+                TypedResults.Conflict(
+                    CompetitionResourceManagerConflictMapper.ToResponse(
+                        CompetitionResourceManagerConflictCode.RoleNotEligible,
+                        result.UserIds)),
             _ => throw new InvalidOperationException(
                 $"Unsupported competition restore state: {result.State}.")
         };
     }
-
-    private static CompetitionRestoreConflictResponse ToConflict(
-        CompetitionRestoreResult result) =>
-        new(
-            result.State switch
-            {
-                CompetitionRestoreState.UserNotFound =>
-                    CompetitionRestoreConflictCodeProtocol.UserNotFound,
-                CompetitionRestoreState.RoleNotEligible =>
-                    CompetitionRestoreConflictCodeProtocol.RoleNotEligible,
-                CompetitionRestoreState.ChallengeImageInvalid =>
-                    CompetitionRestoreConflictCodeProtocol.ChallengeImageInvalid,
-                CompetitionRestoreState.RegistryAuthenticationRequired =>
-                    CompetitionRestoreConflictCodeProtocol.RegistryAuthenticationRequired,
-                CompetitionRestoreState.RegistryAuthenticationFailed =>
-                    CompetitionRestoreConflictCodeProtocol.RegistryAuthenticationFailed,
-                CompetitionRestoreState.RegistryUnavailable =>
-                    CompetitionRestoreConflictCodeProtocol.RegistryUnavailable,
-                CompetitionRestoreState.RegistryManifestNotFound =>
-                    CompetitionRestoreConflictCodeProtocol.RegistryManifestNotFound,
-                CompetitionRestoreState.RegistryManifestInvalid =>
-                    CompetitionRestoreConflictCodeProtocol.RegistryManifestInvalid,
-                CompetitionRestoreState.ChallengeDefinitionRevisionConflict =>
-                    CompetitionRestoreConflictCodeProtocol.ChallengeDefinitionRevisionConflict,
-                _ => throw new InvalidOperationException(
-                    $"Unsupported competition restore conflict: {result.State}.")
-            },
-            result.UserIds ?? [],
-            result.Detail);
 }

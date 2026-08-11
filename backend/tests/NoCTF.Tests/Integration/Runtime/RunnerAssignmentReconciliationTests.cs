@@ -1989,8 +1989,7 @@ public sealed class RunnerAssignmentReconciliationTests
         var teamId = Guid.CreateVersion7();
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "registry.example/reconciliation@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+            new ContainerRuntimeDefinition("registry.example/reconciliation:v1"),
             new RuntimeResourceLimits(67_108_864, 100_000_000, 64));
         var definitionJson = JsonSerializer.Serialize(
             new CtfChallengeConfiguration(

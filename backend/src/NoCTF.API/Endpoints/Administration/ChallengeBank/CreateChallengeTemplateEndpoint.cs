@@ -63,7 +63,6 @@ public enum ChallengeTemplateConflictCode
     ResourceIdConflict,
     RevisionConflict,
     ActiveCompetitionModeConflict,
-    RuntimeImageNotPinned,
     OwnerIncludedInManagerSet,
     UserNotFound,
     RoleNotEligible
@@ -71,8 +70,7 @@ public enum ChallengeTemplateConflictCode
 
 public sealed record ChallengeTemplateConflictResponse(
     [property: Required, JsonRequired] ChallengeTemplateConflictCode Code,
-    [property: Required, JsonRequired] IReadOnlyList<Guid> UserIds,
-    string? Detail = null);
+    [property: Required, JsonRequired] IReadOnlyList<Guid> UserIds);
 
 internal static class ChallengeTemplateWriteResponseMapper
 {
@@ -87,8 +85,6 @@ internal static class ChallengeTemplateWriteResponseMapper
                     ChallengeTemplateConflictCode.RevisionConflict,
                 ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
                     ChallengeTemplateConflictCode.ActiveCompetitionModeConflict,
-                ChallengeTemplateWriteState.RuntimeImageNotPinned =>
-                    ChallengeTemplateConflictCode.RuntimeImageNotPinned,
                 ChallengeTemplateWriteState.OwnerIncludedInManagerSet =>
                     ChallengeTemplateConflictCode.OwnerIncludedInManagerSet,
                 ChallengeTemplateWriteState.UserNotFound =>
@@ -98,8 +94,7 @@ internal static class ChallengeTemplateWriteResponseMapper
                 _ => throw new InvalidOperationException(
                     $"Unsupported challenge template conflict state: {result.State}.")
             },
-            result.UserIds ?? [],
-            result.Detail);
+            result.UserIds ?? []);
 }
 
 public sealed class CreateChallengeTemplateValidator : Validator<CreateChallengeTemplateRequest>

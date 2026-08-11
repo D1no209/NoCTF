@@ -7,7 +7,6 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using System.Text.Json;
-using NoCTF.Application.Challenges.Images;
 
 namespace NoCTF.Infrastructure.Competitions.Lifecycle;
 
@@ -16,9 +15,7 @@ public sealed class CompetitionLifecycleStore(
     CompetitionStartGate startGate,
     ITransactionalMessageOutbox outbox,
     ICompetitionEventRecorder? eventRecorder = null,
-    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null,
-    IChallengeImagePinningStore? imagePinning = null,
-    IChallengeImageDefinitionCatalog? imageDefinitions = null)
+    NoCTF.Infrastructure.Competitions.Management.CompetitionReadModelCache? readModels = null)
     : ICompetitionLifecycleStore
 {
     private static readonly JsonSerializerOptions JsonOptions =
@@ -85,48 +82,6 @@ public sealed class CompetitionLifecycleStore(
         string? reason,
         bool automatic,
         CompetitionLifecycleEffects effects,
-        CancellationToken cancellationToken) =>
-        await TryTransitionInternalAsync(
-            competitionId,
-            from,
-            to,
-            actorId,
-            reason,
-            automatic,
-            effects,
-            expectedChallengeRevisions: null,
-            cancellationToken) == CompetitionLifecycleTransitionCommitState.Applied;
-
-    public Task<CompetitionLifecycleTransitionCommitState> TryTransitionWithChallengeFenceAsync(
-        Guid competitionId,
-        CompetitionStatus from,
-        CompetitionStatus to,
-        Guid? actorId,
-        string? reason,
-        bool automatic,
-        CompetitionLifecycleEffects effects,
-        IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
-        CancellationToken cancellationToken) =>
-        TryTransitionInternalAsync(
-            competitionId,
-            from,
-            to,
-            actorId,
-            reason,
-            automatic,
-            effects,
-            expectedChallengeRevisions,
-            cancellationToken);
-
-    private async Task<CompetitionLifecycleTransitionCommitState> TryTransitionInternalAsync(
-        Guid competitionId,
-        CompetitionStatus from,
-        CompetitionStatus to,
-        Guid? actorId,
-        string? reason,
-        bool automatic,
-        CompetitionLifecycleEffects effects,
-        IReadOnlyDictionary<Guid, int>? expectedChallengeRevisions,
         CancellationToken cancellationToken)
     {
         var ownsTransaction = db.Database.CurrentTransaction is null;
@@ -138,38 +93,10 @@ public sealed class CompetitionLifecycleStore(
         var lockedStatus = await CompetitionStateReader.ReadAsync(
             db, competitionId, cancellationToken);
         if (lockedStatus != from)
-            return CompetitionLifecycleTransitionCommitState.StateConflict;
-        if ((to is CompetitionStatus.Published or CompetitionStatus.Running)
-            && imagePinning is not null
-            && imageDefinitions is not null)
-        {
-            var templates = await imagePinning.LockCompetitionAsync(
-                competitionId,
-                cancellationToken);
-            if (expectedChallengeRevisions is not null
-                && (templates.Count != expectedChallengeRevisions.Count
-                    || templates.Any(template =>
-                        !expectedChallengeRevisions.TryGetValue(
-                            template.ChallengeId,
-                            out var expectedRevision)
-                        || template.Revision != expectedRevision)))
-            {
-                return CompetitionLifecycleTransitionCommitState
-                    .ChallengeDefinitionRevisionConflict;
-            }
-            if (templates.Any(template =>
-            {
-                var definition = imageDefinitions.Read(template.Mode, template.DefinitionJson);
-                return !definition.Succeeded
-                    || definition.Images!.Any(image =>
-                        !ContainerImageReference.TryParse(image.Image, out var parsed)
-                        || !parsed.IsDigest);
-            }))
-                return CompetitionLifecycleTransitionCommitState.StateConflict;
-        }
+            return false;
         if (from == CompetitionStatus.Published && to == CompetitionStatus.Running
             && (await startGate.ValidateAsync(competitionId, cancellationToken)) is not { Count: 0 })
-            return CompetitionLifecycleTransitionCommitState.StateConflict;
+            return false;
         var competition = await db.Competitions
             .SingleAsync(item => item.Id == competitionId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
@@ -357,7 +284,7 @@ public sealed class CompetitionLifecycleStore(
         }
         catch (DbUpdateConcurrencyException)
         {
-            return CompetitionLifecycleTransitionCommitState.StateConflict;
+            return false;
         }
         if (transaction is not null)
         {
@@ -366,7 +293,7 @@ public sealed class CompetitionLifecycleStore(
         }
         if (readModels is not null)
             await readModels.InvalidateAsync(competitionId, cancellationToken);
-        return CompetitionLifecycleTransitionCommitState.Applied;
+        return true;
     }
 
     private sealed record LifecyclePayload(

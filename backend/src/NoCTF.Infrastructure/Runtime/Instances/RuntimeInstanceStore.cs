@@ -1,7 +1,6 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Flags;
-using NoCTF.Application.Challenges.Images;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -270,8 +269,6 @@ public sealed class RuntimeInstanceStore(
     {
         var template = templates.Get(scope.Mode, scope.DefinitionJson)
             ?? throw new InvalidOperationException("The challenge does not define a runtime template.");
-        if (!ChallengeImagePinningPolicy.AreRuntimeImagesPinned(template))
-            throw new InvalidOperationException("Runtime images must be pinned to sha256 digests.");
         if (scope.Mode == GameMode.Ctf
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {

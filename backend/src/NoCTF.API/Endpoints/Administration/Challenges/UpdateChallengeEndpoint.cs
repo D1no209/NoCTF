@@ -39,19 +39,11 @@ public enum CompetitionChallengeConflictCode
     RevisionConflict,
     LifecycleStateConflict,
     ChallengeTemplateNotFound,
-    ChallengeTemplateModeMismatch,
-    RuntimeImageNotPinned,
-    InvalidImageReference,
-    RegistryAuthenticationRequired,
-    RegistryAuthenticationFailed,
-    RegistryUnavailable,
-    RegistryManifestNotFound,
-    RegistryManifestInvalid
+    ChallengeTemplateModeMismatch
 }
 
 public sealed record CompetitionChallengeConflictResponse(
-    [property: Required, JsonRequired] CompetitionChallengeConflictCode Code,
-    string? Detail = null);
+    [property: Required, JsonRequired] CompetitionChallengeConflictCode Code);
 
 internal static class CompetitionChallengeConflictMapper
 {
@@ -73,20 +65,6 @@ internal static class CompetitionChallengeConflictMapper
                 CompetitionChallengeConflictCode.ChallengeTemplateNotFound,
             ChallengeMutationFailure.TemplateModeMismatch =>
                 CompetitionChallengeConflictCode.ChallengeTemplateModeMismatch,
-            ChallengeMutationFailure.RuntimeImageNotPinned =>
-                CompetitionChallengeConflictCode.RuntimeImageNotPinned,
-            ChallengeMutationFailure.InvalidImageReference =>
-                CompetitionChallengeConflictCode.InvalidImageReference,
-            ChallengeMutationFailure.RegistryAuthenticationRequired =>
-                CompetitionChallengeConflictCode.RegistryAuthenticationRequired,
-            ChallengeMutationFailure.RegistryAuthenticationFailed =>
-                CompetitionChallengeConflictCode.RegistryAuthenticationFailed,
-            ChallengeMutationFailure.RegistryUnavailable =>
-                CompetitionChallengeConflictCode.RegistryUnavailable,
-            ChallengeMutationFailure.RegistryManifestNotFound =>
-                CompetitionChallengeConflictCode.RegistryManifestNotFound,
-            ChallengeMutationFailure.RegistryManifestInvalid =>
-                CompetitionChallengeConflictCode.RegistryManifestInvalid,
             _ => throw new InvalidOperationException(
                 $"Unsupported competition challenge conflict: {failure}.")
         });
@@ -147,20 +125,9 @@ public sealed class UpdateChallengeEndpoint(
                 or ChallengeMutationFailure.ChallengeNotFound =>
                 TypedResults.NotFound(),
             ChallengeMutationFailure.RevisionConflict
-                or ChallengeMutationFailure.ChallengeOrderConflict
-                or ChallengeMutationFailure.TemplateNotFound
-                or ChallengeMutationFailure.RuntimeImageNotPinned
-                or ChallengeMutationFailure.InvalidImageReference
-                or ChallengeMutationFailure.RegistryAuthenticationRequired
-                or ChallengeMutationFailure.RegistryAuthenticationFailed
-                or ChallengeMutationFailure.RegistryUnavailable
-                or ChallengeMutationFailure.RegistryManifestNotFound
-                or ChallengeMutationFailure.RegistryManifestInvalid =>
+                or ChallengeMutationFailure.ChallengeOrderConflict =>
                 TypedResults.Conflict(
-                    CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value) with
-                    {
-                        Detail = result.Detail
-                    }),
+                    CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
             ChallengeMutationFailure.InvalidBaseScore
                 or ChallengeMutationFailure.InvalidOrder
                 or ChallengeMutationFailure.InvalidRevision =>

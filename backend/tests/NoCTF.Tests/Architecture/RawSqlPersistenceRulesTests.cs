@@ -24,11 +24,6 @@ public sealed class RawSqlPersistenceRulesTests
     private static readonly IReadOnlyDictionary<string, HashSet<string>> ApprovedProviderSql =
         new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
         {
-            ["backend/src/NoCTF.Infrastructure/Challenges/Images/ChallengeImagePinningStore.cs"] =
-            [
-                "FromSqlInterpolated",
-                "FOR UPDATE"
-            ],
             ["backend/src/NoCTF.Infrastructure/Challenges/Questions/CompetitionQuestionStore.cs"] =
             [
                 "ExecuteSqlInterpolated",

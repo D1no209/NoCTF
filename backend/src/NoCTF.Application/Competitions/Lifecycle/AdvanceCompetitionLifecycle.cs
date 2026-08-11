@@ -1,8 +1,6 @@
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Common;
 using NoCTF.Application.Notifications;
-using NoCTF.Application.Challenges.Images;
-using Microsoft.Extensions.Logging;
 
 namespace NoCTF.Application.Competitions.Lifecycle;
 
@@ -11,13 +9,6 @@ public sealed record CompetitionLifecycleSnapshot(
     CompetitionStatus Status,
     DateTimeOffset StartTime,
     DateTimeOffset EndTime);
-
-public enum CompetitionLifecycleTransitionCommitState
-{
-    Applied,
-    StateConflict,
-    ChallengeDefinitionRevisionConflict
-}
 
 public interface ICompetitionLifecycleStore
 {
@@ -34,28 +25,6 @@ public interface ICompetitionLifecycleStore
         CompetitionLifecycleEffects effects,
         CancellationToken cancellationToken) =>
         TryTransitionAsync(competitionId, from, to, cancellationToken);
-
-    async Task<CompetitionLifecycleTransitionCommitState> TryTransitionWithChallengeFenceAsync(
-        Guid competitionId,
-        CompetitionStatus from,
-        CompetitionStatus to,
-        Guid? actorId,
-        string? reason,
-        bool automatic,
-        CompetitionLifecycleEffects effects,
-        IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
-        CancellationToken cancellationToken) =>
-        await TryTransitionWithAuditAsync(
-            competitionId,
-            from,
-            to,
-            actorId,
-            reason,
-            automatic,
-            effects,
-            cancellationToken)
-            ? CompetitionLifecycleTransitionCommitState.Applied
-            : CompetitionLifecycleTransitionCommitState.StateConflict;
 }
 
 [Flags]
@@ -72,129 +41,53 @@ public enum CompetitionTransitionFailureCode
     CompetitionStartGateFailed,
     InvalidSchedule,
     InvalidLifecycleTransition,
-    LifecycleConflict,
-    ChallengeImageInvalid,
-    RegistryAuthenticationRequired,
-    RegistryAuthenticationFailed,
-    RegistryUnavailable,
-    RegistryManifestNotFound,
-    RegistryManifestInvalid,
-    ChallengeDefinitionRevisionConflict
+    LifecycleConflict
 }
 
 /// <summary>Advances published and running competitions using wall-clock deadlines without extending pauses.</summary>
 public sealed class AdvanceCompetitionLifecycleUseCase(
     ICompetitionLifecycleStore store,
-    CompetitionStartGate? startGate = null,
-    PinChallengeImages? imagePinning = null,
-    ILogger<AdvanceCompetitionLifecycleUseCase>? logger = null,
-    TimeSpan? automaticImagePinningBudget = null)
+    CompetitionStartGate? startGate = null)
 {
-    private static readonly TimeSpan AutomaticImagePinningBudget = TimeSpan.FromSeconds(60);
-
     public async Task<IReadOnlyList<CompetitionLifecycleTransition>> ExecuteAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         var transitions = new List<CompetitionLifecycleTransition>();
-        var due = await store.GetDueAsync(now, cancellationToken);
-        foreach (var competition in due.Where(item =>
-                     (item.Status is CompetitionStatus.Published
-                         or CompetitionStatus.Running
-                         or CompetitionStatus.Paused)
-                     && now >= item.EndTime))
+        foreach (var competition in await store.GetDueAsync(now, cancellationToken))
         {
-            if (await store.TryTransitionWithAuditAsync(
-                    competition.CompetitionId,
-                    competition.Status,
-                    CompetitionStatus.Finished,
-                    null,
-                    "end_time_reached",
-                    true,
-                    EffectsFor(CompetitionStatus.Finished),
-                    cancellationToken))
-                transitions.Add(new(
-                    competition.CompetitionId,
-                    competition.Status,
-                    CompetitionStatus.Finished));
-        }
-
-        using var pinningBudget = CancellationTokenSource.CreateLinkedTokenSource(
-            cancellationToken);
-        pinningBudget.CancelAfter(
-            automaticImagePinningBudget ?? AutomaticImagePinningBudget);
-        foreach (var competition in due.Where(item =>
-                     item.Status == CompetitionStatus.Published
-                     && now >= item.StartTime
-                     && now < item.EndTime))
-        {
-            if (startGate is not null
-                && (await startGate.ValidateAsync(
-                        competition.CompetitionId,
-                        cancellationToken))?
-                    .Any(error => error.Code != StartGateFailureCode.RuntimeImageNotPinned)
-                    == true)
-                continue;
-            ChallengeImagePinResult? pinning = null;
-            if (imagePinning is not null)
+            if (competition.Status is CompetitionStatus.Published or CompetitionStatus.Running or CompetitionStatus.Paused
+                && now >= competition.EndTime)
             {
-                try
-                {
-                    pinning = await imagePinning.PinCompetitionAsync(
+                if (await store.TryTransitionWithAuditAsync(
                         competition.CompetitionId,
-                        now,
-                        pinningBudget.Token);
-                }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-                {
-                    logger?.LogWarning(
-                        "Automatic competition image pinning failed with {FailureCode} for competition {CompetitionId} challenge {ChallengeId}",
-                        ChallengeImagePinFailureCode.RegistryUnavailable,
-                        competition.CompetitionId,
-                        null);
-                    break;
-                }
-                if (!pinning.Succeeded)
-                {
-                    var error = pinning.Errors[0];
-                    logger?.LogWarning(
-                        "Automatic competition image pinning failed with {FailureCode} for competition {CompetitionId} challenge {ChallengeId}",
-                        error.Code,
-                        competition.CompetitionId,
-                        error.ChallengeId);
-                    continue;
-                }
-            }
-            if (startGate is not null
-                && (await startGate.ValidateAsync(
-                    competition.CompetitionId,
-                    cancellationToken)) is { Count: > 0 })
+                        competition.Status,
+                        CompetitionStatus.Finished,
+                        null,
+                        "end_time_reached",
+                        true,
+                        EffectsFor(CompetitionStatus.Finished),
+                        cancellationToken))
+                    transitions.Add(new(competition.CompetitionId, competition.Status, CompetitionStatus.Finished));
                 continue;
-            var committed = pinning is null
-                ? await store.TryTransitionWithAuditAsync(
-                    competition.CompetitionId,
-                    competition.Status,
-                    CompetitionStatus.Running,
-                    null,
-                    "start_time_reached",
-                    true,
-                    EffectsFor(CompetitionStatus.Running),
-                    cancellationToken)
-                        ? CompetitionLifecycleTransitionCommitState.Applied
-                        : CompetitionLifecycleTransitionCommitState.StateConflict
-                : await store.TryTransitionWithChallengeFenceAsync(
-                    competition.CompetitionId,
-                    competition.Status,
-                    CompetitionStatus.Running,
-                    null,
-                    "start_time_reached",
-                    true,
-                    EffectsFor(CompetitionStatus.Running),
-                    pinning.ChallengeRevisions!,
-                    cancellationToken);
-            if (committed == CompetitionLifecycleTransitionCommitState.Applied)
-                transitions.Add(new(
-                    competition.CompetitionId,
-                    competition.Status,
-                    CompetitionStatus.Running));
+            }
+
+            if (competition.Status == CompetitionStatus.Published && now >= competition.StartTime)
+            {
+                if (startGate is not null
+                    && (await startGate.ValidateAsync(
+                        competition.CompetitionId,
+                        cancellationToken)) is { Count: > 0 })
+                    continue;
+                if (await store.TryTransitionWithAuditAsync(
+                        competition.CompetitionId,
+                        competition.Status,
+                        CompetitionStatus.Running,
+                        null,
+                        "start_time_reached",
+                        true,
+                        EffectsFor(CompetitionStatus.Running),
+                        cancellationToken))
+                    transitions.Add(new(competition.CompetitionId, competition.Status, CompetitionStatus.Running));
+            }
         }
         return transitions;
     }
@@ -211,8 +104,7 @@ public sealed class AdvanceCompetitionLifecycleUseCase(
 public sealed class TransitionCompetitionLifecycle(
     ICompetitionLifecycleStore store,
     ICompetitionLifecycleNotificationPublisher? notifications = null,
-    CompetitionStartGate? startGate = null,
-    PinChallengeImages? imagePinning = null)
+    CompetitionStartGate? startGate = null)
 {
     public async Task<OperationResult<CompetitionTransitionFailureCode>> ExecuteAsync(
         Guid competitionId,
@@ -226,50 +118,6 @@ public sealed class TransitionCompetitionLifecycle(
             return OperationResult<CompetitionTransitionFailureCode>.Failure(
                 CompetitionTransitionFailureCode.CompetitionNotFound,
                 "Competition was not found.");
-        var validation = CompetitionLifecyclePolicy.ValidateTransition(current.Value, target);
-        if (!validation.Succeeded)
-            return OperationResult<CompetitionTransitionFailureCode>.Failure(
-                validation.FailureCode switch
-                {
-                    CompetitionLifecyclePolicy.FailureCode.InvalidSchedule => CompetitionTransitionFailureCode.InvalidSchedule,
-                    _ => CompetitionTransitionFailureCode.InvalidLifecycleTransition
-                },
-                validation.ErrorMessage!);
-        if (target == CompetitionStatus.Running
-            && current == CompetitionStatus.Published
-            && startGate is not null)
-        {
-            var preflightErrors = await startGate.ValidateAsync(
-                competitionId,
-                cancellationToken);
-            if (preflightErrors is null)
-                return OperationResult<CompetitionTransitionFailureCode>.Failure(
-                    CompetitionTransitionFailureCode.CompetitionNotFound,
-                    "Competition was not found.");
-            var blockingErrors = preflightErrors
-                .Where(error => error.Code != StartGateFailureCode.RuntimeImageNotPinned)
-                .ToArray();
-            if (blockingErrors.Length > 0)
-                return OperationResult<CompetitionTransitionFailureCode>.Failure(
-                    CompetitionTransitionFailureCode.CompetitionStartGateFailed,
-                    string.Join(" ", blockingErrors.Select(error => error.Message)));
-        }
-        ChallengeImagePinResult? pinning = null;
-        if ((target is CompetitionStatus.Published or CompetitionStatus.Running)
-            && imagePinning is not null)
-        {
-            pinning = await imagePinning.PinCompetitionAsync(
-                competitionId,
-                DateTimeOffset.UtcNow,
-                cancellationToken);
-            if (!pinning.Succeeded)
-            {
-                var error = pinning.Errors[0];
-                return OperationResult<CompetitionTransitionFailureCode>.Failure(
-                    Map(error.Code),
-                    error.Message);
-            }
-        }
         if (target == CompetitionStatus.Running
             && current == CompetitionStatus.Published
             && startGate is not null)
@@ -284,63 +132,29 @@ public sealed class TransitionCompetitionLifecycle(
                     CompetitionTransitionFailureCode.CompetitionStartGateFailed,
                     string.Join(" ", errors.Select(error => error.Message)));
         }
-        var committed = pinning is null
-            ? await store.TryTransitionWithAuditAsync(
-                competitionId,
-                current.Value,
-                target,
-                actorId,
-                reason,
-                false,
-                AdvanceCompetitionLifecycleUseCase.EffectsFor(target),
-                cancellationToken)
-                    ? CompetitionLifecycleTransitionCommitState.Applied
-                    : CompetitionLifecycleTransitionCommitState.StateConflict
-            : await store.TryTransitionWithChallengeFenceAsync(
-                competitionId,
-                current.Value,
-                target,
-                actorId,
-                reason,
-                false,
-                AdvanceCompetitionLifecycleUseCase.EffectsFor(target),
-                pinning.ChallengeRevisions!,
-                cancellationToken);
-        if (committed != CompetitionLifecycleTransitionCommitState.Applied)
+        var validation = CompetitionLifecyclePolicy.ValidateTransition(current.Value, target);
+        if (!validation.Succeeded)
             return OperationResult<CompetitionTransitionFailureCode>.Failure(
-                committed == CompetitionLifecycleTransitionCommitState.ChallengeDefinitionRevisionConflict
-                    ? CompetitionTransitionFailureCode.ChallengeDefinitionRevisionConflict
-                    : CompetitionTransitionFailureCode.LifecycleConflict,
-                committed == CompetitionLifecycleTransitionCommitState.ChallengeDefinitionRevisionConflict
-                    ? "Challenge definition changed after its images were resolved."
-                    : "Competition status changed concurrently.");
+                validation.FailureCode switch
+                {
+                    CompetitionLifecyclePolicy.FailureCode.InvalidSchedule => CompetitionTransitionFailureCode.InvalidSchedule,
+                    _ => CompetitionTransitionFailureCode.InvalidLifecycleTransition
+                },
+                validation.ErrorMessage!);
+        if (!await store.TryTransitionWithAuditAsync(
+                competitionId,
+                current.Value,
+                target,
+                actorId,
+                reason,
+                false,
+                AdvanceCompetitionLifecycleUseCase.EffectsFor(target),
+                cancellationToken))
+            return OperationResult<CompetitionTransitionFailureCode>.Failure(
+                CompetitionTransitionFailureCode.LifecycleConflict,
+                "Competition status changed concurrently.");
         if (notifications is not null)
             await notifications.PublishAsync(competitionId, current.Value, target, DateTimeOffset.UtcNow, cancellationToken);
         return OperationResult<CompetitionTransitionFailureCode>.Success();
     }
-
-    private static CompetitionTransitionFailureCode Map(
-        ChallengeImagePinFailureCode failure) =>
-        failure switch
-        {
-            ChallengeImagePinFailureCode.CompetitionNotFound =>
-                CompetitionTransitionFailureCode.CompetitionNotFound,
-            ChallengeImagePinFailureCode.InvalidDefinition
-                or ChallengeImagePinFailureCode.InvalidImageReference
-                or ChallengeImagePinFailureCode.ChallengeNotFound =>
-                CompetitionTransitionFailureCode.ChallengeImageInvalid,
-            ChallengeImagePinFailureCode.RegistryAuthenticationRequired =>
-                CompetitionTransitionFailureCode.RegistryAuthenticationRequired,
-            ChallengeImagePinFailureCode.RegistryAuthenticationFailed =>
-                CompetitionTransitionFailureCode.RegistryAuthenticationFailed,
-            ChallengeImagePinFailureCode.RegistryUnavailable =>
-                CompetitionTransitionFailureCode.RegistryUnavailable,
-            ChallengeImagePinFailureCode.RegistryManifestNotFound =>
-                CompetitionTransitionFailureCode.RegistryManifestNotFound,
-            ChallengeImagePinFailureCode.RegistryManifestInvalid =>
-                CompetitionTransitionFailureCode.RegistryManifestInvalid,
-            ChallengeImagePinFailureCode.RevisionConflict =>
-                CompetitionTransitionFailureCode.ChallengeDefinitionRevisionConflict,
-            _ => CompetitionTransitionFailureCode.ChallengeImageInvalid
-        };
 }
