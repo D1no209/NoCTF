@@ -51,7 +51,7 @@ export default defineNuxtPlugin(() => {
     // 空响应体(如登录 401)或网络错误:合成带状态码的 problem 形状,
     // parseApiError 会读出其中的 detail 与 status。
     const status = response?.ok === false ? response.status : undefined
-    const url = response?.url ?? request?.url
-    return { status, detail: statusErrorMessage(status, url) }
+    const authenticatedRequest = request?.headers.has('Authorization') ?? false
+    return { status, detail: statusErrorMessage(status, authenticatedRequest) }
   })
 })

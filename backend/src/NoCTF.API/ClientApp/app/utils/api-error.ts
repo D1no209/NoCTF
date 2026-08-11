@@ -45,11 +45,11 @@ export function parseApiError(error: unknown, fallback = translate("请求失败
 }
 
 /** 无 problem+json 响应体时,按 HTTP 状态码给出有意义的提示。 */
-export function statusErrorMessage(status: number | undefined, url?: string): string {
+export function statusErrorMessage(status: number | undefined, authenticatedRequest = false): string {
   switch (status) {
     case 400: return translate("请求参数有误,请检查输入")
     case 401:
-      return url?.includes('/auth/login') ? translate("用户名或密码错误") : translate("登录状态已失效,请重新登录")
+      return authenticatedRequest ? translate("登录状态已失效,请重新登录") : translate("用户名或密码错误")
     case 403: return translate("没有权限执行此操作")
     case 404: return translate("请求的资源不存在")
     case 409: return translate("数据已被他人修改,请刷新后重试")
