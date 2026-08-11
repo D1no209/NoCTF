@@ -67,6 +67,8 @@ services:
       dockerfile: backend/Dockerfile
       target: host
     restart: unless-stopped
+    labels:
+      noctf.io/internal-role: scoring-callback-gateway
     environment:
       ASPNETCORE_URLS: http://+:8080
       Hosting__Roles__0: Api
@@ -96,6 +98,7 @@ services:
       Runtime__Docker__Endpoint: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       Runtime__Docker__Network: noctf-network
       Runtime__Docker__PublicHost: ${DOCKER_PUBLISHED_HOST:-host.docker.internal}
+      Runtime__Docker__CallbackContainerLabelValue: scoring-callback-gateway
       Database__AutoMigrate: "false"
       SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}

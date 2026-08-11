@@ -296,4 +296,13 @@ AWD Checker 不建立 Operation 表。Checker 与目标加入同一内部网络�
 5. 只有 `Up`/`Down` 的变化产生服务计分事实，`Unknown`、`CheckerAbnormalExit`、`CheckerTimedOut` 是诊断状态；
 6. Paused 停止调度且不补跑，Resume 立即安排一次。Finished 后不再安排。
 
+官方 Docker 清单直接把承载 API role 的容器作为 callback identity：Runner 按
+`noctf.io/internal-role=scoring-callback-gateway` 角色标签发现当前运行的 API 容器，再把这些容器以
+callback URL 主机名别名接入每次检查独立的 internal network。Checker 不接入平台 `noctf-network`，
+API 容器也不接入
+题目 Runtime 网络。官方 Kubernetes 清单使用完整 Service FQDN
+`backend-service.noctf.svc.<clusterDomain>`；每次 Checker 的 egress policy 同时精确匹配平台
+Namespace selector 与 API Pod selector，并只开放 callback URL 的 TCP 端口。平台 Namespace 的 ingress
+policy 反向只接受 Runtime Namespace 中 `awd-checker` / `awdp-checker` purpose 的 Pod。
+
 Runtime/Checker 定义更新不热改存量 Runtime；下一次 Start/Reset 使用 Challenge 最新定义。RuntimeInstance 不保存 Challenge 定义版本，也不自动升级。

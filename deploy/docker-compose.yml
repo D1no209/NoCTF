@@ -58,6 +58,8 @@ services:
         HTTPS_PROXY: ${HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
     restart: unless-stopped
+    labels:
+      noctf.io/internal-role: scoring-callback-gateway
     environment:
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__PostgreSql: >-
@@ -230,6 +232,7 @@ services:
       RunnerScoring__Issuer: ${RUNNER_SCORING_ISSUER:-NoCTF.Runner}
       RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}
       RunnerScoring__CallbackBaseUrl: http://backend:8080
+      Runtime__Docker__CallbackContainerLabelValue: scoring-callback-gateway
       Runtime__Docker__Endpoint: ${DOCKER_HOST:-unix:///var/run/docker.sock}
       Runtime__Docker__Network: noctf-network
       Runtime__Docker__PublicHost: ${DOCKER_PUBLISHED_HOST:-host.docker.internal}

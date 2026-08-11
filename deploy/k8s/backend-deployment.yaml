@@ -15,6 +15,7 @@ spec:
     metadata:
       labels:
         app: backend
+        noctf.io/internal-role: scoring-callback-gateway
     spec:
       automountServiceAccountToken: false
       securityContext:

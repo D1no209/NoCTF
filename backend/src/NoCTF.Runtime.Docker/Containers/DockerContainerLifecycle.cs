@@ -663,15 +663,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             throw new InvalidOperationException(
                 "A scoring checker callback requires an absolute HTTP(S) callback URL.");
         }
-        var callbackContainer = await client.Containers.InspectContainerAsync(
-            options.CallbackContainerName, cancellationToken);
-        if (callbackContainer.Config?.Labels is null
-            || !callbackContainer.Config.Labels.TryGetValue(
-                options.CallbackContainerLabelKey, out var callbackRole)
-            || !string.Equals(
-                callbackRole, options.CallbackContainerLabelValue, StringComparison.Ordinal))
-            throw new InvalidOperationException(
-                "The configured callback container does not carry the required role label.");
+        var callbackContainers = await ResolveInternalCallbackContainersAsync(cancellationToken);
 
         var networkName = CallbackNetworkName(request.OperationId);
         var network = await FindNetworkAsync(networkName, cancellationToken);
@@ -703,11 +695,13 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 request.Generation)))
             throw new InvalidOperationException("The checker callback network is not an internal managed network.");
 
-        if (network.Containers?.ContainsKey(callbackContainer.ID) != true)
+        foreach (var callbackContainerId in callbackContainers)
         {
+            if (network.Containers?.ContainsKey(callbackContainerId) == true)
+                continue;
             await client.Networks.ConnectNetworkAsync(network.ID, new NetworkConnectParameters
             {
-                Container = callbackContainer.ID,
+                Container = callbackContainerId,
                 EndpointConfig = new EndpointSettings
                 {
                     Aliases = callback is null ? [] : [callback.Host]
@@ -727,6 +721,57 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 }
             },
             cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<string>> ResolveInternalCallbackContainersAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(options.CallbackContainerName))
+        {
+            var configured = await client.Containers.InspectContainerAsync(
+                options.CallbackContainerName,
+                cancellationToken);
+            EnsureInternalCallbackRole(configured.ID, configured.Config?.Labels);
+            return [configured.ID];
+        }
+
+        var candidates = await client.Containers.ListContainersAsync(
+            new ContainersListParameters
+            {
+                Filters = new Dictionary<string, IDictionary<string, bool>>
+                {
+                    ["label"] = new Dictionary<string, bool>
+                    {
+                        [$"{options.CallbackContainerLabelKey}={options.CallbackContainerLabelValue}"] =
+                            true
+                    }
+                }
+            },
+            cancellationToken);
+        if (candidates.Count == 0)
+            throw new InvalidOperationException(
+                "No running callback container carries the required role label.");
+        foreach (var candidate in candidates)
+            EnsureInternalCallbackRole(candidate.ID, candidate.Labels);
+        return candidates
+            .Select(candidate => candidate.ID)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private void EnsureInternalCallbackRole(
+        string containerId,
+        IDictionary<string, string>? labels)
+    {
+        if (string.IsNullOrWhiteSpace(containerId)
+            || labels is null
+            || !labels.TryGetValue(options.CallbackContainerLabelKey, out var callbackRole)
+            || !string.Equals(
+                callbackRole,
+                options.CallbackContainerLabelValue,
+                StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "The configured callback container does not carry the required role label.");
     }
 
     private async Task DeleteCallbackNetworkAsync(

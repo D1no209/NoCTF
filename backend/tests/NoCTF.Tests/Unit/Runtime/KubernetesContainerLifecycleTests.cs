@@ -83,9 +83,16 @@ public sealed class KubernetesContainerLifecycleTests
             peer.PodSelector?.MatchLabels?.ContainsKey("noctf.io/internal-role") == true));
         await Assert.That(callback.To.Single().PodSelector!.MatchLabels!["noctf.io/internal-role"])
             .IsEqualTo("awdp-callback");
+        await Assert.That(callback.To.Single().NamespaceSelector!.MatchLabels![
+                "kubernetes.io/metadata.name"])
+            .IsEqualTo("noctf");
         await Assert.That(callback.Ports).Count().IsEqualTo(1);
         await Assert.That(callback.Ports.Single().Port.Value).IsEqualTo("8443");
-        var dns = egress.Single(rule => rule.To.Any(peer => peer.NamespaceSelector is not null));
+        var dns = egress.Single(rule => rule.To.Any(peer =>
+            peer.NamespaceSelector?.MatchLabels?.TryGetValue(
+                "kubernetes.io/metadata.name",
+                out var namespaceName) == true
+            && namespaceName == "kube-system"));
         await Assert.That(dns.Ports.Select(port => $"{port.Protocol}:{port.Port.Value}"))
             .IsEquivalentTo(["UDP:53", "TCP:53"]);
     }
@@ -159,7 +166,8 @@ public sealed class KubernetesContainerLifecycleTests
     [Test]
     [Arguments(CallbackPolicyDrift.EndPort)]
     [Arguments(CallbackPolicyDrift.MatchExpression)]
-    public async Task Callback_policy_replay_rejects_selector_or_port_range_drift(
+    [Arguments(CallbackPolicyDrift.CallbackNamespace)]
+    public async Task Callback_policy_replay_rejects_identity_or_port_range_drift(
         CallbackPolicyDrift drift)
     {
         var (client, _, networking) = CreateClient();
@@ -177,6 +185,12 @@ public sealed class KubernetesContainerLifecycleTests
                     OperatorProperty = "DoesNotExist"
                 }
             ];
+        }
+        if (drift == CallbackPolicyDrift.CallbackNamespace)
+        {
+            policy.Spec.Egress.Single(rule => rule.Ports.Count == 1)
+                .To.Single().NamespaceSelector!.MatchLabels!["kubernetes.io/metadata.name"] =
+                "other";
         }
         networking.ReadNamespacedNetworkPolicyWithHttpMessagesAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
@@ -1167,6 +1181,13 @@ public sealed class KubernetesContainerLifecycleTests
                         [
                             new V1NetworkPolicyPeer
                             {
+                                NamespaceSelector = new V1LabelSelector
+                                {
+                                    MatchLabels = new Dictionary<string, string>
+                                    {
+                                        ["kubernetes.io/metadata.name"] = "noctf"
+                                    }
+                                },
                                 PodSelector = new V1LabelSelector
                                 {
                                     MatchLabels = new Dictionary<string, string>
@@ -1230,7 +1251,8 @@ public sealed class KubernetesContainerLifecycleTests
     public enum CallbackPolicyDrift
     {
         EndPort,
-        MatchExpression
+        MatchExpression,
+        CallbackNamespace
     }
 
     private static ContainerRequest CheckerRequest() => new(

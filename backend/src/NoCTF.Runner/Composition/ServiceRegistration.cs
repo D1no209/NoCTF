@@ -111,9 +111,9 @@ public static class ServiceRegistration
             configuration["Runtime:Docker:Endpoint"] ?? "npipe://./pipe/docker_engine",
             configuration["Runtime:Docker:Network"] ?? "noctf",
             configuration["Runtime:Docker:PublicHost"] ?? "localhost",
-            configuration["Runtime:Docker:CallbackContainer"] ?? "noctf-awdp-callback",
+            configuration["Runtime:Docker:CallbackContainer"] ?? string.Empty,
             configuration["Runtime:Docker:CallbackContainerLabelKey"] ?? "noctf.io/internal-role",
-            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "awdp-callback-gateway",
+            configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "scoring-callback-gateway",
             ReadPositiveLongOrDefault(
                 configuration,
                 "Runtime:Docker:RuntimeLogMaxSizeBytes",
@@ -160,7 +160,17 @@ public static class ServiceRegistration
                     configuration.GetSection("Runtime:Kubernetes:ProtectedCidrs")
                         .GetChildren()
                         .Select(section => section.Value ?? string.Empty))
-                : null));
+                : null,
+            isKubernetesPool
+                ? ReadRequiredString(
+                    configuration,
+                    "Runtime:Kubernetes:CallbackNamespaceLabelKey")
+                : "kubernetes.io/metadata.name",
+            isKubernetesPool
+                ? ReadRequiredString(
+                    configuration,
+                    "Runtime:Kubernetes:CallbackNamespaceLabelValue")
+                : "noctf"));
         services.AddSingleton<IKubernetes>(_ =>
             new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig()));
         if (isKubernetesPool)
