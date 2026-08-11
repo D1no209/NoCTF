@@ -80,11 +80,11 @@ async function submit() {
             </Field>
             <Field>
               <FieldLabel for="password">{{ $t('密码') }}</FieldLabel>
-              <Input id="password" v-model="password" type="password" autocomplete="new-password" required />
+              <PasswordInput id="password" v-model="password" autocomplete="new-password" required />
             </Field>
             <Field>
               <FieldLabel for="confirmPassword">{{ $t('确认密码') }}</FieldLabel>
-              <Input id="confirmPassword" v-model="confirmPassword" type="password" autocomplete="new-password" required />
+              <PasswordInput id="confirmPassword" v-model="confirmPassword" autocomplete="new-password" required />
             </Field>
             <Field>
               <Button type="submit" :disabled="pending" class="w-full">
