@@ -61,7 +61,7 @@ async function submit() {
             </Field>
             <Field>
               <FieldLabel for="password">{{ $t('密码') }}</FieldLabel>
-              <Input id="password" v-model="password" type="password" autocomplete="current-password" required />
+              <PasswordInput id="password" v-model="password" autocomplete="current-password" required />
               <FieldDescription>
                 <NuxtLink to="/auth/password-reset" class="underline">{{ $t('忘记密码?') }}</NuxtLink>
               </FieldDescription>

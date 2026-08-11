@@ -1089,6 +1089,7 @@ export const englishMessages: Record<string, string> = {
   "以非 root 用户运行": "Run as non-root user",
   "异常类型": "Exception type",
   "隐藏": "hide",
+  "隐藏密码": "Hide password",
   "应用筛选": "Apply filters",
   "用户": "User",
   "用户 ID": "User ID",
@@ -1480,5 +1481,6 @@ export const englishMessages: Record<string, string> = {
   "平台": "Platform",
   "加载环境状态失败": "Failed to load the environment status",
   "重试": "Retry",
-  "运维": "Maintenance"
+  "运维": "Maintenance",
+  "显示密码": "Show password"
 }

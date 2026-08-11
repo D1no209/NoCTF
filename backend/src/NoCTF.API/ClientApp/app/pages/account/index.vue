@@ -183,15 +183,15 @@ async function changePassword() {
               <FieldGroup>
                 <Field>
                   <FieldLabel for="currentPassword">{{ $t('当前密码') }}</FieldLabel>
-                  <Input id="currentPassword" v-model="currentPassword" type="password" autocomplete="current-password" required />
+                  <PasswordInput id="currentPassword" v-model="currentPassword" autocomplete="current-password" required />
                 </Field>
                 <Field>
                   <FieldLabel for="newPassword">{{ $t('新密码') }}</FieldLabel>
-                  <Input id="newPassword" v-model="newPassword" type="password" autocomplete="new-password" required />
+                  <PasswordInput id="newPassword" v-model="newPassword" autocomplete="new-password" required />
                 </Field>
                 <Field>
                   <FieldLabel for="confirmNewPassword">{{ $t('确认新密码') }}</FieldLabel>
-                  <Input id="confirmNewPassword" v-model="confirmNewPassword" type="password" autocomplete="new-password" required />
+                  <PasswordInput id="confirmNewPassword" v-model="confirmNewPassword" autocomplete="new-password" required />
                 </Field>
               </FieldGroup>
             </form>

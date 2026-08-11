@@ -85,11 +85,11 @@ async function completeReset() {
             </Alert>
             <Field>
               <FieldLabel for="newPassword">{{ $t('新密码') }}</FieldLabel>
-              <Input id="newPassword" v-model="newPassword" type="password" autocomplete="new-password" required />
+              <PasswordInput id="newPassword" v-model="newPassword" autocomplete="new-password" required />
             </Field>
             <Field>
               <FieldLabel for="confirmPassword">{{ $t('确认新密码') }}</FieldLabel>
-              <Input id="confirmPassword" v-model="confirmPassword" type="password" autocomplete="new-password" required />
+              <PasswordInput id="confirmPassword" v-model="confirmPassword" autocomplete="new-password" required />
             </Field>
             <Field>
               <Button type="submit" :disabled="pending" class="w-full">

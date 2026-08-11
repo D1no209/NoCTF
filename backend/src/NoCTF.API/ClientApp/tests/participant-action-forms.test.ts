@@ -57,4 +57,22 @@ describe('participant action page wiring', () => {
 
     expect(page).toContain("alias: ['/reset-password']")
   })
+
+  test('offers an accessible password visibility toggle on every password form', async () => {
+    const component = await Bun.file(
+      new URL('../app/components/PasswordInput.vue', import.meta.url),
+    ).text()
+    const pages = await Promise.all([
+      '../app/pages/auth/login.vue',
+      '../app/pages/auth/register.vue',
+      '../app/pages/auth/password-reset.vue',
+      '../app/pages/account/index.vue',
+    ].map(path => Bun.file(new URL(path, import.meta.url)).text()))
+
+    expect(component).toContain(":type=\"visible ? 'text' : 'password'\"")
+    expect(component).toContain(":aria-label=\"$t(visible ? '隐藏密码' : '显示密码')\"")
+    expect(component).toContain(':aria-pressed="visible"')
+    expect(pages.every(page => page.includes('<PasswordInput'))).toBe(true)
+    expect(pages.some(page => page.includes('type="password"'))).toBe(false)
+  })
 })
