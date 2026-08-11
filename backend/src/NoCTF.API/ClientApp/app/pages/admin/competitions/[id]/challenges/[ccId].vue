@@ -124,6 +124,7 @@ async function saveConfig(json: string) {
 // ---- Flags ----
 const flags = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse[]>([])
 const flagsLoading = ref(true)
+const flagsLoadError = ref<string | null>(null)
 const includeDeletedFlags = ref(false)
 const flagDialogOpen = ref(false)
 const editingFlag = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse | null>(null)
@@ -138,7 +139,13 @@ async function loadFlags() {
     path: { competitionId, competitionChallengeId: ccId },
     query: { includeDeleted: includeDeletedFlags.value },
   })
-  if (!error) flags.value = data?.items ?? []
+  if (error || !data) {
+    flagsLoadError.value = parseApiError(error).message
+  }
+  else {
+    flagsLoadError.value = null
+    flags.value = data.items ?? []
+  }
   flagsLoading.value = false
 }
 watch(includeDeletedFlags, loadFlags)
@@ -233,6 +240,7 @@ async function restoreFlag(f: NoCtfapiEndpointsAdministrationChallengeBankChalle
 // ---- Hints ----
 const hints = ref<NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse[]>([])
 const hintsLoading = ref(true)
+const hintsLoadError = ref<string | null>(null)
 const includeDeletedHints = ref(false)
 const hintDialogOpen = ref(false)
 const editingHint = ref<NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse | null>(null)
@@ -247,7 +255,13 @@ async function loadHints() {
     path: { competitionId, competitionChallengeId: ccId },
     query: { includeDeleted: includeDeletedHints.value },
   })
-  if (!error) hints.value = data?.items ?? []
+  if (error || !data) {
+    hintsLoadError.value = parseApiError(error).message
+  }
+  else {
+    hintsLoadError.value = null
+    hints.value = data.items ?? []
+  }
   hintsLoading.value = false
 }
 watch(includeDeletedHints, loadHints)
@@ -430,13 +444,16 @@ onMounted(() => {
               <Button v-if="canWrite" size="sm" @click="openFlagDialog()">
                 <Plus data-icon="inline-start" /> {{ $t('添加 Flag') }} </Button>
             </div>
+            <Alert v-if="flagsLoadError" variant="destructive">
+              <AlertDescription>{{ flagsLoadError }}</AlertDescription>
+            </Alert>
             <Skeleton v-if="flagsLoading" class="h-32 w-full" />
-            <Empty v-else-if="flags.length === 0" class="border border-dashed py-12">
+            <Empty v-else-if="!flagsLoadError && flags.length === 0" class="border border-dashed py-12">
               <EmptyHeader>
                 <EmptyTitle>{{ $t('暂无 Flag') }}</EmptyTitle>
               </EmptyHeader>
             </Empty>
-            <Table v-else>
+            <Table v-else-if="flags.length > 0">
               <TableHeader>
                 <TableRow>
                   <TableHead>Flag</TableHead>
@@ -489,13 +506,16 @@ onMounted(() => {
               <Button v-if="canWrite" size="sm" @click="openHintDialog()">
                 <Plus data-icon="inline-start" /> {{ $t('添加提示') }} </Button>
             </div>
+            <Alert v-if="hintsLoadError" variant="destructive">
+              <AlertDescription>{{ hintsLoadError }}</AlertDescription>
+            </Alert>
             <Skeleton v-if="hintsLoading" class="h-32 w-full" />
-            <Empty v-else-if="hints.length === 0" class="border border-dashed py-12">
+            <Empty v-else-if="!hintsLoadError && hints.length === 0" class="border border-dashed py-12">
               <EmptyHeader>
                 <EmptyTitle>{{ $t('暂无提示') }}</EmptyTitle>
               </EmptyHeader>
             </Empty>
-            <Table v-else>
+            <Table v-else-if="hints.length > 0">
               <TableHeader>
                 <TableRow>
                   <TableHead>{{ $t('内容') }}</TableHead>

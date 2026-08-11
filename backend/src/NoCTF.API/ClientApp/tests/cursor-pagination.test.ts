@@ -75,4 +75,44 @@ describe('cursor pagination request generations', () => {
     expect(calls).toBe(1)
     expect(pagination.items.value).toEqual(['only'])
   })
+
+  test('keeps the last successful page visible when a later request fails', async () => {
+    let calls = 0
+    const pagination = useCursorPagination<string>(async () => {
+      calls += 1
+      if (calls === 1) return { items: ['kept'], nextCursor: 'next' }
+      throw new Error('next page failed')
+    })
+
+    await pagination.loadMore()
+    await pagination.loadMore()
+
+    expect(pagination.items.value).toEqual(['kept'])
+    expect(pagination.nextCursor.value).toBe('next')
+    expect(pagination.initialized.value).toBeTrue()
+    expect(pagination.error.value).not.toBeNull()
+  })
+
+  test('preserves the prior result across a failed filtered reload and replaces it on success', async () => {
+    let phase: 'initial' | 'failure' | 'success' = 'initial'
+    const pagination = useCursorPagination<string>(async () => {
+      if (phase === 'initial') return { items: ['old'], nextCursor: null }
+      if (phase === 'failure') throw new Error('reload failed')
+      return { items: ['new'], nextCursor: null }
+    })
+
+    await pagination.loadMore()
+    phase = 'failure'
+    pagination.reset({ preserveItems: true })
+    await pagination.loadMore()
+
+    expect(pagination.items.value).toEqual(['old'])
+    expect(pagination.error.value).not.toBeNull()
+
+    phase = 'success'
+    await pagination.loadMore()
+
+    expect(pagination.items.value).toEqual(['new'])
+    expect(pagination.error.value).toBeNull()
+  })
 })

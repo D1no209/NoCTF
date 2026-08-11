@@ -46,7 +46,7 @@ const filterTeam = ref('')
 const filterState = ref('')
 const filterKind = ref('')
 
-const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagination<
+const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
   NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse
 >(async (cursor) => {
   const { data, error } = await adminListRuntimes({
@@ -60,17 +60,17 @@ const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagin
       limit: 30,
     },
   })
-  if (error) throw error
-  return data ?? {}
+  if (error || !data) throw parseApiError(error)
+  return data
 })
 
 function applyFilters() {
-  reset()
+  reset({ preserveItems: true })
   void loadMore()
 }
 
 function refreshList() {
-  reset()
+  reset({ preserveItems: true })
   void loadMore()
 }
 
@@ -308,13 +308,17 @@ onMounted(() => {
       <AlertDescription>{{ opMessage }}</AlertDescription>
     </Alert>
 
+    <Alert v-if="listError" variant="destructive">
+      <AlertDescription>{{ listError.message }}</AlertDescription>
+    </Alert>
+
     <Skeleton v-if="loading && !initialized" class="h-48 w-full" />
-    <Empty v-else-if="initialized && items.length === 0" class="border border-dashed py-12">
+    <Empty v-else-if="!listError && initialized && items.length === 0" class="border border-dashed py-12">
       <EmptyHeader>
         <EmptyTitle>{{ $t('没有符合条件的运行时实例') }}</EmptyTitle>
       </EmptyHeader>
     </Empty>
-    <template v-else>
+    <template v-else-if="items.length > 0">
       <Table>
         <TableHeader>
           <TableRow>

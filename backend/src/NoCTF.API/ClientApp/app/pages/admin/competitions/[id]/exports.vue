@@ -48,6 +48,7 @@ async function exportEvents() {
 // ---- Data exports ----
 const exports_ = ref<NoCtfapiEndpointsAdministrationDataExportsDataExportResponse[]>([])
 const loadingExports = ref(true)
+const exportsError = ref<string | null>(null)
 const includeProtectedFlags = ref(false)
 const exportReason = ref('')
 const creating = ref(false)
@@ -56,7 +57,13 @@ const downloadingId = ref<string | null>(null)
 async function loadExports() {
   loadingExports.value = true
   const { data, error } = await adminListCompetitionDataExports({ path: { competitionId } })
-  if (!error) exports_.value = data?.items ?? []
+  if (error || !data) {
+    exportsError.value = parseApiError(error).message
+  }
+  else {
+    exportsError.value = null
+    exports_.value = data.items ?? []
+  }
   loadingExports.value = false
 }
 
@@ -154,16 +161,19 @@ onMounted(loadExports)
           <Button variant="ghost" size="sm" @click="loadExports">
             <Spinner v-if="loadingExports" data-icon="inline-start" /> {{ $t('刷新') }} </Button>
         </div>
+        <Alert v-if="exportsError" variant="destructive">
+          <AlertDescription>{{ exportsError }}</AlertDescription>
+        </Alert>
         <Alert v-if="hasActive">
           <AlertDescription>{{ $t('有导出任务正在处理中,可稍后刷新查看进度') }}</AlertDescription>
         </Alert>
         <Skeleton v-if="loadingExports && exports_.length === 0" class="h-32 w-full" />
-        <Empty v-else-if="exports_.length === 0" class="border border-dashed py-12">
+        <Empty v-else-if="!exportsError && exports_.length === 0" class="border border-dashed py-12">
           <EmptyHeader>
             <EmptyTitle>{{ $t('暂无导出任务') }}</EmptyTitle>
           </EmptyHeader>
         </Empty>
-        <Table v-else>
+        <Table v-else-if="exports_.length > 0">
           <TableHeader>
             <TableRow>
               <TableHead class="w-44">{{ $t('创建时间') }}</TableHead>
