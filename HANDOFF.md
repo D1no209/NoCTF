@@ -9,6 +9,25 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：Runtime 日志、就绪探针与 Kubernetes 身份隔离
+
+- 功能提交 `fd17a3ca` 为平台创建的 Docker Container 与 Compose 服务统一注入 `local` 日志驱动，
+  默认每容器轮转 `10 MiB × 3`；一次性 Checker/Fix 任务的 stdout、stderr 分别最多保留 1 MiB，超出内容
+  仍会持续读取以避免阻塞，但不会无界驻留内存。限制可以通过现有 Runtime 配置覆盖，日志正文不会写入
+  平台诊断日志。
+- 功能提交 `7c13ff69` 将进程存活与角色就绪分开：`/health/live` 只检查进程，`/health/ready` 使用 2 秒
+  有界检查验证对应角色的 PostgreSQL、Wolverine、Redis 和实际 Runtime Provider。API 的 Redis 故障按
+  降级报告；Worker 新增独立健康端口；Docker Compose 与 Kubernetes 清单已全部改用正确探针。
+- 功能提交 `d6247e02` 让 Kubernetes 单容器 Runtime 与 Compose Runtime 保持相同身份隔离，显式设置
+  `automountServiceAccountToken=false` 和 `enableServiceLinks=false`，题目容器不再默认取得集群 API
+  凭据或平台服务环境变量。
+- 本阶段没有 HTTP/OpenAPI、生成 TypeScript SDK、业务数据模型、数据表、migration、snapshot 或版本号
+  变化；没有改变仍待 grilling 的回调网关、DenyAll、镜像 digest、非 root、SMTP、PID 或端口语义。
+- 验证通过：完整 Backend Release build 0 警告/0 错误；定向单元/架构测试 58/58；真实 Docker 测试
+  3/3（输出截断、镜像拉取、日志限制、Compose 与资源清理）；Kubernetes Container 生命周期 24/24；
+  两份 Docker Compose 清单解析和 `git diff --check` 通过。
+- 尚未推送、部署或操作生产数据。
+
 ## 2026-08-11 全量审计修复：前端故障态与浏览器存储韧性
 
 - 功能提交 `6714e5eb` 新增浏览器存储安全适配层；`localStorage` 对象访问、读取或写入抛出异常时，
