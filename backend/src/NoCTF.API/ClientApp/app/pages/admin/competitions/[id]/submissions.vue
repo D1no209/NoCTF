@@ -23,6 +23,33 @@ definePageMeta({ middleware: 'auth' })
 
 const { competitionId, canWrite } = useCompetitionAdmin()
 
+interface FilterOption<T extends string> {
+  value: T
+  label: string
+}
+
+const gameplayFactKindOptions = [
+  { value: 'FlagAttempt', label: 'Flag' },
+  { value: 'BreakAttempt', label: 'Break' },
+  { value: 'FixAttempt', label: 'Fix' },
+] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol>[]
+
+const gameplayFactStateOptions = [
+  { value: 'Pending', label: '待处理' },
+  { value: 'Queued', label: '排队中' },
+  { value: 'Processing', label: '评测中' },
+  { value: 'Completed', label: '已完成' },
+  { value: 'PlatformFailed', label: '平台失败' },
+] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol>[]
+
+const gameplayFactResultOptions = [
+  { value: 'Correct', label: '正确' },
+  { value: 'Wrong', label: '错误' },
+  { value: 'Duplicate', label: '重复' },
+  { value: 'AttemptsExhausted', label: '次数耗尽' },
+  { value: 'Rejected', label: '已拒绝' },
+] satisfies FilterOption<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol>[]
+
 // ---- Reference data for filters ----
 const challengeOptions = ref<{ id: string; title: string }[]>([])
 const teamOptions = ref<{ id: string; name: string }[]>([])
@@ -42,9 +69,9 @@ async function loadRefs() {
 // ---- Filters + paged list ----
 const filterChallenge = ref('')
 const filterTeam = ref('')
-const filterKind = ref('')
-const filterState = ref('')
-const filterResult = ref('')
+const filterKind = ref<NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol | ''>('')
+const filterState = ref<NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | ''>('')
+const filterResult = ref<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | ''>('')
 const filterFlag = ref('')
 
 const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagination<
@@ -55,9 +82,9 @@ const { items, loading, hasMore, loadMore, reset, initialized } = useCursorPagin
     query: {
       competitionChallengeId: filterChallenge.value || null,
       teamId: filterTeam.value || null,
-      gameplayFactKind: filterKind.value === '' ? null : filterKind.value as NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol,
-      state: filterState.value === '' ? null : filterState.value as NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
-      gameplayFactResult: filterResult.value === '' ? null : filterResult.value as NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
+      gameplayFactKind: filterKind.value || null,
+      state: filterState.value || null,
+      gameplayFactResult: filterResult.value || null,
       value: filterFlag.value || null,
       cursor,
       limit: 30,
@@ -219,9 +246,9 @@ onMounted(() => {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="Flag">Flag</SelectItem>
-                <SelectItem value="Break">Break</SelectItem>
-                <SelectItem value="Fix">Fix</SelectItem>
+                <SelectItem v-for="option in gameplayFactKindOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -231,11 +258,9 @@ onMounted(() => {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="Pending">{{ $t('待处理') }}</SelectItem>
-                <SelectItem value="Queued">{{ $t('排队中') }}</SelectItem>
-                <SelectItem value="Processing">{{ $t('评测中') }}</SelectItem>
-                <SelectItem value="Completed">{{ $t('已完成') }}</SelectItem>
-                <SelectItem value="PlatformFailed">{{ $t('平台失败') }}</SelectItem>
+                <SelectItem v-for="option in gameplayFactStateOptions" :key="option.value" :value="option.value">
+                  {{ $t(option.label) }}
+                </SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
@@ -245,12 +270,9 @@ onMounted(() => {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectItem value="Correct">{{ $t('正确') }}</SelectItem>
-                <SelectItem value="Wrong">{{ $t('错误') }}</SelectItem>
-                <SelectItem value="Duplicate">{{ $t('重复') }}</SelectItem>
-                <SelectItem value="AttemptsExhausted">{{ $t('次数耗尽') }}</SelectItem>
-                <SelectItem value="PlatformFailed">{{ $t('平台失败') }}</SelectItem>
-                <SelectItem value="Rejected">{{ $t('已拒绝') }}</SelectItem>
+                <SelectItem v-for="option in gameplayFactResultOptions" :key="option.value" :value="option.value">
+                  {{ $t(option.label) }}
+                </SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
