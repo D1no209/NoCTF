@@ -18,6 +18,43 @@ public sealed class DockerContainerLifecycleTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task One_shot_output_is_bounded_per_stream(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var dockerProbe = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await dockerProbe.StartAsync(cancellationToken);
+            const int outputLimit = 128;
+            using var lifecycle = new DockerContainerLifecycle(new DockerRuntimeOptions(
+                Endpoint: DockerEndpoint(),
+                OneShotOutputLimitBytesPerStream: outputLimit));
+            var operationId = Guid.NewGuid();
+
+            var result = await lifecycle.RunAsync(new ContainerRequest(
+                operationId,
+                RuntimeProvider.Docker,
+                "busybox:1.36.1",
+                ["/bin/sh", "-c", "head -c 4096 /dev/zero | tr '\\0' A; head -c 4096 /dev/zero | tr '\\0' B >&2"],
+                new Dictionary<string, string>(),
+                new Dictionary<string, string>(),
+                new Dictionary<int, int>(),
+                new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
+                TimeSpan.FromMinutes(2),
+                NetworkName: "none",
+                NetworkPurpose: ContainerNetworkPurpose.AwdpVerification), cancellationToken);
+
+            await Assert.That(result.ExitCode).IsEqualTo(0);
+            await Assert.That(result.StandardOutput).IsEqualTo(new string('A', outputLimit));
+            await Assert.That(result.StandardError).IsEqualTo(new string('B', outputLimit));
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Missing_local_image_is_pulled_before_container_creation(
         CancellationToken cancellationToken)
     {
@@ -61,6 +98,14 @@ public sealed class DockerContainerLifecycleTests
                     NetworkPurpose: ContainerNetworkPurpose.AwdpVerification), cancellationToken);
 
                 await Assert.That(receipt.Status).IsEqualTo(RuntimeStatus.Running);
+                var inspect = await docker.Containers.InspectContainerAsync(
+                    receipt.ResourceId,
+                    cancellationToken);
+                await Assert.That(inspect.HostConfig!.LogConfig.Type).IsEqualTo("local");
+                await Assert.That(inspect.HostConfig.LogConfig.Config["max-size"])
+                    .IsEqualTo("10485760");
+                await Assert.That(inspect.HostConfig.LogConfig.Config["max-file"])
+                    .IsEqualTo("3");
                 _ = await docker.Images.InspectImageAsync(image, cancellationToken);
             }
             finally

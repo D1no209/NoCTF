@@ -152,7 +152,10 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
             ],
             PublishedPorts: [new("web", 8080, 0)]);
 
-        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(
+            request,
+            logMaxSizeBytes: 8_388_608,
+            logMaxFiles: 2);
         var root = Load(prepared);
         var services = Mapping(root, "services");
         var web = Mapping(services, "web");
@@ -178,6 +181,12 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         await Assert.That(
                 Sequence(web, "security_opt").Children.Cast<YamlScalarNode>().Single().Value)
             .IsEqualTo("no-new-privileges:true");
+        var logging = Mapping(web, "logging");
+        await Assert.That(Scalar(logging, "driver")).IsEqualTo("local");
+        await Assert.That(Scalar(Mapping(logging, "options"), "max-size"))
+            .IsEqualTo("8388608");
+        await Assert.That(Scalar(Mapping(logging, "options"), "max-file"))
+            .IsEqualTo("2");
         var networkLabels = Mapping(
             Mapping(Mapping(root, "networks"), "challenge"),
             "labels");
@@ -205,7 +214,10 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
             TimeSpan.FromMinutes(2),
             EgressPolicy: RuntimeEgressPolicy.InternetOnly);
 
-        var action = () => ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+        var action = () => ComposeRuntimeDefinitionPolicy.PrepareForDocker(
+            request,
+            logMaxSizeBytes: 10_485_760,
+            logMaxFiles: 3);
 
         var exception = await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(exception!.Message).Contains("does not support InternetOnly");
@@ -298,7 +310,10 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
                     }
                 });
 
-        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(request);
+        var prepared = ComposeRuntimeDefinitionPolicy.PrepareForDocker(
+            request,
+            logMaxSizeBytes: 10_485_760,
+            logMaxFiles: 3);
         var services = Mapping(Load(prepared), "services");
         var web = Mapping(services, "web");
         var worker = Mapping(services, "worker");

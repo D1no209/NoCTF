@@ -112,6 +112,11 @@ public sealed class DockerComposeRuntimeIntegrationTests
                 await Assert.That(webInspect.NetworkSettings!.Networks.Keys)
                     .DoesNotContain(platformNetworkName);
                 await Assert.That(webInspect.HostConfig!.Memory).IsEqualTo(67_108_864);
+                await Assert.That(webInspect.HostConfig.LogConfig.Type).IsEqualTo("local");
+                await Assert.That(webInspect.HostConfig.LogConfig.Config["max-size"])
+                    .IsEqualTo("10485760");
+                await Assert.That(webInspect.HostConfig.LogConfig.Config["max-file"])
+                    .IsEqualTo("3");
                 await Assert.That(webInspect.HostConfig.NanoCPUs).IsEqualTo(100_000_000);
                 await Assert.That(webInspect.HostConfig.PidsLimit).IsEqualTo(64);
                 await Assert.That(webInspect.HostConfig.Privileged).IsFalse();

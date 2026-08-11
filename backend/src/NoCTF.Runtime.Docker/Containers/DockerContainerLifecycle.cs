@@ -1,3 +1,6 @@
+using System.Buffers;
+using System.Globalization;
+using System.Text;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using NoCTF.Application.Runtime.Provisioning;
@@ -20,6 +23,12 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public DockerContainerLifecycle(DockerRuntimeOptions options)
     {
+        if (options.RuntimeLogMaxSizeBytes <= 0
+            || options.RuntimeLogMaxFiles <= 0
+            || options.OneShotOutputLimitBytesPerStream <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "Docker runtime log and one-shot output limits must be positive.");
         this.options = options;
         client = new DockerClientBuilder()
             .WithEndpoint(new Uri(options.Endpoint))
@@ -79,6 +88,17 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     Memory = request.Limits.MemoryBytes,
                     NanoCPUs = request.Limits.NanoCpus,
                     PidsLimit = request.Limits.PidsLimit,
+                    LogConfig = new LogConfig
+                    {
+                        Type = "local",
+                        Config = new Dictionary<string, string>
+                        {
+                            ["max-size"] = options.RuntimeLogMaxSizeBytes.ToString(
+                                CultureInfo.InvariantCulture),
+                            ["max-file"] = options.RuntimeLogMaxFiles.ToString(
+                                CultureInfo.InvariantCulture)
+                        }
+                    },
                     SecurityOpt = request.Security.NoNewPrivileges ? ["no-new-privileges:true"] : [],
                     ReadonlyRootfs = request.Security.ReadonlyRootfs,
                     CapDrop = request.Security.CapDrop.ToList(),
@@ -325,8 +345,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 ShowStdout = true,
                 ShowStderr = true
             }, cancellationToken);
-            var output = await logs.ReadOutputToEndAsync(cancellationToken);
-            return new(receipt.ResourceId, (int)wait.StatusCode, output.stdout, output.stderr,
+            var output = await ReadBoundedOutputAsync(logs, cancellationToken);
+            return new(receipt.ResourceId, (int)wait.StatusCode, output.Stdout, output.Stderr,
                 started, DateTimeOffset.UtcNow);
         }
         finally
@@ -335,6 +355,61 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 RunnerScoringCallbackDeliveryPolicy.OneShotCleanupBudget);
             await DestroyAsync(receipt, cleanupSource.Token);
         }
+    }
+
+    private async Task<(string Stdout, string Stderr)> ReadBoundedOutputAsync(
+        MultiplexedStream logs,
+        CancellationToken cancellationToken)
+    {
+        var limit = options.OneShotOutputLimitBytesPerStream;
+        using var stdout = new MemoryStream(Math.Min(limit, 81_920));
+        using var stderr = new MemoryStream(Math.Min(limit, 81_920));
+        var buffer = ArrayPool<byte>.Shared.Rent(81_920);
+        try
+        {
+            while (true)
+            {
+                var read = await logs.ReadOutputAsync(
+                    buffer,
+                    0,
+                    buffer.Length,
+                    cancellationToken);
+                if (read.Count > 0)
+                {
+                    if (read.Target == MultiplexedStream.TargetStream.StandardOut)
+                        AppendBounded(stdout, buffer, read.Count, limit);
+                    else if (read.Target == MultiplexedStream.TargetStream.StandardError)
+                        AppendBounded(stderr, buffer, read.Count, limit);
+                }
+                if (read.EOF)
+                    break;
+            }
+
+            return (
+                Encoding.UTF8.GetString(
+                    stdout.GetBuffer(),
+                    0,
+                    checked((int)stdout.Length)),
+                Encoding.UTF8.GetString(
+                    stderr.GetBuffer(),
+                    0,
+                    checked((int)stderr.Length)));
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    private static void AppendBounded(
+        MemoryStream destination,
+        byte[] buffer,
+        int count,
+        int limit)
+    {
+        var remaining = limit - checked((int)destination.Length);
+        if (remaining > 0)
+            destination.Write(buffer, 0, Math.Min(remaining, count));
     }
 
     public Task CopyArchiveAsync(ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken) =>

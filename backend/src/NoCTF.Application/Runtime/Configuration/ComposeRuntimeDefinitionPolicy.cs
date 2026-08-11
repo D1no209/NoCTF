@@ -180,8 +180,15 @@ public static class ComposeRuntimeDefinitionPolicy
         return errors;
     }
 
-    public static string PrepareForDocker(ComposeRequest request)
+    public static string PrepareForDocker(
+        ComposeRequest request,
+        long logMaxSizeBytes,
+        int logMaxFiles)
     {
+        if (logMaxSizeBytes <= 0)
+            throw new ArgumentOutOfRangeException(nameof(logMaxSizeBytes));
+        if (logMaxFiles <= 0)
+            throw new ArgumentOutOfRangeException(nameof(logMaxFiles));
         if (request.EgressPolicy != RuntimeEgressPolicy.DenyAll)
             throw new InvalidOperationException(
                 "Docker Compose does not support InternetOnly egress.");
@@ -211,6 +218,7 @@ public static class ComposeRuntimeDefinitionPolicy
             SetScalar(service, "privileged", "false");
             SetSequence(service, "cap_drop", ["ALL"]);
             SetSequence(service, "security_opt", ["no-new-privileges:true"]);
+            SetDockerLogging(service, logMaxSizeBytes, logMaxFiles);
             MergeMappingValues(service, "environment", request.Environment);
             MergeServiceEnvironment(serviceName, service, request.ServiceEnvironment);
             MergeMappingValues(service, "labels", request.Labels);
@@ -228,6 +236,26 @@ public static class ComposeRuntimeDefinitionPolicy
         using var writer = new StringWriter(CultureInfo.InvariantCulture);
         new YamlStream(new YamlDocument(document)).Save(writer, assignAnchors: false);
         return writer.ToString();
+    }
+
+    private static void SetDockerLogging(
+        YamlMappingNode service,
+        long maxSizeBytes,
+        int maxFiles)
+    {
+        var loggingOptions = new YamlMappingNode();
+        SetQuotedScalar(
+            loggingOptions,
+            "max-size",
+            maxSizeBytes.ToString(CultureInfo.InvariantCulture));
+        SetQuotedScalar(
+            loggingOptions,
+            "max-file",
+            maxFiles.ToString(CultureInfo.InvariantCulture));
+        var logging = new YamlMappingNode();
+        SetScalar(logging, "driver", "local");
+        Set(logging, "options", loggingOptions);
+        Set(service, "logging", logging);
     }
 
     public static string PrepareForKubernetes(
@@ -758,6 +786,9 @@ public static class ComposeRuntimeDefinitionPolicy
 
     private static void SetScalar(YamlMappingNode mapping, string key, string value) =>
         Set(mapping, key, new YamlScalarNode(value));
+
+    private static void SetQuotedScalar(YamlMappingNode mapping, string key, string value) =>
+        Set(mapping, key, new YamlScalarNode(value) { Style = ScalarStyle.DoubleQuoted });
 
     private static void SetSequence(
         YamlMappingNode mapping,

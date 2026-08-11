@@ -6,12 +6,38 @@ using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Runner.Composition;
+using NoCTF.Runtime.Docker.Containers;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Unit.Runner;
 
 public sealed class RunnerAvailabilityOptionsTests
 {
+    [Test]
+    public async Task Docker_runtime_log_limits_are_configurable()
+    {
+        using var services = BuildServices(new Dictionary<string, string?>
+        {
+            ["Runner:Provider"] = nameof(RuntimeProvider.Docker),
+            ["Runner:Pool"] = "docker",
+            ["Runner:Id"] = "docker-1",
+            ["Runner:Capacity:MemoryBytes"] = "4294967296",
+            ["Runner:Capacity:NanoCpus"] = "2000000000",
+            ["Runner:Capacity:PidsLimit"] = "2048",
+            ["Runner:Heartbeat:IntervalSeconds"] = "5",
+            ["Runner:Heartbeat:TtlSeconds"] = "15",
+            ["Runtime:Docker:RuntimeLogMaxSizeBytes"] = "8388608",
+            ["Runtime:Docker:RuntimeLogMaxFiles"] = "2",
+            ["Runtime:Docker:OneShotOutputLimitBytesPerStream"] = "262144"
+        });
+
+        var options = services.GetRequiredService<DockerRuntimeOptions>();
+
+        await Assert.That(options.RuntimeLogMaxSizeBytes).IsEqualTo(8_388_608);
+        await Assert.That(options.RuntimeLogMaxFiles).IsEqualTo(2);
+        await Assert.That(options.OneShotOutputLimitBytesPerStream).IsEqualTo(262_144);
+    }
+
     [Test]
     public async Task Runner_availability_configuration_is_strongly_typed()
     {
