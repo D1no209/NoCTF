@@ -19,6 +19,12 @@ import type {
   NoCtfapiEndpointsRuntimeRuntimeStateProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
+import { createLatestPageRefresh } from '~/lib/latest-page-refresh'
+import {
+  createRuntimeOperationCoordinator,
+  type RuntimeOperationKind,
+  type RuntimeOperationToken,
+} from '~/lib/runtime-operation-coordinator'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -46,7 +52,7 @@ const filterTeam = ref('')
 const filterState = ref('')
 const filterKind = ref('')
 
-const { items, loading, error: listError, hasMore, loadMore, reset, initialized } = useCursorPagination<
+const { items, loading, error: listError, hasMore, loadMore: loadRuntimePage, reset, initialized } = useCursorPagination<
   NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse
 >(async (cursor) => {
   const { data, error } = await adminListRuntimes({
@@ -64,14 +70,20 @@ const { items, loading, error: listError, hasMore, loadMore, reset, initialized 
   return data
 })
 
+const {
+  loadNextPage: loadMore,
+  refreshLatest: refreshRuntimeList,
+} = createLatestPageRefresh({
+  loadMore: loadRuntimePage,
+  reset: () => reset({ preserveItems: true }),
+})
+
 function applyFilters() {
-  reset({ preserveItems: true })
-  void loadMore()
+  void refreshRuntimeList()
 }
 
 function refreshList() {
-  reset({ preserveItems: true })
-  void loadMore()
+  return refreshRuntimeList()
 }
 
 // ---- Detail sheet ----
@@ -89,32 +101,68 @@ async function openDetail(id?: string) {
   detailLoading.value = false
 }
 
-// ---- Operations (202 + poll runtime state) ----
-const opPending = ref<string | null>(null)
+// ---- Operations (202 + bounded background state refresh) ----
+const runtimeOperations = createRuntimeOperationCoordinator()
 const opMessage = ref<string | null>(null)
 
-async function waitForRuntime(runtimeInstanceId: string | undefined, done: (state?: string | null) => boolean) {
-  if (!runtimeInstanceId) return
-  let attempts = 0
-  while (attempts < 30) {
-    attempts += 1
-    try {
-      const { data } = await adminGetRuntime({ path: { competitionId, runtimeInstanceId } })
-      if (done(data?.state)) return
-    }
-    catch { /* transient */ }
-    await new Promise(r => setTimeout(r, Math.min(1000 * attempts, 5000)))
-  }
-  opMessage.value = translate('操作已受理，状态更新较慢，请稍后刷新')
+function runtimeOperationKey(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null): string | null {
+  return rt?.id ?? null
+}
+
+function isRuntimePending(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null): boolean {
+  const key = runtimeOperationKey(rt)
+  return key !== null && runtimeOperations.pending.has(key)
+}
+
+function isRuntimeOperationPending(
+  rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null,
+  operation: RuntimeOperationKind,
+): boolean {
+  const key = runtimeOperationKey(rt)
+  return key !== null && runtimeOperations.pending.get(key) === operation
+}
+
+function beginRuntimeOperation(
+  rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+  operation: RuntimeOperationKind,
+): RuntimeOperationToken | null {
+  const key = runtimeOperationKey(rt)
+  if (!key) return null
+  opMessage.value = null
+  return runtimeOperations.begin(key, operation)
+}
+
+function refreshRuntimeInBackground(
+  token: RuntimeOperationToken,
+  runtimeInstanceId: string,
+  done: (state?: string | null) => boolean,
+): void {
+  void runtimeOperations.poll(token, async (signal) => {
+    const { data, error } = await adminGetRuntime({
+      path: { competitionId, runtimeInstanceId },
+      signal,
+    })
+    if (error || !data) return false
+
+    if (detailOpen.value && detail.value?.id === data.id)
+      detail.value = data
+    await refreshList()
+    return done(data.state)
+  }).then((result) => {
+    if (result === 'exhausted')
+      opMessage.value = translate('操作已受理，状态更新较慢，请稍后刷新')
+  }).finally(() => {
+    runtimeOperations.finish(token)
+  })
 }
 
 async function runRuntimeOp(
   rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
   op: 'start' | 'reset',
 ) {
-  if (!rt.competitionChallengeId) return
-  opPending.value = `${rt.id}:${op}`
-  opMessage.value = null
+  if (!rt.id || !rt.competitionChallengeId) return
+  const token = beginRuntimeOperation(rt, op)
+  if (!token) return
   try {
     const ccPath = { competitionId, competitionChallengeId: rt.competitionChallengeId }
     const teamPath = { ...ccPath, teamId: rt.teamId ?? '' }
@@ -122,25 +170,24 @@ async function runRuntimeOp(
       op === 'start'
         ? (rt.teamId ? await adminStartTeamRuntime({ path: teamPath }) : await adminStartSharedRuntime({ path: ccPath }))
         : (rt.teamId ? await adminResetTeamRuntime({ path: teamPath }) : await adminResetSharedRuntime({ path: ccPath }))
+    if (!runtimeOperations.isActive(token)) return
     if (error) throw error
     const label = op === 'start' ? translate("启动") : translate("重置")
     toast.success(translate('{action}操作已受理', { action: label }))
-    await waitForRuntime(data?.runtimeInstanceId ?? rt.id, state =>
+    void refreshList()
+    refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state =>
       op === 'reset' ? state === 'Stopped' : state === 'Running' || state === 'Failed')
-    refreshList()
-    if (detailOpen.value && detail.value?.id) await openDetail(detail.value.id)
   }
   catch (e) {
-    toast.error(parseApiError(e).message)
-  }
-  finally {
-    opPending.value = null
+    const shouldNotify = runtimeOperations.isActive(token)
+    runtimeOperations.finish(token)
+    if (shouldNotify) toast.error(parseApiError(e).message)
   }
 }
 
 // ---- Exact termination ----
 const terminateDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
-const terminatePending = ref(false)
+const terminatePending = computed(() => isRuntimeOperationPending(terminateDialog.value, 'terminate'))
 
 function canTerminate(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse) {
   return rt.state === 'Queued'
@@ -152,24 +199,24 @@ function canTerminate(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResp
 async function submitTermination() {
   const rt = terminateDialog.value
   if (!rt?.id || rt.processingVersion === undefined || rt.processingVersion === null) return
-  terminatePending.value = true
+  const token = beginRuntimeOperation(rt, 'terminate')
+  if (!token) return
   try {
     const { data, error } = await adminTerminateRuntime({
       path: { competitionId, runtimeInstanceId: rt.id },
       body: { expectedProcessingVersion: rt.processingVersion },
     })
+    if (!runtimeOperations.isActive(token)) return
     if (error) throw error
     toast.success(translate("实例终止操作已受理"))
     terminateDialog.value = null
-    await waitForRuntime(data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped' || state === 'Failed')
-    refreshList()
-    if (detailOpen.value && detail.value?.id === rt.id) await openDetail(rt.id)
+    void refreshList()
+    refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped' || state === 'Failed')
   }
   catch (e) {
-    toast.error(parseApiError(e).message)
-  }
-  finally {
-    terminatePending.value = false
+    const shouldNotify = runtimeOperations.isActive(token)
+    runtimeOperations.finish(token)
+    if (shouldNotify) toast.error(parseApiError(e).message)
   }
 }
 
@@ -177,7 +224,7 @@ async function submitTermination() {
 const forceTerminateDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
 const forceTerminateReason = ref('')
 const forceTerminateConfirmed = ref(false)
-const forceTerminatePending = ref(false)
+const forceTerminatePending = computed(() => isRuntimeOperationPending(forceTerminateDialog.value, 'force-terminate'))
 
 function openForceTermination(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse) {
   forceTerminateReason.value = ''
@@ -190,7 +237,8 @@ async function submitForceTermination() {
   const reason = forceTerminateReason.value.trim()
   if (!rt?.id || rt.processingVersion === undefined || rt.processingVersion === null
     || reason.length < 8 || !forceTerminateConfirmed.value) return
-  forceTerminatePending.value = true
+  const token = beginRuntimeOperation(rt, 'force-terminate')
+  if (!token) return
   try {
     const { data, error } = await adminForceTerminateRuntime({
       path: { competitionId, runtimeInstanceId: rt.id },
@@ -199,46 +247,46 @@ async function submitForceTermination() {
         reason,
       },
     })
+    if (!runtimeOperations.isActive(token)) return
     if (error) throw error
     toast.success(translate("强制终结已交由 Runner 清理"))
     forceTerminateDialog.value = null
-    await waitForRuntime(data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped')
-    refreshList()
-    if (detailOpen.value && detail.value?.id === rt.id) await openDetail(rt.id)
+    void refreshList()
+    refreshRuntimeInBackground(token, data?.runtimeInstanceId ?? rt.id, state => state === 'Stopped')
   }
   catch (e) {
-    toast.error(parseApiError(e).message)
-  }
-  finally {
-    forceTerminatePending.value = false
+    const shouldNotify = runtimeOperations.isActive(token)
+    runtimeOperations.finish(token)
+    if (shouldNotify) toast.error(parseApiError(e).message)
   }
 }
 
 // ---- Extend ----
 const extendDialog = ref<NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null>(null)
 const extendSeconds = ref(1800)
-const extendPending = ref(false)
+const extendPending = computed(() => isRuntimeOperationPending(extendDialog.value, 'extend'))
 
 async function submitExtend() {
   const rt = extendDialog.value
-  if (!rt?.teamId || !rt.competitionChallengeId) return
-  extendPending.value = true
+  if (!rt?.id || !rt.teamId || !rt.competitionChallengeId) return
+  const token = beginRuntimeOperation(rt, 'extend')
+  if (!token) return
   try {
     const { error } = await adminExtendTeamRuntime({
       path: { competitionId, teamId: rt.teamId, competitionChallengeId: rt.competitionChallengeId },
       body: { seconds: extendSeconds.value },
     })
+    if (!runtimeOperations.isActive(token)) return
     if (error) throw error
     toast.success(translate("续期操作已受理"))
     extendDialog.value = null
-    await waitForRuntime(rt.id, () => true)
-    refreshList()
+    void refreshList()
+    refreshRuntimeInBackground(token, rt.id, () => true)
   }
   catch (e) {
-    toast.error(parseApiError(e).message)
-  }
-  finally {
-    extendPending.value = false
+    const shouldNotify = runtimeOperations.isActive(token)
+    runtimeOperations.finish(token)
+    if (shouldNotify) toast.error(parseApiError(e).message)
   }
 }
 
@@ -246,6 +294,8 @@ onMounted(() => {
   void loadRefs()
   void loadMore()
 })
+
+onBeforeUnmount(() => runtimeOperations.cancelAll())
 </script>
 
 <template>
@@ -349,28 +399,29 @@ onMounted(() => {
                 <template v-if="canWrite">
                   <Button
                     v-if="rt.state === 'Stopped' || rt.state === 'Failed'"
-                    variant="ghost" size="sm" :disabled="opPending !== null"
+                    variant="ghost" size="sm" :disabled="isRuntimePending(rt)"
                     @click="runRuntimeOp(rt, 'start')"
-                  >{{ $t('启动') }}</Button>
+                  >
+                    <Spinner v-if="isRuntimeOperationPending(rt, 'start')" data-icon="inline-start" /> {{ $t('启动') }} </Button>
                   <Button
                     v-if="canTerminate(rt)"
-                    variant="destructive" size="sm" :disabled="opPending !== null || terminatePending"
+                    variant="destructive" size="sm" :disabled="isRuntimePending(rt)"
                     @click="terminateDialog = rt"
                   >{{ $t('终止') }}</Button>
                   <Button
                     v-if="isAdministrator && rt.canForceTerminate"
                     variant="destructive" size="sm"
-                    :disabled="opPending !== null || forceTerminatePending"
+                    :disabled="isRuntimePending(rt)"
                     @click="openForceTermination(rt)"
                   >{{ $t('强制终结') }}</Button>
                   <Button
-                    variant="ghost" size="sm" :disabled="opPending !== null"
+                    variant="ghost" size="sm" :disabled="isRuntimePending(rt)"
                     @click="runRuntimeOp(rt, 'reset')"
                   >
-                    <Spinner v-if="opPending === `${rt.id}:reset`" data-icon="inline-start" /> {{ $t('重置') }} </Button>
+                    <Spinner v-if="isRuntimeOperationPending(rt, 'reset')" data-icon="inline-start" /> {{ $t('重置') }} </Button>
                   <Button
                     v-if="rt.teamId && rt.state === 'Running'"
-                    variant="ghost" size="sm" :disabled="opPending !== null"
+                    variant="ghost" size="sm" :disabled="isRuntimePending(rt)"
                     @click="extendDialog = rt; extendSeconds = 1800"
                   >{{ $t('续期') }}</Button>
                 </template>
