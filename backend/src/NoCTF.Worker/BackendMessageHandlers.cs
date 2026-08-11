@@ -28,6 +28,7 @@ using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.Ad
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Worker;
 
@@ -537,6 +538,7 @@ public static class BackendMessageHandlers
             runtime.ProcessingVersion,
             message.RunnerPool,
             message.RunnerId));
+        await QueueNextGameplayFactAsync(submission, db, outbox, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
@@ -713,6 +715,28 @@ public static class BackendMessageHandlers
         submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
         submission.UpdatedAt = DateTimeOffset.UtcNow;
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
+        await QueueNextGameplayFactAsync(submission, db, outbox, cancellationToken);
+    }
+
+    private static async Task QueueNextGameplayFactAsync(
+        GameplayFact completed,
+        NoCtfDbContext db,
+        ITransactionalMessageOutbox outbox,
+        CancellationToken cancellationToken)
+    {
+        var nextGameplayFactId = await db.GameplayFacts.AsNoTracking()
+            .Where(candidate =>
+                candidate.CompetitionId == completed.CompetitionId
+                && candidate.CompetitionChallengeId == completed.CompetitionChallengeId
+                && candidate.TeamId == completed.TeamId
+                && candidate.Kind == completed.Kind
+                && candidate.State == GameplayFactState.Queued)
+            .OrderBy(candidate => candidate.OccurredAt)
+            .ThenBy(candidate => candidate.Id)
+            .Select(candidate => (Guid?)candidate.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (nextGameplayFactId is Guid id)
+            await outbox.PublishAsync(new EvaluateGameplayFact(id));
     }
 
     public static async Task Handle(

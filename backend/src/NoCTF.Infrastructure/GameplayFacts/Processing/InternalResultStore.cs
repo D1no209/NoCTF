@@ -219,12 +219,32 @@ public sealed class InternalResultStore(
             runtime.RunnerPool,
             runtime.RunnerId
                 ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
+        await QueueNextAwdpFixAttemptAsync(fact, ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return configurationWasSuperseded
             ? InternalResultDisposition.Superseded
             : InternalResultDisposition.Applied;
+    }
+
+    private async Task QueueNextAwdpFixAttemptAsync(
+        GameplayFact completed,
+        CancellationToken ct)
+    {
+        var nextGameplayFactId = await db.GameplayFacts.AsNoTracking()
+            .Where(candidate =>
+                candidate.CompetitionId == completed.CompetitionId
+                && candidate.CompetitionChallengeId == completed.CompetitionChallengeId
+                && candidate.TeamId == completed.TeamId
+                && candidate.Kind == GameplayFactKind.FixAttempt
+                && candidate.State == GameplayFactState.Queued)
+            .OrderBy(candidate => candidate.OccurredAt)
+            .ThenBy(candidate => candidate.Id)
+            .Select(candidate => (Guid?)candidate.Id)
+            .FirstOrDefaultAsync(ct);
+        if (nextGameplayFactId is Guid id)
+            await outbox.PublishAsync(new EvaluateGameplayFact(id));
     }
 
     private static DateTimeOffset NextAppliedAt(
