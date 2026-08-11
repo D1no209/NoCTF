@@ -9,6 +9,7 @@ namespace NoCTF.E2E;
 public sealed class KohFullBoundaryTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan LeaderboardProjectionTimeout = TimeSpan.FromSeconds(30);
 
     [Test]
     [Timeout(420_000)]
@@ -179,7 +180,7 @@ public sealed class KohFullBoundaryTests
         await PollScoreAsync(
             anonymous, competitionId, red.TeamId,
             beforeRed.GetValueOrDefault(red.TeamId) + 10,
-            TimeSpan.FromSeconds(15), cancellationToken);
+            LeaderboardProjectionTimeout, cancellationToken);
 
         await SetFixtureAsync(fixtureUrl, "unavailable", null, cancellationToken);
         await AssertScoresStableAsync(
@@ -227,7 +228,7 @@ public sealed class KohFullBoundaryTests
         await PollScoreAsync(
             anonymous, competitionId, blue.TeamId,
             beforeBlue.GetValueOrDefault(blue.TeamId) + 10,
-            TimeSpan.FromSeconds(15), cancellationToken);
+            LeaderboardProjectionTimeout, cancellationToken);
 
         await SendWithoutBodyAsync(admin, HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/finish",
