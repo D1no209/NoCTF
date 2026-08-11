@@ -9,6 +9,23 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：咨询历史查询有界化
+
+- 功能提交 `e1654323` 保留现有 append-only `notifications`、`reply_to_id` 与 `ContentJson` 模型，
+  将咨询列表改为 PostgreSQL 先按当前线程状态、角色可见范围、题目/主题筛选、最后活动时间排序并限页，
+  再用一次递归集合查询加载本页线程；用户、队伍、题目标题和比赛限额也按本页批量装配，不再为每个历史
+  咨询执行递归 CTE 和多组详情查询。
+- 队伍活跃咨询计数现在用单次集合查询投影每个 root 的最终状态，只统计 `Pending` / `Replied`；
+  `Resolved` / `Closed` 永久历史不会再被逐根加载。队伍 advisory lock 与事务内原子限额检查保持不变。
+- 新增真实 PostgreSQL 长历史回归：250 条已关闭咨询下，筛选后的 20 条列表保持不超过 10 次读取，
+  新咨询的活跃计数与完整创建流程保持不超过 14 次读取；同时验证 Manager、Observer、题目 Owner 与
+  非关联题目 Owner 的权限边界和当前状态筛选。
+- 本阶段没有新增表、列、投影实体、migration 或 snapshot，也没有 HTTP/OpenAPI、生成 SDK 或版本号变化；
+  咨询正文仍只存在私有线程，未复制到公开比赛事件。
+- 验证通过：CompetitionQuestionLimits PostgreSQL 4/4、完整私有对话 PostgreSQL 1/1、Raw SQL 架构
+  约束 1/1、完整 Backend Release build 0 警告/0 错误、格式和 `git diff --check` 通过。
+- 尚未推送、部署或操作生产数据；前端超过 100 条咨询的游标导航仍是后续独立协议阶段。
+
 ## 2026-08-11 全量审计修复：Runtime 日志、就绪探针与 Kubernetes 身份隔离
 
 - 功能提交 `fd17a3ca` 为平台创建的 Docker Container 与 Compose 服务统一注入 `local` 日志驱动，
