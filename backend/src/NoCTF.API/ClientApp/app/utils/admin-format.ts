@@ -17,6 +17,7 @@ import type {
   NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol,
 } from '../api'
 import { localeTag, translate } from './i18n'
+import { parseApiError } from './api-error'
 
 /** Protocol enum label maps. HTTP enums are PascalCase strings. */
 
@@ -116,9 +117,46 @@ export function isoToLocalInput(value: string | null | undefined): string {
 /** Whether an SDK error payload looks like an optimistic-concurrency (409) conflict. */
 export function isRevisionConflict(error: unknown): boolean {
   const e = parseApiError(error)
+  if (e.code) return /revision/i.test(e.code)
   if (e.status === 409) return true
-  if (e.code && /revision/i.test(e.code)) return true
   return /revision|已被.*修改|conflict/i.test(e.message)
+}
+
+type ImagePinningConflictCode =
+  | 'RuntimeImageNotPinned'
+  | 'InvalidImageReference'
+  | 'ChallengeImageInvalid'
+  | 'RegistryAuthenticationRequired'
+  | 'RegistryAuthenticationFailed'
+  | 'RegistryUnavailable'
+  | 'RegistryManifestNotFound'
+  | 'RegistryManifestInvalid'
+
+const ImagePinningConflictMessage = {
+  RuntimeImageNotPinned: "已发布或运行中的比赛要求所有运行时和 Checker 镜像固定为 sha256 digest",
+  InvalidImageReference: "运行时或 Checker 镜像地址无效",
+  ChallengeImageInvalid: "运行时或 Checker 镜像配置无效",
+  RegistryAuthenticationRequired: "私有镜像标签无法匿名解析；请填写完整的 image@sha256 digest，或允许匿名读取 Manifest",
+  RegistryAuthenticationFailed: "镜像仓库认证失败；请填写完整的 image@sha256 digest，或确认 Manifest 可匿名读取",
+  RegistryUnavailable: "无法连接镜像仓库,请稍后重试",
+  RegistryManifestNotFound: "镜像仓库中未找到指定镜像或标签",
+  RegistryManifestInvalid: "镜像仓库返回的 Manifest 无效",
+} satisfies Partial<Record<ImagePinningConflictCode, string>>
+
+/** Map stable image-publication failures without treating every HTTP 409 as a revision conflict. */
+export function imagePinningErrorMessage(error: unknown): string | null {
+  const code = parseApiError(error).code
+  if (!code || !(code in ImagePinningConflictMessage)) return null
+  return translate(ImagePinningConflictMessage[code as keyof typeof ImagePinningConflictMessage])
+}
+
+export function startGateErrorMessage(error: {
+  code?: string
+  message?: string
+}): string {
+  return error.code === 'RuntimeImageNotPinned'
+    ? translate("所有运行时和 Checker 镜像必须固定为 sha256 digest 后才能开始比赛")
+    : (error.message ?? translate("启动前检查失败"))
 }
 
 /**
@@ -126,6 +164,11 @@ export function isRevisionConflict(error: unknown): boolean {
  * anything else -> plain error toast.
  */
 export function toastWriteError(error: unknown, refresh?: () => void | Promise<void>): void {
+  const imageMessage = imagePinningErrorMessage(error)
+  if (imageMessage) {
+    toast.error(imageMessage)
+    return
+  }
   if (isRevisionConflict(error)) {
     toast.error(translate("数据已被他人修改,请刷新后重试"))
     void refresh?.()

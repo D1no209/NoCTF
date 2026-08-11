@@ -8,6 +8,7 @@ using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Challenges.Images;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runner.Composition;
 using NoCTF.GameModes.Awd.Configuration;
@@ -126,6 +127,7 @@ public sealed class AwdCheckerWorkReader(
             target.ChallengeRules,
             target.ChallengeDefinition);
         if (settings.Checker is not { } checker
+            || !ChallengeImagePinningPolicy.IsPinnedImage(checker.Image)
             || string.IsNullOrWhiteSpace(target.Runtime.AwdCheckerTargetHost)
             || target.Runtime.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
             return null;

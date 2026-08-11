@@ -1,3 +1,6 @@
+using NoCTF.Application.Challenges.Images;
+using NoCTF.Domain.Competitions;
+
 namespace NoCTF.Application.Competitions.Management;
 
 public enum CompetitionRestoreState
@@ -5,12 +8,20 @@ public enum CompetitionRestoreState
     Restored,
     NotFound,
     UserNotFound,
-    RoleNotEligible
+    RoleNotEligible,
+    ChallengeImageInvalid,
+    RegistryAuthenticationRequired,
+    RegistryAuthenticationFailed,
+    RegistryUnavailable,
+    RegistryManifestNotFound,
+    RegistryManifestInvalid,
+    ChallengeDefinitionRevisionConflict
 }
 
 public sealed record CompetitionRestoreResult(
     CompetitionRestoreState State,
-    IReadOnlyList<Guid>? UserIds = null);
+    IReadOnlyList<Guid>? UserIds = null,
+    string? Detail = null);
 
 public enum CompetitionOwnerTransferState
 {
@@ -81,6 +92,19 @@ public interface IAdminCompetitionStore
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+    Task<CompetitionRestoreResult> RestoreWithChallengeFenceAsync(
+        Guid competitionId,
+        Guid actorId,
+        bool isAdministrator,
+        DateTimeOffset now,
+        IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
+        CancellationToken cancellationToken) =>
+        RestoreAsync(
+            competitionId,
+            actorId,
+            isAdministrator,
+            now,
+            cancellationToken);
     Task<CompetitionHardDeletePreview?> PreviewHardDeleteAsync(
         Guid competitionId,
         Guid actorId,
@@ -121,15 +145,80 @@ public sealed class GetAdminCompetition(IAdminCompetitionStore store)
         store.FindAsync(competitionId, actorId, isAdministrator, includeDeleted, ct);
 }
 
-public sealed class RestoreCompetition(IAdminCompetitionStore store)
+public sealed class RestoreCompetition(
+    IAdminCompetitionStore store,
+    PinChallengeImages? imagePinning = null)
 {
-    public Task<CompetitionRestoreResult> ExecuteAsync(
+    public async Task<CompetitionRestoreResult> ExecuteAsync(
         Guid competitionId,
         Guid actorId,
         bool isAdministrator,
         DateTimeOffset now,
-        CancellationToken ct = default) =>
-        store.RestoreAsync(competitionId, actorId, isAdministrator, now, ct);
+        CancellationToken ct = default)
+    {
+        ChallengeImagePinResult? pinning = null;
+        if (imagePinning is not null)
+        {
+            var competition = await store.FindAsync(
+                competitionId,
+                actorId,
+                isAdministrator,
+                includeDeleted: true,
+                ct);
+            if (competition is null || competition.DeletedAt is null)
+                return new(CompetitionRestoreState.NotFound);
+            if (competition.Status is CompetitionStatus.Published
+                or CompetitionStatus.Running
+                or CompetitionStatus.Paused)
+            {
+                pinning = await imagePinning.PinCompetitionAsync(
+                    competitionId,
+                    now,
+                    ct,
+                    includeDeleted: true);
+                if (!pinning.Succeeded)
+                {
+                    var error = pinning.Errors[0];
+                    return new(Map(error.Code), Detail: error.Message);
+                }
+            }
+        }
+        return pinning is null
+            ? await store.RestoreAsync(
+                competitionId,
+                actorId,
+                isAdministrator,
+                now,
+                ct)
+            : await store.RestoreWithChallengeFenceAsync(
+                competitionId,
+                actorId,
+                isAdministrator,
+                now,
+                pinning.ChallengeRevisions!,
+                ct);
+    }
+
+    private static CompetitionRestoreState Map(ChallengeImagePinFailureCode failure) =>
+        failure switch
+        {
+            ChallengeImagePinFailureCode.CompetitionNotFound
+                or ChallengeImagePinFailureCode.ChallengeNotFound =>
+                CompetitionRestoreState.NotFound,
+            ChallengeImagePinFailureCode.RegistryAuthenticationRequired =>
+                CompetitionRestoreState.RegistryAuthenticationRequired,
+            ChallengeImagePinFailureCode.RegistryAuthenticationFailed =>
+                CompetitionRestoreState.RegistryAuthenticationFailed,
+            ChallengeImagePinFailureCode.RegistryUnavailable =>
+                CompetitionRestoreState.RegistryUnavailable,
+            ChallengeImagePinFailureCode.RegistryManifestNotFound =>
+                CompetitionRestoreState.RegistryManifestNotFound,
+            ChallengeImagePinFailureCode.RegistryManifestInvalid =>
+                CompetitionRestoreState.RegistryManifestInvalid,
+            ChallengeImagePinFailureCode.RevisionConflict =>
+                CompetitionRestoreState.ChallengeDefinitionRevisionConflict,
+            _ => CompetitionRestoreState.ChallengeImageInvalid
+        };
 }
 
 public sealed class HardDeleteCompetition(IAdminCompetitionStore store)

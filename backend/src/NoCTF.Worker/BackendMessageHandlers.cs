@@ -26,6 +26,7 @@ using NoCTF.GameModes.Awdp.Runtime;
 using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Application.Challenges.Images;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Gameplay;
@@ -178,6 +179,15 @@ public static class BackendMessageHandlers
             {
                 target.Runtime.NextCheckerDueAt = null;
                 target.Runtime.CheckerDeadlineAt = null;
+                continue;
+            }
+            if (!ChallengeImagePinningPolicy.IsPinnedImage(checker.Image))
+            {
+                target.Runtime.NextCheckerDueAt = null;
+                target.Runtime.CheckerDeadlineAt = null;
+                target.Runtime.CheckerStatus = AwdServiceState.Unknown;
+                target.Runtime.CheckerStatusUpdatedAt = message.At;
+                applied = true;
                 continue;
             }
 
@@ -741,7 +751,8 @@ public static class BackendMessageHandlers
             : null;
         var template = awdpConfiguration?.Runtime
             ?? templates.Get(target.Competition.Mode, target.Template.DefinitionJson);
-        if (template is null)
+        if (template is null
+            || !ChallengeImagePinningPolicy.AreRuntimeImagesPinned(template))
         {
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
@@ -1193,7 +1204,18 @@ public static class BackendMessageHandlers
             var hasReceipt = !string.IsNullOrWhiteSpace(instance.ProviderReceiptJson);
             if (!hasReceipt && assignmentReleasePending)
             {
+                var release = await capacity.ReleaseOrphanedAsync(
+                    instance.Id,
+                    cancellationToken);
+                if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
+                    throw new InvalidOperationException(
+                        "Pending Runtime capacity release changed owner during reconciliation.");
                 instance.RunnerAssignmentReleaseToken = null;
+                await outbox.PublishAsync(new RuntimeProvisionFailed(
+                    instance.Id,
+                    instance.ProcessingVersion,
+                    RuntimeFailureCode.InvalidConfiguration,
+                    runnerId));
                 applied = true;
             }
             if (heartbeat == RunnerHeartbeatStatus.Online && !assignmentReleasePending)

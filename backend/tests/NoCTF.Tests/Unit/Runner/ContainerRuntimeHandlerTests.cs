@@ -11,6 +11,50 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class ContainerRuntimeHandlerTests
 {
     [Test]
+    public async Task Mutable_container_image_is_rejected_before_provider_access_and_releases_capacity()
+    {
+        var lifecycle = new RecordingContainerLifecycle();
+        var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var reconciler = new RecordingResourceReconciler();
+        var handler = CreateHandler(
+            lifecycle,
+            new RecordingSandboxLifecycle(),
+            capacity,
+            new FixedWorkReader(null),
+            reconciler);
+        var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var message = new ProvisionContainerRuntime(
+            runtimeInstanceId,
+            8,
+            3,
+            "default",
+            "runner-a",
+            new ContainerRequest(
+                runtimeInstanceId,
+                RuntimeProvider.Docker,
+                "challenge:latest",
+                [],
+                new Dictionary<string, string>(),
+                new Dictionary<string, string>(),
+                new Dictionary<int, int> { [8080] = 0 },
+                new RuntimeResourceLimits(268_435_456, 500_000_000, 128),
+                new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
+                TimeSpan.FromHours(1),
+                Generation: 3,
+                RuntimeInstanceId: runtimeInstanceId));
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
+        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+            .IsEqualTo(RuntimeFailureCode.InvalidConfiguration);
+        await Assert.That(lifecycle.ProvisionCount).IsEqualTo(0);
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
+    }
+
+    [Test]
     public async Task Container_configuration_rejection_has_a_stable_failure_code()
     {
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
@@ -35,7 +79,7 @@ public sealed class ContainerRuntimeHandlerTests
             Definition: new ContainerRequest(
                 runtimeInstanceId,
                 RuntimeProvider.Docker,
-                "challenge:latest",
+                "challenge@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 [],
                 new Dictionary<string, string>(),
                 new Dictionary<string, string>(),
@@ -230,17 +274,22 @@ public sealed class ContainerRuntimeHandlerTests
         public List<ContainerReceipt> Destroyed { get; } = [];
         public Exception? ProvisionFailure { get; init; }
         public int EnsureRunningCalls { get; private set; }
+        public int ProvisionCount { get; private set; }
 
         public Task<ContainerReceipt> CreateAsync(
             ContainerRequest request,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken)
+        {
+            ProvisionCount++;
             throw new NotSupportedException();
+        }
 
         public Task<ContainerReceipt> EnsureRunningAsync(
             ContainerRequest request,
             CancellationToken cancellationToken)
         {
             EnsureRunningCalls++;
+            ProvisionCount++;
             return ProvisionFailure is null
                 ? throw new NotSupportedException()
                 : Task.FromException<ContainerReceipt>(ProvisionFailure);

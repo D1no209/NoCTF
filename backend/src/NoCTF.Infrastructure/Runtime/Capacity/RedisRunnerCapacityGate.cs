@@ -214,4 +214,20 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
             _ => throw new InvalidOperationException("Redis returned an unknown capacity release result.")
         };
     }
+
+    public async Task<RunnerCapacityReleaseOutcome> ReleaseOrphanedAsync(
+        Guid runtimeInstanceId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var database = redis.GetDatabase();
+        var claimKey = new RedisKey($"runner-claim:{runtimeInstanceId:N}");
+        var owner = await database.HashGetAsync(claimKey, "runnerId");
+        if (!owner.HasValue || string.IsNullOrWhiteSpace(owner.ToString()))
+            return RunnerCapacityReleaseOutcome.AlreadyReleased;
+        return await ReleaseAsync(
+            runtimeInstanceId,
+            owner.ToString(),
+            cancellationToken);
+    }
 }

@@ -180,6 +180,54 @@ public static class ComposeRuntimeDefinitionPolicy
         return errors;
     }
 
+    public static IReadOnlyDictionary<string, string> ReadServiceImages(string composeYaml)
+    {
+        var document = LoadRequired(composeYaml);
+        var services = GetRequiredMapping(document, "services");
+        var images = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entry in services.Children)
+        {
+            if (entry.Key is not YamlScalarNode { Value: { Length: > 0 } serviceName }
+                || entry.Value is not YamlMappingNode service
+                || !TryGetScalar(service, "image", out var image)
+                || string.IsNullOrWhiteSpace(image))
+                throw new InvalidOperationException(
+                    "Every Compose service must have a scalar image before publication.");
+            images.Add(serviceName, image);
+        }
+        return images;
+    }
+
+    public static string ReplaceServiceImages(
+        string composeYaml,
+        IReadOnlyDictionary<string, string> replacements)
+    {
+        if (replacements.Count == 0)
+            return composeYaml;
+        var document = LoadRequired(composeYaml);
+        var services = GetRequiredMapping(document, "services");
+        var changed = false;
+        foreach (var entry in services.Children)
+        {
+            var serviceName = ((YamlScalarNode)entry.Key).Value!;
+            if (!replacements.TryGetValue(serviceName, out var replacement))
+                continue;
+            var service = (YamlMappingNode)entry.Value;
+            if (!TryGetScalar(service, "image", out var current))
+                throw new InvalidOperationException(
+                    $"Compose service '{serviceName}' requires a scalar image.");
+            if (string.Equals(current, replacement, StringComparison.Ordinal))
+                continue;
+            SetScalar(service, "image", replacement);
+            changed = true;
+        }
+        if (!changed)
+            return composeYaml;
+        using var writer = new StringWriter(CultureInfo.InvariantCulture);
+        new YamlStream(new YamlDocument(document)).Save(writer, assignAnchors: false);
+        return writer.ToString();
+    }
+
     public static string PrepareForDocker(
         ComposeRequest request,
         long logMaxSizeBytes,
