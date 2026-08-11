@@ -9,6 +9,24 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：AWDP Fix 崩溃重放栅栏
+
+- 功能提交 `bfb71721` 使 AWDP Fix 的一次性验证在任何外部副作用前，先于 PostgreSQL 行锁事务中推进
+  execution fence，并与 Wolverine Outbox 一起发布对应超时消息；只有当前 generation 与 processing
+  version 的回调或结果可以落库。
+- 如果同一执行消息在结果尚不确定时重投，Worker 会先推进 recovery fence，使旧 Checker 回调、Patch
+  结果与超时消息立即失效；Runner 随后按 RuntimeInstanceId 与 Generation 精确清理 target、checker、
+  network 和本地工作目录，并确认 Provider 已不存在资源后才 owner-check 释放容量。
+- 清理或确认失败时不会创建替代环境，也不会伪造终态；Wolverine 可以继续安全重试。清理成功后使用原
+  GameplayFact、PatchUpload 与 archive 创建新的 RuntimeInstanceId 和 generation 重放；题目、比赛题目
+  或规则 revision 已变化时明确 PlatformFailed，不会静默改用新配置。
+- 迟到/重复 callback、重复 cleanup completion、旧 generation 与重复 replay 均由状态、generation、
+  runner assignment 和 processing version 栅栏幂等忽略。本阶段复用 RuntimeInstance、GameplayFact 与
+  Wolverine，没有新增表、列、migration、snapshot、HTTP/OpenAPI 或生成 SDK 变化。
+- 独立阶段验证通过：Release solution build 0 警告/0 错误、非 Integration 648/648、真实 PostgreSQL +
+  Wolverine durable retry 4/4，以及 Runner 精确清理/资源残留/版本回执单测、analyzer 与
+  `git diff --check`。统一分支会在最终完整门禁再次覆盖；尚未推送、部署或操作生产 Fix/Runtime。
+
 ## 2026-08-11 全量审计修复：Runtime 访问地址协议边界
 
 - 功能提交 `44b585e7` 新增 Domain 强类型 `RuntimeAccessUrl` / `RuntimeAccessScheme`，按用户确认的
