@@ -9,6 +9,26 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：归档与永久删除边界
+
+- 功能提交 `69d1a4c5` 和 `492bc7f4` 落实用户确认的永久历史不变量：软删除/恢复是可逆归档操作；
+  物理删除是独立的不可逆操作，只允许从未产生永久比赛事件或任何业务引用的空竞赛。正常创建本身会
+  写入永久 `CompetitionCreated`，因此真实使用过的比赛不会因先软删除而获得物理删除资格。
+- 新增强类型 `GET /admin/competitions/{id}/hard-delete-preview`。预览与 DELETE 在同一个 PostgreSQL
+  竞赛行锁不变量下计算 HistoricalEvent、Team、CompetitionChallenge、GameplayFact、RuntimeInstance、
+  PatchUpload、DataExport、Notification 与 PosterFile 阻塞数量；DELETE 返回 204、404 或携带最新预览
+  的 typed 409。并发插入永久事件与物理删除通过外键锁和事务重检 fail closed，不会出现预览后竞态删除。
+- 管理端明确分开“软删除竞赛”“恢复”和“彻底删除”。永久删除按钮只在服务端预览确认无引用时显示；
+  阻塞状态展示引用种类与数量，409 会保留页面事实并刷新影响预览，不会错误切换本地删除状态。
+- OpenAPI、SDK 与 API 文档已从合并后的 193 个 Endpoint 工具重生成，没有手写 URL、DTO 或枚举；
+  没有新增数据表、列、migration 或 snapshot。
+- 验证通过：Release solution build 0 警告/0 错误；硬删除强类型 Endpoint 与真实 PostgreSQL 竞态测试
+  合计 2/2；相关 OpenAPI/路由/Raw SQL 门禁通过；ClientApp 删除与 i18n 定向测试 11/11、typecheck
+  通过。独立阶段还验证了 PostgreSQL 3/3、前端 production build 与 EF model drift；合并后的 OpenAPI
+  再导出和 SDK 再生成无实质漂移。
+- 尚未推送、部署或删除任何生产竞赛。最终 Edge 验收仅使用新建的空竞赛验证物理删除；包含永久事件的
+  测试比赛只验证阻塞预览，绝不为验收清理其历史。
+
 ## 2026-08-11 全量审计修复：比赛事件永久历史导航
 
 - 功能提交 `11734de9` 按用户确认的保留策略区分事件读取窗口：参赛者和队伍仍必须提交最多 31 天的
