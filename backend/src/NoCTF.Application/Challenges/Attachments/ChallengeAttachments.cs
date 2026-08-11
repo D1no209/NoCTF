@@ -40,6 +40,11 @@ public enum ChallengeAttachmentFailureCode
 
 public interface IChallengeAttachmentStore
 {
+    Task<bool> CanWriteAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken cancellationToken);
     Task<IReadOnlyList<ChallengeAttachmentView>?> ListAdminAsync(
         Guid challengeId,
         Guid actorId,
@@ -110,6 +115,10 @@ public sealed class ManageChallengeAttachments(
         if (string.IsNullOrWhiteSpace(fileName) || fileName.Length > 260)
             return OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>.Failure(
                 ChallengeAttachmentFailureCode.InvalidFileName, "FileName is invalid.");
+        if (!await store.CanWriteAsync(challengeId, actorId, isAdministrator, ct))
+            return OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>.Failure(
+                ChallengeAttachmentFailureCode.ChallengeNotFound,
+                "Challenge was not found or access was denied.");
         var attachmentId = requestedAttachmentId ?? Guid.CreateVersion7(now);
         if (await store.AttachmentIdExistsAsync(attachmentId, ct))
             return OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>.Failure(

@@ -39,6 +39,35 @@ public sealed class ChallengeAttachmentUploadTests
     }
 
     [Test]
+    public async Task Unauthorized_challenge_is_rejected_before_file_staging()
+    {
+        var harness = CreateHarness(canWrite: false);
+
+        var result = await UploadAsync(harness);
+
+        await Assert.That(result.Succeeded).IsFalse();
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(ChallengeAttachmentFailureCode.ChallengeNotFound);
+        await harness.Store.DidNotReceiveWithAnyArgs()
+            .AttachmentIdExistsAsync(default, default);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(
+            default,
+            default!,
+            default,
+            default);
+        await harness.Registry.DidNotReceiveWithAnyArgs()
+            .AbandonAsync(default, default);
+        await harness.Store.DidNotReceiveWithAnyArgs().AddAsync(
+            default,
+            default,
+            default,
+            default,
+            default,
+            default,
+            default);
+    }
+
+    [Test]
     [Arguments(AddChallengeAttachmentState.ChallengeNotFound, ChallengeAttachmentFailureCode.ChallengeNotFound)]
     [Arguments(AddChallengeAttachmentState.ResourceIdConflict, ChallengeAttachmentFailureCode.ResourceIdConflict)]
     public async Task Rejected_attachment_deletes_the_exact_stored_object_once(
@@ -143,11 +172,17 @@ public sealed class ChallengeAttachmentUploadTests
             default);
     }
 
-    private static Harness CreateHarness()
+    private static Harness CreateHarness(bool canWrite = true)
     {
         var store = Substitute.For<IChallengeAttachmentStore>();
         var objects = Substitute.For<IObjectStorage>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
+        store.CanWriteAsync(
+                ChallengeId,
+                ActorId,
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(canWrite));
         store.AttachmentIdExistsAsync(AttachmentId, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(false));
         objects.PutAsync(
