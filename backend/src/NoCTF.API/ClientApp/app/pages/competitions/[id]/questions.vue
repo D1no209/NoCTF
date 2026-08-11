@@ -14,6 +14,7 @@ import type {
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode,
   NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse,
 } from '~/api'
+import { createLatestRequestGuard } from '~/lib/latest-request'
 import {
   competitionQuestionErrorMessage,
   competitionQuestionRoleLabel,
@@ -144,13 +145,19 @@ function setCreateOpen(open: boolean) {
 const selectedId = ref<string | null>(null)
 const detail = ref<Question | null>(null)
 const detailLoading = ref(false)
+const detailRequests = createLatestRequestGuard()
 
 async function select(id: string, syncRoute = true) {
   if (detailLoading.value && selectedId.value === id) return
+  const request = detailRequests.begin()
   selectedId.value = id
   detailLoading.value = true
+  if (syncRoute && route.query.question !== id) {
+    void router.replace({ query: { ...route.query, question: id } })
+  }
   try {
     const { data, error } = await getCompetitionQuestion({ path: { competitionId, questionId: id } })
+    if (!detailRequests.isCurrent(request)) return
     if (error || !data) {
       toast.error(parseApiError(error, translate("加载咨询详情失败")).message)
       return
@@ -158,15 +165,14 @@ async function select(id: string, syncRoute = true) {
     detail.value = data
     upsertQuestion(data)
     markRead(data)
-    if (syncRoute && route.query.question !== id) {
-      await router.replace({ query: { ...route.query, question: id } })
-    }
   }
   catch (error) {
-    toast.error(parseApiError(error, translate("加载咨询详情失败")).message)
+    if (detailRequests.isCurrent(request))
+      toast.error(parseApiError(error, translate("加载咨询详情失败")).message)
   }
   finally {
-    detailLoading.value = false
+    if (detailRequests.isCurrent(request))
+      detailLoading.value = false
   }
 }
 

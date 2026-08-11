@@ -14,6 +14,7 @@ import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
 } from '~/api'
+import { createLatestRequestGuard } from '~/lib/latest-request'
 
 definePageMeta({ middleware: 'platform-admin' })
 
@@ -77,13 +78,22 @@ const detail = ref<PlatformUser | null>(null)
 const pendingRole = ref('User')
 const roleSaving = ref(false)
 const invalidating = ref(false)
+const detailRequests = createLatestRequestGuard()
+
+watch(detailOpen, (open) => {
+  if (open) return
+  detailRequests.invalidate()
+  detailLoading.value = false
+})
 
 async function openDetail(user: PlatformUser): Promise<void> {
+  if (!user.id) return
+  const request = detailRequests.begin()
   detailOpen.value = true
   detailLoading.value = true
   detail.value = null
-  if (!user.id) return
   const { data, error } = await adminPlatformGetUser({ path: { userId: user.id } })
+  if (!detailRequests.isCurrent(request)) return
   detailLoading.value = false
   if (error) {
     toast.error(parseApiError(error).message)
