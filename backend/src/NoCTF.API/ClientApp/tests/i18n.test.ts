@@ -80,7 +80,7 @@ describe('locale switch placement', () => {
     expect(layout.replaceAll('\r\n', '\n')).toContain('<ThemeToggle />\n          <LanguageToggle />')
   })
 
-  test('switches the selected locale without reloading the SPA', async () => {
+  test('switches the selected locale without reloading or remounting the SPA page', async () => {
     const composable = await Bun.file(
       new URL('../app/composables/useLocale.ts', import.meta.url),
     ).text()
@@ -90,7 +90,8 @@ describe('locale switch placement', () => {
 
     expect(composable).toContain("setLocale(isEnglish.value ? 'zh-CN' : 'en')")
     expect(composable).not.toContain('window.location.reload()')
-    expect(app).toContain('const { locale } = useLocale()')
-    expect(app).toContain('<NuxtPage :key="locale" />')
+    expect(app).toContain('<NuxtPage />')
+    expect(app).not.toContain('const { locale } = useLocale()')
+    expect(app).not.toMatch(/<NuxtPage\s+[^>]*:key=/)
   })
 })
