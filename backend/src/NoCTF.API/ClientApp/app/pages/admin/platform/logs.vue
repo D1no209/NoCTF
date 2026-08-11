@@ -2,7 +2,7 @@
 import { Download, Radio } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { adminPlatformExportLogs, adminPlatformListLogs } from '~/api'
-import { downloadProtectedFile } from '~/utils/download'
+import { downloadSdkFile } from '~/utils/download'
 import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformLogResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformLogLevelProtocol,
@@ -108,8 +108,8 @@ async function exportLogs(): Promise<void> {
   }
   exporting.value = true
   try {
-    await downloadProtectedFile(
-      () => adminPlatformExportLogs({
+    await downloadSdkFile(
+      adminPlatformExportLogs({
         query: {
           minimumLevel: minimumLevel.value,
           service: service.value === 'all' ? null : service.value,

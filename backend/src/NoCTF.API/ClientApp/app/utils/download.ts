@@ -26,15 +26,15 @@ function contentDispositionFileName(disposition: string, fallbackName: string): 
   }
 }
 
-export async function readProtectedDownload(
-  request: ProtectedDownloadRequest,
-  fallbackName = 'download',
+async function readSdkDownload(
+  request: PromiseLike<ProtectedDownloadResponse>,
+  fallbackName: string,
 ): Promise<ProtectedDownload> {
-  const { data, error, response } = await request()
-  if (error || !response?.ok) {
+  const { data, error, response } = await request
+  if (error || response?.ok === false) {
     throw parseApiError(
       error,
-      translate('下载失败（HTTP {status}）', { status: response?.status ?? 0 }),
+      translate('下载失败（HTTP {status}）', { status: response?.status ?? '-' }),
     )
   }
   if (!(data instanceof Blob)) {
@@ -43,16 +43,34 @@ export async function readProtectedDownload(
   return {
     blob: data,
     fileName: contentDispositionFileName(
-      response.headers.get('content-disposition') ?? '',
+      response?.headers.get('content-disposition') ?? '',
       fallbackName,
     ),
   }
 }
 
-/**
- * 下载需要 Bearer 鉴权的文件(挑战附件等),通过 blob + 临时链接触发浏览器下载。
- * 文件名优先取 Content-Disposition,其次用传入的 fallback。
- */
+export async function readProtectedDownload(
+  request: ProtectedDownloadRequest,
+  fallbackName = 'download',
+): Promise<ProtectedDownload> {
+  return readSdkDownload(request(), fallbackName)
+}
+
+/** Trigger a browser download from a generated SDK file operation. */
+export async function downloadSdkFile(
+  request: PromiseLike<ProtectedDownloadResponse>,
+  fallbackName = 'download',
+): Promise<void> {
+  const { blob, fileName } = await readSdkDownload(request, fallbackName)
+  const anchor = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  anchor.href = objectUrl
+  anchor.download = fileName
+  anchor.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
+/** @deprecated Prefer downloadSdkFile with the generated SDK promise directly. */
 export async function downloadProtectedFile(
   request: ProtectedDownloadRequest,
   fallbackName = 'download',
