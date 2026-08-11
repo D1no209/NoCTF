@@ -85,8 +85,8 @@ public sealed record CompetitionEventQuery(
     Guid? ActorUserId,
     Guid? CompetitionChallengeId,
     Guid? RuntimeInstanceId,
-    DateTimeOffset From,
-    DateTimeOffset To,
+    DateTimeOffset? From,
+    DateTimeOffset? To,
     DateTimeOffset? BeforeOccurredAt,
     Guid? BeforeId,
     int Limit,
@@ -186,15 +186,22 @@ public sealed class ListCompetitionEvents(ICompetitionEventStore store)
     public Task<CompetitionEventPage> ExecuteAsync(
         CompetitionEventQuery query,
         CancellationToken cancellationToken = default) =>
-        IsValidRange(query, 200)
+        IsValidRange(query, 200, allowUnbounded: true)
             ? store.QueryAsync(query, cancellationToken)
             : Task.FromResult(new CompetitionEventPage(CompetitionEventReadState.InvalidQuery));
 
-    internal static bool IsValidRange(CompetitionEventQuery query, int maximumLimit) =>
+    internal static bool IsValidRange(
+        CompetitionEventQuery query,
+        int maximumLimit,
+        bool allowUnbounded) =>
         query.Limit is >= 1
         && query.Limit <= maximumLimit
-        && query.From <= query.To
-        && query.To - query.From <= TimeSpan.FromDays(31)
+        && (query.From is null && query.To is null
+            ? allowUnbounded
+            : query.From is DateTimeOffset from
+              && query.To is DateTimeOffset to
+              && from <= to
+              && to - from <= TimeSpan.FromDays(31))
         && (query.Kind is null || query.Kinds is null or { Count: 0 })
         && ((query.BeforeOccurredAt is null) == (query.BeforeId is null));
 }
@@ -204,7 +211,7 @@ public sealed class ExportCompetitionEvents(ICompetitionEventStore store)
     public Task<CompetitionEventExportResult> ExecuteAsync(
         CompetitionEventQuery query,
         CancellationToken cancellationToken = default) =>
-        ListCompetitionEvents.IsValidRange(query, 50_000)
+        ListCompetitionEvents.IsValidRange(query, 50_000, allowUnbounded: false)
             ? store.ExportAsync(query, cancellationToken)
             : Task.FromResult(new CompetitionEventExportResult(
                 CompetitionEventReadState.InvalidQuery));

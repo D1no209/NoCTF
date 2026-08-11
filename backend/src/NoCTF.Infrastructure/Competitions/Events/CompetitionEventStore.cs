@@ -88,6 +88,9 @@ public sealed class CompetitionEventStore(
             cancellationToken);
         if (access.State != CompetitionEventReadState.Available)
             return new(access.State);
+        if (query.From is null
+            && access.AccessLevel != CompetitionEventAccessLevel.Staff)
+            return new(CompetitionEventReadState.Forbidden);
 
         var items = await LoadAsync(query, access, cancellationToken);
         return new(
@@ -111,6 +114,8 @@ public sealed class CompetitionEventStore(
             return new(access.State);
         if (!access.CanExport)
             return new(CompetitionEventReadState.Forbidden);
+        if (query.From is null || query.To is null)
+            return new(CompetitionEventReadState.InvalidQuery);
 
         var items = await EnrichAsync(
             await LoadAsync(query, access, cancellationToken),
@@ -127,7 +132,7 @@ public sealed class CompetitionEventStore(
         }
         stream.Position = 0;
         var fileName =
-            $"competition-{query.CompetitionId:N}-{query.From:yyyyMMdd}-{query.To:yyyyMMdd}.jsonl";
+            $"competition-{query.CompetitionId:N}-{query.From.Value:yyyyMMdd}-{query.To.Value:yyyyMMdd}.jsonl";
         return new(
             CompetitionEventReadState.Available,
             new CompetitionEventExport(stream, fileName));
@@ -268,10 +273,13 @@ public sealed class CompetitionEventStore(
         CancellationToken cancellationToken)
     {
         var query = db.CompetitionEvents.AsNoTracking()
-            .Where(item =>
-                item.CompetitionId == filter.CompetitionId
-                && item.OccurredAt >= filter.From
-                && item.OccurredAt <= filter.To);
+            .Where(item => item.CompetitionId == filter.CompetitionId);
+        if (filter.From is DateTimeOffset from && filter.To is DateTimeOffset to)
+        {
+            query = query.Where(item =>
+                item.OccurredAt >= from
+                && item.OccurredAt <= to);
+        }
         if (access.AccessLevel != CompetitionEventAccessLevel.Staff)
         {
             query = access.TeamId is Guid teamId

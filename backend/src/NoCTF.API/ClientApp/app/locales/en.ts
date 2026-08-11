@@ -1489,5 +1489,8 @@ export const englishMessages: Record<string, string> = {
   "上一页": "Previous page",
   "下一页": "Next page",
   "运维": "Maintenance",
-  "显示密码": "Show password"
+  "显示密码": "Show password",
+  "完整历史": "Full history",
+  "最近 30 天": "Last 30 days",
+  "无法确认动态历史访问范围，当前仅显示最近 30 天。": "Could not confirm access to the full event history. Showing the last 30 days only."
 }

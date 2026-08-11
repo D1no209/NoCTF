@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { listCompetitionEvents } from '~/api'
+import { adminGetCompetition, listCompetitionEvents } from '~/api'
 import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse, NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol } from '~/api'
+import { competitionEventHistoryRange } from '~/lib/competition-event-history'
 
 type CompetitionEvent = NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse
 
 const route = useRoute()
 const competitionId = route.params.id as string
 const ctx = inject(competitionContextKey)!
+const { canOrganize, isAdministrator } = useAuth()
+const hasStaffHistory = ref(isAdministrator.value)
+const historyScopeResolved = ref(false)
+const historyScopeError = ref<string | null>(null)
 
 const initialKind = typeof route.query.kind === 'string' ? route.query.kind : 'all'
 const kind = ref<string>(initialKind)
@@ -23,15 +28,15 @@ const kindOptions = [
 const { items, loading, error, hasMore, initialized, loadMore, reset } =
   useCursorPagination<CompetitionEvent>(async (cursor) => {
     const competition = ctx.competition.value
-    const now = Date.now()
-    const start = competition?.startTime ? new Date(competition.startTime).getTime() : now
-    // 后端限制 from/to 跨度 ≤31 天
-    const from = new Date(Math.max(start, now - 30 * 24 * 3600 * 1000)).toISOString()
+    const range = competitionEventHistoryRange(
+      hasStaffHistory.value,
+      competition?.startTime,
+    )
     const { data, error: err } = await listCompetitionEvents({
       path: { competitionId },
       query: {
-        from,
-        to: new Date(now).toISOString(),
+        from: range.from,
+        to: range.to,
         kind: kind.value === 'all' ? null : kind.value as NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
         cursor,
         limit: 50,
@@ -41,14 +46,33 @@ const { items, loading, error, hasMore, initialized, loadMore, reset } =
     return { items: data.items, nextCursor: data.nextCursor }
   })
 
+async function resolveHistoryScope() {
+  if (!hasStaffHistory.value && canOrganize.value) {
+    const { data, error: requestError, response } = await adminGetCompetition({
+      path: { competitionId },
+    })
+    hasStaffHistory.value = data?.administrationRole != null
+    if (requestError && response?.status !== 403 && response?.status !== 404) {
+      historyScopeError.value = parseApiError(
+        requestError,
+        translate('无法确认动态历史访问范围，当前仅显示最近 30 天。'),
+      ).message
+    }
+  }
+  historyScopeResolved.value = true
+}
+
 // 竞赛详情就绪后才开始加载
 watch(
   () => ctx.competition.value,
   (competition, previous) => {
-    if (competition && !initialized.value) void loadMore()
+    if (competition && historyScopeResolved.value && !initialized.value) void loadMore()
   },
   { immediate: true },
 )
+
+await resolveHistoryScope()
+if (ctx.competition.value && !initialized.value) await loadMore()
 
 watch(kind, () => {
   reset()
@@ -77,23 +101,32 @@ const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventL
 <template>
   <div class="flex flex-col gap-4">
     <div class="flex items-center justify-between gap-2">
-      <Select v-model="kind">
-        <SelectTrigger class="w-40">
-          <SelectValue :placeholder="$t('全部动态')" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectItem v-for="option in kindOptions" :key="option.value" :value="option.value">
-              {{ $t(option.label) }}
-            </SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+      <div class="flex items-center gap-2">
+        <Select v-model="kind">
+          <SelectTrigger class="w-40">
+            <SelectValue :placeholder="$t('全部动态')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem v-for="option in kindOptions" :key="option.value" :value="option.value">
+                {{ $t(option.label) }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Badge variant="outline">
+          {{ $t(hasStaffHistory ? '完整历史' : '最近 30 天') }}
+        </Badge>
+      </div>
       <Button variant="outline" size="sm" @click="reload">{{ $t('刷新') }}</Button>
     </div>
 
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error.message }}</AlertDescription>
+    </Alert>
+
+    <Alert v-if="historyScopeError" variant="destructive">
+      <AlertDescription>{{ historyScopeError }}</AlertDescription>
     </Alert>
 
     <div v-if="loading && !initialized" class="flex flex-col gap-2">

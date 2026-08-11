@@ -2508,19 +2508,19 @@
           {
             "name": "from",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "nullable": true
             }
           },
           {
             "name": "to",
             "in": "query",
-            "required": true,
             "schema": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "nullable": true
             }
           },
           {
