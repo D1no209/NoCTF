@@ -29,6 +29,12 @@ AWDP 是独立 Break/Fix 模式：
 - 后续正确 GameplayFact 仍保存 Correct，投影器不重复计成就。
 - 首次由 OccurredAt+GameplayFactId 决定，重判覆盖当前结果后可改变。
 
+旧版本曾把已有任意 Correct Break 的后续正确提交保存为
+`Duplicate / DuplicateAchievement`，这会同时误伤 Milestone 的后续正确事实和
+PerRound 的跨轮正确事实。历史裁决差异预览只读识别这一组明确的旧结果，并把
+`Correct` 作为确定性预期结果；它不会把当前合法的 Correct Break 标为 Duplicate，
+也不会为 AWDP 推断 CTF 血榜差异。
+
 Round 使用 EffectiveRunningTime；没有加固期。对任意 GameplayFact，用 Competition 生命周期事件得到 `EffectiveRunningTimeAt(OccurredAt)`，再计算 `floor(effective / current RoundDurationSeconds)+1`。RoundDuration 修改会自动重分组当前事实，不需重判。中途 Finish 不伪造 RoundEnd，结束前 Break/Fix 按 OccurredAt 所属轮次结算。
 
 ## RequireBreakBeforeFix

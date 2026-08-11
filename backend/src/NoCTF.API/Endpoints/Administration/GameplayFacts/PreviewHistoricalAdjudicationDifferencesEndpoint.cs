@@ -38,6 +38,7 @@ public enum AdjudicationDifferenceCertaintyProtocol
 public enum AdjudicationDifferenceKindProtocol
 {
     CurrentCorrectShouldBeDuplicate,
+    CurrentDuplicateShouldBeCorrect,
     DuplicateWithoutCurrentPredecessor,
     HistoricalResultChanged,
     MissingAdjudicationRecord,
@@ -96,7 +97,7 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Previews historical gameplay adjudication differences.";
-            summary.Description = "Returns a bounded, read-only analysis of CTF Flag results and recorded blood awards. It never applies corrections.";
+            summary.Description = "Returns a bounded, read-only analysis of CTF Flag results and recorded blood awards, plus legacy AWDP Break duplicates. It never applies corrections.";
         });
     }
 
@@ -153,6 +154,8 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
         {
             AdjudicationDifferenceKind.CurrentCorrectShouldBeDuplicate =>
                 AdjudicationDifferenceKindProtocol.CurrentCorrectShouldBeDuplicate,
+            AdjudicationDifferenceKind.CurrentDuplicateShouldBeCorrect =>
+                AdjudicationDifferenceKindProtocol.CurrentDuplicateShouldBeCorrect,
             AdjudicationDifferenceKind.DuplicateWithoutCurrentPredecessor =>
                 AdjudicationDifferenceKindProtocol.DuplicateWithoutCurrentPredecessor,
             AdjudicationDifferenceKind.HistoricalResultChanged =>
