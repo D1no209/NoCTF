@@ -347,6 +347,9 @@ export const englishMessages: Record<string, string> = {
   "固定分值": "Fixed points",
   "瓜分受害方防御分池": "Divide the victim defense pool",
   "关闭": "Close",
+  "查看队伍 {team} 详情": "View details for team {team}",
+  "查看死信 {type} 详情": "View details for dead letter {type}",
+  "查看用户 {name} 详情": "View details for user {name}",
   "关闭时，比赛进入 Running 后停止接收新队伍与重新报名。": "When closed, the competition will stop accepting new teams and re-registration after entering Running.",
   "关闭咨询": "Close consultation",
   "关联题目(必选)": "Related questions (required)",
@@ -1481,6 +1484,8 @@ export const englishMessages: Record<string, string> = {
   "平台": "Platform",
   "加载环境状态失败": "Failed to load the environment status",
   "重试": "Retry",
+  "上一页": "Previous page",
+  "下一页": "Next page",
   "运维": "Maintenance",
   "显示密码": "Show password"
 }
