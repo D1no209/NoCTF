@@ -17,7 +17,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();
@@ -68,7 +68,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();
@@ -102,7 +102,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();
@@ -139,7 +139,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();
@@ -168,7 +168,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();
@@ -196,7 +196,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();
@@ -267,7 +267,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();
@@ -319,7 +319,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();
@@ -372,7 +372,7 @@ public sealed class RedisRunnerCapacityGateTests
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
-            await using var container = new RedisBuilder("redis:7-alpine").Build();
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
             await container.StartAsync(cancellationToken);
             await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
             var database = redis.GetDatabase();

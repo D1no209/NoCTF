@@ -770,7 +770,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
 
     private static async Task<PostgreSqlContainer> StartPostgresAsync(CancellationToken ct)
     {
-        var postgres = new PostgreSqlBuilder("postgres:17-alpine")
+        var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
             .WithDatabase("noctf_adjudication_preview")
             .WithUsername("postgres")
             .WithPassword("postgres")

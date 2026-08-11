@@ -698,7 +698,7 @@ public sealed class DataExportPersistenceTests
         };
 
     private static PostgreSqlContainer CreatePostgres(string database) =>
-        new PostgreSqlBuilder("postgres:17-alpine")
+        new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
             .WithDatabase(database)
             .WithUsername("postgres")
             .WithPassword("postgres")
