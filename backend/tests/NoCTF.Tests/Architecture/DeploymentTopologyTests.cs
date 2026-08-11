@@ -155,6 +155,17 @@ public sealed class DeploymentTopologyTests
         await Assert.That(runnerApiPolicy).Contains("- kube-apiserver");
         await Assert.That(runnerApiPolicy).DoesNotContain("0.0.0.0/0");
 
+        var clusterDnsPolicy = networkPolicies
+            .Split("\n---", StringSplitOptions.RemoveEmptyEntries)
+            .Single(document => document.Contains(
+                "name: allow-cluster-dns-egress",
+                StringComparison.Ordinal));
+        await Assert.That(clusterDnsPolicy).Contains("kind: CiliumNetworkPolicy");
+        await Assert.That(clusterDnsPolicy).Contains("\"k8s:k8s-app\": kube-dns");
+        await Assert.That(clusterDnsPolicy).Contains("rules:");
+        await Assert.That(clusterDnsPolicy).Contains("dns:");
+        await Assert.That(clusterDnsPolicy).Contains("matchPattern: \"*.svc.cluster.local\"");
+
         await Assert.That(smtpExample).Contains("kind: CiliumNetworkPolicy");
         await Assert.That(smtpExample).Contains("matchName: smtp.example.com");
         await Assert.That(smtpExample).Contains("\"k8s:k8s-app\": kube-dns");

@@ -142,6 +142,8 @@ kubectl apply -f networkpolicy.yaml
 ```
 
 Email delivery is optional and remains fail-closed under the default-deny policy.
+The stock DNS policy permits only `*.svc.cluster.local` lookups through cluster
+DNS; every external dependency therefore needs its own exact-FQDN policy.
 Before enabling email verification or password reset delivery, copy
 `smtp-egress.example.yaml` outside the repository, replace both occurrences of
 `smtp.example.com` and port `587` with the exact FQDN and TCP port configured in
