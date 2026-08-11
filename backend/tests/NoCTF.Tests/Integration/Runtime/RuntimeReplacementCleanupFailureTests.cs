@@ -918,9 +918,7 @@ public sealed class RuntimeReplacementCleanupFailureTests
         });
         var runtime = new ChallengeRuntimeTemplate(
             RuntimeAllocation.PerTeam,
-            new ContainerRuntimeDefinition(
-                "registry.example/cleanup@sha256:"
-                + new string('a', 64)),
+            new ContainerRuntimeDefinition("registry.example/cleanup:v1"),
             new RuntimeResourceLimits(67_108_864, 100_000_000, 64));
         db.Challenges.Add(new Challenge
         {

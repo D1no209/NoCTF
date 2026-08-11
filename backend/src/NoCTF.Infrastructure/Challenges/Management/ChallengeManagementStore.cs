@@ -7,16 +7,13 @@ using NoCTF.Infrastructure.Challenges;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
-using NoCTF.Application.Challenges.Images;
 
 namespace NoCTF.Infrastructure.Challenges.Management;
 
 public sealed class ChallengeManagementStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
-    ICompetitionEventRecorder? eventRecorder = null,
-    IChallengeImagePinningStore? imagePinning = null,
-    IChallengeImageDefinitionCatalog? imageDefinitions = null) : IChallengeManagementStore
+    ICompetitionEventRecorder? eventRecorder = null) : IChallengeManagementStore
 {
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -157,29 +154,6 @@ public sealed class ChallengeManagementStore(
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
         if (entity.Revision != command.ExpectedRevision)
             return new(null, ChallengeMutationFailure.RevisionConflict);
-        if (command.IsPublished && imagePinning is not null && imageDefinitions is not null)
-        {
-            var template = await imagePinning.LockCompetitionChallengeAsync(
-                command.CompetitionId,
-                command.CompetitionChallengeId,
-                ct);
-            if (template is null)
-                return new(null, ChallengeMutationFailure.TemplateNotFound);
-            if (command.ExpectedTemplateRevision is { } expectedTemplateRevision
-                && template.Revision != expectedTemplateRevision)
-                return new(null, ChallengeMutationFailure.RevisionConflict);
-            var definition = imageDefinitions.Read(template.Mode, template.DefinitionJson);
-            if (!definition.Succeeded
-                || definition.Images!.Any(image =>
-                    !ContainerImageReference.TryParse(image.Image, out var parsed)
-                    || !parsed.IsDigest))
-            {
-                return new(
-                    null,
-                    ChallengeMutationFailure.RuntimeImageNotPinned,
-                    "Every Runtime and Checker image must use a sha256 digest before publication.");
-            }
-        }
 
         var wasPublished = entity.IsPublished;
         var becamePublished = !wasPublished && command.IsPublished;
@@ -258,7 +232,6 @@ public sealed class ChallengeManagementStore(
             competitionId,
             competitionChallengeId,
             expectedRevision,
-            expectedTemplateRevision: null,
             now,
             restore: false,
             ct);
@@ -273,23 +246,6 @@ public sealed class ChallengeManagementStore(
             competitionId,
             competitionChallengeId,
             expectedRevision,
-            expectedTemplateRevision: null,
-            now,
-            restore: true,
-            ct);
-
-    public Task<ChallengeMutationFailure?> RestoreWithTemplateFenceAsync(
-        Guid competitionId,
-        Guid competitionChallengeId,
-        int expectedRevision,
-        int expectedTemplateRevision,
-        DateTimeOffset now,
-        CancellationToken ct) =>
-        SetDeletedAsync(
-            competitionId,
-            competitionChallengeId,
-            expectedRevision,
-            expectedTemplateRevision,
             now,
             restore: true,
             ct);
@@ -298,7 +254,6 @@ public sealed class ChallengeManagementStore(
         Guid competitionId,
         Guid competitionChallengeId,
         int expectedRevision,
-        int? expectedTemplateRevision,
         DateTimeOffset now,
         bool restore,
         CancellationToken ct)
@@ -319,26 +274,7 @@ public sealed class ChallengeManagementStore(
             return ChallengeMutationFailure.LifecycleStateConflict;
         if (restore)
         {
-            ChallengeImagePinSnapshot? template = null;
-            if (entity.IsPublished && imagePinning is not null && imageDefinitions is not null)
-            {
-                template = await imagePinning.LockCompetitionChallengeAsync(
-                    competitionId,
-                    competitionChallengeId,
-                    ct);
-                if (template is null)
-                    return ChallengeMutationFailure.TemplateNotFound;
-                if (expectedTemplateRevision is { } revision
-                    && template.Revision != revision)
-                    return ChallengeMutationFailure.RevisionConflict;
-                var definition = imageDefinitions.Read(template.Mode, template.DefinitionJson);
-                if (!definition.Succeeded
-                    || definition.Images!.Any(image =>
-                        !ContainerImageReference.TryParse(image.Image, out var parsed)
-                        || !parsed.IsDigest))
-                    return ChallengeMutationFailure.RuntimeImageNotPinned;
-            }
-            var templateMode = template?.Mode ?? await db.Challenges.AsNoTracking()
+            var templateMode = await db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.ChallengeId)
                 .Select(challenge => (GameMode?)challenge.Mode)
                 .SingleOrDefaultAsync(ct);

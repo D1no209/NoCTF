@@ -397,10 +397,9 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
         });
 
         var perTeamRuntime = new ChallengeRuntimeTemplate(
-            RuntimeAllocation.PerTeam,
+                        RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
-                "registry.example/challenge@sha256:"
-                + new string('a', 64),
+                "registry.example/challenge:v1",
                 Environment: new Dictionary<string, string>
                 {
                     ["CHALLENGE_FLAG"] = "author-value"

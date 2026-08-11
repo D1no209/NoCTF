@@ -107,17 +107,7 @@ FlagSource: Static | PerTeam
 
 Command null 使用镜像默认。`FlagSource=PerTeam` 时
 `FlagEnvironmentVariableName` 必填；Static 时必须省略。环境变量名合法且不能使用
-`NOCTF_`。Draft Challenge 可以保存 tag 或 digest；一旦 CompetitionChallenge 发布、
-Competition 发布或比赛 Start Gate 运行，平台会解析 Container image、Compose 每个
-service image 和 Checker image 的 Registry Manifest，并把它们持久化为
-`name@sha256:<digest>`。只有定义实际变化时才递增 Challenge Revision 和 UpdatedAt；
-已经固定的定义重复发布不会产生新修订。解析任一镜像失败时整组定义保持不变。
-
-Manifest 解析完成后，最终发布/启动事务会再次核对 Challenge Revision 和全部镜像的
-digest 形式，避免并发编辑绕过固定。Published、Running、Paused 期间不得把模板改回
-tag；恢复已删除的题目或比赛也遵守相同边界。私有 Registry 的 tag 必须允许匿名读取
-Manifest；否则管理员应直接填写 Registry 提供的完整 `image@sha256:<digest>`，平台不会
-联网重解析已经固定的 digest。
+`NOCTF_`。Image 可为 tag/digest，不强制 pin；配置变化只影响新 Generation。
 
 Container 的 `Security` 省略时使用兼容旧镜像的 trusted profile：三个布尔开关均为 `false`，
 capability 列表为空。显式配置的 `NoNewPrivileges` 与 `ReadonlyRootfs` 会由 Docker/Kubernetes
@@ -334,8 +324,3 @@ Runner 只有在 exact RuntimeInstanceId+Generation 的 Provider 资源已确认
 Runner owner 释放后，才发布 replay-ready；Worker 再以新 RuntimeInstanceId/Generation 创建
 替代 target。该流程复用 RuntimeInstance、GameplayFact、Wolverine outbox 和 provider receipt，
 不建立 operation/result-history 表。
-
-Worker 在派发前、Runner 在处理已持久化 Claim 以及最终 Provision 前都会复核消息内的
-Runtime/Compose image；任何
-未固定 tag 或非法 Compose 都以 `InvalidConfiguration` 失败，且不调用 provider。该防线
-覆盖升级前已经进入 Wolverine 队列的旧消息，并确保失败路径释放 Runner 容量。

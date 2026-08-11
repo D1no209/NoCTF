@@ -1,7 +1,6 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Domain.Competitions;
-using NoCTF.Application.Challenges.Images;
 
 namespace NoCTF.Application.Competitions.Lifecycle;
 
@@ -30,8 +29,7 @@ public enum StartGateFailureCode
     RuntimeQuotaInsufficient,
     ChallengeModeMismatch,
     ChallengeRulesInvalid,
-    RuntimeDefinitionInvalid,
-    RuntimeImageNotPinned
+    RuntimeDefinitionInvalid
 }
 
 public sealed record StartGateError(
@@ -49,8 +47,7 @@ public interface ICompetitionStartGateStore
 public sealed class CompetitionStartGate(
     ICompetitionStartGateStore store,
     ICompetitionConfigurationValidator competitionConfigurations,
-    IChallengeConfigurationCatalog challengeConfigurations,
-    IChallengeImageDefinitionCatalog? imageDefinitions = null)
+    IChallengeConfigurationCatalog challengeConfigurations)
 {
     public async Task<IReadOnlyList<StartGateError>?> ValidateAsync(
         Guid competitionId,
@@ -123,24 +120,6 @@ public sealed class CompetitionStartGate(
                     StartGateFailureCode.RuntimeDefinitionInvalid,
                     challenge.CompetitionChallengeId,
                     message));
-            if (imageDefinitions is not null)
-            {
-                var definition = imageDefinitions.Read(
-                    snapshot.Mode,
-                    challenge.DefinitionJson);
-                if (definition.Succeeded)
-                {
-                    foreach (var image in definition.Images!.Where(item =>
-                                 !ContainerImageReference.TryParse(item.Image, out var parsed)
-                                 || !parsed.IsDigest))
-                    {
-                        errors.Add(new(
-                            StartGateFailureCode.RuntimeImageNotPinned,
-                            challenge.CompetitionChallengeId,
-                            "Every Runtime and Checker image must be pinned to a sha256 digest before the competition can start."));
-                    }
-                }
-            }
         }
         return errors
             .DistinctBy(error => (

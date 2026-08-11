@@ -10,9 +10,6 @@ namespace NoCTF.Tests.Unit.Runner;
 
 public sealed class ComposeRuntimeHandlerTests
 {
-    private const string PinnedImage =
-        "challenge@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
     [Test]
     public async Task Provision_persists_receipt_and_expands_compose_urls()
     {
@@ -278,36 +275,6 @@ public sealed class ComposeRuntimeHandlerTests
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
 
-    [Test]
-    [Arguments("services:\n  web:\n    image: challenge:latest")]
-    [Arguments("services: [not-a-mapping]")]
-    public async Task Mutable_or_invalid_compose_image_is_rejected_before_provider_access(
-        string composeYaml)
-    {
-        var runtime = new RecordingComposeRuntime();
-        var capacity = new RecordingCapacity();
-        var reconciler = new RecordingResourceReconciler(RuntimeProvider.Docker);
-        var handler = CreateHandler(
-            runtime,
-            capacity,
-            new FixedWorkReader(RuntimeProvisionWorkStatus.Current),
-            reconciler);
-        var message = CreateProvisionMessage(composeYaml);
-
-        var result = await handler.Handle(message, CancellationToken.None);
-
-        await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
-        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
-            .IsEqualTo(RuntimeFailureCode.InvalidConfiguration);
-        await Assert.That(runtime.UpCount).IsEqualTo(0);
-        await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(
-                message.RuntimeInstanceId,
-                message.Generation)]);
-        await Assert.That(capacity.ReleasedRuntimeIds)
-            .IsEquivalentTo([message.RuntimeInstanceId]);
-    }
-
     private static RuntimeProviderHandler CreateHandler(
         IComposeRuntime runtime,
         IRunnerCapacityGate capacity,
@@ -329,8 +296,7 @@ public sealed class ComposeRuntimeHandlerTests
             reader);
     }
 
-    private static ProvisionComposeRuntime CreateProvisionMessage(
-        string? composeYaml = null)
+    private static ProvisionComposeRuntime CreateProvisionMessage()
     {
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         return new(
@@ -344,7 +310,7 @@ public sealed class ComposeRuntimeHandlerTests
                 RuntimeProvider.Docker,
                 3,
                 "noctf-runtime",
-                composeYaml ?? $"services:\n  web:\n    image: {PinnedImage}",
+                "services:\n  web:\n    image: challenge:v1",
                 new Dictionary<string, string>(),
                 new Dictionary<string, string>(),
                 new Dictionary<string, RuntimeResourceLimits>

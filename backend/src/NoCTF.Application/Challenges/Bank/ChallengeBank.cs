@@ -2,7 +2,6 @@ using NoCTF.Application.Common;
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
-using NoCTF.Application.Challenges.Images;
 
 namespace NoCTF.Application.Challenges.Bank;
 
@@ -31,7 +30,6 @@ public enum ChallengeTemplateWriteState
     NotFoundOrForbidden,
     RevisionConflict,
     ActiveCompetitionModeConflict,
-    RuntimeImageNotPinned,
     OwnerIncludedInManagerSet,
     UserNotFound,
     RoleNotEligible
@@ -227,9 +225,7 @@ public sealed class GetChallengeTemplate(IChallengeBankStore store)
 
 public sealed class UpdateChallengeTemplate(
     IChallengeBankStore store,
-    IChallengeConfigurationCatalog configurations,
-    IChallengeImagePinningStore? imagePinning = null,
-    IChallengeImageDefinitionCatalog? imageDefinitions = null)
+    IChallengeConfigurationCatalog configurations)
 {
     public async Task<ChallengeTemplateWriteResult> ExecuteAsync(
         UpdateChallengeTemplateCommand command,
@@ -255,21 +251,6 @@ public sealed class UpdateChallengeTemplate(
             return new(
                 ChallengeTemplateWriteState.InvalidDefinition,
                 Detail: string.Join(" ", definitionErrors));
-        }
-        if (imagePinning is not null
-            && imageDefinitions is not null
-            && await imagePinning.RequiresPinnedDefinitionAsync(command.ChallengeId, ct))
-        {
-            var definition = imageDefinitions.Read(command.Mode, command.DefinitionJson);
-            if (definition.Succeeded
-                && definition.Images!.Any(image =>
-                    !ContainerImageReference.TryParse(image.Image, out var parsed)
-                    || !parsed.IsDigest))
-            {
-                return new(
-                    ChallengeTemplateWriteState.RuntimeImageNotPinned,
-                    Detail: "Published or running competitions require every Runtime and Checker image to use a sha256 digest.");
-            }
         }
         return await store.UpdateAsync(command with
         {

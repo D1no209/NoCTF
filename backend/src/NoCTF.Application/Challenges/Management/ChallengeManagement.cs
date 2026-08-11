@@ -1,6 +1,5 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Domain.Competitions;
-using NoCTF.Application.Challenges.Images;
 
 namespace NoCTF.Application.Challenges.Management;
 
@@ -19,8 +18,7 @@ public sealed record UpdateCompetitionChallengeCommand(
     int Order,
     bool IsPublished,
     int ExpectedRevision,
-    DateTimeOffset UpdatedAt,
-    int? ExpectedTemplateRevision = null);
+    DateTimeOffset UpdatedAt);
 
 public sealed record ChallengeView(
     Guid Id,
@@ -46,13 +44,6 @@ public enum ChallengeMutationFailure
     CompetitionNotFound,
     TemplateNotFound,
     TemplateModeMismatch,
-    RuntimeImageNotPinned,
-    InvalidImageReference,
-    RegistryAuthenticationRequired,
-    RegistryAuthenticationFailed,
-    RegistryUnavailable,
-    RegistryManifestNotFound,
-    RegistryManifestInvalid,
     ChallengeNotFound,
     ResourceIdConflict,
     ChallengeOrderConflict,
@@ -63,8 +54,7 @@ public enum ChallengeMutationFailure
 
 public sealed record ChallengeMutationResult(
     ChallengeView? Challenge,
-    ChallengeMutationFailure? Failure = null,
-    string? Detail = null);
+    ChallengeMutationFailure? Failure = null);
 
 public sealed record ChallengeCompetitionContext(GameMode Mode, CompetitionStatus Status);
 
@@ -109,19 +99,6 @@ public interface IChallengeManagementStore
         int expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task<ChallengeMutationFailure?> RestoreWithTemplateFenceAsync(
-        Guid competitionId,
-        Guid competitionChallengeId,
-        int expectedRevision,
-        int expectedTemplateRevision,
-        DateTimeOffset now,
-        CancellationToken cancellationToken) =>
-        RestoreAsync(
-            competitionId,
-            competitionChallengeId,
-            expectedRevision,
-            now,
-            cancellationToken);
 }
 
 public sealed class CreateChallenge(
@@ -176,9 +153,7 @@ public sealed class ListChallenges(IChallengeManagementStore store)
         store.ListAsync(competitionId, includeUnpublished, includeDeleted, ct);
 }
 
-public sealed class UpdateChallenge(
-    IChallengeManagementStore store,
-    PinChallengeImages? imagePinning = null)
+public sealed class UpdateChallenge(IChallengeManagementStore store)
 {
     public async Task<ChallengeMutationResult> ExecuteAsync(
         UpdateCompetitionChallengeCommand command,
@@ -191,74 +166,15 @@ public sealed class UpdateChallenge(
         if (command.ExpectedRevision < 0)
             return new(null, ChallengeMutationFailure.InvalidRevision);
 
-        int? expectedTemplateRevision = null;
-        if (command.IsPublished && imagePinning is not null)
-        {
-            var current = await store.FindAsync(
-                command.CompetitionId,
-                command.CompetitionChallengeId,
-                includeUnpublished: true,
-                includeDeleted: false,
-                ct);
-            if (current is null)
-                return new(null, ChallengeMutationFailure.ChallengeNotFound);
-            if (current.Revision != command.ExpectedRevision)
-                return new(null, ChallengeMutationFailure.RevisionConflict);
-            var pinning = await imagePinning.PinCompetitionChallengeAsync(
-                command.CompetitionId,
-                command.CompetitionChallengeId,
-                command.UpdatedAt,
-                ct);
-            if (!pinning.Succeeded)
-            {
-                var error = pinning.Errors[0];
-                return new(null, ChallengeImagePinFailureMapping.Map(error.Code), error.Message);
-            }
-            expectedTemplateRevision = pinning.ChallengeRevisions![current.ChallengeId];
-        }
-
-        var result = await store.UpdateAsync(command with
-        {
-            ExpectedTemplateRevision = expectedTemplateRevision
-        }, ct);
+        var result = await store.UpdateAsync(command, ct);
         if (result.Challenge is null)
             return result;
 
         return result;
     }
-
 }
 
-internal static class ChallengeImagePinFailureMapping
-{
-    public static ChallengeMutationFailure Map(ChallengeImagePinFailureCode failure) =>
-        failure switch
-        {
-            ChallengeImagePinFailureCode.CompetitionNotFound =>
-                ChallengeMutationFailure.CompetitionNotFound,
-            ChallengeImagePinFailureCode.ChallengeNotFound =>
-                ChallengeMutationFailure.ChallengeNotFound,
-            ChallengeImagePinFailureCode.InvalidDefinition =>
-                ChallengeMutationFailure.RuntimeImageNotPinned,
-            ChallengeImagePinFailureCode.InvalidImageReference =>
-                ChallengeMutationFailure.InvalidImageReference,
-            ChallengeImagePinFailureCode.RegistryAuthenticationRequired =>
-                ChallengeMutationFailure.RegistryAuthenticationRequired,
-            ChallengeImagePinFailureCode.RegistryAuthenticationFailed =>
-                ChallengeMutationFailure.RegistryAuthenticationFailed,
-            ChallengeImagePinFailureCode.RegistryUnavailable =>
-                ChallengeMutationFailure.RegistryUnavailable,
-            ChallengeImagePinFailureCode.RegistryManifestNotFound =>
-                ChallengeMutationFailure.RegistryManifestNotFound,
-            ChallengeImagePinFailureCode.RegistryManifestInvalid =>
-                ChallengeMutationFailure.RegistryManifestInvalid,
-            _ => ChallengeMutationFailure.RevisionConflict
-        };
-}
-
-public sealed class DeleteChallenge(
-    IChallengeManagementStore store,
-    PinChallengeImages? imagePinning = null)
+public sealed class DeleteChallenge(IChallengeManagementStore store)
 {
     public Task<ChallengeMutationFailure?> ExecuteAsync(
         Guid competitionId,
@@ -299,48 +215,13 @@ public sealed class DeleteChallenge(
         if (expectedRevision < 0)
             return ChallengeMutationFailure.InvalidRevision;
 
-        int? expectedTemplateRevision = null;
-        if (restore && imagePinning is not null)
-        {
-            var challenge = await store.FindAsync(
+        var failure = restore
+            ? await store.RestoreAsync(
                 competitionId,
                 competitionChallengeId,
-                includeUnpublished: true,
-                includeDeleted: true,
-                ct);
-            if (challenge is null)
-                return ChallengeMutationFailure.ChallengeNotFound;
-            if (challenge.Revision != expectedRevision)
-                return ChallengeMutationFailure.RevisionConflict;
-            if (challenge.DeletedAt is null)
-                return ChallengeMutationFailure.LifecycleStateConflict;
-            if (challenge.IsPublished)
-            {
-                var pinning = await imagePinning.PinChallengeAsync(
-                    challenge.ChallengeId,
-                    now,
-                    ct);
-                if (!pinning.Succeeded)
-                    return ChallengeImagePinFailureMapping.Map(pinning.Errors[0].Code);
-                expectedTemplateRevision = pinning.ChallengeRevisions![challenge.ChallengeId];
-            }
-        }
-
-        var failure = restore
-            ? expectedTemplateRevision is { } templateRevision
-                ? await store.RestoreWithTemplateFenceAsync(
-                    competitionId,
-                    competitionChallengeId,
-                    expectedRevision,
-                    templateRevision,
-                    now,
-                    ct)
-                : await store.RestoreAsync(
-                    competitionId,
-                    competitionChallengeId,
-                    expectedRevision,
-                    now,
-                    ct)
+                expectedRevision,
+                now,
+                ct)
             : await store.SoftDeleteAsync(
                 competitionId,
                 competitionChallengeId,

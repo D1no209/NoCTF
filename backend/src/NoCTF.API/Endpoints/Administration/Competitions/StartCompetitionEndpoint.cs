@@ -13,13 +13,14 @@ public sealed class StartCompetitionEndpoint(
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
     : EndpointWithoutRequest<
-        Results<NoContent, NotFound, ForbidHttpResult, Conflict<CompetitionTransitionConflictResponse>>>
+        Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
     {
         Post("/admin/competitions/{competitionId}/start");
         AuthSchemes("Bearer");
-        Description(builder => builder.WithName("AdminStartCompetition"));
+        Description(builder => builder.WithName("AdminStartCompetition")
+            .ProducesProblemFE(StatusCodes.Status409Conflict));
         Summary(summary =>
         {
             summary.Summary = "Starts a published competition.";
@@ -28,7 +29,7 @@ public sealed class StartCompetitionEndpoint(
     }
 
     public override async Task<
-        Results<NoContent, NotFound, ForbidHttpResult, Conflict<CompetitionTransitionConflictResponse>>> ExecuteAsync(
+        Results<NoContent, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
@@ -44,6 +45,9 @@ public sealed class StartCompetitionEndpoint(
             return TypedResults.NotFound();
         return result.Succeeded
             ? TypedResults.NoContent()
-            : TypedResults.Conflict(CompetitionTransitionConflictMapper.ToResponse(result));
+            : TypedResults.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                title: "Competition cannot be started.",
+                detail: result.ErrorMessage);
     }
 }

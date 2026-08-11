@@ -3,7 +3,6 @@ using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
-using NoCTF.Application.Challenges.Images;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
 
@@ -30,7 +29,6 @@ public sealed class RuntimeClaimHandler(
             message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
-            ChallengeImagePinningPolicy.IsPinnedImage(message.Definition.Image),
             CapacityLimits(
                 message.Definition.Provider,
                 message.Definition.Limits,
@@ -59,8 +57,6 @@ public sealed class RuntimeClaimHandler(
             message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
-            ChallengeImagePinningPolicy.AreComposeImagesPinned(
-                message.Definition.ComposeYaml),
             CapacityLimits(
                 message.Definition.Provider,
                 message.Definition.Limits,
@@ -89,7 +85,6 @@ public sealed class RuntimeClaimHandler(
             message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
-            definitionPinned: true,
             message.Definition.Limits,
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
             (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
@@ -139,7 +134,6 @@ public sealed class RuntimeClaimHandler(
         long processingVersion,
         int generation,
         string runnerPool,
-        bool definitionPinned,
         RuntimeResourceLimits limits,
         Func<DateTimeOffset, ValueTask> scheduleRetry,
         Func<long, string, ValueTask> publishProvision,
@@ -169,67 +163,6 @@ public sealed class RuntimeClaimHandler(
                 && string.Equals(instance.RunnerId, runnerId, StringComparison.Ordinal)
                 ? MessageExecutionOutcome.Idempotent
                 : MessageExecutionOutcome.Superseded;
-
-        if (!definitionPinned)
-        {
-            var nextVersion = checked(processingVersion + 1);
-            var assignmentReleaseToken = Guid.CreateVersion7();
-            int rejected;
-            if (db.Database.IsRelational())
-            {
-                rejected = await db.RuntimeInstances
-                    .Where(candidate => candidate.Id == runtimeInstanceId
-                        && candidate.State == RuntimeState.Queued
-                        && candidate.ProcessingVersion == processingVersion
-                        && candidate.Generation == generation)
-                    .ExecuteUpdateAsync(
-                        setters => setters
-                            .SetProperty(candidate => candidate.State, RuntimeState.Provisioning)
-                            .SetProperty(candidate => candidate.RunnerId, runnerId)
-                            .SetProperty(
-                                candidate => candidate.RunnerAssignmentReleaseToken,
-                                assignmentReleaseToken)
-                            .SetProperty(candidate => candidate.ProcessingVersion, nextVersion),
-                        cancellationToken);
-            }
-            else
-            {
-                var tracked = await db.RuntimeInstances.SingleOrDefaultAsync(
-                    candidate => candidate.Id == runtimeInstanceId
-                        && candidate.State == RuntimeState.Queued
-                        && candidate.ProcessingVersion == processingVersion
-                        && candidate.Generation == generation,
-                    cancellationToken);
-                if (tracked is null)
-                {
-                    rejected = 0;
-                }
-                else
-                {
-                    tracked.State = RuntimeState.Provisioning;
-                    tracked.RunnerId = runnerId;
-                    tracked.RunnerAssignmentReleaseToken = assignmentReleaseToken;
-                    tracked.ProcessingVersion = nextVersion;
-                    await db.SaveChangesAsync(cancellationToken);
-                    rejected = 1;
-                }
-            }
-            if (rejected == 0)
-                return MessageExecutionOutcome.Superseded;
-            var release = await capacity.ReleaseOrphanedAsync(
-                runtimeInstanceId,
-                cancellationToken);
-            if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
-                throw new InvalidOperationException(
-                    "Mutable-image Runtime capacity changed owner during orphan recovery.");
-            await outbox.PublishAsync(new RuntimeProvisionFailed(
-                runtimeInstanceId,
-                nextVersion,
-                RuntimeFailureCode.InvalidConfiguration,
-                runnerId));
-            await outbox.FlushOutgoingMessagesAsync();
-            return MessageExecutionOutcome.Applied;
-        }
 
         var claim = await capacity.TryClaimForRunnerAsync(
             new RunnerCapacityRequest(
@@ -288,20 +221,10 @@ public sealed class RuntimeClaimHandler(
             }
             if (updated == 0)
             {
-                var assignment = await db.RuntimeInstances.AsNoTracking()
-                    .Where(candidate => candidate.Id == runtimeInstanceId)
-                    .Select(candidate => new
-                    {
-                        candidate.RunnerId,
-                        candidate.RunnerAssignmentReleaseToken
-                    })
-                    .SingleOrDefaultAsync(cancellationToken);
-                var assignmentStillOwnsClaim = assignment is not null
-                    && assignment.RunnerAssignmentReleaseToken is null
-                    && string.Equals(
-                        assignment.RunnerId,
-                        runnerId,
-                        StringComparison.Ordinal);
+                var assignmentStillOwnsClaim = await db.RuntimeInstances.AsNoTracking().AnyAsync(
+                    candidate => candidate.Id == runtimeInstanceId
+                        && candidate.RunnerId == runnerId,
+                    cancellationToken);
                 if (claim.State == RunnerCapacityClaimState.Acquired && !assignmentStillOwnsClaim)
                     await capacity.ReleaseAsync(runtimeInstanceId, runnerId, cancellationToken);
                 return MessageExecutionOutcome.Superseded;

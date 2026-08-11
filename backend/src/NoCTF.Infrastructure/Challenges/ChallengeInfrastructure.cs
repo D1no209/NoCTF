@@ -16,8 +16,6 @@ using NoCTF.Infrastructure.Challenges.Management;
 using NoCTF.Application.Challenges.Questions;
 using NoCTF.Infrastructure.Challenges.Questions;
 using NoCTF.Infrastructure.Caching;
-using NoCTF.Application.Challenges.Images;
-using NoCTF.Infrastructure.Challenges.Images;
 
 namespace NoCTF.Infrastructure.Challenges;
 
@@ -27,16 +25,6 @@ internal static class ChallengeInfrastructure
     {
         services.AddScoped<TeamChallengeCriticalSection>();
         services.AddSingleton<IChallengeConfigurationCatalog, GameModeChallengeConfigurationCatalog>();
-        services.AddSingleton<IChallengeImageDefinitionCatalog, ChallengeImageDefinitionCatalog>();
-        services.AddHttpClient(OciRegistryManifestResolver.ClientName, client =>
-            client.Timeout = TimeSpan.FromSeconds(15))
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-            {
-                AllowAutoRedirect = false
-            });
-        services.AddSingleton<IContainerRegistryManifestResolver, OciRegistryManifestResolver>();
-        services.AddScoped<IChallengeImagePinningStore, ChallengeImagePinningStore>();
-        services.AddScoped<PinChallengeImages>();
         services.AddSingleton<ChallengeRuntimeTemplateCatalog>();
         services.AddSingleton<IChallengeRuntimeTemplateCatalog,
             FusionChallengeRuntimeTemplateCatalog>();
