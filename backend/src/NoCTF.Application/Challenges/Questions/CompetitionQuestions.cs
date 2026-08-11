@@ -119,7 +119,16 @@ public sealed record CompetitionQuestionQuery(
     Guid? CompetitionChallengeId,
     CompetitionQuestionSubject? Subject,
     CompetitionQuestionStatus? Status,
-    int Limit);
+    int Limit,
+    CompetitionQuestionPagePosition? Position = null);
+
+public sealed record CompetitionQuestionPagePosition(
+    DateTimeOffset UpdatedAt,
+    Guid Id);
+
+public sealed record CompetitionQuestionPage(
+    IReadOnlyList<CompetitionQuestionView> Items,
+    CompetitionQuestionPagePosition? NextPosition);
 
 public interface ICompetitionQuestionStore
 {
@@ -127,7 +136,7 @@ public interface ICompetitionQuestionStore
         CreateCompetitionQuestionCommand command,
         CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<CompetitionQuestionView>> ListAsync(
+    Task<CompetitionQuestionPage> ListAsync(
         CompetitionQuestionQuery query,
         CancellationToken cancellationToken);
 
@@ -323,7 +332,7 @@ public sealed class CreateCompetitionQuestion(
 
 public sealed class ListCompetitionQuestions(ICompetitionQuestionStore store)
 {
-    public Task<IReadOnlyList<CompetitionQuestionView>> ExecuteAsync(
+    public Task<CompetitionQuestionPage> ExecuteAsync(
         CompetitionQuestionQuery query,
         CancellationToken ct = default) =>
         store.ListAsync(query with

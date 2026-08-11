@@ -115,22 +115,22 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 null,
                 null,
                 20), ct);
-            await Assert.That(authorList.Select(item => item.Id))
+            await Assert.That(authorList.Items.Select(item => item.Id))
                 .IsEquivalentTo([questionId]);
-            await Assert.That(await store.ListAsync(new(
+            await Assert.That((await store.ListAsync(new(
                 fixture.CompetitionId,
                 fixture.OtherChallengeOwnerId,
                 null,
                 null,
                 null,
-                20), ct)).IsEmpty();
-            await Assert.That(await store.ListAsync(new(
+                20), ct)).Items).IsEmpty();
+            await Assert.That((await store.ListAsync(new(
                 fixture.CompetitionId,
                 fixture.ObserverId,
                 null,
                 null,
                 CompetitionQuestionStatus.Pending,
-                20), ct)).Count().IsEqualTo(2);
+                20), ct)).Items.Count).IsEqualTo(2);
 
             var competition = await db.Competitions.SingleAsync(
                 candidate => candidate.Id == fixture.CompetitionId,
@@ -416,8 +416,8 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             CompetitionQuestionStatus.Closed,
             20), ct);
 
-        await Assert.That(listed).Count().IsEqualTo(20);
-        await Assert.That(listed.All(question =>
+        await Assert.That(listed.Items).Count().IsEqualTo(20);
+        await Assert.That(listed.Items.All(question =>
             question.Status == CompetitionQuestionStatus.Closed)).IsTrue();
         await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(10);
 
@@ -432,6 +432,161 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             1000), ct);
         await Assert.That(created.Failure).IsNull();
         await Assert.That(counter.ReaderCount).IsLessThanOrEqualTo(14);
+    }, ct);
+
+    [Test]
+    [Timeout(300_000)]
+    public Task List_keyset_pages_long_history_without_gaps_and_preserves_visibility_filters(
+        CancellationToken ct) => RunAsync(async fixture =>
+    {
+        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web)
+        {
+            Converters = { new JsonStringEnumConverter() }
+        };
+        await using (var setup = fixture.CreateDbContext())
+        {
+            for (var index = 0; index < 180; index++)
+            {
+                var sentAt = fixture.Now.AddDays(-60).AddSeconds(index / 2 * 2);
+                var subject = index % 2 == 0
+                    ? CompetitionQuestionSubject.Challenge
+                    : CompetitionQuestionSubject.Platform;
+                var status = (index % 4) switch
+                {
+                    1 => CompetitionQuestionStatus.Closed,
+                    2 => CompetitionQuestionStatus.Resolved,
+                    3 => CompetitionQuestionStatus.Replied,
+                    _ => CompetitionQuestionStatus.Pending
+                };
+                var root = new Notification
+                {
+                    Id = Guid.CreateVersion7(sentAt),
+                    SourceType = NotificationSourceType.User,
+                    SourceId = index < 160 ? fixture.MemberOneId : fixture.OtherMemberId,
+                    TargetType = NotificationTargetType.CompetitionCollaborators,
+                    TargetId = fixture.CompetitionId,
+                    Kind = NotificationKind.QuestionOpened,
+                    ContentJson = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        subject,
+                        title = $"分页咨询 {index:D3}",
+                        body = "该咨询用于验证有界 keyset 分页。",
+                        teamId = index < 160 ? fixture.TeamId : fixture.OtherTeamId,
+                        competitionChallengeId = subject == CompetitionQuestionSubject.Challenge
+                            ? fixture.PublishedBindingId
+                            : (Guid?)null,
+                        gameplayFactId = (Guid?)null,
+                        status = CompetitionQuestionStatus.Pending
+                    }, jsonOptions),
+                    SentAt = sentAt
+                };
+                setup.Notifications.Add(root);
+                if (status != CompetitionQuestionStatus.Pending)
+                {
+                    setup.Notifications.Add(new Notification
+                    {
+                        Id = Guid.CreateVersion7(sentAt.AddSeconds(1)),
+                        SourceType = NotificationSourceType.User,
+                        SourceId = fixture.ManagerId,
+                        TargetType = root.TargetType,
+                        TargetId = root.TargetId,
+                        Kind = NotificationKind.QuestionStatusChanged,
+                        ContentJson = JsonSerializer.Serialize(new
+                        {
+                            schemaVersion = 1,
+                            from = CompetitionQuestionStatus.Pending,
+                            to = status,
+                            actorRole = CompetitionQuestionParticipantRole.CompetitionManager
+                        }, jsonOptions),
+                        SentAt = sentAt.AddSeconds(1),
+                        ReplyToId = root.Id
+                    });
+                }
+            }
+            await setup.SaveChangesAsync(ct);
+        }
+
+        async Task<CompetitionQuestionView[]> ReadAllAsync(
+            Guid actorUserId,
+            Guid? competitionChallengeId = null,
+            CompetitionQuestionSubject? subject = null,
+            CompetitionQuestionStatus? status = null,
+            int limit = 37)
+        {
+            var items = new List<CompetitionQuestionView>();
+            CompetitionQuestionPagePosition? position = null;
+            await using var db = fixture.CreateDbContext();
+            var store = CreateStore(db);
+            do
+            {
+                var page = await store.ListAsync(new(
+                    fixture.CompetitionId,
+                    actorUserId,
+                    competitionChallengeId,
+                    subject,
+                    status,
+                    limit,
+                    position), ct);
+                await Assert.That(page.Items.Count).IsLessThanOrEqualTo(limit);
+                if (page.NextPosition is null)
+                    await Assert.That(page.Items.Count).IsLessThan(limit);
+                else
+                    await Assert.That(page.Items.Count).IsEqualTo(limit);
+                items.AddRange(page.Items);
+                position = page.NextPosition;
+            } while (position is not null);
+            return items.ToArray();
+        }
+
+        var managerItems = await ReadAllAsync(fixture.ManagerId);
+        await Assert.That(managerItems.Length).IsEqualTo(180);
+        await Assert.That(managerItems.Select(item => item.Id).Distinct().Count())
+            .IsEqualTo(180);
+        await Assert.That(managerItems.Zip(managerItems.Skip(1)).All(pair =>
+            pair.First.UpdatedAt > pair.Second.UpdatedAt
+            || pair.First.UpdatedAt == pair.Second.UpdatedAt
+            && pair.First.Id.CompareTo(pair.Second.Id) > 0)).IsTrue();
+
+        var participantItems = await ReadAllAsync(fixture.MemberOneId);
+        await Assert.That(participantItems.Length).IsEqualTo(160);
+        await Assert.That(participantItems.All(item => item.TeamId == fixture.TeamId)).IsTrue();
+        var otherParticipantItems = await ReadAllAsync(fixture.OtherMemberId);
+        await Assert.That(otherParticipantItems.Length).IsEqualTo(20);
+        await Assert.That(otherParticipantItems.All(item => item.TeamId == fixture.OtherTeamId)).IsTrue();
+        var challengeOwnerItems = await ReadAllAsync(fixture.ChallengeOwnerId);
+        await Assert.That(challengeOwnerItems.Length).IsEqualTo(90);
+        await Assert.That(challengeOwnerItems.All(item =>
+            item.CompetitionChallengeId == fixture.PublishedBindingId)).IsTrue();
+        var observerItems = await ReadAllAsync(fixture.ObserverId);
+        await Assert.That(observerItems.Length).IsEqualTo(180);
+
+        var closedItems = await ReadAllAsync(
+            fixture.ManagerId,
+            status: CompetitionQuestionStatus.Closed);
+        await Assert.That(closedItems.Length).IsEqualTo(45);
+        await Assert.That(closedItems.All(item =>
+            item.Status == CompetitionQuestionStatus.Closed)).IsTrue();
+        await using (var exactPageDb = fixture.CreateDbContext())
+        {
+            var exactLastPage = await CreateStore(exactPageDb).ListAsync(new(
+                fixture.CompetitionId,
+                fixture.ManagerId,
+                null,
+                null,
+                CompetitionQuestionStatus.Closed,
+                45), ct);
+            await Assert.That(exactLastPage.Items.Count).IsEqualTo(45);
+            await Assert.That(exactLastPage.NextPosition).IsNull();
+        }
+        var challengeItems = await ReadAllAsync(
+            fixture.ManagerId,
+            competitionChallengeId: fixture.PublishedBindingId,
+            subject: CompetitionQuestionSubject.Challenge);
+        await Assert.That(challengeItems.Length).IsEqualTo(90);
+        await Assert.That(challengeItems.All(item =>
+            item.Subject == CompetitionQuestionSubject.Challenge
+            && item.CompetitionChallengeId == fixture.PublishedBindingId)).IsTrue();
     }, ct);
 
     private static CreateCompetitionQuestionCommand Command(
@@ -498,6 +653,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
         public Guid MemberTwoId { get; } = Guid.CreateVersion7();
         public Guid OtherMemberId { get; } = Guid.CreateVersion7();
         public Guid TeamId { get; } = Guid.CreateVersion7();
+        public Guid OtherTeamId { get; } = Guid.CreateVersion7();
 
         public NoCtfDbContext CreateDbContext(params IInterceptor[] interceptors) => new(
             new DbContextOptionsBuilder<NoCtfDbContext>()
@@ -536,7 +692,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 Binding(OtherCompetitionBindingId, OtherCompetitionId, otherTemplateId, true, 1));
             db.Teams.AddRange(
                 Team(TeamId, CompetitionId, "Question team", MemberOneId, [MemberOneId, MemberTwoId]),
-                Team(Guid.CreateVersion7(), CompetitionId, "Other team", OtherMemberId, [OtherMemberId]));
+                Team(OtherTeamId, CompetitionId, "Other team", OtherMemberId, [OtherMemberId]));
             await db.SaveChangesAsync(ct);
         }
 

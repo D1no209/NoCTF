@@ -1,6 +1,8 @@
 using FastEndpoints;
 using FluentValidation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Pagination;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Questions;
 
@@ -11,6 +13,7 @@ public sealed class ListCompetitionQuestionsRequest
     public Guid? CompetitionChallengeId { get; set; }
     public CompetitionQuestionSubjectCode? Subject { get; set; }
     public CompetitionQuestionStatusCode? Status { get; set; }
+    public string? Cursor { get; set; }
     public int Limit { get; set; } = 50;
 }
 public sealed class ListCompetitionQuestionsValidator
@@ -26,13 +29,20 @@ public sealed class ListCompetitionQuestionsValidator
 }
 
 public sealed record CompetitionQuestionListResponse(
-    IReadOnlyList<CompetitionQuestionResponse> Items);
+    IReadOnlyList<CompetitionQuestionResponse> Items,
+    string? NextCursor);
 
 public sealed class ListCompetitionQuestionsEndpoint(
     ListCompetitionQuestions list,
+    SignedKeysetCursor cursors,
     IUserContext user)
-    : Endpoint<ListCompetitionQuestionsRequest, Results<Ok<CompetitionQuestionListResponse>, ForbidHttpResult>>
+    : Endpoint<ListCompetitionQuestionsRequest, Results<
+        Ok<CompetitionQuestionListResponse>,
+        ForbidHttpResult,
+        ProblemHttpResult>>
 {
+    private const string CursorEndpoint = "competition.questions.list";
+
     public override void Configure()
     {
         Get("/competitions/{competitionId}/questions");
@@ -45,13 +55,24 @@ public sealed class ListCompetitionQuestionsEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<CompetitionQuestionListResponse>, ForbidHttpResult>>
+    public override async Task<Results<
+        Ok<CompetitionQuestionListResponse>,
+        ForbidHttpResult,
+        ProblemHttpResult>>
         ExecuteAsync(ListCompetitionQuestionsRequest request, CancellationToken ct)
     {
         if (!user.IsHuman)
             return TypedResults.Forbid();
-        var items = await list.ExecuteAsync(new(
-            Route<Guid>("competitionId"),
+        var competitionId = Route<Guid>("competitionId");
+        var filterKey = FilterKey(competitionId, user.UserId, request);
+        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
+        {
+            return TypedResults.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid cursor.");
+        }
+        var page = await list.ExecuteAsync(new(
+            competitionId,
             user.UserId,
             request.CompetitionChallengeId,
             request.Subject is null
@@ -60,8 +81,30 @@ public sealed class ListCompetitionQuestionsEndpoint(
             request.Status is null
                 ? null
                 : CompetitionQuestionResponseMapper.ToDomain(request.Status.Value),
-            request.Limit), ct);
+            request.Limit,
+            position is null
+                ? null
+                : new CompetitionQuestionPagePosition(position.CreatedAt, position.Id)), ct);
+        var nextCursor = page.NextPosition is null
+            ? null
+            : cursors.Encode(
+                CursorEndpoint,
+                filterKey,
+                new(page.NextPosition.UpdatedAt, page.NextPosition.Id));
         return TypedResults.Ok(new CompetitionQuestionListResponse(
-            items.Select(CompetitionQuestionResponseMapper.ToResponse).ToArray()));
+            page.Items.Select(CompetitionQuestionResponseMapper.ToResponse).ToArray(),
+            nextCursor));
     }
+
+    private static string FilterKey(
+        Guid competitionId,
+        Guid actorUserId,
+        ListCompetitionQuestionsRequest request) =>
+        string.Join(
+            '|',
+            competitionId,
+            actorUserId,
+            request.CompetitionChallengeId,
+            request.Subject,
+            request.Status);
 }

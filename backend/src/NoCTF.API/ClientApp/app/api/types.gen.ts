@@ -630,6 +630,7 @@ export type NoCtfapiEndpointsChallengesQuestionsCreateCompetitionQuestionRequest
 
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionListResponse = {
     items?: Array<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse>;
+    nextCursor?: string | null;
 };
 
 export type NoCtfapiEndpointsChallengesQuestionsListCompetitionQuestionsRequest = {
@@ -3337,6 +3338,7 @@ export type ListCompetitionQuestionsData = {
         competitionChallengeId?: string | null;
         subject?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionSubjectCode | null;
         status?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode | null;
+        cursor?: string | null;
         limit: number;
     };
     url: '/api/v1/competitions/{competitionId}/questions';
