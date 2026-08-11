@@ -56,4 +56,5 @@ Break 不会被预览标为 Duplicate；同轮、跨轮旧异常都只读报告
 - 不可变事件中存在互相冲突的裁决结果，或当前 `Duplicate` 的前序事实已不再为 `Correct`，标记为 `NeedsReview`，因为旧配置、旧 Flag 归属和完整旧结果均未保存；
 - 尤其不得静默推断或修复 `Correct → Wrong → Correct`。
 
-Observer、Judge、Manager、Owner 与平台管理员均可读取；参赛者不可访问。此功能刻意不提供“应用纠正”操作。
+Observer、Judge、Manager、Owner 与平台管理员均可读取，比赛软删除归档后仍可继续只读审计；
+参赛者不可访问，不存在的比赛返回 404。此功能刻意不提供“应用纠正”操作。

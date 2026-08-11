@@ -85,6 +85,7 @@ public sealed class CompetitionEventStore(
         var access = await ResolveAccessAsync(
             query.CompetitionId,
             query.UserId,
+            allowArchivedStaff: true,
             cancellationToken);
         if (access.State != CompetitionEventReadState.Available)
             return new(access.State);
@@ -109,6 +110,7 @@ public sealed class CompetitionEventStore(
         var access = await ResolveAccessAsync(
             query.CompetitionId,
             query.UserId,
+            allowArchivedStaff: false,
             cancellationToken);
         if (access.State != CompetitionEventReadState.Available)
             return new(access.State);
@@ -146,6 +148,7 @@ public sealed class CompetitionEventStore(
         var access = await ResolveAccessAsync(
             command.CompetitionId,
             command.ActorUserId,
+            allowArchivedStaff: true,
             cancellationToken);
         if (access.State != CompetitionEventReadState.Available)
             return new(access.State);
@@ -200,6 +203,7 @@ public sealed class CompetitionEventStore(
     private async Task<AccessResolution> ResolveAccessAsync(
         Guid competitionId,
         Guid userId,
+        bool allowArchivedStaff,
         CancellationToken cancellationToken)
     {
         var user = await db.Users.AsNoTracking()
@@ -212,11 +216,12 @@ public sealed class CompetitionEventStore(
         if (user is null)
             return new(CompetitionEventReadState.Forbidden);
 
-        var competition = await db.Competitions.AsNoTracking()
-            .Where(item => item.Id == competitionId && item.DeletedAt == null)
+        var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
+            .Where(item => item.Id == competitionId)
             .Select(item => new
             {
                 item.Status,
+                item.DeletedAt,
                 item.OwnerId,
                 item.ManagerIds,
                 item.JudgeIds,
@@ -231,7 +236,10 @@ public sealed class CompetitionEventStore(
         var manager = competition.ManagerIds.Contains(userId);
         var judge = competition.JudgeIds.Contains(userId);
         var observer = competition.ObserverIds.Contains(userId);
-        if (administrator || owner || manager || judge || observer)
+        var staff = administrator || owner || manager || judge || observer;
+        if (competition.DeletedAt is not null && (!allowArchivedStaff || !staff))
+            return new(CompetitionEventReadState.CompetitionNotFound);
+        if (staff)
         {
             return new(
                 CompetitionEventReadState.Available,

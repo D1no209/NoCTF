@@ -199,11 +199,24 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await Assert.That(missingCompetition.State)
                 .IsEqualTo(HistoricalAdjudicationPreviewReadState.CompetitionNotFound);
             await db.Competitions.Where(item => item.Id == fixture.CompetitionId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    item => item.DeletedAt, fixture.Now), cancellationToken);
-            await Assert.That(await authorizer.CanObserveAsync(
-                fixture.AdministratorId, fixture.CompetitionId, cancellationToken)).IsTrue();
-            foreach (var deletedCollaboratorId in new[]
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.Mode, GameMode.Awdp)
+                    .SetProperty(item => item.DeletedAt, fixture.Now), cancellationToken);
+            foreach (var archivedStaffId in new[]
+                     {
+                         fixture.OwnerId,
+                         fixture.ManagerId,
+                         fixture.JudgeId,
+                         fixture.ObserverId,
+                         fixture.AdministratorId
+                     })
+            {
+                await Assert.That(await authorizer.CanReadHistoricalAuditAsync(
+                    archivedStaffId, fixture.CompetitionId, cancellationToken)).IsTrue();
+            }
+            await Assert.That(await authorizer.CanReadHistoricalAuditAsync(
+                fixture.FirstUserId, fixture.CompetitionId, cancellationToken)).IsFalse();
+            foreach (var archivedCollaboratorId in new[]
                      {
                          fixture.OwnerId,
                          fixture.ManagerId,
@@ -212,12 +225,19 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                      })
             {
                 await Assert.That(await authorizer.CanObserveAsync(
-                    deletedCollaboratorId, fixture.CompetitionId, cancellationToken)).IsFalse();
+                    archivedCollaboratorId, fixture.CompetitionId, cancellationToken)).IsFalse();
+                await Assert.That(await authorizer.CanJudgeAsync(
+                    archivedCollaboratorId, fixture.CompetitionId, cancellationToken)).IsFalse();
+                await Assert.That(await authorizer.CanModerateAsync(
+                    archivedCollaboratorId, fixture.CompetitionId, cancellationToken)).IsFalse();
             }
-            var deletedCompetition = await preview.ExecuteAsync(
+
+            var archivedCompetition = await preview.ExecuteAsync(
                 fixture.CompetitionId, null, null, null, 20, cancellationToken);
-            await Assert.That(deletedCompetition.State)
-                .IsEqualTo(HistoricalAdjudicationPreviewReadState.CompetitionNotFound);
+            await Assert.That(archivedCompetition.State)
+                .IsEqualTo(HistoricalAdjudicationPreviewReadState.Available);
+            await Assert.That(archivedCompetition.Items.Select(item => item.GameplayFactId))
+                .IsEquivalentTo([fixture.EarlierFactId, fixture.LaterFactId]);
         });
     }
 
@@ -649,6 +669,9 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         await db.Database.MigrateAsync(ct);
         db.Users.AddRange(
             User(ownerId, "preview-owner", UserRole.Organizer, now),
+            User(managerId, "preview-manager", UserRole.Organizer, now),
+            User(judgeId, "preview-judge", UserRole.Organizer, now),
+            User(observerId, "preview-observer", UserRole.Organizer, now),
             User(userId, "preview-player", UserRole.User, now),
             User(administratorId, "preview-admin", UserRole.Administrator, now));
         db.Competitions.Add(new Competition

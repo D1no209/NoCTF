@@ -106,7 +106,7 @@ public sealed class PreviewHistoricalAdjudicationDifferencesEndpoint(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
-        if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
+        if (!await authorizer.CanReadHistoricalAuditAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
         var filterKey = FilterKey(competitionId, user.UserId, request.CompetitionChallengeId);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))

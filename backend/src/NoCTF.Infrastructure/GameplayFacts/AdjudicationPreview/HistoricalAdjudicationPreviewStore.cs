@@ -32,11 +32,11 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.RepeatableRead,
             ct);
-        var competition = await db.Competitions.AsNoTracking()
+        var competition = await db.Competitions.IgnoreQueryFilters().AsNoTracking()
             .Where(competition => competition.Id == competitionId)
-            .Select(competition => new { competition.Mode, competition.DeletedAt })
+            .Select(competition => new { competition.Mode })
             .SingleOrDefaultAsync(ct);
-        if (competition is null || competition.DeletedAt is not null)
+        if (competition is null)
         {
             await transaction.CommitAsync(ct);
             return new(HistoricalAdjudicationPreviewReadState.CompetitionNotFound, []);
