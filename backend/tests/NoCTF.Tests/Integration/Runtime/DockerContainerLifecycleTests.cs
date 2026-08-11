@@ -129,6 +129,49 @@ public sealed class DockerContainerLifecycleTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Run_as_non_root_rejects_a_root_image_before_container_creation(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            const string image = "busybox:1.36.1";
+            await using var imageProbe = new ContainerBuilder(image)
+                .WithCommand("true")
+                .Build();
+            await imageProbe.StartAsync(cancellationToken);
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var inspectedImage = await docker.Images.InspectImageAsync(image, cancellationToken);
+            await Assert.That(inspectedImage.Config?.User ?? string.Empty).IsEmpty();
+            var operationId = Guid.NewGuid();
+            using var lifecycle = CreateLifecycle();
+
+            var action = async () => await lifecycle.CreateAsync(new(
+                operationId,
+                RuntimeProvider.Docker,
+                image,
+                ["sleep", "300"],
+                new Dictionary<string, string>(),
+                new Dictionary<string, string>(),
+                new Dictionary<int, int>(),
+                new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                new ContainerSecurityPolicy(true, false, true, ["ALL"], []),
+                TimeSpan.FromMinutes(1),
+                NetworkName: "none",
+                NetworkPurpose: ContainerNetworkPurpose.AwdpVerification), cancellationToken);
+
+            await Assert.That(action).Throws<RuntimeConfigurationException>();
+            Func<Task> inspectContainer = async () =>
+                _ = await docker.Containers.InspectContainerAsync(
+                    $"noctf-{operationId:N}",
+                    cancellationToken);
+            await Assert.That(inspectContainer).Throws<DockerContainerNotFoundException>();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Isolated_network_replay_returns_the_original_network(
         CancellationToken cancellationToken)
     {
@@ -798,7 +841,7 @@ public sealed class DockerContainerLifecycleTests
         new Dictionary<string, string> { ["noctf.purpose"] = "awdp-checker" },
         new Dictionary<int, int>(),
         new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
-        new ContainerSecurityPolicy(true, false, true, ["ALL"], []),
+        new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
         TimeSpan.FromMinutes(1),
         NetworkName: networkName,
         AllowInternalCallback: true,

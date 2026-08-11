@@ -29,8 +29,32 @@ public sealed class AwdpTargetDefinitionFactoryTests
         await Assert.That(definition.Labels["noctf.io/managed"]).IsEqualTo("true");
         await Assert.That(definition.Labels["noctf.io/generation"]).IsEqualTo("3");
         await Assert.That(definition.Labels.ContainsKey("noctf.io/expires-at")).IsFalse();
+        await Assert.That(definition.Security.NoNewPrivileges).IsFalse();
+        await Assert.That(definition.Security.ReadonlyRootfs).IsFalse();
+        await Assert.That(definition.Security.RunAsNonRoot).IsFalse();
         await Assert.That(definition.Security.CapAdd).IsEmpty();
-        await Assert.That(definition.Security.CapDrop).Contains("ALL");
+        await Assert.That(definition.Security.CapDrop).IsEmpty();
+    }
+
+    [Test]
+    public async Task Disposable_target_preserves_explicit_container_security()
+    {
+        var expected = new ContainerSecurityPolicy(true, true, false, ["ALL"], []);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "target:latest",
+                Security: expected,
+                InternalPorts: [8080]));
+
+        var definition = AwdpTargetDefinitionFactory.Create(
+            Guid.NewGuid(),
+            generation: 1,
+            template,
+            RuntimeProvider.Docker,
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(definition.Security).IsEqualTo(expected);
     }
 
     [Test]

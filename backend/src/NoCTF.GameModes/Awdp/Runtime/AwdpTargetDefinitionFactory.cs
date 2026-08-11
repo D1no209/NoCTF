@@ -32,6 +32,13 @@ public static class AwdpTargetDefinitionFactory
             System.Globalization.CultureInfo.InvariantCulture);
         labels["noctf.io/purpose"] = "awdp-target";
         labels["noctf.io/job-kind"] = "awdp-verification";
+        var security = definition.Security
+            ?? new ContainerSecurityPolicy(false, false, false, [], []);
+        security = security with
+        {
+            CapDrop = security.CapDrop ?? [],
+            CapAdd = security.CapAdd ?? []
+        };
         return new ContainerRequest(
             operationId,
             provider,
@@ -41,7 +48,7 @@ public static class AwdpTargetDefinitionFactory
             labels,
             new Dictionary<int, int>(),
             template.Limits ?? new RuntimeResourceLimits(512 * 1024 * 1024, 500_000_000, 256),
-            new ContainerSecurityPolicy(true, false, true, ["ALL"], []),
+            security,
             Ttl: ttl,
             OperationTimeout: template.OperationTimeoutSeconds is > 0
                 ? TimeSpan.FromSeconds(template.OperationTimeoutSeconds.Value)

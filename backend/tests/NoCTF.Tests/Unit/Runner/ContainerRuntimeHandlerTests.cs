@@ -11,6 +11,51 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class ContainerRuntimeHandlerTests
 {
     [Test]
+    public async Task Container_configuration_rejection_has_a_stable_failure_code()
+    {
+        var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var lifecycle = new RecordingContainerLifecycle
+        {
+            ProvisionFailure = new RuntimeConfigurationException("Invalid image user.")
+        };
+        var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var reconciler = new RecordingResourceReconciler();
+        var handler = CreateHandler(
+            lifecycle,
+            new RecordingSandboxLifecycle(),
+            capacity,
+            new FixedWorkReader(null),
+            reconciler);
+        var message = new ProvisionContainerRuntime(
+            runtimeInstanceId,
+            ProcessingVersion: 8,
+            Generation: 3,
+            RunnerPool: "default",
+            RunnerId: "runner-a",
+            Definition: new ContainerRequest(
+                runtimeInstanceId,
+                RuntimeProvider.Docker,
+                "challenge:latest",
+                [],
+                new Dictionary<string, string>(),
+                new Dictionary<string, string>(),
+                new Dictionary<int, int>(),
+                new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                new ContainerSecurityPolicy(false, false, true, [], []),
+                Ttl: null));
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
+        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+            .IsEqualTo(RuntimeFailureCode.InvalidConfiguration);
+        await Assert.That(lifecycle.EnsureRunningCalls).IsEqualTo(1);
+        await Assert.That(reconciler.Destroyed)
+            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
+    }
+
+    [Test]
     public async Task Stop_capacity_owner_mismatch_fails_closed_after_provider_cleanup()
     {
         var lifecycle = new RecordingContainerLifecycle();
@@ -183,6 +228,8 @@ public sealed class ContainerRuntimeHandlerTests
     private sealed class RecordingContainerLifecycle : IContainerLifecycle
     {
         public List<ContainerReceipt> Destroyed { get; } = [];
+        public Exception? ProvisionFailure { get; init; }
+        public int EnsureRunningCalls { get; private set; }
 
         public Task<ContainerReceipt> CreateAsync(
             ContainerRequest request,
@@ -191,8 +238,13 @@ public sealed class ContainerRuntimeHandlerTests
 
         public Task<ContainerReceipt> EnsureRunningAsync(
             ContainerRequest request,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            CancellationToken cancellationToken)
+        {
+            EnsureRunningCalls++;
+            return ProvisionFailure is null
+                ? throw new NotSupportedException()
+                : Task.FromException<ContainerReceipt>(ProvisionFailure);
+        }
 
         public Task DestroyAsync(
             ContainerReceipt receipt,
@@ -268,7 +320,7 @@ public sealed class ContainerRuntimeHandlerTests
         public Task<RuntimeProvisionWorkStatus> ReadProvisionStatusAsync(
             IRuntimeProvisionMessage message,
             CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult(RuntimeProvisionWorkStatus.Current);
 
         public Task<RuntimeStopWork?> ReadStopAsync(
             IRuntimeStopMessage message,

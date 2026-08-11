@@ -61,6 +61,44 @@ describe('dynamic flag templates', () => {
   })
 })
 
+describe('container security drafts', () => {
+  test('omits the trusted compatibility defaults', () => {
+    const model = emptyDefinition('Ctf')
+    model.runtime = emptyRuntimeTemplate('Ctf')
+
+    const json = JSON.parse(serializeDefinition('Ctf', model))
+
+    expect(json.runtime.definition.security).toBeUndefined()
+  })
+
+  test('serializes and parses explicit hardening values', () => {
+    const model = emptyDefinition('Ctf')
+    model.runtime = emptyRuntimeTemplate('Ctf')
+    if (model.runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    model.runtime.definition.security = {
+      noNewPrivileges: true,
+      readonlyRootfs: true,
+      runAsNonRoot: true,
+      capDrop: ['ALL'],
+      capAdd: [],
+    }
+
+    const json = serializeDefinition('Ctf', model)
+    const serialized = JSON.parse(json)
+
+    expect(serialized.runtime.definition.security).toEqual({
+      noNewPrivileges: true,
+      readonlyRootfs: true,
+      runAsNonRoot: true,
+      capDrop: ['ALL'],
+    })
+    const parsed = parseDefinition(json)
+    expect(parsed?.runtime?.definition.kind).toBe('container')
+    if (parsed?.runtime?.definition.kind !== 'container') throw new Error('Expected parsed container definition')
+    expect(parsed.runtime.definition.security).toEqual(model.runtime.definition.security)
+  })
+})
+
 describe('AWDP patch upload limits', () => {
   test('keeps the visible default and serializes challenge-managed bytes', () => {
     const model = emptyDefinition('Awdp')

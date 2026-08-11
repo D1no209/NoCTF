@@ -35,6 +35,11 @@ public sealed class RuntimeClaimFactoryTests
         await Assert.That(container.Definition.EgressPolicy)
             .IsEqualTo(RuntimeEgressPolicy.Isolated);
         await Assert.That(container.Definition.PortMappings[8080]).IsEqualTo(0);
+        await Assert.That(container.Definition.Security.NoNewPrivileges).IsFalse();
+        await Assert.That(container.Definition.Security.ReadonlyRootfs).IsFalse();
+        await Assert.That(container.Definition.Security.RunAsNonRoot).IsFalse();
+        await Assert.That(container.Definition.Security.CapDrop).IsEmpty();
+        await Assert.That(container.Definition.Security.CapAdd).IsEmpty();
         await Assert.That(container.Definition.Labels["noctf.io/job-kind"])
             .IsEqualTo("persistent-runtime");
     }

@@ -82,10 +82,6 @@ internal static class ChallengeRuntimeTemplateValidator
                     errors.Add("Runtime internal ports cannot contain duplicates.");
                 if (container.Security is { } security)
                 {
-                    if (!security.RunAsNonRoot)
-                        errors.Add("Runtime security must require a non-root user.");
-                    if (!security.NoNewPrivileges)
-                        errors.Add("Runtime security must disable privilege escalation.");
                     if (security.CapDrop is null
                         || !security.CapDrop.Contains("ALL", StringComparer.OrdinalIgnoreCase))
                         errors.Add("Runtime security must drop all capabilities.");

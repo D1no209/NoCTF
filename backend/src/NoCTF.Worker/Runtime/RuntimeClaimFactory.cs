@@ -149,8 +149,12 @@ public static class RuntimeClaimFactory
         ContainerSecurityPolicy? security)
     {
         var configured = security
-            ?? new ContainerSecurityPolicy(true, true, true, ["ALL"], []);
-        return configured with { CapAdd = configured.CapAdd ?? [] };
+            ?? new ContainerSecurityPolicy(false, false, false, [], []);
+        return configured with
+        {
+            CapDrop = configured.CapDrop ?? [],
+            CapAdd = configured.CapAdd ?? []
+        };
     }
 
     private static string? ResolvePerTeamFlag(

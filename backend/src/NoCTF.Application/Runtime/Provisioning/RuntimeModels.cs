@@ -11,6 +11,8 @@ public sealed record ContainerSecurityPolicy(
     IReadOnlyList<string> CapDrop,
     IReadOnlyList<string> CapAdd);
 
+public sealed class RuntimeConfigurationException(string message) : Exception(message);
+
 public enum RuntimeAllocation
 {
     Shared,
