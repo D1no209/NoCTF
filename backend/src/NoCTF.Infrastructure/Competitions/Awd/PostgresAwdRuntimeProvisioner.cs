@@ -100,6 +100,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
         var desiredChallengeIds = challenges.Select(challenge => challenge.Id).ToHashSet();
         var applied = false;
         var deferredCleanup = false;
+        AwdRuntimeProvisioningOutcome? terminalOutcome = null;
         foreach (var teamId in teamIds)
         {
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -110,7 +111,10 @@ public sealed class PostgresAwdRuntimeProvisioner(
                 cancellationToken);
             if (await CompetitionStateReader.ReadAsync(db, competitionId, cancellationToken)
                 != CompetitionStatus.Running)
-                return AwdRuntimeProvisioningOutcome.RejectedBusiness;
+            {
+                terminalOutcome = AwdRuntimeProvisioningOutcome.RejectedBusiness;
+                break;
+            }
 
             var existing = await db.RuntimeInstances
                 .Where(runtime => runtime.CompetitionId == competitionId
@@ -134,7 +138,10 @@ public sealed class PostgresAwdRuntimeProvisioner(
             if (competition.MaxConcurrentRuntimeInstancesPerTeam > 0
                 && active.Concat(desiredChallengeIds).Distinct().Count()
                     > competition.MaxConcurrentRuntimeInstancesPerTeam)
-                return AwdRuntimeProvisioningOutcome.CapacityExceeded;
+            {
+                terminalOutcome = AwdRuntimeProvisioningOutcome.CapacityExceeded;
+                break;
+            }
 
             var maximumGenerations = existing
                 .GroupBy(runtime => runtime.CompetitionChallengeId)
@@ -183,7 +190,6 @@ public sealed class PostgresAwdRuntimeProvisioner(
                 }
                 await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                await outbox.FlushOutgoingMessagesAsync();
                 deferredCleanup = true;
                 applied = true;
                 continue;
@@ -220,9 +226,12 @@ public sealed class PostgresAwdRuntimeProvisioner(
             }
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
             applied = true;
         }
+        if (applied)
+            await outbox.FlushOutgoingMessagesAsync();
+        if (terminalOutcome is not null)
+            return terminalOutcome.Value;
         if (deferredCleanup)
             return AwdRuntimeProvisioningOutcome.DeferredCleanup;
         return applied

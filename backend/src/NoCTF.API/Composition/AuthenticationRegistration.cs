@@ -95,10 +95,9 @@ public static class AuthenticationRegistration
                 .RequireClaim("token_type", "internal")
                 .RequireClaim("permission", "awdp:fix-result:write")
                 .RequireClaim("resource")
-                .RequireClaim("submission_id")
+                .RequireClaim("gameplay_fact_id")
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("generation")
-                .RequireClaim("processing_version")
                 .RequireClaim("runtime_processing_version")
                 .RequireClaim("deadline"));
             options.AddPolicy("FixArchiveRead", policy => policy
@@ -106,7 +105,7 @@ public static class AuthenticationRegistration
                 .RequireAuthenticatedUser()
                 .RequireClaim("token_type", "internal")
                 .RequireClaim("permission", "awdp:fix-archive:read")
-                .RequireClaim("submission_id"));
+                .RequireClaim("gameplay_fact_id"));
         });
         return services;
     }

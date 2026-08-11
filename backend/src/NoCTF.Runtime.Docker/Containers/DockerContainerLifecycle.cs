@@ -26,7 +26,15 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             .Build();
     }
 
-    public async Task<ContainerReceipt> CreateAsync(ContainerRequest request, CancellationToken cancellationToken)
+    public Task<ContainerReceipt> CreateAsync(
+        ContainerRequest request,
+        CancellationToken cancellationToken) =>
+        CreateAsync(request, allowCompletedOneShot: false, cancellationToken);
+
+    private async Task<ContainerReceipt> CreateAsync(
+        ContainerRequest request,
+        bool allowCompletedOneShot,
+        CancellationToken cancellationToken)
     {
         if (request.Provider != RuntimeProvider.Docker)
             throw new ArgumentOutOfRangeException(nameof(request), request.Provider, "Docker runtime cannot create another provider.");
@@ -96,7 +104,8 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     status = ToRuntimeStatus(created.State?.Status);
                 }
             }
-            if (status != RuntimeStatus.Running)
+            if (status != RuntimeStatus.Running
+                && !(allowCompletedOneShot && status == RuntimeStatus.Stopped))
             {
                 throw new InvalidOperationException(
                     $"Docker container {response.ID} did not reach the running state; current state is {status}.");
@@ -307,7 +316,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
     public async Task<OneShotResult> RunAsync(ContainerRequest request, CancellationToken cancellationToken)
     {
         var started = DateTimeOffset.UtcNow;
-        var receipt = await CreateAsync(request, cancellationToken);
+        var receipt = await CreateAsync(request, allowCompletedOneShot: true, cancellationToken);
         try
         {
             var wait = await client.Containers.WaitContainerAsync(receipt.ResourceId, cancellationToken);

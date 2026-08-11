@@ -108,6 +108,11 @@ public sealed class AwdpFixWorkReader(
                 upload => upload.Id,
                 (submission, upload) => new { GameplayFact = submission, Upload = upload })
             .Join(
+                db.Files.AsNoTracking(),
+                item => item.Upload.FileId,
+                file => file.Id,
+                (item, file) => new { item.GameplayFact, item.Upload, File = file })
+            .Join(
                 db.RuntimeInstances.AsNoTracking()
                     .Where(runtime => runtime.Id == message.RuntimeInstanceId
                         && runtime.Purpose == RuntimePurpose.AwdpTarget
@@ -119,7 +124,13 @@ public sealed class AwdpFixWorkReader(
                         && runtime.RunnerId == message.RunnerId),
                 pair => pair.GameplayFact.Id,
                 runtime => runtime.GameplayFactId,
-                (pair, runtime) => new { pair.GameplayFact, pair.Upload, Runtime = runtime })
+                (pair, runtime) => new
+                {
+                    pair.GameplayFact,
+                    pair.Upload,
+                    pair.File,
+                    Runtime = runtime
+                })
             .Join(
                 db.CompetitionChallenges.AsNoTracking(),
                 item => item.GameplayFact.CompetitionChallengeId,
@@ -128,6 +139,7 @@ public sealed class AwdpFixWorkReader(
                 {
                     item.GameplayFact,
                     item.Upload,
+                    item.File,
                     item.Runtime,
                     ChallengeRulesJson = challenge.RulesJson,
                     challenge.ChallengeId,
@@ -140,6 +152,7 @@ public sealed class AwdpFixWorkReader(
                 (item, challenge) => new
                 {
                     item.Upload,
+                    item.File,
                     item.Runtime,
                     item.ChallengeRulesJson,
                     ChallengeDefinitionJson = challenge.DefinitionJson,
@@ -153,6 +166,7 @@ public sealed class AwdpFixWorkReader(
                 (item, competition) => new
                 {
                     item.Upload,
+                    item.File,
                     item.Runtime,
                     item.ChallengeRulesJson,
                     item.ChallengeDefinitionJson,
@@ -216,9 +230,9 @@ public sealed class AwdpFixWorkReader(
                     baseUri,
                     $"/api/internal/v1/awdp/fix-archives/{message.GameplayFactId:D}"),
                 archiveToken,
-                target.Upload.OriginalFileName,
-                target.Upload.ByteLength,
-                target.Upload.Sha256),
+                target.File.FileName,
+                target.File.ByteLength,
+                target.File.Sha256),
             receipt,
             settings.PatchEntrypoint,
             patchCommand,
