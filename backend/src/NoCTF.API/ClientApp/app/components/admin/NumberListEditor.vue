@@ -11,7 +11,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   placeholder: '',
-  addLabel: translate("添加端口"),
+  addLabel: '添加端口',
   min: 1,
   max: 65535,
   disabled: false,
@@ -69,7 +69,7 @@ function add(): void {
       @click="add"
     >
       <Plus data-icon="inline-start" />
-      {{ addLabel }}
+      {{ $t(addLabel) }}
     </Button>
   </div>
 </template>

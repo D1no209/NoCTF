@@ -20,16 +20,16 @@ type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
 type DataExport = NoCtfapiEndpointsAdministrationDataExportsDataExportResponse
 
 const KIND_LABELS: Record<string, string> = {
-  CompetitionLifecycle: translate("竞赛生命周期"), UserAccountLifecycle: translate("账户生命周期"), CompetitionLeaderboardVisibility: translate("榜单可见性"), CompetitionEvent: translate("竞赛事件"),
+  CompetitionLifecycle: '竞赛生命周期', UserAccountLifecycle: '账户生命周期', CompetitionLeaderboardVisibility: '榜单可见性', CompetitionEvent: '竞赛事件',
 }
 const EXPORT_STATUS: Record<string, { label: string; variant: 'secondary' | 'outline' | 'destructive' | 'default' }> = {
-  Queued: { label: translate("排队中"), variant: 'outline' }, Processing: { label: translate("处理中"), variant: 'secondary' }, Available: { label: translate("可下载"), variant: 'default' }, Failed: { label: translate("失败"), variant: 'destructive' }, Expired: { label: translate("已过期"), variant: 'outline' },
+  Queued: { label: '排队中', variant: 'outline' }, Processing: { label: '处理中', variant: 'secondary' }, Available: { label: '可下载', variant: 'default' }, Failed: { label: '失败', variant: 'destructive' }, Expired: { label: '已过期', variant: 'outline' },
 }
 const COMPETITION_STATUS_LABELS: Record<string, string> = {
-  Draft: translate("草稿"), Visible: translate("可见"), Published: translate("已发布"), Running: translate("进行中"), Paused: translate("已暂停"), Finished: translate("已结束"),
+  Draft: '草稿', Visible: '可见', Published: '已发布', Running: '进行中', Paused: '已暂停', Finished: '已结束',
 }
-const VISIBILITY_LABELS: Record<string, string> = { Normal: translate("正常"), Frozen: translate("冻结"), Blackout: translate("封榜") }
-const ACCOUNT_ACTION_LABELS: Record<string, string> = { Banned: translate("封禁"), Disabled: translate("禁用"), Anonymized: translate("匿名化"), PhysicallyDeleted: translate("物理删除") }
+const VISIBILITY_LABELS: Record<string, string> = { Normal: '正常', Frozen: '冻结', Blackout: '封榜' }
+const ACCOUNT_ACTION_LABELS: Record<string, string> = { Banned: '封禁', Disabled: '禁用', Anonymized: '匿名化', PhysicallyDeleted: '物理删除' }
 
 const kind = ref('all')
 const actorId = ref('')
@@ -68,16 +68,21 @@ function applyFilters(): void {
 
 function detailText(log: AuditLog): string {
   if (log.kind === 'CompetitionLifecycle' && log.fromCompetitionStatus !== null && log.fromCompetitionStatus !== undefined) {
-    const fromLabel = COMPETITION_STATUS_LABELS[String(log.fromCompetitionStatus)] ?? log.fromCompetitionStatus
-    const toLabel = COMPETITION_STATUS_LABELS[String(log.toCompetitionStatus)] ?? log.toCompetitionStatus
+    const fromKey = COMPETITION_STATUS_LABELS[String(log.fromCompetitionStatus)]
+    const toKey = COMPETITION_STATUS_LABELS[String(log.toCompetitionStatus)]
+    const fromLabel = fromKey ? translate(fromKey) : log.fromCompetitionStatus
+    const toLabel = toKey ? translate(toKey) : log.toCompetitionStatus
     return translate('状态 {from} → {to}', { from: fromLabel ?? '-', to: toLabel ?? '-' })
   }
   if (log.kind === 'UserAccountLifecycle' && log.userAccountAction !== null && log.userAccountAction !== undefined) {
-    return ACCOUNT_ACTION_LABELS[String(log.userAccountAction)] ?? String(log.userAccountAction)
+    const action = ACCOUNT_ACTION_LABELS[String(log.userAccountAction)]
+    return action ? translate(action) : String(log.userAccountAction)
   }
   if (log.kind === 'CompetitionLeaderboardVisibility' && log.fromLeaderboardVisibility !== null && log.fromLeaderboardVisibility !== undefined) {
-    const fromLabel = VISIBILITY_LABELS[String(log.fromLeaderboardVisibility)] ?? log.fromLeaderboardVisibility
-    const toLabel = VISIBILITY_LABELS[String(log.toLeaderboardVisibility)] ?? log.toLeaderboardVisibility
+    const fromKey = VISIBILITY_LABELS[String(log.fromLeaderboardVisibility)]
+    const toKey = VISIBILITY_LABELS[String(log.toLeaderboardVisibility)]
+    const fromLabel = fromKey ? translate(fromKey) : log.fromLeaderboardVisibility
+    const toLabel = toKey ? translate(toKey) : log.toLeaderboardVisibility
     return translate('可见性 {from} → {to}', { from: fromLabel ?? '-', to: toLabel ?? '-' })
   }
   return log.reason ?? '-'
@@ -217,7 +222,7 @@ onMounted(() => {
                 <AdminDateTime :value="log.occurredAt" />
               </TableCell>
               <TableCell>
-                <Badge variant="secondary">{{ KIND_LABELS[String(log.kind)] ?? log.kind }}</Badge>
+                <Badge variant="secondary">{{ KIND_LABELS[String(log.kind)] ? $t(KIND_LABELS[String(log.kind)]!) : log.kind }}</Badge>
                 <Badge v-if="log.automatic" variant="outline" class="ml-1">{{ $t('自动') }}</Badge>
               </TableCell>
               <TableCell class="max-w-56">
@@ -283,7 +288,7 @@ onMounted(() => {
               </TableCell>
               <TableCell>
                 <Badge :variant="EXPORT_STATUS[String(item.status)]?.variant ?? 'outline'">
-                  {{ EXPORT_STATUS[String(item.status)]?.label ?? item.status }}
+                  {{ EXPORT_STATUS[String(item.status)]?.label ? $t(EXPORT_STATUS[String(item.status)]!.label) : item.status }}
                 </Badge>
                 <p v-if="item.failureDetail" class="mt-1 text-xs text-destructive" :title="item.failureDetail">
                   {{ item.failureDetail }}

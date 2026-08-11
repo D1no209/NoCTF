@@ -936,6 +936,8 @@ export const englishMessages: Record<string, string> = {
   "未知队伍": "unknown team",
   "未知角色": "unknown role",
   "未知题目": "Unknown question",
+  "题目 · {title}": "Challenge · {title}",
+  "题目咨询 · {title}": "Challenge question · {title}",
   "文件名": "file name",
   "问答回复": "Q&A Reply",
   "我": "me",

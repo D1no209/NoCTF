@@ -99,15 +99,15 @@ async function openDetail(gameplayFactId?: string) {
 
 // ---- Actions ----
 const ActionMeta = {
-  confirm: { title: translate("确认作弊并封禁"), description: translate("确认该事件为作弊，并立即封禁来源队伍。") },
-  dismiss: { title: translate("驳回作弊事件"), description: translate("驳回该作弊事件，不产生封禁。") },
-  correct: { title: translate("纠正作弊事件"), description: translate("将此前确认的作弊标记为误判并解除相关封禁。") },
+  confirm: { title: '确认作弊并封禁', description: '确认该事件为作弊，并立即封禁来源队伍。' },
+  dismiss: { title: '驳回作弊事件', description: '驳回该作弊事件，不产生封禁。' },
+  correct: { title: '纠正作弊事件', description: '将此前确认的作弊标记为误判并解除相关封禁。' },
 } as const
 
 const SuccessMessage = {
-  confirm: translate("已确认作弊并封禁来源队伍"),
-  dismiss: translate("已驳回作弊事件"),
-  correct: translate("已纠正作弊事件并解除相关封禁"),
+  confirm: '已确认作弊并封禁来源队伍',
+  dismiss: '已驳回作弊事件',
+  correct: '已纠正作弊事件并解除相关封禁',
 } as const
 
 async function refreshResolvedIncident(request: CheatIncidentResolutionRequest) {
@@ -133,7 +133,7 @@ const {
   competitionId,
   readError: error => parseApiError(error).message,
   onSuccess: (request) => {
-    toast.success(SuccessMessage[request.action])
+    toast.success(translate(SuccessMessage[request.action]))
     void refreshResolvedIncident(request)
   },
 })
@@ -310,9 +310,9 @@ onBeforeUnmount(() => {
     <AlertDialog :open="resolutionOpen" @update:open="handleResolutionOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ resolutionAction ? ActionMeta[resolutionAction].title : '' }}</AlertDialogTitle>
+          <AlertDialogTitle>{{ resolutionAction ? $t(ActionMeta[resolutionAction].title) : '' }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ resolutionAction ? ActionMeta[resolutionAction].description : '' }}
+            {{ resolutionAction ? $t(ActionMeta[resolutionAction].description) : '' }}
             {{ $t('影响对象：{target}。理由会记入比赛事件和审计记录。', { target: resolutionTargetLabel }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -348,7 +348,7 @@ onBeforeUnmount(() => {
             @click="handleResolutionSubmit"
           >
             <Spinner v-if="resolutionPending" data-icon="inline-start" />
-            {{ resolutionPending ? $t('提交中') : (resolutionAction ? ActionMeta[resolutionAction].title : $t('确认')) }}
+            {{ resolutionPending ? $t('提交中') : (resolutionAction ? $t(ActionMeta[resolutionAction].title) : $t('确认')) }}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

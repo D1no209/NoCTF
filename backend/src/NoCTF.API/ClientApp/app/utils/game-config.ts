@@ -31,25 +31,25 @@ export const AwardSettlement = { Milestone: 0, PerRound: 1 } as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
 
 export const ATTACK_REWARD_MODES = [
-  { value: 'FixedPerAttack', label: translate("每次攻击固定得分") },
-  { value: 'SplitVictimDefensePool', label: translate("瓜分受害方防御分池") },
+  { value: 'FixedPerAttack', label: '每次攻击固定得分' },
+  { value: 'SplitVictimDefensePool', label: '瓜分受害方防御分池' },
 ] as const
 
 export const BLOOD_REWARD_POLICIES = [
-  { value: BloodRewardPolicy.FixedPoints, label: translate("固定分值") },
-  { value: BloodRewardPolicy.InitialPointsPercentage, label: translate("初始分百分比") },
-  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: translate("解题时分值百分比") },
-  { value: BloodRewardPolicy.CurrentPointsPercentage, label: translate("当前分值百分比") },
+  { value: BloodRewardPolicy.FixedPoints, label: '固定分值' },
+  { value: BloodRewardPolicy.InitialPointsPercentage, label: '初始分百分比' },
+  { value: BloodRewardPolicy.SolveTimePointsPercentage, label: '解题时分值百分比' },
+  { value: BloodRewardPolicy.CurrentPointsPercentage, label: '当前分值百分比' },
 ] as const
 
 export const AWARD_SETTLEMENTS = [
-  { value: AwardSettlement.Milestone, label: translate("里程碑结算(一次性)") },
-  { value: AwardSettlement.PerRound, label: translate("按轮次结算") },
+  { value: AwardSettlement.Milestone, label: '里程碑结算(一次性)' },
+  { value: AwardSettlement.PerRound, label: '按轮次结算' },
 ] as const
 
 export const EVALUATION_DISPATCH_MODES = [
-  { value: EvaluationDispatch.Automatic, label: translate("自动评测") },
-  { value: EvaluationDispatch.ManualBatch, label: translate("手动批量评测") },
+  { value: EvaluationDispatch.Automatic, label: '自动评测' },
+  { value: EvaluationDispatch.ManualBatch, label: '手动批量评测' },
 ] as const
 
 // ---------- 题目模板 Definition 模型 ----------

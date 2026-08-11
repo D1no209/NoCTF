@@ -261,10 +261,10 @@ const deletingFlag = ref<Flag | null>(null)
 const flagActionPending = ref(false)
 
 const SPECIFICATION_KINDS = [
-  { value: 'Attachment', label: translate("附件") },
-  { value: 'AwdRound', label: translate("AWD 轮次") },
-  { value: 'RuntimeDefinition', label: translate("运行时定义") },
-  { value: 'Hint', label: translate("提示") },
+  { value: 'Attachment', label: '附件' },
+  { value: 'AwdRound', label: 'AWD 轮次' },
+  { value: 'RuntimeDefinition', label: '运行时定义' },
+  { value: 'Hint', label: '提示' },
 ] as const
 
 async function loadFlags(): Promise<void> {
@@ -364,7 +364,8 @@ async function restoreFlag(flag: Flag): Promise<void> {
 
 function specificationKindLabel(kind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null): string {
   if (kind === null || kind === undefined) return '—'
-  return SPECIFICATION_KINDS.find(item => item.value === kind)?.label ?? String(kind)
+  const label = SPECIFICATION_KINDS.find(item => item.value === kind)?.label
+  return label ? translate(label) : String(kind)
 }
 
 // ---------- 权限 ----------
@@ -883,7 +884,7 @@ onMounted(() => {
                 <SelectContent>
                   <SelectGroup>
                     <SelectItem v-for="kind in SPECIFICATION_KINDS" :key="kind.value" :value="kind.value">
-                      {{ kind.label }}
+                      {{ $t(kind.label) }}
                     </SelectItem>
                   </SelectGroup>
                 </SelectContent>

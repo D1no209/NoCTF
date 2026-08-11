@@ -12,12 +12,12 @@ const initialKind = typeof route.query.kind === 'string' ? route.query.kind : 'a
 const kind = ref<string>(initialKind)
 
 const kindOptions = [
-  { value: 'all', label: translate("全部动态") },
-  { value: 'CompetitionLifecycleChanged', label: translate("比赛状态") },
-  { value: 'AnnouncementPublished', label: translate("公告") }, { value: 'ChallengePublished', label: translate("题目发布") }, { value: 'HintPublished', label: translate("提示发布") },
-  { value: 'FirstBloodAwarded', label: translate("一血") }, { value: 'SecondBloodAwarded', label: translate("二血") }, { value: 'ThirdBloodAwarded', label: translate("三血") },
-  { value: 'GameplayFactAdjudicated', label: translate("提交评测") }, { value: 'TeamRegistered', label: translate("队伍报名") }, { value: 'TeamBanned', label: translate("队伍封禁") },
-  { value: 'QuestionOpened', label: translate("咨询创建") }, { value: 'QuestionReplied', label: translate("咨询回复") }, { value: 'QuestionStatusChanged', label: translate("咨询状态") },
+  { value: 'all', label: '全部动态' },
+  { value: 'CompetitionLifecycleChanged', label: '比赛状态' },
+  { value: 'AnnouncementPublished', label: '公告' }, { value: 'ChallengePublished', label: '题目发布' }, { value: 'HintPublished', label: '提示发布' },
+  { value: 'FirstBloodAwarded', label: '一血' }, { value: 'SecondBloodAwarded', label: '二血' }, { value: 'ThirdBloodAwarded', label: '三血' },
+  { value: 'GameplayFactAdjudicated', label: '提交评测' }, { value: 'TeamRegistered', label: '队伍报名' }, { value: 'TeamBanned', label: '队伍封禁' },
+  { value: 'QuestionOpened', label: '咨询创建' }, { value: 'QuestionReplied', label: '咨询回复' }, { value: 'QuestionStatusChanged', label: '咨询状态' },
 ]
 
 const { items, loading, error, hasMore, initialized, loadMore, reset } =
@@ -84,7 +84,7 @@ const levelLabel = (level?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventL
         <SelectContent>
           <SelectGroup>
             <SelectItem v-for="option in kindOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
+              {{ $t(option.label) }}
             </SelectItem>
           </SelectGroup>
         </SelectContent>

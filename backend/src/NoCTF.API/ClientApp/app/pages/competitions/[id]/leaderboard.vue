@@ -99,7 +99,7 @@ function slotFor(teamId?: string, challengeId?: string) {
 function cellText(slot: LeaderboardCell, title: string): string {
   const parts = [title]
   if (slot.score !== undefined) parts.push(translate('{score} 分', { score: slot.score }))
-  if (slot.bloodRank) parts.push(bloodRankLabel[String(slot.bloodRank)] ?? '')
+  if (slot.bloodRank) parts.push(bloodRankLabel(slot.bloodRank))
   if (slot.solvedAt) parts.push(formatDateTime(slot.solvedAt))
   if (slot.solverName) parts.push(slot.solverName)
   return parts.filter(Boolean).join(' · ')

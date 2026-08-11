@@ -29,24 +29,24 @@ const loadError = ref<string | null>(null)
 const search = ref('')
 const roleFilter = ref('all')
 
-const ROLE_LABELS: Record<string, string> = { User: translate("用户"), Organizer: translate("组织者"), Administrator: translate("管理员") }
-const STATUS_LABELS: Record<string, string> = { Active: translate("正常"), Banned: translate("已封禁"), Disabled: translate("已禁用"), Anonymized: translate("已匿名") }
+const ROLE_LABELS: Record<string, string> = { User: '用户', Organizer: '组织者', Administrator: '管理员' }
+const STATUS_LABELS: Record<string, string> = { Active: '正常', Banned: '已封禁', Disabled: '已禁用', Anonymized: '已匿名' }
 const REFERENCE_LABELS: Record<string, string> = {
-  CompetitionOwner: translate("竞赛负责人"),
-  CompetitionCollaborator: translate("竞赛协作者"),
-  ChallengeOwner: translate("题库模板负责人"),
-  ChallengeManager: translate("题库模板管理员"),
-  TeamCaptain: translate("队伍队长"),
-  TeamMember: translate("队伍成员"),
-  Submission: translate("提交记录"),
-  PatchUpload: translate("补丁上传"),
-  Notification: translate("通知"),
-  GameplayFact: translate("比赛事实"),
-  CompetitionLifecycleAudit: translate("竞赛生命周期审计"),
-  CompetitionQuestion: translate("竞赛问答"),
-  CompetitionQuestionEntry: translate("问答回复"),
-  CompetitionEvent: translate("竞赛事件"),
-  UserAccountLifecycleAudit: translate("账户生命周期审计"),
+  CompetitionOwner: '竞赛负责人',
+  CompetitionCollaborator: '竞赛协作者',
+  ChallengeOwner: '题库模板负责人',
+  ChallengeManager: '题库模板管理员',
+  TeamCaptain: '队伍队长',
+  TeamMember: '队伍成员',
+  Submission: '提交记录',
+  PatchUpload: '补丁上传',
+  Notification: '通知',
+  GameplayFact: '比赛事实',
+  CompetitionLifecycleAudit: '竞赛生命周期审计',
+  CompetitionQuestion: '竞赛问答',
+  CompetitionQuestionEntry: '问答回复',
+  CompetitionEvent: '竞赛事件',
+  UserAccountLifecycleAudit: '账户生命周期审计',
 }
 
 const filteredUsers = computed(() => {
@@ -269,12 +269,12 @@ onMounted(() => {
             </TableCell>
             <TableCell>
               <Badge :variant="user.role === 'Administrator' ? 'default' : 'secondary'">
-                {{ ROLE_LABELS[String(user.role)] ?? user.role }}
+                {{ ROLE_LABELS[String(user.role)] ? $t(ROLE_LABELS[String(user.role)]!) : user.role }}
               </Badge>
             </TableCell>
             <TableCell>
               <Badge :variant="user.accountStatus === 'Active' ? 'outline' : 'destructive'">
-                {{ STATUS_LABELS[String(user.accountStatus)] ?? user.accountStatus }}
+                {{ STATUS_LABELS[String(user.accountStatus)] ? $t(STATUS_LABELS[String(user.accountStatus)]!) : user.accountStatus }}
               </Badge>
             </TableCell>
             <TableCell>
@@ -309,7 +309,7 @@ onMounted(() => {
             <dt class="text-muted-foreground">{{ $t('类型') }}</dt>
             <dd>{{ detail.kind === 'Bot' ? 'Bot' : $t('用户') }}</dd>
             <dt class="text-muted-foreground">{{ $t('状态') }}</dt>
-            <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ?? detail.accountStatus }}</dd>
+            <dd>{{ STATUS_LABELS[String(detail.accountStatus)] ? $t(STATUS_LABELS[String(detail.accountStatus)]!) : detail.accountStatus }}</dd>
             <dt class="text-muted-foreground">{{ $t('令牌版本') }}</dt>
             <dd class="font-mono tabular-nums">{{ detail.tokenVersion ?? 0 }}</dd>
             <dt class="text-muted-foreground">{{ $t('注册时间') }}</dt>
@@ -397,7 +397,7 @@ onMounted(() => {
             <p class="text-sm text-muted-foreground">{{ $t('该用户存在以下业务引用:') }}</p>
             <div class="flex flex-wrap gap-2">
               <Badge v-for="reference in preview.references" :key="reference.code" variant="secondary">
-                {{ REFERENCE_LABELS[reference.code ?? ''] ?? reference.code }} × {{ reference.count }}
+                {{ REFERENCE_LABELS[reference.code ?? ''] ? $t(REFERENCE_LABELS[reference.code ?? '']!) : reference.code }} × {{ reference.count }}
               </Badge>
             </div>
           </div>

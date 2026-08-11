@@ -27,8 +27,8 @@ export function detectLocale(): AppLocale {
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en'
 }
 
-// Resolve the persisted locale while modules are evaluated so labels declared at
-// module scope are created in the same language as the first rendered frame.
+// Resolve the persisted locale synchronously to keep the first rendered frame stable.
+// UI consumers translate during render/computed evaluation so this ref remains reactive.
 const activeLocale = shallowRef<AppLocale>(detectLocale())
 
 export function initializeLocale(): AppLocale {

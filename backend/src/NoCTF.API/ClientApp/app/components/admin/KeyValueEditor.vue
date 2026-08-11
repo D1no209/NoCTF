@@ -8,9 +8,9 @@ const props = withDefaults(defineProps<{
   addLabel?: string
   disabled?: boolean
 }>(), {
-  keyPlaceholder: translate("键"),
-  valuePlaceholder: translate("值"),
-  addLabel: translate("添加一项"),
+  keyPlaceholder: '键',
+  valuePlaceholder: '值',
+  addLabel: '添加一项',
   disabled: false,
 })
 
@@ -70,14 +70,14 @@ function remove(index: number): void {
     <div v-for="(row, index) in rows" :key="index" class="flex items-center gap-2">
       <Input
         v-model="row.key"
-        :placeholder="keyPlaceholder"
+        :placeholder="$t(keyPlaceholder)"
         :disabled="disabled"
         class="font-mono text-sm"
         @blur="commit"
       />
       <Input
         v-model="row.value"
-        :placeholder="valuePlaceholder"
+        :placeholder="$t(valuePlaceholder)"
         :disabled="disabled"
         class="font-mono text-sm"
         @blur="commit"
@@ -102,7 +102,7 @@ function remove(index: number): void {
       @click="add"
     >
       <Plus data-icon="inline-start" />
-      {{ addLabel }}
+      {{ $t(addLabel) }}
     </Button>
   </div>
 </template>

@@ -27,11 +27,11 @@ const status = computed(() => competition.value?.status)
 const isDeleted = computed(() => !!competition.value?.deletedAt)
 
 const steps = [
-  { value: 'Draft', label: translate("草稿") },
-  { value: 'Visible', label: translate("可见") },
-  { value: 'Published', label: translate("已发布") },
-  { value: 'Running', label: translate("进行中") },
-  { value: 'Finished', label: translate("已结束") },
+  { value: 'Draft', label: '草稿' },
+  { value: 'Visible', label: '可见' },
+  { value: 'Published', label: '已发布' },
+  { value: 'Running', label: '进行中' },
+  { value: 'Finished', label: '已结束' },
 ]
 
 interface LifecycleAction {
@@ -232,7 +232,7 @@ async function submitDelete() {
         <div class="flex flex-wrap items-center gap-2">
           <template v-for="(step, i) in steps" :key="step.value">
             <Badge :variant="status === step.value || (step.value === 'Running' && status === 'Paused') ? 'default' : 'outline'">
-              {{ step.value === 'Running' && status === 'Paused' ? $t('已暂停') : step.label }}
+              {{ step.value === 'Running' && status === 'Paused' ? $t('已暂停') : $t(step.label) }}
             </Badge>
             <span v-if="i < steps.length - 1" class="text-muted-foreground">→</span>
           </template>
