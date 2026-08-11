@@ -23,9 +23,13 @@
   新的首页请求也不必等待已失效请求结束。
 - 功能提交 `d8608cbe` 通过 Bun overrides 将间接依赖 `js-yaml` 固定为已修复的 `4.3.1`，保持
   `@hey-api/openapi-ts` 生成链不变；`bun audit` 从两个 High 降为 0。
+- 功能提交 `f22f6062` 将题目附件、随机附件、平台日志、平台审计归档、比赛事件和比赛数据归档下载
+  全部改为调用生成 SDK 并显式按 Blob 解析。下载现在复用统一认证拦截器和单飞 Refresh Cookie 恢复，
+  Access Token 过期时不再因原生 `fetch` 只携带旧内存 Token 而失败；同时移除这些页面的手写 API 路径、
+  查询串和重复下载实现。
 - 本阶段没有 HTTP/OpenAPI、生成 TypeScript SDK、数据模型、数据表、migration、snapshot 或版本号变化；
   `app/api` 生成目录未被手工修改。
-- 验证通过：ClientApp `bun test` 106/106、`bun run typecheck`、`bun run build`、`bun audit`（0 漏洞）
+- 验证通过：ClientApp `bun test` 110/110、`bun run typecheck`、`bun run build`、`bun audit`（0 漏洞）
   和 `git diff --check`。生产构建仅保留既有大 chunk 和第三方 deprecation 警告。
 - 修复位于隔离分支 `codex/fix-audit-findings-20260811`；尚未推送、部署或操作生产数据。浏览器动态验收
   将在所有前端修复收口后统一使用 Microsoft Edge 执行。
