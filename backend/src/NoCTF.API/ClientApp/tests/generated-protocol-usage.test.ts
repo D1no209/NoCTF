@@ -29,4 +29,13 @@ describe('generated protocol usage', () => {
       'export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol',
     )
   })
+
+  test('uses the generated competition administration role', async () => {
+    const source = await Bun.file(new URL('../app/lib/admin-competition.ts', import.meta.url)).text()
+
+    expect(source).toContain(
+      'export type CompetitionAdminRole = NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol',
+    )
+    expect(source).not.toContain("'owner' | 'manager' | 'judge' | 'observer'")
+  })
 })

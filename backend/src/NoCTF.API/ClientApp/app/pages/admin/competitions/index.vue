@@ -16,20 +16,14 @@ const error = ref<string | null>(null)
 const includeDeleted = ref(route.query.includeDeleted === 'true')
 
 const RoleLabel: Record<CompetitionAdminRole, string> = {
-  owner: '负责人',
-  manager: '管理员',
-  judge: '裁判',
-  observer: '观察员',
+  Owner: '负责人',
+  Manager: '管理员',
+  Judge: '裁判',
+  Observer: '观察员',
 }
 
 function adminRole(competition: NoCtfapiEndpointsCompetitionsCompetitionResponse): CompetitionAdminRole {
-  return competition.administrationRole === 'Owner'
-    ? 'owner'
-    : competition.administrationRole === 'Manager'
-      ? 'manager'
-      : competition.administrationRole === 'Judge'
-        ? 'judge'
-        : 'observer'
+  return competition.administrationRole ?? 'Observer'
 }
 
 async function load() {

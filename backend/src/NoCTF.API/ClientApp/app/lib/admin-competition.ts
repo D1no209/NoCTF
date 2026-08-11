@@ -1,14 +1,17 @@
 import type { InjectionKey } from 'vue'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
+import type {
+  NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol,
+  NoCtfapiEndpointsCompetitionsCompetitionResponse,
+} from '~/api'
 
 /**
  * My role inside one competition, derived in the [id] shell:
- * - owner: competition owner or platform administrator (full access incl. permissions)
- * - manager: can moderate (read + write)
- * - judge: can adjudicate incidents, bans, and ban appeals
- * - observer: read-only UI
+ * - Owner: competition owner or platform administrator (full access incl. permissions)
+ * - Manager: can moderate (read + write)
+ * - Judge: can adjudicate incidents, bans, and ban appeals
+ * - Observer: read-only UI
  */
-export type CompetitionAdminRole = 'owner' | 'manager' | 'judge' | 'observer'
+export type CompetitionAdminRole = NoCtfapiEndpointsCompetitionsCompetitionAdministrationRoleProtocol
 
 export interface CompetitionAdminContext {
   competitionId: string
