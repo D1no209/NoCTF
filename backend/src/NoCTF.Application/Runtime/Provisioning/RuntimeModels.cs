@@ -38,7 +38,7 @@ public enum ContainerNetworkIsolation
 
 public enum RuntimeEgressPolicy
 {
-    DenyAll,
+    Isolated,
     InternetOnly
 }
 
@@ -77,7 +77,7 @@ public sealed record ContainerRuntimeDefinition(
     IReadOnlyDictionary<int, int>? PortMappings = null,
     ContainerSecurityPolicy? Security = null,
     string? FlagEnvironmentVariableName = null,
-    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll,
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
     IReadOnlyList<int>? InternalPorts = null) : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.Container;
@@ -89,7 +89,7 @@ public sealed record ComposeRuntimeDefinition(
     IReadOnlyDictionary<string, string>? Environment = null,
     IReadOnlyDictionary<string, string>? Labels = null,
     IReadOnlyDictionary<string, string>? FlagEnvironmentVariables = null,
-    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll)
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated)
     : ChallengeRuntimeDefinition
 {
     public override RuntimeKind RuntimeKind => RuntimeKind.Compose;
@@ -157,7 +157,7 @@ public sealed record ContainerRequest(
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
     RuntimeUrlBinding? ControlCheckUrlBinding = null,
     RuntimeInternalEndpointBinding? AwdCheckerTargetBinding = null,
-    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.DenyAll,
+    RuntimeEgressPolicy EgressPolicy = RuntimeEgressPolicy.Isolated,
     ContainerNetworkPurpose NetworkPurpose = ContainerNetworkPurpose.PersistentRuntime)
 {
     public IReadOnlyList<int> ContainerPorts =>

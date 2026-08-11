@@ -20,7 +20,7 @@ public sealed class RuntimeClaimFactoryTests
             new ContainerRuntimeDefinition(
                 "challenge:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 },
-                EgressPolicy: RuntimeEgressPolicy.DenyAll),
+                EgressPolicy: RuntimeEgressPolicy.Isolated),
             Limits: new(268_435_456, 500_000_000, 128));
 
         var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
@@ -33,7 +33,7 @@ public sealed class RuntimeClaimFactoryTests
         await Assert.That(container.Definition.NetworkIsolation)
             .IsEqualTo(ContainerNetworkIsolation.Isolated);
         await Assert.That(container.Definition.EgressPolicy)
-            .IsEqualTo(RuntimeEgressPolicy.DenyAll);
+            .IsEqualTo(RuntimeEgressPolicy.Isolated);
         await Assert.That(container.Definition.PortMappings[8080]).IsEqualTo(0);
         await Assert.That(container.Definition.Labels["noctf.io/job-kind"])
             .IsEqualTo("persistent-runtime");
@@ -98,7 +98,7 @@ public sealed class RuntimeClaimFactoryTests
                 {
                     ["web"] = new(268_435_456, 500_000_000, 128)
                 },
-                EgressPolicy: RuntimeEgressPolicy.DenyAll),
+                EgressPolicy: RuntimeEgressPolicy.Isolated),
             Limits: new(268_435_456, 500_000_000, 128));
 
         var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
@@ -110,7 +110,7 @@ public sealed class RuntimeClaimFactoryTests
         await Assert.That(compose.Definition.ProjectName)
             .IsEqualTo($"noctf-{instance.Id:N}-{instance.Generation}");
         await Assert.That(compose.Definition.EgressPolicy)
-            .IsEqualTo(RuntimeEgressPolicy.DenyAll);
+            .IsEqualTo(RuntimeEgressPolicy.Isolated);
         await Assert.That(compose.Definition.Labels["noctf.io/job-kind"])
             .IsEqualTo("persistent-runtime");
     }

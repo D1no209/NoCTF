@@ -938,7 +938,7 @@ public sealed class KubernetesContainerLifecycleTests
                 new RuntimeResourceIdentity(
                     Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3),
                 ContainerNetworkPurpose.AwdpVerification,
-                RuntimeEgressPolicy.DenyAll,
+                RuntimeEgressPolicy.Isolated,
                 [],
                 8080),
             CancellationToken.None);
