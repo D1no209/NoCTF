@@ -24,6 +24,15 @@ public sealed class ChallengeAttachmentStore(
             new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry()),
             new FileReferenceLock()) { }
 
+    public Task<bool> CanWriteAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct) =>
+        WriteAuthorized(actorId, isAdministrator)
+            .AsNoTracking()
+            .AnyAsync(item => item.Id == challengeId, ct);
+
     public Task<bool> AttachmentIdExistsAsync(
         Guid attachmentId,
         CancellationToken ct) =>
