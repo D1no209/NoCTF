@@ -9,6 +9,25 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：用途级上传上限与 AWDP Fix 配置
+
+- 用户通过 `/grilling` 选择用途级上传上限，并明确要求 Fix 包可在题目管理中配置。功能提交
+  `471c3577` 新增启动时验证的 `Uploads` 配置：用户/队伍头像、平台 Logo、比赛海报默认均为 12 MiB，
+  题目附件默认 1 GiB；每项允许 1 byte 至 1 GiB。各上传 Endpoint 同时设置“文件上限 + 64 KiB
+  multipart 开销”的传输硬上限，防止模型绑定前无限写临时盘。
+- 超过精确业务上限统一返回 413/`UploadTooLarge`，不会进入图片解析、对象存储或业务引用写入。此前
+  题目附件的写权限预检仍在对象暂存前执行，最终引用写入继续二次授权，保持 TOCTOU fail-closed。
+- AWDP `Challenge.DefinitionJson` 新增 nullable `MaximumPatchUploadBytes`，题目管理以 MiB 编辑；缺省
+  256 MiB、最大 1 GiB。上传作用域从现有 Competition/CompetitionChallenge/Challenge JSON 解析有效值，
+  超限在 tar.gz 解压校验与对象存储前返回 413/`ArchiveTooLarge`。没有新增表、列、migration 或 snapshot。
+- OpenAPI 两份制品已由后端工具重新导出，TypeScript SDK 已重新生成；六个上传端点均声明 typed 413，
+  Patch 同时保留 typed 422。前端只编辑现有强类型配置模型和生成 SDK，不手写 URL/DTO。
+- 验证通过：超限 Fix 真实 TestServer HTTP 场景 1/1（并断言存储零调用）、完整非 Integration TUnit
+  649/649、Release solution build 0 警告/0 错误、ClientApp 完整 `bun test` 140/140、typecheck、production
+  build 与 `git diff --check`。构建只保留既有 chunk-size/第三方 deprecation 警告。
+- 尚未推送、部署或操作生产文件；部署 overlay 如配置反向代理 body limit，必须不低于 Endpoint 的传输
+  硬上限，否则会在应用强类型错误前被代理拒绝。
+
 ## 2026-08-11 全量审计修复：AWD Flag 批次有界化
 
 - 用户通过 `/grilling` 选择“固定条数与总字节上限、仍按一次 HTTP 请求计限流”。功能提交
