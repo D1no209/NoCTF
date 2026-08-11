@@ -9,6 +9,23 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：官方 Checker 回调拓扑
+
+- 功能提交 `fccd9101` 修复官方 Docker/Kubernetes 部署没有可工作的 AWD/AWDP Checker 回调路径。
+  没有新增网关进程、业务表或回调协议；仍使用现有 Runner 签发的短期 JWT 和 API 强类型内部 Endpoint，
+  并保留一次 Checker 执行可多次回调、后写覆盖的既有契约。
+- Docker 官方 Compose 为所有 API 角色容器注入精确
+  `noctf.io/internal-role=scoring-callback-gateway` 标签。Runner 默认按该标签发现全部运行中的 API 容器，
+  并仅将它们接入本次 Checker 的 internal callback network；显式 `CallbackContainer` 配置仍可用且同样
+  强制校验角色标签。回调容器扩缩容不再依赖固定 container_name。
+- Kubernetes 回调地址改为准确 FQDN `backend-service.noctf.svc.cluster.local:8080`；Runtime namespace
+  的 Checker egress 同时约束平台 namespace、callback Pod 标签与 TCP 8080，平台 ingress 反向只接受
+  purpose 为 `awd-checker` 或 `awdp-checker` 的 Runtime Pod。题目业务 Pod 不获得平台 API 访问能力。
+- Docker/Kubernetes 配置、NetworkPolicy、部署说明与 Runtime 文档已同步。没有 migration、OpenAPI、
+  SDK 或版本号变化。统一分支验证：Release build 0 警告/0 错误，Deployment topology 4/4、Kubernetes
+  lifecycle 25/25、真实 Docker lifecycle 11/11、真实 Docker Compose 4/4；独立阶段另验证 46/46 K8s
+  manifests、两份官方 Compose config 及 analyzer。尚未推送、部署或操作生产 Checker/Runtime。
+
 ## 2026-08-11 全量审计修复：Runtime 隔离网络语义校正
 
 - 用户在 `/grilling` 中明确选择保留 Docker 当前 bridge 行为，不增加宿主防火墙或 Egress Gateway。
