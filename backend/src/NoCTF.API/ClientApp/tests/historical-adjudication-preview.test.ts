@@ -29,5 +29,8 @@ describe('historical adjudication difference preview', () => {
 
   test('describes the narrow legacy AWDP break analysis accurately', () => {
     expect(source).toContain('当前分析 CTF Flag，并识别旧版本错误判为重复成就的 AWDP Break；AWD、KoH 与其他事实类型不在此预览中。')
+    expect(source).toContain("CurrentDuplicateShouldBeCorrect: '当前重复结果来自旧版错误，应恢复为正确'")
+    expect(source).toContain("MissingAdjudicationRecord: '当前结果缺少不可变裁决事件'")
+    expect(source).toContain("TeamEligibilityHistoryRequiresReview: '队伍当前资格无法证明发生时血榜资格'")
   })
 })

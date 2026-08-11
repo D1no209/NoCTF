@@ -1520,6 +1520,7 @@ export const englishMessages: Record<string, string> = {
   "确定性预期": "Deterministic expectation",
   "血榜记录": "Recorded blood awards",
   "当前正确结果按权威顺序应为重复": "The current Correct result should be Duplicate under authoritative ordering",
+  "当前重复结果来自旧版错误，应恢复为正确": "The current Duplicate result comes from a legacy defect and should be restored to Correct",
   "当前重复结果缺少仍为正确的前序事实": "The current Duplicate result has no preceding fact that remains Correct",
   "历史裁决与当前结果不一致或曾发生变化": "Historical adjudication conflicts with the current result or changed over time",
   "当前结果缺少不可变裁决事件": "The current result has no immutable adjudication event",

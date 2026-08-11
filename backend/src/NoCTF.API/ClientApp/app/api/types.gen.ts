@@ -1167,7 +1167,7 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDi
     certainty?: NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceCertaintyProtocol;
 };
 
-export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol = 'CurrentCorrectShouldBeDuplicate' | 'DuplicateWithoutCurrentPredecessor' | 'HistoricalResultChanged' | 'MissingBloodAward' | 'UnexpectedBloodAward' | 'WrongBloodRank' | 'DuplicateBloodAward';
+export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceKindProtocol = 'CurrentCorrectShouldBeDuplicate' | 'CurrentDuplicateShouldBeCorrect' | 'DuplicateWithoutCurrentPredecessor' | 'HistoricalResultChanged' | 'MissingAdjudicationRecord' | 'TeamEligibilityHistoryRequiresReview' | 'MissingBloodAward' | 'UnexpectedBloodAward' | 'WrongBloodRank' | 'DuplicateBloodAward';
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsAdjudicationDifferenceCertaintyProtocol = 'Deterministic' | 'NeedsReview';
 
@@ -5561,6 +5561,10 @@ export type AdminPreviewHistoricalAdjudicationDifferencesErrors = {
      * Forbidden
      */
     403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
 };
 
 export type AdminPreviewHistoricalAdjudicationDifferencesError = AdminPreviewHistoricalAdjudicationDifferencesErrors[keyof AdminPreviewHistoricalAdjudicationDifferencesErrors];

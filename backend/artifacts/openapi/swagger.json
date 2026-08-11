@@ -7154,7 +7154,7 @@
           "Admin"
         ],
         "summary": "Previews historical gameplay adjudication differences.",
-        "description": "Returns a bounded, read-only analysis of current gameplay results and recorded blood awards. It never applies corrections.",
+        "description": "Returns a bounded, read-only analysis of CTF Flag results and recorded blood awards, plus legacy AWDP Break duplicates. It never applies corrections.",
         "operationId": "AdminPreviewHistoricalAdjudicationDifferences",
         "parameters": [
           {
@@ -7202,6 +7202,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found"
           },
           "401": {
             "description": "Unauthorized"
@@ -16623,8 +16626,11 @@
         "description": "",
         "x-enumNames": [
           "CurrentCorrectShouldBeDuplicate",
+          "CurrentDuplicateShouldBeCorrect",
           "DuplicateWithoutCurrentPredecessor",
           "HistoricalResultChanged",
+          "MissingAdjudicationRecord",
+          "TeamEligibilityHistoryRequiresReview",
           "MissingBloodAward",
           "UnexpectedBloodAward",
           "WrongBloodRank",
@@ -16632,8 +16638,11 @@
         ],
         "enum": [
           "CurrentCorrectShouldBeDuplicate",
+          "CurrentDuplicateShouldBeCorrect",
           "DuplicateWithoutCurrentPredecessor",
           "HistoricalResultChanged",
+          "MissingAdjudicationRecord",
+          "TeamEligibilityHistoryRequiresReview",
           "MissingBloodAward",
           "UnexpectedBloodAward",
           "WrongBloodRank",

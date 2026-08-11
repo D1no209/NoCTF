@@ -1880,7 +1880,7 @@ export const adminListGameplayFacts = <ThrowOnError extends boolean = false>(opt
 /**
  * Previews historical gameplay adjudication differences.
  *
- * Returns a bounded, read-only analysis of current gameplay results and recorded blood awards. It never applies corrections.
+ * Returns a bounded, read-only analysis of CTF Flag results and recorded blood awards, plus legacy AWDP Break duplicates. It never applies corrections.
  */
 export const adminPreviewHistoricalAdjudicationDifferences = <ThrowOnError extends boolean = false>(options: Options<AdminPreviewHistoricalAdjudicationDifferencesData, ThrowOnError>): RequestResult<AdminPreviewHistoricalAdjudicationDifferencesResponses, AdminPreviewHistoricalAdjudicationDifferencesErrors, ThrowOnError> => (options.client ?? client).get<AdminPreviewHistoricalAdjudicationDifferencesResponses, AdminPreviewHistoricalAdjudicationDifferencesErrors, ThrowOnError>({
     security: [{
