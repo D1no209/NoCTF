@@ -9,6 +9,21 @@
 - 根 `AGENTS.md`、`CONTEXT.md` 与数据库/API/消息/计分/存储文档已同步。
 - 当前完整测试基线已清零：最后一次运行结果为 759 通过、2 跳过、0 失败；PostgreSQL、Redis、Docker Container/Compose 等真实依赖场景已强制执行，只有未配置实集群/镜像的 Kubernetes 与 Libvirt 外部集成按设计跳过。Build、OpenAPI、Nuxt 与 EF drift 检查通过。
 
+## 2026-08-11 全量审计修复：Kubernetes PID 限制证明链
+
+- 功能提交 `953b68e9` 没有伪造 Kubernetes 不支持的 Pod 级 PID limit。运维确认 kubelet Pool-wide
+  `PodPidsLimit` 后，必须以 `noctf.io/pod-pids-limit=<精确数值>` 标记允许承载题目的 Node；标签只是
+  明确 attestation，不会修改 kubelet。
+- Runner 启动时使用只读 Node `get/list` 权限检查至少一个标签值与配置完全一致、Ready 且可调度的节点；
+  缺少证明时 fail closed。单容器、Checker、AWDP 验证与 Compose Runtime Pod 均强制同一
+  `nodeSelector`，因此新节点在核验并打标签前不能接收题目工作负载。
+- RBAC 仅增加 Node 元数据读取，Runner 仍无修改 Node 权限；部署说明给出显式核验/标记顺序，并重申
+  Application 配置不会代替 kubelet 设置。本阶段无业务表、列、migration、snapshot、HTTP/OpenAPI、
+  SDK 或版本号变化。
+- 统一分支验证：Release solution build 0 警告/0 错误；StartupCheck 6/6、Kubernetes Container 25/25、
+  Compose manifest 9/9、DeploymentTopology 5/5 与 `git diff --check` 通过。当前机器没有可用 Kubernetes
+  API，故未伪报实集群验收；尚未推送或部署。
+
 ## 2026-08-11 全量审计修复：Kubernetes 平台出站边界
 
 - 功能提交 `ac628036` 移除 Runner 对 `0.0.0.0/0:443,6443` 的宽泛出站放行。官方清单已要求
