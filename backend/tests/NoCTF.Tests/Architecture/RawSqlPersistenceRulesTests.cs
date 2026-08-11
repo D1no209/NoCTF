@@ -16,6 +16,7 @@ public sealed class RawSqlPersistenceRulesTests
         "ExecuteSqlInterpolated",
         "FromSqlInterpolated",
         "pg_advisory_",
+        "LOCK TABLE",
         "FOR UPDATE",
         "SKIP LOCKED",
         "ON CONFLICT",
@@ -30,6 +31,11 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "pg_advisory_",
                 "WITH RECURSIVE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Administration/ActiveHumanAdministratorMutationGuard.cs"] =
+            [
+                "ExecuteSqlInterpolated",
+                "LOCK TABLE"
             ],
             ["backend/src/NoCTF.Infrastructure/Competitions/Administration/AdminCompetitionStore.cs"] =
             [
