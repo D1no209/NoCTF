@@ -9,9 +9,6 @@ namespace NoCTF.Application.GameplayFacts.Intake;
 
 public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmissionModePolicy modePolicy)
 {
-    public const int MaximumBatchFlagCount = 64;
-    public const int MaximumBatchUtf8Bytes = 256 * 1024;
-
     public async Task<OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>> ExecuteAsync(
         FlagGameplayFactCommand command,
         CancellationToken cancellationToken = default)
@@ -64,16 +61,6 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
         if (flags.Count == 0)
             return OperationResult<IReadOnlyList<GameplayFactAccepted>, GameplayFactAdmissionFailureCode>.Failure(
                 GameplayFactAdmissionFailureCode.FlagInvalid, "At least one Flag is required.");
-        if (flags.Count > MaximumBatchFlagCount)
-            return OperationResult<IReadOnlyList<GameplayFactAccepted>, GameplayFactAdmissionFailureCode>.Failure(
-                GameplayFactAdmissionFailureCode.FlagBatchLimitExceeded,
-                $"A Flag collection can contain at most {MaximumBatchFlagCount} items.");
-
-        var totalByteLength = flags.Sum(Encoding.UTF8.GetByteCount);
-        if (totalByteLength > MaximumBatchUtf8Bytes)
-            return OperationResult<IReadOnlyList<GameplayFactAccepted>, GameplayFactAdmissionFailureCode>.Failure(
-                GameplayFactAdmissionFailureCode.FlagBatchLimitExceeded,
-                $"A Flag collection can contain at most {MaximumBatchUtf8Bytes} UTF-8 bytes.");
         foreach (var flag in flags)
         {
             var byteLength = Encoding.UTF8.GetByteCount(flag);

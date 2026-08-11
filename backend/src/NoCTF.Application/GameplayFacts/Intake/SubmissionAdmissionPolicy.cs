@@ -19,7 +19,6 @@ public enum GameplayFactAdmissionFailureCode
     BreakRequired,
     AttemptsExhausted,
     FlagInvalid,
-    FlagBatchLimitExceeded,
     FlagBatchNotSupported,
     GameplayFactScopeNotFound,
     GameplayFactConcurrency,

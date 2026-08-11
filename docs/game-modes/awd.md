@@ -69,9 +69,9 @@ Round 不建表。Round 1 生成后，ChallengeFlag 的 AwdRound Specification �
 
 ## 攻击 GameplayFact
 
-AWD 可使用单 `flag` 或 `flags` 数组；无尝试上限。每个批量请求最多 64 项、Flag UTF-8 正文合计最多
-256 KiB，超限在创建任何 GameplayFact 前原子拒绝。Worker 以原文、CompetitionChallenge、
-ReceivedAt 窗口、AwdRound Specification 反查：
+AWD 可使用单 `flag` 或 `flags` 数组；批次数量、批次总字节数和尝试次数均无上限。每项仍必须为
+1–4096 UTF-8 bytes 且禁止 NUL，任一项非法时整批在创建任何 GameplayFact 前原子拒绝。Worker 以
+原文、CompetitionChallenge、ReceivedAt 窗口、AwdRound Specification 反查：
 
 - ChallengeFlag.TeamId 是 VictimTeamId；
 - 自己 TeamId -> Rejected/SelfAttackRejected；
