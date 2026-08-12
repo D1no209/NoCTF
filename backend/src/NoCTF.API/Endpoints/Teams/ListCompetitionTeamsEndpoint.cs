@@ -13,7 +13,11 @@ public sealed class ListCompetitionTeamsEndpoint(ListCompetitionTeams list, Link
     public override void Configure() { Get("/competitions/{competitionId}/teams"); AllowAnonymous(); }
     public override async Task<Ok<TeamListResponse>> ExecuteAsync(ListCompetitionTeamsRequest request, CancellationToken ct)
     {
-        var items = await list.ExecuteAsync(Route<Guid>("competitionId"), false, ct);
+        var items = await list.ExecuteAsync(
+            Route<Guid>("competitionId"),
+            includePending: false,
+            includeInternal: false,
+            ct);
         return TypedResults.Ok(new TeamListResponse(
             items.Select(item => TeamMapper.ToResponse(item, links, HttpContext)).ToList()));
     }

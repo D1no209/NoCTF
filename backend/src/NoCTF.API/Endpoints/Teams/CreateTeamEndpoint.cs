@@ -34,11 +34,34 @@ public enum TeamBanSourceProtocol
     CheatIncident
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<TeamRegistrationFailureCodeProtocol>))]
+public enum TeamRegistrationFailureCodeProtocol
+{
+    InvalidTeamName,
+    CompetitionNotFound,
+    RegistrationClosed,
+    UserAlreadyRegistered,
+    TeamNameOrMembershipConflict,
+    TeamNotFound,
+    CompetitionFinished,
+    TeamLocked,
+    TeamConflict,
+    TeamReviewConflict,
+    CompetitionActive,
+    TrackNotFound,
+    TrackNotPublicSelectable
+}
+
+public sealed record TeamRegistrationFailureResponse(
+    TeamRegistrationFailureCodeProtocol Code,
+    string Message);
+
 public sealed class CreateTeamRequest
 {
     private string name = string.Empty;
 
     public Guid CompetitionId { get; set; }
+    public string? TrackKey { get; set; }
     public string Name
     {
         get => name;
@@ -49,6 +72,8 @@ public sealed class CreateTeamRequest
 public sealed record TeamResponse(
     Guid Id,
     Guid CompetitionId,
+    string TrackKey,
+    string TrackName,
     string Name,
     string? AvatarUrl,
     Guid CaptainId,
@@ -56,7 +81,8 @@ public sealed record TeamResponse(
     TeamRegistrationStatusProtocol RegistrationStatus,
     bool IsLocked,
     bool IsBanned,
-    DateTimeOffset RegisteredAt);
+    DateTimeOffset RegisteredAt,
+    long ConcurrencyVersion);
 
 public sealed record TeamListResponse(IReadOnlyList<TeamResponse> Items);
 
@@ -101,6 +127,8 @@ internal static partial class TeamMapper
         return new(
             view.Id,
             view.CompetitionId,
+            view.TrackKey,
+            view.TrackName,
             view.Name,
             avatarUrl,
             view.CaptainId,
@@ -108,7 +136,8 @@ internal static partial class TeamMapper
             ToProtocol(view.RegistrationStatus),
             view.IsLocked,
             view.IsBanned,
-            view.RegisteredAt);
+            view.RegisteredAt,
+            view.ConcurrencyVersion);
     }
 
     [MapEnum(EnumMappingStrategy.ByName)]
@@ -121,18 +150,25 @@ internal static partial class TeamMapper
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial TeamBanSourceProtocol ToProtocol(TeamBanSource value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial TeamRegistrationFailureCodeProtocol ToProtocol(
+        TeamRegistrationFailure value);
 }
 
 public sealed class CreateTeamEndpoint(CreateTeam create, IUserContext user, LinkGenerator links)
-    : Endpoint<CreateTeamRequest, Results<Created<TeamResponse>, NotFound, ProblemHttpResult>>
+    : Endpoint<CreateTeamRequest, Results<Created<TeamResponse>, NotFound, Conflict<TeamRegistrationFailureResponse>>>
 {
     public override void Configure() { Post("/competitions/{competitionId}/teams"); AuthSchemes("Bearer"); }
-    public override async Task<Results<Created<TeamResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(CreateTeamRequest request, CancellationToken ct)
+    public override async Task<Results<Created<TeamResponse>, NotFound, Conflict<TeamRegistrationFailureResponse>>> ExecuteAsync(CreateTeamRequest request, CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         var result = await create.ExecuteAsync(TeamMapper.ToCommand(request, user.UserId, DateTimeOffset.UtcNow), ct);
         if (result.FailureCode == TeamRegistrationFailure.CompetitionNotFound) return TypedResults.NotFound();
-        if (!result.Succeeded) return TypedResults.Problem(statusCode: StatusCodes.Status409Conflict, title: "Team was not created.", detail: result.ErrorMessage);
+        if (!result.Succeeded)
+            return TypedResults.Conflict(new TeamRegistrationFailureResponse(
+                TeamMapper.ToProtocol(result.FailureCode!.Value),
+                result.ErrorMessage ?? "Team was not created."));
         var response = TeamMapper.ToResponse(result.Value!, links, HttpContext);
         return TypedResults.Created($"/competitions/{request.CompetitionId}/teams/{response.Id}", response);
     }

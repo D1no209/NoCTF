@@ -27,7 +27,9 @@ public sealed class TeamRegistrationStore(
                 x.Status,
                 x.TeamRegistrationAutoApprove,
                 x.DeletedAt != null,
-                x.AllowTeamRegistrationWhileRunning))
+                x.AllowTeamRegistrationWhileRunning,
+                x.Mode,
+                x.TrackConfigurationJson))
             .SingleOrDefaultAsync(ct);
 
     public async Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken ct)
@@ -45,6 +47,16 @@ public sealed class TeamRegistrationStore(
             || competition.Status == CompetitionStatus.Running
                 && !competition.AllowTeamRegistrationWhileRunning)
             return new(null, TeamRegistrationFailure.RegistrationClosed);
+        var tracks = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson);
+        var requestedTrackKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey)
+            ?? tracks.DefaultTrack.Key;
+        var track = tracks.Find(requestedTrackKey);
+        if (track is null)
+            return new(null, TeamRegistrationFailure.TrackNotFound);
+        if (track.IsInternal || !track.IsPublicSelectable)
+            return new(null, TeamRegistrationFailure.TrackNotPublicSelectable);
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
             && x.MemberIds.Contains(command.UserId), ct))
@@ -54,6 +66,7 @@ public sealed class TeamRegistrationStore(
         {
             Id = id,
             CompetitionId = command.CompetitionId,
+            TrackKey = track.Key,
             Name = name,
             NormalizedName = name.ToUpperInvariant(),
             CaptainId = command.UserId,
@@ -67,14 +80,15 @@ public sealed class TeamRegistrationStore(
             team.CompetitionId,
             CompetitionEventKind.TeamRegistered,
             CompetitionEventLevel.Information,
-            status == TeamRegistrationStatus.Approved
+            status == TeamRegistrationStatus.Approved && !track.IsInternal
                 ? CompetitionEventVisibility.Public
                 : CompetitionEventVisibility.Staff,
             command.RegisteredAt,
             ActorUserId: command.UserId,
             RelatedUserId: command.UserId,
             TeamId: team.Id,
-            TeamRegistrationStatus: status), ct);
+            TeamRegistrationStatus: status,
+            TrackKey: track.Key), ct);
         competition.LeaderboardDirty = true;
         try
         {
@@ -90,23 +104,62 @@ public sealed class TeamRegistrationStore(
         return new(Map(team), null);
     }
 
-    public async Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken ct) =>
-        await db.Teams.AsNoTracking()
+    public Task<IReadOnlyList<TeamView>> ListAsync(
+        Guid competitionId,
+        bool includePending,
+        CancellationToken ct) =>
+        ListCoreAsync(competitionId, includePending, includeInternal: true, ct);
+
+    public Task<IReadOnlyList<TeamView>> ListPublicAsync(
+        Guid competitionId,
+        bool includePending,
+        CancellationToken ct) =>
+        ListCoreAsync(competitionId, includePending, includeInternal: false, ct);
+
+    private async Task<IReadOnlyList<TeamView>> ListCoreAsync(
+        Guid competitionId,
+        bool includePending,
+        bool includeInternal,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == competitionId && item.DeletedAt == null)
+            .Select(item => new { item.Mode, item.TrackConfigurationJson })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null)
+            return [];
+        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson);
+        var internalKeys = configuration.Tracks.Where(track => track.IsInternal)
+            .Select(track => track.Key)
+            .ToArray();
+        var teams = await db.Teams.AsNoTracking()
             .Where(x => x.CompetitionId == competitionId && x.DeletedAt == null
-                && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
+                && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved)
+                && (includeInternal || !internalKeys.Contains(x.TrackKey)))
             .OrderBy(x => x.Name)
-            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarFileId, x.CaptainId, x.MemberIds,
-                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt)).ToListAsync(ct);
+            .ToListAsync(ct);
+        return teams.Select(team => Map(team, configuration)).ToArray();
+    }
 
     public async Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var competitionStatus = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
-        if (competitionStatus is null) return new(false, TeamRegistrationFailure.CompetitionNotFound);
-        if (competitionStatus == CompetitionStatus.Finished) return new(false, TeamRegistrationFailure.CompetitionFinished);
-        var exists = await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId
-            && x.CompetitionId == competitionId && x.DeletedAt == null, ct);
-        if (!exists) return new(false, TeamRegistrationFailure.TeamNotFound);
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == competitionId && item.DeletedAt == null)
+            .Select(item => new { item.Status, item.Mode, item.TrackConfigurationJson })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null) return new(false, TeamRegistrationFailure.CompetitionNotFound);
+        if (competition.Status == CompetitionStatus.Finished) return new(false, TeamRegistrationFailure.CompetitionFinished);
+        var team = await db.Teams.AsNoTracking().Where(item => item.Id == teamId
+                && item.CompetitionId == competitionId && item.DeletedAt == null)
+            .Select(item => new { item.TrackKey })
+            .SingleOrDefaultAsync(ct);
+        if (team is null) return new(false, TeamRegistrationFailure.TeamNotFound);
+        var track = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson).Find(team.TrackKey);
         var changed = await db.Teams.Where(x => x.Id == teamId && x.CompetitionId == competitionId
                 && x.RegistrationStatus == TeamRegistrationStatus.Pending)
             .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RegistrationStatus, status), ct);
@@ -118,12 +171,13 @@ public sealed class TeamRegistrationStore(
                 status == TeamRegistrationStatus.Rejected
                     ? CompetitionEventLevel.Warning
                     : CompetitionEventLevel.Information,
-                status == TeamRegistrationStatus.Approved
+                status == TeamRegistrationStatus.Approved && track?.IsInternal != true
                     ? CompetitionEventVisibility.Public
                     : CompetitionEventVisibility.Staff,
                 timeProvider.GetUtcNow(),
                 TeamId: teamId,
-                TeamRegistrationStatus: status), ct);
+                TeamRegistrationStatus: status,
+                TrackKey: team.TrackKey), ct);
             await db.SaveChangesAsync(ct);
             await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         }
@@ -186,21 +240,69 @@ public sealed class TeamRegistrationStore(
             : new(false, TeamRegistrationFailure.TeamReviewConflict);
     }
 
-    public Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken ct) =>
-        db.Teams.AsNoTracking().Where(x => x.Id == teamId && x.CompetitionId == competitionId && x.DeletedAt == null
-                && (includePending || x.RegistrationStatus == TeamRegistrationStatus.Approved))
-            .Select(x => new TeamView(x.Id, x.CompetitionId, x.Name, x.AvatarFileId, x.CaptainId, x.MemberIds,
-                x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt)).SingleOrDefaultAsync(ct);
+    public Task<TeamView?> FindAsync(
+        Guid competitionId,
+        Guid teamId,
+        bool includePending,
+        CancellationToken ct) =>
+        FindCoreAsync(competitionId, teamId, includePending, includeInternal: true, ct);
 
-    public Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct) =>
-        db.Teams.AsNoTracking().Where(team => team.CompetitionId == competitionId
+    public Task<TeamView?> FindPublicAsync(
+        Guid competitionId,
+        Guid teamId,
+        bool includePending,
+        CancellationToken ct) =>
+        FindCoreAsync(competitionId, teamId, includePending, includeInternal: false, ct);
+
+    private async Task<TeamView?> FindCoreAsync(
+        Guid competitionId,
+        Guid teamId,
+        bool includePending,
+        bool includeInternal,
+        CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == competitionId && item.DeletedAt == null)
+            .Select(item => new { item.Mode, item.TrackConfigurationJson })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null)
+            return null;
+        var configuration = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson);
+        var team = await db.Teams.AsNoTracking().SingleOrDefaultAsync(item =>
+            item.Id == teamId
+            && item.CompetitionId == competitionId
+            && item.DeletedAt == null
+            && (includePending || item.RegistrationStatus == TeamRegistrationStatus.Approved),
+            ct);
+        if (team is null)
+            return null;
+        var track = configuration.Find(team.TrackKey);
+        if (!includeInternal && track?.IsInternal == true)
+            return null;
+        return Map(team, configuration);
+    }
+
+    public async Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken ct)
+    {
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == competitionId && item.DeletedAt == null)
+            .Select(item => new { item.Mode, item.TrackConfigurationJson })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null)
+            return null;
+        var team = await db.Teams.AsNoTracking().Where(team => team.CompetitionId == competitionId
                 && team.MemberIds.Contains(userId)
                 && team.DeletedAt == null
                 && (includePending || team.RegistrationStatus == TeamRegistrationStatus.Approved))
-            .Select(team => new TeamView(team.Id, team.CompetitionId, team.Name, team.AvatarFileId,
-                team.CaptainId, team.MemberIds, team.RegistrationStatus, team.IsLocked,
-                team.IsBanned, team.RegisteredAt))
             .SingleOrDefaultAsync(ct);
+        return team is null
+            ? null
+            : Map(team, CompetitionTrackConfiguration.ParseOrDefault(
+                competition.Mode,
+                competition.TrackConfigurationJson));
+    }
 
     public async Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken ct) =>
         await db.Teams.AsNoTracking().AnyAsync(x => x.Id == teamId && x.CompetitionId == competitionId
@@ -272,7 +374,23 @@ public sealed class TeamRegistrationStore(
 
     private static TeamView Map(Team x) => new(
         x.Id, x.CompetitionId, x.Name, x.AvatarFileId, x.CaptainId, x.MemberIds,
-        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt);
+        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TrackKey, x.TrackKey,
+        x.ConcurrencyVersion);
+
+    private static TeamView Map(Team team, CompetitionTrackConfiguration configuration) => new(
+        team.Id,
+        team.CompetitionId,
+        team.Name,
+        team.AvatarFileId,
+        team.CaptainId,
+        team.MemberIds,
+        team.RegistrationStatus,
+        team.IsLocked,
+        team.IsBanned,
+        team.RegisteredAt,
+        team.TrackKey,
+        configuration.Find(team.TrackKey)?.Name ?? team.TrackKey,
+        team.ConcurrencyVersion);
 
     private static string CreateInvitationToken()
     {

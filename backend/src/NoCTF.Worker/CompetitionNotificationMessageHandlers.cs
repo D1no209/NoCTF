@@ -7,6 +7,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Worker;
 
@@ -127,6 +128,20 @@ public static class CompetitionNotificationMessageHandlers
                 message.BannedAt),
             message.TeamId,
             ct);
+
+        var teamTrack = await db.Teams.AsNoTracking()
+            .Where(team => team.Id == message.TeamId && team.CompetitionId == message.CompetitionId)
+            .Select(team => team.TrackKey)
+            .SingleOrDefaultAsync(ct);
+        var competition = await db.Competitions.AsNoTracking()
+            .Where(item => item.Id == message.CompetitionId)
+            .Select(item => new { item.Mode, item.TrackConfigurationJson })
+            .SingleOrDefaultAsync(ct);
+        if (competition is null
+            || CompetitionTrackConfiguration.ParseOrDefault(
+                competition.Mode,
+                competition.TrackConfigurationJson).Find(teamTrack)?.IsInternal == true)
+            return;
 
         if (message.AnnouncementKind is not { } announcementKind)
             return;

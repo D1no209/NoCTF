@@ -65,7 +65,9 @@ public sealed class CompetitionEventStore(
                 runtimeInstanceId = draft.RuntimeInstanceId,
                 gameplayFactId = draft.GameplayFactId,
                 questionId = draft.QuestionId,
-                reason = SanitizeReason(draft.Reason)
+                reason = SanitizeReason(draft.Reason),
+                trackKey = draft.TrackKey,
+                previousTrackKey = draft.PreviousTrackKey
             }, ExportJsonOptions),
             OccurredAt = draft.OccurredAt
         });
@@ -290,6 +292,16 @@ public sealed class CompetitionEventStore(
         }
         if (access.AccessLevel != CompetitionEventAccessLevel.Staff)
         {
+            var competition = await db.Competitions.AsNoTracking()
+                .Where(item => item.Id == filter.CompetitionId)
+                .Select(item => new { item.Mode, item.TrackConfigurationJson })
+                .SingleAsync(cancellationToken);
+            var internalTrackKeys = CompetitionTrackConfiguration.ParseOrDefault(
+                    competition.Mode,
+                    competition.TrackConfigurationJson)
+                .Tracks.Where(track => track.IsInternal)
+                .Select(track => track.Key)
+                .ToArray();
             query = access.TeamId is Guid teamId
                 ? query.Where(item =>
                     item.Visibility == CompetitionEventVisibility.Public
@@ -298,6 +310,15 @@ public sealed class CompetitionEventStore(
                         || (item.RelatedType == EntityReferenceKind.Team && item.RelatedId == teamId)))
                 : query.Where(item =>
                     item.Visibility == CompetitionEventVisibility.Public);
+            if (internalTrackKeys.Length > 0)
+            {
+                query = query.Where(item =>
+                    !db.Teams.Any(team =>
+                        team.CompetitionId == filter.CompetitionId
+                        && internalTrackKeys.Contains(team.TrackKey)
+                        && ((item.SubjectType == EntityReferenceKind.Team && item.SubjectId == team.Id)
+                            || (item.RelatedType == EntityReferenceKind.Team && item.RelatedId == team.Id))));
+            }
         }
         if (filter.Kind is CompetitionEventKind kind)
             query = query.Where(item => item.Kind == kind);
@@ -419,6 +440,8 @@ public sealed class CompetitionEventStore(
             payload.RuntimeGeneration,
             payload.HostPort,
             payload.Reason,
+            payload.TrackKey,
+            payload.PreviousTrackKey,
             item.OccurredAt);
         }).ToArray();
     }
@@ -513,7 +536,9 @@ public sealed class CompetitionEventStore(
         NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus? QuestionStatus = null,
         int? RuntimeGeneration = null,
         int? HostPort = null,
-        string? Reason = null);
+        string? Reason = null,
+        string? TrackKey = null,
+        string? PreviousTrackKey = null);
 
     private sealed record AccessResolution(
         CompetitionEventReadState State,

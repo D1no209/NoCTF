@@ -20,6 +20,8 @@ using NoCTF.Infrastructure.Competitions.Visibility;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Application.Competitions.Tracks;
+using NoCTF.Infrastructure.Competitions.Tracks;
 
 namespace NoCTF.Infrastructure.Competitions;
 
@@ -68,6 +70,10 @@ internal static class CompetitionInfrastructure
         services.AddSingleton<ICompetitionConfigurationValidator, GameModeCompetitionConfigurationValidator>();
         services.AddScoped<GetCompetitionConfiguration>();
         services.AddScoped<UpdateCompetitionConfiguration>();
+        services.AddScoped<ICompetitionTrackStore, CompetitionTrackStore>();
+        services.AddScoped<GetCompetitionTracks>();
+        services.AddScoped<UpdateCompetitionTracks>();
+        services.AddScoped<AssignTeamTrack>();
         services.AddScoped<ICompetitionPermissionStore, CompetitionPermissionStore>();
         services.AddScoped<GetCompetitionPermissions>();
         services.AddScoped<ListCompetitionPermissionCandidates>();

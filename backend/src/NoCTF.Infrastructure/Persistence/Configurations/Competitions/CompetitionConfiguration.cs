@@ -12,6 +12,9 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.HasKey(competition => competition.Id);
         builder.Property(competition => competition.Title).HasMaxLength(160);
         builder.Property(competition => competition.ConfigurationJson).HasColumnType("jsonb");
+        builder.Property(competition => competition.TrackConfigurationJson)
+            .HasColumnType("jsonb");
+        builder.Property(competition => competition.TrackConfigurationRevision).HasDefaultValue(0);
         builder.Property(competition => competition.ManagerIds).HasColumnType("uuid[]");
         builder.Property(competition => competition.JudgeIds).HasColumnType("uuid[]");
         builder.Property(competition => competition.ObserverIds).HasColumnType("uuid[]");
