@@ -55,7 +55,7 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
         LeaderboardProjectionInput input)
     {
         var validTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted)
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsBlood)
             .Select(team => team.Id)
             .ToHashSet();
         var validChallenges = (input.Challenges ?? [])

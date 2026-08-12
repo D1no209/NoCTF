@@ -39,11 +39,20 @@ internal static class CtfLeaderboardProjection
         IReadOnlyDictionary<Guid, long> CurrentScores)
         ProjectCore(LeaderboardProjectionInput input)
     {
-        var validTeams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var activeTeams = input.Teams
+            .Where(team => !team.IsBanned && !team.IsDeleted)
+            .ToDictionary(team => team.Id);
+        var validTeams = activeTeams.Values
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
+            .ToDictionary(team => team.Id);
+        var dynamicTeams = activeTeams.Values
+            .Where(team => team.AffectsDynamicChallengeScore)
+            .Select(team => team.Id)
+            .ToHashSet();
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
         var defaults = ParseCompetition(input.CompetitionConfigurationJson);
         var solves = input.GameplayFacts
-            .Where(fact => fact.TeamId is Guid teamId && validTeams.ContainsKey(teamId)
+            .Where(fact => fact.TeamId is Guid teamId && activeTeams.ContainsKey(teamId)
                           && fact.Kind == GameplayFactKind.FlagAttempt
                           && fact.Result == GameplayFactResult.Correct
                           && fact.CompetitionChallengeId is not null
@@ -56,6 +65,7 @@ internal static class CtfLeaderboardProjection
             .ThenBy(fact => fact.GameplayFactId)
             .ToList();
         var currentSolveCounts = solves
+            .Where(solve => dynamicTeams.Contains(solve.TeamId!.Value))
             .GroupBy(solve => solve.CompetitionChallengeId!.Value)
             .ToDictionary(group => group.Key, group => group.Count());
         var currentScores = challenges.ToDictionary(
@@ -72,12 +82,12 @@ internal static class CtfLeaderboardProjection
                     points.InitialPoints,
                     points.MinimumPoints,
                     solveCount,
-                    validTeams.Count,
+                    dynamicTeams.Count,
                     points.DecayFactor));
             });
 
         var awarded = new Dictionary<Guid, List<(LeaderboardGameplayFact Fact, long Points, int SolveOrdinal)>>();
-        var solveNumber = new Dictionary<Guid, int>();
+        var bloodSolveNumber = new Dictionary<Guid, int>();
         foreach (var solve in solves)
         {
             var challengeId = solve.CompetitionChallengeId!.Value;
@@ -85,31 +95,36 @@ internal static class CtfLeaderboardProjection
                 ? challenge.ConfigurationJson
                 : null);
             var points = configuration.Points ?? defaults.DefaultPoints;
-            var index = solveNumber.GetValueOrDefault(challengeId);
-            var solveOrdinal = checked(index + 1);
+            if (!validTeams.TryGetValue(solve.TeamId!.Value, out var team))
+                continue;
+            var bloodIndex = bloodSolveNumber.GetValueOrDefault(challengeId);
+            var solveOrdinal = team.EarnsBlood ? checked(bloodIndex + 1) : 0;
             var expression = configuration.ScoreExpression
                 ?? defaults.ScoreExpression
                 ?? DefaultScoreExpression;
             var score = ScoreExpression.Evaluate(expression, new(
                 points.InitialPoints,
                 points.MinimumPoints,
-                currentSolveCounts[challengeId],
-                validTeams.Count,
+                Math.Max(1, currentSolveCounts.GetValueOrDefault(challengeId)),
+                dynamicTeams.Count,
                 points.DecayFactor));
-            score = checked(score + BloodRewardAt(
-                configuration.BloodRewards ?? defaults.BloodRewards,
-                index,
-                score,
-                () => currentSolveCounts[challengeId] == solveOrdinal
-                    ? score
-                    : ScoreExpression.Evaluate(expression, new(
-                        points.InitialPoints,
-                        points.MinimumPoints,
-                        solveOrdinal,
-                        validTeams.Count,
-                        points.DecayFactor)),
-                points));
-            solveNumber[challengeId] = index + 1;
+            if (team.EarnsBlood)
+            {
+                score = checked(score + BloodRewardAt(
+                    configuration.BloodRewards ?? defaults.BloodRewards,
+                    bloodIndex,
+                    score,
+                    () => currentSolveCounts.GetValueOrDefault(challengeId) == solveOrdinal
+                        ? score
+                        : ScoreExpression.Evaluate(expression, new(
+                            points.InitialPoints,
+                            points.MinimumPoints,
+                            solveOrdinal,
+                            dynamicTeams.Count,
+                            points.DecayFactor)),
+                    points));
+                bloodSolveNumber[challengeId] = bloodIndex + 1;
+            }
             var teamId = solve.TeamId!.Value;
             if (!awarded.TryGetValue(teamId, out var teamSolves))
                 awarded[teamId] = teamSolves = [];
@@ -154,16 +169,19 @@ internal static class CtfLeaderboardProjection
                     team.Name,
                     total,
                     own.Count,
-                    last == default ? null : last),
+                    last == default ? null : last,
+                    team.TrackKey),
                 team.RegisteredAt);
         });
         var entries = rows
-            .OrderByDescending(row => row.Entry.Score)
-            .ThenBy(row => row.Entry.LastScoreAt ?? DateTimeOffset.MaxValue)
-            .ThenByDescending(row => row.Entry.SolveCount)
-            .ThenBy(row => row.RegisteredAt)
-            .ThenBy(row => row.Entry.TeamId)
-            .Select((row, index) => row.Entry with { Rank = index + 1 })
+            .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(track => track
+                .OrderByDescending(row => row.Entry.Score)
+                .ThenBy(row => row.Entry.LastScoreAt ?? DateTimeOffset.MaxValue)
+                .ThenByDescending(row => row.Entry.SolveCount)
+                .ThenBy(row => row.RegisteredAt)
+                .ThenBy(row => row.Entry.TeamId)
+                .Select((row, index) => row.Entry with { Rank = index + 1 }))
             .ToList();
         var cells = ProjectionPenalties.ApplyManualAdjustments(input, awarded
             .SelectMany(pair => pair.Value.Select(item => new LeaderboardCellFact(
@@ -240,7 +258,12 @@ internal static class AwdLeaderboardProjection
         var challenges = (input.Challenges ?? [])
             .Where(challenge => !challenge.IsDeleted)
             .ToDictionary(challenge => challenge.Id);
-        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var teams = input.Teams
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
+            .ToDictionary(team => team.Id);
+        var competitiveTeams = input.Teams
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.AffectsCompetitiveResults)
+            .ToDictionary(team => team.Id);
         var values = teams.Keys.ToDictionary(team => team, _ => 0L);
         var cellScores = new Dictionary<(Guid TeamId, Guid ChallengeId), long>();
         var cellSolves = new Dictionary<(Guid TeamId, Guid ChallengeId), (DateTimeOffset At, string? SolverName)>();
@@ -260,7 +283,7 @@ internal static class AwdLeaderboardProjection
         var attackPoints = teams.Keys.ToDictionary(team => team, _ => 0L);
         var upRoundCounts = teams.Keys.ToDictionary(team => team, _ => 0);
         var solves = input.GameplayFacts
-            .Where(fact => fact.TeamId is Guid teamId && teams.ContainsKey(teamId)
+            .Where(fact => fact.TeamId is Guid teamId && competitiveTeams.ContainsKey(teamId)
                           && fact.Kind == GameplayFactKind.FlagAttempt
                           && fact is
                           {
@@ -271,7 +294,7 @@ internal static class AwdLeaderboardProjection
                           && fact.CompetitionChallengeId is not null
                           && fact.VictimTeamId is not null
                           && fact.VictimTeamId != fact.TeamId
-                          && teams.ContainsKey(fact.VictimTeamId.Value)
+                          && competitiveTeams.ContainsKey(fact.VictimTeamId.Value)
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
@@ -300,14 +323,19 @@ internal static class AwdLeaderboardProjection
                 : settings.VictimDefensePoolPoints / attackers.Count;
             foreach (var attacker in attackers)
             {
+                if (!values.ContainsKey(attacker))
+                    continue;
                 values[attacker] = checked(values[attacker] + reward);
                 attackPoints[attacker] = checked(attackPoints[attacker] + reward);
                 var first = pool.First(fact => fact.TeamId == attacker);
                 AddCell(attacker, pool.Key.ChallengeId, reward, first.OccurredAt, first.SubmitterName);
             }
-            values[pool.Key.VictimId] = checked(
-                values[pool.Key.VictimId] - settings.VictimDefensePoolPoints);
-            AddCell(pool.Key.VictimId, pool.Key.ChallengeId, -settings.VictimDefensePoolPoints);
+            if (values.ContainsKey(pool.Key.VictimId))
+            {
+                values[pool.Key.VictimId] = checked(
+                    values[pool.Key.VictimId] - settings.VictimDefensePoolPoints);
+                AddCell(pool.Key.VictimId, pool.Key.ChallengeId, -settings.VictimDefensePoolPoints);
+            }
         }
         var serviceStates = input.GameplayFacts
             .Where(fact => fact is
@@ -371,21 +399,25 @@ internal static class AwdLeaderboardProjection
                     team.Name,
                     values[team.Id],
                     attackCount,
-                    lastAttackAt),
+                    lastAttackAt,
+                    team.TrackKey),
                 attackPoints[team.Id],
                 upRoundCounts[team.Id],
                 attackCount,
                 lastAttackAt,
                 team.RegisteredAt);
         });
-        var entries = rows.OrderByDescending(row => row.Entry.Score)
-            .ThenByDescending(row => row.AttackPoints)
-            .ThenByDescending(row => row.UpRoundCount)
-            .ThenByDescending(row => row.AttackCount)
-            .ThenBy(row => row.LastAttackAt ?? DateTimeOffset.MaxValue)
-            .ThenBy(row => row.RegisteredAt)
-            .ThenBy(row => row.Entry.TeamId)
-            .Select((row, index) => row.Entry with { Rank = index + 1 })
+        var entries = rows
+            .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(track => track
+                .OrderByDescending(row => row.Entry.Score)
+                .ThenByDescending(row => row.AttackPoints)
+                .ThenByDescending(row => row.UpRoundCount)
+                .ThenByDescending(row => row.AttackCount)
+                .ThenBy(row => row.LastAttackAt ?? DateTimeOffset.MaxValue)
+                .ThenBy(row => row.RegisteredAt)
+                .ThenBy(row => row.Entry.TeamId)
+                .Select((row, index) => row.Entry with { Rank = index + 1 }))
             .ToList();
         var cells = ProjectionPenalties.ApplyManualAdjustments(input, cellScores.Select(pair =>
         {
@@ -471,13 +503,23 @@ internal static class AwdpLeaderboardProjection
     public static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells) Project(LeaderboardProjectionInput input)
     {
         var competition = ParseCompetition(input.CompetitionConfigurationJson);
-        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var teams = input.Teams
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
+            .ToDictionary(team => team.Id);
+        var competitiveTeams = input.Teams
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.AffectsCompetitiveResults)
+            .Select(team => team.Id)
+            .ToHashSet();
         var challenges = (input.Challenges ?? []).Where(challenge => !challenge.IsDeleted).ToDictionary(challenge => challenge.Id);
         var facts = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && teams.ContainsKey(teamId)
                           && fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
                           && fact.Result == GameplayFactResult.Correct
                           && fact.CompetitionChallengeId is not null
+                          && (fact.Kind != GameplayFactKind.BreakAttempt
+                              || competitiveTeams.Contains(teamId)
+                              && (fact.VictimTeamId is null
+                                  || competitiveTeams.Contains(fact.VictimTeamId.Value)))
                           && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
@@ -518,6 +560,10 @@ internal static class AwdpLeaderboardProjection
         var penalties = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId && teams.ContainsKey(teamId)
                            && fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
+                           && (fact.Kind != GameplayFactKind.BreakAttempt
+                               || competitiveTeams.Contains(teamId)
+                               && (fact.VictimTeamId is null
+                                   || competitiveTeams.Contains(fact.VictimTeamId.Value)))
                            && fact.CompetitionChallengeId is not null
                            && (challenges.Count == 0 || challenges.ContainsKey(fact.CompetitionChallengeId.Value)))
             .GroupBy(fact => fact.TeamId!.Value)
@@ -554,21 +600,25 @@ internal static class AwdpLeaderboardProjection
                     checked(awardedScore - penalty - hintCosts.GetValueOrDefault(team.Id)
                         + manualAdjustments.GetValueOrDefault(team.Id)),
                     own.Count,
-                    last == default ? null : last),
+                    last == default ? null : last,
+                    team.TrackKey),
                 own.Count(item => item.Fact.Kind == GameplayFactKind.FixAttempt),
                 own.Count(item => item.Fact.Kind == GameplayFactKind.BreakAttempt),
                 penalty,
                 lastFixAt,
                 team.RegisteredAt);
         });
-        var entries = rows.OrderByDescending(row => row.Entry.Score)
-            .ThenByDescending(row => row.FixCount)
-            .ThenByDescending(row => row.BreakCount)
-            .ThenBy(row => row.Penalty)
-            .ThenBy(row => row.LastFixAt ?? DateTimeOffset.MaxValue)
-            .ThenBy(row => row.RegisteredAt)
-            .ThenBy(row => row.Entry.TeamId)
-            .Select((row, index) => row.Entry with { Rank = index + 1 })
+        var entries = rows
+            .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(track => track
+                .OrderByDescending(row => row.Entry.Score)
+                .ThenByDescending(row => row.FixCount)
+                .ThenByDescending(row => row.BreakCount)
+                .ThenBy(row => row.Penalty)
+                .ThenBy(row => row.LastFixAt ?? DateTimeOffset.MaxValue)
+                .ThenBy(row => row.RegisteredAt)
+                .ThenBy(row => row.Entry.TeamId)
+                .Select((row, index) => row.Entry with { Rank = index + 1 }))
             .ToList();
         var cells = ProjectionPenalties.ApplyManualAdjustments(input, awarded
             .SelectMany(pair => pair.Value
@@ -669,7 +719,14 @@ internal static class KohLeaderboardProjection
     public static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells) Project(LeaderboardProjectionInput input)
     {
         var configuration = ParseCompetition(input.CompetitionConfigurationJson);
-        var teams = input.Teams.Where(team => !team.IsBanned && !team.IsDeleted).ToDictionary(team => team.Id);
+        var activeTeams = input.Teams
+            .Where(team => !team.IsBanned && !team.IsDeleted)
+            .ToDictionary(team => team.Id);
+        var teams = activeTeams.Values
+            .Where(team => !team.IsBanned && !team.IsDeleted
+                && team.EarnsScore
+                && team.AffectsCompetitiveResults)
+            .ToDictionary(team => team.Id);
         var hasChallengeCatalog = input.Challenges is not null;
         var challenges = (input.Challenges ?? [])
             .Where(challenge => !challenge.IsDeleted)
@@ -677,20 +734,37 @@ internal static class KohLeaderboardProjection
         var challengePoints = challenges.ToDictionary(
             item => item.Key,
             item => PointsFor(configuration, item.Value.ConfigurationJson));
-        var observations = input.GameplayFacts
+        var rawObservations = input.GameplayFacts
             .Where(fact => fact is
             {
                 Kind: GameplayFactKind.KohControlObservation,
-                Result: GameplayFactResult.Controlled,
-                TeamId: not null,
                 CompetitionChallengeId: not null
             }
-            && teams.ContainsKey(fact.TeamId!.Value)
             && (!hasChallengeCatalog
                 || challenges.ContainsKey(fact.CompetitionChallengeId!.Value)))
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
             .ToList();
+        var observations = new List<LeaderboardGameplayFact>();
+        var currentKings = new Dictionary<Guid, Guid>();
+        foreach (var observation in rawObservations)
+        {
+            var challengeId = observation.CompetitionChallengeId!.Value;
+            if (observation.Result == GameplayFactResult.Uncontrolled)
+            {
+                currentKings.Remove(challengeId);
+                continue;
+            }
+            if (observation is not { Result: GameplayFactResult.Controlled, TeamId: Guid observedTeamId }
+                || !activeTeams.TryGetValue(observedTeamId, out var observedTeam))
+                continue;
+            if (observedTeam.AffectsCompetitiveResults)
+                currentKings[challengeId] = observedTeamId;
+            if (!currentKings.TryGetValue(challengeId, out var effectiveKingId)
+                || !teams.ContainsKey(effectiveKingId))
+                continue;
+            observations.Add(observation with { TeamId = effectiveKingId });
+        }
         var hintCosts = ProjectionPenalties.HintCosts(input, teams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, teams.Keys);
         var rows = teams.Values.Select(team =>
@@ -712,19 +786,23 @@ internal static class KohLeaderboardProjection
                     checked(observationPoints - hintCosts.GetValueOrDefault(team.Id)
                         + manualAdjustments.GetValueOrDefault(team.Id)),
                     own.Count,
-                    last == default ? null : last),
+                    last == default ? null : last,
+                    team.TrackKey),
                 own.Count,
                 own.Select(fact => fact.CompetitionChallengeId!.Value).Distinct().Count(),
                 first == default ? null : first,
                 team.RegisteredAt);
         });
-        var entries = rows.OrderByDescending(row => row.Entry.Score)
-            .ThenByDescending(row => row.ControlledObservationCount)
-            .ThenByDescending(row => row.ControlledChallengeCount)
-            .ThenBy(row => row.FirstControlAt ?? DateTimeOffset.MaxValue)
-            .ThenBy(row => row.RegisteredAt)
-            .ThenBy(row => row.Entry.TeamId)
-            .Select((row, index) => row.Entry with { Rank = index + 1 })
+        var entries = rows
+            .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(track => track
+                .OrderByDescending(row => row.Entry.Score)
+                .ThenByDescending(row => row.ControlledObservationCount)
+                .ThenByDescending(row => row.ControlledChallengeCount)
+                .ThenBy(row => row.FirstControlAt ?? DateTimeOffset.MaxValue)
+                .ThenBy(row => row.RegisteredAt)
+                .ThenBy(row => row.Entry.TeamId)
+                .Select((row, index) => row.Entry with { Rank = index + 1 }))
             .ToList();
         var cells = ProjectionPenalties.ApplyManualAdjustments(input, observations
             .GroupBy(fact => (
@@ -801,7 +879,7 @@ internal static class ProjectionPenalties
         IReadOnlyList<LeaderboardCellFact> projectedCells)
     {
         var validTeams = input.Teams
-            .Where(team => !team.IsBanned && !team.IsDeleted)
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
             .Select(team => team.Id)
             .ToHashSet();
         var adjustments = input.GameplayFacts

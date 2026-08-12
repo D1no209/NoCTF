@@ -53,16 +53,42 @@ public sealed class FusionLeaderboardCache(
         if (competition is null)
             return null;
 
+        var trackConfiguration = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson);
+        var trackDefinitions = trackConfiguration.Tracks.ToDictionary(
+            track => track.Key,
+            StringComparer.OrdinalIgnoreCase);
+
         var teams = await db.Teams.AsNoTracking()
             .Where(team => team.CompetitionId == competitionId
                 && team.RegistrationStatus == TeamRegistrationStatus.Approved)
-            .Select(team => new LeaderboardTeamFact(
+            .Select(team => new
+            {
+                team.Id,
+                team.Name,
+                team.TrackKey,
+                team.IsBanned,
+                team.RegisteredAt
+            })
+            .ToListAsync(ct);
+        var teamFacts = teams.Select(team =>
+        {
+            var track = trackDefinitions.GetValueOrDefault(team.TrackKey)
+                ?? trackConfiguration.DefaultTrack;
+            return new LeaderboardTeamFact(
                 team.Id,
                 team.Name,
                 team.IsBanned,
                 false,
-                team.RegisteredAt))
-            .ToListAsync(ct);
+                team.RegisteredAt,
+                track.Key,
+                track.EarnsScore,
+                track.EarnsBlood,
+                track.AffectsDynamicChallengeScore,
+                track.VisibleOnLeaderboard,
+                track.AffectsCompetitiveResults);
+        }).ToList();
 
         var challengeEntities = await db.CompetitionChallenges.AsNoTracking()
             .Where(instance => instance.CompetitionId == competitionId)
@@ -158,7 +184,7 @@ public sealed class FusionLeaderboardCache(
         var projection = projectionEngine.Project(new(
             competitionId,
             competition.Mode,
-            teams,
+            teamFacts,
             facts,
             challenges,
             competition.ConfigurationJson,
@@ -169,6 +195,11 @@ public sealed class FusionLeaderboardCache(
         return new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
         {
             Challenges = projection.Challenges,
+            Tracks = trackConfiguration.Tracks.Select(track => new LeaderboardTrackInfo(
+                track.Key,
+                track.Name,
+                track.IsInternal,
+                track.VisibleOnLeaderboard)).ToArray(),
             Visibility = CompetitionLeaderboardVisibility.Normal,
             DataScope = LeaderboardDataScope.Live,
             DataAsOf = projectedAt

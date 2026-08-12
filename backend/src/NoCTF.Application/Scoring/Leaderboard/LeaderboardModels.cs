@@ -38,7 +38,8 @@ public sealed record LeaderboardEntry(
     string TeamName,
     long Score,
     int SolveCount,
-    DateTimeOffset? LastScoreAt)
+    DateTimeOffset? LastScoreAt,
+    string TrackKey = "default")
 {
     /// <summary>Only solved/corrected cells are serialized; the matrix is sparse.</summary>
     public IReadOnlyList<LeaderboardCell> Cells { get; init; } = [];

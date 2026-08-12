@@ -806,12 +806,29 @@ public sealed class GameplayFactProcessor(
             || evaluation.Decision.Result != GameplayFactResult.Correct)
             return null;
 
-        var competitionMode = await db.Competitions.AsNoTracking()
+        var competition = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == submission.CompetitionId)
-            .Select(competition => competition.Mode)
+            .Select(competition => new
+            {
+                competition.Mode,
+                competition.TrackConfigurationJson
+            })
             .SingleAsync(ct);
-        if (competitionMode != GameMode.Ctf)
+        if (competition.Mode != GameMode.Ctf)
             return null;
+
+        var tracks = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson);
+        var currentTrackKey = await db.Teams.AsNoTracking()
+            .Where(team => team.Id == submission.TeamId)
+            .Select(team => team.TrackKey)
+            .SingleAsync(ct);
+        if (tracks.Find(currentTrackKey)?.EarnsBlood != true)
+            return null;
+        var bloodTrackKeys = tracks.Tracks.Where(track => track.EarnsBlood)
+            .Select(track => track.Key)
+            .ToArray();
 
         var solvedTeamIds = await db.GameplayFacts.AsNoTracking()
             .Where(candidate =>
@@ -820,7 +837,11 @@ public sealed class GameplayFactProcessor(
                 && candidate.Kind == GameplayFactKind.FlagAttempt
                 && candidate.Result == GameplayFactResult.Correct
                 && candidate.Id != submission.Id)
-            .Select(candidate => candidate.TeamId!.Value)
+            .Join(
+                db.Teams.AsNoTracking().Where(team => bloodTrackKeys.Contains(team.TrackKey)),
+                candidate => candidate.TeamId,
+                team => (Guid?)team.Id,
+                (candidate, _) => candidate.TeamId!.Value)
             .Distinct()
             .ToArrayAsync(ct);
         if (submission.TeamId is Guid teamId && solvedTeamIds.Contains(teamId)

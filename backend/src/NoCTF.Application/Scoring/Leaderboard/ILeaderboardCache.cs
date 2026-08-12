@@ -9,9 +9,16 @@ public enum LeaderboardDataScope
     Hidden
 }
 
+public sealed record LeaderboardTrackInfo(
+    string Key,
+    string Name,
+    bool IsInternal,
+    bool VisibleOnLeaderboard);
+
 public sealed record LeaderboardResponse(Guid CompetitionId, DateTimeOffset GeneratedAt, IReadOnlyList<LeaderboardEntry> Entries)
 {
     public IReadOnlyList<LeaderboardChallengeInfo> Challenges { get; init; } = [];
+    public IReadOnlyList<LeaderboardTrackInfo> Tracks { get; init; } = [];
     public CompetitionLeaderboardVisibility Visibility { get; init; }
     public LeaderboardDataScope DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }

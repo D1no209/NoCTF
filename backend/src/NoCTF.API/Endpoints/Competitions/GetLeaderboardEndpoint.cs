@@ -7,6 +7,8 @@ using NoCTF.Application.Competitions.Management;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.API.Security;
 using NoCTF.API.Serialization;
+using NoCTF.Application.Competitions.Tracks;
+using NoCTF.Application.Teams.Moderation;
 using System.Text.Json.Serialization;
 using Riok.Mapperly.Abstractions;
 
@@ -38,6 +40,7 @@ public sealed record LeaderboardEntryResponse(
     int Rank,
     Guid TeamId,
     string TeamName,
+    string TrackKey,
     long Score,
     int SolveCount,
     DateTimeOffset? LastScoreAt,
@@ -49,12 +52,19 @@ public sealed record LeaderboardChallengeInfoResponse(
     string Direction,
     long? CurrentScore);
 
+public sealed record LeaderboardTrackInfoResponse(
+    string Key,
+    string Name,
+    bool IsInternal,
+    bool VisibleOnLeaderboard);
+
 public sealed record LeaderboardProtocolResponse(
     Guid CompetitionId,
     DateTimeOffset GeneratedAt,
     IReadOnlyList<LeaderboardEntryResponse> Entries)
 {
     public IReadOnlyList<LeaderboardChallengeInfoResponse> Challenges { get; init; } = [];
+    public IReadOnlyList<LeaderboardTrackInfoResponse> Tracks { get; init; } = [];
     public LeaderboardVisibilityProtocol Visibility { get; init; }
     public LeaderboardDataScopeProtocol DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }
@@ -87,6 +97,7 @@ internal static partial class LeaderboardProtocolMapper
         value.Rank,
         value.TeamId,
         value.TeamName,
+        value.TrackKey,
         value.Score,
         value.SolveCount,
         value.LastScoreAt,
@@ -112,6 +123,8 @@ public sealed class GetLeaderboardEndpoint(
     ILeaderboardCache leaderboard,
     IBackendMessagePublisher messages,
     ICompetitionVisibilityAccess access,
+    GetCompetitionTracks getTracks,
+    ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
     : Endpoint<GetLeaderboardRequest, Results<Ok<LeaderboardProtocolResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
 {
@@ -150,7 +163,20 @@ public sealed class GetLeaderboardEndpoint(
             : await leaderboard.GetAsync(request.CompetitionId, cancellationToken);
         if (snapshot is not null)
         {
-            return TypedResults.Ok(LeaderboardProtocolMapper.ToResponse(snapshot with
+            var canObserve = user.UserId != Guid.Empty
+                && await authorizer.CanObserveAsync(
+                    user.UserId,
+                    request.CompetitionId,
+                    cancellationToken);
+            var tracks = await getTracks.ExecuteAsync(
+                request.CompetitionId,
+                user.UserId == Guid.Empty ? null : user.UserId,
+                canObserve,
+                cancellationToken);
+            if (tracks is null)
+                return TypedResults.NotFound();
+            var filteredSnapshot = FilterSnapshot(snapshot, tracks, canObserve);
+            return TypedResults.Ok(LeaderboardProtocolMapper.ToResponse(filteredSnapshot with
             {
                 Visibility = visibility.Visibility,
                 DataScope = visibility.DataScope,
@@ -178,6 +204,34 @@ public sealed class GetLeaderboardEndpoint(
                 });
         await leaderboard.InvalidateAsync(request.CompetitionId, cancellationToken);
         return Processing(request.CompetitionId);
+    }
+
+    private static LeaderboardResponse FilterSnapshot(
+        LeaderboardResponse snapshot,
+        CompetitionTracksView tracks,
+        bool canObserve)
+    {
+        if (canObserve)
+            return snapshot;
+
+        var visibleKeys = tracks.Tracks
+            .Where(track => !track.IsInternal && track.VisibleOnLeaderboard)
+            .Select(track => track.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var viewerKeys = tracks.Tracks
+            .Where(track => track.IsViewerTrack)
+            .Select(track => track.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var visibleEntries = snapshot.Entries
+            .Where(entry => visibleKeys.Contains(entry.TrackKey)
+                || viewerKeys.Contains(entry.TrackKey)
+                    && entry.TeamId == tracks.ViewerTeamId)
+            .ToArray();
+        var visibleTrackInfo = snapshot.Tracks
+            .Where(track => visibleKeys.Contains(track.Key)
+                || viewerKeys.Contains(track.Key))
+            .ToArray();
+        return snapshot with { Entries = visibleEntries, Tracks = visibleTrackInfo };
     }
 
     private Accepted<LeaderboardProcessingProtocolResponse> Processing(
