@@ -1,5 +1,24 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-12 alpha.31 CTF 中控大屏
+
+- 功能提交 `3dfd0049` 新增 CTF 专用路由 `/competitions/{competitionId}/screen`，并在比赛工作区加入
+  “中控大屏”入口。页面参考 `DemoVideo/output.mp4` 的赛事态势布局，但沿用 NoCTF 深色工业视觉：
+  中央按当前题目分值与解题数生成题目塔阵，右侧展示当前赛道前十名与最新解题战报，顶部展示队伍、
+  解题、题目攻克、剩余时间和已进行时间；支持全屏、手动刷新、15 秒轮询与登录态实时失效刷新。
+- 多赛道比赛只展示公开且允许进入排行榜的赛道，并确保排名、题目解题数和战报随赛道隔离；最多同时
+  展示 8 道题，更多题目每 12 秒自动轮播。血榜使用一血、二血、三血视觉层级；新解题到达时显示短暂
+  战报强调。排行榜隐藏、冻结、投影中、加载失败和非 CTF 模式都有明确状态，不伪造或补齐服务端没有
+  提供的数据。
+- 数据只来自生成 SDK 的 `GetCompetitionEndpoint` 与 `GetLeaderboardEndpoint`，没有手写 API URL、DTO
+  或协议枚举；没有新增后端 Endpoint、数据表、列、migration、snapshot、OpenAPI 或生成 SDK 变化。
+  `DemoVideo/` 已由独立提交 `ff435f47` 加入 `.gitignore`，本地参考视频不会进入仓库。
+- 发布提交 `f20686a1` 将平台版本由 `0.1.0-alpha.30` 递增为 `0.1.0-alpha.31`。前端完整测试
+  177/177（1371 assertions）、TypeScript typecheck、production build 与 `git diff --check` 通过；API
+  Release build 0 warning/0 error。构建只有既有的大 chunk、插件耗时与第三方 Node exports 弃用提示。
+- `3dfd0049` 与 `f20686a1` 已快进推送到远程 `main`。部署与生产页面只读验收将在本节后续更新；部署前
+  的 Microsoft Edge 自动化因无法可靠识别当前浏览器 URL 被安全机制终止，未据此伪报视觉验收通过。
+
 ## 2026-08-12 alpha.30 多赛道发布
 
 - 功能提交 `71e900c3`、`722b262d`、`df7a145b`、`6b7cf07a` 与 `fc58bd6e` 为一场比赛增加最多
