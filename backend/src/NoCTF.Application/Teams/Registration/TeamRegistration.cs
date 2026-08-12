@@ -4,7 +4,12 @@ using NoCTF.Domain.Teams;
 
 namespace NoCTF.Application.Teams.Registration;
 
-public sealed record CreateTeamCommand(Guid CompetitionId, Guid UserId, string Name, DateTimeOffset RegisteredAt);
+public sealed record CreateTeamCommand(
+    Guid CompetitionId,
+    Guid UserId,
+    string Name,
+    DateTimeOffset RegisteredAt,
+    string? TrackKey = null);
 public sealed record TeamView(
     Guid Id,
     Guid CompetitionId,
@@ -15,12 +20,17 @@ public sealed record TeamView(
     TeamRegistrationStatus RegistrationStatus,
     bool IsLocked,
     bool IsBanned,
-    DateTimeOffset RegisteredAt);
+    DateTimeOffset RegisteredAt,
+    string TrackKey = CompetitionTrackConfiguration.DefaultTrackKey,
+    string TrackName = "Default",
+    long ConcurrencyVersion = 0);
 public sealed record TeamRegistrationPolicy(
     CompetitionStatus Status,
     bool AutoApprove,
     bool CompetitionDeleted,
-    bool AllowWhileRunning = false);
+    bool AllowWhileRunning = false,
+    GameMode Mode = GameMode.Ctf,
+    string? TrackConfigurationJson = null);
 public enum TeamRegistrationFailure
 {
     InvalidTeamName,
@@ -33,7 +43,9 @@ public enum TeamRegistrationFailure
     TeamLocked,
     TeamConflict,
     TeamReviewConflict,
-    CompetitionActive
+    CompetitionActive,
+    TrackNotFound,
+    TrackNotPublicSelectable
 }
 public sealed record TeamCreateStoreResult(TeamView? Team, TeamRegistrationFailure? Failure = null);
 public sealed record TeamReviewStoreResult(bool Changed, TeamRegistrationFailure? Failure = null);
@@ -45,6 +57,11 @@ public interface ITeamRegistrationStore
     Task<TeamRegistrationPolicy?> GetPolicyAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<TeamCreateStoreResult> TryCreateAsync(CreateTeamCommand command, TeamRegistrationStatus status, CancellationToken cancellationToken);
     Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TeamView>> ListPublicAsync(
+        Guid competitionId,
+        bool includePending,
+        CancellationToken cancellationToken) =>
+        ListAsync(competitionId, includePending, cancellationToken);
     Task<TeamReviewStoreResult> SetStatusAsync(Guid competitionId, Guid teamId, TeamRegistrationStatus status, CancellationToken cancellationToken);
     Task<TeamReviewStoreResult> ResubmitAsync(
         Guid competitionId,
@@ -55,6 +72,12 @@ public interface ITeamRegistrationStore
             false,
             TeamRegistrationFailure.TeamReviewConflict));
     Task<TeamView?> FindAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken cancellationToken);
+    Task<TeamView?> FindPublicAsync(
+        Guid competitionId,
+        Guid teamId,
+        bool includePending,
+        CancellationToken cancellationToken) =>
+        FindAsync(competitionId, teamId, includePending, cancellationToken);
     Task<TeamView?> FindForUserAsync(Guid competitionId, Guid userId, bool includePending, CancellationToken cancellationToken) =>
         Task.FromResult<TeamView?>(null);
     Task<bool> CanManageAsync(Guid actorId, Guid competitionId, Guid teamId, CancellationToken cancellationToken);
@@ -74,7 +97,21 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.CompetitionNotFound, "Competition was not found.");
         if (RegistrationIsClosed(policy))
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(TeamRegistrationFailure.RegistrationClosed, "Team registration is closed.");
-        var created = await store.TryCreateAsync(command with { Name = name },
+        var tracks = CompetitionTrackConfiguration.ParseOrDefault(
+            policy.Mode,
+            policy.TrackConfigurationJson);
+        var requestedKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey)
+            ?? tracks.DefaultTrack.Key;
+        var requestedTrack = tracks.Find(requestedKey);
+        if (requestedTrack is null)
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                TeamRegistrationFailure.TrackNotFound,
+                "The selected competition track was not found.");
+        if (requestedTrack.IsInternal || !requestedTrack.IsPublicSelectable)
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                TeamRegistrationFailure.TrackNotPublicSelectable,
+                "The selected competition track cannot be selected by participants.");
+        var created = await store.TryCreateAsync(command with { Name = name, TrackKey = requestedTrack.Key },
             policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
         return created.Team is not null
             ? OperationResult<TeamView, TeamRegistrationFailure>.Success(created.Team)
@@ -88,14 +125,27 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
 
 public sealed class ListCompetitionTeams(ITeamRegistrationStore store)
 {
-    public Task<IReadOnlyList<TeamView>> ExecuteAsync(Guid competitionId, bool includePending, CancellationToken ct = default) =>
-        store.ListAsync(competitionId, includePending, ct);
+    public Task<IReadOnlyList<TeamView>> ExecuteAsync(
+        Guid competitionId,
+        bool includePending,
+        bool includeInternal,
+        CancellationToken ct = default) =>
+        includeInternal
+            ? store.ListAsync(competitionId, includePending, ct)
+            : store.ListPublicAsync(competitionId, includePending, ct);
 }
 
 public sealed class GetTeam(ITeamRegistrationStore store)
 {
-    public Task<TeamView?> ExecuteAsync(Guid competitionId, Guid teamId, bool includePending, CancellationToken ct = default) =>
-        store.FindAsync(competitionId, teamId, includePending, ct);
+    public Task<TeamView?> ExecuteAsync(
+        Guid competitionId,
+        Guid teamId,
+        bool includePending,
+        bool includeInternal,
+        CancellationToken ct = default) =>
+        includeInternal
+            ? store.FindAsync(competitionId, teamId, includePending, ct)
+            : store.FindPublicAsync(competitionId, teamId, includePending, ct);
 }
 
 public sealed class GetMyTeam(ITeamRegistrationStore store)

@@ -69,6 +69,10 @@ public sealed class CompetitionManagementStore(
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
             ConfigurationRevision = 0,
             ConfigurationUpdatedAt = command.CreatedAt,
+            TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(
+                CompetitionTrackConfiguration.DefaultFor(command.Mode)),
+            TrackConfigurationRevision = 0,
+            TrackConfigurationUpdatedAt = command.CreatedAt,
             FlagDerivationSecret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)
         };
         db.Competitions.Add(competition);

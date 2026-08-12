@@ -42,6 +42,8 @@ public sealed record CompetitionEventDraft(
     int? RuntimeGeneration = null,
     int? HostPort = null,
     string? Reason = null,
+    string? TrackKey = null,
+    string? PreviousTrackKey = null,
     EntityReferenceKind? SubjectType = null,
     Guid? SubjectId = null,
     EntityReferenceKind? RelatedType = null,
@@ -123,6 +125,8 @@ public sealed record CompetitionEventView(
     int? RuntimeGeneration,
     int? HostPort,
     string? Reason,
+    string? TrackKey,
+    string? PreviousTrackKey,
     DateTimeOffset OccurredAt);
 
 public enum CompetitionEventReadState : short

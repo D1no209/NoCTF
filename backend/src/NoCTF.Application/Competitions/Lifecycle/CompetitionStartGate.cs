@@ -1,5 +1,6 @@
 using NoCTF.Application.Challenges.Configuration;
 using NoCTF.Application.Competitions.Configuration;
+using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Scoring;
 using NoCTF.Domain.Competitions;
 
@@ -21,7 +22,9 @@ public sealed record CompetitionStartGateSnapshot(
     string ConfigurationJson,
     IReadOnlyList<StartGateChallenge> Challenges,
     int ApprovedTeamCount,
-    int MaxConcurrentRuntimeInstancesPerTeam);
+    int MaxConcurrentRuntimeInstancesPerTeam,
+    string? TrackConfigurationJson = null,
+    IReadOnlyList<string>? ApprovedTeamTrackKeys = null);
 
 public enum StartGateFailureCode
 {
@@ -32,7 +35,9 @@ public enum StartGateFailureCode
     RuntimeQuotaInsufficient,
     ChallengeModeMismatch,
     ChallengeRulesInvalid,
-    RuntimeDefinitionInvalid
+    RuntimeDefinitionInvalid,
+    TrackConfigurationInvalid,
+    TeamTrackInvalid
 }
 
 public sealed record StartGateError(
@@ -77,6 +82,32 @@ public sealed class CompetitionStartGate(
                      snapshot.ApprovedTeamCount,
                      publishedChallengeConfigurations))
             errors.Add(new(StartGateFailureCode.CompetitionConfigurationInvalid, null, message));
+        var trackConfiguration = CompetitionTrackConfiguration.DefaultFor(snapshot.Mode);
+        if (!string.IsNullOrWhiteSpace(snapshot.TrackConfigurationJson)
+            && !CompetitionTrackConfiguration.TryParse(
+                snapshot.TrackConfigurationJson,
+                out trackConfiguration))
+        {
+            errors.Add(new(
+                StartGateFailureCode.TrackConfigurationInvalid,
+                null,
+                "Track configuration is not valid JSON."));
+        }
+        else
+        {
+            foreach (var message in CompetitionTrackPolicy.Validate(snapshot.Mode, trackConfiguration))
+                errors.Add(new(StartGateFailureCode.TrackConfigurationInvalid, null, message));
+            foreach (var trackKey in snapshot.ApprovedTeamTrackKeys ?? [])
+            {
+                if (trackConfiguration.Find(trackKey) is null)
+                {
+                    errors.Add(new(
+                        StartGateFailureCode.TeamTrackInvalid,
+                        null,
+                        $"Approved team references missing track '{trackKey}'."));
+                }
+            }
+        }
         if (!snapshot.Challenges.Any(challenge => challenge.Published))
             errors.Add(new(
                 StartGateFailureCode.PublishedChallengeRequired,

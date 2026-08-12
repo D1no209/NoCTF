@@ -19,6 +19,10 @@ public sealed class Competition
     public int PermissionRevision { get; set; }
     public GameMode Mode { get; set; }
     public string ConfigurationJson { get; set; } = """{"schemaVersion":1}""";
+    public string? TrackConfigurationJson { get; set; }
+    [ConcurrencyCheck]
+    public int TrackConfigurationRevision { get; set; }
+    public DateTimeOffset TrackConfigurationUpdatedAt { get; set; }
     [ConcurrencyCheck]
     public int ConfigurationRevision { get; set; }
     public DateTimeOffset ConfigurationUpdatedAt { get; set; }

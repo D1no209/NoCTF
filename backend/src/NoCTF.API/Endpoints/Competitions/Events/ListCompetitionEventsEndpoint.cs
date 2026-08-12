@@ -38,7 +38,8 @@ public enum CompetitionEventKindProtocol
     TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished,
     RuntimeForceTerminationRequested, RuntimeForceTerminationCompleted,
     RuntimeForceTerminationFailed, AnnouncementPublished, QuestionOpened,
-    QuestionReplied, QuestionStatusChanged, ChallengeDescriptionUpdated
+    QuestionReplied, QuestionStatusChanged, ChallengeDescriptionUpdated,
+    TrackConfigurationUpdated, TeamTrackChanged
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionEventLevelProtocol>))]
@@ -142,6 +143,8 @@ public sealed record CompetitionEventResponse(
     int? RuntimeGeneration,
     int? HostPort,
     string? Reason,
+    string? TrackKey,
+    string? PreviousTrackKey,
     DateTimeOffset OccurredAt);
 
 public sealed record CompetitionEventListResponse(
@@ -290,5 +293,7 @@ public sealed class ListCompetitionEventsEndpoint(
             item.RuntimeGeneration,
             item.HostPort,
             item.Reason,
+            item.TrackKey,
+            item.PreviousTrackKey,
             item.OccurredAt);
 }

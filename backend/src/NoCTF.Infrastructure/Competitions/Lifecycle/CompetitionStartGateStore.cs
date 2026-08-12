@@ -20,6 +20,7 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
                 item.Mode,
                 item.Status,
                 item.ConfigurationJson,
+                item.TrackConfigurationJson,
                 item.MaxConcurrentRuntimeInstancesPerTeam
             })
             .SingleOrDefaultAsync(ct);
@@ -41,19 +42,23 @@ public sealed class CompetitionStartGateStore(NoCtfDbContext db)
                     item.BaseScore,
                     item.Hints.Select(hint => hint.Cost).ToArray()))
             .ToArrayAsync(ct);
-        var teams = await db.Teams.AsNoTracking().CountAsync(
+        var teamTracks = await db.Teams.AsNoTracking()
+            .Where(
             team => team.CompetitionId == competitionId
                 && team.DeletedAt == null
                 && !team.IsBanned
-                && team.RegistrationStatus == TeamRegistrationStatus.Approved,
-            ct);
+                && team.RegistrationStatus == TeamRegistrationStatus.Approved)
+            .Select(team => team.TrackKey)
+            .ToArrayAsync(ct);
         return new(
             competition.Id,
             competition.Mode,
             competition.Status,
             competition.ConfigurationJson,
             challenges,
-            teams,
-            competition.MaxConcurrentRuntimeInstancesPerTeam);
+            teamTracks.Length,
+            competition.MaxConcurrentRuntimeInstancesPerTeam,
+            competition.TrackConfigurationJson,
+            teamTracks);
     }
 }

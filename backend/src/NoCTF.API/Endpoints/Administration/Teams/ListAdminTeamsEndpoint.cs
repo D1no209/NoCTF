@@ -33,7 +33,11 @@ public sealed class ListAdminTeamsEndpoint(
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, ct))
             return TypedResults.Forbid();
-        var items = await list.ExecuteAsync(competitionId, includePending: true, ct);
+        var items = await list.ExecuteAsync(
+            competitionId,
+            includePending: true,
+            includeInternal: true,
+            ct);
         return TypedResults.Ok(new TeamListResponse(
             items.Select(item => TeamMapper.ToResponse(item, links, HttpContext)).ToArray()));
     }

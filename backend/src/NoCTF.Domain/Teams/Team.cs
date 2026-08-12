@@ -10,6 +10,8 @@ public sealed class Team
     public long ConcurrencyVersion { get; set; }
     public long CriticalSectionVersion { get; set; }
     public Guid CompetitionId { get; set; }
+    [MaxLength(64)]
+    public string TrackKey { get; set; } = NoCTF.Domain.Competitions.CompetitionTrackConfiguration.DefaultTrackKey;
     [MaxLength(128)]
     public string Name { get; set; } = string.Empty;
     [MaxLength(128)]

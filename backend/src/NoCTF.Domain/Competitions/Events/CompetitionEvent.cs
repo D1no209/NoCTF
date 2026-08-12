@@ -57,7 +57,9 @@ public enum CompetitionEventKind : short
     QuestionOpened,
     QuestionReplied,
     QuestionStatusChanged,
-    ChallengeDescriptionUpdated
+    ChallengeDescriptionUpdated,
+    TrackConfigurationUpdated,
+    TeamTrackChanged
 }
 
 public enum CompetitionEventLevel : short
@@ -110,6 +112,8 @@ public sealed class CompetitionEvent
     [NotMapped] public int? RuntimeGeneration => PayloadValue<int>("runtimeGeneration");
     [NotMapped] public int? HostPort => PayloadValue<int>("hostPort");
     [NotMapped] public string? Reason => PayloadText("reason");
+    [NotMapped] public string? TrackKey => PayloadText("trackKey");
+    [NotMapped] public string? PreviousTrackKey => PayloadText("previousTrackKey");
 
     private Guid? Reference(EntityReferenceKind kind) =>
         SubjectType == kind ? SubjectId : RelatedType == kind ? RelatedId : null;
