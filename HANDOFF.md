@@ -1,5 +1,24 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-13 alpha.34 CTF 中控大屏解题镜头
+
+- 功能提交 `5149bd4e` 依据 `DemoVideo/output.mp4` 的完整 38 秒镜头重新编排 CTF 中控大屏：保留
+  左侧题目城市、右侧排行榜与实时报板的信息骨架，同时新增缓慢巡航、轨道、扫描光束、星点和交替
+  绿紫题目建筑。视觉实现仍为原生 Vue/CSS，没有新增图片资产、动画库或手写接口。
+- 中控大屏现在会先把首屏历史解题作为基线，后续按 `solvedAt` 与稳定 key 识别所有新增解题并排入
+  队列，不再只比较一条最新记录。每条新解题依次触发目标题目聚焦、其他建筑降噪、扩散冲击环、
+  粒子爆发、血榜名次、队伍、题目和得分确认牌；连续解题不会丢失或重复播放，切换赛道会重新建立
+  当前赛道基线。`prefers-reduced-motion` 下会关闭巡航与庆祝动画，保留完整信息。
+- 前端仅继续使用生成 SDK 与既有 Leaderboard/CompetitionHub 契约，没有 API、OpenAPI、SDK、数据模型、
+  migration 或业务表变化。英文资源补齐 `Solve confirmed`。
+- 验证通过：前端完整 `bun test` 180/180（1395 assertions）、`bun run typecheck`、production
+  `bun run build` 与 `git diff --check`。构建仅保留既有大 chunk、plugin timing 和第三方 Node exports
+  warning。使用 Microsoft Edge 1920×1080 与可丢弃本地假数据完成实际视觉验收，确认刷新后排名、
+  实时报板、目标题目聚焦和解题确认牌同步出现；临时服务、截图与视频拆帧均已清理。
+- 发布提交 `24126f08` 将平台版本由 `0.1.0-alpha.33` 递增为 `0.1.0-alpha.34`。本阶段在独立工作树
+  `E:\SourceCode\NoCTF-flag-rules-20260813` 完成，没有覆盖原工作区中的用户未提交文件；尚未推送、
+  合并远程 `main`、部署或操作生产数据。
+
 ## 2026-08-13 alpha.33 Flag 默认模板与静态正则匹配
 
 - 功能提交 `456a913c` 将未指定或仅含空白的动态 Flag 前缀、正文分别归一为 `flag` 与 `[GUID]`，
