@@ -18733,6 +18733,9 @@
           "flag": {
             "type": "string"
           },
+          "matchKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
+          },
           "specificationKind": {
             "nullable": true,
             "oneOf": [
@@ -18766,6 +18769,18 @@
             "format": "date-time"
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Exact",
+          "RegularExpression"
+        ],
+        "enum": [
+          "Exact",
+          "RegularExpression"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol": {
         "type": "string",
@@ -18805,6 +18820,9 @@
             "maxLength": 4096,
             "minLength": 0,
             "nullable": false
+          },
+          "matchKind": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
           },
           "specificationKind": {
             "nullable": true,
@@ -18959,6 +18977,9 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagResponse"
             }
+          },
+          "supportsRegularExpression": {
+            "type": "boolean"
           }
         }
       },

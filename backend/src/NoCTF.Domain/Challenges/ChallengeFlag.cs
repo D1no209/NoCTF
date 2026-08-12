@@ -10,10 +10,17 @@ public sealed class ChallengeFlag
     public SpecificationKind? SpecificationKind { get; set; }
     public Guid? SpecificationId { get; set; }
     public string Flag { get; set; } = string.Empty;
+    public ChallengeFlagMatchKind MatchKind { get; set; }
     public DateTimeOffset? ValidStart { get; set; }
     public DateTimeOffset? ValidUntil { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
+}
+
+public enum ChallengeFlagMatchKind : short
+{
+    Exact,
+    RegularExpression
 }
 
 public enum SpecificationKind : short

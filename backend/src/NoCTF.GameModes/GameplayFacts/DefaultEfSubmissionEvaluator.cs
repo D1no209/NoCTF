@@ -1,5 +1,4 @@
-using System.Security.Cryptography;
-using System.Text;
+using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Gameplay;
 using SubmissionEntity = NoCTF.Domain.Gameplay.GameplayFact;
@@ -27,12 +26,10 @@ public sealed class DefaultEfGameplayFactEvaluator : IGameplayFactEvaluator
 
     internal static bool Matches(SubmissionEntity submission, NoCTF.Domain.Challenges.ChallengeFlag flag)
     {
-        if (submission.Value is null || submission.ValueSha256 is not { Length: 32 }
-            || flag.FlagSha256 is not { Length: 32 })
+        if (submission.Value is null)
             return false;
-        return CryptographicOperations.FixedTimeEquals(submission.ValueSha256, flag.FlagSha256)
-            && string.Equals(submission.Value, flag.Flag, StringComparison.Ordinal);
+        return ChallengeFlagMatcher.IsMatch(submission.Value, flag);
     }
 
-    internal static byte[] Hash(string value) => SHA256.HashData(Encoding.UTF8.GetBytes(value));
+    internal static byte[] Hash(string value) => ManageChallengeFlags.Hash(value);
 }

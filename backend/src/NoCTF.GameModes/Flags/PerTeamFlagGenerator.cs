@@ -9,7 +9,13 @@ public sealed record PerTeamFlagTemplate(
     string BodyTemplate,
     bool LeetLiteralText)
 {
-    public static PerTeamFlagTemplate Default { get; } = new("flag", "[TEAMHASH]", false);
+    public static PerTeamFlagTemplate Default { get; } = new("flag", "[GUID]", false);
+
+    public PerTeamFlagTemplate Normalize() => this with
+    {
+        Header = string.IsNullOrWhiteSpace(Header) ? Default.Header : Header.Trim(),
+        BodyTemplate = string.IsNullOrWhiteSpace(BodyTemplate) ? Default.BodyTemplate : BodyTemplate
+    };
 }
 
 public readonly record struct PerTeamFlagContext(
@@ -43,6 +49,7 @@ public static partial class PerTeamFlagGenerator
         if (context.FlagDerivationSecret.Length != 32)
             throw new ArgumentException("Flag derivation secret must contain exactly 32 bytes.", nameof(context));
 
+        template = template.Normalize();
         var generatedGuid = Guid.NewGuid();
         var segments = ParseSegments(template.BodyTemplate, context, generatedGuid);
         if (template.LeetLiteralText)

@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
@@ -10,26 +8,25 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class PerTeamFlagGeneratorTests
 {
     [Test]
-    public async Task Default_template_uses_the_documented_team_hash_contract()
+    public async Task Default_template_uses_flag_prefix_and_random_uuid_body()
     {
         var secret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray();
         var competitionId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var challengeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var competitionChallengeId = Guid.Parse("33333333-3333-3333-3333-333333333333");
         var teamId = Guid.Parse("44444444-4444-4444-4444-444444444444");
-        var input = Encoding.UTF8.GetBytes(
-            $"noctf:teamhash:v1:{competitionId:D}:{competitionChallengeId:D}:{teamId:D}");
-        var expectedHash = Convert.ToHexStringLower(HMACSHA256.HashData(secret, input))[..32];
 
         var flag = PerTeamFlagGenerator.Generate(
             PerTeamFlagTemplate.Default,
             new(secret, competitionId, challengeId, competitionChallengeId, teamId));
 
-        await Assert.That(flag).IsEqualTo($"flag{{{expectedHash}}}");
+        await Assert.That(flag).StartsWith("flag{");
+        await Assert.That(flag).EndsWith("}");
+        await Assert.That(Guid.TryParse(flag[5..^1], out _)).IsTrue();
     }
 
     [Test]
-    public async Task Specification_scope_is_stable_within_a_round_and_rotates_between_rounds()
+    public async Task Default_uuid_body_is_random_for_each_generation()
     {
         var context = new PerTeamFlagContext(
             Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
@@ -45,8 +42,20 @@ public sealed class PerTeamFlagGeneratorTests
             PerTeamFlagTemplate.Default,
             context with { SpecificationId = Guid.Parse("00000002-0000-0000-0000-000000000000") });
 
-        await Assert.That(replay).IsEqualTo(first);
+        await Assert.That(replay).IsNotEqualTo(first);
         await Assert.That(next).IsNotEqualTo(first);
+    }
+
+    [Test]
+    public async Task Missing_header_and_body_are_normalized_to_defaults()
+    {
+        var flag = PerTeamFlagGenerator.Generate(
+            new("  ", string.Empty, false),
+            new(new byte[32], Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
+
+        await Assert.That(flag).StartsWith("flag{");
+        await Assert.That(flag).EndsWith("}");
+        await Assert.That(Guid.TryParse(flag[5..^1], out _)).IsTrue();
     }
 
     [Test]

@@ -20,6 +20,7 @@ import {
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
@@ -245,12 +246,14 @@ function formatBytes(value?: number): string {
 
 // ---------- Flags ----------
 const flags = ref<Flag[]>([])
+const supportsRegularExpression = ref(false)
 const flagsLoading = ref(false)
 const flagsIncludeDeleted = ref(false)
 const flagCreateOpen = ref(false)
 const flagCreating = ref(false)
 const flagForm = reactive({
   flag: '',
+  matchKind: 'Exact' as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
   teamId: '',
   specificationKind: '',
   specificationId: '',
@@ -279,6 +282,9 @@ async function loadFlags(): Promise<void> {
     return
   }
   flags.value = data?.items ?? []
+  supportsRegularExpression.value = data?.supportsRegularExpression ?? false
+  if (!supportsRegularExpression.value && flagForm.matchKind === 'RegularExpression')
+    flagForm.matchKind = 'Exact'
 }
 
 watch(flagsIncludeDeleted, () => {
@@ -287,6 +293,7 @@ watch(flagsIncludeDeleted, () => {
 
 function openFlagCreate(): void {
   flagForm.flag = ''
+  flagForm.matchKind = 'Exact'
   flagForm.teamId = ''
   flagForm.specificationKind = ''
   flagForm.specificationId = ''
@@ -311,6 +318,7 @@ async function createFlag(): Promise<void> {
     path: { challengeId },
     body: {
       flag: flagForm.flag,
+      matchKind: flagForm.matchKind,
       teamId: flagForm.teamId.trim() || null,
       specificationKind: flagForm.specificationKind === ''
         ? null
@@ -750,8 +758,13 @@ onMounted(() => {
                   </TableHeader>
                   <TableBody>
                     <TableRow v-for="flag in flags" :key="flag.id">
-                      <TableCell class="max-w-md truncate font-mono text-sm" :title="flag.flag">
-                        {{ flag.flag }}
+                      <TableCell class="max-w-md" :title="flag.flag">
+                        <div class="flex min-w-0 items-center gap-2">
+                          <Badge variant="outline">
+                            {{ flag.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
+                          </Badge>
+                          <span class="truncate font-mono text-sm">{{ flag.flag }}</span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge v-if="flag.specificationKind !== null && flag.specificationKind !== undefined" variant="outline">
@@ -871,8 +884,33 @@ onMounted(() => {
         </DialogHeader>
         <FieldGroup>
           <Field>
-            <FieldLabel for="flag-value">{{ $t('Flag 内容') }}</FieldLabel>
-            <Input id="flag-value" v-model="flagForm.flag" required class="font-mono text-sm" placeholder="flag{...}" />
+            <FieldLabel for="flag-match-kind">{{ $t('匹配方式') }}</FieldLabel>
+            <Select v-model="flagForm.matchKind">
+              <SelectTrigger id="flag-match-kind" class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Exact">{{ $t('精确匹配') }}</SelectItem>
+                <SelectItem v-if="supportsRegularExpression" value="RegularExpression">
+                  {{ $t('正则匹配') }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <FieldDescription>
+              {{ $t('正则表达式匹配完整 Flag，区分大小写；仅 CTF 静态 Flag 可用。') }}
+            </FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel for="flag-value">
+              {{ flagForm.matchKind === 'RegularExpression' ? $t('正则表达式') : $t('Flag 内容') }}
+            </FieldLabel>
+            <Input
+              id="flag-value"
+              v-model="flagForm.flag"
+              required
+              class="font-mono text-sm"
+              :placeholder="flagForm.matchKind === 'RegularExpression' ? 'flag\\{[0-9a-f-]{36}\\}' : 'flag{...}'"
+            />
           </Field>
           <div class="grid gap-4 sm:grid-cols-2">
             <Field>

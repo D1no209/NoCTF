@@ -1,14 +1,69 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using NoCTF.Application.GameplayFacts.Processing;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.GameplayFact;
+using NoCTF.GameModes.Ctf.Configuration;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
 public sealed class CtfGameplayFactEvaluatorTests
 {
+    [Test]
+    public async Task Static_ctf_regular_expression_matches_the_entire_flag_case_sensitively()
+    {
+        var fixture = CreateFixture("flag{123e4567-e89b-12d3-a456-426614174000}");
+        var expression = fixture.Flag(null);
+        expression.Flag = @"flag\{[0-9a-f-]{36}\}";
+        expression.FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(expression.Flag));
+        expression.MatchKind = ChallengeFlagMatchKind.RegularExpression;
+
+        var staticDefinition = JsonSerializer.Serialize(new CtfChallengeConfiguration(
+            CtfChallengeConfiguration.CurrentSchemaVersion,
+            null,
+            null),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var accepted = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([expression]) with { ChallengeDefinitionJson = staticDefinition });
+        fixture.GameplayFact.Value = "prefix-flag{123e4567-e89b-12d3-a456-426614174000}";
+        var partial = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([expression]) with { ChallengeDefinitionJson = staticDefinition });
+        fixture.GameplayFact.Value = "FLAG{123e4567-e89b-12d3-a456-426614174000}";
+        var differentCase = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([expression]) with { ChallengeDefinitionJson = staticDefinition });
+
+        await Assert.That(accepted.Result).IsEqualTo(GameplayFactResult.Correct);
+        await Assert.That(partial.Result).IsEqualTo(GameplayFactResult.Wrong);
+        await Assert.That(differentCase.Result).IsEqualTo(GameplayFactResult.Wrong);
+    }
+
+    [Test]
+    public async Task Dynamic_ctf_runtime_ignores_regular_expression_flags()
+    {
+        var fixture = CreateFixture("flag{dynamic}");
+        var expression = fixture.Flag(null);
+        expression.Flag = @"flag\{.*\}";
+        expression.FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(expression.Flag));
+        expression.MatchKind = ChallengeFlagMatchKind.RegularExpression;
+        var definition = JsonSerializer.Serialize(new CtfChallengeConfiguration(
+            CtfChallengeConfiguration.CurrentSchemaVersion,
+            null,
+            null,
+            Runtime: new ChallengeRuntimeTemplate(
+                RuntimeAllocation.PerTeam,
+                new ContainerRuntimeDefinition("registry.example/challenge:v1"),
+                FlagSource: RuntimeFlagSource.PerTeam)),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([expression]) with { ChallengeDefinitionJson = definition });
+
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Wrong);
+    }
+
     [Test]
     public async Task Foreign_team_flag_is_rejected_with_owner_team_evidence()
     {

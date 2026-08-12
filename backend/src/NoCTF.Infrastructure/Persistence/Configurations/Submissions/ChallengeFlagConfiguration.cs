@@ -11,6 +11,7 @@ internal sealed class ChallengeFlagConfiguration : IEntityTypeConfiguration<Chal
         builder.ToTable("challenge_flags");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Flag).HasColumnType("text");
+        builder.Property(x => x.MatchKind).HasConversion<short>();
         builder.Property(x => x.SpecificationKind).HasConversion<short>();
         builder.HasIndex(x => new
         {

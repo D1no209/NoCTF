@@ -7,7 +7,10 @@ using NoCTF.Infrastructure.Challenges;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Messaging;
+using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.GameModes.Registration;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -18,6 +21,8 @@ public sealed class ChallengeBankStore(
     ITransactionalMessageOutbox? messageOutbox = null,
     ICompetitionEventRecorder? eventRecorder = null) : IChallengeBankStore
 {
+    private static readonly IChallengeRuntimeTemplateCatalog RuntimeTemplates =
+        new ChallengeRuntimeTemplateCatalog();
     private readonly ITransactionalMessageOutbox outbox =
         messageOutbox ?? new OpenApiTransactionalMessageOutbox();
     private readonly ICompetitionEventRecorder events =
@@ -139,6 +144,30 @@ public sealed class ChallengeBankStore(
                     ct))
         {
             return new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
+        }
+        var supportsRegularExpression = command.Mode == GameMode.Ctf
+            && RuntimeTemplates.Get(command.Mode, command.DefinitionJson)?.FlagSource
+                is null or RuntimeFlagSource.Static;
+        if (!supportsRegularExpression)
+        {
+            var competitionChallengeIds = db.CompetitionChallenges.IgnoreQueryFilters()
+                .Where(item => item.ChallengeId == command.ChallengeId)
+                .Select(item => item.Id);
+            var hasRegularExpressionFlags = await db.ChallengeFlags.AsNoTracking()
+                .AnyAsync(flag =>
+                    flag.DeletedAt == null
+                    &&
+                    flag.MatchKind == ChallengeFlagMatchKind.RegularExpression
+                    && (flag.ChallengeId == command.ChallengeId
+                        || flag.CompetitionChallengeId != null
+                        && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value)),
+                    ct);
+            if (hasRegularExpressionFlags)
+            {
+                return new(
+                    ChallengeTemplateWriteState.InvalidDefinition,
+                    Detail: "Delete or convert regular-expression flags before enabling dynamic flags or changing the game mode.");
+            }
         }
         var descriptionChanged = !string.Equals(
             entity.Description,

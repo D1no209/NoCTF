@@ -196,7 +196,7 @@ export function emptyRunnerJob(): RunnerJobModel {
 }
 
 export function emptyFlagTemplate(): FlagTemplateModel {
-  return { header: 'flag', bodyTemplate: '[TEAMHASH]', leetLiteralText: false }
+  return { header: 'flag', bodyTemplate: '[GUID]', leetLiteralText: false }
 }
 
 export function emptyDefinition(mode: GameModeValue): DefinitionModel {
@@ -338,7 +338,7 @@ function parseFlagTemplate(raw: unknown): FlagTemplateModel {
   const obj = asObject(raw) ?? {}
   return {
     header: asString(obj.header) || 'flag',
-    bodyTemplate: asString(obj.bodyTemplate),
+    bodyTemplate: asString(obj.bodyTemplate) || '[GUID]',
     leetLiteralText: asBool(obj.leetLiteralText),
   }
 }
@@ -520,8 +520,8 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
     && model.runtime?.flagSource === FlagSource.PerTeam
     && model.flagTemplate) {
     obj.flagTemplate = {
-      header: model.flagTemplate.header,
-      bodyTemplate: model.flagTemplate.bodyTemplate,
+      header: model.flagTemplate.header.trim() || 'flag',
+      bodyTemplate: model.flagTemplate.bodyTemplate.trim() || '[GUID]',
       leetLiteralText: model.flagTemplate.leetLiteralText,
     }
   }
@@ -539,8 +539,8 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
     }
     if (model.flagTemplate) {
       obj.flagTemplate = {
-        header: model.flagTemplate.header,
-        bodyTemplate: model.flagTemplate.bodyTemplate,
+        header: model.flagTemplate.header.trim() || 'flag',
+        bodyTemplate: model.flagTemplate.bodyTemplate.trim() || '[GUID]',
         leetLiteralText: model.flagTemplate.leetLiteralText,
       }
     }
@@ -840,7 +840,11 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
     case 'flagTemplate': {
       const tpl = value as FlagTemplateModel
       if (!tpl) return
-      out[field.key] = { header: tpl.header, bodyTemplate: tpl.bodyTemplate, leetLiteralText: tpl.leetLiteralText }
+      out[field.key] = {
+        header: tpl.header.trim() || 'flag',
+        bodyTemplate: tpl.bodyTemplate.trim() || '[GUID]',
+        leetLiteralText: tpl.leetLiteralText,
+      }
       return
     }
   }

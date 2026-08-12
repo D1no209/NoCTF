@@ -19,6 +19,7 @@ import {
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
   NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse,
   NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
@@ -123,12 +124,21 @@ async function saveConfig(json: string) {
 
 // ---- Flags ----
 const flags = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse[]>([])
+const supportsRegularExpression = ref(false)
 const flagsLoading = ref(true)
 const flagsLoadError = ref<string | null>(null)
 const includeDeletedFlags = ref(false)
 const flagDialogOpen = ref(false)
 const editingFlag = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse | null>(null)
-const flagForm = ref({ flag: '', teamId: '', specificationKind: '', specificationId: '', validStart: '', validUntil: '' })
+const flagForm = ref({
+  flag: '',
+  matchKind: 'Exact' as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
+  teamId: '',
+  specificationKind: '',
+  specificationId: '',
+  validStart: '',
+  validUntil: '',
+})
 const flagError = ref<string | null>(null)
 const savingFlag = ref(false)
 const pendingFlagId = ref<string | null>(null)
@@ -141,10 +151,14 @@ async function loadFlags() {
   })
   if (error || !data) {
     flagsLoadError.value = parseApiError(error).message
+    supportsRegularExpression.value = false
   }
   else {
     flagsLoadError.value = null
     flags.value = data.items ?? []
+    supportsRegularExpression.value = data.supportsRegularExpression ?? false
+    if (!supportsRegularExpression.value && flagForm.value.matchKind === 'RegularExpression')
+      flagForm.value.matchKind = 'Exact'
   }
   flagsLoading.value = false
 }
@@ -155,6 +169,7 @@ function openFlagDialog(flag?: NoCtfapiEndpointsAdministrationChallengeBankChall
   flagError.value = null
   flagForm.value = {
     flag: flag?.flag ?? '',
+    matchKind: flag?.matchKind ?? 'Exact',
     teamId: flag?.teamId ?? '',
     specificationKind: flag?.specificationKind !== null && flag?.specificationKind !== undefined ? String(flag.specificationKind) : '',
     specificationId: flag?.specificationId ?? '',
@@ -173,6 +188,7 @@ async function saveFlag() {
   flagError.value = null
   const body = {
     flag: flagForm.value.flag,
+    matchKind: flagForm.value.matchKind,
     teamId: flagForm.value.teamId.trim() || null,
     specificationKind: flagForm.value.specificationKind === ''
       ? null
@@ -466,7 +482,14 @@ onMounted(() => {
               </TableHeader>
               <TableBody>
                 <TableRow v-for="f in flags" :key="f.id" :class="{ 'opacity-60': f.deletedAt }">
-                  <TableCell class="max-w-64 truncate font-mono text-xs">{{ f.flag }}</TableCell>
+                  <TableCell class="max-w-64">
+                    <div class="flex min-w-0 items-center gap-2">
+                      <Badge variant="outline">
+                        {{ f.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
+                      </Badge>
+                      <span class="truncate font-mono text-xs">{{ f.flag }}</span>
+                    </div>
+                  </TableCell>
                   <TableCell class="font-mono text-xs">{{ f.teamId ?? $t('全部') }}</TableCell>
                   <TableCell>
                     <span v-if="f.specificationKind !== null && f.specificationKind !== undefined">
@@ -563,8 +586,33 @@ onMounted(() => {
               <AlertDescription>{{ flagError }}</AlertDescription>
             </Alert>
             <Field>
-              <FieldLabel for="flag-value">{{ $t('Flag 内容') }}</FieldLabel>
-              <Input id="flag-value" v-model="flagForm.flag" class="font-mono" required />
+              <FieldLabel for="flag-match-kind">{{ $t('匹配方式') }}</FieldLabel>
+              <Select v-model="flagForm.matchKind">
+                <SelectTrigger id="flag-match-kind" class="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Exact">{{ $t('精确匹配') }}</SelectItem>
+                  <SelectItem v-if="supportsRegularExpression" value="RegularExpression">
+                    {{ $t('正则匹配') }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                {{ $t('正则表达式匹配完整 Flag，区分大小写；仅 CTF 静态 Flag 可用。') }}
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel for="flag-value">
+                {{ flagForm.matchKind === 'RegularExpression' ? $t('正则表达式') : $t('Flag 内容') }}
+              </FieldLabel>
+              <Input
+                id="flag-value"
+                v-model="flagForm.flag"
+                class="font-mono"
+                required
+                :placeholder="flagForm.matchKind === 'RegularExpression' ? 'flag\\{[0-9a-f-]{36}\\}' : 'flag{...}'"
+              />
             </Field>
             <Field>
               <FieldLabel for="flag-team">{{ $t('队伍 ID(可选)') }}</FieldLabel>

@@ -47,9 +47,15 @@ public sealed class ListChallengeFlagsEndpoint(
             isAdministrator: true,
             request.IncludeDeleted,
             ct);
-        return items is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(new ChallengeFlagListResponse(
-                items.Select(ChallengeFlagMapping.ToResponse).ToArray()));
+        if (items is null)
+            return TypedResults.NotFound();
+        var supportsRegularExpression = await flags.SupportsRegularExpressionAsync(
+            ChallengeFlagScope.Competition(competitionId, request.CompetitionChallengeId),
+            actorId: null,
+            isAdministrator: true,
+            ct) == true;
+        return TypedResults.Ok(new ChallengeFlagListResponse(
+            items.Select(ChallengeFlagMapping.ToResponse).ToArray(),
+            supportsRegularExpression));
     }
 }

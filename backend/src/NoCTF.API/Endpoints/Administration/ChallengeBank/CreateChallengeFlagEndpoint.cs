@@ -2,6 +2,8 @@ using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using System.Text.Json.Serialization;
+using NoCTF.API.Serialization;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Domain.Challenges;
@@ -13,6 +15,7 @@ public sealed class SaveChallengeFlagRequest
     public Guid? Id { get; set; }
     public Guid? TeamId { get; set; }
     public string Flag { get; set; } = string.Empty;
+    public ChallengeFlagMatchKindProtocol MatchKind { get; set; }
     public SpecificationKindProtocol? SpecificationKind { get; set; }
     public Guid? SpecificationId { get; set; }
     public DateTimeOffset? ValidStart { get; set; }
@@ -27,6 +30,7 @@ public sealed class SaveChallengeFlagValidator : Validator<SaveChallengeFlagRequ
             .Must(id => id is null || id != Guid.Empty)
             .WithMessage("Id cannot be empty when supplied.");
         RuleFor(request => request.Flag).NotEmpty().MaximumLength(4096);
+        RuleFor(request => request.MatchKind).IsInEnum();
         RuleFor(request => request.SpecificationKind)
             .IsInEnum()
             .When(request => request.SpecificationKind is not null);
@@ -47,7 +51,20 @@ internal static class SaveChallengeFlagMapping
                 ? null
                 : ChallengeTemplateMapper.ToDomain(request.SpecificationKind.Value),
             request.SpecificationId,
-            request.ValidStart, request.ValidUntil, now);
+            request.ValidStart, request.ValidUntil, now,
+            request.MatchKind switch
+            {
+                ChallengeFlagMatchKindProtocol.Exact => ChallengeFlagMatchKind.Exact,
+                ChallengeFlagMatchKindProtocol.RegularExpression => ChallengeFlagMatchKind.RegularExpression,
+                _ => throw new ArgumentOutOfRangeException(nameof(request.MatchKind))
+            });
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeFlagMatchKindProtocol>))]
+public enum ChallengeFlagMatchKindProtocol
+{
+    Exact,
+    RegularExpression
 }
 
 public sealed class CreateChallengeFlagEndpoint(

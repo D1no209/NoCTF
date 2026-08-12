@@ -1,12 +1,47 @@
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Flags;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
+using NoCTF.Domain.Competitions;
 
 namespace NoCTF.Infrastructure.Challenges.Flags;
 
-public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallengeFlagStore
+public sealed class ChallengeFlagManagementStore(
+    NoCtfDbContext db,
+    IChallengeRuntimeTemplateCatalog runtimeTemplates) : IChallengeFlagStore
 {
+    public ChallengeFlagManagementStore(NoCtfDbContext db)
+        : this(db, new NoCTF.GameModes.Registration.ChallengeRuntimeTemplateCatalog()) { }
+
+    public async Task<bool?> SupportsRegularExpressionAsync(
+        ChallengeFlagScope scope,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
+            return null;
+
+        var challenge = scope.ChallengeId is Guid challengeId
+            ? await db.Challenges.AsNoTracking()
+                .Where(item => item.Id == challengeId)
+                .Select(item => new { item.Mode, item.DefinitionJson })
+                .SingleAsync(ct)
+            : await db.CompetitionChallenges.AsNoTracking()
+                .Where(item => item.Id == scope.CompetitionChallengeId
+                    && item.CompetitionId == scope.CompetitionId)
+                .Join(
+                    db.Challenges.AsNoTracking(),
+                    item => item.ChallengeId,
+                    template => template.Id,
+                    (_, template) => new { template.Mode, template.DefinitionJson })
+                .SingleAsync(ct);
+        return challenge.Mode == GameMode.Ctf
+            && runtimeTemplates.Get(challenge.Mode, challenge.DefinitionJson)?.FlagSource
+                is null or RuntimeFlagSource.Static;
+    }
+
     public async Task<IReadOnlyList<ChallengeFlagView>?> ListAsync(
         ChallengeFlagScope scope,
         Guid? actorId,
@@ -21,7 +56,7 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
             .ThenBy(flag => flag.Id)
             .Select(flag => new ChallengeFlagView(
                 flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
-                flag.Flag, flag.SpecificationKind, flag.SpecificationId,
+                flag.Flag, flag.MatchKind, flag.SpecificationKind, flag.SpecificationId,
                 flag.ValidStart, flag.ValidUntil, flag.DeletedAt, flag.CreatedAt))
             .ToListAsync(ct);
     }
@@ -40,7 +75,7 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
             .Where(flag => flag.Id == flagId)
             .Select(flag => new ChallengeFlagView(
                 flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
-                flag.Flag, flag.SpecificationKind, flag.SpecificationId,
+                flag.Flag, flag.MatchKind, flag.SpecificationKind, flag.SpecificationId,
                 flag.ValidStart, flag.ValidUntil, flag.DeletedAt, flag.CreatedAt))
             .SingleOrDefaultAsync(ct);
     }
@@ -79,6 +114,7 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
         entity.TeamId = command.TeamId;
         entity.Flag = command.Flag;
         entity.FlagSha256 = ManageChallengeFlags.Hash(command.Flag);
+        entity.MatchKind = command.MatchKind;
         entity.SpecificationKind = command.SpecificationKind;
         entity.SpecificationId = command.SpecificationId;
         entity.ValidStart = command.ValidStart;
@@ -126,6 +162,9 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
             .SingleOrDefaultAsync(flag => flag.Id == flagId && flag.DeletedAt != null, ct);
         if (entity is null)
             return false;
+        if (entity.MatchKind == ChallengeFlagMatchKind.RegularExpression
+            && await SupportsRegularExpressionAsync(scope, actorId, isAdministrator, ct) != true)
+            return false;
         entity.DeletedAt = null;
         await db.SaveChangesAsync(ct);
         return true;
@@ -164,7 +203,7 @@ public sealed class ChallengeFlagManagementStore(NoCtfDbContext db) : IChallenge
     private static ChallengeFlagView Map(ChallengeFlag flag) =>
         new(
             flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
-            flag.Flag, flag.SpecificationKind, flag.SpecificationId,
+            flag.Flag, flag.MatchKind, flag.SpecificationKind, flag.SpecificationId,
             flag.ValidStart, flag.ValidUntil, flag.DeletedAt, flag.CreatedAt);
 
 }

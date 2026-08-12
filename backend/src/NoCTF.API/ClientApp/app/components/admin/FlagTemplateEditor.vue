@@ -24,7 +24,7 @@ withDefaults(defineProps<{
     </div>
     <Field>
       <FieldLabel>{{ $t('正文模板') }}</FieldLabel>
-      <Input v-model="template.bodyTemplate" placeholder="[RANDOM:32]" class="font-mono text-sm" :disabled="disabled" />
+      <Input v-model="template.bodyTemplate" placeholder="[GUID]" class="font-mono text-sm" :disabled="disabled" />
       <FieldDescription> {{ $t('可用占位符:[GUID]、[TEAMID]、[CHALLENGEID]、[COMPETITIONCHALLENGEID]、[COMPETITIONID]、 [TEAMHASH:n](8–64,默认 32)、[RANDOM:n](8–128,必填)。') }} </FieldDescription>
     </Field>
   </FieldGroup>

@@ -227,6 +227,7 @@ public sealed class ChallengeAttachmentStore(
                     TeamId = scope.TeamId,
                     Flag = selected.Flag,
                     FlagSha256 = selected.FlagSha256,
+                    MatchKind = selected.MatchKind,
                     SpecificationKind = SpecificationKind.Attachment,
                     SpecificationId = selectedId,
                     CreatedAt = DateTimeOffset.UtcNow

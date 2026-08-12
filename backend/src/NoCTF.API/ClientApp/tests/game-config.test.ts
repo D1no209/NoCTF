@@ -37,10 +37,10 @@ describe('container port drafts', () => {
 })
 
 describe('dynamic flag templates', () => {
-  test('exposes the CTF competition dynamic flag header with the stable team hash default', () => {
+  test('exposes the CTF competition dynamic flag template with the random UUID default', () => {
     expect(emptyFlagTemplate()).toEqual({
       header: 'flag',
-      bodyTemplate: '[TEAMHASH]',
+      bodyTemplate: '[GUID]',
       leetLiteralText: false,
     })
     expect(competitionConfigFields('Ctf').some(field => field.key === 'flagTemplate')).toBeTrue()
