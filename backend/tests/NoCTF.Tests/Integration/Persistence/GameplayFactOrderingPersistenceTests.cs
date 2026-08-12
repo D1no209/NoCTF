@@ -170,6 +170,57 @@ public sealed class GameplayFactOrderingPersistenceTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Earlier_internal_solve_is_retained_without_consuming_public_blood(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(
+                "noctf_fact_internal_track_blood", cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 2, cancellationToken);
+            await using (var configure = new NoCtfDbContext(options))
+            {
+                configure.Competitions.Single().TrackConfigurationJson =
+                    CompetitionTrackConfiguration.Serialize(new(
+                        CompetitionTrackConfiguration.CurrentSchemaVersion,
+                        [
+                            new("default", "Official", true, true, false, true, true, true, true, true),
+                            new("internal", "Internal", false, false, true, false, false, false, false, false)
+                        ]));
+                configure.Teams.Single(team => team.Id == fixture.TeamIds[0]).TrackKey = "internal";
+                await configure.SaveChangesAsync(cancellationToken);
+            }
+            var internalFactId = Guid.Parse("31000000-0000-0000-0000-000000000001");
+            var publicFactId = Guid.Parse("31000000-0000-0000-0000-000000000002");
+            await AddFactsAsync(options,
+            [
+                Fact(fixture, internalFactId, fixture.TeamIds[0], fixture.Now),
+                Fact(fixture, publicFactId, fixture.TeamIds[1], fixture.Now.AddMilliseconds(1))
+            ], cancellationToken);
+            var outbox = new RecordingOutbox();
+
+            await ProcessAsync(options, internalFactId, outbox, cancellationToken);
+            await ProcessAsync(options, publicFactId, outbox, cancellationToken);
+
+            await using var verification = new NoCtfDbContext(options);
+            var facts = await verification.GameplayFacts.AsNoTracking()
+                .OrderBy(item => item.OccurredAt)
+                .ToArrayAsync(cancellationToken);
+            await Assert.That(facts.All(item => item.Result == GameplayFactResult.Correct)).IsTrue();
+            var awards = outbox.Messages.OfType<BloodAwarded>().ToArray();
+            await Assert.That(awards.Length).IsEqualTo(1);
+            await Assert.That(awards[0].TeamId).IsEqualTo(fixture.TeamIds[1]);
+            await Assert.That(awards[0].BloodRank).IsEqualTo(LeaderboardBloodRank.First);
+            var eventCount = await verification.CompetitionEvents.AsNoTracking()
+                .CountAsync(@event => @event.Kind == CompetitionEventKind.FirstBloodAwarded,
+                    cancellationToken);
+            await Assert.That(eventCount).IsEqualTo(1);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Unchanged_correct_rejudge_does_not_append_another_blood_award(
         CancellationToken cancellationToken)
     {

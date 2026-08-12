@@ -229,6 +229,50 @@ public sealed class CompetitionEventPersistenceTests
             await Assert.That(nextPage.Items!).Count().IsEqualTo(1);
             await Assert.That(nextPage.Items![0].Level).IsEqualTo(CompetitionEventLevel.Warning);
 
+            var internalTracks = new CompetitionTrackConfiguration(
+                CompetitionTrackConfiguration.CurrentSchemaVersion,
+                [
+                    CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf).DefaultTrack,
+                    new CompetitionTrackDefinition(
+                        "internal",
+                        "Internal",
+                        IsDefault: false,
+                        IsPublicSelectable: false,
+                        IsInternal: true,
+                        EarnsScore: false,
+                        EarnsBlood: false,
+                        AffectsDynamicChallengeScore: false,
+                        VisibleOnLeaderboard: false,
+                        AffectsCompetitiveResults: false)
+                ]);
+            await db.Competitions.Where(item => item.Id == ids.CompetitionId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    item => item.TrackConfigurationJson,
+                    CompetitionTrackConfiguration.Serialize(internalTracks)), ct);
+            await db.Teams.Where(team => team.Id == ids.TeamBId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    team => team.TrackKey,
+                    "internal"), ct);
+            await store.RecordAsync(new(
+                ids.CompetitionId,
+                CompetitionEventKind.TeamBanned,
+                CompetitionEventLevel.Warning,
+                CompetitionEventVisibility.Public,
+                now.AddSeconds(-30),
+                TeamId: ids.TeamBId), ct);
+            await db.SaveChangesAsync(ct);
+
+            var filteredParticipant = await store.QueryAsync(
+                Query(ids, ids.ParticipantId, now), ct);
+            await Assert.That(filteredParticipant.Items!).Count().IsEqualTo(2);
+            await Assert.That(filteredParticipant.Items!.Any(item => item.TeamId == ids.TeamBId))
+                .IsFalse();
+            var staffAfterInternalEvent = await store.QueryAsync(
+                Query(ids, ids.ObserverId, now), ct);
+            await Assert.That(staffAfterInternalEvent.Items!.Any(item =>
+                item.TeamId == ids.TeamBId
+                && item.Kind == CompetitionEventKind.TeamBanned)).IsTrue();
+
             var observerExport = await store.ExportAsync(Query(ids, ids.ObserverId, now), ct);
             await Assert.That(observerExport.State).IsEqualTo(CompetitionEventReadState.Forbidden);
             var managerExport = await store.ExportAsync(Query(ids, ids.ManagerId, now), ct);
@@ -236,7 +280,7 @@ public sealed class CompetitionEventPersistenceTests
             using var reader = new StreamReader(managerExport.Export!.Content, Encoding.UTF8);
             var export = await reader.ReadToEndAsync(ct);
             await Assert.That(export.Split('\n', StringSplitOptions.RemoveEmptyEntries)).Count()
-                .IsEqualTo(5);
+                .IsEqualTo(6);
             await Assert.That(export).DoesNotContain("super-secret-token");
 
             var observerFlag = await store.AccessGameplayFactValueAsync(new(
@@ -320,7 +364,7 @@ public sealed class CompetitionEventPersistenceTests
             var bot = await store.QueryAsync(Query(ids, ids.BotId, now), ct);
             await Assert.That(bot.State).IsEqualTo(CompetitionEventReadState.Forbidden);
             await Assert.That(outbox.Messages.OfType<CompetitionEventCommitted>()).Count()
-                .IsEqualTo(9);
+                .IsEqualTo(10);
 
             var immutable = await db.CompetitionEvents.SingleAsync(
                 item => item.Id == eventIds[0], ct);

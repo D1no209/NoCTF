@@ -47,6 +47,41 @@ public class TeamRegistrationTests
     }
 
     [Test]
+    public async Task CreateTeam_Allows_only_publicly_selectable_tracks_and_defaults_when_omitted()
+    {
+        var configuration = new CompetitionTrackConfiguration(1,
+        [
+            Track("formal", isDefault: true, publicSelectable: true),
+            Track("invite", publicSelectable: false),
+            Track("internal", publicSelectable: false, isInternal: true)
+        ]);
+        var policy = new TeamRegistrationPolicy(
+            CompetitionStatus.Published,
+            AutoApprove: true,
+            CompetitionDeleted: false,
+            Mode: GameMode.Ctf,
+            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration));
+        var store = new Store(policy);
+        var create = new CreateTeam(store);
+
+        var defaultResult = await create.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), "defaulted", DateTimeOffset.UtcNow));
+        var publicResult = await create.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), "public", DateTimeOffset.UtcNow, " FORMAL "));
+        var hiddenResult = await create.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), "hidden", DateTimeOffset.UtcNow, "invite"));
+        var internalResult = await create.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), "internal", DateTimeOffset.UtcNow, "internal"));
+
+        await Assert.That(defaultResult.Value!.TrackKey).IsEqualTo("formal");
+        await Assert.That(publicResult.Value!.TrackKey).IsEqualTo("formal");
+        await Assert.That(hiddenResult.FailureCode)
+            .IsEqualTo(TeamRegistrationFailure.TrackNotPublicSelectable);
+        await Assert.That(internalResult.FailureCode)
+            .IsEqualTo(TeamRegistrationFailure.TrackNotPublicSelectable);
+    }
+
+    [Test]
     public async Task ReviewTeamRegistration_FinishedCompetitionRejectsBeforeWrite()
     {
         var store = new Store(new(CompetitionStatus.Finished, true, false));
@@ -75,7 +110,9 @@ public class TeamRegistrationTests
                 status,
                 false,
                 false,
-                command.RegisteredAt);
+                command.RegisteredAt,
+                command.TrackKey ?? CompetitionTrackConfiguration.DefaultTrackKey,
+                command.TrackKey ?? CompetitionTrackConfiguration.DefaultTrackKey);
             return Task.FromResult(new TeamCreateStoreResult(team, null));
         }
         public Task<IReadOnlyList<TeamView>> ListAsync(Guid competitionId, bool includePending, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<TeamView>>([]);
@@ -89,4 +126,20 @@ public class TeamRegistrationTests
         public Task<TeamUpdateStoreResult> UpdateAsync(UpdateTeamCommand command, CancellationToken cancellationToken) => Task.FromResult(new TeamUpdateStoreResult(null, TeamRegistrationFailure.TeamNotFound));
         public Task<TeamRegistrationFailure?> SoftDeleteAsync(Guid competitionId, Guid teamId, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken) => Task.FromResult<TeamRegistrationFailure?>(null);
     }
+
+    private static CompetitionTrackDefinition Track(
+        string key,
+        bool isDefault = false,
+        bool publicSelectable = true,
+        bool isInternal = false) => new(
+        key,
+        key,
+        isDefault,
+        publicSelectable,
+        isInternal,
+        EarnsScore: !isInternal,
+        EarnsBlood: !isInternal,
+        AffectsDynamicChallengeScore: !isInternal,
+        VisibleOnLeaderboard: !isInternal,
+        AffectsCompetitiveResults: !isInternal);
 }
