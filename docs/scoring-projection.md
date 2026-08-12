@@ -40,4 +40,8 @@ FusionCache 提供 L1，生产环境使用 Redis L2 与 backplane。排行榜业
 
 Points、Penalty、Hint Cost、ManualAdjustment 和最终分数使用 checked signed Int64；溢出使整场投影失败并保留旧快照。所有可配置的单项 Points、Penalty、CompetitionChallenge BaseScore 与 Hint Cost 必须位于 0–1,000,000；CTF InitialPoints 最小为 1。百分比血奖仍使用 0–100。该边界不改变 ManualAdjustment 的规范 Int32 文本边界，也不截断最终聚合分数。CTF DynamicExpresso 只注入 `initialPoints`、`minimumPoints`、`solveCount`、`eligibleTeamCount`、`decayParameter`，禁止 Reflection、assignment、额外程序集和复杂对象。Correct solve 及血奖顺序统一按 `(OccurredAt, GameplayFactId)`。
 
-公共响应仍是 `challenges[]` 与排序后的 `entries[]` 稀疏矩阵，保留 GeneratedAt、DataScope、DataAsOf、Visibility、Entries、Challenges。
+公共响应仍是 `challenges[]` 与排序后的 `entries[]` 稀疏矩阵，并返回可见的 `tracks[]`。每条 Entry 带 TrackKey，名次在各赛道内独立计算。普通访问者只读取 VisibleOnLeaderboard 的非内部赛道（以及本队赛道的自身条目）；工作人员可查看全部赛道。EarnsScore=false 不生成排行榜条目。
+
+CTF 动态分值的 eligibleTeamCount 与 solveCount 只读取 AffectsDynamicChallengeScore=true 的赛道；不影响动态分值但允许计分的队伍使用正式池的当前题目分值。全比赛一二三血只读取 EarnsBlood=true 的赛道。AWD/AWDP 的攻击或受害结算、KoH 的公开 King 与控制积分只读取 AffectsCompetitiveResults=true 的队伍；内部测试事实仍留在 PostgreSQL，但不能改变公开投影、事件或通知。
+
+响应保留 GeneratedAt、DataScope、DataAsOf、Visibility、Entries、Challenges、Tracks。

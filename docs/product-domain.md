@@ -32,13 +32,20 @@ PasswordHash。Bot 是否能密码登录由 UserKind 规则决定，而不是由
 - TeamRegistrationAutoApprove、MaxTeamMembers、MaxConcurrentRuntimeInstancesPerTeam；
 - 32-byte `FlagDerivationSecret`；
 - ConfigurationRevision、LeaderboardDirty；
+- 版本化的跨模式赛道配置 JSON；
 - 生命周期审计。
 
 协作者直接存为三个互斥 UUID 数组，不存在 Collaborator 实体。Owner 不得同时出现在数组中。
 
 ### Team
 
-Team 只属于一个 Competition。字段包含 `CaptainId` 与无顺序语义的 `MemberIds uuid[]`。数组不得为空、不得重复、必须包含 CaptainId，且长度不超过 Competition.MaxTeamMembers。不存在 TeamMember 表。
+Team 只属于一个 Competition。字段包含稳定、大小写不敏感的 `TrackKey`、`CaptainId` 与无顺序语义的 `MemberIds uuid[]`。数组不得为空、不得重复、必须包含 CaptainId，且长度不超过 Competition.MaxTeamMembers。不存在 TeamMember 或赛道成员表。
+
+### Competition Track
+
+Competition 以自己的 `TrackConfigurationJson` 定义 1–32 条跨模式赛道；赛道不是业务表，GameplayFact 也不复制赛道。每场比赛恰有一个公开、非内部的默认赛道，旧比赛的空配置按唯一 `default` 赛道解释。Team.TrackKey 是事实发生时的稳定归属；Competition 首次进入 Running 后，Running/Paused/Finished 都冻结赛道定义和队伍赛道归属。
+
+每条赛道独立声明是否允许公开选择、计分、参与 CTF 血榜、影响 CTF 动态分值、出现在公开排行榜以及影响 AWD/AWDP/KoH 的竞争性结果。内部赛道必须关闭所有公开与竞争开关，但仍可正常查看题目、运行 Runtime/Checker 并产生永久 GameplayFact 和工作人员事件。Administrator、Owner、Manager 可在开赛前配置/分配；Judge、Observer 只读；普通参赛者只能选择公开赛道。
 
 团队拥有一个全局唯一、明文的 32 字符 Base62 InvitationToken。字母表固定为 `0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz`，使用 CSPRNG rejection sampling 逐字符无偏生成；若撞全局唯一索引就整体重生。持有 Token 的已登录用户在 Published 状态直接加入；轮换立即使旧值失效。
 

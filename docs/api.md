@@ -43,6 +43,7 @@ GET  /api/v1/competitions
 GET  /api/v1/competitions/{competitionId}
 GET  /api/v1/competitions/{competitionId}/poster
 GET  /api/v1/competitions/{competitionId}/leaderboard
+GET  /api/v1/competitions/{competitionId}/tracks
 
 POST /api/v1/competitions/{competitionId}/teams
 GET  /api/v1/competitions/{competitionId}/teams
@@ -170,6 +171,8 @@ GET  /api/v1/admin/competitions/{competitionId}/configuration
 PUT  /api/v1/admin/competitions/{competitionId}/configuration
 GET  /api/v1/admin/competitions/{competitionId}/leaderboard-visibility
 PUT  /api/v1/admin/competitions/{competitionId}/leaderboard-visibility
+GET  /api/v1/admin/competitions/{competitionId}/tracks
+PUT  /api/v1/admin/competitions/{competitionId}/tracks
 DELETE /api/v1/admin/competitions/{competitionId}
 POST /api/v1/admin/competitions/{competitionId}/restore
 GET  /api/v1/admin/competitions/{competitionId}/hard-delete-preview
@@ -243,6 +246,7 @@ Owner transfer 也递增该 revision。Manager 必须是 Organizer/Administrator
 
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/teams
+PUT  /api/v1/admin/competitions/{competitionId}/teams/{teamId}/track
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/approve
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/reject
 POST /api/v1/admin/competitions/{competitionId}/teams/{teamId}/ban

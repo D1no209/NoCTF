@@ -26,6 +26,7 @@
 拥有者/协作者直接存 `owner_id uuid`、`manager_ids uuid[]`、`judge_ids uuid[]`、`observer_ids uuid[]`；
 另有 `id`、`title`、`description`、`mode`、`status`、`start_at`、`end_at`、运行时钟字段、团队限制、
 `configuration_json jsonb`、`configuration_revision`、`permission_revision`、`leaderboard_dirty bool`、
+`track_configuration_json jsonb?`、`track_configuration_revision`、`track_configuration_updated_at`、
 `flag_derivation_secret bytea(32)`、`leaderboard_visibility` 状态字段、`poster_file_id uuid?`、时间戳和 `deleted_at?`。
 
 ### `competition_events`
@@ -38,9 +39,9 @@
 
 ### `teams`
 
-`id`、`competition_id`、`name`、`normalized_name`、`avatar_file_id?`、`captain_id`、`member_ids uuid[]`、
+`id`、`competition_id`、`track_key varchar(64)`、`name`、`normalized_name`、`avatar_file_id?`、`captain_id`、`member_ids uuid[]`、
 `invitation_token varchar(32)`、注册/锁定/封禁字段、`registered_at`、`deleted_at?`。成员数组无重复且包含 Captain；
-不存在 TeamMember/TeamInvitation 表。
+不存在 TeamMember/TeamInvitation/CompetitionTrack 表。旧行通过数据库默认值归入 `default` 赛道。
 
 ### `challenges`
 
