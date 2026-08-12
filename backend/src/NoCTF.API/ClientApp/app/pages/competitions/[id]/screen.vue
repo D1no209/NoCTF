@@ -20,6 +20,7 @@ import {
   controlScreenChallenges,
   controlScreenEntries,
   controlScreenSolveFeed,
+  reconcileControlScreenSolves,
 } from '~/utils/control-screen'
 import type { ControlScreenSolve } from '~/utils/control-screen'
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
@@ -39,12 +40,14 @@ const refreshing = ref(false)
 const projectionPending = ref(false)
 const error = ref<string | null>(null)
 const featuredSolve = ref<ControlScreenSolve | null>(null)
+const celebrationQueue = ref<ControlScreenSolve[]>([])
 const fullscreen = ref(false)
 const clock = ref(Date.now())
 let clockTimer: ReturnType<typeof setInterval> | undefined
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 let projectionTimer: ReturnType<typeof setTimeout> | undefined
-let featuredTimer: ReturnType<typeof setTimeout> | undefined
+let celebrationTimer: ReturnType<typeof setTimeout> | undefined
+let seenSolveKeys: Set<string> | null = null
 let unwatch: (() => void) | undefined
 
 const availableTracks = computed(() => (leaderboard.value?.tracks ?? [])
@@ -75,8 +78,15 @@ const visibleChallenges = computed(() => challenges.value.slice(
 const solveFeed = computed(() => controlScreenSolveFeed(leaderboard.value, entries.value).slice(0, 8))
 const solvedChallengeCount = computed(() => challenges.value.filter(challenge => challenge.solveCount > 0).length)
 const totalSolveCount = computed(() => challenges.value.reduce((sum, challenge) => sum + challenge.solveCount, 0))
-const latestSolve = computed(() => solveFeed.value[0] ?? null)
 const dataAsOf = computed(() => leaderboard.value?.dataAsOf ?? leaderboard.value?.generatedAt)
+const featuredChallengeKey = computed(() => challengeKey(featuredSolve.value?.competitionChallengeId))
+
+const celebrationParticles = Array.from({ length: 28 }, (_, index) => ({
+  id: index,
+  angle: `${index * (360 / 28)}deg`,
+  distance: `${9 + (index % 5) * 1.7}rem`,
+  delay: `${(index % 7) * 28}ms`,
+}))
 
 const remainingText = computed(() => {
   const end = competition.value?.endTime ? new Date(competition.value.endTime).getTime() : null
@@ -124,6 +134,28 @@ function rankClass(rank?: number): string {
   return ''
 }
 
+function challengeKey(value?: string | null): string {
+  return (value ?? '').replace(/[^0-9a-f]/gi, '').toLowerCase()
+}
+
+function playNextCelebration(): void {
+  if (featuredSolve.value || !celebrationQueue.value.length) return
+  featuredSolve.value = celebrationQueue.value.shift() ?? null
+  if (!featuredSolve.value) return
+  celebrationTimer = setTimeout(() => {
+    featuredSolve.value = null
+    celebrationTimer = setTimeout(playNextCelebration, 450)
+  }, 5_200)
+}
+
+function reconcileCelebrations(currentSolves: readonly ControlScreenSolve[]): void {
+  const reconciled = reconcileControlScreenSolves(seenSolveKeys, currentSolves)
+  seenSolveKeys = reconciled.seenKeys
+  if (!reconciled.newSolves.length) return
+  celebrationQueue.value.push(...reconciled.newSolves)
+  playNextCelebration()
+}
+
 async function loadData(): Promise<void> {
   refreshing.value = Boolean(competition.value || leaderboard.value)
   const [competitionResult, leaderboardResult] = await Promise.all([
@@ -161,15 +193,9 @@ async function loadData(): Promise<void> {
   }
   projectionPending.value = false
   error.value = null
-  const previousLatestKey = latestSolve.value?.key
   leaderboard.value = leaderboardResult.data as NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse
   await nextTick()
-  const currentLatest = latestSolve.value
-  if (previousLatestKey && currentLatest && currentLatest.key !== previousLatestKey) {
-    featuredSolve.value = currentLatest
-    if (featuredTimer) clearTimeout(featuredTimer)
-    featuredTimer = setTimeout(() => { featuredSolve.value = null }, 4_500)
-  }
+  reconcileCelebrations(controlScreenSolveFeed(leaderboard.value, entries.value))
 }
 
 const refreshLatest = createTrailingRefresh(loadData)
@@ -188,6 +214,14 @@ function syncFullscreen(): void {
   fullscreen.value = Boolean(document.fullscreenElement)
 }
 
+watch(selectedTrackKey, () => {
+  const currentSolves = controlScreenSolveFeed(leaderboard.value, entries.value)
+  seenSolveKeys = new Set(currentSolves.map(solve => solve.key))
+  celebrationQueue.value = []
+  featuredSolve.value = null
+  if (celebrationTimer) clearTimeout(celebrationTimer)
+})
+
 onMounted(async () => {
   await ensureLoaded()
   await refreshLatest()
@@ -205,7 +239,7 @@ onUnmounted(() => {
   if (clockTimer) clearInterval(clockTimer)
   if (refreshTimer) clearInterval(refreshTimer)
   if (projectionTimer) clearTimeout(projectionTimer)
-  if (featuredTimer) clearTimeout(featuredTimer)
+  if (celebrationTimer) clearTimeout(celebrationTimer)
   document.removeEventListener('fullscreenchange', syncFullscreen)
   unwatch?.()
 })
@@ -302,7 +336,13 @@ onUnmounted(() => {
     </main>
 
     <main v-else class="control-screen-layout">
-      <section class="control-screen-arena" :aria-label="t('题目态势')">
+      <section
+        :class="['control-screen-arena', featuredSolve && 'control-screen-arena-celebrating']"
+        :aria-label="t('题目态势')"
+      >
+        <div class="control-screen-starfield" aria-hidden="true"><i v-for="index in 20" :key="index" /></div>
+        <div class="control-screen-beam control-screen-beam-one" aria-hidden="true" />
+        <div class="control-screen-beam control-screen-beam-two" aria-hidden="true" />
         <div class="control-screen-orbit control-screen-orbit-one" aria-hidden="true" />
         <div class="control-screen-orbit control-screen-orbit-two" aria-hidden="true" />
         <div class="control-screen-scan" aria-hidden="true" />
@@ -325,7 +365,11 @@ onUnmounted(() => {
           <article
             v-for="(challenge, index) in visibleChallenges"
             :key="challenge.competitionChallengeId"
-            class="control-screen-tower-wrap"
+            :class="[
+              'control-screen-tower-wrap',
+              featuredSolve && featuredChallengeKey !== challengeKey(challenge.competitionChallengeId) && 'control-screen-tower-muted',
+              featuredChallengeKey === challengeKey(challenge.competitionChallengeId) && 'control-screen-tower-featured',
+            ]"
             :style="{ '--screen-delay': `${index * 45}ms` }"
           >
             <div class="control-screen-tower-copy">
@@ -345,11 +389,38 @@ onUnmounted(() => {
         </div>
         <div v-else class="control-screen-empty">{{ t('暂无已发布题目') }}</div>
 
-        <Transition name="screen-burst" mode="out-in">
-          <div v-if="featuredSolve" :key="featuredSolve.key" class="control-screen-burst">
-            <p :class="bloodClass(featuredSolve.bloodRank)">{{ bloodLabel(featuredSolve.bloodRank) }}</p>
-            <strong>{{ featuredSolve.teamName }}</strong>
-            <span>{{ featuredSolve.challengeTitle }} · <b>+{{ featuredSolve.score }} pts</b></span>
+        <Transition name="screen-celebration" mode="out-in">
+          <div v-if="featuredSolve" :key="featuredSolve.key" class="control-screen-celebration" aria-live="assertive">
+            <div class="control-screen-celebration-flash" aria-hidden="true" />
+            <div class="control-screen-impact" aria-hidden="true">
+              <i class="control-screen-impact-ring control-screen-impact-ring-one" />
+              <i class="control-screen-impact-ring control-screen-impact-ring-two" />
+              <i class="control-screen-impact-ring control-screen-impact-ring-three" />
+              <span
+                v-for="particle in celebrationParticles"
+                :key="particle.id"
+                class="control-screen-particle"
+                :style="{
+                  '--particle-angle': particle.angle,
+                  '--particle-distance': particle.distance,
+                  '--particle-delay': particle.delay,
+                }"
+              />
+            </div>
+            <div class="control-screen-celebration-card">
+              <div class="control-screen-celebration-eyebrow">
+                <span>{{ bloodLabel(featuredSolve.bloodRank) }}</span>
+                <i />
+                <span>{{ t('解题确认') }}</span>
+              </div>
+              <strong>{{ featuredSolve.teamName }}</strong>
+              <p>{{ t('攻克了') }} <b>{{ featuredSolve.challengeTitle }}</b></p>
+              <div class="control-screen-celebration-score">
+                <span>+{{ featuredSolve.score }}</span>
+                <small>PTS</small>
+              </div>
+              <div class="control-screen-celebration-progress" aria-hidden="true"><i /></div>
+            </div>
           </div>
         </Transition>
 
@@ -400,28 +471,30 @@ onUnmounted(() => {
 
 <style scoped>
 .control-screen {
-  --screen-panel: rgba(11, 17, 31, .88);
-  --screen-line: rgba(96, 165, 250, .18);
+  --screen-panel: rgba(12, 8, 25, .94);
+  --screen-line: rgba(158, 119, 237, .2);
+  --screen-green: oklch(0.78 0.22 149);
+  --screen-purple: oklch(0.67 0.19 300);
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   width: 100%;
   min-height: 100svh;
   overflow: hidden;
-  color: #e5edf9;
-  background: #070b14;
+  color: oklch(0.94 0.015 292);
+  background: oklch(0.105 0.025 292);
   color-scheme: dark;
 }
 .control-screen-grid {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: .42;
+  opacity: .55;
   background-image:
-    linear-gradient(rgba(59, 130, 246, .035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, .035) 1px, transparent 1px),
-    radial-gradient(circle at 42% 22%, rgba(37, 99, 235, .18), transparent 38%);
-  background-size: 48px 48px, 48px 48px, auto;
+    linear-gradient(rgba(158, 119, 237, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(158, 119, 237, .035) 1px, transparent 1px),
+    radial-gradient(circle at 40% 58%, rgba(30, 224, 109, .11), transparent 36%);
+  background-size: 42px 42px, 42px 42px, auto;
 }
 .control-screen-header,
 .control-screen-footer {
@@ -431,44 +504,82 @@ onUnmounted(() => {
   align-items: center;
   gap: 1.5rem;
   border-color: rgba(148, 163, 184, .13);
-  background: rgba(7, 11, 20, .92);
+  background: rgba(7, 5, 16, .95);
 }
 .control-screen-header { min-height: 5.5rem; border-bottom-width: 1px; padding: 1rem 1.5rem; }
 .control-screen-footer { min-height: 2rem; border-top-width: 1px; padding: .4rem 1.5rem; font-size: .625rem; text-transform: uppercase; letter-spacing: .14em; color: #64748b; }
-.control-screen-wordmark { font-family: var(--font-mono); font-weight: 700; letter-spacing: .18em; color: #60a5fa; text-transform: uppercase; }
+.control-screen-wordmark { font-family: var(--font-mono); font-weight: 700; letter-spacing: .18em; color: var(--screen-purple); text-transform: uppercase; }
 .control-screen-divider { width: 1px; height: 1.75rem; background: rgba(148, 163, 184, .18); }
 .control-screen-track { border: 1px solid rgba(148, 163, 184, .16); padding: .14rem .5rem; font-family: var(--font-mono); font-size: .55rem; color: #64748b; transition: border-color .15s ease, background-color .15s ease, color .15s ease; }
 .control-screen-track:hover, .control-screen-track:focus-visible { border-color: rgba(96, 165, 250, .5); color: #cbd5e1; outline: none; }
-.control-screen-track-active { border-color: rgba(96, 165, 250, .65); background: rgba(37, 99, 235, .14); color: #93c5fd; }
+.control-screen-track-active { border-color: color-mix(in oklch, var(--screen-purple) 70%, transparent); background: rgba(115, 72, 173, .18); color: oklch(0.84 0.11 300); }
 .control-screen-metrics { margin-left: auto; display: grid; grid-auto-flow: column; gap: 1.75rem; }
 .control-screen-metrics div { min-width: 4rem; text-align: center; }
 .control-screen-metrics dt { font-size: .625rem; text-transform: uppercase; letter-spacing: .18em; color: #64748b; }
 .control-screen-metrics dd { margin-top: .2rem; font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: #f8fafc; }
 .control-screen-metrics dd span { margin-left: .15rem; font-size: .7rem; color: #64748b; }
 .control-screen-layout { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) clamp(18rem, 24vw, 27rem); min-height: 0; gap: .75rem; padding: .75rem; }
-.control-screen-arena { position: relative; min-height: 0; overflow: hidden; border: 1px solid var(--screen-line); background: radial-gradient(circle at 50% 64%, rgba(37, 99, 235, .15), transparent 42%), rgba(4, 8, 18, .62); }
+.control-screen-arena { position: relative; min-height: 0; overflow: hidden; border: 1px solid var(--screen-line); background: radial-gradient(circle at 50% 72%, rgba(30, 224, 109, .12), transparent 34%), radial-gradient(circle at 42% 34%, rgba(130, 80, 198, .12), transparent 38%), rgba(5, 3, 14, .72); isolation: isolate; }
 .control-screen-arena-heading { position: absolute; z-index: 5; inset: 1rem 1.25rem auto; display: flex; justify-content: space-between; gap: 1rem; font-size: .7rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #94a3b8; }
 .control-screen-frozen { color: #fbbf24; }
-.control-screen-orbit { position: absolute; border: 1px solid rgba(96, 165, 250, .14); border-radius: 999px; }
+.control-screen-orbit { position: absolute; border: 1px solid rgba(154, 103, 226, .22); border-radius: 999px; animation: screen-orbit-drift 16s ease-in-out infinite alternate; }
 .control-screen-orbit-one { width: 72%; aspect-ratio: 1; left: -14%; top: 14%; transform: rotate(-12deg); }
 .control-screen-orbit-two { width: 65%; aspect-ratio: 1; right: -28%; bottom: -34%; transform: rotate(18deg); }
-.control-screen-scan { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0 46%, rgba(59, 130, 246, .08) 49%, transparent 52%); background-size: 100% 35%; animation: screen-scan 10s linear infinite; }
-.control-screen-towers { position: absolute; inset: 5rem 4% 3.2rem; display: flex; align-items: flex-end; justify-content: center; gap: clamp(.55rem, 1.5vw, 1.5rem); perspective: 800px; }
-.control-screen-tower-wrap { display: grid; grid-template-rows: auto 1fr auto auto; align-items: end; width: min(8.5rem, 11%); min-width: 4.7rem; height: 100%; animation: screen-rise .55s ease-out both; animation-delay: var(--screen-delay); }
+.control-screen-scan { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0 46%, rgba(31, 220, 112, .065) 49%, transparent 52%); background-size: 100% 35%; animation: screen-scan 10s linear infinite; }
+.control-screen-towers { position: absolute; inset: 5rem 4% 3.2rem; display: flex; align-items: flex-end; justify-content: center; gap: clamp(.55rem, 1.5vw, 1.5rem); perspective: 900px; transform-origin: 50% 75%; animation: screen-camera-cruise 18s cubic-bezier(.45, 0, .55, 1) infinite alternate; transition: transform .9s cubic-bezier(.16, 1, .3, 1), filter .8s ease; }
+.control-screen-tower-wrap { position: relative; display: grid; grid-template-rows: auto 1fr auto auto; align-items: end; width: min(8.5rem, 11%); min-width: 4.7rem; height: 100%; transform-origin: 50% 100%; animation: screen-rise .55s cubic-bezier(.16, 1, .3, 1) both; animation-delay: var(--screen-delay); transition: opacity .65s ease, filter .65s ease, transform .85s cubic-bezier(.16, 1, .3, 1); }
 .control-screen-tower-copy { margin-bottom: .5rem; display: flex; flex-direction: column; text-align: center; font-size: clamp(.58rem, .75vw, .78rem); }
 .control-screen-tower-copy span:last-child { margin-top: .12rem; font-size: .65rem; }
-.control-screen-tower { position: relative; width: 72%; min-height: 3rem; margin: 0 auto; border: 1px solid rgba(96, 165, 250, .55); background: repeating-linear-gradient(180deg, rgba(59, 130, 246, .22) 0 3px, rgba(15, 23, 42, .9) 3px 8px); box-shadow: inset 0 0 24px rgba(37, 99, 235, .25), 0 0 22px rgba(37, 99, 235, .12); transform: skewY(-3deg); }
-.control-screen-tower-cap { position: absolute; inset: -.38rem -.16rem auto; height: .5rem; border: 1px solid rgba(147, 197, 253, .6); background: #2563eb; transform: skewY(8deg); box-shadow: 0 0 18px rgba(59, 130, 246, .65); }
-.control-screen-tower-lines { position: absolute; inset: 0; background: linear-gradient(90deg, transparent 42%, rgba(147, 197, 253, .26) 43% 46%, transparent 47%); }
+.control-screen-tower { position: relative; width: 72%; min-height: 3rem; margin: 0 auto; border: 1px solid rgba(39, 219, 113, .55); background: repeating-linear-gradient(180deg, rgba(28, 210, 102, .2) 0 3px, rgba(8, 22, 19, .94) 3px 8px); box-shadow: inset 0 0 24px rgba(25, 201, 95, .22), 0 0 24px rgba(23, 194, 91, .14); transform: skewY(-3deg); }
+.control-screen-tower-wrap:nth-child(3n) .control-screen-tower { border-color: rgba(157, 98, 229, .58); background: repeating-linear-gradient(180deg, rgba(133, 75, 197, .22) 0 3px, rgba(20, 10, 35, .94) 3px 8px); box-shadow: inset 0 0 24px rgba(139, 83, 202, .23), 0 0 24px rgba(118, 61, 184, .14); }
+.control-screen-tower-cap { position: absolute; inset: -.38rem -.16rem auto; height: .5rem; border: 1px solid rgba(159, 255, 198, .72); background: var(--screen-green); transform: skewY(8deg); box-shadow: 0 0 22px rgba(33, 232, 117, .72); }
+.control-screen-tower-wrap:nth-child(3n) .control-screen-tower-cap { border-color: rgba(225, 198, 255, .7); background: var(--screen-purple); box-shadow: 0 0 22px rgba(164, 98, 236, .68); }
+.control-screen-tower-lines { position: absolute; inset: 0; background: linear-gradient(90deg, transparent 42%, rgba(148, 255, 190, .22) 43% 46%, transparent 47%); }
 .control-screen-tower-meta { margin-top: .65rem; display: flex; flex-direction: column; align-items: center; gap: .25rem; }
 .control-screen-tower-meta span:first-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid currentColor; border-radius: 999px; padding: .08rem .45rem; font-size: .58rem; }
 .control-screen-progress { width: 72%; height: 2px; margin: .45rem auto 0; overflow: hidden; background: rgba(148, 163, 184, .14); }
-.control-screen-progress span { display: block; height: 100%; background: #60a5fa; box-shadow: 0 0 8px #3b82f6; transition: width .45s ease; }
-.control-screen-burst { position: absolute; z-index: 7; left: 50%; top: 18%; display: flex; min-width: min(26rem, 70%); transform: translateX(-50%); flex-direction: column; align-items: center; border: 1px solid rgba(96, 165, 250, .36); background: rgba(7, 11, 20, .9); padding: 1rem 2.5rem; text-align: center; box-shadow: 0 0 45px rgba(37, 99, 235, .18); backdrop-filter: blur(10px); }
-.control-screen-burst p { font-size: .65rem; font-weight: 800; letter-spacing: .32em; text-transform: uppercase; }
-.control-screen-burst strong { margin-top: .25rem; font-size: clamp(1.35rem, 2vw, 2.2rem); }
-.control-screen-burst span { margin-top: .15rem; font-size: .75rem; color: #94a3b8; }
-.control-screen-burst b, .screen-blood-solve { color: #60a5fa; }
+.control-screen-progress span { display: block; height: 100%; background: var(--screen-green); box-shadow: 0 0 8px rgba(33, 232, 117, .75); transition: width .45s ease; }
+.control-screen-starfield { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.control-screen-starfield i { position: absolute; left: 10%; top: 18%; width: 3px; height: 3px; background: var(--screen-green); box-shadow: 0 0 10px currentColor; opacity: .22; animation: screen-star-drift 9s linear infinite; }
+.control-screen-starfield i:nth-child(10n+2) { left: 24%; top: 72%; animation-delay: -2s; color: var(--screen-purple); }
+.control-screen-starfield i:nth-child(10n+3) { left: 38%; top: 31%; animation-delay: -5s; }
+.control-screen-starfield i:nth-child(10n+4) { left: 52%; top: 83%; animation-delay: -7s; color: var(--screen-purple); }
+.control-screen-starfield i:nth-child(10n+5) { left: 66%; top: 16%; animation-delay: -4s; }
+.control-screen-starfield i:nth-child(10n+6) { left: 79%; top: 61%; animation-delay: -1s; color: var(--screen-purple); }
+.control-screen-starfield i:nth-child(10n+7) { left: 91%; top: 37%; animation-delay: -6s; }
+.control-screen-starfield i:nth-child(10n+8) { left: 17%; top: 48%; animation-delay: -3s; color: var(--screen-purple); }
+.control-screen-starfield i:nth-child(10n+9) { left: 45%; top: 12%; animation-delay: -8s; }
+.control-screen-starfield i:nth-child(10n) { left: 72%; top: 91%; animation-delay: -4.5s; color: var(--screen-purple); }
+.control-screen-beam { position: absolute; width: 30%; height: 130%; top: -20%; opacity: .12; transform: rotate(18deg); transform-origin: 50% 100%; background: linear-gradient(90deg, transparent, rgba(39, 226, 118, .72), transparent); filter: blur(3px); animation: screen-beam-sweep 13s ease-in-out infinite alternate; }
+.control-screen-beam-one { left: 14%; }
+.control-screen-beam-two { right: 4%; opacity: .09; background: linear-gradient(90deg, transparent, rgba(165, 100, 235, .75), transparent); animation-delay: -7s; }
+.control-screen-tower-muted { opacity: .24; filter: saturate(.4) blur(.6px); transform: scale(.93); }
+.control-screen-tower-featured { z-index: 5; transform: translateY(-1.2rem) scale(1.16); filter: brightness(1.35) saturate(1.18); }
+.control-screen-tower-featured::after { content: ''; position: absolute; left: 50%; bottom: 2.2rem; width: 110%; aspect-ratio: 1; transform: translateX(-50%) rotateX(68deg); border: 2px solid var(--screen-green); border-radius: 50%; box-shadow: 0 0 26px rgba(33, 232, 117, .55), inset 0 0 18px rgba(33, 232, 117, .25); animation: screen-target-pulse .9s ease-out infinite; }
+.control-screen-arena-celebrating .control-screen-towers { animation-play-state: paused; transform: scale(1.055) translateY(1.5%); }
+.control-screen-celebration { position: absolute; z-index: 9; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.control-screen-celebration-flash { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(111, 255, 169, .32), transparent 48%); animation: screen-flash 1.15s ease-out both; }
+.control-screen-impact { position: absolute; left: 50%; top: 59%; width: 1px; height: 1px; }
+.control-screen-impact-ring { position: absolute; left: 0; top: 0; width: 5rem; aspect-ratio: 1; border: 2px solid var(--screen-green); border-radius: 50%; transform: translate(-50%, -50%) scale(.12); box-shadow: 0 0 18px rgba(36, 231, 118, .5); animation: screen-impact-ring 1.5s cubic-bezier(.16, 1, .3, 1) both; }
+.control-screen-impact-ring-two { animation-delay: .18s; border-color: var(--screen-purple); }
+.control-screen-impact-ring-three { animation-delay: .36s; }
+.control-screen-particle { --particle-angle: 0deg; --particle-distance: 12rem; --particle-delay: 0ms; position: absolute; left: 0; top: 0; width: .35rem; height: .35rem; background: var(--screen-green); box-shadow: 0 0 12px rgba(38, 239, 126, .85); animation: screen-particle 1.25s cubic-bezier(.16, 1, .3, 1) var(--particle-delay) both; }
+.control-screen-particle:nth-of-type(3n) { width: .24rem; height: .7rem; background: var(--screen-purple); box-shadow: 0 0 12px rgba(170, 104, 236, .85); }
+.control-screen-celebration-card { position: relative; display: flex; min-width: min(31rem, 74%); flex-direction: column; align-items: center; border: 1px solid rgba(193, 153, 244, .55); background: rgba(9, 5, 19, .94); padding: 1.45rem 3rem 1.25rem; text-align: center; box-shadow: 0 0 0 1px rgba(41, 230, 120, .12), 0 0 58px rgba(93, 40, 153, .3); animation: screen-card-arrive 5.2s cubic-bezier(.16, 1, .3, 1) both; }
+.control-screen-celebration-card::before, .control-screen-celebration-card::after { content: ''; position: absolute; top: .55rem; bottom: .55rem; width: 1px; background: var(--screen-green); opacity: .8; }
+.control-screen-celebration-card::before { left: .65rem; }
+.control-screen-celebration-card::after { right: .65rem; }
+.control-screen-celebration-eyebrow { display: flex; align-items: center; gap: .6rem; font-size: .62rem; font-weight: 800; letter-spacing: .26em; text-transform: uppercase; color: var(--screen-green); }
+.control-screen-celebration-eyebrow i { width: 2.4rem; height: 1px; background: currentColor; }
+.control-screen-celebration-card strong { margin-top: .35rem; max-width: 22ch; font-size: clamp(1.8rem, 3.6vw, 3.4rem); line-height: 1; color: oklch(0.97 0.012 292); }
+.control-screen-celebration-card p { margin-top: .5rem; font-size: .78rem; color: oklch(0.74 0.04 292); }
+.control-screen-celebration-card p b { color: oklch(0.92 0.08 149); }
+.control-screen-celebration-score { display: flex; align-items: baseline; gap: .35rem; margin-top: .6rem; font-family: var(--font-mono); color: var(--screen-green); }
+.control-screen-celebration-score span { font-size: 1.45rem; font-weight: 800; }
+.control-screen-celebration-score small { font-size: .55rem; letter-spacing: .18em; }
+.control-screen-celebration-progress { position: absolute; left: .65rem; right: .65rem; bottom: .42rem; height: 2px; background: rgba(255, 255, 255, .06); overflow: hidden; }
+.control-screen-celebration-progress i { display: block; height: 100%; background: var(--screen-green); transform-origin: left; animation: screen-celebration-progress 5.2s linear both; }
+.screen-blood-solve { color: var(--screen-green); }
 .screen-blood-first { color: #fbbf24; }
 .screen-blood-second { color: #cbd5e1; }
 .screen-blood-third { color: #fb923c; }
@@ -498,10 +609,20 @@ onUnmounted(() => {
 .control-screen-feed em { color: #60a5fa; font-family: var(--font-mono); font-style: normal; font-weight: 700; }
 .control-screen-empty, .control-screen-loading { display: flex; align-items: center; justify-content: center; color: #64748b; }
 .control-screen-loading { position: relative; z-index: 2; min-height: 0; flex-direction: column; gap: 1rem; }
-.screen-burst-enter-active, .screen-burst-leave-active { transition: opacity .35s ease, transform .35s ease; }
-.screen-burst-enter-from, .screen-burst-leave-to { opacity: 0; transform: translate(-50%, -12px) scale(.98); }
+.screen-celebration-enter-active, .screen-celebration-leave-active { transition: opacity .42s cubic-bezier(.16, 1, .3, 1); }
+.screen-celebration-enter-from, .screen-celebration-leave-to { opacity: 0; }
 @keyframes screen-scan { from { background-position-y: -50%; } to { background-position-y: 150%; } }
 @keyframes screen-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes screen-camera-cruise { from { transform: translate3d(-1.5%, 1.2%, 0) rotateY(-2deg) scale(.985); } to { transform: translate3d(1.5%, -1%, 0) rotateY(2deg) scale(1.025); } }
+@keyframes screen-orbit-drift { from { translate: -1.5% 1%; scale: .98; } to { translate: 1.5% -1%; scale: 1.03; } }
+@keyframes screen-star-drift { 0% { translate: 0 2rem; opacity: 0; } 18%, 78% { opacity: .5; } 100% { translate: 1.8rem -7rem; opacity: 0; } }
+@keyframes screen-beam-sweep { from { transform: translateX(-26%) rotate(12deg); } to { transform: translateX(30%) rotate(22deg); } }
+@keyframes screen-target-pulse { from { opacity: .85; transform: translateX(-50%) rotateX(68deg) scale(.55); } to { opacity: 0; transform: translateX(-50%) rotateX(68deg) scale(1.3); } }
+@keyframes screen-flash { 0% { opacity: 0; } 16% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes screen-impact-ring { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.12); } 14% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(5.4); } }
+@keyframes screen-particle { 0% { opacity: 0; transform: rotate(var(--particle-angle)) translateX(1rem) scale(.5); } 18% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--particle-angle)) translateX(var(--particle-distance)) scale(1); } }
+@keyframes screen-card-arrive { 0% { opacity: 0; transform: translateY(-1rem) scale(.84); clip-path: inset(0 50%); } 12% { opacity: 1; transform: translateY(0) scale(1.025); clip-path: inset(0); } 18%, 100% { opacity: 1; transform: scale(1); clip-path: inset(0); } }
+@keyframes screen-celebration-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @media (max-width: 900px) {
   .control-screen { min-height: 100svh; overflow: auto; }
   .control-screen-header { flex-wrap: wrap; }
@@ -511,7 +632,9 @@ onUnmounted(() => {
   .control-screen-rail { min-height: 35rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .control-screen-scan, .control-screen-tower-wrap { animation: none; }
-  .screen-burst-enter-active, .screen-burst-leave-active { transition: none; }
+  .control-screen-scan, .control-screen-tower-wrap, .control-screen-towers, .control-screen-starfield i, .control-screen-beam, .control-screen-orbit, .control-screen-tower-featured::after, .control-screen-celebration-flash, .control-screen-impact-ring, .control-screen-particle, .control-screen-celebration-card, .control-screen-celebration-progress i { animation: none; }
+  .control-screen-tower-wrap, .control-screen-towers { transition: none; }
+  .screen-celebration-enter-active, .screen-celebration-leave-active { transition: none; }
+  .control-screen-celebration-card { opacity: 1; }
 }
 </style>

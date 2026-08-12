@@ -1584,6 +1584,7 @@ export const englishMessages: Record<string, string> = {
   "中控大屏": "Control screen",
   "比赛已结束": "Competition finished",
   "竞赛中控": "Competition control",
+  "解题确认": "Solve confirmed",
   "现场赛事数据": "Live competition data",
   "综合赛道": "Combined track",
   "已攻克": "Breached",

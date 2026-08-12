@@ -4,6 +4,7 @@ import {
   controlScreenChallenges,
   controlScreenEntries,
   controlScreenSolveFeed,
+  reconcileControlScreenSolves,
 } from '../app/utils/control-screen'
 
 const leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
@@ -69,6 +70,21 @@ describe('CTF control screen projection', () => {
     expect(feed.map(item => item.challengeTitle)).toEqual(['pwn-200', 'web-100'])
   })
 
+  test('baselines historical solves and queues every new solve in occurrence order', () => {
+    const initial = controlScreenSolveFeed(leaderboard, controlScreenEntries(leaderboard, ''))
+    const baseline = reconcileControlScreenSolves(null, initial)
+    expect(baseline.newSolves).toEqual([])
+
+    const next = [
+      { ...initial[0]!, key: 'third', solvedAt: '2026-08-12T12:08:00Z', teamName: 'Gamma' },
+      { ...initial[0]!, key: 'second', solvedAt: '2026-08-12T12:07:00Z', teamName: 'Delta' },
+      ...initial,
+    ]
+    const reconciled = reconcileControlScreenSolves(baseline.seenKeys, next)
+    expect(reconciled.newSolves.map(item => item.teamName)).toEqual(['Delta', 'Gamma'])
+    expect(reconcileControlScreenSolves(reconciled.seenKeys, next).newSolves).toEqual([])
+  })
+
   test('ships as a dedicated CTF screen using generated SDK and realtime invalidation', async () => {
     const page = await Bun.file(
       new URL('../app/pages/competitions/[id]/screen.vue', import.meta.url),
@@ -81,6 +97,9 @@ describe('CTF control screen projection', () => {
     expect(page).toContain('getLeaderboardEndpoint({ path: { competitionId } })')
     expect(page).toContain('leaderboardRefreshed: () => void refreshLatest()')
     expect(page).toContain('refreshTimer = setInterval(() => void refreshLatest(), 15_000)')
+    expect(page).toContain('reconcileControlScreenSolves')
+    expect(page).toContain('celebrationQueue')
+    expect(page).toContain('control-screen-impact-ring')
     expect(page).toContain("competition.value.mode !== 'Ctf'")
     expect(page).not.toContain('$fetch(')
     expect(page).not.toContain('/api/v1')
