@@ -1,5 +1,44 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-12 alpha.30 多赛道发布
+
+- 功能提交 `71e900c3`、`722b262d`、`df7a145b`、`6b7cf07a` 与 `fc58bd6e` 为一场比赛增加最多
+  32 个可配置赛道。赛道配置复用 `competitions` 的结构化 JSON，队伍只增加 `TrackKey`；EF 工具生成
+  migration `20260812075438_AddCompetitionTracks`，没有新增业务表。历史比赛和历史队伍通过
+  `default` 赛道保持兼容，平台仍只支持 CTF、AWD、AWDP、KoH 四种模式。
+- 赛道支持公开/内部、计分、动态分值、血榜资格等强类型规则；内部赛道固定为不公开且不计分。排行榜
+  按赛道独立排名，非计分赛道不进入公开榜；CTF 动态分值与一二三血、AWD/AWDP 攻防结算、KoH
+  当前 King 和占领区间均遵守赛道资格。比赛第一次进入 Running 后冻结赛道定义，工作人员仍可将队伍
+  调整到已有赛道；内部队伍、事件和封禁公告不会泄露给参赛者。
+- 新增强类型公开赛道读取以及管理端赛道读取/保存、队伍赛道分配接口；所有协议变更由工具导出
+  OpenAPI 并重新生成 TypeScript SDK，前端没有手写 URL、DTO 或协议枚举。两份 OpenAPI 连续两轮
+  生成均为 SHA-256 `2067A330F314105C108C0C195A52B59608FA6AAFA8333D3217A3D9A94DEE62C8`，
+  总计 198 个 Endpoint，第二轮无差异。
+- 管理端增加“赛道”配置页和队伍赛道分配；参赛者报名只显示可公开加入的赛道，队伍卡片和详情显示
+  赛道名称，排行榜只展示公开且计分的赛道并支持切换。中文、英文、loading、失败保留与冻结提示均已
+  补齐，并保持现有前端视觉风格。
+- 同批发布包含 `f8a88f6e` 的受保护 Flag 最终权限：平台 Administrator 直接查看且不记读取审计；比赛
+  Owner、Manager、Judge 直接查看、不要求理由，但每次成功读取仍追加不可变审计；Observer 与参赛者
+  继续不可读取。发布提交 `8b6516ec` 将平台版本递增为 `0.1.0-alpha.30`。
+- 最终门禁：Release build 0 warning/0 error；完整 TUnit 913 项，911 通过、0 失败，2 项因未配置真实
+  Kubernetes cluster 与 Libvirt disk path 按设计跳过，真实 PostgreSQL、Redis、Docker 与 Wolverine
+  场景均通过。四模式 Full E2E 为 CTF 1/1（55.313s）、AWD 1/1（1m35.674s）、AWDP 1/1
+  （1m30.215s）、KoH 1/1（1m29.183s），资源已精确清理。前端 174/174（1351 assertions）、
+  typecheck、production build、`bun audit`、NuGet vulnerable/deprecated 审计、analyzer、EF model drift、
+  API/Host/Worker/Runner publish、两份 Compose config、恢复脚本语法和 `git diff --check` 均通过。
+  kubeconform 严格校验 49 个资源：46 valid、0 invalid/error、3 个预期 Cilium CRD schema skip。
+- 浏览器验收使用 Microsoft Edge 151 与可丢弃本地数据：管理员创建公开与内部赛道、保存刷新、冻结态，
+  参赛者仅看到公开赛道并在指定赛道建队，队伍详情与排行榜筛选均正确；最终相关页面无新增 Console
+  错误。生产发布后再次用 Edge 只读验证匿名首页、已结束比赛详情和单默认赛道排行榜，均正常加载。
+- `main` 与生产工作副本已同步到 `8b6516ec8c062f88aaf173bc9549eea5505e63d5`。迁移前快照保存在服务器
+  `/root/noctf-backups/pre-alpha30-20260812-194930.dump`；migration 成功应用上述三列、一列和索引变更，
+  现有 4 支队伍均为 `default`。API、Worker、Runner 已切换到 alpha.30 镜像并全部 healthy；公开
+  `/health/live`、`/health/ready` 与首页均为 HTTP 200，启动后未发现新增 Error、Fatal、Unhandled 或
+  Exception。发布时无活动 Runtime，PostgreSQL、Redis、上传卷、HTTPS 证书与生产 override 未被替换。
+- 生产服务器访问 Docker Hub 校验 Runner 的已固定基础镜像时超时；因此使用相同 Dockerfile 与相同
+  digest 在本机构建 Linux/amd64 Runner，传输并加载最终镜像后完成切换。该过程没有改变题目镜像策略：
+  Runtime、Checker 和 Compose 镜像仍按用户决策接受可信 tag 或 digest，不做平台自动 digest 固定。
+
 ## 2026-08-12 受保护 Flag 读取权限与审计策略
 
 - 功能提交 `f8a88f6e` 按最终产品语义调整受保护 Flag 读取：平台 Administrator、比赛 Owner、
