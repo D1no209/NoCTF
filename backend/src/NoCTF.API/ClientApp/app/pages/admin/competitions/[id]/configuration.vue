@@ -25,6 +25,7 @@ const maxConcurrentRuntimeInstancesPerTeam = ref(1)
 const maxActiveQuestionsPerTeam = ref(5)
 const maxParticipantMessagesBeforeHandlerReply = ref(3)
 const allowChallengeOwnersToHandleQuestions = ref(true)
+const practiceModeEnabled = ref(false)
 const savingMeta = ref(false)
 const metaError = ref<string | null>(null)
 
@@ -41,6 +42,7 @@ watch(competition, (c) => {
   maxActiveQuestionsPerTeam.value = c.maxActiveQuestionsPerTeam ?? 5
   maxParticipantMessagesBeforeHandlerReply.value = c.maxParticipantMessagesBeforeHandlerReply ?? 3
   allowChallengeOwnersToHandleQuestions.value = c.allowChallengeOwnersToHandleQuestions ?? true
+  practiceModeEnabled.value = c.practiceModeEnabled ?? false
 }, { immediate: true })
 
 async function saveMeta() {
@@ -67,6 +69,7 @@ async function saveMeta() {
         maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
         maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
         allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
+        practiceModeEnabled: practiceModeEnabled.value,
       },
     })
     if (error) throw error
@@ -160,6 +163,13 @@ onMounted(loadConfig)
             <Field orientation="horizontal">
               <Checkbox id="c-auto-approve" v-model="teamRegistrationAutoApprove" :disabled="!canWrite" />
               <FieldLabel for="c-auto-approve" class="font-normal">{{ $t('队伍注册自动通过') }}</FieldLabel>
+            </Field>
+            <Field v-if="competition?.mode === 'Ctf'" orientation="horizontal">
+              <Checkbox id="c-practice-mode" v-model="practiceModeEnabled" :disabled="!canWrite" />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="c-practice-mode" class="font-normal">{{ $t('赛后练习模式') }}</FieldLabel>
+                <FieldDescription>{{ $t('比赛结束后，已通过审核且未封禁的原参赛队伍可以启动 Container 或 Compose 靶机并验证 Flag；练习不计分，也不产生血榜。') }}</FieldDescription>
+              </div>
             </Field>
             <Field orientation="horizontal">
               <Checkbox id="c-allow-running-registration" v-model="allowTeamRegistrationWhileRunning" :disabled="!canWrite" />

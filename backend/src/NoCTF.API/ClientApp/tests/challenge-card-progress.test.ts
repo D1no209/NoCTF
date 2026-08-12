@@ -39,4 +39,22 @@ describe('participant challenge progress', () => {
     expect(submit).toContain('@media (prefers-reduced-motion: reduce)')
     expect(submit).toContain("if (wasPending && !isGameplayFactPending(data.state) && !toasted.has(id))")
   })
+
+  test('uses the generated no-score practice judgement after a CTF competition finishes', async () => {
+    const panel = await Bun.file(
+      new URL('../app/components/challenges/panels/CtfPanel.vue', import.meta.url),
+    ).text()
+    const submit = await Bun.file(
+      new URL('../app/components/challenges/FlagSubmit.vue', import.meta.url),
+    ).text()
+    const create = await Bun.file(
+      new URL('../app/pages/admin/competitions/new.vue', import.meta.url),
+    ).text()
+
+    expect(panel).toContain("competition.status === 'Finished' && competition.practiceModeEnabled === true")
+    expect(submit).toContain('judgePracticeFlag({')
+    expect(submit).toContain('Flag 正确；本次练习不计分')
+    expect(submit).not.toContain('judgePracticeFlagEndpoint')
+    expect(create).toContain("practiceModeEnabled: mode.value === 'Ctf' && practiceModeEnabled.value")
+  })
 })

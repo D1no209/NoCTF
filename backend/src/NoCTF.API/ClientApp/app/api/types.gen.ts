@@ -224,7 +224,7 @@ export type NoCtfDomainNotificationsNotificationSourceType = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfDomainNotificationsNotificationTargetType = 0 | 1 | 2 | 3 | 4;
 
-export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'Message' | 'CompetitionAnnouncement' | 'QuestionOpened' | 'QuestionStatusChanged' | 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'GameplayFactAdjudicated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'DataExportReady' | 'DataExportFailed' | 'UserAccountLifecycleChanged';
+export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'Message' | 'CompetitionAnnouncement' | 'QuestionOpened' | 'QuestionStatusChanged' | 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'GameplayFactAdjudicated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'DataExportReady' | 'DataExportFailed' | 'UserAccountLifecycleChanged' | 'CompetitionForceDeleted';
 
 export type NoCtfDomainSharedEntityReferenceKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
@@ -284,6 +284,22 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'Fla
 
 export type NoCtfapiEndpointsGameplayFactsGetGameplayFactStatusRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsGameplayFactsPracticeFlagJudgementResponse = {
+    result?: NoCtfapiEndpointsGameplayFactsPracticeFlagJudgementProtocol;
+};
+
+export type NoCtfapiEndpointsGameplayFactsPracticeFlagJudgementProtocol = 'Correct' | 'Wrong';
+
+export type NoCtfapiEndpointsGameplayFactsPracticeFlagConflictResponse = {
+    code?: NoCtfapiEndpointsGameplayFactsPracticeFlagFailureCodeProtocol;
+};
+
+export type NoCtfapiEndpointsGameplayFactsPracticeFlagFailureCodeProtocol = 'PracticeUnavailable' | 'TeamNotEligible' | 'RuntimeNotRunning' | 'FlagInvalid';
+
+export type NoCtfapiEndpointsGameplayFactsJudgePracticeFlagRequest = {
+    flag: string;
 };
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactListResponse = {
@@ -370,6 +386,7 @@ export type NoCtfapiEndpointsCompetitionsCompetitionResponse = {
     maxActiveQuestionsPerTeam?: number;
     maxParticipantMessagesBeforeHandlerReply?: number;
     allowChallengeOwnersToHandleQuestions?: boolean;
+    practiceModeEnabled?: boolean;
 };
 
 export type NoCtfapiEndpointsCompetitionsGameModeProtocol = 'Ctf' | 'Awd' | 'Awdp' | 'Koh';
@@ -1085,7 +1102,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     occurredAt?: string;
 };
 
-export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = 'CompetitionLifecycle' | 'UserAccountLifecycle' | 'CompetitionLeaderboardVisibility' | 'CompetitionEvent';
+export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = 'CompetitionLifecycle' | 'UserAccountLifecycle' | 'CompetitionAdministration' | 'CompetitionLeaderboardVisibility' | 'CompetitionEvent';
 
 export type NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol = 'Banned' | 'Disabled' | 'Anonymized' | 'PhysicallyDeleted';
 
@@ -1313,6 +1330,35 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest 
     maxActiveQuestionsPerTeam?: number;
     maxParticipantMessagesBeforeHandlerReply?: number;
     allowChallengeOwnersToHandleQuestions?: boolean;
+    practiceModeEnabled?: boolean;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictResponse = {
+    code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode;
+    preview?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse | null;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode = 'ActiveCompetition' | 'ActiveRuntimeResource' | 'ConfirmationMismatch';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse = {
+    competitionId?: string;
+    title?: string;
+    isSoftDeleted?: boolean;
+    canHardDelete?: boolean;
+    canForceDelete?: boolean;
+    references?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse = {
+    code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode;
+    count?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'DataExport' | 'Notification' | 'PosterFile' | 'ActiveRuntimeResource';
+
+export type NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest = {
+    confirmationTitle: string;
+    reason: string;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsGenerateMissingFlagsResponse = {
@@ -1355,21 +1401,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsRes
     permissionRevision?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse = {
-    competitionId?: string;
-    title?: string;
-    isSoftDeleted?: boolean;
-    canHardDelete?: boolean;
-    references?: Array<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse>;
-};
-
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse = {
-    code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode;
-    count?: number;
-};
-
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'DataExport' | 'Notification' | 'PosterFile';
-
 export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionListResponse = {
     items?: Array<NoCtfapiEndpointsCompetitionsCompetitionResponse>;
 };
@@ -1411,6 +1442,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionRequest 
     maxActiveQuestionsPerTeam?: number;
     maxParticipantMessagesBeforeHandlerReply?: number;
     allowChallengeOwnersToHandleQuestions?: boolean;
+    practiceModeEnabled?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityFailureResponse = {
@@ -2824,6 +2856,43 @@ export type GetGameplayFactStatusEndpointResponses = {
 };
 
 export type GetGameplayFactStatusEndpointResponse = GetGameplayFactStatusEndpointResponses[keyof GetGameplayFactStatusEndpointResponses];
+
+export type JudgePracticeFlagData = {
+    body: NoCtfapiEndpointsGameplayFactsJudgePracticeFlagRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag';
+};
+
+export type JudgePracticeFlagErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    409: NoCtfapiEndpointsGameplayFactsPracticeFlagConflictResponse;
+};
+
+export type JudgePracticeFlagError = JudgePracticeFlagErrors[keyof JudgePracticeFlagErrors];
+
+export type JudgePracticeFlagResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsGameplayFactsPracticeFlagJudgementResponse;
+};
+
+export type JudgePracticeFlagResponse = JudgePracticeFlagResponses[keyof JudgePracticeFlagResponses];
 
 export type ListGameplayFactsEndpointData = {
     body?: never;
@@ -6295,6 +6364,46 @@ export type AdminFinishCompetitionResponses = {
 };
 
 export type AdminFinishCompetitionResponse = AdminFinishCompetitionResponses[keyof AdminFinishCompetitionResponses];
+
+export type AdminForceDeleteCompetitionData = {
+    body: NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/force-delete';
+};
+
+export type AdminForceDeleteCompetitionErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictResponse;
+};
+
+export type AdminForceDeleteCompetitionError = AdminForceDeleteCompetitionErrors[keyof AdminForceDeleteCompetitionErrors];
+
+export type AdminForceDeleteCompetitionResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type AdminForceDeleteCompetitionResponse = AdminForceDeleteCompetitionResponses[keyof AdminForceDeleteCompetitionResponses];
 
 export type AdminGenerateMissingFlagsData = {
     body?: never;

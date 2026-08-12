@@ -64,6 +64,7 @@ public sealed class CompetitionManagementStore(
                 command.MaxParticipantMessagesBeforeHandlerReply,
             AllowChallengeOwnersToHandleQuestions =
                 command.AllowChallengeOwnersToHandleQuestions,
+            PracticeModeEnabled = command.PracticeModeEnabled,
             CreatedAt = command.CreatedAt,
             UpdatedAt = command.CreatedAt,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
@@ -118,12 +119,27 @@ public sealed class CompetitionManagementStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM competitions WHERE id = {command.CompetitionId} FOR UPDATE",
+            ct);
         var competition = await db.Competitions
             .SingleOrDefaultAsync(x => x.Id == command.CompetitionId
                 && x.DeletedAt == null
                 && x.Status == expectedStatus, ct);
         if (competition is null)
             return null;
+        if (competition.PracticeModeEnabled
+            && !command.PracticeModeEnabled
+            && await db.RuntimeInstances.AnyAsync(runtime =>
+                runtime.CompetitionId == competition.Id
+                && runtime.Purpose == NoCTF.Domain.Runtime.RuntimePurpose.Practice
+                && (runtime.State == NoCTF.Domain.Runtime.RuntimeState.Queued
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Provisioning
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running
+                    || runtime.State == NoCTF.Domain.Runtime.RuntimeState.Stopping), ct))
+        {
+            return null;
+        }
         competition.Title = command.Title.Trim();
         competition.Description = command.Description?.Trim();
         competition.StartAt = command.StartTime;
@@ -138,6 +154,7 @@ public sealed class CompetitionManagementStore(
             command.MaxParticipantMessagesBeforeHandlerReply;
         competition.AllowChallengeOwnersToHandleQuestions =
             command.AllowChallengeOwnersToHandleQuestions;
+        competition.PracticeModeEnabled = command.PracticeModeEnabled;
         competition.UpdatedAt = command.UpdatedAt;
         await events.RecordAsync(new(
             competition.Id,
@@ -213,7 +230,8 @@ public sealed class CompetitionManagementStore(
             x.DeletedAt,
             x.MaxActiveQuestionsPerTeam,
             x.MaxParticipantMessagesBeforeHandlerReply,
-            x.AllowChallengeOwnersToHandleQuestions));
+            x.AllowChallengeOwnersToHandleQuestions,
+            x.PracticeModeEnabled));
 
     private static CompetitionView Map(Competition x) =>
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
@@ -224,5 +242,6 @@ public sealed class CompetitionManagementStore(
             x.DeletedAt,
             x.MaxActiveQuestionsPerTeam,
             x.MaxParticipantMessagesBeforeHandlerReply,
-            x.AllowChallengeOwnersToHandleQuestions);
+            x.AllowChallengeOwnersToHandleQuestions,
+            x.PracticeModeEnabled);
 }

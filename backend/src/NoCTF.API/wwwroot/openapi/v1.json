@@ -1738,6 +1738,90 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Checks a Flag in CTF practice mode without scoring.",
+        "description": "Returns only correctness. It never creates GameplayFact, blood awards or leaderboard changes.",
+        "operationId": "JudgePracticeFlag",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "JudgePracticeFlagRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsJudgePracticeFlagRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPracticeFlagJudgementResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPracticeFlagConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/gameplay-facts": {
       "get": {
         "tags": [
@@ -8276,6 +8360,80 @@
         ]
       }
     },
+    "/api/v1/admin/competitions/{competitionId}/force-delete": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Permanently deletes a competition and all scoped data.",
+        "description": "Requires the exact competition title and an audit reason. Running or paused competitions and competitions with live Runtime resources are rejected.",
+        "operationId": "AdminForceDeleteCompetition",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "ForceDeleteCompetitionRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/competitions/{competitionId}/flags/generate-missing": {
       "post": {
         "tags": [
@@ -13030,7 +13188,8 @@
           "TeamBanCorrected",
           "DataExportReady",
           "DataExportFailed",
-          "UserAccountLifecycleChanged"
+          "UserAccountLifecycleChanged",
+          "CompetitionForceDeleted"
         ],
         "enum": [
           "Message",
@@ -13051,7 +13210,8 @@
           "TeamBanCorrected",
           "DataExportReady",
           "DataExportFailed",
-          "UserAccountLifecycleChanged"
+          "UserAccountLifecycleChanged",
+          "CompetitionForceDeleted"
         ]
       },
       "NoCTFDomainSharedEntityReferenceKind": {
@@ -13397,6 +13557,67 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsGameplayFactsPracticeFlagJudgementResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "result": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPracticeFlagJudgementProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsPracticeFlagJudgementProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Correct",
+          "Wrong"
+        ],
+        "enum": [
+          "Correct",
+          "Wrong"
+        ]
+      },
+      "NoCTFAPIEndpointsGameplayFactsPracticeFlagConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsPracticeFlagFailureCodeProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsPracticeFlagFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "PracticeUnavailable",
+          "TeamNotEligible",
+          "RuntimeNotRunning",
+          "FlagInvalid"
+        ],
+        "enum": [
+          "PracticeUnavailable",
+          "TeamNotEligible",
+          "RuntimeNotRunning",
+          "FlagInvalid"
+        ]
+      },
+      "NoCTFAPIEndpointsGameplayFactsJudgePracticeFlagRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flag"
+        ],
+        "properties": {
+          "flag": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
+      },
       "NoCTFAPIEndpointsGameplayFactsGameplayFactListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -13701,6 +13922,9 @@
             "format": "int32"
           },
           "allowChallengeOwnersToHandleQuestions": {
+            "type": "boolean"
+          },
+          "practiceModeEnabled": {
             "type": "boolean"
           }
         }
@@ -16528,12 +16752,14 @@
         "x-enumNames": [
           "CompetitionLifecycle",
           "UserAccountLifecycle",
+          "CompetitionAdministration",
           "CompetitionLeaderboardVisibility",
           "CompetitionEvent"
         ],
         "enum": [
           "CompetitionLifecycle",
           "UserAccountLifecycle",
+          "CompetitionAdministration",
           "CompetitionLeaderboardVisibility",
           "CompetitionEvent"
         ]
@@ -17464,6 +17690,131 @@
           },
           "allowChallengeOwnersToHandleQuestions": {
             "type": "boolean"
+          },
+          "practiceModeEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode"
+          },
+          "preview": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse"
+              }
+            ]
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionForceDeleteConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ActiveCompetition",
+          "ActiveRuntimeResource",
+          "ConfirmationMismatch"
+        ],
+        "enum": [
+          "ActiveCompetition",
+          "ActiveRuntimeResource",
+          "ConfirmationMismatch"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "isSoftDeleted": {
+            "type": "boolean"
+          },
+          "canHardDelete": {
+            "type": "boolean"
+          },
+          "canForceDelete": {
+            "type": "boolean"
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "HistoricalEvent",
+          "Team",
+          "CompetitionChallenge",
+          "GameplayFact",
+          "RuntimeInstance",
+          "PatchUpload",
+          "DataExport",
+          "Notification",
+          "PosterFile",
+          "ActiveRuntimeResource"
+        ],
+        "enum": [
+          "HistoricalEvent",
+          "Team",
+          "CompetitionChallenge",
+          "GameplayFact",
+          "RuntimeInstance",
+          "PatchUpload",
+          "DataExport",
+          "Notification",
+          "PosterFile",
+          "ActiveRuntimeResource"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "confirmationTitle",
+          "reason"
+        ],
+        "properties": {
+          "confirmationTitle": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": false
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 8,
+            "nullable": false
           }
         }
       },
@@ -17609,70 +17960,6 @@
           }
         }
       },
-      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "title": {
-            "type": "string"
-          },
-          "isSoftDeleted": {
-            "type": "boolean"
-          },
-          "canHardDelete": {
-            "type": "boolean"
-          },
-          "references": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "code": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode"
-          },
-          "count": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "HistoricalEvent",
-          "Team",
-          "CompetitionChallenge",
-          "GameplayFact",
-          "RuntimeInstance",
-          "PatchUpload",
-          "DataExport",
-          "Notification",
-          "PosterFile"
-        ],
-        "enum": [
-          "HistoricalEvent",
-          "Team",
-          "CompetitionChallenge",
-          "GameplayFact",
-          "RuntimeInstance",
-          "PatchUpload",
-          "DataExport",
-          "Notification",
-          "PosterFile"
-        ]
-      },
       "NoCTFAPIEndpointsAdministrationCompetitionsAdminCompetitionListResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -17813,6 +18100,9 @@
             "exclusiveMinimum": true
           },
           "allowChallengeOwnersToHandleQuestions": {
+            "type": "boolean"
+          },
+          "practiceModeEnabled": {
             "type": "boolean"
           }
         }

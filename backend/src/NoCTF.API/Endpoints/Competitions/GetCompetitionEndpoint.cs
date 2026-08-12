@@ -84,7 +84,8 @@ public sealed record CompetitionResponse(
     CompetitionAdministrationRoleProtocol? AdministrationRole = null,
     int MaxActiveQuestionsPerTeam = 5,
     int MaxParticipantMessagesBeforeHandlerReply = 3,
-    bool AllowChallengeOwnersToHandleQuestions = true);
+    bool AllowChallengeOwnersToHandleQuestions = true,
+    bool PracticeModeEnabled = false);
 
 internal static class CompetitionMapper
 {
@@ -112,7 +113,8 @@ internal static class CompetitionMapper
             AdministrationRole: null,
             view.MaxActiveQuestionsPerTeam,
             view.MaxParticipantMessagesBeforeHandlerReply,
-            view.AllowChallengeOwnersToHandleQuestions);
+            view.AllowChallengeOwnersToHandleQuestions,
+            view.PracticeModeEnabled);
 }
 
 public sealed class GetCompetitionRequest { public Guid CompetitionId { get; set; } }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Challenges;
@@ -13,6 +14,7 @@ using NoCTF.Domain.Shared;
 using NoCTF.Domain.Storage;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Competitions.Administration;
+using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Infrastructure.Persistence;
@@ -25,7 +27,7 @@ public sealed class CompetitionHardDeletePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Hard_delete_preview_preserves_history_and_allows_only_an_unreferenced_competition(
+    public async Task Force_delete_removes_scoped_history_but_preserves_a_platform_audit_fact(
         CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -47,6 +49,7 @@ public sealed class CompetitionHardDeletePersistenceTests
             var posterFileId = Guid.CreateVersion7(now.AddTicks(3));
             var eventId = Guid.CreateVersion7(now.AddTicks(4));
             var notificationId = Guid.CreateVersion7(now.AddTicks(5));
+            var teamNotificationId = Guid.CreateVersion7(now.AddTicks(51));
             var dataExportId = Guid.CreateVersion7(now.AddTicks(6));
             var challengeId = Guid.CreateVersion7(now.AddTicks(7));
             var competitionChallengeId = Guid.CreateVersion7(now.AddTicks(8));
@@ -156,18 +159,32 @@ public sealed class CompetitionHardDeletePersistenceTests
                     SubjectId = historicalCompetitionId,
                     OccurredAt = now
                 });
-                setup.Notifications.Add(new Notification
-                {
-                    Id = notificationId,
-                    SourceType = NotificationSourceType.System,
-                    TargetType = NotificationTargetType.User,
-                    TargetId = ownerId,
-                    Kind = NotificationKind.CompetitionLifecycleChanged,
-                    ContentJson = "{\"schemaVersion\":1}",
-                    RelatedType = EntityReferenceKind.Competition,
-                    RelatedId = historicalCompetitionId,
-                    SentAt = now
-                });
+                setup.Notifications.AddRange(
+                    new Notification
+                    {
+                        Id = notificationId,
+                        SourceType = NotificationSourceType.System,
+                        TargetType = NotificationTargetType.User,
+                        TargetId = ownerId,
+                        Kind = NotificationKind.CompetitionLifecycleChanged,
+                        ContentJson = "{\"schemaVersion\":1}",
+                        RelatedType = EntityReferenceKind.Competition,
+                        RelatedId = historicalCompetitionId,
+                        SentAt = now
+                    },
+                    new Notification
+                    {
+                        Id = teamNotificationId,
+                        SourceType = NotificationSourceType.Team,
+                        SourceId = teamId,
+                        TargetType = NotificationTargetType.TeamMembers,
+                        TargetId = teamId,
+                        Kind = NotificationKind.TeamRegistrationChanged,
+                        ContentJson = "{\"schemaVersion\":1}",
+                        RelatedType = EntityReferenceKind.Team,
+                        RelatedId = teamId,
+                        SentAt = now.AddTicks(1)
+                    });
                 setup.DataExports.Add(new DataExport
                 {
                     Id = dataExportId,
@@ -184,7 +201,8 @@ public sealed class CompetitionHardDeletePersistenceTests
 
             await using (var db = new NoCtfDbContext(options))
             {
-                var store = new AdminCompetitionStore(db);
+                var outbox = new RecordingOutbox();
+                var store = new AdminCompetitionStore(db, messageOutbox: outbox);
                 var emptyPreview = await store.PreviewHardDeleteAsync(
                     emptyCompetitionId,
                     ownerId,
@@ -199,6 +217,7 @@ public sealed class CompetitionHardDeletePersistenceTests
                 await Assert.That(emptyPreview).IsNotNull();
                 await Assert.That(emptyPreview!.IsSoftDeleted).IsFalse();
                 await Assert.That(emptyPreview.CanHardDelete).IsTrue();
+                await Assert.That(emptyPreview.CanForceDelete).IsFalse();
                 await Assert.That(emptyPreview.References).IsEmpty();
                 await Assert.That(historicalPreview).IsNotNull();
                 await Assert.That(historicalPreview!.IsSoftDeleted).IsTrue();
@@ -229,7 +248,7 @@ public sealed class CompetitionHardDeletePersistenceTests
                             1),
                         new CompetitionHardDeleteReference(
                             CompetitionHardDeleteReferenceKind.Notification,
-                            1),
+                            2),
                         new CompetitionHardDeleteReference(
                             CompetitionHardDeleteReferenceKind.PosterFile,
                             1)
@@ -252,6 +271,40 @@ public sealed class CompetitionHardDeletePersistenceTests
                     .IsTrue();
                 await Assert.That(deleted.State)
                     .IsEqualTo(CompetitionHardDeleteState.Deleted);
+
+                var runtime = await db.RuntimeInstances.SingleAsync(
+                    item => item.Id == runtimeId,
+                    ct);
+                runtime.State = RuntimeState.Running;
+                runtime.StoppedAt = null;
+                runtime.RunningAt = now;
+                await db.SaveChangesAsync(ct);
+                var liveResourceBlocked = await store.ForceDeleteAsync(new(
+                    historicalCompetitionId,
+                    ownerId,
+                    "Historical draft",
+                    "Remove the disposable integration competition.",
+                    now.AddMinutes(2)), true, ct);
+                await Assert.That(liveResourceBlocked.State)
+                    .IsEqualTo(CompetitionForceDeleteState.ActiveRuntimeResource);
+                await Assert.That(liveResourceBlocked.Preview!.References.Any(reference =>
+                    reference.Kind == CompetitionHardDeleteReferenceKind.ActiveRuntimeResource))
+                    .IsTrue();
+
+                runtime.State = RuntimeState.Stopped;
+                runtime.RunningAt = null;
+                runtime.StoppedAt = now.AddMinutes(2);
+                await db.SaveChangesAsync(ct);
+                var forced = await store.ForceDeleteAsync(new(
+                    historicalCompetitionId,
+                    ownerId,
+                    "Historical draft",
+                    "Remove the disposable integration competition.",
+                    now.AddMinutes(3)), true, ct);
+                await Assert.That(forced.State)
+                    .IsEqualTo(CompetitionForceDeleteState.Deleted);
+                await Assert.That(outbox.Published.OfType<CleanupFile>().Select(item => item.FileId))
+                    .IsEquivalentTo([posterFileId, patchFileId]);
             }
 
             await using (var verification = new NoCtfDbContext(options))
@@ -261,16 +314,43 @@ public sealed class CompetitionHardDeletePersistenceTests
                     ct)).IsFalse();
                 await Assert.That(await verification.Competitions.IgnoreQueryFilters().AnyAsync(
                     item => item.Id == historicalCompetitionId,
-                    ct)).IsTrue();
+                    ct)).IsFalse();
                 await Assert.That(await verification.CompetitionEvents.AnyAsync(
                     item => item.Id == eventId,
-                    ct)).IsTrue();
+                    ct)).IsFalse();
                 await Assert.That(await verification.Notifications.AnyAsync(
                     item => item.Id == notificationId,
-                    ct)).IsTrue();
+                    ct)).IsFalse();
+                await Assert.That(await verification.Notifications.AnyAsync(
+                    item => item.Id == teamNotificationId,
+                    ct)).IsFalse();
                 await Assert.That(await verification.DataExports.AnyAsync(
                     item => item.Id == dataExportId,
-                    ct)).IsTrue();
+                    ct)).IsFalse();
+                var audit = await verification.Notifications.SingleAsync(item =>
+                    item.Kind == NotificationKind.CompetitionForceDeleted,
+                    ct);
+                await Assert.That(audit.SourceId).IsEqualTo(ownerId);
+                await Assert.That(audit.TargetType)
+                    .IsEqualTo(NotificationTargetType.PlatformAdministrators);
+                await Assert.That(audit.ContentJson).Contains(historicalCompetitionId.ToString());
+                await Assert.That(audit.ContentJson)
+                    .Contains("Remove the disposable integration competition.");
+                var auditItems = await new PlatformAuditLogStore(verification)
+                    .QueryAsync(new(
+                        PlatformAuditKind.CompetitionAdministration,
+                        From: null,
+                        To: null,
+                        CompetitionId: historicalCompetitionId,
+                        ActorId: ownerId,
+                        BeforeOccurredAt: null,
+                        BeforeId: null,
+                        Limit: 20), ct);
+                await Assert.That(auditItems).HasSingleItem();
+                await Assert.That(auditItems[0].SubjectDisplayName)
+                    .IsEqualTo("Historical draft");
+                await Assert.That(auditItems[0].Reason)
+                    .IsEqualTo("Remove the disposable integration competition.");
             }
         });
     }
@@ -500,7 +580,12 @@ public sealed class CompetitionHardDeletePersistenceTests
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {
-        public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
+        public List<object> Published { get; } = [];
+        public ValueTask PublishAsync<T>(T message)
+        {
+            Published.Add(message!);
+            return ValueTask.CompletedTask;
+        }
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
         public ValueTask PublishToRunnerPoolAsync<T>(T message)

@@ -3,6 +3,7 @@ import { toast } from 'vue-sonner'
 import {
   adminDeleteCompetition,
   adminFinishCompetition,
+  adminForceDeleteCompetition,
   adminGenerateMissingFlags,
   adminHardDeleteCompetition,
   adminMakeCompetitionVisible,
@@ -24,6 +25,7 @@ import { useCompetitionAdmin } from '~/lib/admin-competition'
 definePageMeta({ middleware: 'auth' })
 
 const { competitionId, competition, canWrite, canManagePermissions, refresh } = useCompetitionAdmin()
+const { isAdministrator } = useAuth()
 
 const pendingAction = ref<string | null>(null)
 const actionError = ref<string | null>(null)
@@ -165,7 +167,12 @@ async function generateMissingFlags() {
 const deleting = ref(false)
 const restoring = ref(false)
 const hardDeleting = ref(false)
+const forceDeleting = ref(false)
 const deleteConfirm = ref<'soft' | 'hard' | null>(null)
+const forceDeleteOpen = ref(false)
+const forceDeleteTitle = ref('')
+const forceDeleteReason = ref('')
+const forceDeleteError = ref<string | null>(null)
 const hardDeletePreview = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeletePreviewResponse | null>(null)
 const hardDeletePreviewLoading = ref(false)
 const hardDeletePreviewError = ref<string | null>(null)
@@ -181,6 +188,7 @@ const hardDeleteReferenceLabels: Record<NoCtfapiEndpointsAdministrationCompetiti
   DataExport: '数据导出',
   Notification: '通知与咨询',
   PosterFile: '比赛海报',
+  ActiveRuntimeResource: '活动运行环境资源',
 }
 
 function hardDeleteReferenceLabel(code?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode) {
@@ -277,6 +285,45 @@ async function hardDelete() {
   finally {
     hardDeleting.value = false
     deleteConfirm.value = null
+  }
+}
+
+const forceDeleteValid = computed(() =>
+  forceDeleteTitle.value === (competition.value?.title ?? '')
+  && forceDeleteReason.value.trim().length >= 8
+  && forceDeleteReason.value.trim().length <= 500,
+)
+
+function beginForceDelete(): void {
+  forceDeleteTitle.value = ''
+  forceDeleteReason.value = ''
+  forceDeleteError.value = null
+  forceDeleteOpen.value = true
+}
+
+async function forceDelete(): Promise<void> {
+  if (!forceDeleteValid.value) return
+  forceDeleting.value = true
+  forceDeleteError.value = null
+  try {
+    const { error } = await adminForceDeleteCompetition({
+      path: { competitionId },
+      body: {
+        confirmationTitle: forceDeleteTitle.value,
+        reason: forceDeleteReason.value.trim(),
+      },
+    })
+    if (error) throw error
+    forceDeleteOpen.value = false
+    toast.success(translate('竞赛及其作用域数据已永久删除，平台审计记录已保留'))
+    await navigateTo('/admin/competitions')
+  }
+  catch (error) {
+    forceDeleteError.value = parseApiError(error).message
+    await loadHardDeletePreview()
+  }
+  finally {
+    forceDeleting.value = false
   }
 }
 
@@ -385,6 +432,13 @@ async function submitDelete() {
             :disabled="hardDeleting"
             @click="deleteConfirm = 'hard'"
           > {{ $t('彻底删除') }} </Button>
+          <Button
+            v-if="isAdministrator && hardDeletePreview?.canForceDelete && !hardDeletePreview.canHardDelete"
+            variant="destructive"
+            size="sm"
+            :disabled="forceDeleting"
+            @click="beginForceDelete"
+          > {{ $t('强制级联删除') }} </Button>
         </div>
 
         <div v-if="canManagePermissions && hardDeletePreviewLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
@@ -404,6 +458,9 @@ async function submitDelete() {
               <Badge v-for="reference in hardDeletePreview.references" :key="reference.code" variant="outline">
                 {{ hardDeleteReferenceLabel(reference.code) }} · {{ reference.count ?? 0 }}
               </Badge>
+            </span>
+            <span v-if="isAdministrator && hardDeletePreview.canForceDelete" class="text-destructive">
+              {{ $t('平台管理员可使用强制级联删除。该操作会永久移除比赛作用域数据，只保留一条平台审计记录。') }}
             </span>
           </AlertDescription>
         </Alert>
@@ -433,6 +490,56 @@ async function submitDelete() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <Dialog v-model:open="forceDeleteOpen">
+      <DialogContent class="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{{ $t('强制级联删除竞赛') }}</DialogTitle>
+          <DialogDescription>
+            {{ $t('此操作不可恢复，将永久删除比赛、队伍、题目实例、提交、事件、通知、运行时和导出等比赛作用域数据。平台审计会保留操作者、原因和时间。') }}
+          </DialogDescription>
+        </DialogHeader>
+        <Alert v-if="forceDeleteError" variant="destructive">
+          <AlertDescription>{{ forceDeleteError }}</AlertDescription>
+        </Alert>
+        <FieldGroup>
+          <Field>
+            <FieldLabel for="force-delete-title">{{ $t('输入完整竞赛标题以确认') }}</FieldLabel>
+            <Input
+              id="force-delete-title"
+              v-model="forceDeleteTitle"
+              autocomplete="off"
+              :placeholder="competition.title"
+              :disabled="forceDeleting"
+            />
+            <FieldError v-if="forceDeleteTitle && forceDeleteTitle !== competition.title">
+              {{ $t('竞赛标题必须完全一致') }}
+            </FieldError>
+          </Field>
+          <Field>
+            <FieldLabel for="force-delete-reason">{{ $t('删除原因') }}</FieldLabel>
+            <Textarea
+              id="force-delete-reason"
+              v-model="forceDeleteReason"
+              rows="4"
+              maxlength="500"
+              :disabled="forceDeleting"
+            />
+            <FieldDescription>{{ $t('至少 8 个字符；该原因会写入平台审计日志。') }}</FieldDescription>
+            <FieldError v-if="forceDeleteReason && forceDeleteReason.trim().length < 8">
+              {{ $t('删除原因至少需要 8 个字符') }}
+            </FieldError>
+          </Field>
+        </FieldGroup>
+        <DialogFooter>
+          <Button variant="outline" :disabled="forceDeleting" @click="forceDeleteOpen = false">{{ $t('取消') }}</Button>
+          <Button variant="destructive" :disabled="forceDeleting || !forceDeleteValid" @click="forceDelete">
+            <Spinner v-if="forceDeleting" data-icon="inline-start" />
+            {{ forceDeleting ? $t('正在永久删除') : $t('确认强制删除') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <AlertDialog :open="deleteConfirm !== null" @update:open="(v) => { if (!v) deleteConfirm = null }">
       <AlertDialogContent>

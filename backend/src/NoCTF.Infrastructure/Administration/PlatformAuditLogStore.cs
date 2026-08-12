@@ -7,6 +7,7 @@ using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Notifications;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Shared;
+using NoCTF.Application.Competitions.Management;
 
 namespace NoCTF.Infrastructure.Administration;
 
@@ -20,7 +21,8 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
         CancellationToken ct)
     {
         var items = new List<PlatformAuditView>(query.Limit * 2);
-        if (query.Kind is not PlatformAuditKind.UserAccountLifecycle)
+        if (query.Kind is not PlatformAuditKind.UserAccountLifecycle
+            and not PlatformAuditKind.CompetitionAdministration)
         {
             var competitionEvents = db.CompetitionEvents.AsNoTracking();
             if (query.From is not null)
@@ -96,37 +98,52 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 item.OccurredAt)));
         }
 
-        if (query.CompetitionId is null
-            && query.Kind is null or PlatformAuditKind.UserAccountLifecycle)
+        if (query.Kind is null
+            or PlatformAuditKind.UserAccountLifecycle
+            or PlatformAuditKind.CompetitionAdministration)
         {
-            var lifecycleFacts = db.Notifications.AsNoTracking().Where(notification =>
-                notification.Kind == NotificationKind.UserAccountLifecycleChanged
+            var auditFacts = db.Notifications.AsNoTracking().Where(notification =>
+                (notification.Kind == NotificationKind.UserAccountLifecycleChanged
+                    || notification.Kind == NotificationKind.CompetitionForceDeleted)
                 && notification.TargetType == NotificationTargetType.PlatformAdministrators);
+            auditFacts = query.Kind switch
+            {
+                PlatformAuditKind.UserAccountLifecycle => auditFacts.Where(notification =>
+                    notification.Kind == NotificationKind.UserAccountLifecycleChanged),
+                PlatformAuditKind.CompetitionAdministration => auditFacts.Where(notification =>
+                    notification.Kind == NotificationKind.CompetitionForceDeleted),
+                _ => auditFacts
+            };
             if (query.From is not null)
-                lifecycleFacts = lifecycleFacts.Where(notification =>
+                auditFacts = auditFacts.Where(notification =>
                     notification.SentAt >= query.From.Value);
             if (query.To is not null)
-                lifecycleFacts = lifecycleFacts.Where(notification =>
+                auditFacts = auditFacts.Where(notification =>
                     notification.SentAt <= query.To.Value);
             if (query.ActorId is not null)
-                lifecycleFacts = lifecycleFacts.Where(notification =>
+                auditFacts = auditFacts.Where(notification =>
                     notification.SourceType == NotificationSourceType.User
                     && notification.SourceId == query.ActorId.Value);
+            if (query.CompetitionId is Guid competitionId)
+                auditFacts = auditFacts.Where(notification =>
+                    notification.Kind == NotificationKind.CompetitionForceDeleted
+                    && notification.RelatedType == EntityReferenceKind.Competition
+                    && notification.RelatedId == competitionId);
             if (query.BeforeOccurredAt is DateTimeOffset beforeOccurredAt
                 && query.BeforeId is Guid beforeId)
             {
-                lifecycleFacts = lifecycleFacts.Where(notification =>
+                auditFacts = auditFacts.Where(notification =>
                     notification.SentAt < beforeOccurredAt
                     || notification.SentAt == beforeOccurredAt
                     && notification.Id.CompareTo(beforeId) < 0);
             }
 
-            var lifecycleItems = await lifecycleFacts
+            var auditItems = await auditFacts
                 .OrderByDescending(notification => notification.SentAt)
                 .ThenByDescending(notification => notification.Id)
                 .Take(query.Limit)
                 .ToArrayAsync(ct);
-            items.AddRange(lifecycleItems.Select(ToAuditView));
+            items.AddRange(auditItems.Select(ToAuditView));
         }
 
         return items
@@ -150,6 +167,40 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
 
     private static PlatformAuditView ToAuditView(Notification notification)
     {
+        if (notification.Kind == NotificationKind.CompetitionForceDeleted)
+        {
+            var deletionFact = JsonSerializer.Deserialize<CompetitionForceDeletionFact>(
+                notification.ContentJson,
+                JsonOptions) ?? throw new InvalidOperationException(
+                $"Notification {notification.Id} has no competition force-deletion payload.");
+            return new(
+                Id: notification.Id,
+                Kind: PlatformAuditKind.CompetitionAdministration,
+                SubjectId: deletionFact.CompetitionId,
+                CompetitionId: deletionFact.CompetitionId,
+                ActorId: notification.SourceId,
+                FromCompetitionStatus: null,
+                ToCompetitionStatus: null,
+                FromLeaderboardVisibility: null,
+                ToLeaderboardVisibility: null,
+                UserAccountAction: null,
+                CompetitionEventKind: null,
+                CompetitionEventLevel: CompetitionEventLevel.Warning,
+                CompetitionEventVisibility: CompetitionEventVisibility.Staff,
+                RelatedUserId: null,
+                TeamId: null,
+                CompetitionChallengeId: null,
+                RuntimeInstanceId: null,
+                GameplayFactId: null,
+                QuestionId: null,
+                GameplayFactKind: null,
+                GameplayFactState: null,
+                GameplayFactResult: null,
+                SubjectDisplayName: deletionFact.CompetitionTitle,
+                Reason: deletionFact.Reason,
+                Automatic: false,
+                OccurredAt: notification.SentAt);
+        }
         var fact = JsonSerializer.Deserialize<UserAccountLifecycleFact>(
             notification.ContentJson,
             JsonOptions) ?? throw new InvalidOperationException(

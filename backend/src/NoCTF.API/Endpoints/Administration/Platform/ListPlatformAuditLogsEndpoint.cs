@@ -23,6 +23,7 @@ public enum PlatformAuditKindProtocol
 {
     CompetitionLifecycle,
     UserAccountLifecycle,
+    CompetitionAdministration,
     CompetitionLeaderboardVisibility,
     CompetitionEvent
 }

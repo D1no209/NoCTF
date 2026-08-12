@@ -18,7 +18,8 @@ public enum CompetitionHardDeleteReferenceCode
     PatchUpload,
     DataExport,
     Notification,
-    PosterFile
+    PosterFile,
+    ActiveRuntimeResource
 }
 
 public sealed record CompetitionHardDeleteReferenceResponse(
@@ -30,6 +31,7 @@ public sealed record CompetitionHardDeletePreviewResponse(
     string Title,
     bool IsSoftDeleted,
     bool CanHardDelete,
+    bool CanForceDelete,
     IReadOnlyList<CompetitionHardDeleteReferenceResponse> References);
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]

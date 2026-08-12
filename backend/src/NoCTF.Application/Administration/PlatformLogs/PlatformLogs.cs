@@ -89,6 +89,7 @@ public enum PlatformAuditKind : short
 {
     CompetitionLifecycle,
     UserAccountLifecycle,
+    CompetitionAdministration,
     CompetitionLeaderboardVisibility,
     CompetitionEvent
 }

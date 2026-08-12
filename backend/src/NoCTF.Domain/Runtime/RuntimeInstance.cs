@@ -22,7 +22,8 @@ public enum RuntimeState : short
 public enum RuntimePurpose : short
 {
     Player,
-    AwdpTarget
+    AwdpTarget,
+    Practice
 }
 
 public enum RuntimeFailureCode : short

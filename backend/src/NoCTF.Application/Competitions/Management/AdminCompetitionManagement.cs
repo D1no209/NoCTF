@@ -32,7 +32,8 @@ public enum CompetitionHardDeleteReferenceKind
     PatchUpload,
     DataExport,
     Notification,
-    PosterFile
+    PosterFile,
+    ActiveRuntimeResource
 }
 
 public sealed record CompetitionHardDeleteReference(
@@ -44,6 +45,7 @@ public sealed record CompetitionHardDeletePreview(
     string Title,
     bool IsSoftDeleted,
     bool CanHardDelete,
+    bool CanForceDelete,
     IReadOnlyList<CompetitionHardDeleteReference> References);
 
 public enum CompetitionHardDeleteState
@@ -56,6 +58,34 @@ public enum CompetitionHardDeleteState
 public sealed record CompetitionHardDeleteResult(
     CompetitionHardDeleteState State,
     CompetitionHardDeletePreview? Preview = null);
+
+public sealed record ForceDeleteCompetitionCommand(
+    Guid CompetitionId,
+    Guid ActorId,
+    string ConfirmationTitle,
+    string Reason,
+    DateTimeOffset OccurredAt);
+
+public enum CompetitionForceDeleteState
+{
+    Deleted,
+    NotFound,
+    ActiveCompetition,
+    ActiveRuntimeResource,
+    ConfirmationMismatch,
+    InvalidReason
+}
+
+public sealed record CompetitionForceDeleteResult(
+    CompetitionForceDeleteState State,
+    CompetitionHardDeletePreview? Preview = null);
+
+public sealed record CompetitionForceDeletionFact(
+    int SchemaVersion,
+    Guid CompetitionId,
+    string CompetitionTitle,
+    string Reason,
+    IReadOnlyList<CompetitionHardDeleteReference> DeletedReferences);
 
 public sealed record CompetitionOwnerTransferResult(
     CompetitionOwnerTransferState State,
@@ -89,6 +119,10 @@ public interface IAdminCompetitionStore
     Task<CompetitionHardDeleteResult> HardDeleteAsync(
         Guid competitionId,
         Guid actorId,
+        bool isAdministrator,
+        CancellationToken cancellationToken);
+    Task<CompetitionForceDeleteResult> ForceDeleteAsync(
+        ForceDeleteCompetitionCommand command,
         bool isAdministrator,
         CancellationToken cancellationToken);
     Task<CompetitionOwnerTransferResult> TransferOwnerAsync(
@@ -150,6 +184,33 @@ public sealed class PreviewCompetitionHardDelete(IAdminCompetitionStore store)
         bool isAdministrator,
         CancellationToken ct = default) =>
         store.PreviewHardDeleteAsync(competitionId, actorId, isAdministrator, ct);
+}
+
+public sealed class ForceDeleteCompetition(IAdminCompetitionStore store)
+{
+    public Task<CompetitionForceDeleteResult> ExecuteAsync(
+        ForceDeleteCompetitionCommand command,
+        bool isAdministrator,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(command.Reason)
+            || command.Reason.Trim().Length is < 8 or > 500)
+        {
+            return Task.FromResult(new CompetitionForceDeleteResult(
+                CompetitionForceDeleteState.InvalidReason));
+        }
+
+        if (string.IsNullOrEmpty(command.ConfirmationTitle))
+        {
+            return Task.FromResult(new CompetitionForceDeleteResult(
+                CompetitionForceDeleteState.ConfirmationMismatch));
+        }
+
+        return store.ForceDeleteAsync(
+            command with { Reason = command.Reason.Trim() },
+            isAdministrator,
+            ct);
+    }
 }
 
 public sealed class TransferCompetitionOwner(IAdminCompetitionStore store)

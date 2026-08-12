@@ -19,6 +19,7 @@ const maxConcurrentRuntimeInstancesPerTeam = ref(1)
 const maxActiveQuestionsPerTeam = ref(5)
 const maxParticipantMessagesBeforeHandlerReply = ref(3)
 const allowChallengeOwnersToHandleQuestions = ref(true)
+const practiceModeEnabled = ref(false)
 const error = ref<string | null>(null)
 const pending = ref(false)
 
@@ -54,6 +55,7 @@ async function submit() {
         maxActiveQuestionsPerTeam: maxActiveQuestionsPerTeam.value,
         maxParticipantMessagesBeforeHandlerReply: maxParticipantMessagesBeforeHandlerReply.value,
         allowChallengeOwnersToHandleQuestions: allowChallengeOwnersToHandleQuestions.value,
+        practiceModeEnabled: mode.value === 'Ctf' && practiceModeEnabled.value,
       },
     })
     if (e || !data) throw e
@@ -158,6 +160,13 @@ async function submit() {
               <div class="grid gap-1.5 leading-none">
                 <FieldLabel for="allow-challenge-owner-questions" class="font-normal">{{ $t('允许题目所有者处理关联咨询') }}</FieldLabel>
                 <FieldDescription>{{ $t('仅限其拥有或协作的题目；不会授予 Flag、Token 或平台密钥权限。') }}</FieldDescription>
+              </div>
+            </Field>
+            <Field v-if="mode === 'Ctf'" orientation="horizontal">
+              <Checkbox id="practice-mode" v-model="practiceModeEnabled" />
+              <div class="grid gap-1.5 leading-none">
+                <FieldLabel for="practice-mode" class="font-normal">{{ $t('比赛结束后开放练习模式') }}</FieldLabel>
+                <FieldDescription>{{ $t('已审核且未封禁的原参赛队伍可启动容器题环境并验证 Flag；不产生分数、血榜或排行榜变化。') }}</FieldDescription>
               </div>
             </Field>
             <Field>

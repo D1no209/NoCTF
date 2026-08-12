@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { getGameplayFactStatusEndpoint, submitFlagEndpoint } from '~/api'
+import { getGameplayFactStatusEndpoint, judgePracticeFlag, submitFlagEndpoint } from '~/api'
 import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '~/api'
 
 type TrackedSubmission = Pick<
@@ -18,8 +18,9 @@ const props = withDefaults(
     multiple?: boolean
     title?: string
     description?: string
+    practice?: boolean
   }>(),
-  { multiple: false, title: translate("提交 Flag"), description: '' },
+  { multiple: false, title: translate("提交 Flag"), description: '', practice: false },
 )
 
 const emit = defineEmits<{ evaluated: [] }>()
@@ -92,6 +93,39 @@ async function submit() {
     : [input.value.trim()].filter(Boolean)
   if (!lines.length) return
   submitting.value = true
+  if (props.practice) {
+    const { data, error } = await judgePracticeFlag({
+      path: {
+        competitionId: props.competitionId,
+        competitionChallengeId: props.competitionChallengeId,
+      },
+      body: { flag: lines[0]! },
+    })
+    submitting.value = false
+    if (error || !data) {
+      const parsed = parseApiError(error, translate('练习 Flag 验证失败'))
+      const message = parsed.code === 'PracticeUnavailable'
+        ? translate('当前比赛未开放练习模式')
+        : parsed.code === 'RuntimeNotRunning'
+          ? translate('请先启动并等待题目环境进入运行状态')
+          : parsed.code === 'FlagInvalid'
+            ? translate('Flag 格式无效')
+            : parsed.status === 403
+              ? translate('当前账号没有可参与练习的已审核队伍')
+              : parsed.message
+      toast.error(message)
+      return
+    }
+    if (data.result === 'Correct') {
+      input.value = ''
+      toast.success(translate('Flag 正确；本次练习不计分'))
+      celebrateCorrectFlag()
+    }
+    else {
+      toast.error(translate('Flag 错误'))
+    }
+    return
+  }
   const { data, error } = await submitFlagEndpoint({
     path: { competitionId: props.competitionId, competitionChallengeId: props.competitionChallengeId },
     body: props.multiple ? { flags: lines } : { flag: lines[0] },
@@ -155,6 +189,7 @@ function resultVariant(result?: string | null) {
     <CardHeader>
       <CardTitle class="text-base">{{ title }}</CardTitle>
       <CardDescription v-if="description">{{ description }}</CardDescription>
+      <CardDescription v-else-if="practice">{{ $t('练习模式只验证 Flag 正误，不会产生分数、血榜或排行榜变化。') }}</CardDescription>
     </CardHeader>
     <CardContent>
       <form @submit.prevent="submit">

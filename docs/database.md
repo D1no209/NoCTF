@@ -28,6 +28,7 @@
 `configuration_json jsonb`、`configuration_revision`、`permission_revision`、`leaderboard_dirty bool`、
 `track_configuration_json jsonb?`、`track_configuration_revision`、`track_configuration_updated_at`、
 `flag_derivation_secret bytea(32)`、`leaderboard_visibility` 状态字段、`poster_file_id uuid?`、时间戳和 `deleted_at?`。
+`practice_mode_enabled bool` 仅可在 CTF 使用，用于允许 Finished 后创建隔离的练习 Runtime。
 
 ### `competition_events`
 
@@ -69,6 +70,7 @@ Flag 原文/Hash、Challenge 或 CompetitionChallenge 作用域、Specification�
 
 运行实例状态、Generation、Provider receipt、URL、Checker 状态、Runner assignment、时间戳和 `published_ports_json jsonb`。
 端口元素为 `{ serviceName?, containerPort, hostPort, allocatedAt }`，同实例 service/containerPort 唯一，端口范围 1–65535。
+`purpose` 区分正式 Player、AWDP FixVerification 与赛后 Practice；Player/Practice 的活动实例共同受同队同题唯一约束。
 
 ### `patch_uploads`
 
