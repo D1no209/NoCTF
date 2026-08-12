@@ -1,5 +1,40 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-13 alpha.32 强制级联删除与 CTF 赛后练习
+
+- 功能提交 `f63d7d97` 新增平台 Administrator 专用的强制级联删除入口。操作必须输入完整竞赛标题、
+  填写 8–500 字符原因并再次确认；Running/Paused 竞赛以及仍有 Queued、Provisioning、Running、
+  Stopping 或待清理 Provider 资源的 Runtime 会稳定拒绝。成功后在同一 PostgreSQL 事务内物理删除
+  竞赛作用域的队伍、题目实例、Flag、GameplayFact、Runtime、补丁、事件、通知线程和导出数据，
+  并通过现有 Outbox 清理不再引用的文件。平台管理员通知中保留一条不可变的
+  `CompetitionForceDeleted` 审计事实，记录操作者、标题、原因、时间及已删除引用计数；没有新增审计表。
+- 同一提交为 CTF 增加可配置的赛后练习模式。仅 Finished 且开启练习的 CTF 竞赛、原已审核且未封禁
+  队伍以及 Container/Compose 题目可以启动 `Practice` Runtime；它继续使用既有 Runner 容量、TTL、
+  Docker host port `0` 和清理流程。关闭练习模式前会锁定竞赛并拒绝仍有活动练习 Runtime 的更新。
+  `POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag` 只返回
+  Correct/Wrong；它会验证当前运行环境和当前有效静态/队伍 Flag，但不会创建 GameplayFact、比赛事件、
+  血榜、通知、分数或排行榜脏标记。前端在已结束比赛的题目区复用现有 Runtime 卡片和 Flag 输入，明确
+  标注“不计分”，并补齐中文、英文、loading、错误保留及正确 Flag 动画。
+- 数据模型只在 `competitions` 增加 `practice_mode_enabled`，并为 `RuntimePurpose.Practice` 调整现有活动
+  Runtime 唯一索引；没有新增业务表。migration `20260812152239_AddCompetitionPracticeMode` 完全由
+  `dotnet ef` 生成，snapshot 同步，EF `has-pending-model-changes` 为无漂移。强制删除复用现有 16 张
+  业务表、`notifications` 和 Wolverine Outbox，没有引入级联导航实体或额外审计模型。
+- 新增强类型 FastEndpoints `AdminForceDeleteCompetition` 与 `JudgePracticeFlag`；OpenAPI 两份制品由工具
+  导出，TypeScript SDK 由 `bun run api:gen` 生成。连续两轮导出/生成 SHA-256 保持一致：OpenAPI
+  `93B331573062B9049A3C920017CB161326F0A7E4F9A64379E06CA6091B0BC560`、`types.gen.ts`
+  `0F33238D41B2E76534397F6B46965A64C27BF6D2AA41995DCC11734E90026B39`、`sdk.gen.ts`
+  `27E07699FC62DF90B21AF476C5CF8FDB7E4AF5C196009E9891E596C132871C18`；当前共 200 个 Endpoint，
+  前端没有手写 URL、DTO 或协议枚举。
+- 验证通过：Release solution build 0 warning/0 error；完整非 Integration TUnit 749/749；强制真实依赖
+  Integration 169 项中 167 通过、0 失败，2 项仅因未配置真实 Kubernetes cluster 与 Libvirt disk path
+  按设计跳过，真实 PostgreSQL、Redis、Wolverine、Docker Container/Compose 路径均通过；前端
+  178/178（1381 assertions）、TypeScript typecheck、production build、analyzer 与 `git diff --check`
+  均通过。完整集成第一次运行遇到既有 Wolverine 单活故障转移时序抖动，独立重跑 1/1 后整套重跑
+  归零；未修改产品逻辑或放宽断言。
+- 发布提交 `1c4cf2db` 将平台版本由 `0.1.0-alpha.31` 递增为 `0.1.0-alpha.32`。当前功能与版本均为
+  本地提交，尚未合并发布后可能出现的远程 `main`、推送或部署；生产迁移、服务健康与 Microsoft Edge
+  验收结果将在部署完成后补记。
+
 ## 2026-08-12 alpha.31 CTF 中控大屏
 
 - 功能提交 `3dfd0049` 新增 CTF 专用路由 `/competitions/{competitionId}/screen`，并在比赛工作区加入
