@@ -5,17 +5,21 @@ import {
   adminApproveTeam,
   adminBanTeam,
   adminCorrectTeamBan,
+  adminCompetitionTracksGet,
   adminListTeamBanAppeals,
   adminListTeams,
   adminRejectTeam,
   adminUnbanTeam,
   adminUpholdTeamBanAppeal,
+  adminTeamTrackAssign,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse,
+  NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse,
   NoCtfapiEndpointsTeamsTeamResponse,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
+import { competitionTrackErrorMessage } from '~/lib/competition-track'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -25,14 +29,43 @@ const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const pendingId = ref<string | null>(null)
+const tracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
+const tracksFrozen = ref(false)
 
 async function load() {
   loading.value = true
   error.value = null
-  const { data, error: e } = await adminListTeams({ path: { competitionId } })
-  if (e) error.value = parseApiError(e).message
-  else teams.value = data?.items ?? []
+  const [teamResult, trackResult] = await Promise.all([
+    adminListTeams({ path: { competitionId } }),
+    adminCompetitionTracksGet({ path: { competitionId } }),
+  ])
+  if (teamResult.error || !teamResult.data) error.value = parseApiError(teamResult.error).message
+  else teams.value = teamResult.data.items ?? []
+  if (!trackResult.error && trackResult.data) {
+    tracks.value = trackResult.data.items ?? []
+    tracksFrozen.value = trackResult.data.isFrozen ?? false
+  }
   loading.value = false
+}
+
+async function assignTrack(team: NoCtfapiEndpointsTeamsTeamResponse, trackKey: string) {
+  if (!team.id || !canWrite.value || tracksFrozen.value || team.trackKey === trackKey) return
+  pendingId.value = team.id
+  try {
+    const { error: requestError } = await adminTeamTrackAssign({
+      path: { competitionId, teamId: team.id },
+      body: { trackKey, expectedTeamVersion: team.concurrencyVersion ?? 0 },
+    })
+    if (requestError) throw requestError
+    toast.success(translate('队伍赛道已更新'))
+    await load()
+  }
+  catch (requestError) {
+    toast.error(competitionTrackErrorMessage(requestError, translate('更新队伍赛道失败')))
+  }
+  finally {
+    pendingId.value = null
+  }
 }
 
 async function simpleAction(team: NoCtfapiEndpointsTeamsTeamResponse, action: 'approve' | 'reject') {
@@ -203,6 +236,7 @@ onMounted(() => {
         <TableHeader>
           <TableRow>
             <TableHead>{{ $t('队名') }}</TableHead>
+            <TableHead class="min-w-36">{{ $t('赛道') }}</TableHead>
             <TableHead class="w-24">{{ $t('人数') }}</TableHead>
             <TableHead class="w-28">{{ $t('注册状态') }}</TableHead>
             <TableHead class="w-28">{{ $t('封禁状态') }}</TableHead>
@@ -213,6 +247,22 @@ onMounted(() => {
         <TableBody>
           <TableRow v-for="t in teams" :key="t.id">
             <TableCell class="font-medium">{{ t.name }}</TableCell>
+            <TableCell>
+              <Select
+                v-if="canWrite && !tracksFrozen"
+                :model-value="t.trackKey"
+                :disabled="pendingId === t.id"
+                @update:model-value="value => assignTrack(t, String(value))"
+              >
+                <SelectTrigger class="min-w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="track in tracks" :key="track.key" :value="track.key!">
+                    {{ track.name }}<template v-if="track.isInternal"> · {{ $t('内部') }}</template>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Badge v-else variant="outline">{{ t.trackName ?? t.trackKey }}</Badge>
+            </TableCell>
             <TableCell class="font-mono tabular-nums">{{ t.memberIds?.length ?? 0 }}</TableCell>
             <TableCell>
               <Badge :variant="t.registrationStatus === 'Approved' ? 'default' : t.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'">

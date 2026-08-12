@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Container, Download, FileCheck, KeyRound, LayoutDashboard, Megaphone, Puzzle, Settings, ShieldAlert, Trophy, Users } from '@lucide/vue'
+import { Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Puzzle, Settings, ShieldAlert, Trophy, Users } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   adminCreateCompetitionAnnouncement,
@@ -119,6 +119,7 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => [
     items: [
       { to: base, label: translate("概览"), icon: LayoutDashboard, exact: true },
       { to: `${base}/configuration`, label: translate("配置"), icon: Settings },
+      { to: `${base}/tracks`, label: translate("赛道"), icon: GitBranch },
       { to: `${base}/challenges`, label: translate("题目"), icon: Puzzle },
       { to: `${base}/teams`, label: translate("团队"), icon: Users },
     ],

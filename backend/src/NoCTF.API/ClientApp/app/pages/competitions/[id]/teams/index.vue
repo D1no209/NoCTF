@@ -58,6 +58,7 @@ onMounted(async () => {
                   >
                     {{ teamRegistrationStatusLabel(team.registrationStatus) }}
                   </Badge>
+                  <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
                   <span class="text-xs text-muted-foreground">{{ $t('{count} 名成员', { count: team.memberIds?.length ?? 0 }) }}</span>
                 </div>
               </div>

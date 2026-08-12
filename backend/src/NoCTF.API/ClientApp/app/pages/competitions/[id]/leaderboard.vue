@@ -73,6 +73,20 @@ const directionGroups = computed<DirectionGroup[]>(() => {
 
 const showGroupLabels = ref(true)
 
+// ---- 独立赛道 ----
+const selectedTrackKey = ref('')
+const availableTracks = computed(() => leaderboard.value?.tracks ?? [])
+
+watch(availableTracks, (next) => {
+  if (!next.length) {
+    selectedTrackKey.value = ''
+    return
+  }
+  if (!next.some(track => track.key === selectedTrackKey.value)) {
+    selectedTrackKey.value = next[0]?.key ?? ''
+  }
+}, { immediate: true })
+
 // ---- 队伍 × 题目稀疏矩阵 ----
 const slotsByTeam = computed(() => {
   const map = new Map<string, Map<string, LeaderboardCell>>()
@@ -130,7 +144,12 @@ const hasAnySeries = computed(() => entries.value.some(entry =>
 
 // ---- 完整快照上的渐进渲染 ----
 const entryBatchSize = 50
-const entries = computed<MatrixEntry[]>(() => (leaderboard.value?.entries ?? []) as MatrixEntry[])
+const entries = computed<MatrixEntry[]>(() => {
+  const all = (leaderboard.value?.entries ?? []) as MatrixEntry[]
+  return selectedTrackKey.value
+    ? all.filter(entry => entry.trackKey === selectedTrackKey.value)
+    : all
+})
 const visibleEntryCount = ref(entryBatchSize)
 const visibleEntries = computed(() =>
   entries.value.slice(0, visibleEntryCount.value),
@@ -209,6 +228,16 @@ function exportCsv() {
         <h2 class="flex items-center gap-2 text-display text-xl">
           <Trophy class="size-5 text-primary" /> {{ $t('排行榜') }} </h2>
         <div class="flex items-center gap-4">
+          <Select v-if="availableTracks.length > 1" v-model="selectedTrackKey">
+            <SelectTrigger class="min-w-40" :aria-label="$t('选择排行榜赛道')">
+              <SelectValue :placeholder="$t('选择赛道')" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">
+                {{ track.name }}<template v-if="track.isInternal"> · {{ $t('内部') }}</template>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <label class="flex items-center gap-2 text-sm text-muted-foreground">
             <Checkbox v-model="showGroupLabels" /> {{ $t('显示分组标签') }} </label>
           <Button variant="outline" :disabled="!entries.length" @click="exportCsv">
@@ -306,6 +335,9 @@ function exportCsv() {
                             <AvatarFallback>{{ entry.teamName?.slice(0, 2) ?? '?' }}</AvatarFallback>
                           </Avatar>
                           <span class="font-medium">{{ entry.teamName }}</span>
+                          <Badge v-if="availableTracks.length > 1" variant="outline" class="text-[0.7rem]">
+                            {{ availableTracks.find(track => track.key === entry.trackKey)?.name ?? entry.trackKey }}
+                          </Badge>
                         </span>
                       </TableCell>
                       <TableCell class="text-right font-mono font-semibold tabular-nums">{{ entry.score }} pts</TableCell>
