@@ -12,6 +12,7 @@ TEST/
 .vs/
 .vscode/
 .idea/
+DemoVideo/
 
 # OS/editor noise
 .DS_Store
