@@ -2,9 +2,11 @@
 
 ## 存储与比较
 
-所有正确答案只存 `challenge_flags`，选手提交原文只存 `submissions.submitted_flag`。Flag 明文保存，不加密、不 HMAC 替代、不做不可逆隐藏。日志允许记录 Flag；玩家 API 不得泄露其他队/正确答案。
+所有正确答案只存 `challenge_flags`，选手提交原文只存 `gameplay_facts.value`。Flag 明文保存，不加密、不 HMAC 替代、不做不可逆隐藏。日志允许记录 Flag；玩家 API 不得泄露其他队/正确答案。
 
-比较固定为：UTF-8、ordinal、区分大小写、固定时间比较；不 Trim、不 Unicode 归一化。合法 Flag 为 1..4096 UTF-8 bytes 且不含 NUL。
+精确匹配固定为：UTF-8、ordinal、区分大小写、固定时间比较；不 Trim、不 Unicode 归一化。合法 Flag 或匹配表达式为 1..4096 UTF-8 bytes且不含 NUL。
+
+题目 Owner/Manager 可以将 CTF 静态答案配置为正则表达式。正则匹配整段提交内容、区分大小写，并使用 .NET NonBacktracking 引擎和 100ms 超时；不支持回溯型结构（例如反向引用和环视）。正则仅适用于无 Runtime 或 `FlagSource=Static` 的 CTF 题目；CTF `PerTeam`、AWD、AWDP、KoH 生成的动态 Flag始终只做精确匹配。切换题目模式或改为动态 Flag 前必须先删除或改回其所有正则 Flag。
 
 CTF 赛后练习判题复用完全相同的 Flag scope、Team、有效时间、SHA-256 候选缩小与 ordinal 原文比较，
 并要求本队对应题目的 `Practice` Runtime 正在运行且未到期。它只返回 `Correct`/`Wrong`，不写入
@@ -62,7 +64,7 @@ bodyTemplate: string
 leetLiteralText: bool
 ```
 
-header 非空结果为 `header{body}`；header 空则仅 body，不自动加括号。Header 不 Leet。只 Leet bodyTemplate 的字面文本，占位符展开值不 Leet。模板变更只影响以后生成。
+header 非空结果为 `header{body}`；Header 不 Leet。只 Leet bodyTemplate 的字面文本，占位符展开值不 Leet。模板变更只影响以后生成。未指定或仅含空白的 header 自动使用 `flag`；未指定或仅含空白的 bodyTemplate 自动使用 `[GUID]`，即默认生成 `flag{<随机 UUIDv4>}`。
 
 支持：
 

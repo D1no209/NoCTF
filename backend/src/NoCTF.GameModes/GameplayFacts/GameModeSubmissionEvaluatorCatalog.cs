@@ -3,6 +3,9 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.GameModes.Ctf.Configuration;
+using NoCTF.GameModes.Registration;
 using SubmissionEntity = NoCTF.Domain.Gameplay.GameplayFact;
 
 namespace NoCTF.GameModes.GameplayFact;
@@ -68,9 +71,33 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
             return ModeGameplayFactEvaluatorRules.Reject(
                 context.GameplayFact,
                 GameplayFactFailureCode.FixNotSupported);
+        var supportsRegularExpression = SupportsRegularExpression(context.ChallengeDefinitionJson);
+        var effectiveContext = supportsRegularExpression
+            ? context
+            : context with
+            {
+                ApplicableFlags = context.ApplicableFlags
+                    .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact)
+                    .ToArray()
+            };
         return ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(
-            context,
-            inner.Evaluate(context));
+            effectiveContext,
+            inner.Evaluate(effectiveContext));
+    }
+
+    private static bool SupportsRegularExpression(string? definitionJson)
+    {
+        if (string.IsNullOrWhiteSpace(definitionJson))
+            return false;
+        try
+        {
+            return CtfConfigurationUpgrader.ParseChallenge(definitionJson).Runtime?.FlagSource
+                is null or RuntimeFlagSource.Static;
+        }
+        catch (GameModeConfigurationException)
+        {
+            return false;
+        }
     }
 }
 
@@ -88,6 +115,7 @@ public sealed class AwdGameplayFactEvaluator : IGameplayFactEvaluator
             return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.HardeningActive);
 
         var candidates = context.ApplicableFlags
+            .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact)
             .Where(flag => flag.TeamId is not null && DefaultEfGameplayFactEvaluator.Matches(submission, flag))
             .OrderBy(flag => flag.Id)
             .ToList();
@@ -135,8 +163,15 @@ public sealed class AwdpGameplayFactEvaluator(IGameplayFactEvaluator inner) : IG
         if (submission.Kind != GameplayFactKind.BreakAttempt)
             return inner.Evaluate(context);
 
-        var normalDecision = inner.Evaluate(context with { PriorFacts = [] });
-        return ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(context, normalDecision);
+        var exactContext = context with
+        {
+            ApplicableFlags = context.ApplicableFlags
+                .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact)
+                .ToArray(),
+            PriorFacts = []
+        };
+        var normalDecision = inner.Evaluate(exactContext);
+        return ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(exactContext, normalDecision);
     }
 }
 

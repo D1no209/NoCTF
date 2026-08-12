@@ -1632,4 +1632,9 @@ export const englishMessages: Record<string, string> = {
   "正在永久删除": "Permanently deleting",
   "确认强制删除": "Confirm force deletion",
   "竞赛已被强制删除": "Competition force-deleted",
+  "匹配方式": "Match type",
+  "精确匹配": "Exact match",
+  "正则匹配": "Regular expression",
+  "正则表达式": "Regular expression",
+  "正则表达式匹配完整 Flag，区分大小写；仅 CTF 静态 Flag 可用。": "The regular expression matches the entire Flag and is case-sensitive. It is available only for static CTF Flags.",
 }

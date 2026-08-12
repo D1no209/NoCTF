@@ -112,6 +112,30 @@ public sealed class CompetitionPracticeModePersistenceTests
                 await Assert.That(await db.Competitions
                     .Select(item => item.LeaderboardDirty)
                     .SingleAsync(ct)).IsFalse();
+
+                var storedFlag = await db.ChallengeFlags.SingleAsync(ct);
+                storedFlag.Flag = @"flag\{practice-[a-z-]+\}";
+                storedFlag.FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(storedFlag.Flag));
+                storedFlag.MatchKind = ChallengeFlagMatchKind.RegularExpression;
+                await db.SaveChangesAsync(ct);
+                var regexCorrect = await judge.ExecuteAsync(new(
+                    fixture.CompetitionId,
+                    fixture.CompetitionChallengeId,
+                    fixture.UserId,
+                    fixture.Flag,
+                    fixture.Now.AddMinutes(1)), ct);
+                var regexPartial = await judge.ExecuteAsync(new(
+                    fixture.CompetitionId,
+                    fixture.CompetitionChallengeId,
+                    fixture.UserId,
+                    $"prefix-{fixture.Flag}",
+                    fixture.Now.AddMinutes(1)), ct);
+
+                await Assert.That(regexCorrect.Judgement)
+                    .IsEqualTo(PracticeFlagJudgement.Correct);
+                await Assert.That(regexPartial.Judgement)
+                    .IsEqualTo(PracticeFlagJudgement.Wrong);
+                await Assert.That(await db.GameplayFacts.CountAsync(ct)).IsEqualTo(0);
             }
 
             await using (var db = new NoCtfDbContext(options))

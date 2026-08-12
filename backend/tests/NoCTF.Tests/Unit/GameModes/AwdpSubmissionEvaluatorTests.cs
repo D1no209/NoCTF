@@ -15,6 +15,38 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class AwdpGameplayFactEvaluatorTests
 {
     [Test]
+    public async Task Break_does_not_accept_regular_expression_flags()
+    {
+        const string flag = "flag{awdp-regex}";
+        var receivedAt = DateTimeOffset.UtcNow;
+        var submission = new GameplayFact
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = Guid.NewGuid(),
+            CompetitionChallengeId = Guid.NewGuid(),
+            TeamId = Guid.NewGuid(),
+            Kind = GameplayFactKind.BreakAttempt,
+            Value = flag,
+            ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
+            OccurredAt = receivedAt
+        };
+        var expression = new ChallengeFlag
+        {
+            Id = Guid.NewGuid(),
+            CompetitionChallengeId = submission.CompetitionChallengeId,
+            Flag = @"flag\{.*\}",
+            FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(@"flag\{.*\}")),
+            MatchKind = ChallengeFlagMatchKind.RegularExpression,
+            CreatedAt = receivedAt
+        };
+
+        var decision = new AwdpGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(new(submission, [], [expression], null, "{}", "{}"));
+
+        await Assert.That(decision.Result).IsEqualTo(GameplayFactResult.Wrong);
+    }
+
+    [Test]
     [Arguments(AchievementSettlement.Milestone)]
     [Arguments(AchievementSettlement.PerRound)]
     public async Task Break_after_prior_correct_remains_correct(

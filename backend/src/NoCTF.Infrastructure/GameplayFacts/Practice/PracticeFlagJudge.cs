@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.GameplayFacts.Practice;
+using NoCTF.Application.Challenges.Flags;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
@@ -9,8 +11,13 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Practice;
 
-public sealed class PracticeFlagJudge(NoCtfDbContext db) : IPracticeFlagJudge
+public sealed class PracticeFlagJudge(
+    NoCtfDbContext db,
+    IChallengeRuntimeTemplateCatalog runtimeTemplates) : IPracticeFlagJudge
 {
+    public PracticeFlagJudge(NoCtfDbContext db)
+        : this(db, new NoCTF.GameModes.Registration.ChallengeRuntimeTemplateCatalog()) { }
+
     public async Task<PracticeFlagResult> JudgeAsync(
         JudgePracticeFlagCommand command,
         CancellationToken ct)
@@ -34,7 +41,7 @@ public sealed class PracticeFlagJudge(NoCtfDbContext db) : IPracticeFlagJudge
                 item => item.Instance.ChallengeId,
                 template => template.Id,
                 (item, template) => new { item.Instance, Template = template })
-            .Select(item => new { item.Instance.ChallengeId })
+            .Select(item => new { item.Instance.ChallengeId, item.Template.DefinitionJson })
             .SingleOrDefaultAsync(ct);
         if (scope is null)
             return new(FailureCode: PracticeFlagFailureCode.PracticeUnavailable);
@@ -61,6 +68,9 @@ public sealed class PracticeFlagJudge(NoCtfDbContext db) : IPracticeFlagJudge
             return new(FailureCode: PracticeFlagFailureCode.RuntimeNotRunning);
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(command.Flag));
+        var supportsRegularExpression = runtimeTemplates
+            .Get(GameMode.Ctf, scope.DefinitionJson)?.FlagSource
+                is null or RuntimeFlagSource.Static;
         var candidates = await db.ChallengeFlags.AsNoTracking()
             .IgnoreQueryFilters()
             .Where(flag => flag.DeletedAt == null
@@ -69,11 +79,12 @@ public sealed class PracticeFlagJudge(NoCtfDbContext db) : IPracticeFlagJudge
                 && (flag.TeamId == null || flag.TeamId == team.Id)
                 && (flag.ValidStart == null || flag.ValidStart <= command.SubmittedAt)
                 && (flag.ValidUntil == null || command.SubmittedAt < flag.ValidUntil)
-                && flag.FlagSha256 == hash)
-            .Select(flag => flag.Flag)
+                && (flag.FlagSha256 == hash
+                    || supportsRegularExpression
+                    && flag.MatchKind == NoCTF.Domain.Challenges.ChallengeFlagMatchKind.RegularExpression))
             .ToArrayAsync(ct);
         var correct = candidates.Any(candidate =>
-            string.Equals(candidate, command.Flag, StringComparison.Ordinal));
+            ChallengeFlagMatcher.IsMatch(command.Flag, candidate));
         return new(correct ? PracticeFlagJudgement.Correct : PracticeFlagJudgement.Wrong);
     }
 }

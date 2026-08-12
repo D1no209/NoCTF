@@ -244,7 +244,8 @@ public sealed class GameplayFactProcessor(
             configuration.Competition.ConfigurationJson,
             configuration.CompetitionChallenge.RulesJson,
             configuration.Competition.StartAt,
-            effectiveRunningTime));
+            effectiveRunningTime,
+            configuration.Challenge.DefinitionJson));
         return new(
             decision,
             configuration.Competition.ConfigurationRevision,

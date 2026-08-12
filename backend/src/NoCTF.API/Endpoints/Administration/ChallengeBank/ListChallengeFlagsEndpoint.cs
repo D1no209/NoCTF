@@ -12,6 +12,7 @@ public sealed record ChallengeFlagResponse(
     Guid? CompetitionChallengeId,
     Guid? TeamId,
     string Flag,
+    ChallengeFlagMatchKindProtocol MatchKind,
     SpecificationKindProtocol? SpecificationKind,
     Guid? SpecificationId,
     DateTimeOffset? ValidStart,
@@ -19,7 +20,9 @@ public sealed record ChallengeFlagResponse(
     DateTimeOffset? DeletedAt,
     DateTimeOffset CreatedAt);
 
-public sealed record ChallengeFlagListResponse(IReadOnlyList<ChallengeFlagResponse> Items);
+public sealed record ChallengeFlagListResponse(
+    IReadOnlyList<ChallengeFlagResponse> Items,
+    bool SupportsRegularExpression);
 
 internal static class ChallengeFlagMapping
 {
@@ -27,6 +30,12 @@ internal static class ChallengeFlagMapping
         new(
             view.Id, view.ChallengeId, view.CompetitionChallengeId, view.TeamId,
             view.Flag,
+            view.MatchKind switch
+            {
+                ChallengeFlagMatchKind.Exact => ChallengeFlagMatchKindProtocol.Exact,
+                ChallengeFlagMatchKind.RegularExpression => ChallengeFlagMatchKindProtocol.RegularExpression,
+                _ => throw new ArgumentOutOfRangeException(nameof(view.MatchKind))
+            },
             view.SpecificationKind is null
                 ? null
                 : ChallengeTemplateMapper.ToProtocol(view.SpecificationKind.Value),
@@ -68,9 +77,15 @@ public sealed class ListChallengeFlagsEndpoint(
             user.IsAdministrator,
             request.IncludeDeleted,
             ct);
-        return items is null
-            ? TypedResults.NotFound()
-            : TypedResults.Ok(new ChallengeFlagListResponse(
-                items.Select(ChallengeFlagMapping.ToResponse).ToArray()));
+        if (items is null)
+            return TypedResults.NotFound();
+        var supportsRegularExpression = await flags.SupportsRegularExpressionAsync(
+            ChallengeFlagScope.Template(request.ChallengeId),
+            user.UserId,
+            user.IsAdministrator,
+            ct) == true;
+        return TypedResults.Ok(new ChallengeFlagListResponse(
+            items.Select(ChallengeFlagMapping.ToResponse).ToArray(),
+            supportsRegularExpression));
     }
 }

@@ -21,6 +21,7 @@ public sealed record ChallengeFlagView(
     Guid? CompetitionChallengeId,
     Guid? TeamId,
     string Flag,
+    ChallengeFlagMatchKind MatchKind,
     SpecificationKind? SpecificationKind,
     Guid? SpecificationId,
     DateTimeOffset? ValidStart,
@@ -38,7 +39,8 @@ public sealed record SaveChallengeFlagCommand(
     Guid? SpecificationId,
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidUntil,
-    DateTimeOffset Now);
+    DateTimeOffset Now,
+    ChallengeFlagMatchKind MatchKind = ChallengeFlagMatchKind.Exact);
 
 public enum ChallengeFlagSaveFailure
 {
@@ -50,6 +52,8 @@ public enum ChallengeFlagSaveFailure
 public enum ChallengeFlagFailureCode
 {
     InvalidFlag,
+    InvalidRegularExpression,
+    RegularExpressionNotSupported,
     InvalidSpecification,
     InvalidValidityWindow,
     InvalidTemplateFlagScope,
@@ -63,6 +67,11 @@ public sealed record ChallengeFlagSaveResult(
 
 public interface IChallengeFlagStore
 {
+    Task<bool?> SupportsRegularExpressionAsync(
+        ChallengeFlagScope scope,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken cancellationToken);
     Task<IReadOnlyList<ChallengeFlagView>?> ListAsync(
         ChallengeFlagScope scope,
         Guid? actorId,
@@ -99,6 +108,13 @@ public interface IChallengeFlagStore
 
 public sealed class ManageChallengeFlags(IChallengeFlagStore store)
 {
+    public Task<bool?> SupportsRegularExpressionAsync(
+        ChallengeFlagScope scope,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken ct = default) =>
+        store.SupportsRegularExpressionAsync(scope, actorId, isAdministrator, ct);
+
     public Task<IReadOnlyList<ChallengeFlagView>?> ListAsync(
         ChallengeFlagScope scope,
         Guid? actorId,
@@ -122,11 +138,35 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         bool isAdministrator,
         CancellationToken ct = default)
     {
+        if (!Enum.IsDefined(command.MatchKind))
+            return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.InvalidFlag,
+                "Flag match kind is invalid.");
         var bytes = Encoding.UTF8.GetBytes(command.Flag);
         if (bytes.Length is < 1 or > 4096 || bytes.Contains((byte)0))
             return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
                 ChallengeFlagFailureCode.InvalidFlag,
                 "Flag must be 1..4096 UTF-8 bytes and cannot contain NUL.");
+        if (command.MatchKind == ChallengeFlagMatchKind.RegularExpression)
+        {
+            if (!ChallengeFlagMatcher.IsValidRegularExpression(command.Flag))
+                return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.InvalidRegularExpression,
+                    "Flag regular expression is invalid or uses unsupported constructs.");
+            var supported = await store.SupportsRegularExpressionAsync(
+                command.Scope,
+                actorId,
+                isAdministrator,
+                ct);
+            if (supported is null)
+                return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.FlagNotFound,
+                    "Flag scope was not found or access was denied.");
+            if (!supported.Value)
+                return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.RegularExpressionNotSupported,
+                    "Regular-expression flags are only supported by CTF challenges without dynamic per-team flags.");
+        }
         if ((command.SpecificationKind is null) != (command.SpecificationId is null))
             return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
                 ChallengeFlagFailureCode.InvalidSpecification,

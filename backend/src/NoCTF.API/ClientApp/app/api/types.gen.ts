@@ -1607,6 +1607,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = 
     competitionChallengeId?: string | null;
     teamId?: string | null;
     flag?: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
     specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
     specificationId?: string | null;
     validStart?: string | null;
@@ -1615,12 +1616,15 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = 
     createdAt?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
+
 export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest = {
     id?: string | null;
     teamId?: string | null;
     flag: string;
+    matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
     specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
     specificationId?: string | null;
     validStart?: string | null;
@@ -1677,6 +1681,7 @@ export type NoCtfapiEndpointsAdministrationChallengesListAdminChallengesRequest 
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagListResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse>;
+    supportsRegularExpression?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesListCompetitionChallengeFlagsRequest = {

@@ -20,7 +20,8 @@ public sealed record GameplayFactProcessingContext(
     string CompetitionConfigurationJson,
     string ChallengeConfigurationJson,
     DateTimeOffset? CompetitionStartTime = null,
-    TimeSpan? EffectiveRunningTime = null);
+    TimeSpan? EffectiveRunningTime = null,
+    string? ChallengeDefinitionJson = null);
 
 public interface IGameplayFactEvaluator
 {

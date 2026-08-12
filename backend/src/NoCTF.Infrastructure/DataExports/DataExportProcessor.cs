@@ -466,6 +466,7 @@ public sealed class DataExportProcessor(
                         item.TeamId,
                         Sha256 = Convert.ToHexString(item.FlagSha256),
                         Flag = includeProtectedFlags ? item.Flag : null,
+                        item.MatchKind,
                         item.SpecificationKind,
                         item.SpecificationId,
                         item.ValidStart,
