@@ -271,6 +271,7 @@ function setAppealOpen(open: boolean) {
             >
               {{ teamRegistrationStatusLabel(team.registrationStatus) }}
             </Badge>
+            <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
             <Badge v-if="team.isLocked" variant="outline">{{ $t('已锁定') }}</Badge>
             <Badge v-if="team.isBanned" variant="destructive">{{ $t('已封禁') }}</Badge>
           </div>

@@ -44,6 +44,7 @@ onMounted(async () => {
         >
           {{ teamRegistrationStatusLabel(team.registrationStatus) }}
         </Badge>
+        <Badge variant="outline">{{ team.trackName ?? team.trackKey }}</Badge>
         <Badge v-if="team.isBanned" variant="destructive">{{ $t('已封禁') }}</Badge>
       </div>
       <p class="text-sm text-muted-foreground">{{ $t('报名时间：{time}', { time: formatDateTime(team.registeredAt) }) }}</p>

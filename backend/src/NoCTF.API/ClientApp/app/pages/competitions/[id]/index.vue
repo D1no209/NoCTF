@@ -18,8 +18,13 @@ import {
   getMyTeamEndpoint,
   joinTeamByInvitationEndpoint,
   listCompetitionTeamsEndpoint,
+  listCompetitionTracks,
 } from '~/api'
-import type { NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
+import type {
+  NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse,
+  NoCtfapiEndpointsTeamsTeamResponse,
+} from '~/api'
+import { teamRegistrationErrorMessage } from '~/lib/competition-track'
 
 const route = useRoute()
 const competitionId = route.params.id as string
@@ -48,12 +53,21 @@ watch(isLoggedIn, loadMyTeam)
 
 // 已报名队伍数
 const approvedTeamCount = ref<number | null>(null)
+const selectableTracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
 onMounted(async () => {
-  const { data, error } = await listCompetitionTeamsEndpoint({ path: { competitionId } })
-  if (error || !data) return
-  approvedTeamCount.value = (data.items ?? []).filter(
+  const [teamResult, trackResult] = await Promise.all([
+    listCompetitionTeamsEndpoint({ path: { competitionId } }),
+    listCompetitionTracks({ path: { competitionId } }),
+  ])
+  if (!teamResult.error && teamResult.data) approvedTeamCount.value = (teamResult.data.items ?? []).filter(
     (team) => team.registrationStatus === 'Approved',
   ).length
+  if (!trackResult.error && trackResult.data) {
+    selectableTracks.value = (trackResult.data.items ?? []).filter(track => track.isPublicSelectable)
+    createTrackKey.value = selectableTracks.value.find(track => track.isDefault)?.key
+      ?? selectableTracks.value[0]?.key
+      ?? ''
+  }
 })
 
 // 倒计时
@@ -95,6 +109,7 @@ const teamRegistrationOpen = computed(() => {
 // 创建队伍
 const createOpen = ref(false)
 const createName = ref('')
+const createTrackKey = ref('')
 const createPending = ref(false)
 
 async function submitCreate() {
@@ -102,11 +117,14 @@ async function submitCreate() {
   createPending.value = true
   const { data, error } = await createTeamEndpoint({
     path: { competitionId },
-    body: { name: createName.value.trim() },
+    body: {
+      name: createName.value.trim(),
+      trackKey: createTrackKey.value || undefined,
+    },
   })
   createPending.value = false
   if (error || !data) {
-    toast.error(parseApiError(error, translate("创建队伍失败")).message)
+    toast.error(teamRegistrationErrorMessage(error, translate('创建队伍失败')))
     return
   }
   toast.success(translate("队伍创建成功"))
@@ -199,6 +217,18 @@ const isCaptain = computed(
                       <Field>
                         <FieldLabel for="team-name">{{ $t('队伍名称') }}</FieldLabel>
                         <Input id="team-name" v-model="createName" required maxlength="64" />
+                      </Field>
+                      <Field v-if="selectableTracks.length > 1">
+                        <FieldLabel for="team-track">{{ $t('参赛赛道') }}</FieldLabel>
+                        <Select v-model="createTrackKey" required>
+                          <SelectTrigger id="team-track"><SelectValue :placeholder="$t('选择赛道')" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem v-for="track in selectableTracks" :key="track.key" :value="track.key!">
+                              {{ track.name }}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FieldDescription>{{ $t('队伍创建后，开赛前可由比赛管理员调整。') }}</FieldDescription>
                       </Field>
                       <Field>
                         <Button type="submit" class="w-full" :disabled="createPending">
@@ -306,6 +336,9 @@ const isCaptain = computed(
     </Alert>
     <Alert v-else-if="myTeam?.isBanned" variant="destructive">
       <AlertDescription>{{ $t('队伍「{team}」已被封禁，如有异议请联系主办方。', { team: myTeam.name ?? '-' }) }}</AlertDescription>
+    </Alert>
+    <Alert v-if="myTeam">
+      <AlertDescription>{{ $t('当前赛道：{track}', { track: myTeam.trackName ?? myTeam.trackKey ?? '-' }) }}</AlertDescription>
     </Alert>
 
     <!-- 竞赛介绍 -->

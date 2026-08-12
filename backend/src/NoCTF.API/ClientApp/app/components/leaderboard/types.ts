@@ -40,6 +40,7 @@ export interface MatrixEntry {
   rank?: number
   teamId?: string
   teamName?: string
+  trackKey?: string
   score?: number
   solveCount?: number
   lastScoreAt?: string | null
