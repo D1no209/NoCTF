@@ -32,6 +32,11 @@ export interface ControlScreenSolve {
   solvedAt: string
 }
 
+export interface ControlScreenSolveReconciliation {
+  seenKeys: Set<string>
+  newSolves: ControlScreenSolve[]
+}
+
 export function controlScreenEntries(
   leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
   trackKey: string,
@@ -102,4 +107,19 @@ export function controlScreenSolveFeed(
   }
 
   return solves.sort((left, right) => right.solvedAt.localeCompare(left.solvedAt))
+}
+
+export function reconcileControlScreenSolves(
+  previousKeys: ReadonlySet<string> | null,
+  currentSolves: readonly ControlScreenSolve[],
+): ControlScreenSolveReconciliation {
+  const seenKeys = new Set(previousKeys ?? [])
+  const newSolves = previousKeys
+    ? currentSolves
+        .filter(solve => !seenKeys.has(solve.key))
+        .sort((left, right) => left.solvedAt.localeCompare(right.solvedAt) || left.key.localeCompare(right.key))
+    : []
+
+  for (const solve of currentSolves) seenKeys.add(solve.key)
+  return { seenKeys, newSolves }
 }
