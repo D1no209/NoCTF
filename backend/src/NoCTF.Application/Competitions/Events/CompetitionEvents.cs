@@ -153,7 +153,6 @@ public sealed record GameplayFactValueAccessCommand(
     Guid CompetitionId,
     Guid GameplayFactId,
     Guid ActorUserId,
-    string Reason,
     DateTimeOffset AccessedAt);
 
 public sealed record GameplayFactValueAccessView(
@@ -221,12 +220,6 @@ public sealed class AccessGameplayFactValue(ICompetitionEventStore store)
 {
     public Task<GameplayFactValueAccessResult> ExecuteAsync(
         GameplayFactValueAccessCommand command,
-        CancellationToken cancellationToken = default)
-    {
-        var reason = command.Reason.Trim();
-        return reason.Length is >= 8 and <= 512
-            ? store.AccessGameplayFactValueAsync(command with { Reason = reason }, cancellationToken)
-            : Task.FromResult(new GameplayFactValueAccessResult(
-                CompetitionEventReadState.InvalidQuery));
-    }
+        CancellationToken cancellationToken = default) =>
+        store.AccessGameplayFactValueAsync(command, cancellationToken);
 }

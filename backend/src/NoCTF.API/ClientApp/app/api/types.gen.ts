@@ -435,10 +435,6 @@ export type NoCtfapiEndpointsCompetitionsEventsAccessCompetitionGameplayFactValu
     accessedAt?: string;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsAccessCompetitionGameplayFactValueRequest = {
-    reason: string;
-};
-
 export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = {
     [key: string]: never;
 };
@@ -2998,7 +2994,7 @@ export type ListCompetitionsEndpointResponses = {
 export type ListCompetitionsEndpointResponse = ListCompetitionsEndpointResponses[keyof ListCompetitionsEndpointResponses];
 
 export type AdminAccessCompetitionGameplayFactValueData = {
-    body: NoCtfapiEndpointsCompetitionsEventsAccessCompetitionGameplayFactValueRequest;
+    body?: never;
     path: {
         competitionId: string;
         gameplayFactId: string;
@@ -3008,10 +3004,6 @@ export type AdminAccessCompetitionGameplayFactValueData = {
 };
 
 export type AdminAccessCompetitionGameplayFactValueErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -3025,8 +3017,6 @@ export type AdminAccessCompetitionGameplayFactValueErrors = {
      */
     404: unknown;
 };
-
-export type AdminAccessCompetitionGameplayFactValueError = AdminAccessCompetitionGameplayFactValueErrors[keyof AdminAccessCompetitionGameplayFactValueErrors];
 
 export type AdminAccessCompetitionGameplayFactValueResponses = {
     /**

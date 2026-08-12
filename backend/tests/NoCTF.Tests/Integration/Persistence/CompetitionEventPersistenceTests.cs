@@ -21,7 +21,7 @@ public sealed class CompetitionEventPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Immutable_feed_enforces_visibility_export_and_audited_flag_access(
+    public async Task Immutable_feed_enforces_visibility_export_and_role_specific_flag_access_auditing(
         CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -243,14 +243,23 @@ public sealed class CompetitionEventPersistenceTests
                 ids.CompetitionId,
                 ids.GameplayFactId,
                 ids.ObserverId,
-                "Need incident review",
                 now), ct);
             await Assert.That(observerFlag.State).IsEqualTo(CompetitionEventReadState.Forbidden);
+            var administratorFlag = await store.AccessGameplayFactValueAsync(new(
+                ids.CompetitionId,
+                ids.GameplayFactId,
+                ids.AdministratorId,
+                now), ct);
+            await Assert.That(administratorFlag.State).IsEqualTo(CompetitionEventReadState.Available);
+            await Assert.That(administratorFlag.View!.Value)
+                .IsEqualTo("flag{competition-event-secret}");
+            await Assert.That(await db.CompetitionEvents.AsNoTracking().CountAsync(
+                item => item.Kind == CompetitionEventKind.ProtectedGameplayFactValueAccessed,
+                ct)).IsEqualTo(0);
             var judgeFlag = await store.AccessGameplayFactValueAsync(new(
                 ids.CompetitionId,
                 ids.GameplayFactId,
                 ids.JudgeId,
-                "Investigate flag{competition-event-secret} incident",
                 now), ct);
             await Assert.That(judgeFlag.State).IsEqualTo(CompetitionEventReadState.Available);
             await Assert.That(judgeFlag.View!.Value)
@@ -259,8 +268,7 @@ public sealed class CompetitionEventPersistenceTests
                 item => item.Kind == CompetitionEventKind.ProtectedGameplayFactValueAccessed,
                 ct);
             await Assert.That(flagAudit.ActorUserId).IsEqualTo(ids.JudgeId);
-            await Assert.That(flagAudit.Reason).Contains("[REDACTED]");
-            await Assert.That(flagAudit.Reason).DoesNotContain("competition-event-secret");
+            await Assert.That(flagAudit.Reason).IsNull();
 
             await db.Competitions.Where(item => item.Id == ids.CompetitionId)
                 .ExecuteUpdateAsync(
@@ -280,7 +288,6 @@ public sealed class CompetitionEventPersistenceTests
                     ids.CompetitionId,
                     ids.GameplayFactId,
                     readerId,
-                    "Archived incident evidence review",
                     archivedAccessedAt), ct);
                 await Assert.That(archivedFlag.State)
                     .IsEqualTo(CompetitionEventReadState.Available);
@@ -292,7 +299,6 @@ public sealed class CompetitionEventPersistenceTests
                 ids.CompetitionId,
                 ids.GameplayFactId,
                 ids.ObserverId,
-                "Archived incident evidence review",
                 archivedAccessedAt), ct);
             await Assert.That(archivedObserverFlag.State)
                 .IsEqualTo(CompetitionEventReadState.Forbidden);
@@ -300,7 +306,6 @@ public sealed class CompetitionEventPersistenceTests
                 ids.CompetitionId,
                 ids.GameplayFactId,
                 ids.ParticipantId,
-                "Archived incident evidence review",
                 archivedAccessedAt), ct);
             await Assert.That(archivedParticipantFlag.State)
                 .IsEqualTo(CompetitionEventReadState.CompetitionNotFound);
@@ -310,12 +315,12 @@ public sealed class CompetitionEventPersistenceTests
                     && item.OccurredAt == archivedAccessedAt)
                 .ToListAsync(ct);
             await Assert.That(archivedValueAudits.Select(item => item.ActorUserId!.Value))
-                .IsEquivalentTo(archivedValueReaders);
+                .IsEquivalentTo([ids.OwnerId, ids.ManagerId, ids.JudgeId]);
 
             var bot = await store.QueryAsync(Query(ids, ids.BotId, now), ct);
             await Assert.That(bot.State).IsEqualTo(CompetitionEventReadState.Forbidden);
             await Assert.That(outbox.Messages.OfType<CompetitionEventCommitted>()).Count()
-                .IsEqualTo(10);
+                .IsEqualTo(9);
 
             var immutable = await db.CompetitionEvents.SingleAsync(
                 item => item.Id == eventIds[0], ct);

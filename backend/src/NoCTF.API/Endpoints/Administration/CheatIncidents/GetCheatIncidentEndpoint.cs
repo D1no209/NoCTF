@@ -61,7 +61,7 @@ public sealed class GetCheatIncidentEndpoint(
         {
             summary.Summary = "Reads one protected cross-team Flag incident.";
             summary.Description =
-                "Administrator, owner, manager, and judge only. The full Flag response is never cached and every successful read is audited.";
+                "Administrator, owner, manager, and judge only. The full Flag response is never cached. Owner, manager, and judge reads are audited; platform Administrator reads are not.";
         });
     }
 
@@ -89,6 +89,7 @@ public sealed class GetCheatIncidentEndpoint(
             request.CompetitionId,
             request.GameplayFactId,
             user.UserId,
+            user.IsAdministrator,
             timeProvider.GetUtcNow(),
             cancellationToken);
         if (detail is null)

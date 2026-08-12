@@ -72,4 +72,4 @@ version 和最小写权限。只有 sequence/version 与 Runtime 当前值精确
 
 ## 日志中的敏感内容
 
-选手永远不能通过 API 看到其他队或系统 GameplayFact 的 Value。管理者可查看 GameplayFact 原始 Flag，并通过受保护访问事件审计；密码、PasswordHash、InvitationToken、Access/Refresh/Internal JWT、邮箱验证 Token、密码重置 Token、FlagDerivationSecret 永远不得记录。
+选手永远不能通过 API 看到其他队或系统 GameplayFact 的 Value。平台 Administrator 可直接查看 GameplayFact 原始 Flag 且不记录该读取行为；比赛 Owner、Manager、Judge 也可直接查看，但每次成功读取仍追加受保护访问事件。密码、PasswordHash、InvitationToken、Access/Refresh/Internal JWT、邮箱验证 Token、密码重置 Token、FlagDerivationSecret 永远不得记录。

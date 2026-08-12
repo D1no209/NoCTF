@@ -2220,7 +2220,7 @@
           "Admin"
         ],
         "summary": "Explicitly reads one protected submitted Flag.",
-        "description": "Administrator, owner, manager, and judge only. Every successful access appends an immutable audit event.",
+        "description": "Administrator, owner, manager, and judge only. Owner, manager, and judge access appends an immutable audit event; platform Administrator access is not audited.",
         "operationId": "AdminAccessCompetitionGameplayFactValue",
         "parameters": [
           {
@@ -2240,19 +2240,6 @@
             }
           }
         ],
-        "requestBody": {
-          "x-name": "AccessCompetitionGameplayFactValueRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsEventsAccessCompetitionGameplayFactValueRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -2272,16 +2259,6 @@
           },
           "403": {
             "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -9349,7 +9326,7 @@
           "Admin"
         ],
         "summary": "Reads one protected cross-team Flag incident.",
-        "description": "Administrator, owner, manager, and judge only. The full Flag response is never cached and every successful read is audited.",
+        "description": "Administrator, owner, manager, and judge only. The full Flag response is never cached. Owner, manager, and judge reads are audited; platform Administrator reads are not.",
         "operationId": "AdminGetCheatIncident",
         "parameters": [
           {
@@ -13695,21 +13672,6 @@
           "accessedAt": {
             "type": "string",
             "format": "date-time"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsCompetitionsEventsAccessCompetitionGameplayFactValueRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "reason"
-        ],
-        "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 512,
-            "minLength": 8,
-            "nullable": false
           }
         }
       },

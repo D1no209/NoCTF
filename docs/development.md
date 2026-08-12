@@ -75,7 +75,7 @@ dotnet ef database update
 
 ## 日志
 
-结构化日志包含 Competition/Challenge/Team/GameplayFact/RuntimeInstance/Message Id。受保护 Flag 访问必须有审计；密码、任何 JWT/Token、InvitationToken、FlagDerivationSecret 不记录。异常不作为业务分支；Result/enum 表达预期失败。
+结构化日志包含 Competition/Challenge/Team/GameplayFact/RuntimeInstance/Message Id。比赛 Owner、Manager、Judge 的受保护 Flag 访问必须有审计；平台 Administrator 读取不写审计。密码、任何 JWT/Token、InvitationToken、FlagDerivationSecret 不记录。异常不作为业务分支；Result/enum 表达预期失败。
 
 ## 文档同步
 

@@ -84,36 +84,37 @@ public sealed class CheatIncidentStore(
     }
 
     public async Task<CheatIncidentDetail?> GetDetailAsync(
-        Guid competitionId,
-        Guid gameplayFactId,
-        Guid actorUserId,
-        DateTimeOffset accessedAt,
+        CheatIncidentAccessCommand command,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var fact = await ProjectFacts(IncidentGameplayFacts(competitionId)
-                .Where(item => item.Id == gameplayFactId))
+        var fact = await ProjectFacts(IncidentGameplayFacts(command.CompetitionId)
+                .Where(item => item.Id == command.GameplayFactId))
             .SingleOrDefaultAsync(cancellationToken);
         if (fact is null)
             return null;
-        var resolutions = await LoadResolutionsAsync([gameplayFactId], cancellationToken);
-        var resolution = Resolve(gameplayFactId, resolutions);
+        var resolutions = await LoadResolutionsAsync([command.GameplayFactId], cancellationToken);
+        var resolution = Resolve(command.GameplayFactId, resolutions);
         var resolverNames = await LoadResolverNamesAsync(resolutions, cancellationToken);
-        await events.RecordAsync(new(
-            competitionId,
-            CompetitionEventKind.ProtectedGameplayFactValueAccessed,
-            CompetitionEventLevel.Warning,
-            CompetitionEventVisibility.Staff,
-            accessedAt,
-            ActorUserId: actorUserId,
-            TeamId: fact.SourceTeamId,
-            CompetitionChallengeId: fact.CompetitionChallengeId,
-            GameplayFactId: gameplayFactId,
-            GameplayFactKind: fact.GameplayFactKind,
-            Reason: "Anti-cheat incident detail viewed."), cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
+        if (command.ShouldAuditAccess)
+        {
+            await events.RecordAsync(new(
+                command.CompetitionId,
+                CompetitionEventKind.ProtectedGameplayFactValueAccessed,
+                CompetitionEventLevel.Warning,
+                CompetitionEventVisibility.Staff,
+                command.AccessedAt,
+                ActorUserId: command.ActorUserId,
+                TeamId: fact.SourceTeamId,
+                CompetitionChallengeId: fact.CompetitionChallengeId,
+                GameplayFactId: command.GameplayFactId,
+                GameplayFactKind: fact.GameplayFactKind,
+                Reason: "Anti-cheat incident detail viewed."), cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        if (command.ShouldAuditAccess)
+            await outbox.FlushOutgoingMessagesAsync();
         return MapDetail(fact, resolution, resolverNames);
     }
 

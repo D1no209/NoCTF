@@ -641,7 +641,7 @@ export const listCompetitionsEndpoint = <ThrowOnError extends boolean = false>(o
 /**
  * Explicitly reads one protected submitted Flag.
  *
- * Administrator, owner, manager, and judge only. Every successful access appends an immutable audit event.
+ * Administrator, owner, manager, and judge only. Owner, manager, and judge access appends an immutable audit event; platform Administrator access is not audited.
  */
 export const adminAccessCompetitionGameplayFactValue = <ThrowOnError extends boolean = false>(options: Options<AdminAccessCompetitionGameplayFactValueData, ThrowOnError>): RequestResult<AdminAccessCompetitionGameplayFactValueResponses, AdminAccessCompetitionGameplayFactValueErrors, ThrowOnError> => (options.client ?? client).post<AdminAccessCompetitionGameplayFactValueResponses, AdminAccessCompetitionGameplayFactValueErrors, ThrowOnError>({
     security: [{
@@ -650,11 +650,7 @@ export const adminAccessCompetitionGameplayFactValue = <ThrowOnError extends boo
             type: 'http'
         }],
     url: '/api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
+    ...options
 });
 
 /**
@@ -2522,7 +2518,7 @@ export const adminDismissCheatIncident = <ThrowOnError extends boolean = false>(
 /**
  * Reads one protected cross-team Flag incident.
  *
- * Administrator, owner, manager, and judge only. The full Flag response is never cached and every successful read is audited.
+ * Administrator, owner, manager, and judge only. The full Flag response is never cached. Owner, manager, and judge reads are audited; platform Administrator reads are not.
  */
 export const adminGetCheatIncident = <ThrowOnError extends boolean = false>(options: Options<AdminGetCheatIncidentData, ThrowOnError>): RequestResult<AdminGetCheatIncidentResponses, AdminGetCheatIncidentErrors, ThrowOnError> => (options.client ?? client).get<AdminGetCheatIncidentResponses, AdminGetCheatIncidentErrors, ThrowOnError>({
     security: [{

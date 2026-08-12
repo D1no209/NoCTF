@@ -172,25 +172,24 @@ public sealed class CompetitionEventStore(
         if (submission is null)
             return new(CompetitionEventReadState.CompetitionNotFound);
 
-        var safeReason = command.Reason.Replace(
-            submission.Value,
-            "[REDACTED]",
-            StringComparison.Ordinal);
-        await RecordAsync(new CompetitionEventDraft(
-            command.CompetitionId,
-            CompetitionEventKind.ProtectedGameplayFactValueAccessed,
-            CompetitionEventLevel.Warning,
-            CompetitionEventVisibility.Staff,
-            command.AccessedAt,
-            ActorUserId: command.ActorUserId,
-            TeamId: submission.TeamId,
-            CompetitionChallengeId: submission.CompetitionChallengeId,
-            GameplayFactId: submission.Id,
-            GameplayFactKind: submission.Kind,
-            Reason: safeReason), cancellationToken);
-        await db.SaveChangesAsync(cancellationToken);
+        if (access.ShouldAuditGameplayFactValueAccess)
+        {
+            await RecordAsync(new CompetitionEventDraft(
+                command.CompetitionId,
+                CompetitionEventKind.ProtectedGameplayFactValueAccessed,
+                CompetitionEventLevel.Warning,
+                CompetitionEventVisibility.Staff,
+                command.AccessedAt,
+                ActorUserId: command.ActorUserId,
+                TeamId: submission.TeamId,
+                CompetitionChallengeId: submission.CompetitionChallengeId,
+                GameplayFactId: submission.Id,
+                GameplayFactKind: submission.Kind), cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
         await transaction.CommitAsync(cancellationToken);
-        await outbox.FlushOutgoingMessagesAsync();
+        if (access.ShouldAuditGameplayFactValueAccess)
+            await outbox.FlushOutgoingMessagesAsync();
         return new(
             CompetitionEventReadState.Available,
             new GameplayFactValueAccessView(
@@ -246,7 +245,8 @@ public sealed class CompetitionEventStore(
                 CompetitionEventAccessLevel.Staff,
                 null,
                 administrator || owner || manager,
-                administrator || owner || manager || judge);
+                administrator || owner || manager || judge,
+                !administrator && (owner || manager || judge));
         }
         if (competition.Status == CompetitionStatus.Draft)
             return new(CompetitionEventReadState.Forbidden);
@@ -520,5 +520,6 @@ public sealed class CompetitionEventStore(
         CompetitionEventAccessLevel? AccessLevel = null,
         Guid? TeamId = null,
         bool CanExport = false,
-        bool CanAccessGameplayFactValues = false);
+        bool CanAccessGameplayFactValues = false,
+        bool ShouldAuditGameplayFactValueAccess = false);
 }

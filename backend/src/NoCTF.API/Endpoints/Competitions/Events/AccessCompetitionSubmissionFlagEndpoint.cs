@@ -1,5 +1,4 @@
 using FastEndpoints;
-using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.GameplayFacts;
@@ -8,21 +7,6 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.API.Endpoints.Competitions.Events;
-
-public sealed class AccessCompetitionGameplayFactValueRequest
-{
-    public string Reason { get; set; } = string.Empty;
-}
-
-public sealed class AccessCompetitionGameplayFactValueValidator
-    : Validator<AccessCompetitionGameplayFactValueRequest>
-{
-    public AccessCompetitionGameplayFactValueValidator() =>
-        RuleFor(request => request.Reason)
-            .NotEmpty()
-            .MinimumLength(8)
-            .MaximumLength(512);
-}
 
 public sealed record AccessCompetitionGameplayFactValueResponse(
     Guid GameplayFactId,
@@ -34,7 +18,7 @@ public sealed class AccessCompetitionGameplayFactValueEndpoint(
     AccessGameplayFactValue access,
     IUserContext user,
     TimeProvider timeProvider)
-    : Endpoint<AccessCompetitionGameplayFactValueRequest,
+    : EndpointWithoutRequest<
         Results<Ok<AccessCompetitionGameplayFactValueResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
 {
     public override void Configure()
@@ -46,21 +30,18 @@ public sealed class AccessCompetitionGameplayFactValueEndpoint(
         {
             summary.Summary = "Explicitly reads one protected submitted Flag.";
             summary.Description =
-                "Administrator, owner, manager, and judge only. Every successful access appends an immutable audit event.";
+                "Administrator, owner, manager, and judge only. Owner, manager, and judge access appends an immutable audit event; platform Administrator access is not audited.";
         });
     }
 
     public override async Task<
         Results<Ok<AccessCompetitionGameplayFactValueResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
-        ExecuteAsync(
-            AccessCompetitionGameplayFactValueRequest request,
-            CancellationToken cancellationToken)
+        ExecuteAsync(CancellationToken cancellationToken)
     {
         var result = await access.ExecuteAsync(new GameplayFactValueAccessCommand(
             Route<Guid>("competitionId"),
             Route<Guid>("gameplayFactId"),
             user.UserId,
-            request.Reason,
             timeProvider.GetUtcNow()), cancellationToken);
         if (result.State == CompetitionEventReadState.Forbidden)
             return TypedResults.Forbid();
