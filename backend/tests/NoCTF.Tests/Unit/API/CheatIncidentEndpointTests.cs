@@ -81,10 +81,28 @@ public sealed class CheatIncidentEndpointTests
         await Assert.That(detail!.Value).IsEqualTo("flag{protected-evidence}");
         await Assert.That(detail.CanDismiss).IsTrue();
         await Assert.That(detail.CanConfirm).IsTrue();
+        await Assert.That(store.LastDetailReadShouldAudit).IsTrue();
         await Assert.That(dismissResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
         await Assert.That(store.DismissCalls).IsEqualTo(1);
         await Assert.That(confirmResponse.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
         await Assert.That(store.ConfirmCalls).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Platform_administrator_evidence_read_is_not_audited()
+    {
+        var authorizer = new TestAuthorizer { Access = TestAccess.Moderator };
+        var store = new RecordingStore();
+        await using var app = await CreateApplicationAsync(
+            store,
+            authorizer,
+            isAdministrator: true);
+        using var client = app.GetTestClient();
+
+        using var detailResponse = await client.GetAsync(DetailUri());
+
+        await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(store.LastDetailReadShouldAudit).IsFalse();
     }
 
     [Test]
@@ -150,7 +168,8 @@ public sealed class CheatIncidentEndpointTests
 
     private static async Task<WebApplication> CreateApplicationAsync(
         RecordingStore store,
-        TestAuthorizer authorizer)
+        TestAuthorizer authorizer,
+        bool isAdministrator = false)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -183,7 +202,7 @@ public sealed class CheatIncidentEndpointTests
         builder.Services.AddScoped<ModerateTeam>();
         builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(authorizer);
         builder.Services.AddSingleton<SignedKeysetCursor>();
-        builder.Services.AddSingleton<IUserContext>(new ActorUserContext());
+        builder.Services.AddSingleton<IUserContext>(new ActorUserContext(isAdministrator));
         builder.Services.AddSingleton(TimeProvider.System);
 
         var app = builder.Build();
@@ -200,6 +219,7 @@ public sealed class CheatIncidentEndpointTests
             DateTimeOffset.Parse("2026-08-01T12:00:00Z");
 
         public int DetailReads { get; private set; }
+        public bool? LastDetailReadShouldAudit { get; private set; }
         public int DismissCalls { get; private set; }
         public int ConfirmCalls { get; private set; }
         public int CorrectCalls { get; private set; }
@@ -234,13 +254,11 @@ public sealed class CheatIncidentEndpointTests
             ], 1));
 
         public Task<CheatIncidentDetail?> GetDetailAsync(
-            Guid competitionId,
-            Guid scoringEventId,
-            Guid actorUserId,
-            DateTimeOffset accessedAt,
+            CheatIncidentAccessCommand command,
             CancellationToken cancellationToken)
         {
             DetailReads++;
+            LastDetailReadShouldAudit = command.ShouldAuditAccess;
             return Task.FromResult<CheatIncidentDetail?>(new(
                 GameplayFactId,
                 "flag{protected-evidence}",
@@ -337,10 +355,10 @@ public sealed class CheatIncidentEndpointTests
         Moderator
     }
 
-    private sealed class ActorUserContext : IUserContext
+    private sealed class ActorUserContext(bool isAdministrator) : IUserContext
     {
         public Guid UserId => ActorId;
-        public bool IsAdministrator => false;
+        public bool IsAdministrator => isAdministrator;
     }
 
     private sealed class TestBearerHandler(

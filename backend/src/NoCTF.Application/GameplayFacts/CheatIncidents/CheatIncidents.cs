@@ -74,6 +74,13 @@ public sealed record CheatIncidentResolutionCommand(
     string Reason,
     DateTimeOffset OccurredAt);
 
+public sealed record CheatIncidentAccessCommand(
+    Guid CompetitionId,
+    Guid GameplayFactId,
+    Guid ActorUserId,
+    bool ShouldAuditAccess,
+    DateTimeOffset AccessedAt);
+
 public enum CheatIncidentResolutionFailure : short
 {
     InvalidReason,
@@ -98,10 +105,7 @@ public interface ICheatIncidentStore
         CancellationToken cancellationToken);
 
     Task<CheatIncidentDetail?> GetDetailAsync(
-        Guid competitionId,
-        Guid gameplayFactId,
-        Guid actorUserId,
-        DateTimeOffset accessedAt,
+        CheatIncidentAccessCommand command,
         CancellationToken cancellationToken);
 
     Task<CheatIncidentResolutionResult> DismissAsync(
@@ -136,13 +140,15 @@ public sealed class AccessCheatIncident(ICheatIncidentStore store)
         Guid competitionId,
         Guid gameplayFactId,
         Guid actorUserId,
+        bool isPlatformAdministrator,
         DateTimeOffset accessedAt,
         CancellationToken cancellationToken = default) =>
-        store.GetDetailAsync(
+        store.GetDetailAsync(new CheatIncidentAccessCommand(
             competitionId,
             gameplayFactId,
             actorUserId,
-            accessedAt,
+            ShouldAuditAccess: !isPlatformAdministrator,
+            accessedAt),
             cancellationToken);
 }
 

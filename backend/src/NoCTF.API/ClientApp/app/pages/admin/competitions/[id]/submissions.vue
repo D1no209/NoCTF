@@ -24,7 +24,8 @@ import { useCompetitionAdmin } from '~/lib/admin-competition'
 
 definePageMeta({ middleware: 'auth' })
 
-const { competitionId, canWrite } = useCompetitionAdmin()
+const { competitionId, canWrite, canJudge } = useCompetitionAdmin()
+const { isAdministrator } = useAuth()
 
 interface FilterOption<T extends string> {
   value: T
@@ -246,36 +247,50 @@ async function queueEvaluation() {
   }
 }
 
-// ---- Protected flag access (audited) ----
+// ---- Protected flag access ----
 const flagDialog = ref<{ gameplayFactId: string } | null>(null)
-const flagReason = ref('')
 const flagResult = ref<string | null>(null)
+const flagError = ref<string | null>(null)
 const flagPending = ref(false)
+let flagRequestSequence = 0
 
 function openFlagAccess(gameplayFactId?: string) {
   if (!gameplayFactId) return
+  const requestSequence = ++flagRequestSequence
   flagDialog.value = { gameplayFactId }
-  flagReason.value = ''
   flagResult.value = null
+  flagError.value = null
+  flagPending.value = false
+  void accessFlag(requestSequence)
 }
 
-async function accessFlag() {
+function closeFlagAccess() {
+  flagRequestSequence++
+  flagDialog.value = null
+  flagPending.value = false
+}
+
+async function accessFlag(requestSequence = ++flagRequestSequence) {
   const ctx = flagDialog.value
-  if (!ctx || !flagReason.value.trim()) return
+  if (!ctx) return
   flagPending.value = true
+  flagError.value = null
   try {
     const { data, error } = await adminAccessCompetitionGameplayFactValue({
       path: { competitionId, gameplayFactId: ctx.gameplayFactId },
-      body: { reason: flagReason.value.trim() },
     })
     if (error) throw error
+    if (requestSequence !== flagRequestSequence || flagDialog.value?.gameplayFactId !== ctx.gameplayFactId) return
     flagResult.value = data?.value ?? translate('(无内容)')
   }
   catch (e) {
-    toast.error(parseApiError(e).message)
+    if (requestSequence !== flagRequestSequence || flagDialog.value?.gameplayFactId !== ctx.gameplayFactId) return
+    flagError.value = parseApiError(e).message
+    toast.error(flagError.value)
   }
   finally {
-    flagPending.value = false
+    if (requestSequence === flagRequestSequence)
+      flagPending.value = false
   }
 }
 
@@ -466,7 +481,7 @@ onMounted(() => {
             <TableCell class="text-right">
               <div class="flex flex-wrap justify-end gap-1">
                 <Button variant="ghost" size="sm" @click="openDetail(s.id)">{{ $t('详情') }}</Button>
-                <Button variant="ghost" size="sm" @click="openFlagAccess(s.id)">{{ $t('读取 Flag') }}</Button>
+                <Button v-if="canJudge" variant="ghost" size="sm" @click="openFlagAccess(s.id)">{{ $t('读取 Flag') }}</Button>
                 <Button v-if="canWrite" variant="ghost" size="sm" :disabled="actionPending === s.id" @click="rejudgeOne(s.id)">
                   <Spinner v-if="actionPending === s.id" data-icon="inline-start" /> {{ $t('重判') }} </Button>
               </div>
@@ -501,31 +516,32 @@ onMounted(() => {
       </SheetContent>
     </Sheet>
 
-    <Dialog :open="flagDialog !== null" @update:open="(v) => { if (!v) flagDialog = null }">
+    <Dialog :open="flagDialog !== null" @update:open="(v) => { if (!v) closeFlagAccess() }">
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ $t('读取受保护的提交 Flag') }}</DialogTitle>
-          <DialogDescription>{{ $t('该操作会被记录审计日志,请填写读取原因。') }}</DialogDescription>
+          <DialogDescription>
+            {{ isAdministrator
+              ? $t('平台管理员读取 Flag 不记录审计日志。')
+              : $t('比赛工作人员读取 Flag 会记录审计日志。') }}
+          </DialogDescription>
         </DialogHeader>
-        <template v-if="flagResult === null">
-          <FieldGroup>
-            <Field>
-              <FieldLabel for="flag-reason">{{ $t('读取原因') }}</FieldLabel>
-              <Textarea id="flag-reason" v-model="flagReason" required />
-            </Field>
-          </FieldGroup>
-          <DialogFooter>
-            <Button variant="outline" @click="flagDialog = null">{{ $t('取消') }}</Button>
-            <Button :disabled="flagPending || !flagReason.trim()" @click="accessFlag">
-              <Spinner v-if="flagPending" data-icon="inline-start" /> {{ $t('读取') }} </Button>
-          </DialogFooter>
-        </template>
-        <template v-else>
+        <div v-if="flagPending" class="flex min-h-24 items-center justify-center">
+          <Spinner class="size-5" />
+        </div>
+        <Alert v-else-if="flagError" variant="destructive">
+          <AlertTitle>{{ $t('读取 Flag 失败') }}</AlertTitle>
+          <AlertDescription>{{ flagError }}</AlertDescription>
+        </Alert>
+        <template v-else-if="flagResult !== null">
           <div class="rounded-md border bg-muted p-3 font-mono text-sm break-all">{{ flagResult }}</div>
-          <DialogFooter>
-            <Button @click="flagDialog = null">{{ $t('关闭') }}</Button>
-          </DialogFooter>
         </template>
+        <DialogFooter>
+          <Button v-if="flagError" variant="outline" :disabled="flagPending" @click="() => accessFlag()">
+            {{ $t('重试') }}
+          </Button>
+          <Button @click="closeFlagAccess">{{ $t('关闭') }}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   </div>

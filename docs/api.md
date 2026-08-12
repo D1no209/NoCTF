@@ -219,7 +219,8 @@ Id、类型、级别与发生时间，客户端收到后通过本 GET 重新读�
 
 跨队 Flag 线索以触发 ForeignTeamFlagDetected 的 GameplayFactId 为身份，并结合 CompetitionEvent 处置事件推导，不新增独立业务表。
 Observer 可读取不含 Flag 的列表，Judge 可显式读取完整 Flag 并驳回线索；归档后 Administrator、
-Owner、Manager、Judge 仍可显式读取完整 Flag。每次完整证据读取都会写入审计事件且响应禁止缓存。
+Owner、Manager、Judge 仍可显式读取完整 Flag。Administrator 读取不写审计；Owner、Manager、Judge
+每次成功读取都会写入审计事件。响应禁止缓存。
 只有 Administrator、Owner、Manager 可确认并封禁，或纠正误判并解封。
 驳回不通知参赛者；确认与纠错只发送不含 Flag 和工作人员原因的全场通用通知。误判纠错允许在
 Finished 后执行，只恢复历史计分投影，不重启 Runtime。
