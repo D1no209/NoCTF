@@ -1,5 +1,34 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-13 alpha.33 Flag 默认模板与静态正则匹配
+
+- 功能提交 `456a913c` 将未指定或仅含空白的动态 Flag 前缀、正文分别归一为 `flag` 与 `[GUID]`，
+  默认生成 `flag{<随机 UUIDv4>}`。生成后的 Flag 仍由既有 `challenge_flags`、Runtime generation 和
+  轮次流程保存，不会因为同一环境被读取多次而重新生成；显式配置的 TEAMHASH 等模板继续保持原行为。
+- 同一提交允许题目 Owner、题目 Manager 和平台 Administrator 在题库或比赛题目 Flag 管理中选择
+  `RegularExpression`。正则采用整段、区分大小写匹配，使用 .NET `NonBacktracking`、
+  `CultureInvariant` 和 100ms 超时；不支持的回溯结构会作为稳定输入错误拒绝，不会抛成 500。仅
+  CTF 无 Runtime 或 `FlagSource=Static` 的题目允许正则；CTF `PerTeam`、AWD、AWDP 与 KoH 仍只接受
+  精确 Flag。模板若仍有有效正则 Flag，切换到动态 Flag 或其他模式会被拒绝；软删除后可切换，之后
+  不允许把该正则 Flag 恢复，避免规则静默失效。
+- 正则规则同时进入正式比赛判题与 CTF 赛后练习判题。练习仍只返回 Correct/Wrong，不产生分数、
+  GameplayFact、事件或通知。附件随机 Flag 选择和数据导出保留 `MatchKind`；AWDP Break、AWD 动态
+  Flag 等模式边界有显式回归测试。
+- 数据模型只在既有 `challenge_flags` 增加非空 `match_kind smallint default 0`，没有新增业务表。
+  migration `20260812165207_AddChallengeFlagMatchKind` 由 `dotnet ef` 工具生成，snapshot 同步，EF
+  `has-pending-model-changes` 为无漂移。Flag 列表/保存的强类型协议已由工具导出 OpenAPI 并重新生成
+  TypeScript SDK；连续两轮导出/生成无漂移，两份 OpenAPI SHA-256 均为
+  `21109CEB00029DC986CF18AE0732B7F3BFCF7A68A2C70623B88C63AB93940025`。
+- 验证通过：Release solution build 0 warning/0 error；完整非 Integration TUnit 755/755；完整真实
+  依赖 Integration 170 项中 168 通过、0 失败，2 项仅因未配置 Kubernetes cluster 与 Libvirt disk
+  path 按设计跳过。第一次 Integration 的 BusyBox 拉取遇到 Docker Hub auth EOF，目标用例随后 1/1
+  通过，整套重跑归零。前端 179/179（1389 assertions）、TypeScript typecheck、production build、
+  analyzer、EF drift、OpenAPI/SDK 幂等和 `git diff --check` 均通过；构建仅有既有 chunk/plugin timing
+  与第三方 Node exports warning。
+- 发布提交 `4684c84a` 将平台版本由 `0.1.0-alpha.32` 递增为 `0.1.0-alpha.33`。本阶段在独立工作树
+  `E:\SourceCode\NoCTF-flag-rules-20260813` 完成，没有覆盖原工作区中的用户未提交文件；尚未推送、
+  合并远程 `main`、部署或操作生产数据。
+
 ## 2026-08-13 alpha.32 强制级联删除与 CTF 赛后练习
 
 - 功能提交 `f63d7d97` 新增平台 Administrator 专用的强制级联删除入口。操作必须输入完整竞赛标题、
