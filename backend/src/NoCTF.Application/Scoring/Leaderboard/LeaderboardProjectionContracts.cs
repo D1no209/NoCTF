@@ -20,7 +20,13 @@ public sealed record LeaderboardTeamFact(
     string Name,
     bool IsBanned,
     bool IsDeleted,
-    DateTimeOffset RegisteredAt = default);
+    DateTimeOffset RegisteredAt = default,
+    string TrackKey = CompetitionTrackConfiguration.DefaultTrackKey,
+    bool EarnsScore = true,
+    bool EarnsBlood = true,
+    bool AffectsDynamicChallengeScore = true,
+    bool VisibleOnLeaderboard = true,
+    bool AffectsCompetitiveResults = true);
 public sealed record LeaderboardChallengeFact(
     Guid Id,
     string Direction,
