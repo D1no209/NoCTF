@@ -9,8 +9,10 @@ using Microsoft.Extensions.DependencyInjection;
 using NoCTF.API.Composition;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.Application.Competitions.Visibility;
+using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
 using NoCTF.API.Security;
 
@@ -171,6 +173,9 @@ public sealed class LeaderboardEndpointTests
         builder.Services.AddSingleton(messages);
         builder.Services.AddSingleton<ICompetitionVisibilityAccess>(
             new PublicVisibilityAccess(competitionId, visibility, dataScope));
+        builder.Services.AddSingleton<GetCompetitionTracks>();
+        builder.Services.AddSingleton<ICompetitionTrackStore>(new DefaultTrackStore(competitionId));
+        builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(new NoStaffAccess());
         builder.Services.AddSingleton<IUserContext>(new AnonymousUserContext());
 
         var app = builder.Build();
@@ -204,6 +209,54 @@ public sealed class LeaderboardEndpointTests
     {
         public Guid UserId => Guid.Empty;
         public bool IsAdministrator => false;
+    }
+
+    private sealed class DefaultTrackStore(Guid competitionId) : ICompetitionTrackStore
+    {
+        public Task<CompetitionTracksView?> GetAsync(
+            Guid requestedCompetitionId,
+            Guid? viewerUserId,
+            bool includeInternal,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<CompetitionTracksView?>(requestedCompetitionId == competitionId
+                ? new CompetitionTracksView(
+                    competitionId,
+                    GameMode.Ctf,
+                    CompetitionStatus.Running,
+                    0,
+                    true,
+                    [new CompetitionTrackView(
+                        CompetitionTrackConfiguration.DefaultTrackKey,
+                        "Default",
+                        true,
+                        true,
+                        false,
+                        true,
+                        true,
+                        true,
+                        true,
+                        true)])
+                : null);
+
+        public Task<NoCTF.Application.Common.OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+            UpdateCompetitionTracksCommand command,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<NoCTF.Application.Common.OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode>> AssignAsync(
+            AssignTeamTrackCommand command,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class NoStaffAccess : ICompetitionModerationAuthorizer
+    {
+        public Task<bool> CanModerateAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+        public Task<bool> CanJudgeAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+        public Task<bool> CanObserveAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+        public Task<bool> CanReadHistoricalAuditAsync(Guid userId, Guid competitionId, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
     }
 
     private sealed class CachedLeaderboard(

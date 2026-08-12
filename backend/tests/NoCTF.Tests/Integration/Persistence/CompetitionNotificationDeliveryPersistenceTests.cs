@@ -358,6 +358,52 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 .ToArrayAsync(ct);
             await Assert.That(publicBanEvents).Count().IsEqualTo(1);
 
+            var internalTracks = new CompetitionTrackConfiguration(
+                CompetitionTrackConfiguration.CurrentSchemaVersion,
+                [
+                    CompetitionTrackConfiguration.DefaultFor(GameMode.Ctf).DefaultTrack,
+                    new CompetitionTrackDefinition(
+                        "internal",
+                        "Internal",
+                        IsDefault: false,
+                        IsPublicSelectable: false,
+                        IsInternal: true,
+                        EarnsScore: false,
+                        EarnsBlood: false,
+                        AffectsDynamicChallengeScore: false,
+                        VisibleOnLeaderboard: false,
+                        AffectsCompetitiveResults: false)
+                ]);
+            await db.Competitions.Where(item => item.Id == competitionId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    item => item.TrackConfigurationJson,
+                    CompetitionTrackConfiguration.Serialize(internalTracks)), ct);
+            await db.Teams.Where(team => team.Id == bannedTeamId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    team => team.TrackKey,
+                    "internal"), ct);
+
+            await CompetitionNotificationMessageHandlers.Handle(
+                announcedBan with { BannedAt = now.AddMilliseconds(2) },
+                db,
+                delivery,
+                ct,
+                banEventStore);
+
+            await Assert.That(await db.Notifications.AsNoTracking().CountAsync(notification =>
+                notification.RelatedId == competitionId
+                && notification.Kind == NotificationKind.CompetitionAnnouncement, ct))
+                .IsEqualTo(1);
+            await Assert.That(await db.Notifications.AsNoTracking().CountAsync(notification =>
+                notification.TargetType == NotificationTargetType.TeamMembers
+                && notification.TargetId == bannedTeamId, ct))
+                .IsEqualTo(3);
+            await Assert.That(await db.CompetitionEvents.AsNoTracking().CountAsync(item =>
+                item.CompetitionId == competitionId
+                && item.Kind == CompetitionEventKind.TeamBanned
+                && item.Visibility == CompetitionEventVisibility.Public, ct))
+                .IsEqualTo(1);
+
             await delivery.DeliverAsync(
                 competitionId,
                 Guid.CreateVersion7(),
@@ -389,7 +435,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     NotificationKind.ChallengePublished
                 ]);
             await Assert.That(unrelatedFeed).IsEmpty();
-            await Assert.That(bannedMemberFeed).Count().IsEqualTo(2);
+            await Assert.That(bannedMemberFeed).Count().IsEqualTo(3);
             await Assert.That(bannedMemberFeed.All(
                 notification => notification.Kind == NotificationKind.TeamBanned)).IsTrue();
         });

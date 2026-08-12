@@ -38,6 +38,7 @@ public sealed class LeaderboardOpenApiTests
             "rank",
             "teamId",
             "teamName",
+            "trackKey",
             "score",
             "solveCount",
             "lastScoreAt",
