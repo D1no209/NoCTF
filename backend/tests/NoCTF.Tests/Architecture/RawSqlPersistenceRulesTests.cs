@@ -40,6 +40,12 @@ public sealed class RawSqlPersistenceRulesTests
             ["backend/src/NoCTF.Infrastructure/Competitions/Administration/AdminCompetitionStore.cs"] =
             [
                 "ExecuteSqlInterpolated",
+                "FOR UPDATE",
+                "WITH RECURSIVE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Competitions/Management/CompetitionManagementStore.cs"] =
+            [
+                "ExecuteSqlInterpolated",
                 "FOR UPDATE"
             ],
             ["backend/src/NoCTF.Infrastructure/Notifications/NotificationReader.cs"] =
@@ -70,6 +76,11 @@ public sealed class RawSqlPersistenceRulesTests
             ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/AwdpFixExecutionFence.cs"] =
             [
                 "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Runtime/Instances/RuntimeInstanceStore.cs"] =
+            [
+                "ExecuteSqlInterpolated",
                 "FOR UPDATE"
             ],
             ["backend/src/NoCTF.Infrastructure/Scoring/Leaderboard/FusionLeaderboardCache.cs"] =

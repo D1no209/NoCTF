@@ -317,6 +317,12 @@ policy 反向只接受 Runtime Namespace 中 `awd-checker` / `awdp-checker` purp
 
 Runtime/Checker 定义更新不热改存量 Runtime；下一次 Start/Reset 使用 Challenge 最新定义。RuntimeInstance 不保存 Challenge 定义版本，也不自动升级。
 
+CTF 比赛可配置赛后练习模式。比赛进入 Finished 后，原比赛中 Approved 且未封禁的队伍可以为已发布
+的 Container/Compose 题目创建 `RuntimePurpose.Practice` 实例；OVA 和其他比赛模式不支持练习实例。
+练习实例与正式 `Player` 实例分离，Generation 在同队同题的完整历史上继续递增，并继续使用平台既有
+每队容量、TTL、Docker host port 0、Runner 调度与资源回收约束。关闭练习模式前必须确认该比赛不存在
+Queued、Provisioning、Running 或 Stopping 的练习实例。
+
 AWDP disposable target 额外使用两级 `ProcessingVersion` fence：Provider Running 后的首次 Fix
 消息先持久认领 execution fence，结果不确定的重投再持久认领 recovery fence。recovery fence
 必须先于 Provider cleanup，因此旧 checker callback 即使与清理并发也不能发布权威结果。

@@ -38,6 +38,7 @@ public sealed class CompetitionHardDeleteEndpointTests
             "Protected competition",
             true,
             false,
+            false,
             [
                 new(
                     CompetitionHardDeleteReferenceKind.HistoricalEvent,
@@ -120,14 +121,90 @@ public sealed class CompetitionHardDeleteEndpointTests
             Arg.Any<CancellationToken>());
     }
 
+    [Test]
+    public async Task Administrator_force_delete_sends_exact_confirmation_and_reason_once()
+    {
+        var store = Substitute.For<IAdminCompetitionStore>();
+        store.ForceDeleteAsync(
+                Arg.Any<ForceDeleteCompetitionCommand>(),
+                true,
+                Arg.Any<CancellationToken>())
+            .Returns(new CompetitionForceDeleteResult(CompetitionForceDeleteState.Deleted));
+        await using var app = await CreateApplicationAsync(store, administrator: true);
+        using var client = app.GetTestClient();
+
+        using var response = await client.PostAsJsonAsync(
+            ForceDeleteUri(),
+            new ForceDeleteCompetitionRequest
+            {
+                ConfirmationTitle = "Protected competition",
+                Reason = "Remove this disposable competition fixture."
+            });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+        await store.Received(1).ForceDeleteAsync(
+            Arg.Is<ForceDeleteCompetitionCommand>(command =>
+                command != null
+                && command.CompetitionId == CompetitionId
+                && command.ActorId == ActorId
+                && command.ConfirmationTitle == "Protected competition"
+                && command.Reason == "Remove this disposable competition fixture."),
+            true,
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task Force_delete_returns_a_typed_live_runtime_conflict()
+    {
+        var store = Substitute.For<IAdminCompetitionStore>();
+        var preview = new CompetitionHardDeletePreview(
+            CompetitionId,
+            "Protected competition",
+            false,
+            false,
+            false,
+            [new(CompetitionHardDeleteReferenceKind.ActiveRuntimeResource, 1)]);
+        store.ForceDeleteAsync(
+                Arg.Any<ForceDeleteCompetitionCommand>(),
+                true,
+                Arg.Any<CancellationToken>())
+            .Returns(new CompetitionForceDeleteResult(
+                CompetitionForceDeleteState.ActiveRuntimeResource,
+                preview));
+        await using var app = await CreateApplicationAsync(store, administrator: true);
+        using var client = app.GetTestClient();
+
+        using var response = await client.PostAsJsonAsync(
+            ForceDeleteUri(),
+            new ForceDeleteCompetitionRequest
+            {
+                ConfirmationTitle = "Protected competition",
+                Reason = "A sufficiently detailed deletion reason."
+            });
+        var body = await response.Content
+            .ReadFromJsonAsync<CompetitionForceDeleteConflictResponse>();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Conflict);
+        await Assert.That(body).IsNotNull();
+        await Assert.That(body!.Code)
+            .IsEqualTo(CompetitionForceDeleteConflictCode.ActiveRuntimeResource);
+        await Assert.That(body.Preview!.References).HasSingleItem();
+        await Assert.That(body.Preview.References[0].Code)
+            .IsEqualTo(CompetitionHardDeleteReferenceCode.ActiveRuntimeResource);
+    }
+
     private static string PreviewUri() =>
         $"/api/v1/admin/competitions/{CompetitionId}/hard-delete-preview";
 
     private static string DeleteUri() =>
         $"/api/v1/admin/competitions/{CompetitionId}/hard-delete";
 
+    private static string ForceDeleteUri() =>
+        $"/api/v1/admin/competitions/{CompetitionId}/force-delete";
+
     private static async Task<WebApplication> CreateApplicationAsync(
-        IAdminCompetitionStore store)
+        IAdminCompetitionStore store,
+        bool administrator = false)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -138,7 +215,8 @@ public sealed class CompetitionHardDeleteEndpointTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(HardDeleteCompetitionEndpoint).Assembly];
             options.Filter = type => type == typeof(HardDeleteCompetitionEndpoint)
-                || type == typeof(PreviewCompetitionHardDeleteEndpoint);
+                || type == typeof(PreviewCompetitionHardDeleteEndpoint)
+                || type == typeof(ForceDeleteCompetitionEndpoint);
         });
         builder.Services.SwaggerDocument();
         builder.Services
@@ -154,7 +232,9 @@ public sealed class CompetitionHardDeleteEndpointTests
         builder.Services.AddSingleton(store);
         builder.Services.AddScoped<HardDeleteCompetition>();
         builder.Services.AddScoped<PreviewCompetitionHardDelete>();
-        builder.Services.AddSingleton<IUserContext>(new ActorUserContext());
+        builder.Services.AddScoped<ForceDeleteCompetition>();
+        builder.Services.AddSingleton<IUserContext>(new ActorUserContext(administrator));
+        builder.Services.AddSingleton(new TestIdentityOptions(administrator));
 
         var app = builder.Build();
         app.UseAuthentication();
@@ -164,23 +244,30 @@ public sealed class CompetitionHardDeleteEndpointTests
         return app;
     }
 
-    private sealed class ActorUserContext : IUserContext
+    private sealed class ActorUserContext(bool administrator) : IUserContext
     {
         public Guid UserId => ActorId;
-        public bool IsAdministrator => false;
+        public bool IsAdministrator => administrator;
     }
+
+    private sealed record TestIdentityOptions(bool Administrator);
 
     private sealed class TestBearerHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
-        UrlEncoder encoder)
+        UrlEncoder encoder,
+        TestIdentityOptions identityOptions)
         : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
     {
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var identity = new ClaimsIdentity(
-                [new Claim(ClaimTypes.NameIdentifier, ActorId.ToString())],
-                Scheme.Name);
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, ActorId.ToString())
+            };
+            if (identityOptions.Administrator)
+                claims.Add(new Claim(ClaimTypes.Role, "Administrator"));
+            var identity = new ClaimsIdentity(claims, Scheme.Name);
             var ticket = new AuthenticationTicket(
                 new ClaimsPrincipal(identity),
                 Scheme.Name);

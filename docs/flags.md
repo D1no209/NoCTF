@@ -6,6 +6,10 @@
 
 比较固定为：UTF-8、ordinal、区分大小写、固定时间比较；不 Trim、不 Unicode 归一化。合法 Flag 为 1..4096 UTF-8 bytes 且不含 NUL。
 
+CTF 赛后练习判题复用完全相同的 Flag scope、Team、有效时间、SHA-256 候选缩小与 ordinal 原文比较，
+并要求本队对应题目的 `Practice` Runtime 正在运行且未到期。它只返回 `Correct`/`Wrong`，不写入
+GameplayFact、CompetitionEvent、Notification，不触发血榜、分数或排行榜刷新。
+
 先用普通 SHA-256 索引缩小候选，再比较原文。SHA-256 不是安全边界。
 
 ## 时间窗

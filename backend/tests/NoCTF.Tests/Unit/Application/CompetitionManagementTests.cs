@@ -42,6 +42,27 @@ public class CompetitionManagementTests
     }
 
     [Test]
+    public async Task Practice_mode_is_available_only_for_ctf_competitions()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var store = new Store();
+
+        var rejected = await new CreateCompetition(store).ExecuteAsync(new(
+            "AWD practice", null, GameMode.Awd, now, now.AddHours(1), true, 5, 1,
+            Guid.NewGuid(), now, PracticeModeEnabled: true));
+        var accepted = await new CreateCompetition(store).ExecuteAsync(new(
+            "CTF practice", null, GameMode.Ctf, now, now.AddHours(1), true, 5, 1,
+            Guid.NewGuid(), now, PracticeModeEnabled: true));
+
+        await Assert.That(rejected.State)
+            .IsEqualTo(CompetitionCreationState.InvalidRequest);
+        await Assert.That(rejected.Detail)
+            .IsEqualTo("Practice mode is supported only for CTF competitions.");
+        await Assert.That(accepted.Succeeded).IsTrue();
+        await Assert.That(store.Last!.PracticeModeEnabled).IsTrue();
+    }
+
+    [Test]
     [Arguments(CompetitionStatus.Running)]
     [Arguments(CompetitionStatus.Paused)]
     public async Task UpdateCompetition_ActiveCompetitionAllowsConfigurationChanges(CompetitionStatus status)
@@ -130,7 +151,8 @@ public class CompetitionManagementTests
         {
             Last = new(Guid.NewGuid(), command.Title, command.Description, command.Mode, command.StartTime, command.EndTime,
                 CompetitionStatus.Draft, command.TeamRegistrationAutoApprove, command.MaxTeamMembers,
-                command.MaxConcurrentRuntimeInstancesPerTeam, command.OwnerId);
+                command.MaxConcurrentRuntimeInstancesPerTeam, command.OwnerId,
+                PracticeModeEnabled: command.PracticeModeEnabled);
             return Task.FromResult(new CompetitionCreationResult(
                 CompetitionCreationState.Created,
                 Last));

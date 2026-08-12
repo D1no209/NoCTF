@@ -45,7 +45,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
         {
             instance.CompetitionChallengeId,
             instance.TeamId
-        }).IsUnique().HasFilter("purpose = 0 AND state IN (0, 1, 2)");
+        }).IsUnique().HasFilter("purpose IN (0, 2) AND state IN (0, 1, 2)");
         builder.HasIndex(instance => instance.GameplayFactId)
             .IsUnique()
             .HasFilter("purpose = 1 AND gameplay_fact_id IS NOT NULL AND state IN (0, 1, 2, 3)");

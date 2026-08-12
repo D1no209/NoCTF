@@ -54,6 +54,7 @@ function categoryLabel(notification: Notification): string {
   if (notification.kind === 'CheatIncidentDetected' || notification.kind === 'ManagementFailure' || notification.kind === 'StartGateFailed')
     return translate("管理")
   if (notification.kind === 'UserAccountLifecycleChanged') return translate("账号")
+  if (notification.kind === 'CompetitionForceDeleted') return translate("管理")
   return translate("消息")
 }
 

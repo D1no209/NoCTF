@@ -59,5 +59,6 @@ public enum NotificationKind : short
     TeamBanCorrected,
     DataExportReady,
     DataExportFailed,
-    UserAccountLifecycleChanged
+    UserAccountLifecycleChanged,
+    CompetitionForceDeleted
 }

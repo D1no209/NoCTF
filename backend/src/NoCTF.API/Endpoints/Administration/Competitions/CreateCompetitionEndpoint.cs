@@ -23,6 +23,7 @@ public sealed class CreateCompetitionRequest
     public int MaxActiveQuestionsPerTeam { get; set; } = 5;
     public int MaxParticipantMessagesBeforeHandlerReply { get; set; } = 3;
     public bool AllowChallengeOwnersToHandleQuestions { get; set; } = true;
+    public bool PracticeModeEnabled { get; set; }
 }
 
 public sealed class CreateCompetitionValidator : Validator<CreateCompetitionRequest>
@@ -82,7 +83,8 @@ public sealed class CreateCompetitionEndpoint(CreateCompetition create, IUserCon
             request.AllowTeamRegistrationWhileRunning,
             request.MaxActiveQuestionsPerTeam,
             request.MaxParticipantMessagesBeforeHandlerReply,
-            request.AllowChallengeOwnersToHandleQuestions), ct);
+            request.AllowChallengeOwnersToHandleQuestions,
+            request.PracticeModeEnabled), ct);
         return result.State switch
         {
             CompetitionCreationState.Created =>

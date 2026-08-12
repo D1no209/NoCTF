@@ -20,7 +20,7 @@ type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
 type DataExport = NoCtfapiEndpointsAdministrationDataExportsDataExportResponse
 
 const KIND_LABELS: Record<string, string> = {
-  CompetitionLifecycle: '竞赛生命周期', UserAccountLifecycle: '账户生命周期', CompetitionLeaderboardVisibility: '榜单可见性', CompetitionEvent: '竞赛事件',
+  CompetitionLifecycle: '竞赛生命周期', UserAccountLifecycle: '账户生命周期', CompetitionAdministration: '竞赛管理', CompetitionLeaderboardVisibility: '榜单可见性', CompetitionEvent: '竞赛事件',
 }
 const EXPORT_STATUS: Record<string, { label: string; variant: 'secondary' | 'outline' | 'destructive' | 'default' }> = {
   Queued: { label: '排队中', variant: 'outline' }, Processing: { label: '处理中', variant: 'secondary' }, Available: { label: '可下载', variant: 'default' }, Failed: { label: '失败', variant: 'destructive' }, Expired: { label: '已过期', variant: 'outline' },
@@ -163,6 +163,7 @@ onMounted(() => {
                 <SelectItem value="all">{{ $t('全部类型') }}</SelectItem>
                 <SelectItem value="CompetitionLifecycle">{{ $t('竞赛生命周期') }}</SelectItem>
                 <SelectItem value="UserAccountLifecycle">{{ $t('账户生命周期') }}</SelectItem>
+                <SelectItem value="CompetitionAdministration">{{ $t('竞赛管理') }}</SelectItem>
                 <SelectItem value="CompetitionLeaderboardVisibility">{{ $t('榜单可见性') }}</SelectItem>
                 <SelectItem value="CompetitionEvent">{{ $t('竞赛事件') }}</SelectItem>
               </SelectGroup>

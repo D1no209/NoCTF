@@ -220,6 +220,7 @@ const notificationTargetResolvers = {
   DataExportReady: context => context.detailPath,
   DataExportFailed: context => context.detailPath,
   UserAccountLifecycleChanged: context => context.detailPath,
+  CompetitionForceDeleted: context => context.detailPath,
 } satisfies Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, NotificationTargetResolver>
 
 export function notificationTargetPath(
@@ -291,6 +292,7 @@ export function notificationActionLabel(
     DataExportReady: '查看通知详情',
     DataExportFailed: '查看通知详情',
     UserAccountLifecycleChanged: '查看通知详情',
+    CompetitionForceDeleted: '查看通知详情',
   } satisfies Record<NoCtfapiEndpointsNotificationsNotificationKindProtocol, string>
   return translate(notification.kind ? labels[notification.kind] : '查看通知详情')
 }
@@ -314,7 +316,7 @@ export function notificationText(
     BloodAwarded: translate('恭喜，你在{challenge}拿下了血榜名次', { challenge }), ChallengePublished: translate('竞赛{title}发布了新题目{challenge}', { title, challenge }), HintPublished: translate('{challenge}发布了新提示', { challenge }),
     TeamBanned: translate('你的队伍{team}已被封禁', { team }), QuestionOpened: translate('竞赛{title}有新的咨询', { title }), Message: translate('你的咨询已有新回复'),
     QuestionStatusChanged: translate("你的咨询状态已变更"), CheatIncidentDetected: translate("检测到疑似作弊行为"), TeamBanCorrected: translate("队伍封禁已被纠正"), DataExportReady: translate("数据导出已就绪"), DataExportFailed: translate("数据导出失败"),
-    UserAccountLifecycleChanged: translate("用户账号状态已变更"), CompetitionAnnouncement: announcement,
+    UserAccountLifecycleChanged: translate("用户账号状态已变更"), CompetitionForceDeleted: translate("竞赛已被强制删除"), CompetitionAnnouncement: announcement,
   }
   return notification.kind ? templates[notification.kind] ?? translate('你有一条新通知') : translate('你有一条新通知')
 }

@@ -50,7 +50,8 @@ public sealed class TeamRuntimeQuota(LocalCriticalSectionRegistry localLeases)
             .Where(runtime =>
                 runtime.CompetitionId == competitionId &&
                 runtime.TeamId == teamId &&
-                runtime.Purpose == RuntimePurpose.Player &&
+                (runtime.Purpose == RuntimePurpose.Player
+                    || runtime.Purpose == RuntimePurpose.Practice) &&
                 (runtime.State == RuntimeState.Queued ||
                  runtime.State == RuntimeState.Provisioning ||
                  runtime.State == RuntimeState.Running ||

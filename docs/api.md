@@ -122,6 +122,7 @@ Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向�
 
 ```text
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/fix-submissions
 GET  /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
@@ -177,6 +178,7 @@ DELETE /api/v1/admin/competitions/{competitionId}
 POST /api/v1/admin/competitions/{competitionId}/restore
 GET  /api/v1/admin/competitions/{competitionId}/hard-delete-preview
 DELETE /api/v1/admin/competitions/{competitionId}/hard-delete
+POST /api/v1/admin/competitions/{competitionId}/force-delete
 POST /api/v1/admin/competitions/{competitionId}/publish
 POST /api/v1/admin/competitions/{competitionId}/make-visible
 POST /api/v1/admin/competitions/{competitionId}/start
@@ -419,8 +421,10 @@ RuntimeInstance、Team、User、CompetitionChallenge、GameplayFact 以及有界
 通用 Secret 必须在写入 Redis 前脱敏。平台管理员属于可信角色，Flag 不在日志层强制脱敏，
 但业务代码仍不得为调试目的主动打印 Flag。管理审计使用签名 keyset 分页，从用户账号生命周期
 审计和工作人员可见的 PostgreSQL `competition_events` 投影，不复制事实、不设置 TTL 或新增
-审计业务表。`competition_events` 永久、append-only，存在历史事件时禁止比赛物理删除；比赛
-结束、队伍解散和用户匿名化注销不会清理事件关系。
+审计业务表。`competition_events` 默认永久、append-only，普通物理删除在存在历史事件时必须拒绝；
+比赛结束、队伍解散和用户匿名化注销不会清理事件关系。唯一显式例外是平台 Administrator 的强制
+级联删除：仅非 Running/Paused 且无活动或待处理 Runtime 资源的比赛可执行，并要求完整标题、原因和
+二次确认。该操作删除比赛作用域事件及引用数据，但在平台管理员审计投影中永久保留独立删除事实。
 
 删除用户前必须读取影响预览。没有任何业务引用时可物理删除；存在比赛、题目、队伍、
 提交、计分、通知或生命周期审计引用时，只允许不可逆匿名化并停用。匿名化会清除个人

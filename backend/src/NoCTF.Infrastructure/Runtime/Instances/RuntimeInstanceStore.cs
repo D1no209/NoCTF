@@ -47,13 +47,16 @@ public sealed class RuntimeInstanceStore(
         CancellationToken ct)
     {
         var scope = await ResolveScopeAsync(competitionId, competitionChallengeId, userId, ct);
-        if (scope is null || scope.Mode is GameMode.Koh or GameMode.Awdp)
+        if (scope is null
+            || !AllowsRuntimeActions(scope)
+            || scope.Mode is GameMode.Koh or GameMode.Awdp)
             return null;
+        var purpose = PurposeFor(scope);
         return await db.RuntimeInstances.AsNoTracking()
             .Where(instance =>
                 instance.CompetitionId == competitionId &&
                 instance.CompetitionChallengeId == competitionChallengeId &&
-                instance.Purpose == RuntimePurpose.Player &&
+                instance.Purpose == purpose &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .Select(instance => new RuntimeInstanceView(
@@ -69,17 +72,19 @@ public sealed class RuntimeInstanceStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await LockCompetitionAsync(command.CompetitionId, ct);
         var scope = await ResolveScopeAsync(
             command.CompetitionId,
             command.CompetitionChallengeId,
             command.UserId,
             ct);
-        if (scope is null || scope.Status != CompetitionStatus.Running)
+        if (scope is null || !AllowsRuntimeActions(scope))
             return new(null, RuntimeMutationFailure.NotFound);
         if (scope.Mode is GameMode.Koh or GameMode.Awdp)
             return new(null, RuntimeMutationFailure.Unsupported);
         if (scope.Mode == GameMode.Awd && command.Action is RuntimeAction.Start or RuntimeAction.Stop or RuntimeAction.Extend)
             return new(null, RuntimeMutationFailure.Unsupported);
+        var purpose = PurposeFor(scope);
 
         await using var quotaLease = await runtimeQuota.AcquireLockAsync(
             db,
@@ -89,10 +94,15 @@ public sealed class RuntimeInstanceStore(
         var current = await db.RuntimeInstances
             .Where(instance =>
                 instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                instance.Purpose == RuntimePurpose.Player &&
+                instance.Purpose == purpose &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .FirstOrDefaultAsync(ct);
+        var latestGeneration = await db.RuntimeInstances.AsNoTracking()
+            .Where(instance =>
+                instance.CompetitionChallengeId == command.CompetitionChallengeId
+                && instance.TeamId == scope.TeamId)
+            .MaxAsync(instance => (int?)instance.Generation, ct) ?? 0;
 
         RuntimeInstance entity;
         switch (command.Action)
@@ -103,7 +113,7 @@ public sealed class RuntimeInstanceStore(
                 if (await db.RuntimeInstances.AnyAsync(instance =>
                         instance.CompetitionId == command.CompetitionId &&
                         instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                        instance.Purpose == RuntimePurpose.Player &&
+                        instance.Purpose == purpose &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Stopping,
                         ct))
@@ -120,7 +130,7 @@ public sealed class RuntimeInstanceStore(
                     .Where(instance =>
                         instance.CompetitionId == command.CompetitionId &&
                         instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                        instance.Purpose == RuntimePurpose.Player &&
+                        instance.Purpose == purpose &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Failed &&
                         instance.RunnerId != null &&
@@ -155,7 +165,7 @@ public sealed class RuntimeInstanceStore(
                     entity = await CreateAsync(
                         scope,
                         command,
-                        checked((current?.Generation ?? 0) + 1),
+                        checked(latestGeneration + 1),
                         cleanupTarget?.Id,
                         ct);
                 }
@@ -269,6 +279,12 @@ public sealed class RuntimeInstanceStore(
     {
         var template = templates.Get(scope.Mode, scope.DefinitionJson)
             ?? throw new InvalidOperationException("The challenge does not define a runtime template.");
+        if (PurposeFor(scope) == RuntimePurpose.Practice
+            && template.RuntimeKind is not RuntimeKind.Container and not RuntimeKind.Compose)
+        {
+            throw new InvalidOperationException(
+                "Practice mode supports only Container and Compose Runtime templates.");
+        }
         if (scope.Mode == GameMode.Ctf
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {
@@ -286,7 +302,7 @@ public sealed class RuntimeInstanceStore(
             CompetitionId = command.CompetitionId,
             CompetitionChallengeId = command.CompetitionChallengeId,
             TeamId = scope.TeamId,
-            Purpose = RuntimePurpose.Player,
+            Purpose = PurposeFor(scope),
             Generation = generation,
             RuntimeKind = template.RuntimeKind,
             RuntimeProvider = placement.Provider,
@@ -335,12 +351,32 @@ public sealed class RuntimeInstanceStore(
                 item.Team.Id,
                 item.Competition.Mode,
                 item.Competition.Status,
+                item.Competition.PracticeModeEnabled,
                 item.Competition.MaxConcurrentRuntimeInstancesPerTeam,
                 item.Template.DefinitionJson))
             .SingleOrDefaultAsync(ct);
 
+    private Task LockCompetitionAsync(Guid competitionId, CancellationToken ct) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT 1 FROM competitions WHERE id = {competitionId} FOR UPDATE",
+            ct);
+
     private static bool IsActive(RuntimeState state) =>
         state is RuntimeState.Queued or RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping;
+
+    private static bool AllowsRuntimeActions(RuntimeScope scope) =>
+        scope.Status == CompetitionStatus.Running
+        || scope is
+        {
+            Mode: GameMode.Ctf,
+            Status: CompetitionStatus.Finished,
+            PracticeModeEnabled: true
+        };
+
+    private static RuntimePurpose PurposeFor(RuntimeScope scope) =>
+        scope.Status == CompetitionStatus.Finished
+            ? RuntimePurpose.Practice
+            : RuntimePurpose.Player;
 
     private static bool CanReset(RuntimeInstance instance) =>
         instance.State is RuntimeState.Provisioning or RuntimeState.Running
@@ -361,6 +397,7 @@ public sealed class RuntimeInstanceStore(
         Guid TeamId,
         GameMode Mode,
         CompetitionStatus Status,
+        bool PracticeModeEnabled,
         int MaxConcurrentRuntimeInstances,
         string DefinitionJson);
 }

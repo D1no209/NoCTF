@@ -22,6 +22,7 @@ public sealed class UpdateCompetitionRequest
     public int MaxActiveQuestionsPerTeam { get; set; } = 5;
     public int MaxParticipantMessagesBeforeHandlerReply { get; set; } = 3;
     public bool AllowChallengeOwnersToHandleQuestions { get; set; } = true;
+    public bool PracticeModeEnabled { get; set; }
 }
 
 public sealed class UpdateCompetitionValidator : Validator<UpdateCompetitionRequest>
@@ -80,7 +81,8 @@ public sealed class UpdateCompetitionEndpoint(
             request.AllowTeamRegistrationWhileRunning,
             request.MaxActiveQuestionsPerTeam,
             request.MaxParticipantMessagesBeforeHandlerReply,
-            request.AllowChallengeOwnersToHandleQuestions), ct);
+            request.AllowChallengeOwnersToHandleQuestions,
+            request.PracticeModeEnabled), ct);
         if (result.FailureCode == CompetitionManagementFailureCode.CompetitionNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)

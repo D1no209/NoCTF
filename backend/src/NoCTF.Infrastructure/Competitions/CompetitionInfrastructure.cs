@@ -64,6 +64,7 @@ internal static class CompetitionInfrastructure
         services.AddScoped<GetAdminCompetition>();
         services.AddScoped<RestoreCompetition>();
         services.AddScoped<HardDeleteCompetition>();
+        services.AddScoped<ForceDeleteCompetition>();
         services.AddScoped<PreviewCompetitionHardDelete>();
         services.AddScoped<TransferCompetitionOwner>();
         services.AddScoped<ICompetitionConfigurationStore, CompetitionConfigurationStore>();
