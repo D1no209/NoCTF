@@ -1,5 +1,25 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-12 受保护 Flag 读取权限与审计策略
+
+- 功能提交 `f8a88f6e` 按最终产品语义调整受保护 Flag 读取：平台 Administrator、比赛 Owner、
+  Manager、Judge 均可直接读取，不再要求填写理由；Observer 与参赛者仍不可读取。管理端只有具备
+  Judge 及以上权限的角色显示“读取 Flag”入口，打开后立即加载，并保留 loading、错误、重试及过期
+  响应隔离。
+- 审计按角色区分：平台 Administrator 的成功读取不追加读取审计；比赛 Owner、Manager、Judge 的
+  每次成功读取仍追加不可变 `ProtectedGameplayFactValueAccessed` 事件，但不再记录人工理由。该规则
+  同时覆盖提交列表中的显式读取和作弊事件详情中的 Flag 展示；作弊确认、驳回、纠正等处置审计没有
+  改动。
+- 强类型接口 `POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/value`
+  保留原路径和响应，但请求体已移除。两份 OpenAPI 由工具重新导出，TypeScript SDK 由
+  `bun run api:gen` 重新生成，并通过连续两轮生成幂等检查；两份 OpenAPI SHA-256 一致。没有手工
+  修改 SDK、没有新增表、列、migration 或 snapshot。
+- 验证通过：Release solution build 0 warning/0 error；完整非 Integration TUnit 717/717；作弊接口
+  定向测试 5/5；真实 PostgreSQL CompetitionEvent 测试 2/2；前端测试 170/170（1313 assertions）、
+  typecheck 与 production build；改动 C# 文件的 whitespace/analyzer verify；`git diff --check`。
+  前端构建只有既有的大 chunk、插件耗时与第三方 Node exports 弃用 warning。
+- 平台版本仍为 `0.1.0-alpha.29`。本阶段尚未推送、部署或操作生产数据。
+
 ## 2026-08-12 alpha.29 生产发布
 
 - 生产首次切换 alpha.28 后，API 存活正常，但 API/Worker/Runner 的 `/health/ready` 把 Wolverine
