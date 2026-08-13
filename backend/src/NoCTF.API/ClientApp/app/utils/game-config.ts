@@ -556,6 +556,16 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
   return JSON.stringify(obj, null, 2)
 }
 
+/** 创建或切换模式时使用的完整、可提交默认定义。 */
+export function defaultDefinitionJson(mode: GameModeValue): string {
+  return serializeDefinition(mode, emptyDefinition(mode))
+}
+
+export function normalizeDefinitionJson(mode: GameModeValue, json: string): string | null {
+  const model = parseDefinition(json)
+  return model ? serializeDefinition(mode, model) : null
+}
+
 // ---------- 通用「按字段描述」配置(竞赛配置 / 题目规则) ----------
 
 export type ConfigFieldType =
@@ -593,6 +603,18 @@ export interface PointsCurveValue {
   initialPoints: number | null
   minimumPoints: number | null
   decayFactor: number | null
+}
+
+export function ctfPointsAtSolveCount(curve: PointsCurveValue, solveCount: number): number | null {
+  const { initialPoints, minimumPoints, decayFactor } = curve
+  if (initialPoints === null || minimumPoints === null || decayFactor === null
+    || initialPoints < minimumPoints || minimumPoints < 0 || decayFactor <= 1)
+    return null
+
+  if (solveCount <= 1) return initialPoints
+  if (solveCount >= decayFactor) return minimumPoints
+  const progress = (solveCount - 1) / (decayFactor - 1)
+  return initialPoints + (minimumPoints - initialPoints) * progress * progress
 }
 
 export interface MilestonePointsValue {

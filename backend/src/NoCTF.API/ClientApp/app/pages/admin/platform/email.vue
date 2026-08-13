@@ -77,12 +77,12 @@ async function load(): Promise<void> {
 async function save(): Promise<void> {
   if (!configuration.value) return
   saving.value = true
-  const { data, error, response } = await adminPlatformUpdateEmailVerificationConfiguration({
+  const { data, error } = await adminPlatformUpdateEmailVerificationConfiguration({
     body: { ...form, expectedRevision: configuration.value.revision ?? 0 },
   })
   saving.value = false
   if (error) {
-    if (response?.status === 409) {
+    if (isRevisionConflict(error)) {
       toast.error(translate("配置已被他人修改,请刷新后重试"))
       await load()
     }
@@ -98,12 +98,12 @@ async function save(): Promise<void> {
 async function replacePassword(): Promise<void> {
   if (!configuration.value || !newPassword.value) return
   passwordSaving.value = true
-  const { data, error, response } = await adminPlatformReplaceEmailVerificationPassword({
+  const { data, error } = await adminPlatformReplaceEmailVerificationPassword({
     body: { password: newPassword.value, expectedRevision: configuration.value.revision ?? 0 },
   })
   passwordSaving.value = false
   if (error) {
-    if (response?.status === 409) {
+    if (isRevisionConflict(error)) {
       toast.error(translate("配置已被他人修改,请刷新后重试"))
       passwordOpen.value = false
       await load()

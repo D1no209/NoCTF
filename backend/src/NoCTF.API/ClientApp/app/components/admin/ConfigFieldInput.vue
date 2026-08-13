@@ -158,35 +158,38 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
     </SelectContent>
   </Select>
 
-  <div v-else-if="field.type === 'pointsCurve'" class="grid gap-3 sm:grid-cols-3">
-    <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">{{ $t('初始分') }}</span>
-      <Input
-        type="number"
-        :model-value="curve.initialPoints ?? ''"
-        :disabled="disabled"
-        @update:model-value="updateCurve({ initialPoints: parseNullableNumber($event) })"
-      />
+  <div v-else-if="field.type === 'pointsCurve'" class="flex flex-col gap-3">
+    <div class="grid gap-3 sm:grid-cols-3">
+      <div class="flex flex-col gap-1.5">
+        <span class="text-xs text-muted-foreground">{{ $t('初始分') }}</span>
+        <Input
+          type="number"
+          :model-value="curve.initialPoints ?? ''"
+          :disabled="disabled"
+          @update:model-value="updateCurve({ initialPoints: parseNullableNumber($event) })"
+        />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <span class="text-xs text-muted-foreground">{{ $t('最低分') }}</span>
+        <Input
+          type="number"
+          :model-value="curve.minimumPoints ?? ''"
+          :disabled="disabled"
+          @update:model-value="updateCurve({ minimumPoints: parseNullableNumber($event) })"
+        />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <span class="text-xs text-muted-foreground">{{ $t('衰减系数') }}</span>
+        <Input
+          type="number"
+          step="any"
+          :model-value="curve.decayFactor ?? ''"
+          :disabled="disabled"
+          @update:model-value="updateCurve({ decayFactor: parseNullableNumber($event) })"
+        />
+      </div>
     </div>
-    <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">{{ $t('最低分') }}</span>
-      <Input
-        type="number"
-        :model-value="curve.minimumPoints ?? ''"
-        :disabled="disabled"
-        @update:model-value="updateCurve({ minimumPoints: parseNullableNumber($event) })"
-      />
-    </div>
-    <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">{{ $t('衰减系数') }}</span>
-      <Input
-        type="number"
-        step="any"
-        :model-value="curve.decayFactor ?? ''"
-        :disabled="disabled"
-        @update:model-value="updateCurve({ decayFactor: parseNullableNumber($event) })"
-      />
-    </div>
+    <PointsDecayCurve :curve="curve" />
   </div>
 
   <div v-else-if="field.type === 'milestonePoints'" class="grid gap-3 sm:grid-cols-2">

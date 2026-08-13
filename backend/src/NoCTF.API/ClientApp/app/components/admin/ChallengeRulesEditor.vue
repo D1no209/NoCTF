@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import type { ConfigValues, GameModeValue } from '~/utils/game-config'
+import type { ConfigFieldDef, ConfigValues, GameModeValue } from '~/utils/game-config'
 import { challengeRuleFields, parseConfigValues, serializeConfigValues } from '~/utils/game-config'
 
 const props = withDefaults(defineProps<{
   mode: GameModeValue
   /** 服务器端当前规则 JSON。 */
   json?: string | null
+  /** 当前竞赛配置 JSON，用于展示继承后的具体值。 */
+  inheritedJson?: string | null
   /** 乐观并发修订版本(仅展示)。 */
   revision?: number
   readonly?: boolean
@@ -13,6 +15,7 @@ const props = withDefaults(defineProps<{
   saving?: boolean
 }>(), {
   json: null,
+  inheritedJson: null,
   revision: 0,
   readonly: false,
   loading: false,
@@ -25,6 +28,9 @@ const fields = computed(() => challengeRuleFields(props.mode))
 const values = ref<ConfigValues>({})
 const overridden = ref<Record<string, boolean>>({})
 const parseFailed = ref(false)
+const inheritedValues = computed(() =>
+  parseConfigValues(props.inheritedJson, fields.value)?.values ?? {},
+)
 
 watch(
   [() => props.json, () => props.mode],
@@ -48,8 +54,20 @@ function updateField(key: string, value: unknown) {
   values.value = { ...values.value, [key]: value }
 }
 
-function setOverride(key: string, on: boolean) {
-  overridden.value = { ...overridden.value, [key]: on }
+function setOverride(field: ConfigFieldDef, on: boolean) {
+  if (on && !(overridden.value[field.key] ?? false) && inheritedValues.value[field.key] !== undefined) {
+    values.value = {
+      ...values.value,
+      [field.key]: structuredClone(inheritedValues.value[field.key]),
+    }
+  }
+  overridden.value = { ...overridden.value, [field.key]: on }
+}
+
+function displayedValue(field: ConfigFieldDef): unknown {
+  return (overridden.value[field.key] ?? false)
+    ? values.value[field.key]
+    : (inheritedValues.value[field.key] ?? values.value[field.key])
 }
 
 function canonicalize(value: unknown): unknown {
@@ -108,14 +126,14 @@ function save() {
               size="sm"
               :model-value="overridden[field.key] ?? false"
               :disabled="readonly"
-              @update:model-value="setOverride(field.key, $event === true)"
+              @update:model-value="setOverride(field, $event === true)"
             />
             <span class="text-xs text-muted-foreground">{{ $t('覆盖') }}</span>
             <span v-if="!(overridden[field.key] ?? false)" class="text-xs text-muted-foreground">{{ $t('· 继承竞赛默认') }}</span>
           </div>
           <ConfigFieldInput
             :field="field"
-            :model-value="values[field.key]"
+            :model-value="displayedValue(field)"
             :disabled="readonly || !(overridden[field.key] ?? false)"
             @update:model-value="updateField(field.key, $event)"
           />
