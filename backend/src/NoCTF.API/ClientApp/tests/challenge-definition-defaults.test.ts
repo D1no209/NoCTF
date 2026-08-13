@@ -13,8 +13,10 @@ describe('challenge definition defaults', () => {
   })
 
   test('initializes creation and resets the definition before a mode switch', async () => {
-    const createPage = await Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text()
-    const editPage = await Bun.file(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text()
+    const createPage = (await Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text())
+      .replaceAll('\r\n', '\n')
+    const editPage = (await Bun.file(new URL('../app/pages/admin/challenges/[id].vue', import.meta.url)).text())
+      .replaceAll('\r\n', '\n')
 
     expect(createPage).toContain('ref(defaultDefinitionJson(mode.value))')
     expect(createPage).toContain('definitionJson.value = defaultDefinitionJson(value)\n  mode.value = value')
