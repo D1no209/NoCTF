@@ -14735,6 +14735,10 @@
           "title": {
             "type": "string"
           },
+          "customTitle": {
+            "type": "string",
+            "nullable": true
+          },
           "description": {
             "type": "string",
             "nullable": true
@@ -18695,6 +18699,12 @@
             "minLength": 1,
             "nullable": false
           },
+          "customTitle": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": true
+          },
           "baseScore": {
             "type": "integer",
             "format": "int64",
@@ -19030,12 +19040,19 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "customTitle",
           "baseScore",
           "order",
           "isPublished",
           "expectedRevision"
         ],
         "properties": {
+          "customTitle": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0,
+            "nullable": true
+          },
           "baseScore": {
             "type": "integer",
             "format": "int64",

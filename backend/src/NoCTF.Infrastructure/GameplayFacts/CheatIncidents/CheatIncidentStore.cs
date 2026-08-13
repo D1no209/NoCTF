@@ -387,7 +387,7 @@ public sealed class CheatIncidentStore(
                     item.user.Id,
                     item.user.UserName,
                     item.competitionChallenge.Id,
-                    challenge.Title,
+                    item.competitionChallenge.CustomTitle ?? challenge.Title,
                     item.fact.Kind,
                     item.fact.Result!.Value,
                     item.fact.FailureCode!.Value,

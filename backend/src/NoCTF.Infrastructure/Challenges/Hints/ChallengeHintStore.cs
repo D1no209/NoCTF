@@ -275,7 +275,7 @@ public sealed class ChallengeHintStore(
 
         var challengeTitle = await db.Challenges.AsNoTracking()
             .Where(template => template.Id == challenge.ChallengeId)
-            .Select(template => template.Title)
+            .Select(template => challenge.CustomTitle ?? template.Title)
             .SingleAsync(ct);
         var message = new PublishHintNotification(
             competitionId,

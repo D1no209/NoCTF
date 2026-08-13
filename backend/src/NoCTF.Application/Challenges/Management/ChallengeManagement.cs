@@ -10,7 +10,8 @@ public sealed record CreateCompetitionChallengeCommand(
     Guid ChallengeId,
     long BaseScore,
     int Order,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? CustomTitle = null);
 
 public sealed record UpdateCompetitionChallengeCommand(
     Guid CompetitionId,
@@ -19,13 +20,15 @@ public sealed record UpdateCompetitionChallengeCommand(
     int Order,
     bool IsPublished,
     int ExpectedRevision,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? CustomTitle = null);
 
 public sealed record ChallengeView(
     Guid Id,
     Guid CompetitionId,
     Guid ChallengeId,
     string Title,
+    string? CustomTitle,
     string? Description,
     string Direction,
     long BaseScore,
@@ -39,6 +42,7 @@ public sealed record ChallengeView(
 public enum ChallengeMutationFailure
 {
     InvalidChallengeId,
+    InvalidTitle,
     InvalidBaseScore,
     InvalidOrder,
     InvalidRevision,
@@ -112,6 +116,9 @@ public sealed class CreateChallenge(
     {
         if (command.ChallengeId == Guid.Empty)
             return new(null, ChallengeMutationFailure.InvalidChallengeId);
+        var customTitle = CompetitionChallengeTitle.Normalize(command.CustomTitle);
+        if (customTitle is { Length: > CompetitionChallengeTitle.MaximumLength })
+            return new(null, ChallengeMutationFailure.InvalidTitle);
         if (command.BaseScore is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
             return new(null, ChallengeMutationFailure.InvalidBaseScore);
         if (command.Order < 0)
@@ -122,7 +129,7 @@ public sealed class CreateChallenge(
             return new(null, ChallengeMutationFailure.CompetitionNotFound);
 
         return await store.CreateAsync(
-            command,
+            command with { CustomTitle = customTitle },
             configurationCatalog.GetDefaultJson(competition.Mode),
             ct);
     }
@@ -160,6 +167,9 @@ public sealed class UpdateChallenge(IChallengeManagementStore store)
         UpdateCompetitionChallengeCommand command,
         CancellationToken ct = default)
     {
+        var customTitle = CompetitionChallengeTitle.Normalize(command.CustomTitle);
+        if (customTitle is { Length: > CompetitionChallengeTitle.MaximumLength })
+            return new(null, ChallengeMutationFailure.InvalidTitle);
         if (command.BaseScore is < 0 or > ScoreValueLimits.MaximumConfiguredValue)
             return new(null, ChallengeMutationFailure.InvalidBaseScore);
         if (command.Order < 0)
@@ -167,12 +177,20 @@ public sealed class UpdateChallenge(IChallengeManagementStore store)
         if (command.ExpectedRevision < 0)
             return new(null, ChallengeMutationFailure.InvalidRevision);
 
-        var result = await store.UpdateAsync(command, ct);
+        var result = await store.UpdateAsync(command with { CustomTitle = customTitle }, ct);
         if (result.Challenge is null)
             return result;
 
         return result;
     }
+}
+
+internal static class CompetitionChallengeTitle
+{
+    public const int MaximumLength = 160;
+
+    public static string? Normalize(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 public sealed class DeleteChallenge(IChallengeManagementStore store)

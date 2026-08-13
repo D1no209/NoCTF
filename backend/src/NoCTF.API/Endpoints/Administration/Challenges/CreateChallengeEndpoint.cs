@@ -13,6 +13,7 @@ public sealed class CreateChallengeRequest
 {
     public Guid? Id { get; set; }
     public Guid ChallengeId { get; set; }
+    public string? CustomTitle { get; set; }
     public long BaseScore { get; set; }
     public int Order { get; set; }
 }
@@ -25,6 +26,7 @@ public sealed class CreateChallengeValidator : Validator<CreateChallengeRequest>
             .Must(id => id is null || id != Guid.Empty)
             .WithMessage("Id cannot be empty when supplied.");
         RuleFor(request => request.ChallengeId).NotEmpty();
+        RuleFor(request => request.CustomTitle).MaximumLength(160);
         RuleFor(request => request.BaseScore).GreaterThanOrEqualTo(0);
         RuleFor(request => request.Order).GreaterThanOrEqualTo(0);
     }
@@ -74,7 +76,8 @@ public sealed class CreateChallengeEndpoint(
             request.ChallengeId,
             request.BaseScore,
             request.Order,
-            DateTimeOffset.UtcNow), ct);
+            DateTimeOffset.UtcNow,
+            request.CustomTitle), ct);
         if (result.Challenge is not null)
         {
             var response = ChallengeMapper.ToResponse(result.Challenge);
@@ -94,6 +97,7 @@ public sealed class CreateChallengeEndpoint(
                 TypedResults.Conflict(
                     CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
             ChallengeMutationFailure.InvalidChallengeId
+                or ChallengeMutationFailure.InvalidTitle
                 or ChallengeMutationFailure.InvalidBaseScore
                 or ChallengeMutationFailure.InvalidOrder
                 or ChallengeMutationFailure.TemplateModeMismatch =>

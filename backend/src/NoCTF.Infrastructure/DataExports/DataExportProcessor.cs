@@ -410,6 +410,7 @@ public sealed class DataExportProcessor(
                 instance.Id,
                 instance.CompetitionId,
                 instance.ChallengeId,
+                instance.CustomTitle,
                 instance.BaseScore,
                 instance.Order,
                 instance.IsPublished,

@@ -30,7 +30,7 @@ NoCTF 不解析 Git 仓库、不执行 Docker build，也不承担仓库级差�
 - Bot 和自然人都是 `User`，使用相同的角色、比赛权限、题库权限和授权路径；
 - Challenge 与且只与一种 `GameMode` 绑定；
 - Challenge 管理 provider-neutral Runtime、Checker 和动态 Flag 注入定义；
-- CompetitionChallenge 管理本场比赛的分值、顺序、发布状态、Hint 和模式规则；
+- CompetitionChallenge 管理本场比赛的可选展示名称、分值、顺序、发布状态、Hint 和模式规则；展示名称为空时使用 Challenge 模板标题；
 - Competition 和 Challenge 都不关心平台部署使用 Docker 还是 Kubernetes；
 - Manifest 中禁止出现 `provider`、`runnerPool`、Docker host port、Kubernetes namespace、Ingress 等部署字段；
 - 静态题和静态附件中的 Flag 可以明文提交；
@@ -44,7 +44,7 @@ NoCTF 不解析 Git 仓库、不执行 Docker build，也不承担仓库级差�
 NoCTF 题目模型分为两个层次：
 
 - `Challenge` 是全局题库模板，绑定一种 GameMode，拥有标题、题面、方向、可见性、模板附件、模板静态 Flag、Runtime、Checker 和动态 Flag 注入定义；
-- `CompetitionChallenge` 是某场比赛对 Challenge 的一次引用，拥有比赛内排序、发布状态、BaseScore、Rules 和 Hint。
+- `CompetitionChallenge` 是某场比赛对 Challenge 的一次引用，拥有可选比赛内展示名称、比赛内排序、发布状态、BaseScore、Rules 和 Hint；比赛内展示名称不会修改 Challenge 模板标题。
 
 仓库协议与领域模型直接对应：
 

@@ -1113,7 +1113,11 @@ public sealed class CompetitionQuestionStore(
                 db.Challenges.IgnoreQueryFilters().AsNoTracking(),
                 binding => binding.ChallengeId,
                 challenge => challenge.Id,
-                (binding, challenge) => new { binding.Id, challenge.Title })
+                (binding, challenge) => new
+                {
+                    binding.Id,
+                    Title = binding.CustomTitle ?? challenge.Title
+                })
             .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
         var competitionIds = questions
             .Select(input => input.Question.RootNotification.TargetId)

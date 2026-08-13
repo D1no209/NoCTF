@@ -9,6 +9,8 @@ public sealed class CompetitionChallenge
     public long CriticalSectionVersion { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid ChallengeId { get; set; }
+    [MaxLength(160)]
+    public string? CustomTitle { get; set; }
     public long BaseScore { get; set; }
     public int Order { get; set; }
     public bool IsPublished { get; set; }

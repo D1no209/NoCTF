@@ -44,6 +44,7 @@ const addOpen = ref(false)
 const templates = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse[]>([])
 const templatesLoading = ref(false)
 const selectedTemplateId = ref<string>('')
+const newCustomTitle = ref('')
 const newBaseScore = ref(100)
 const newOrder = ref(0)
 const adding = ref(false)
@@ -57,6 +58,7 @@ async function openAdd() {
   addOpen.value = true
   addError.value = null
   selectedTemplateId.value = ''
+  newCustomTitle.value = ''
   newOrder.value = (items.value.filter(i => !i.deletedAt).map(i => i.order ?? 0).reduce((m, o) => Math.max(m, o), 0) || 0) + 1
   templatesLoading.value = true
   const { data, error: e } = await adminChallengeBankListTemplates({ query: { includeDeleted: false } })
@@ -77,6 +79,7 @@ async function addChallenge() {
       path: { competitionId },
       body: {
         challengeId: selectedTemplateId.value,
+        customTitle: newCustomTitle.value.trim() || null,
         baseScore: newBaseScore.value,
         order: newOrder.value,
       },
@@ -251,6 +254,16 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
             <FieldDescription v-if="!templatesLoading && modeTemplates.length === 0">
               {{ $t('题库中没有 {mode} 模式的可用模板', { mode: enumLabel(GameModeLabel, competition?.mode) }) }}
             </FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel for="new-title">{{ $t('比赛题目名称') }}</FieldLabel>
+            <Input
+              id="new-title"
+              v-model="newCustomTitle"
+              maxlength="160"
+              :placeholder="$t('留空时使用题库模板标题')"
+            />
+            <FieldDescription>{{ $t('只修改本场比赛中的展示名称,不会更改题库模板') }}</FieldDescription>
           </Field>
           <div class="grid gap-4 sm:grid-cols-2">
             <Field>

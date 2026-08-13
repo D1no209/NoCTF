@@ -564,6 +564,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     competitionId?: string;
     challengeId?: string;
     title?: string;
+    customTitle?: string | null;
     description?: string | null;
     direction?: string;
     baseScore?: number | null;
@@ -1597,6 +1598,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflic
 export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     id?: string | null;
     challengeId: string;
+    customTitle?: string | null;
     baseScore?: number;
     order?: number;
 };
@@ -1706,6 +1708,7 @@ export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeConfiguratio
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest = {
+    customTitle: string | null;
     baseScore: number;
     order: number;
     isPublished: boolean;

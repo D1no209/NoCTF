@@ -52,12 +52,14 @@ async function loadChallenge() {
 
 // ---- Edit form ----
 const editBaseScore = ref(0)
+const editCustomTitle = ref('')
 const editOrder = ref(0)
 const editPublished = ref(false)
 const savingEdit = ref(false)
 
 watch(challenge, (c) => {
   if (!c) return
+  editCustomTitle.value = c.customTitle ?? ''
   editBaseScore.value = c.baseScore ?? 0
   editOrder.value = c.order ?? 0
   editPublished.value = c.isPublished ?? false
@@ -70,6 +72,7 @@ async function saveEdit() {
     const { data, error } = await adminUpdateCompetitionChallenge({
       path: { competitionId, competitionChallengeId: ccId },
       body: {
+        customTitle: editCustomTitle.value.trim() || null,
         baseScore: editBaseScore.value,
         order: editOrder.value,
         isPublished: editPublished.value,
@@ -406,6 +409,17 @@ onMounted(() => {
             <CardContent>
               <form @submit.prevent="saveEdit">
                 <FieldGroup>
+                  <Field>
+                    <FieldLabel for="cc-title">{{ $t('比赛题目名称') }}</FieldLabel>
+                    <Input
+                      id="cc-title"
+                      v-model="editCustomTitle"
+                      maxlength="160"
+                      :readonly="!canWrite"
+                      :placeholder="$t('留空时使用题库模板标题')"
+                    />
+                    <FieldDescription>{{ $t('只修改本场比赛中的展示名称,不会更改题库模板') }}</FieldDescription>
+                  </Field>
                   <div class="grid gap-4 sm:grid-cols-2">
                     <Field>
                       <FieldLabel for="cc-score">{{ $t('基础分') }}</FieldLabel>

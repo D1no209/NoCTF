@@ -53,7 +53,7 @@ Competition 以自己的 `TrackConfigurationJson` 定义 1–32 条跨模式赛�
 
 `Challenge` 是且只属于一个 GameMode 的全局可复用题库模板，拥有题面、方向、模板 Attachment、明文模板静态 Flag，以及 provider-neutral 的 Runtime、Checker、动态 Flag 生成/注入定义。它不包含比赛排序、发布状态、分数、Hint、RuntimeProvider 或 RunnerPool。
 
-`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有 Order、IsPublished、BaseScore、Revision、Rules JSON 和 Hint。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Generation；下一次 Start/Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
+`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、BaseScore、Revision、Rules JSON 和 Hint。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Generation；下一次 Start/Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
 
 ### GameplayFact
 

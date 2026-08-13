@@ -73,6 +73,7 @@ public sealed class ChallengeManagementStore(
             Id = command.CompetitionChallengeId ?? Guid.CreateVersion7(command.CreatedAt),
             CompetitionId = command.CompetitionId,
             ChallengeId = command.ChallengeId,
+            CustomTitle = command.CustomTitle,
             BaseScore = command.BaseScore,
             Order = command.Order,
             RulesJson = configurationJson,
@@ -158,6 +159,7 @@ public sealed class ChallengeManagementStore(
         var wasPublished = entity.IsPublished;
         var becamePublished = !wasPublished && command.IsPublished;
         entity.BaseScore = command.BaseScore;
+        entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.IsPublished = command.IsPublished;
         entity.Revision = checked(entity.Revision + 1);
@@ -188,7 +190,7 @@ public sealed class ChallengeManagementStore(
                 await outbox.PublishAsync(new ChallengePublished(
                     command.CompetitionId,
                     entity.Id,
-                    publishedTemplate.Title,
+                    entity.CustomTitle ?? publishedTemplate.Title,
                     publishedTemplate.Direction,
                     command.UpdatedAt,
                     entity.Revision));
@@ -362,7 +364,8 @@ public sealed class ChallengeManagementStore(
                 item.Instance.Id,
                 item.Instance.CompetitionId,
                 item.Instance.ChallengeId,
-                item.Template.Title,
+                item.Instance.CustomTitle ?? item.Template.Title,
+                item.Instance.CustomTitle,
                 item.Template.Description,
                 item.Template.Direction,
                 item.Instance.BaseScore,
@@ -379,7 +382,8 @@ public sealed class ChallengeManagementStore(
             instance.Id,
             instance.CompetitionId,
             instance.ChallengeId,
-            template.Title,
+            instance.CustomTitle ?? template.Title,
+            instance.CustomTitle,
             template.Description,
             template.Direction,
             instance.BaseScore,

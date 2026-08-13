@@ -104,7 +104,7 @@ public sealed class FusionLeaderboardCache(
             .Select(instance => new LeaderboardChallengeFact(
                 instance.Id,
                 templates[instance.ChallengeId].Direction,
-                templates[instance.ChallengeId].Title,
+                instance.CustomTitle ?? templates[instance.ChallengeId].Title,
                 false,
                 instance.RulesJson))
             .ToList();

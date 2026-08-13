@@ -90,6 +90,47 @@ public class ChallengeManagementTests
     }
 
     [Test]
+    public async Task CreateChallenge_CustomTitle_IsTrimmedBeforePersistence()
+    {
+        var store = new Store();
+
+        var result = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
+            CreateCommand() with { CustomTitle = "  Finals Web  " });
+
+        await Assert.That(result.Failure).IsNull();
+        await Assert.That(store.LastCustomTitle).IsEqualTo("Finals Web");
+    }
+
+    [Test]
+    public async Task UpdateChallenge_BlankCustomTitle_RestoresTemplateFallback()
+    {
+        var store = new Store();
+
+        var result = await new UpdateChallenge(store).ExecuteAsync(
+            UpdateCommand() with { CustomTitle = "   " });
+
+        await Assert.That(result.Failure).IsNull();
+        await Assert.That(store.LastCustomTitle).IsNull();
+    }
+
+    [Test]
+    public async Task CustomTitle_OverMaximumLength_IsRejectedBeforeStore()
+    {
+        var store = new Store();
+        var title = new string('x', 161);
+
+        var createResult = await new CreateChallenge(store, new Catalog()).ExecuteAsync(
+            CreateCommand() with { CustomTitle = title });
+        var updateResult = await new UpdateChallenge(store).ExecuteAsync(
+            UpdateCommand() with { CustomTitle = title });
+
+        await Assert.That(createResult.Failure).IsEqualTo(ChallengeMutationFailure.InvalidTitle);
+        await Assert.That(updateResult.Failure).IsEqualTo(ChallengeMutationFailure.InvalidTitle);
+        await Assert.That(store.CreateCalls).IsEqualTo(0);
+        await Assert.That(store.MutationCalls).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task ListChallenges_PublicQuery_ExcludesUnpublishedAtStoreBoundary()
     {
         var store = new Store();
@@ -249,6 +290,7 @@ public class ChallengeManagementTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "Web 100",
+            null,
             "Description",
             "Web",
             100,
@@ -266,6 +308,7 @@ public class ChallengeManagementTests
         public int MutationCalls { get; private set; }
         public int? LastExpectedRevision { get; private set; }
         public bool? LastIncludeUnpublished { get; private set; }
+        public string? LastCustomTitle { get; private set; }
 
         public Task<ChallengeCompetitionContext?> GetCompetitionAsync(
             Guid competitionId,
@@ -278,6 +321,7 @@ public class ChallengeManagementTests
             CancellationToken cancellationToken)
         {
             CreateCalls++;
+            LastCustomTitle = command.CustomTitle;
             return Task.FromResult(CreateResult ?? new ChallengeMutationResult(challenge, null));
         }
 
@@ -307,6 +351,7 @@ public class ChallengeManagementTests
             CancellationToken cancellationToken)
         {
             MutationCalls++;
+            LastCustomTitle = command.CustomTitle;
             LastExpectedRevision = command.ExpectedRevision;
             return Task.FromResult(MutationFailure is null
                 ? new ChallengeMutationResult(challenge)

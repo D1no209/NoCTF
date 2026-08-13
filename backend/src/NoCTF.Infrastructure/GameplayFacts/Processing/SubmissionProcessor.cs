@@ -855,7 +855,10 @@ public sealed class GameplayFactProcessor(
                 db.Challenges.AsNoTracking(),
                 challenge => challenge.ChallengeId,
                 template => template.Id,
-                (challenge, template) => new { template.Title })
+                (challenge, template) => new
+                {
+                    Title = challenge.CustomTitle ?? template.Title
+                })
             .Join(
                 db.Teams.AsNoTracking().Where(team => team.Id == submission.TeamId),
                 _ => submission.TeamId,

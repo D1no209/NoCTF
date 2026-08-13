@@ -13,6 +13,7 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class UpdateChallengeRequest
 {
+    public required string? CustomTitle { get; set; }
     public long? BaseScore { get; set; }
     public int? Order { get; set; }
     public bool? IsPublished { get; set; }
@@ -23,6 +24,7 @@ public sealed class UpdateChallengeValidator : Validator<UpdateChallengeRequest>
 {
     public UpdateChallengeValidator()
     {
+        RuleFor(request => request.CustomTitle).MaximumLength(160);
         RuleFor(request => request.BaseScore).NotNull().GreaterThanOrEqualTo(0);
         RuleFor(request => request.Order).NotNull().GreaterThanOrEqualTo(0);
         RuleFor(request => request.IsPublished).NotNull();
@@ -115,7 +117,8 @@ public sealed class UpdateChallengeEndpoint(
             request.Order!.Value,
             request.IsPublished!.Value,
             request.ExpectedRevision!.Value,
-            DateTimeOffset.UtcNow), ct);
+            DateTimeOffset.UtcNow,
+            request.CustomTitle), ct);
         if (result.Challenge is not null)
             return TypedResults.Ok(ChallengeMapper.ToResponse(result.Challenge));
 
@@ -129,6 +132,7 @@ public sealed class UpdateChallengeEndpoint(
                 TypedResults.Conflict(
                     CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
             ChallengeMutationFailure.InvalidBaseScore
+                or ChallengeMutationFailure.InvalidTitle
                 or ChallengeMutationFailure.InvalidOrder
                 or ChallengeMutationFailure.InvalidRevision =>
                 TypedResults.Problem(
