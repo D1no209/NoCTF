@@ -1,5 +1,23 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-13 alpha.35 题目配置反馈与分值曲线
+
+- 前端修复提交 `a5f8cd6e` 不再把所有 HTTP 409 解释为修订冲突；从生成 SDK 的
+  `CompetitionChallengeConflictResponse.code` 精确区分题目模板重复、顺序冲突、资源标识冲突和
+  `RevisionConflict`。添加失败时弹窗、已选模板、自定义标题、基础分和顺序均保留；通用
+  409 只显示状态冲突，仅精确 `RevisionConflict` 会刷新并提示“已被他人修改”。
+- 新建题库模板和切换 CTF/AWD/AWDP/KoH 模式时，前端现在由既有结构化定义模型生成该
+  模式的完整默认 JSON；提交前再解析并规范化，保证 CTF 等模式包含必需的
+  `schemaVersion`。定义无效时显示本地化错误，不暴露原始英文，也不清空当前表单。
+- CTF 分值规则下新增实时虚线衰减曲线，直接复用后端权威的二次衰减公式：第 1 支解题
+  队伍为初始分，到“衰减系数”指定的队伍数时降至最低分。初始分、最低分或衰减系数修改后立即
+  重绘；题目未覆盖分值规则时，会加载并绘制竞赛级实际继承曲线，不再显示空输入。图表使用
+  语义化主题色、SVG 虚线和可访问图像标签，没有引入新的图表依赖。
+- 验证通过：前端定向 31/31；完整 `bun test` 195/195（1445 assertions）；
+  `bun run typecheck`、production `bun run build` 和 `git diff --check` 通过。构建仅保留既有的大 chunk、
+  plugin timing 与第三方 Node exports warning。本阶段没有 API、OpenAPI、生成 SDK、数据模型、
+  migration 或业务表变化；尚未推送、合并远程 `main`、部署或操作生产数据。
+
 ## 2026-08-13 alpha.35 比赛题目自定义展示名称
 
 - 功能提交 `c5de8114` 为既有 `competition_challenges` 增加可选 `custom_title`。比赛 Owner/Manager
