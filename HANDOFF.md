@@ -18,8 +18,19 @@
 - 验证通过：Runner 归属定向单元与真实 PostgreSQL 闭环 12/12；完整
   `RunnerAssignmentReconciliationTests` 19/19；Release solution build 0 warning/0 error；完整 TUnit
   930 通过、0 失败，2 项仅因未配置真实 Kubernetes 集群和 Libvirt disk path 按设计跳过；
-  `dotnet format ... whitespace --verify-no-changes` 与 `git diff --check` 通过。当前尚未推送、部署或
-  修改生产数据；生产收敛和删除预览结果待发布后补记。
+  `dotnet format ... whitespace --verify-no-changes` 与 `git diff --check` 通过。
+- 功能、版本及初始 HANDOFF 提交已快进推送到远程 `main@a99e2c9c`。生产 `/root/NoCTF` 使用校验过
+  SHA-256 的增量 Git bundle 快进到同一提交；API/Worker 镜像归档 SHA-256 为
+  `d5e7c8f27c8b983da0b03a9b35f4ee1c341a0a1659d562f885ceaa77be71a67d`，Git bundle 为
+  `769358dc60755dd157dc3dcfcd44573aef7972504e90d2866861b356c658d931`。生产只重建 API 和 Worker，
+  Runner、PostgreSQL、Redis、证书、上传卷和题目 Runtime 均未重启或覆盖；旧 API/Worker 镜像保留
+  `rollback-d9c79b90` 标签。
+- 部署后 API/Worker healthy、Runner 继续 healthy，HTTPS `/health` 返回 200，三服务 restart count
+  均为 0，最近日志无新增 fail/critical/Fatal/Unhandled。API 程序集确认包含
+  `0.1.0-alpha.36`。维护链路随后自动将上述三条生产 Runtime 收敛为 `Stopped` 并写入
+  `stopped_at=2026-08-13 16:31:10Z`；三个精确 Redis capacity claim 均不存在，按 Runtime 标签查询
+  Docker 也无资源，强制删除活动资源判定计数为 0。没有直接 UPDATE/DELETE Runtime 记录，也没有
+  为验收删除 `TEST GAME III`；现在可由管理员在二次确认后执行强制删除。
 
 ## 2026-08-13 alpha.35 题目配置反馈与分值曲线
 
