@@ -1,5 +1,26 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-14 alpha.36 失败 Runtime 归属收敛
+
+- 功能提交 `ac481a32` 修复 `Failed + provider_receipt_json=null +
+  runner_assignment_release_token=null + runner_id!=null` 被永久视为活动资源的问题。Worker 的既有
+  Runner 归属维护扫描现在会接管这类无回执失败实例，将其进入 `Stopping`，并向原 Owner Runner
+  派发精确到 Runtime ID、Generation、Pool 和 Runner 的 Stop 消息；没有绕过强制删除的活动资源保护，
+  也没有直接修改或删除数据库记录。
+- Runner 继续复用既有安全清理链路：按实例标签执行幂等资源清理，重新列举并确认相同
+  `(RuntimeInstanceId, Generation)` 的资源确实不存在，随后按原 Runner Owner 释放可能残留的容量。
+  只有上述步骤全部成功，Worker 才接受 `RuntimeStopped` 回执并写入 `StoppedAt`、将状态收敛为
+  `Stopped`；清理失败、资源仍存在或容量 Owner 不匹配时保持阻塞并由 Wolverine 重试。
+- 该修复覆盖生产中 `TEST GAME III` 的三条 `InvalidConfiguration` 无回执残留记录。部署后由维护消息
+  自动触发收敛；确认三条 Runtime 均为 `Stopped` 后，强制删除预览不再将它们计为活动资源。
+- 没有新增业务表、迁移、API、OpenAPI、SDK 或前端变更。发布提交 `74092eaf` 将平台版本从
+  `0.1.0-alpha.35` 递增至 `0.1.0-alpha.36`。
+- 验证通过：Runner 归属定向单元与真实 PostgreSQL 闭环 12/12；完整
+  `RunnerAssignmentReconciliationTests` 19/19；Release solution build 0 warning/0 error；完整 TUnit
+  930 通过、0 失败，2 项仅因未配置真实 Kubernetes 集群和 Libvirt disk path 按设计跳过；
+  `dotnet format ... whitespace --verify-no-changes` 与 `git diff --check` 通过。当前尚未推送、部署或
+  修改生产数据；生产收敛和删除预览结果待发布后补记。
+
 ## 2026-08-13 alpha.35 题目配置反馈与分值曲线
 
 - 前端修复提交 `a5f8cd6e` 不再把所有 HTTP 409 解释为修订冲突；从生成 SDK 的
