@@ -329,7 +329,8 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 ```
 
 CompetitionChallenge create/update/delete/restore 的并发冲突统一返回强类型
-`CompetitionChallengeConflictResponse`。update body 必须包含完整的 BaseScore、Order、
+`CompetitionChallengeConflictResponse`。create/update 可携带最长 160 字符的 `customTitle`；
+空白值会规范化为 null，并回退显示题库模板标题。update body 必须包含完整的 BaseScore、Order、
 IsPublished 与非负 expectedRevision；delete/restore 必须通过 required query
 `expectedRevision` 携带当前聚合 revision。成功的 delete/restore 各递增一次 revision；
 陈旧 revision 返回 `RevisionConflict`，当前 revision 但删除状态方向错误返回

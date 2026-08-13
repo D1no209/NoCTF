@@ -80,9 +80,9 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
                 .GetProperty("schema"));
 
         await Assert.That(PropertyNames(request))
-            .IsEquivalentTo(["baseScore", "order", "isPublished", "expectedRevision"]);
+            .IsEquivalentTo(["customTitle", "baseScore", "order", "isPublished", "expectedRevision"]);
         await Assert.That(RequiredPropertyNames(request))
-            .IsEquivalentTo(["baseScore", "order", "isPublished", "expectedRevision"]);
+            .IsEquivalentTo(["customTitle", "baseScore", "order", "isPublished", "expectedRevision"]);
         AssertNonNegativeInt32(
             request.GetProperty("properties").GetProperty("expectedRevision"));
     }

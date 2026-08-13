@@ -140,7 +140,11 @@ public sealed class HistoricalAdjudicationPreviewStore(NoCtfDbContext db)
                 db.Challenges.AsNoTracking(),
                 competitionChallenge => competitionChallenge.ChallengeId,
                 challenge => challenge.Id,
-                (competitionChallenge, challenge) => new { competitionChallenge.Id, challenge.Title })
+                (competitionChallenge, challenge) => new
+                {
+                    competitionChallenge.Id,
+                    Title = competitionChallenge.CustomTitle ?? challenge.Title
+                })
             .ToDictionaryAsync(item => item.Id, item => item.Title, ct);
 
         var evidence = facts.Select(fact =>

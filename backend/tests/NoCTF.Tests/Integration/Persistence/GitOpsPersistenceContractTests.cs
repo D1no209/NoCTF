@@ -132,10 +132,13 @@ public sealed class GitOpsPersistenceContractTests
                     challengeId,
                     500,
                     1,
-                    now),
+                    now,
+                    "Finals Web"),
                 """{"schemaVersion":1}""",
                 cancellationToken);
             await Assert.That(linked.Challenge!.Id).IsEqualTo(competitionChallengeId);
+            await Assert.That(linked.Challenge.Title).IsEqualTo("Finals Web");
+            await Assert.That(linked.Challenge.CustomTitle).IsEqualTo("Finals Web");
             await Assert.That((await challengeBank.FindAsync(
                 challengeId,
                 botId,
@@ -260,17 +263,37 @@ public sealed class GitOpsPersistenceContractTests
                 now,
                 cancellationToken)).IsTrue();
 
+            var beforeTitleReset = (await competitionChallenges.ListAsync(
+                competitionId,
+                true,
+                false,
+                cancellationToken)).Single();
+            var restoredTemplateTitle = await competitionChallenges.UpdateAsync(
+                new(
+                    competitionId,
+                    competitionChallengeId,
+                    beforeTitleReset.BaseScore,
+                    beforeTitleReset.Order,
+                    beforeTitleReset.IsPublished,
+                    beforeTitleReset.Revision,
+                    now.AddSeconds(1),
+                    null),
+                cancellationToken);
+            await Assert.That(restoredTemplateTitle.Challenge!.Title).IsEqualTo("Stable challenge");
+            await Assert.That(restoredTemplateTitle.Challenge.CustomTitle).IsNull();
+
             await Assert.That(await competitionChallenges.SoftDeleteAsync(
                 competitionId,
                 competitionChallengeId,
-                3,
+                restoredTemplateTitle.Challenge.Revision,
                 now,
                 cancellationToken)).IsNull();
-            await Assert.That((await competitionChallenges.ListAsync(
+            var deletedCompetitionChallenge = (await competitionChallenges.ListAsync(
                 competitionId,
                 true,
                 true,
-                cancellationToken)).Single().DeletedAt).IsNotNull();
+                cancellationToken)).Single();
+            await Assert.That(deletedCompetitionChallenge.DeletedAt).IsNotNull();
             await Assert.That((await challengeBank.FindAsync(
                 challengeId,
                 botId,
@@ -280,7 +303,7 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(await competitionChallenges.RestoreAsync(
                 competitionId,
                 competitionChallengeId,
-                4,
+                deletedCompetitionChallenge.Revision,
                 now,
                 cancellationToken)).IsNull();
 

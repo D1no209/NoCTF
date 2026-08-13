@@ -396,7 +396,7 @@ public sealed class CompetitionEventStore(
                 (competitionChallenge, challenge) => new
                 {
                     competitionChallenge.Id,
-                    challenge.Title
+                    Title = competitionChallenge.CustomTitle ?? challenge.Title
                 })
             .ToDictionaryAsync(
                 item => item.Id,

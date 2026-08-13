@@ -37,14 +37,42 @@ public sealed class CompetitionChallengeProtocolTests
     {
         var validator = new UpdateChallengeValidator();
 
-        await Assert.That(validator.Validate(new UpdateChallengeRequest()).IsValid)
+        await Assert.That(validator.Validate(new UpdateChallengeRequest { CustomTitle = null }).IsValid)
             .IsFalse();
         await Assert.That(validator.Validate(new UpdateChallengeRequest
         {
+            CustomTitle = "Finals Web",
             BaseScore = 500,
             Order = 1,
             IsPublished = false,
             ExpectedRevision = 0
         }).IsValid).IsTrue();
+        await Assert.That(validator.Validate(new UpdateChallengeRequest
+        {
+            CustomTitle = new string('x', 161),
+            BaseScore = 500,
+            Order = 1,
+            IsPublished = false,
+            ExpectedRevision = 0
+        }).IsValid).IsFalse();
+    }
+
+
+    [Test]
+    public async Task Create_request_allows_blank_fallback_and_bounds_custom_title()
+    {
+        var validator = new CreateChallengeValidator();
+        var request = new CreateChallengeRequest
+        {
+            ChallengeId = Guid.NewGuid(),
+            BaseScore = 100,
+            Order = 1
+        };
+
+        await Assert.That(validator.Validate(request).IsValid).IsTrue();
+        request.CustomTitle = "Finals Web";
+        await Assert.That(validator.Validate(request).IsValid).IsTrue();
+        request.CustomTitle = new string('x', 161);
+        await Assert.That(validator.Validate(request).IsValid).IsFalse();
     }
 }
