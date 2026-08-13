@@ -1,5 +1,27 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-13 alpha.35 比赛题目自定义展示名称
+
+- 功能提交 `c5de8114` 为既有 `competition_challenges` 增加可选 `custom_title`。比赛 Owner/Manager
+  在“从题库添加题目”时可以直接填写本场比赛名称，也可以在题目基本设置中修改；空白输入规范化为
+  null，并实时回退到题库模板 `Challenge.Title`，不会修改或复制全局题库题面。
+- 有效标题统一为 `CompetitionChallenge.CustomTitle ?? Challenge.Title`，已经覆盖管理列表、选手题目卡、
+  排行榜/中控大屏、血榜与题目发布播报、Hint 通知、咨询、作弊详情、历史裁决预览、比赛事件和数据
+  导出，避免管理端改名后其他页面继续显示模板原名。
+- 数据模型没有新增业务表，只在 `competition_challenges` 增加 nullable varchar(160)；migration
+  `20260813042039_AddCompetitionChallengeCustomTitle` 与 snapshot 完全由 `dotnet ef` 生成，EF
+  `has-pending-model-changes` 返回无漂移。Create/Update/Response 强类型协议增加 `customTitle`，OpenAPI
+  两份制品由工具导出，TypeScript SDK 由 `bun run api:gen` 生成；连续两轮导出/生成 SHA-256 均保持
+  OpenAPI `6F69359939F28EE3515D508FC034AC60A2C36C17C5A2DD4E5FD27E3972CBA522`、SDK types
+  `F73DAC8DFC8F768B9E18560D2AB2CFCDD643C4FB51A4E55D5B0815B2AA2FE22D`。
+- 验证通过：Release solution build 0 warning/0 error；完整非 Integration TUnit 759/759；真实
+  PostgreSQL GitOps 聚合持久化测试 1/1（含自定义名持久化与清空回退）；前端完整 `bun test`
+  182/182（1402 assertions）、`bun run typecheck`、production `bun run build`、EF drift 与
+  `git diff --check`。构建只保留既有大 chunk、plugin timing 和第三方 Node exports warning。
+- 发布提交 `0b755804` 将平台版本由 `0.1.0-alpha.34` 递增为 `0.1.0-alpha.35`。本阶段在独立分支
+  `codex/competition-challenge-title` / 工作树 `E:\SourceCode\NoCTF-flag-rules-20260813` 完成，未覆盖
+  原工作区的用户未提交修改；尚未推送、合并远程 `main`、部署或操作生产数据。
+
 ## 2026-08-13 alpha.34 CTF 中控大屏解题镜头
 
 - 功能提交 `5149bd4e` 依据 `DemoVideo/output.mp4` 的完整 38 秒镜头重新编排 CTF 中控大屏：保留
