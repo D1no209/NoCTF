@@ -358,6 +358,122 @@ public sealed class RunnerAssignmentReconciliationTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Failed_unreceipted_assignment_is_identity_checked_released_and_stopped(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = CreatePostgres();
+            await postgres.StartAsync(cancellationToken);
+            var options = CreateOptions(postgres.GetConnectionString());
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using (var prepare = new NoCtfDbContext(options))
+            {
+                var runtime = await prepare.RuntimeInstances.SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+                runtime.State = RuntimeState.Failed;
+                runtime.FailureCode = RuntimeFailureCode.InvalidConfiguration;
+                runtime.ProviderReceiptJson = null;
+                runtime.RunnerAssignmentReleaseToken = null;
+                runtime.RunnerUnavailableAt = null;
+                runtime.StoppedAt = null;
+                await prepare.SaveChangesAsync(cancellationToken);
+            }
+
+            var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Online);
+            var outbox = new RecordingTransactionalOutbox();
+            await using (var reconcileDb = new NoCtfDbContext(options))
+            {
+                var outcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now),
+                    reconcileDb,
+                    capacity,
+                    outbox,
+                    cancellationToken);
+                await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
+            }
+
+            var cleanup = outbox.RunnerNodeMessages
+                .OfType<StopContainerRuntime>()
+                .Single(message => message.RuntimeInstanceId == fixture.RetainReceiptId);
+            await using (var stoppingDb = new NoCtfDbContext(options))
+            {
+                var stopping = await stoppingDb.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(
+                        instance => instance.Id == fixture.RetainReceiptId,
+                        cancellationToken);
+                await Assert.That(stopping.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(stopping.FailureCode).IsNull();
+                await Assert.That(stopping.ProviderReceiptJson).IsNull();
+                await Assert.That(stopping.RunnerId).IsEqualTo("runner-c");
+                await Assert.That(stopping.StoppedAt).IsNull();
+            }
+
+            var services = new ServiceCollection();
+            services.AddDbContext<NoCtfDbContext>(builder => builder
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention());
+            await using var serviceProvider = services.BuildServiceProvider();
+            var workReader = new RuntimeNodeWorkReader(
+                serviceProvider.GetRequiredService<IServiceScopeFactory>());
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Runner:Pool"] = "pool-a",
+                    ["Runner:Id"] = "runner-c"
+                })
+                .Build();
+            var identity = new RuntimeResourceIdentity(fixture.RetainReceiptId, 1);
+            var reconciler = new RemovingResourceReconciler(
+                RuntimeProvider.Docker,
+                [identity]);
+            var runner = new RuntimeProviderHandler(
+                new UnusedRuntimeProviderCatalog(),
+                [reconciler],
+                configuration,
+                capacity,
+                workReader);
+            var acknowledgement = (RuntimeStopped)await runner.Handle(
+                cleanup,
+                cancellationToken);
+
+            await Assert.That(reconciler.Destroyed).IsEquivalentTo([identity]);
+            await Assert.That(reconciler.ListCalls).IsGreaterThanOrEqualTo(1);
+            await Assert.That(capacity.ReleasedRuntimeIds)
+                .IsEquivalentTo([fixture.RetainReceiptId]);
+            await using (var writeBackDb = new NoCtfDbContext(options))
+            {
+                await RuntimeWriteBackHandler.Handle(
+                    acknowledgement,
+                    writeBackDb,
+                    outbox,
+                    cancellationToken);
+            }
+
+            await using (var replayDb = new NoCtfDbContext(options))
+            {
+                var replayOutcome = await BackendMessageHandlers.ExecuteRunnerAssignmentReconciliationAsync(
+                    new ReconcileRunnerAssignments(fixture.Now.AddSeconds(1)),
+                    replayDb,
+                    capacity,
+                    outbox,
+                    cancellationToken);
+                await Assert.That(replayOutcome).IsEqualTo(MessageExecutionOutcome.Idempotent);
+            }
+            await using var verify = new NoCtfDbContext(options);
+            var stopped = await verify.RuntimeInstances.AsNoTracking()
+                .SingleAsync(
+                    instance => instance.Id == fixture.RetainReceiptId,
+                    cancellationToken);
+            await Assert.That(stopped.State).IsEqualTo(RuntimeState.Stopped);
+            await Assert.That(stopped.FailureCode).IsNull();
+            await Assert.That(stopped.StoppedAt).IsNotNull();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Failed_unreceipted_cleanup_retains_capacity_and_later_start_retries_before_dispatch(
         CancellationToken cancellationToken)
     {
@@ -2337,6 +2453,36 @@ public sealed class RunnerAssignmentReconciliationTests
             return failCleanup || identity == failedIdentity
                 ? Task.FromException(new InvalidOperationException("cleanup failed"))
                 : Task.CompletedTask;
+        }
+    }
+
+    private sealed class RemovingResourceReconciler(
+        RuntimeProvider provider,
+        IEnumerable<RuntimeResourceIdentity> managed) : IRuntimeManagedResourceReconciler
+    {
+        private readonly HashSet<RuntimeResourceIdentity> managedResources = [.. managed];
+
+        public RuntimeProvider Provider { get; } = provider;
+
+        public List<RuntimeResourceIdentity> Destroyed { get; } = [];
+
+        public int ListCalls { get; private set; }
+
+        public Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
+            CancellationToken cancellationToken)
+        {
+            ListCalls++;
+            return Task.FromResult<IReadOnlyList<RuntimeResourceIdentity>>(
+                [.. managedResources]);
+        }
+
+        public Task DestroyByIdentityAsync(
+            RuntimeResourceIdentity identity,
+            CancellationToken cancellationToken)
+        {
+            Destroyed.Add(identity);
+            managedResources.Remove(identity);
+            return Task.CompletedTask;
         }
     }
 
