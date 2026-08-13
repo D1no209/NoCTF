@@ -5,6 +5,8 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
 } from '~/api'
+import { challengeTemplateWriteErrorMessage } from '~/lib/challenge-template-error'
+import { defaultDefinitionJson, normalizeDefinitionJson } from '~/utils/game-config'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -15,14 +17,25 @@ const mode = ref<NoCtfapiEndpointsCompetitionsGameModeProtocol>('Ctf')
 const visibility = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol>('Private')
 const direction = ref('')
 const description = ref('')
-const definitionJson = ref('{}')
+const definitionJson = ref(defaultDefinitionJson(mode.value))
 const error = ref<string | null>(null)
 const pending = ref(false)
+
+function changeMode(value: unknown): void {
+  if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
+  definitionJson.value = defaultDefinitionJson(value)
+  mode.value = value
+}
 
 async function submit(): Promise<void> {
   error.value = null
   if (!title.value.trim() || !direction.value.trim()) {
     error.value = translate('请填写标题和方向')
+    return
+  }
+  const normalizedDefinition = normalizeDefinitionJson(mode.value, definitionJson.value)
+  if (!normalizedDefinition) {
+    error.value = translate('题目定义格式无效,请检查题目定义配置')
     return
   }
   pending.value = true
@@ -33,12 +46,12 @@ async function submit(): Promise<void> {
       visibility: visibility.value,
       direction: direction.value.trim(),
       description: description.value.trim() || null,
-      definitionJson: definitionJson.value,
+      definitionJson: normalizedDefinition,
     },
   })
   pending.value = false
   if (apiError || !data) {
-    error.value = parseApiError(apiError).message
+    error.value = challengeTemplateWriteErrorMessage(apiError)
     return
   }
   toast.success(translate("模板已创建"))
@@ -77,7 +90,7 @@ async function submit(): Promise<void> {
                 <div class="grid gap-4 sm:grid-cols-2">
                   <Field>
                     <FieldLabel for="mode">{{ $t('游戏模式') }}</FieldLabel>
-                    <Select v-model="mode">
+                    <Select :model-value="mode" @update:model-value="changeMode">
                       <SelectTrigger id="mode" class="w-full">
                         <SelectValue :placeholder="$t('选择模式')" />
                       </SelectTrigger>

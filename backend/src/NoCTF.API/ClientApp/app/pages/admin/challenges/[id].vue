@@ -26,7 +26,8 @@ import type {
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
   NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
 } from '~/api'
-import { FlagSource } from '~/utils/game-config'
+import { challengeTemplateWriteErrorMessage } from '~/lib/challenge-template-error'
+import { defaultDefinitionJson, FlagSource, normalizeDefinitionJson } from '~/utils/game-config'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -76,6 +77,12 @@ const hasModeDefinition = computed(() => {
 // 依赖运行环境的模式定义块在未启用运行环境时不生效。
 const runtimeDisabled = computed(() => definitionModel.value !== null && definitionModel.value.runtime === null)
 
+function changeMode(value: unknown): void {
+  if (value !== 'Ctf' && value !== 'Awd' && value !== 'Awdp' && value !== 'Koh') return
+  form.definitionJson = defaultDefinitionJson(value)
+  form.mode = value
+}
+
 function syncForm(value: Template): void {
   form.title = value.title ?? ''
   form.mode = value.mode ?? 'Ctf'
@@ -104,8 +111,13 @@ async function loadTemplate(): Promise<void> {
 
 async function save(): Promise<void> {
   if (!template.value) return
+  const normalizedDefinition = normalizeDefinitionJson(form.mode, form.definitionJson)
+  if (!normalizedDefinition) {
+    toast.error(translate('题目定义格式无效,请检查题目定义配置'))
+    return
+  }
   saving.value = true
-  const { data, error, response } = await adminChallengeBankUpdateTemplate({
+  const { data, error } = await adminChallengeBankUpdateTemplate({
     path: { challengeId },
     body: {
       title: form.title.trim(),
@@ -113,18 +125,18 @@ async function save(): Promise<void> {
       visibility: form.visibility,
       direction: form.direction.trim(),
       description: form.description.trim() || null,
-      definitionJson: form.definitionJson,
+      definitionJson: normalizedDefinition,
       expectedRevision: template.value.revision ?? 0,
     },
   })
   saving.value = false
   if (error) {
-    if (response?.status === 409) {
+    if (isRevisionConflict(error)) {
       toast.error(translate("模板已被他人修改,请刷新后重试"))
       await loadTemplate()
     }
     else {
-      toast.error(parseApiError(error).message)
+      toast.error(challengeTemplateWriteErrorMessage(error))
     }
     return
   }
@@ -544,7 +556,7 @@ onMounted(() => {
                     <div class="grid gap-4 sm:grid-cols-2">
                       <Field>
                         <FieldLabel for="edit-mode">{{ $t('游戏模式') }}</FieldLabel>
-                        <Select v-model="form.mode" :disabled="isDeleted">
+                        <Select :model-value="form.mode" :disabled="isDeleted" @update:model-value="changeMode">
                           <SelectTrigger id="edit-mode" class="w-full">
                             <SelectValue />
                           </SelectTrigger>

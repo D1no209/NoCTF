@@ -13,6 +13,7 @@ import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
+import { competitionChallengeConflictMessage } from '~/lib/competition-challenge-conflict'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -84,13 +85,16 @@ async function addChallenge() {
         order: newOrder.value,
       },
     })
-    if (error) throw error
+    if (error) {
+      addError.value = competitionChallengeConflictMessage(error) ?? parseApiError(error).message
+      return
+    }
     toast.success(translate("题目已添加"))
     addOpen.value = false
     await load()
   }
   catch (e) {
-    addError.value = parseApiError(e).message
+    addError.value = competitionChallengeConflictMessage(e) ?? parseApiError(e).message
   }
   finally {
     adding.value = false

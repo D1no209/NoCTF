@@ -16,6 +16,7 @@ import type {
   NoCtfapiEndpointsTeamsTeamBanSourceProtocol,
   NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol,
 } from '../api'
+import { parseApiError } from './api-error'
 import { localeTag, translate } from './i18n'
 
 /** Protocol enum label maps. HTTP enums are PascalCase strings. */
@@ -115,14 +116,11 @@ export function isoToLocalInput(value: string | null | undefined): string {
 
 /** Whether an SDK error payload looks like an optimistic-concurrency (409) conflict. */
 export function isRevisionConflict(error: unknown): boolean {
-  const e = parseApiError(error)
-  if (e.status === 409) return true
-  if (e.code && /revision/i.test(e.code)) return true
-  return /revision|已被.*修改|conflict/i.test(e.message)
+  return parseApiError(error).code === 'RevisionConflict'
 }
 
 /**
- * Standard error handling for admin writes: 409 -> refresh + conflict hint,
+ * Standard error handling for admin writes: RevisionConflict -> refresh + conflict hint,
  * anything else -> plain error toast.
  */
 export function toastWriteError(error: unknown, refresh?: () => void | Promise<void>): void {

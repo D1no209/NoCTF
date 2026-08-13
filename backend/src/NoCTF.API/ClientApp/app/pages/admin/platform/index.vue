@@ -50,7 +50,7 @@ async function load(): Promise<void> {
 async function save(): Promise<void> {
   if (!configuration.value || !name.value.trim()) return
   saving.value = true
-  const { data, error, response } = await adminPlatformUpdateConfiguration({
+  const { data, error } = await adminPlatformUpdateConfiguration({
     body: {
       name: name.value.trim(),
       description: description.value.trim() || null,
@@ -59,7 +59,7 @@ async function save(): Promise<void> {
   })
   saving.value = false
   if (error) {
-    if (response?.status === 409) {
+    if (isRevisionConflict(error)) {
       toast.error(translate("配置已被他人修改,请刷新后重试"))
       await load()
     }
@@ -79,12 +79,12 @@ async function uploadLogo(event: Event): Promise<void> {
   input.value = ''
   if (!file || !configuration.value) return
   logoUploading.value = true
-  const { data, error, response } = await adminPlatformUploadLogo({
+  const { data, error } = await adminPlatformUploadLogo({
     body: { file, expectedRevision: configuration.value.revision ?? 0 },
   })
   logoUploading.value = false
   if (error) {
-    if (response?.status === 409) {
+    if (isRevisionConflict(error)) {
       toast.error(translate("配置已被他人修改,请刷新后重试"))
       await load()
     }

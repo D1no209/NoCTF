@@ -4,6 +4,7 @@ import { toast } from 'vue-sonner'
 import {
   adminChallengeConfigurationGet,
   adminChallengeConfigurationUpdate,
+  adminCompetitionConfigurationGet,
   adminCreateCompetitionChallengeFlag,
   adminCreateCompetitionChallengeHint,
   adminDeleteCompetitionChallengeFlag,
@@ -95,13 +96,20 @@ async function saveEdit() {
 const config = ref<NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse | null>(null)
 const configLoading = ref(true)
 const savingConfig = ref(false)
+const inheritedConfigJson = ref<string | null>(null)
 
 async function loadConfig() {
   configLoading.value = true
-  const { data, error } = await adminChallengeConfigurationGet({
-    path: { competitionId, competitionChallengeId: ccId },
-  })
-  if (!error && data) config.value = data
+  const [challengeResult, competitionResult] = await Promise.all([
+    adminChallengeConfigurationGet({
+      path: { competitionId, competitionChallengeId: ccId },
+    }),
+    adminCompetitionConfigurationGet({ path: { competitionId } }),
+  ])
+  if (!challengeResult.error && challengeResult.data) config.value = challengeResult.data
+  if (!competitionResult.error && competitionResult.data) {
+    inheritedConfigJson.value = competitionResult.data.json ?? null
+  }
   configLoading.value = false
 }
 
@@ -454,6 +462,7 @@ onMounted(() => {
               <ChallengeRulesEditor
                 :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
                 :json="config?.json"
+                :inherited-json="inheritedConfigJson"
                 :revision="config?.revision"
                 :readonly="!canWrite"
                 :loading="configLoading"
