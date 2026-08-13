@@ -1640,6 +1640,7 @@ export const englishMessages: Record<string, string> = {
   "竞赛及其作用域数据已永久删除，平台审计记录已保留": "The competition and its scoped data were permanently deleted; the platform audit record was retained",
   "强制级联删除": "Force cascade delete",
   "平台管理员可使用强制级联删除。该操作会永久移除比赛作用域数据，只保留一条平台审计记录。": "Platform administrators can force a cascade deletion. This permanently removes competition-scoped data and retains only a platform audit record.",
+  "强制级联删除当前受阻：请先结束比赛并清理全部活动运行环境资源。": "Force cascade deletion is currently blocked. Finish the competition and clean up every active runtime resource first.",
   "强制级联删除竞赛": "Force-delete competition",
   "此操作不可恢复，将永久删除比赛、队伍、题目实例、提交、事件、通知、运行时和导出等比赛作用域数据。平台审计会保留操作者、原因和时间。": "This cannot be undone. It permanently deletes the competition and scoped teams, challenge instances, submissions, events, notifications, runtimes, and exports. The platform audit retains the operator, reason, and time.",
   "输入完整竞赛标题以确认": "Enter the full competition title to confirm",

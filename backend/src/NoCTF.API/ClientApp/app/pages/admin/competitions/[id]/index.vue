@@ -433,7 +433,7 @@ async function submitDelete() {
             @click="deleteConfirm = 'hard'"
           > {{ $t('彻底删除') }} </Button>
           <Button
-            v-if="isAdministrator && hardDeletePreview?.canForceDelete && !hardDeletePreview.canHardDelete"
+            v-if="isAdministrator"
             variant="destructive"
             size="sm"
             :disabled="forceDeleting"
@@ -459,8 +459,10 @@ async function submitDelete() {
                 {{ hardDeleteReferenceLabel(reference.code) }} · {{ reference.count ?? 0 }}
               </Badge>
             </span>
-            <span v-if="isAdministrator && hardDeletePreview.canForceDelete" class="text-destructive">
-              {{ $t('平台管理员可使用强制级联删除。该操作会永久移除比赛作用域数据，只保留一条平台审计记录。') }}
+            <span v-if="isAdministrator" class="text-destructive">
+              {{ hardDeletePreview.canForceDelete
+                ? $t('平台管理员可使用强制级联删除。该操作会永久移除比赛作用域数据，只保留一条平台审计记录。')
+                : $t('强制级联删除当前受阻：请先结束比赛并清理全部活动运行环境资源。') }}
             </span>
           </AlertDescription>
         </Alert>
