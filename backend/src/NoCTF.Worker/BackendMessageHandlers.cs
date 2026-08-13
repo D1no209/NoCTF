@@ -1092,7 +1092,10 @@ public static class BackendMessageHandlers
             .Where(instance => instance.RunnerId != null
                 && (instance.State == RuntimeState.Provisioning
                     || instance.State == RuntimeState.Running
-                    || instance.State == RuntimeState.Stopping)
+                    || instance.State == RuntimeState.Stopping
+                    || (instance.State == RuntimeState.Failed
+                        && instance.ProviderReceiptJson == null
+                        && instance.RunnerAssignmentReleaseToken == null))
                 && (message.AfterRuntimeInstanceId == null
                     || instance.Id.CompareTo(message.AfterRuntimeInstanceId.Value) > 0))
             .OrderBy(instance => instance.Id)
@@ -1196,7 +1199,9 @@ public static class BackendMessageHandlers
                 instance.RunnerAssignmentReleaseToken = null;
                 applied = true;
             }
-            if (heartbeat == RunnerHeartbeatStatus.Online && !assignmentReleasePending)
+            if (heartbeat == RunnerHeartbeatStatus.Online
+                && !assignmentReleasePending
+                && instance.State != RuntimeState.Failed)
                 continue;
 
             var action = RunnerAssignmentRecoveryPolicy.Decide(
@@ -1212,6 +1217,7 @@ public static class BackendMessageHandlers
             {
                 case RunnerAssignmentRecoveryAction.AwaitOwnerCleanup:
                     instance.State = RuntimeState.Stopping;
+                    instance.FailureCode = null;
                     instance.RunnerAssignmentReleaseToken = null;
                     instance.RunnerUnavailableAt = message.At;
                     await PublishRuntimeStopAsync(outbox, instance, runnerId);

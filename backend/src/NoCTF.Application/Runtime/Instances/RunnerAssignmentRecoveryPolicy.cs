@@ -15,8 +15,9 @@ public static class RunnerAssignmentRecoveryPolicy
         bool recoveryAlreadyRecorded,
         bool assignmentReleasePending)
     {
-        return state is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
-            && (!recoveryAlreadyRecorded || assignmentReleasePending)
+        return state == RuntimeState.Failed
+            || state is RuntimeState.Provisioning or RuntimeState.Running or RuntimeState.Stopping
+                && (!recoveryAlreadyRecorded || assignmentReleasePending)
             ? RunnerAssignmentRecoveryAction.AwaitOwnerCleanup
             : RunnerAssignmentRecoveryAction.Ignore;
     }
