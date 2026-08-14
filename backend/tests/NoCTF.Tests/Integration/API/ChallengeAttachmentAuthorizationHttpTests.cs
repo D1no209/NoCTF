@@ -468,8 +468,17 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
     {
         public Task<StoredObject?> InspectAsync(
             string objectKey,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            CancellationToken cancellationToken)
+        {
+            if (!objects.TryGetValue(objectKey, out var content))
+                return Task.FromResult<StoredObject?>(null);
+            return Task.FromResult<StoredObject?>(new(
+                objectKey,
+                objectKey,
+                "application/octet-stream",
+                content.LongLength,
+                string.Empty));
+        }
 
         public Task<StoredObject> PutAsync(
             string objectKey,
