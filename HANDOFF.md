@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-14 静态题目运行环境入口与 3D 中控大屏收口
+
+- 功能提交 `dab289d1` 为选手题目接口新增只读 `hasRuntime` 契约，由后端使用现有 Runtime 模板目录解析题库定义；无 Container/Compose Runtime 的静态 CTF 题目不再挂载 Runtime 组件，也不会请求实例状态或显示“启动环境”。该字段已通过 OpenAPI 工具导出并重新生成 TypeScript SDK，没有手写 DTO、URL 或端点路径。
+- 功能提交 `11060f01` 删除旧的自研二维 `/competitions/{id}/screen` 页面及导航入口，只保留协作者实现的 `/live` 3D 大屏。3D 大屏不再提供赛道切换，统一聚合所有 `isInternal != true` 的赛道数据；内部赛道不会进入排行榜、题目状态、解题流或动画队列。
+- 3D 城市默认视角拉远并抬高：巡航半径和高度随城市跨度扩大，观察中心同步抬升，使空闲巡航时可以看到各队柱体的整体高度与相对态势，聚焦解题动画仍沿用既有镜头切换。
+- 测试夹具提交 `30a6cab0` 补齐测试对象存储的只读对象检查能力，不改变生产对象存储实现。
+- 验证通过：Release solution build 0 warning/0 error；完整非 Integration TUnit 777/777；前端完整 `bun test` 200/200（1504 assertions）、`bun run typecheck`、production `bun run build`；相机最终调整后的定向前端测试 9/9；C# analyzers、EF `has-pending-model-changes`、OpenAPI/SDK 双次生成幂等和 `git diff --check` 均通过。完整 Integration 本轮执行 173 项时曾有 2 项失败：一项是 Docker Hub 拉取 `busybox` 的瞬时 EOF，另一项是测试对象存储夹具未实现本次合法调用的 `InspectAsync`；夹具修正后两项均分别真实重跑 1/1 通过。Kubernetes 与 Libvirt 两项因环境未配置按设计跳过。
+- 本阶段没有新增业务表、列、migration 或 snapshot，没有修改题目 Runtime/Checker 镜像策略，没有推送、部署或操作生产数据。
+
 ## 2026-08-14 随机附件交付与比赛级动态 Flag 配置
 
 - 功能提交 `4ff6a257` 重构题目附件与 Flag 管理。普通 `All` 模式允许上传并向选手展示全部附件；`RandomOnePerTeam` 模式由工作人员设置统一下载文件名并批量上传变体，原始上传文件名完整解析为对应的精确 Flag，不删除扩展名，也不向选手、下载响应、对象存储公开地址或普通日志暴露。批次会在写入前完整验证，文件暂存、数据库写入与失败补偿组成原子流程；没有新增附件—Flag 映射表。
