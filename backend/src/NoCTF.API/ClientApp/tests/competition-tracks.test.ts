@@ -60,6 +60,7 @@ describe('competition track pages', () => {
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
     expect(teams).toContain('adminTeamTrackAssign')
     expect(teams).toContain('expectedTeamVersion: team.concurrencyVersion ?? 0')
+    expect(teams).not.toContain('tracksFrozen.value || team.trackKey === trackKey')
   })
 
   test('exposes participant selection and per-track leaderboard switching', async () => {
@@ -67,8 +68,10 @@ describe('competition track pages', () => {
     const leaderboard = await Bun.file(new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url)).text()
 
     expect(overview).toContain('listCompetitionTracks')
-    expect(overview).toContain('trackKey: createTrackKey.value || undefined')
+    expect(overview).toContain('trackKey: createTrackKey.value')
     expect(overview).toContain('track.isPublicSelectable')
+    expect(overview).toContain('v-if="selectableTracks.length > 0"')
+    expect(overview).not.toContain('createTrackKey.value = selectableTracks.value.find')
     expect(leaderboard).toContain("all.filter(entry => entry.trackKey === selectedTrackKey.value)")
     expect(leaderboard).toContain('availableTracks.length > 1')
   })

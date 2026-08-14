@@ -9,7 +9,7 @@ public sealed record CreateTeamCommand(
     Guid UserId,
     string Name,
     DateTimeOffset RegisteredAt,
-    string? TrackKey = null);
+    string TrackKey);
 public sealed record TeamView(
     Guid Id,
     Guid CompetitionId,
@@ -100,8 +100,11 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
         var tracks = CompetitionTrackConfiguration.ParseOrDefault(
             policy.Mode,
             policy.TrackConfigurationJson);
-        var requestedKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey)
-            ?? tracks.DefaultTrack.Key;
+        var requestedKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey);
+        if (requestedKey is null)
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                TeamRegistrationFailure.TrackNotFound,
+                "A competition track must be selected when creating a team.");
         var requestedTrack = tracks.Find(requestedKey);
         if (requestedTrack is null)
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(

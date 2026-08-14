@@ -36,7 +36,7 @@ export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
 export type NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol = 'InvalidTeamName' | 'CompetitionNotFound' | 'RegistrationClosed' | 'UserAlreadyRegistered' | 'TeamNameOrMembershipConflict' | 'TeamNotFound' | 'CompetitionFinished' | 'TeamLocked' | 'TeamConflict' | 'TeamReviewConflict' | 'CompetitionActive' | 'TrackNotFound' | 'TrackNotPublicSelectable';
 
 export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
-    trackKey?: string | null;
+    trackKey: string;
     name?: string;
 };
 

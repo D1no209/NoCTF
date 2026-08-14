@@ -170,6 +170,7 @@ public sealed class CompetitionTrackPersistenceTests
                 await Assert.That(result.FailureCode).IsEqualTo(CompetitionTrackFailureCode.TrackInUse);
             }
 
+            long expectedTeamVersion = 1;
             foreach (var frozenStatus in new[]
                      {
                          CompetitionStatus.Running,
@@ -191,11 +192,12 @@ public sealed class CompetitionTrackPersistenceTests
                         competitionId,
                         teamId,
                         "default",
-                        ExpectedTeamVersion: 1,
+                        ExpectedTeamVersion: expectedTeamVersion,
                         ownerId,
                         now.AddSeconds(3)), cancellationToken);
-                await Assert.That(assignment.FailureCode)
-                    .IsEqualTo(CompetitionTrackFailureCode.AssignmentLocked);
+                await Assert.That(assignment.Succeeded).IsTrue();
+                await Assert.That(assignment.Value!.TrackKey).IsEqualTo("default");
+                expectedTeamVersion = assignment.Value.TeamVersion;
                 var update = await store.UpdateAsync(new(
                         competitionId,
                         ExpectedRevision: 1,
@@ -204,6 +206,17 @@ public sealed class CompetitionTrackPersistenceTests
                         now.AddSeconds(4)), cancellationToken);
                 await Assert.That(update.FailureCode)
                     .IsEqualTo(CompetitionTrackFailureCode.ConfigurationLocked);
+
+                await using var restoreDb = new NoCtfDbContext(options);
+                var restored = await CreateStore(restoreDb).AssignAsync(new(
+                    competitionId,
+                    teamId,
+                    "internal",
+                    ExpectedTeamVersion: assignment.Value.TeamVersion,
+                    ownerId,
+                    now.AddSeconds(5)), cancellationToken);
+                await Assert.That(restored.Succeeded).IsTrue();
+                expectedTeamVersion = restored.Value!.TeamVersion;
             }
 
             await using var verify = new NoCtfDbContext(options);
@@ -219,10 +232,12 @@ public sealed class CompetitionTrackPersistenceTests
             await Assert.That(team.TrackKey).IsEqualTo("internal");
             await Assert.That(competition.TrackConfigurationRevision).IsEqualTo(1);
             await Assert.That(competition.LeaderboardDirty).IsTrue();
-            await Assert.That(eventKinds).IsEquivalentTo([
-                NoCTF.Domain.Competitions.Events.CompetitionEventKind.TrackConfigurationUpdated,
-                NoCTF.Domain.Competitions.Events.CompetitionEventKind.TeamTrackChanged
-            ]);
+            await Assert.That(eventKinds.Count(kind =>
+                    kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.TrackConfigurationUpdated))
+                .IsEqualTo(1);
+            await Assert.That(eventKinds.Count(kind =>
+                    kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.TeamTrackChanged))
+                .IsEqualTo(7);
         });
     }
 

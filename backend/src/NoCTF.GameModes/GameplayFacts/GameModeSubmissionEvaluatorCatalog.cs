@@ -71,28 +71,31 @@ public sealed class CtfGameplayFactEvaluator(IGameplayFactEvaluator inner) : IGa
             return ModeGameplayFactEvaluatorRules.Reject(
                 context.GameplayFact,
                 GameplayFactFailureCode.FixNotSupported);
-        var supportsRegularExpression = SupportsRegularExpression(context.ChallengeDefinitionJson);
-        var effectiveContext = supportsRegularExpression
-            ? context
-            : context with
+        var usesRuntimeInjection = UsesRuntimeInjection(context.ChallengeDefinitionJson);
+        var effectiveContext = usesRuntimeInjection
+            ? context with
             {
                 ApplicableFlags = context.ApplicableFlags
-                    .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact)
+                    .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact
+                        && flag.TeamId is not null
+                        && flag.SpecificationKind == SpecificationKind.RuntimeDefinition
+                        && flag.SpecificationId == context.GameplayFact.CompetitionChallengeId)
                     .ToArray()
-            };
+            }
+            : context;
         return ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(
             effectiveContext,
             inner.Evaluate(effectiveContext));
     }
 
-    private static bool SupportsRegularExpression(string? definitionJson)
+    private static bool UsesRuntimeInjection(string? definitionJson)
     {
         if (string.IsNullOrWhiteSpace(definitionJson))
             return false;
         try
         {
             return CtfConfigurationUpgrader.ParseChallenge(definitionJson).Runtime?.FlagSource
-                is null or RuntimeFlagSource.Static;
+                == RuntimeFlagSource.PerTeam;
         }
         catch (GameModeConfigurationException)
         {

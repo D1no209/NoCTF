@@ -14,6 +14,9 @@ describe('challenge flag match kind editor', () => {
       expect(page).toContain('matchKind: flagForm')
       expect(page).toContain('supportsRegularExpression')
       expect(page).toContain('value="RegularExpression"')
+      expect(page).toContain('usesRuntimeFlagInjection')
+      expect(page).toContain("$t('环境变量注入')")
+      expect(page).toContain('无需维护精确或正则 Flag')
     }
   })
 })

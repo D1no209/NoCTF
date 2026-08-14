@@ -9,7 +9,7 @@ FlagSelectionPolicy: All | RandomOnePerTeam
 EvaluationDispatchMode: Automatic | ManualBatch
 MaxFlagSubmissions: int                 // <=0 无限
 Runtime?                               // 按队 Runtime 配置
-Runtime.FlagSource: Static | PerTeam
+Runtime.FlagSource: PerTeam
 ```
 
 数值约束：MinimumPoints 0..BaseScore，DecayParameter>1，Penalty/Reward 非负，百分比 0..100。覆盖值为 0 时就是显式 0，不表示继承；只有 null 表示继承。所有配置对象带 `schemaVersion`，未知版本拒绝保存。
@@ -21,9 +21,9 @@ CTF CompetitionChallenge 可为：
 - Static：题面、Attachment、外部链接；
 - PerTeamRuntime：Container、Compose 或 OVA；按队按需启动，没有多阶段语义。
 
-Runtime.FlagSource：Static 或 PerTeam。OVA 只能 Static；Container PerTeam 使用
-`FlagEnvironmentVariableName`，Compose PerTeam 使用
-`FlagEnvironmentVariables[serviceName]`，在创建时注入固定队伍 Flag。
+只要配置 Runtime，`Runtime.FlagSource` 就必须为 PerTeam。Container 使用
+`FlagEnvironmentVariableName`，Compose 使用 `FlagEnvironmentVariables[serviceName]`，平台在创建 Runtime
+时注入固定队伍 Flag。无 Runtime 的静态题才使用管理员维护的精确或正则 Flag。
 
 Competition 可用 `FlagTemplate` 配置动态 Flag 的默认 Header、BodyTemplate 与字面文本 leet；
 Challenge.DefinitionJson 可在 `Runtime.FlagSource=PerTeam` 时用同名字段覆盖。优先级为题目模板、
@@ -32,7 +32,7 @@ Flag 不轮换，Reset/重启继续复用原值；静态题和管理员维护的
 
 ## Flag 与附件
 
-一题可有多个正确 Flag。模板级静态 Flag 用 ChallengeId；比赛/团队 Runtime Flag 用 CompetitionChallengeId。任一符合 scope、Team、Specification 与 ReceivedAt 时间窗的 Flag 可正确。
+无 Runtime 的静态题可有多个正确 Flag。模板级静态 Flag 用 ChallengeId；比赛/团队 Runtime Flag 用 CompetitionChallengeId。动态 Runtime 判题只接受当前题目生成的 Team + RuntimeDefinition Flag，不混入模板或手工静态 Flag。
 
 Attachment 策略：
 

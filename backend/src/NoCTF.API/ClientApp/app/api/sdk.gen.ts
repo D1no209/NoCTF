@@ -1208,7 +1208,7 @@ export const adminApproveTeam = <ThrowOnError extends boolean = false>(options: 
 /**
  * Assigns a team to a competition track.
  *
- * Allows competition administrators to assign public or internal tracks before start.
+ * Allows competition administrators to move a team to an existing public or internal track, including after start.
  */
 export const adminTeamTrackAssign = <ThrowOnError extends boolean = false>(options: Options<AdminTeamTrackAssignData, ThrowOnError>): RequestResult<AdminTeamTrackAssignResponses, AdminTeamTrackAssignErrors, ThrowOnError> => (options.client ?? client).put<AdminTeamTrackAssignResponses, AdminTeamTrackAssignErrors, ThrowOnError>({
     security: [{

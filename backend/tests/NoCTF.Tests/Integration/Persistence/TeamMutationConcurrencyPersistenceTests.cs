@@ -72,7 +72,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             registrationOutbox,
             eventRecorder: blocker);
         var registrationTask = store.TryCreateAsync(
-            new(competition.Id, participant.Id, "Refresh Team", now.AddMinutes(1)),
+            new(competition.Id, participant.Id, "Refresh Team", now.AddMinutes(1), "default"),
             TeamRegistrationStatus.Approved,
             ct);
 
@@ -128,12 +128,12 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var first = CreateAsync(
             options,
-            new(competition.Id, participant.Id, "Double A", now.AddMinutes(1)),
+            new(competition.Id, participant.Id, "Double A", now.AddMinutes(1), "default"),
             start.Task,
             ct);
         var second = CreateAsync(
             options,
-            new(competition.Id, participant.Id, "Double B", now.AddMinutes(1).AddTicks(1)),
+            new(competition.Id, participant.Id, "Double B", now.AddMinutes(1).AddTicks(1), "default"),
             start.Task,
             ct);
         start.SetResult();
@@ -181,7 +181,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var createTask = CreateAsync(
             options,
-            new(competition.Id, participant.Id, "Created Team", now.AddMinutes(1)),
+            new(competition.Id, participant.Id, "Created Team", now.AddMinutes(1), "default"),
             start.Task,
             ct);
         var joinTask = JoinAsync(

@@ -30,7 +30,6 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const pendingId = ref<string | null>(null)
 const tracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
-const tracksFrozen = ref(false)
 
 async function load() {
   loading.value = true
@@ -43,13 +42,12 @@ async function load() {
   else teams.value = teamResult.data.items ?? []
   if (!trackResult.error && trackResult.data) {
     tracks.value = trackResult.data.items ?? []
-    tracksFrozen.value = trackResult.data.isFrozen ?? false
   }
   loading.value = false
 }
 
 async function assignTrack(team: NoCtfapiEndpointsTeamsTeamResponse, trackKey: string) {
-  if (!team.id || !canWrite.value || tracksFrozen.value || team.trackKey === trackKey) return
+  if (!team.id || !canWrite.value || team.trackKey === trackKey) return
   pendingId.value = team.id
   try {
     const { error: requestError } = await adminTeamTrackAssign({
@@ -249,7 +247,7 @@ onMounted(() => {
             <TableCell class="font-medium">{{ t.name }}</TableCell>
             <TableCell>
               <Select
-                v-if="canWrite && !tracksFrozen"
+                v-if="canWrite"
                 :model-value="t.trackKey"
                 :disabled="pendingId === t.id"
                 @update:model-value="value => assignTrack(t, String(value))"

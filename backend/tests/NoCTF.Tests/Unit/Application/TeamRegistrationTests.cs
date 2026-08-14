@@ -10,7 +10,7 @@ public class TeamRegistrationTests
     public async Task CreateTeam_AutoApproveCreatesCaptainTeam()
     {
         var store = new Store(new(CompetitionStatus.Published, true, false));
-        var command = new CreateTeamCommand(Guid.NewGuid(), Guid.NewGuid(), "alpha", DateTimeOffset.UtcNow);
+        var command = new CreateTeamCommand(Guid.NewGuid(), Guid.NewGuid(), "alpha", DateTimeOffset.UtcNow, "default");
 
         var result = await new CreateTeam(store).ExecuteAsync(command);
 
@@ -23,7 +23,7 @@ public class TeamRegistrationTests
     public async Task CreateTeam_RunningCompetitionRejectsRegistration()
     {
         var store = new Store(new(CompetitionStatus.Running, true, false));
-        var result = await new CreateTeam(store).ExecuteAsync(new(Guid.NewGuid(), Guid.NewGuid(), "alpha", DateTimeOffset.UtcNow));
+        var result = await new CreateTeam(store).ExecuteAsync(new(Guid.NewGuid(), Guid.NewGuid(), "alpha", DateTimeOffset.UtcNow, "default"));
         await Assert.That(result.FailureCode).IsEqualTo(TeamRegistrationFailure.RegistrationClosed);
     }
 
@@ -40,14 +40,15 @@ public class TeamRegistrationTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             "alpha",
-            DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow,
+            "default"));
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.Status).IsEqualTo(TeamRegistrationStatus.Pending);
     }
 
     [Test]
-    public async Task CreateTeam_Allows_only_publicly_selectable_tracks_and_defaults_when_omitted()
+    public async Task CreateTeam_Requires_an_explicit_publicly_selectable_track()
     {
         var configuration = new CompetitionTrackConfiguration(1,
         [
@@ -65,7 +66,7 @@ public class TeamRegistrationTests
         var create = new CreateTeam(store);
 
         var defaultResult = await create.ExecuteAsync(new(
-            Guid.NewGuid(), Guid.NewGuid(), "defaulted", DateTimeOffset.UtcNow));
+            Guid.NewGuid(), Guid.NewGuid(), "defaulted", DateTimeOffset.UtcNow, ""));
         var publicResult = await create.ExecuteAsync(new(
             Guid.NewGuid(), Guid.NewGuid(), "public", DateTimeOffset.UtcNow, " FORMAL "));
         var hiddenResult = await create.ExecuteAsync(new(
@@ -73,7 +74,7 @@ public class TeamRegistrationTests
         var internalResult = await create.ExecuteAsync(new(
             Guid.NewGuid(), Guid.NewGuid(), "internal", DateTimeOffset.UtcNow, "internal"));
 
-        await Assert.That(defaultResult.Value!.TrackKey).IsEqualTo("formal");
+        await Assert.That(defaultResult.FailureCode).IsEqualTo(TeamRegistrationFailure.TrackNotFound);
         await Assert.That(publicResult.Value!.TrackKey).IsEqualTo("formal");
         await Assert.That(hiddenResult.FailureCode)
             .IsEqualTo(TeamRegistrationFailure.TrackNotPublicSelectable);

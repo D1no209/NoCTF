@@ -33,7 +33,9 @@ const kindOptions = computed(() =>
 
 function switchKind(kind: string): void {
   if (kind === props.runtime.definition.kind) return
-  props.runtime.definition = kind === 'compose' ? emptyComposeDefinition() : emptyContainerDefinition()
+  props.runtime.definition = kind === 'compose'
+    ? emptyComposeDefinition()
+    : emptyContainerDefinition(props.mode === 'Ctf')
 }
 
 const flagSourceOptions = computed(() => {
@@ -71,6 +73,9 @@ watch(
     runtime.allocation = mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
     if (mode !== 'Koh') runtime.controlCheckUrlBinding = null
     if (mode === 'Ctf') {
+      runtime.flagSource = FlagSource.PerTeam
+      if (runtime.definition.kind === 'container' && !runtime.definition.flagEnvironmentVariableName.trim())
+        runtime.definition.flagEnvironmentVariableName = 'FLAG'
       for (const binding of runtime.urlBindings) binding.exposure = UrlExposure.OwnerOnly
     }
     if (mode === 'Awdp') {
@@ -83,6 +88,7 @@ watch(
       }
     }
   },
+  { immediate: true },
 )
 </script>
 
@@ -99,7 +105,6 @@ watch(
         <FieldDescription v-if="mode === 'Koh'">{{ $t('KoH 要求所有队伍共享同一套环境。') }}</FieldDescription>
         <FieldDescription v-else>{{ $t('{mode} 要求每个队伍独立的运行环境。', { mode }) }}</FieldDescription>
       </Field>
-
       <Field>
         <FieldLabel>{{ $t('运行环境类型') }}</FieldLabel>
         <Select
@@ -195,7 +200,7 @@ watch(
     </DefinitionSection>
 
     <DefinitionSection :title="$t('Flag 与访问')" :collapsible="false">
-      <Field>
+      <Field v-if="mode !== 'Ctf'">
         <FieldLabel>{{ $t('Flag 来源') }}</FieldLabel>
         <Select
           :model-value="String(runtime.flagSource)"
@@ -213,6 +218,13 @@ watch(
             </SelectGroup>
           </SelectContent>
         </Select>
+      </Field>
+      <Field v-else>
+        <FieldLabel>{{ $t('Flag 来源') }}</FieldLabel>
+        <div class="flex h-9 items-center gap-2">
+          <Badge variant="secondary">{{ $t('每队独立 Flag（环境变量注入）') }}</Badge>
+        </div>
+        <FieldDescription>{{ $t('容器题由平台生成队伍专属 Flag，并在启动环境时注入配置的环境变量。') }}</FieldDescription>
       </Field>
 
       <Field v-if="mode !== 'Awdp'">

@@ -114,7 +114,7 @@ public sealed class CompetitionManagementPersistenceTests
                 db,
                 new OpenApiTransactionalMessageOutbox());
             var allowed = await registrations.TryCreateAsync(
-                new(competitionId, ownerId, "Running team", now.AddMinutes(2)),
+                new(competitionId, ownerId, "Running team", now.AddMinutes(2), "default"),
                 TeamRegistrationStatus.Approved,
                 cancellationToken);
             await Assert.That(allowed.Team).IsNotNull();
@@ -122,7 +122,7 @@ public sealed class CompetitionManagementPersistenceTests
             runningCompetition.AllowTeamRegistrationWhileRunning = false;
             await db.SaveChangesAsync(cancellationToken);
             var rejected = await registrations.TryCreateAsync(
-                new(competitionId, Guid.NewGuid(), "Late team", now.AddMinutes(3)),
+                new(competitionId, Guid.NewGuid(), "Late team", now.AddMinutes(3), "default"),
                 TeamRegistrationStatus.Approved,
                 cancellationToken);
             await Assert.That(rejected.Failure)

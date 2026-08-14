@@ -50,8 +50,9 @@ public sealed class TeamRegistrationStore(
         var tracks = CompetitionTrackConfiguration.ParseOrDefault(
             competition.Mode,
             competition.TrackConfigurationJson);
-        var requestedTrackKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey)
-            ?? tracks.DefaultTrack.Key;
+        var requestedTrackKey = CompetitionTrackConfiguration.NormalizeKey(command.TrackKey);
+        if (requestedTrackKey is null)
+            return new(null, TeamRegistrationFailure.TrackNotFound);
         var track = tracks.Find(requestedTrackKey);
         if (track is null)
             return new(null, TeamRegistrationFailure.TrackNotFound);

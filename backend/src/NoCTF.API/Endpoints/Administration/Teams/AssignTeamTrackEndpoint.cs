@@ -46,7 +46,7 @@ public sealed class AssignTeamTrackEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Assigns a team to a competition track.";
-            summary.Description = "Allows competition administrators to assign public or internal tracks before start.";
+            summary.Description = "Allows competition administrators to move a team to an existing public or internal track, including after start.";
         });
     }
 

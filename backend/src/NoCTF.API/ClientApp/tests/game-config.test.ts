@@ -59,6 +59,15 @@ describe('dynamic flag templates', () => {
     const staticDefinition = JSON.parse(serializeDefinition('Ctf', model))
     expect(staticDefinition.flagTemplate).toBeUndefined()
   })
+
+  test('creates CTF runtimes with per-team environment injection by default', () => {
+    const runtime = emptyRuntimeTemplate('Ctf')
+
+    expect(runtime.flagSource).toBe(FlagSource.PerTeam)
+    expect(runtime.definition.kind).toBe('container')
+    if (runtime.definition.kind !== 'container') throw new Error('Expected container definition')
+    expect(runtime.definition.flagEnvironmentVariableName).toBe('FLAG')
+  })
 })
 
 describe('container security drafts', () => {

@@ -72,12 +72,9 @@ public static class CtfConfigurationValidator
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
             errors.Add("CTF runtimes must use PerTeam allocation.");
-        if (configuration.Runtime is
-            {
-                FlagSource: not (RuntimeFlagSource.Static or RuntimeFlagSource.PerTeam)
-            })
+        if (configuration.Runtime is { FlagSource: not RuntimeFlagSource.PerTeam })
         {
-            errors.Add("CTF runtimes only support Static or PerTeam flags.");
+            errors.Add("CTF runtimes must use PerTeam flags injected into the runtime environment.");
         }
         if ((configuration.Runtime?.UrlBindings ?? [])
             .Any(binding => binding is not null

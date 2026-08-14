@@ -74,6 +74,10 @@ const hasModeDefinition = computed(() => {
   return false
 })
 
+const usesRuntimeFlagInjection = computed(() =>
+  form.mode === 'Ctf' && definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam,
+)
+
 // 依赖运行环境的模式定义块在未启用运行环境时不生效。
 const runtimeDisabled = computed(() => definitionModel.value !== null && definitionModel.value.runtime === null)
 
@@ -746,16 +750,24 @@ onMounted(() => {
                   <Switch id="flags-include-deleted" v-model="flagsIncludeDeleted" />
                   <Label for="flags-include-deleted">{{ $t('显示已删除') }}</Label>
                 </div>
-                <Button :disabled="isDeleted" @click="openFlagCreate"> {{ $t('新增 Flag') }} </Button>
+                <Button v-if="!usesRuntimeFlagInjection" :disabled="isDeleted" @click="openFlagCreate">
+                  {{ $t('新增 Flag') }}
+                </Button>
               </CardHeader>
               <CardContent>
+                <Alert v-if="usesRuntimeFlagInjection" class="mb-4">
+                  <AlertDescription>
+                    {{ $t('该题使用运行环境动态 Flag。平台会为每支队伍生成 Flag，并在启动容器时注入环境变量；无需维护精确或正则 Flag。') }}
+                  </AlertDescription>
+                </Alert>
                 <div v-if="flagsLoading" class="flex flex-col gap-2">
                   <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
                 </div>
                 <Empty v-else-if="flags.length === 0">
                   <EmptyHeader>
                     <EmptyTitle>{{ $t('暂无 Flag') }}</EmptyTitle>
-                    <EmptyDescription>{{ $t('添加模板级静态 Flag。') }}</EmptyDescription>
+                    <EmptyDescription v-if="!usesRuntimeFlagInjection">{{ $t('添加模板级静态 Flag。') }}</EmptyDescription>
+                    <EmptyDescription v-else>{{ $t('动态 Flag 将在队伍启动容器时自动生成。') }}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
                 <Table v-else>
@@ -765,7 +777,7 @@ onMounted(() => {
                       <TableHead>{{ $t('规格') }}</TableHead>
                       <TableHead>{{ $t('有效期') }}</TableHead>
                       <TableHead>{{ $t('状态') }}</TableHead>
-                      <TableHead class="text-right">{{ $t('操作') }}</TableHead>
+                      <TableHead v-if="!usesRuntimeFlagInjection" class="text-right">{{ $t('操作') }}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -773,7 +785,7 @@ onMounted(() => {
                       <TableCell class="max-w-md" :title="flag.flag">
                         <div class="flex min-w-0 items-center gap-2">
                           <Badge variant="outline">
-                            {{ flag.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
+                            {{ usesRuntimeFlagInjection ? $t('环境变量注入') : flag.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
                           </Badge>
                           <span class="truncate font-mono text-sm">{{ flag.flag }}</span>
                         </div>
@@ -794,7 +806,7 @@ onMounted(() => {
                         <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
                         <Badge v-else variant="secondary">{{ $t('正常') }}</Badge>
                       </TableCell>
-                      <TableCell class="text-right">
+                      <TableCell v-if="!usesRuntimeFlagInjection" class="text-right">
                         <Button
                           v-if="flag.deletedAt"
                           size="sm"

@@ -110,7 +110,7 @@ onMounted(load)
       <div class="space-y-1">
         <h2 class="text-xl font-semibold">{{ $t('赛道配置') }}</h2>
         <p class="text-sm text-muted-foreground">
-          {{ $t('为同一场比赛划分独立排名、计分和公开范围。赛道及队伍归属在首次开赛后冻结。') }}
+          {{ $t('为同一场比赛划分独立排名、计分和公开范围。赛道定义在首次开赛后冻结，队伍归属仍可在队伍页调整。') }}
         </p>
       </div>
       <div v-if="canWrite && !frozen" class="flex gap-2">
@@ -125,7 +125,7 @@ onMounted(load)
     </header>
 
     <Alert v-if="frozen">
-      <AlertDescription>{{ $t('比赛已开始，赛道定义与队伍归属已冻结。') }}</AlertDescription>
+      <AlertDescription>{{ $t('比赛已开始，赛道定义已冻结；队伍赛道归属仍可在队伍页调整。') }}</AlertDescription>
     </Alert>
     <Alert v-if="error" variant="destructive">
       <AlertDescription class="flex items-center justify-between gap-3">

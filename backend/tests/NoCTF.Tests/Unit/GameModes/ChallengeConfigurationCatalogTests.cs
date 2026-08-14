@@ -156,8 +156,14 @@ public class ChallengeConfigurationCatalogTests
             var modeTemplate = template with
             {
                 Allocation = expectedAllocation,
+                FlagSource = mode == GameMode.Ctf
+                    ? RuntimeFlagSource.PerTeam
+                    : template.FlagSource,
                 Definition = ((ContainerRuntimeDefinition)template.Definition) with
                 {
+                    FlagEnvironmentVariableName = mode == GameMode.Ctf
+                        ? "FLAG"
+                        : ((ContainerRuntimeDefinition)template.Definition).FlagEnvironmentVariableName,
                     PortMappings = mode == GameMode.Awdp
                         ? new Dictionary<int, int>()
                         : ((ContainerRuntimeDefinition)template.Definition).PortMappings,
@@ -400,8 +406,10 @@ public class ChallengeConfigurationCatalogTests
             RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/challenge:v1",
+                FlagEnvironmentVariableName: "FLAG",
                 Security: new(false, false, false, ["ALL"], [])),
-            Limits: new(268_435_456, 500_000_000, 128));
+            Limits: new(268_435_456, 500_000_000, 128),
+            FlagSource: RuntimeFlagSource.PerTeam);
 
         var errors = configurations.Validate(
             GameMode.Ctf,
@@ -502,7 +510,24 @@ public class ChallengeConfigurationCatalogTests
 
         await Assert.That(errors)
             .Contains(
-                "FlagEnvironmentVariableName is only supported for PerTeam runtimes.");
+                "CTF runtimes must use PerTeam flags injected into the runtime environment.");
+    }
+
+    [Test]
+    public async Task Ctf_container_runtime_rejects_static_flags_even_without_an_injection_variable()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition("registry.example/challenge:v1"),
+            FlagSource: RuntimeFlagSource.Static);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Ctf,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
+
+        await Assert.That(errors)
+            .Contains("CTF runtimes must use PerTeam flags injected into the runtime environment.");
     }
 
     [Test]
@@ -519,7 +544,7 @@ public class ChallengeConfigurationCatalogTests
             WithRuntime(catalog.GetDefaultJson(GameMode.Ctf), runtime));
 
         await Assert.That(errors)
-            .Contains("CTF runtimes only support Static or PerTeam flags.");
+            .Contains("CTF runtimes must use PerTeam flags injected into the runtime environment.");
     }
 
     [Test]

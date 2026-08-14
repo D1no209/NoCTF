@@ -156,10 +156,6 @@ public sealed class CompetitionTrackStore(
         if (competition is null)
             return AssignmentFailure(CompetitionTrackFailureCode.CompetitionNotFound,
                 "Competition was not found.");
-        if (CompetitionTrackPolicy.IsFrozen(competition.Status))
-            return AssignmentFailure(CompetitionTrackFailureCode.AssignmentLocked,
-                "Team track assignments are frozen after the competition first starts.");
-
         var configuration = CompetitionTrackConfiguration.ParseOrDefault(
             competition.Mode,
             competition.TrackConfigurationJson);
