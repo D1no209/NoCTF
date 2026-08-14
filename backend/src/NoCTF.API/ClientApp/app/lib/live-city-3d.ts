@@ -232,7 +232,7 @@ export class LiveCityScene {
   private readonly podiumMaterial = new THREE.MeshStandardMaterial()
   private readonly grid: THREE.GridHelper
 
-  private rig: CameraRig = { azimuth: 0.7, radius: 60, height: 34, lookX: 0, lookY: 6, lookZ: 0 }
+  private rig: CameraRig = { azimuth: 0.7, radius: 82, height: 54, lookX: 0, lookY: 6, lookZ: 0 }
   private cruise: CameraRig = { ...this.rig }
   private tween: { from: CameraRig; to: CameraRig; elapsed: number; duration: number } | null = null
   private focusing = false
@@ -479,16 +479,17 @@ export class LiveCityScene {
     this.citySpan = Math.max(cols, rows) * CELL_SIZE
     this.cruise = {
       azimuth: this.rig.azimuth,
-      radius: this.citySpan * 0.64 + 20,
-      height: this.citySpan * 0.38 + 13,
+      radius: this.citySpan * 0.88 + 28,
+      height: this.citySpan * 0.62 + 20,
       lookX: 0,
-      lookY: 8,
+      lookY: Math.min(10, this.citySpan * 0.1 + 4),
       lookZ: 0,
     }
     if (!this.focusing && !this.tween) {
       this.rig.radius = this.cruise.radius
       this.rig.height = this.cruise.height
       this.rig.lookX = 0
+      this.rig.lookY = this.cruise.lookY
       this.rig.lookZ = 0
     }
 
