@@ -11,6 +11,7 @@ using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Management;
 using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.GameModes.Registration;
 using NSubstitute;
 using Testcontainers.PostgreSql;
 
@@ -675,7 +676,10 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
     private static ChallengeManagementStore CreateManagementStore(
         NoCtfDbContext db,
         ITransactionalMessageOutbox? outbox = null) =>
-        new(db, outbox ?? Substitute.For<ITransactionalMessageOutbox>());
+        new(
+            db,
+            outbox ?? Substitute.For<ITransactionalMessageOutbox>(),
+            new ChallengeRuntimeTemplateCatalog());
 
     private static async Task WaitForPostgresSleepAsync(
         NoCtfDbContext db,

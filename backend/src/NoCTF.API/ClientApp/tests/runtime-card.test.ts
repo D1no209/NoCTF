@@ -48,4 +48,12 @@ describe('player runtime presentation', () => {
     expect(source).toContain('<Alert v-if="loadError" variant="destructive">')
     expect(source).toContain('<div v-if="!loadError" class="flex flex-wrap items-center gap-2">')
   })
+
+  test('does not render or request a runtime for static CTF challenges', async () => {
+    const source = await Bun.file(
+      new URL('../app/components/challenges/panels/CtfPanel.vue', import.meta.url),
+    ).text()
+
+    expect(source).toContain('v-if="challenge.hasRuntime === true &&')
+  })
 })

@@ -19,6 +19,7 @@ using NoCTF.Infrastructure.Challenges.Bank;
 using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Challenges.Hints;
 using NoCTF.Infrastructure.Challenges.Management;
+using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Persistence;
 using NSubstitute;
 using Testcontainers.PostgreSql;
@@ -124,7 +125,8 @@ public sealed class GitOpsPersistenceContractTests
             var competitionChallengeId = Guid.CreateVersion7(now.AddMilliseconds(4));
             var competitionChallenges = new ChallengeManagementStore(
                 db,
-                Substitute.For<ITransactionalMessageOutbox>());
+                Substitute.For<ITransactionalMessageOutbox>(),
+                new ChallengeRuntimeTemplateCatalog());
             var linked = await competitionChallenges.CreateAsync(
                 new(
                     competitionChallengeId,
@@ -139,6 +141,7 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(linked.Challenge!.Id).IsEqualTo(competitionChallengeId);
             await Assert.That(linked.Challenge.Title).IsEqualTo("Finals Web");
             await Assert.That(linked.Challenge.CustomTitle).IsEqualTo("Finals Web");
+            await Assert.That(linked.Challenge.HasRuntime).IsFalse();
             await Assert.That((await challengeBank.FindAsync(
                 challengeId,
                 botId,

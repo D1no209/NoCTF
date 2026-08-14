@@ -6,6 +6,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Infrastructure.Challenges;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Infrastructure.Challenges.Management;
@@ -13,6 +14,7 @@ namespace NoCTF.Infrastructure.Challenges.Management;
 public sealed class ChallengeManagementStore(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
+    IChallengeRuntimeTemplateCatalog runtimeTemplates,
     ICompetitionEventRecorder? eventRecorder = null) : IChallengeManagementStore
 {
     private readonly ICompetitionEventRecorder events =
@@ -118,26 +120,31 @@ public sealed class ChallengeManagementStore(
         }
     }
 
-    public Task<ChallengeView?> FindAsync(
+    public async Task<ChallengeView?> FindAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         bool includeUnpublished,
         bool includeDeleted,
-        CancellationToken ct) =>
-        Query(
+        CancellationToken ct)
+    {
+        var projection = await Query(
                 includeUnpublished,
                 includeDeleted,
                 competitionId,
                 competitionChallengeId)
             .SingleOrDefaultAsync(ct);
+        return projection is null ? null : Map(projection);
+    }
 
     public async Task<IReadOnlyList<ChallengeView>> ListAsync(
         Guid competitionId,
         bool includeUnpublished,
         bool includeDeleted,
         CancellationToken ct) =>
-        await Query(includeUnpublished, includeDeleted, competitionId)
-            .ToListAsync(ct);
+        (await Query(includeUnpublished, includeDeleted, competitionId)
+            .ToListAsync(ct))
+            .Select(Map)
+            .ToArray();
 
     public async Task<ChallengeMutationResult> UpdateAsync(
         UpdateCompetitionChallengeCommand command,
@@ -335,7 +342,7 @@ public sealed class ChallengeManagementStore(
         }
     }
 
-    private IQueryable<ChallengeView> Query(
+    private IQueryable<ChallengeProjection> Query(
         bool includeUnpublished,
         bool includeDeleted,
         Guid? competitionId = null,
@@ -360,7 +367,7 @@ public sealed class ChallengeManagementStore(
             .Where(item => includeUnpublished || item.Instance.IsPublished)
             .OrderBy(item => item.Instance.Order)
             .ThenBy(item => item.Instance.Id)
-            .Select(item => new ChallengeView(
+            .Select(item => new ChallengeProjection(
                 item.Instance.Id,
                 item.Instance.CompetitionId,
                 item.Instance.ChallengeId,
@@ -373,11 +380,13 @@ public sealed class ChallengeManagementStore(
                 item.Instance.IsPublished,
                 item.Instance.Revision,
                 item.Instance.DeletedAt,
+                item.Template.Mode,
+                item.Template.DefinitionJson,
                 item.Template.CreatedAt,
                 item.Instance.UpdatedAt));
     }
 
-    private static ChallengeView Map(CompetitionChallenge instance, Challenge template) =>
+    private ChallengeView Map(CompetitionChallenge instance, Challenge template) =>
         new(
             instance.Id,
             instance.CompetitionId,
@@ -391,8 +400,45 @@ public sealed class ChallengeManagementStore(
             instance.IsPublished,
             instance.Revision,
             instance.DeletedAt,
+            runtimeTemplates.Get(template.Mode, template.DefinitionJson) is not null,
             template.CreatedAt,
             instance.UpdatedAt);
+
+    private ChallengeView Map(ChallengeProjection projection) =>
+        new(
+            projection.Id,
+            projection.CompetitionId,
+            projection.ChallengeId,
+            projection.Title,
+            projection.CustomTitle,
+            projection.Description,
+            projection.Direction,
+            projection.BaseScore,
+            projection.Order,
+            projection.IsPublished,
+            projection.Revision,
+            projection.DeletedAt,
+            runtimeTemplates.Get(projection.Mode, projection.DefinitionJson) is not null,
+            projection.CreatedAt,
+            projection.UpdatedAt);
+
+    private sealed record ChallengeProjection(
+        Guid Id,
+        Guid CompetitionId,
+        Guid ChallengeId,
+        string Title,
+        string? CustomTitle,
+        string? Description,
+        string Direction,
+        long BaseScore,
+        int Order,
+        bool IsPublished,
+        int Revision,
+        DateTimeOffset? DeletedAt,
+        GameMode Mode,
+        string DefinitionJson,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt);
 
     private async Task<ChallengeMutationFailure?> FindCompetitionChallengeConflictAsync(
         Guid id,

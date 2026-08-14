@@ -298,6 +298,7 @@ public class ChallengeManagementTests
             false,
             0,
             null,
+            false,
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow);
 
