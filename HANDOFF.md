@@ -7,7 +7,8 @@
 - 3D 城市默认视角拉远并抬高：巡航半径和高度随城市跨度扩大，观察中心同步抬升，使空闲巡航时可以看到各队柱体的整体高度与相对态势，聚焦解题动画仍沿用既有镜头切换。
 - 测试夹具提交 `30a6cab0` 补齐测试对象存储的只读对象检查能力，不改变生产对象存储实现。
 - 验证通过：Release solution build 0 warning/0 error；完整非 Integration TUnit 777/777；前端完整 `bun test` 200/200（1504 assertions）、`bun run typecheck`、production `bun run build`；相机最终调整后的定向前端测试 9/9；C# analyzers、EF `has-pending-model-changes`、OpenAPI/SDK 双次生成幂等和 `git diff --check` 均通过。完整 Integration 本轮执行 173 项时曾有 2 项失败：一项是 Docker Hub 拉取 `busybox` 的瞬时 EOF，另一项是测试对象存储夹具未实现本次合法调用的 `InspectAsync`；夹具修正后两项均分别真实重跑 1/1 通过。Kubernetes 与 Libvirt 两项因环境未配置按设计跳过。
-- 本阶段没有新增业务表、列、migration 或 snapshot，没有修改题目 Runtime/Checker 镜像策略，没有推送、部署或操作生产数据。
+- 本阶段没有新增业务表、列、migration 或 snapshot，没有修改题目 Runtime/Checker 镜像策略。发布提交 `51468078` 将平台版本从 `0.1.0-alpha.38` 递增为 `0.1.0-alpha.39`；功能、测试、初始 HANDOFF 与版本提交已快进推送到远程 `main@51468078`。
+- 生产 `/root/NoCTF` 已快进到 `51468078`。本地构建的 Linux/amd64 API/Worker 镜像归档 SHA-256 为 `B6EC465051B4AFE84BDC992CACCEB29A8E4C2D7ED2CD7C4FA3C9E23940096DC2`；远程运行的 API 镜像为 `feaf6b3cd4202230ceda89612dcf3b18864154f11476f99250cc14b8dcd75162`，Worker 镜像为 `d0977e75be28a9ee75a0c1269382fe0cfb87e77df754cd665e4225e1a8f6e436`，原 Alpha.38 镜像保留 `rollback-720e3758` 标签。部署仅以 `--no-deps --no-build --force-recreate` 重建 API 与 Worker；Runner、PostgreSQL、Redis、证书、上传卷和题目 Runtime 均未重建。部署后 API、Worker、Runner 全部 healthy，重启次数均为 0，Runner 启动时间保持 `2026-08-13T06:20:18Z`；公开 `/health` 返回 `Ok`，生产 OpenAPI 已包含 `hasRuntime`，最近 15 分钟 API/Worker 日志无 Fatal、Critical、Unhandled、Exception 或 fail。远端与本地传输归档均已清理，服务器仍有约 17 GB 可用空间；未执行数据修改。
 
 ## 2026-08-14 随机附件交付与比赛级动态 Flag 配置
 
