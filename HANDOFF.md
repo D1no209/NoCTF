@@ -1,5 +1,13 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-14 alpha.37 队伍赛道选择与 CTF Runtime Flag 注入
+
+- 功能提交 `fae710a1` 将队伍赛道归属改为显式选择：参赛者创建队伍时必须从当前比赛可公开选择的赛道中选择一条，API 的 `CreateTeamRequest.trackKey` 从可空可选字段改为必填非空字符串；服务端不再静默回退默认赛道。Administrator、Competition Owner 和 Manager 仍可配置内部或公开赛道，并可在 Running、Paused、Finished 等生命周期中通过队伍管理页调整既有队伍归属；赛道定义本身在首次开赛后继续冻结。每次归属变化仍写入既有不可变 `TeamTrackChanged` 事件，没有新增赛道或分配表。
+- 同一提交纠正 CTF Flag 模型：无 Runtime 的静态题继续支持 `Exact` 与 `RegularExpression`；任何 CTF Container/Compose Runtime 必须使用 `PerTeam` Flag。平台按队伍生成 Flag，Container 通过 `FlagEnvironmentVariableName`（新建默认 `FLAG`）、Compose 通过已有服务环境变量映射在启动时注入。正式比赛与赛后练习判题都只接受当前队伍、当前 `CompetitionChallengeId`、`RuntimeDefinition` 来源的动态 Exact 记录，不会把模板静态 Flag 或正则规则误用于容器题。内部持久化的 Exact 只是动态 Flag 的判定实现，管理端统一显示为“环境变量注入”，并隐藏动态题的静态 Flag 增删改入口。
+- OpenAPI 两份制品由工具重新导出，TypeScript SDK 由 `bun run api:gen` 重新生成；连续第二轮导出/生成保持完全一致。两份 OpenAPI SHA-256 均为 `C17A2E7CEBFA66A7DBC903044635FFE0601BAD4891AAF6602749EA6C01B53840`，`sdk.gen.ts` 为 `7A951631F16C5AA69499FD9AFE81BFC0734296923AE7076168C39EA73D7FC1D9`，`types.gen.ts` 为 `6C47A377A55F91E57C53E8F6B1EE7EC29D42C6FAC815D10C04187ED7513EF27F`。没有手写 URL、DTO、枚举或生成 SDK。
+- 验证通过：Release solution build 0 warning/0 error；完整非 Integration TUnit 763/763；真实 PostgreSQL 定向测试 6/6，覆盖赛道跨生命周期重分配、CTF 每队 Runtime Flag 生成、静态题正则判定及练习 Runtime 动态 Flag 隔离；前端完整 `bun test` 196/196（1463 assertions）、`bun run typecheck`、production `bun run build`；EF `has-pending-model-changes` 无漂移；变更 C# analyzer 与 `git diff --check` 通过。前端构建只保留既有大 chunk、plugin timing 和第三方 Node exports warning。
+- 发布提交 `a9b0a531` 将平台版本从 `0.1.0-alpha.36` 递增为 `0.1.0-alpha.37`。本阶段没有新增业务表、列、migration 或 snapshot；功能、版本及本节 HANDOFF 均在独立分支 `codex/team-track-dynamic-flags-20260814` / 工作树 `E:\SourceCode\NoCTF-team-track-dynamic-flags-20260814` 完成，没有覆盖原工作区中的用户未提交修改。当前尚未推送或部署，生产验证结果将在部署完成后补记。
+
 ## 2026-08-14 alpha.36 失败 Runtime 归属收敛
 
 - 功能提交 `ac481a32` 修复 `Failed + provider_receipt_json=null +
