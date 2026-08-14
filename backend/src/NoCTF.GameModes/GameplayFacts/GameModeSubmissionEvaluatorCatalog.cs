@@ -39,14 +39,45 @@ internal static class ModeGameplayFactEvaluatorRules
             .Where(flag => flag.ValidStart is null || flag.ValidStart <= submission.OccurredAt)
             .Where(flag => flag.ValidUntil is null || submission.OccurredAt < flag.ValidUntil)
             .ToArray();
-        if (activeMatches.Any(flag => flag.TeamId is null || flag.TeamId == submission.TeamId))
+        if (activeMatches.Any(flag => flag.TeamId == submission.TeamId))
             return normalDecision;
+
+        var duplicateForeignAttempt = context.PriorFacts.Any(fact =>
+            fact.TeamId == submission.TeamId
+            && fact.CompetitionChallengeId == submission.CompetitionChallengeId
+            && fact.Kind == submission.Kind
+            && fact.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected
+            && string.Equals(fact.Value, submission.Value, StringComparison.Ordinal));
+        if (duplicateForeignAttempt)
+        {
+            return new(
+                GameplayFactResult.Duplicate,
+                null,
+                submission.OccurredAt);
+        }
+
+        var attachmentCandidateMatched = activeMatches.Any(flag =>
+            flag.TeamId is null
+            && flag.SpecificationKind == SpecificationKind.Attachment);
+        if (activeMatches.Any(flag => flag.TeamId is null
+                && flag.SpecificationKind != SpecificationKind.Attachment))
+        {
+            return normalDecision;
+        }
 
         var ownerTeamIds = activeMatches
             .Where(flag => flag.TeamId is not null && flag.TeamId != submission.TeamId)
             .Select(flag => flag.TeamId!.Value)
             .Distinct()
             .ToArray();
+        if (attachmentCandidateMatched)
+        {
+            return new(
+                GameplayFactResult.Rejected,
+                GameplayFactFailureCode.ForeignTeamFlagDetected,
+                submission.OccurredAt,
+                ownerTeamIds.Length == 1 ? ownerTeamIds[0] : null);
+        }
         return ownerTeamIds.Length switch
         {
             0 => normalDecision,

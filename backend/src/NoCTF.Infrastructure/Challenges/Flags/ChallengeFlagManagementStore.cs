@@ -14,29 +14,31 @@ public sealed class ChallengeFlagManagementStore(
     public ChallengeFlagManagementStore(NoCtfDbContext db)
         : this(db, new NoCTF.GameModes.Registration.ChallengeRuntimeTemplateCatalog()) { }
 
+    public async Task<bool?> SupportsManualStaticFlagsAsync(
+        ChallengeFlagScope scope,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        var challenge = await LoadChallengeAsync(scope, actorId, isAdministrator, ct);
+        if (challenge is null)
+            return null;
+        if (challenge.Mode == GameMode.Awdp)
+            return true;
+        return challenge.Mode == GameMode.Ctf
+            && runtimeTemplates.Get(challenge.Mode, challenge.DefinitionJson)?.FlagSource
+                is null or RuntimeFlagSource.Static;
+    }
+
     public async Task<bool?> SupportsRegularExpressionAsync(
         ChallengeFlagScope scope,
         Guid? actorId,
         bool isAdministrator,
         CancellationToken ct)
     {
-        if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
+        var challenge = await LoadChallengeAsync(scope, actorId, isAdministrator, ct);
+        if (challenge is null)
             return null;
-
-        var challenge = scope.ChallengeId is Guid challengeId
-            ? await db.Challenges.AsNoTracking()
-                .Where(item => item.Id == challengeId)
-                .Select(item => new { item.Mode, item.DefinitionJson })
-                .SingleAsync(ct)
-            : await db.CompetitionChallenges.AsNoTracking()
-                .Where(item => item.Id == scope.CompetitionChallengeId
-                    && item.CompetitionId == scope.CompetitionId)
-                .Join(
-                    db.Challenges.AsNoTracking(),
-                    item => item.ChallengeId,
-                    template => template.Id,
-                    (_, template) => new { template.Mode, template.DefinitionJson })
-                .SingleAsync(ct);
         return challenge.Mode == GameMode.Ctf
             && runtimeTemplates.Get(challenge.Mode, challenge.DefinitionJson)?.FlagSource
                 is null or RuntimeFlagSource.Static;
@@ -95,9 +97,19 @@ public sealed class ChallengeFlagManagementStore(
                 ?? null!;
             if (entity is null)
                 return new(null, ChallengeFlagSaveFailure.FlagNotFound);
+            if (IsSystemManaged(entity))
+                return new(null, ChallengeFlagSaveFailure.SystemManagedFlag);
         }
         else
         {
+            if (command.Scope.ChallengeId is Guid challengeId
+                && await db.ChallengeFlags.AsNoTracking().AnyAsync(flag =>
+                    flag.ChallengeId == challengeId
+                    && flag.SpecificationKind == SpecificationKind.Attachment,
+                    ct))
+            {
+                return new(null, ChallengeFlagSaveFailure.DeliveryModeConflict);
+            }
             var requestedId = command.FlagId ?? Guid.CreateVersion7(command.Now);
             if (await db.ChallengeFlags.IgnoreQueryFilters().AsNoTracking()
                     .AnyAsync(flag => flag.Id == requestedId, ct))
@@ -130,7 +142,7 @@ public sealed class ChallengeFlagManagementStore(
         }
     }
 
-    public async Task<bool> DeleteAsync(
+    public async Task<ChallengeFlagMutationState> DeleteAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
@@ -139,16 +151,18 @@ public sealed class ChallengeFlagManagementStore(
         CancellationToken ct)
     {
         if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
-            return false;
+            return ChallengeFlagMutationState.NotFound;
         var entity = await Scoped(scope).SingleOrDefaultAsync(flag => flag.Id == flagId, ct);
         if (entity is null)
-            return false;
+            return ChallengeFlagMutationState.NotFound;
+        if (IsSystemManaged(entity))
+            return ChallengeFlagMutationState.SystemManagedFlag;
         entity.DeletedAt = now;
         await db.SaveChangesAsync(ct);
-        return true;
+        return ChallengeFlagMutationState.Updated;
     }
 
-    public async Task<bool> RestoreAsync(
+    public async Task<ChallengeFlagMutationState> RestoreAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
@@ -157,17 +171,19 @@ public sealed class ChallengeFlagManagementStore(
         CancellationToken ct)
     {
         if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
-            return false;
+            return ChallengeFlagMutationState.NotFound;
         var entity = await Scoped(scope, includeDeleted: true)
             .SingleOrDefaultAsync(flag => flag.Id == flagId && flag.DeletedAt != null, ct);
         if (entity is null)
-            return false;
+            return ChallengeFlagMutationState.NotFound;
+        if (IsSystemManaged(entity))
+            return ChallengeFlagMutationState.SystemManagedFlag;
         if (entity.MatchKind == ChallengeFlagMatchKind.RegularExpression
             && await SupportsRegularExpressionAsync(scope, actorId, isAdministrator, ct) != true)
-            return false;
+            return ChallengeFlagMutationState.NotFound;
         entity.DeletedAt = null;
         await db.SaveChangesAsync(ct);
-        return true;
+        return ChallengeFlagMutationState.Updated;
     }
 
     private IQueryable<ChallengeFlag> Scoped(
@@ -200,10 +216,43 @@ public sealed class ChallengeFlagManagementStore(
                 challenge.CompetitionId == scope.CompetitionId, ct);
     }
 
+    private async Task<ChallengeFlagSupport?> LoadChallengeAsync(
+        ChallengeFlagScope scope,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken ct)
+    {
+        if (!await ScopeExistsAsync(scope, actorId, isAdministrator, ct))
+            return null;
+        return scope.ChallengeId is Guid challengeId
+            ? await db.Challenges.AsNoTracking()
+                .Where(item => item.Id == challengeId)
+                .Select(item => new ChallengeFlagSupport(item.Mode, item.DefinitionJson))
+                .SingleAsync(ct)
+            : await db.CompetitionChallenges.AsNoTracking()
+                .Where(item => item.Id == scope.CompetitionChallengeId
+                    && item.CompetitionId == scope.CompetitionId)
+                .Join(
+                    db.Challenges.AsNoTracking(),
+                    item => item.ChallengeId,
+                    template => template.Id,
+                    (_, template) => new ChallengeFlagSupport(template.Mode, template.DefinitionJson))
+                .SingleAsync(ct);
+    }
+
     private static ChallengeFlagView Map(ChallengeFlag flag) =>
         new(
             flag.Id, flag.ChallengeId, flag.CompetitionChallengeId, flag.TeamId,
             flag.Flag, flag.MatchKind, flag.SpecificationKind, flag.SpecificationId,
             flag.ValidStart, flag.ValidUntil, flag.DeletedAt, flag.CreatedAt);
+
+    private static bool IsSystemManaged(ChallengeFlag flag) =>
+        flag.TeamId is not null
+        || flag.SpecificationKind is not null
+        || flag.SpecificationId is not null
+        || flag.ValidStart is not null
+        || flag.ValidUntil is not null;
+
+    private sealed record ChallengeFlagSupport(GameMode Mode, string DefinitionJson);
 
 }

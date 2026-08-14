@@ -190,7 +190,8 @@ public sealed class GameplayFactProcessor(
                 item.CompetitionId == submission.CompetitionId
                 && item.CompetitionChallengeId == submission.CompetitionChallengeId
                 && item.TeamId == submission.TeamId
-                && item.Result == GameplayFactResult.Correct
+                && (item.Result == GameplayFactResult.Correct
+                    || item.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected)
                 && (item.OccurredAt < submission.OccurredAt
                     || item.OccurredAt == submission.OccurredAt
                     && item.Id.CompareTo(submission.Id) < 0))
@@ -559,18 +560,20 @@ public sealed class GameplayFactProcessor(
         submission.UpdatedAt = now;
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
         if (submission.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected
-            && submission.VictimTeamId is Guid ownerTeamId
             && submission.TeamId is Guid sourceTeamId
             && submission.ActorUserId is Guid actorUserId)
         {
-            await outbox.PublishAsync(new ForeignTeamFlagDetected(
-                submission.CompetitionId,
-                submission.Id,
-                sourceTeamId,
-                ownerTeamId,
-                actorUserId,
-                submission.CompetitionChallengeId,
-                submission.OccurredAt));
+            if (submission.VictimTeamId is Guid ownerTeamId)
+            {
+                await outbox.PublishAsync(new ForeignTeamFlagDetected(
+                    submission.CompetitionId,
+                    submission.Id,
+                    sourceTeamId,
+                    ownerTeamId,
+                    actorUserId,
+                    submission.CompetitionChallengeId,
+                    submission.OccurredAt));
+            }
             await events.RecordAsync(new(
                 submission.CompetitionId,
                 CompetitionEventKind.CheatIncidentDetected,
@@ -588,7 +591,7 @@ public sealed class GameplayFactProcessor(
                 submission.CompetitionId,
                 submission.Id,
                 submission.TeamId,
-                ownerTeamId);
+                submission.VictimTeamId);
         }
         else if (submission.FailureCode == GameplayFactFailureCode.AmbiguousFlagMatch)
         {

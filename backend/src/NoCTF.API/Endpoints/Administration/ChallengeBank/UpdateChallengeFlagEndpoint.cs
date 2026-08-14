@@ -9,7 +9,10 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 public sealed class UpdateChallengeFlagEndpoint(
     ManageChallengeFlags flags,
     IUserContext user)
-    : Endpoint<SaveChallengeFlagRequest, Results<Ok<ChallengeFlagResponse>, NotFound, ProblemHttpResult>>
+    : Endpoint<SaveChallengeFlagRequest, Results<
+        Ok<ChallengeFlagResponse>,
+        NotFound,
+        Conflict<ChallengeFlagFailureResponse>>>
 {
     public override void Configure()
     {
@@ -23,7 +26,10 @@ public sealed class UpdateChallengeFlagEndpoint(
         });
     }
 
-    public override async Task<Results<Ok<ChallengeFlagResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<
+        Ok<ChallengeFlagResponse>,
+        NotFound,
+        Conflict<ChallengeFlagFailureResponse>>> ExecuteAsync(
         SaveChallengeFlagRequest request,
         CancellationToken ct)
     {
@@ -39,11 +45,9 @@ public sealed class UpdateChallengeFlagEndpoint(
             ct);
         if (result.FailureCode == ChallengeFlagFailureCode.FlagNotFound)
             return TypedResults.NotFound();
-        return result.Succeeded
-            ? TypedResults.Ok(ChallengeFlagMapping.ToResponse(result.Value!))
-            : TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Flag was not updated.",
-                detail: result.ErrorMessage);
+        if (result.Succeeded)
+            return TypedResults.Ok(ChallengeFlagMapping.ToResponse(result.Value!));
+        var failure = ChallengeFlagFailureMapping.ToResponse(result.FailureCode!.Value, result.ErrorMessage);
+        return TypedResults.Conflict(failure);
     }
 }

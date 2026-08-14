@@ -12,7 +12,11 @@ public sealed class CreateChallengeFlagEndpoint(
     ManageChallengeFlags flags,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : Endpoint<SaveChallengeFlagRequest, Results<Created<ChallengeFlagResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>>
+    : Endpoint<SaveChallengeFlagRequest, Results<
+        Created<ChallengeFlagResponse>,
+        NotFound,
+        ForbidHttpResult,
+        Conflict<ChallengeFlagFailureResponse>>>
 {
     public override void Configure()
     {
@@ -26,7 +30,11 @@ public sealed class CreateChallengeFlagEndpoint(
         });
     }
 
-    public override async Task<Results<Created<ChallengeFlagResponse>, NotFound, ForbidHttpResult, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<
+        Created<ChallengeFlagResponse>,
+        NotFound,
+        ForbidHttpResult,
+        Conflict<ChallengeFlagFailureResponse>>> ExecuteAsync(
         SaveChallengeFlagRequest request,
         CancellationToken ct)
     {
@@ -47,13 +55,10 @@ public sealed class CreateChallengeFlagEndpoint(
         if (result.FailureCode == ChallengeFlagFailureCode.FlagNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
-            return TypedResults.Problem(
-                statusCode: result.FailureCode == ChallengeFlagFailureCode.ResourceIdConflict
-                    ? StatusCodes.Status409Conflict
-                    : StatusCodes.Status400BadRequest,
-                title: "Flag was not created.",
-                detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() });
+        {
+            var failure = ChallengeFlagFailureMapping.ToResponse(result.FailureCode!.Value, result.ErrorMessage);
+            return TypedResults.Conflict(failure);
+        }
         var response = ChallengeFlagMapping.ToResponse(result.Value!);
         return TypedResults.Created(
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{response.Id}",

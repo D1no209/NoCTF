@@ -26,9 +26,10 @@ CTF CompetitionChallenge 可为：
 时注入固定队伍 Flag。无 Runtime 的静态题才使用管理员维护的精确或正则 Flag。
 
 Competition 可用 `FlagTemplate` 配置动态 Flag 的默认 Header、BodyTemplate 与字面文本 leet；
-Challenge.DefinitionJson 可在 `Runtime.FlagSource=PerTeam` 时用同名字段覆盖。优先级为题目模板、
+CompetitionChallenge.RulesJson 可用同名字段为本场比赛的该题覆盖。优先级为比赛题目规则、
 竞赛默认、平台默认 `flag{[TEAMHASH]}`。该配置只在缺失的每队容器 Flag 首次生成时读取：已经持久化的
 Flag 不轮换，Reset/重启继续复用原值；静态题和管理员维护的手工 Flag 完全不受影响。
+Challenge.DefinitionJson 只保存 Runtime 与注入目标，不保存动态 Flag 前缀或正文模板。
 
 ## Flag 与附件
 

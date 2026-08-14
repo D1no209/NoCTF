@@ -52,6 +52,8 @@ public sealed class CheatIncidentEndpointTests
         await Assert.That(listResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(page).IsNotNull();
         await Assert.That(page!.Items).HasSingleItem();
+        await Assert.That(page.Items[0].OwnerTeamId).IsNull();
+        await Assert.That(page.Items[0].OwnerTeamName).IsNull();
         await Assert.That(page.Items[0].GetType().GetProperty("Value")).IsNull();
         await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(store.DetailReads).IsEqualTo(0);
@@ -79,6 +81,8 @@ public sealed class CheatIncidentEndpointTests
         await Assert.That(detailResponse.Headers.CacheControl?.NoCache).IsTrue();
         await Assert.That(detail).IsNotNull();
         await Assert.That(detail!.Value).IsEqualTo("flag{protected-evidence}");
+        await Assert.That(detail.OwnerTeamId).IsNull();
+        await Assert.That(detail.OwnerTeamName).IsNull();
         await Assert.That(detail.CanDismiss).IsTrue();
         await Assert.That(detail.CanConfirm).IsTrue();
         await Assert.That(store.LastDetailReadShouldAudit).IsTrue();
@@ -234,8 +238,8 @@ public sealed class CheatIncidentEndpointTests
                     GameplayFactId,
                     Guid.CreateVersion7(),
                     "Source Team",
-                    Guid.CreateVersion7(),
-                    "Owner Team",
+                    null,
+                    null,
                     ActorId,
                     "submitter",
                     Guid.CreateVersion7(),
@@ -264,8 +268,8 @@ public sealed class CheatIncidentEndpointTests
                 "flag{protected-evidence}",
                 Guid.CreateVersion7(),
                 "Source Team",
-                Guid.CreateVersion7(),
-                "Owner Team",
+                null,
+                null,
                 ActorId,
                 "submitter",
                 Guid.CreateVersion7(),

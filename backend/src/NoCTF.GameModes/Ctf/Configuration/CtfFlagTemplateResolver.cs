@@ -6,12 +6,12 @@ public static class CtfFlagTemplateResolver
 {
     public static PerTeamFlagTemplate Resolve(
         string competitionConfigurationJson,
-        string challengeDefinitionJson)
+        string challengeRulesJson)
     {
         var competition = CtfConfigurationUpgrader.ParseCompetition(
             competitionConfigurationJson);
         var challenge = CtfConfigurationUpgrader.ParseChallenge(
-            challengeDefinitionJson);
+            challengeRulesJson);
         return challenge.FlagTemplate
             ?? competition.FlagTemplate
             ?? PerTeamFlagTemplate.Default;

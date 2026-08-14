@@ -138,7 +138,7 @@ public sealed class PostgresAwdRoundCoordinator(
         var runtimeByTeam = runtimes.ToDictionary(instance => instance.TeamId);
         var template = AwdFlagTemplateResolver.Resolve(
             target.Competition.ConfigurationJson,
-            target.Template.DefinitionJson);
+            target.Challenge.RulesJson);
         var candidates = existingFlags.Select(flag => flag.Flag).ToHashSet(StringComparer.Ordinal);
         foreach (var teamId in missing)
         {

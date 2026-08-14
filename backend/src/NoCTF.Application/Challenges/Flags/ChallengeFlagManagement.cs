@@ -46,7 +46,16 @@ public enum ChallengeFlagSaveFailure
 {
     ScopeNotFound,
     FlagNotFound,
-    ResourceIdConflict
+    ResourceIdConflict,
+    SystemManagedFlag,
+    DeliveryModeConflict
+}
+
+public enum ChallengeFlagMutationState
+{
+    Updated,
+    NotFound,
+    SystemManagedFlag
 }
 
 public enum ChallengeFlagFailureCode
@@ -58,7 +67,10 @@ public enum ChallengeFlagFailureCode
     InvalidValidityWindow,
     InvalidTemplateFlagScope,
     ResourceIdConflict,
-    FlagNotFound
+    FlagNotFound,
+    ManualFlagNotSupported,
+    SystemManagedFlag,
+    DeliveryModeConflict
 }
 
 public sealed record ChallengeFlagSaveResult(
@@ -67,6 +79,11 @@ public sealed record ChallengeFlagSaveResult(
 
 public interface IChallengeFlagStore
 {
+    Task<bool?> SupportsManualStaticFlagsAsync(
+        ChallengeFlagScope scope,
+        Guid? actorId,
+        bool isAdministrator,
+        CancellationToken cancellationToken);
     Task<bool?> SupportsRegularExpressionAsync(
         ChallengeFlagScope scope,
         Guid? actorId,
@@ -90,14 +107,14 @@ public interface IChallengeFlagStore
         Guid? actorId,
         bool isAdministrator,
         CancellationToken cancellationToken);
-    Task<bool> DeleteAsync(
+    Task<ChallengeFlagMutationState> DeleteAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken cancellationToken);
-    Task<bool> RestoreAsync(
+    Task<ChallengeFlagMutationState> RestoreAsync(
         ChallengeFlagScope scope,
         Guid flagId,
         Guid? actorId,
@@ -138,6 +155,37 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         bool isAdministrator,
         CancellationToken ct = default)
     {
+        if (!command.IsCreate && command.FlagId is Guid flagId)
+        {
+            var existing = await store.FindAsync(
+                command.Scope,
+                flagId,
+                actorId,
+                isAdministrator,
+                includeDeleted: false,
+                ct);
+            if (existing is null)
+                return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.FlagNotFound,
+                    "Flag scope was not found, access was denied, or the Flag does not exist.");
+            if (IsSystemManaged(existing))
+                return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.SystemManagedFlag,
+                    "System-managed Flags are read-only.");
+        }
+        var manualSupported = await store.SupportsManualStaticFlagsAsync(
+            command.Scope,
+            actorId,
+            isAdministrator,
+            ct);
+        if (manualSupported is null)
+            return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.FlagNotFound,
+                "Flag scope was not found or access was denied.");
+        if (!manualSupported.Value)
+            return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                ChallengeFlagFailureCode.ManualFlagNotSupported,
+                "Manual exact Flags are supported by static CTF and AWDP challenges only.");
         if (!Enum.IsDefined(command.MatchKind))
             return OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
                 ChallengeFlagFailureCode.InvalidFlag,
@@ -193,6 +241,14 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
                 OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
                     ChallengeFlagFailureCode.FlagNotFound,
                     "Flag scope was not found, access was denied, or the flag does not exist."),
+            ChallengeFlagSaveFailure.SystemManagedFlag =>
+                OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.SystemManagedFlag,
+                    "System-managed Flags are read-only."),
+            ChallengeFlagSaveFailure.DeliveryModeConflict =>
+                OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.DeliveryModeConflict,
+                    "Static Flags cannot be mixed with RandomOnePerTeam attachment variants."),
             _ => OperationResult<ChallengeFlagView, ChallengeFlagFailureCode>.Success(result.Flag!)
         };
     }
@@ -204,11 +260,18 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken ct = default) =>
-        await store.DeleteAsync(scope, flagId, actorId, isAdministrator, now, ct)
-            ? OperationResult<ChallengeFlagFailureCode>.Success()
-            : OperationResult<ChallengeFlagFailureCode>.Failure(
+        (await store.DeleteAsync(scope, flagId, actorId, isAdministrator, now, ct)) switch
+        {
+            ChallengeFlagMutationState.Updated =>
+                OperationResult<ChallengeFlagFailureCode>.Success(),
+            ChallengeFlagMutationState.SystemManagedFlag =>
+                OperationResult<ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.SystemManagedFlag,
+                    "System-managed Flags are read-only."),
+            _ => OperationResult<ChallengeFlagFailureCode>.Failure(
                 ChallengeFlagFailureCode.FlagNotFound,
-                "Flag was not found or access was denied.");
+                "Flag was not found or access was denied.")
+        };
 
     public async Task<OperationResult<ChallengeFlagFailureCode>> RestoreAsync(
         ChallengeFlagScope scope,
@@ -217,14 +280,28 @@ public sealed class ManageChallengeFlags(IChallengeFlagStore store)
         bool isAdministrator,
         DateTimeOffset now,
         CancellationToken ct = default) =>
-        await store.RestoreAsync(scope, flagId, actorId, isAdministrator, now, ct)
-            ? OperationResult<ChallengeFlagFailureCode>.Success()
-            : OperationResult<ChallengeFlagFailureCode>.Failure(
+        (await store.RestoreAsync(scope, flagId, actorId, isAdministrator, now, ct)) switch
+        {
+            ChallengeFlagMutationState.Updated =>
+                OperationResult<ChallengeFlagFailureCode>.Success(),
+            ChallengeFlagMutationState.SystemManagedFlag =>
+                OperationResult<ChallengeFlagFailureCode>.Failure(
+                    ChallengeFlagFailureCode.SystemManagedFlag,
+                    "System-managed Flags are read-only."),
+            _ => OperationResult<ChallengeFlagFailureCode>.Failure(
                 ChallengeFlagFailureCode.FlagNotFound,
-                "Deleted flag was not found or access was denied.");
+                "Deleted flag was not found or access was denied.")
+        };
 
     private static bool teamOrWindowPresent(SaveChallengeFlagCommand command) =>
         command.TeamId is not null || command.ValidStart is not null || command.ValidUntil is not null;
+
+    private static bool IsSystemManaged(ChallengeFlagView flag) =>
+        flag.TeamId is not null
+        || flag.SpecificationKind is not null
+        || flag.SpecificationId is not null
+        || flag.ValidStart is not null
+        || flag.ValidUntil is not null;
 
     public static byte[] Hash(string flag) => SHA256.HashData(Encoding.UTF8.GetBytes(flag));
 }

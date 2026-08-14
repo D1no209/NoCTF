@@ -46,9 +46,12 @@ describe('admin list error presentation', () => {
     for (const section of ['flags', 'hints']) {
       expect(source).toContain(`${section}LoadError.value = parseApiError(error).message`)
       expect(source).toContain(`<Alert v-if="${section}LoadError" variant="destructive">`)
-      expect(source).toContain(`!${section}LoadError && ${section}.length === 0`)
-      expect(source).toContain(`v-else-if="${section}.length > 0"`)
     }
+    expect(source).toContain('!flagsLoadError && staticFlags.length === 0 && systemFlags.length === 0')
+    expect(source).toContain('!flagsLoading && staticFlags.length > 0')
+    expect(source).toContain('!flagsLoading && systemFlags.length > 0')
+    expect(source).toContain('!hintsLoadError && hints.length === 0')
+    expect(source).toContain('v-else-if="hints.length > 0"')
   })
 
   test('platform audit exports do not turn an initial failure into no tasks', async () => {

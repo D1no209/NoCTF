@@ -103,7 +103,7 @@ public sealed class KohFullBoundaryTests
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { baseScore = 0, order = 0, isPublished = true, expectedRevision = challengeRevision },
+            new { customTitle = (string?)null, baseScore = 0, order = 0, isPublished = true, expectedRevision = challengeRevision },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -191,19 +191,17 @@ public sealed class KohFullBoundaryTests
             anonymous, competitionId, TimeSpan.FromSeconds(7), cancellationToken);
         await SetFixtureAsync(fixtureUrl, "wrong", null, cancellationToken);
 
-        const string ambiguousFlag = "flag{koh-ambiguous-control}";
-        await UpdateFlagAsync(admin, competitionId, competitionChallengeId,
-            byTeam[red.TeamId], ambiguousFlag, cancellationToken);
-        await UpdateFlagAsync(admin, competitionId, competitionChallengeId,
-            byTeam[blue.TeamId], ambiguousFlag, cancellationToken);
-        await SetFixtureAsync(fixtureUrl, "flag", ambiguousFlag, cancellationToken);
+        const string attemptedReplacement = "flag{koh-manual-replacement}";
+        await AssertSystemManagedFlagRejectedAsync(
+            admin, competitionId, competitionChallengeId,
+            byTeam[red.TeamId], attemptedReplacement, cancellationToken);
+        await AssertSystemManagedFlagRejectedAsync(
+            admin, competitionId, competitionChallengeId,
+            byTeam[blue.TeamId], attemptedReplacement, cancellationToken);
+        await SetFixtureAsync(fixtureUrl, "flag", attemptedReplacement, cancellationToken);
         await AssertScoresStableAsync(
             anonymous, competitionId, TimeSpan.FromSeconds(5), cancellationToken);
         await SetFixtureAsync(fixtureUrl, "wrong", null, cancellationToken);
-        await UpdateFlagAsync(admin, competitionId, competitionChallengeId,
-            byTeam[red.TeamId], redFlag, cancellationToken);
-        await UpdateFlagAsync(admin, competitionId, competitionChallengeId,
-            byTeam[blue.TeamId], blueFlag, cancellationToken);
 
         await SendWithoutBodyAsync(admin, HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/pause",
@@ -301,14 +299,15 @@ public sealed class KohFullBoundaryTests
             }
         }, JsonOptions);
 
-    private static async Task UpdateFlagAsync(
+    private static async Task AssertSystemManagedFlagRejectedAsync(
         HttpClient admin,
         Guid competitionId,
         Guid competitionChallengeId,
         JsonElement original,
         string flag,
-        CancellationToken cancellationToken) =>
-        _ = await SendJsonAsync(
+        CancellationToken cancellationToken)
+    {
+        var response = await SendJsonAsync(
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{original.GetProperty("id").GetGuid()}",
@@ -319,8 +318,11 @@ public sealed class KohFullBoundaryTests
                 specificationKind = "RuntimeDefinition",
                 specificationId = competitionChallengeId
             },
-            HttpStatusCode.OK,
+            HttpStatusCode.Conflict,
             cancellationToken);
+        await Assert.That(response.GetProperty("code").GetString())
+            .IsEqualTo("SystemManagedFlag");
+    }
 
     private static async Task SetFixtureAsync(
         Uri fixtureUrl,
@@ -436,7 +438,7 @@ public sealed class KohFullBoundaryTests
             anonymous, userName, password, cancellationToken));
         var team = await SendJsonAsync(
             client, HttpMethod.Post, $"/api/v1/competitions/{competitionId}/teams",
-            new { name = teamName }, HttpStatusCode.Created, cancellationToken);
+            new { name = teamName, trackKey = "default" }, HttpStatusCode.Created, cancellationToken);
         return new(client, team.GetProperty("id").GetGuid());
     }
 

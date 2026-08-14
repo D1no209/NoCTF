@@ -13,7 +13,7 @@ ServiceHealthyPoints: bigint >= 0
 ServiceUnhealthyPenalty: bigint >= 0
 ```
 
-`Challenge.DefinitionJson` 管理 Runtime、Checker、Flag 生成与注入：
+`Challenge.DefinitionJson` 管理 Runtime、Checker 与 Flag 注入位置：
 
 ```text
 Runtime: Container | Compose
@@ -27,8 +27,9 @@ FlagInjection:
 
 FixedPerAttack 使用 AttackPoints；SplitVictimDefensePool 忽略 AttackPoints。两者都使用 VictimDefensePoolPoints。覆盖值 0 是显式 0，只有 null 继承。AWD 不使用 EvaluationDispatchMode/最大提交次数；Flag 接入总是 Automatic。
 
-Competition 的可选 `FlagTemplate` 是动态轮换 Flag 的竞赛默认；Challenge.DefinitionJson 的可选
-`FlagTemplate` 优先覆盖，未配置时使用平台默认 `flag{[TEAMHASH]}`。模板变更只影响后续尚未生成的
+Competition 的可选 `FlagTemplate` 是动态轮换 Flag 的竞赛默认；CompetitionChallenge.RulesJson
+的可选 `FlagTemplate` 优先覆盖，未配置时使用平台默认 `flag{[TEAMHASH]}`。Challenge.DefinitionJson
+中的历史 `FlagTemplate` 不参与生成。模板变更只影响后续尚未生成的
 “队伍×题目×轮次”Flag；已经持久化的当轮事实保持原值并继续有效。静态和管理员手工 Flag 不读取
 该模板。
 

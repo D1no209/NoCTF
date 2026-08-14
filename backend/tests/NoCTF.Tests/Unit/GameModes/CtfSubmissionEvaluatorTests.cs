@@ -170,6 +170,101 @@ public sealed class CtfGameplayFactEvaluatorTests
     }
 
     [Test]
+    public async Task Assigned_random_attachment_flag_is_correct_for_the_current_team()
+    {
+        var fixture = CreateFixture("flag{assigned-attachment}");
+        var candidate = fixture.Flag(null);
+        candidate.ChallengeId = Guid.NewGuid();
+        candidate.CompetitionChallengeId = null;
+        candidate.SpecificationKind = SpecificationKind.Attachment;
+        candidate.SpecificationId = Guid.NewGuid();
+        var assignment = fixture.Flag(fixture.GameplayFact.TeamId);
+        assignment.SpecificationKind = SpecificationKind.Attachment;
+        assignment.SpecificationId = candidate.SpecificationId;
+
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([candidate, assignment]));
+
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Correct);
+        await Assert.That(result.FailureCode).IsNull();
+    }
+
+    [Test]
+    public async Task Unassigned_random_attachment_flag_is_a_cheat_without_a_false_owner()
+    {
+        var fixture = CreateFixture("flag{unused-attachment}");
+        var candidate = fixture.Flag(null);
+        candidate.ChallengeId = Guid.NewGuid();
+        candidate.CompetitionChallengeId = null;
+        candidate.SpecificationKind = SpecificationKind.Attachment;
+        candidate.SpecificationId = Guid.NewGuid();
+
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([candidate]));
+
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Rejected);
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(GameplayFactFailureCode.ForeignTeamFlagDetected);
+        await Assert.That(result.VictimTeamId).IsNull();
+    }
+
+    [Test]
+    public async Task Repeated_foreign_attachment_flag_is_duplicate_without_another_cheat_incident()
+    {
+        var fixture = CreateFixture("flag{repeated-foreign-attachment}");
+        var candidate = fixture.Flag(null);
+        candidate.ChallengeId = Guid.NewGuid();
+        candidate.CompetitionChallengeId = null;
+        candidate.SpecificationKind = SpecificationKind.Attachment;
+        candidate.SpecificationId = Guid.NewGuid();
+        var prior = new GameplayFact
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = fixture.GameplayFact.CompetitionId,
+            CompetitionChallengeId = fixture.GameplayFact.CompetitionChallengeId,
+            TeamId = fixture.GameplayFact.TeamId,
+            Kind = GameplayFactKind.FlagAttempt,
+            Value = fixture.GameplayFact.Value,
+            ValueSha256 = fixture.GameplayFact.ValueSha256,
+            OccurredAt = fixture.GameplayFact.OccurredAt.AddMilliseconds(-1),
+            State = GameplayFactState.Completed,
+            Result = GameplayFactResult.Rejected,
+            FailureCode = GameplayFactFailureCode.ForeignTeamFlagDetected
+        };
+
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([candidate]) with { PriorFacts = [prior] });
+
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Duplicate);
+        await Assert.That(result.FailureCode).IsNull();
+        await Assert.That(result.VictimTeamId).IsNull();
+    }
+
+    [Test]
+    public async Task Shared_random_attachment_flag_is_legal_for_each_assigned_team()
+    {
+        var fixture = CreateFixture("flag{shared-attachment}");
+        var candidate = fixture.Flag(null);
+        candidate.ChallengeId = Guid.NewGuid();
+        candidate.CompetitionChallengeId = null;
+        candidate.SpecificationKind = SpecificationKind.Attachment;
+        candidate.SpecificationId = Guid.NewGuid();
+        var own = fixture.Flag(fixture.GameplayFact.TeamId);
+        own.SpecificationKind = SpecificationKind.Attachment;
+        own.SpecificationId = candidate.SpecificationId;
+        var other = fixture.Flag(Guid.NewGuid());
+        other.SpecificationKind = SpecificationKind.Attachment;
+        other.SpecificationId = candidate.SpecificationId;
+
+        var result = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
+            .Evaluate(fixture.Context([candidate, own, other]));
+
+        await Assert.That(result.Result).IsEqualTo(GameplayFactResult.Correct);
+        await Assert.That(result.FailureCode).IsNull();
+        await Assert.That(result.VictimTeamId).IsNull();
+    }
+
+    [Test]
     public async Task Hint_unlock_does_not_turn_a_correct_rejudge_into_a_duplicate()
     {
         const string flag = "flag{rejudge}";

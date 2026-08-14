@@ -516,15 +516,6 @@ function serializeRunnerJob(job: RunnerJobModel): JsonObject {
 export function serializeDefinition(mode: GameModeValue, model: DefinitionModel): string {
   const obj: JsonObject = { schemaVersion: DEFINITION_SCHEMA_VERSION[mode] }
   if (model.runtime) obj.runtime = serializeRuntimeTemplate(model.runtime)
-  if (mode === 'Ctf'
-    && model.runtime?.flagSource === FlagSource.PerTeam
-    && model.flagTemplate) {
-    obj.flagTemplate = {
-      header: model.flagTemplate.header.trim() || 'flag',
-      bodyTemplate: model.flagTemplate.bodyTemplate.trim() || '[GUID]',
-      leetLiteralText: model.flagTemplate.leetLiteralText,
-    }
-  }
   if (mode === 'Awd') {
     if (model.checker) {
       const checker: JsonObject = { job: serializeRunnerJob(model.checker.job) }
@@ -536,13 +527,6 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
       putNumber(injection, 'timeoutSeconds', model.flagInjection.timeoutSeconds)
       putString(injection, 'serviceName', model.flagInjection.serviceName)
       obj.flagInjection = injection
-    }
-    if (model.flagTemplate) {
-      obj.flagTemplate = {
-        header: model.flagTemplate.header.trim() || 'flag',
-        bodyTemplate: model.flagTemplate.bodyTemplate.trim() || '[GUID]',
-        leetLiteralText: model.flagTemplate.leetLiteralText,
-      }
     }
   }
   if (mode === 'Awdp') {
@@ -686,6 +670,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'maxFlagAttempts', label: translate("Flag 提交次数上限"), type: 'int', min: 1 },
         { key: 'scoreExpression', label: translate("自定义计分表达式"), type: 'text', description: translate("变量:initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayParameter") },
         { key: 'wrongSubmissionPenalty', label: translate("错误提交扣分"), type: 'int', min: 0 },
+        { key: 'flagTemplate', label: translate("动态 Flag 模板"), type: 'flagTemplate', description: translate("仅用于本场比赛该题目今后生成的每队容器 Flag；未覆盖时继承竞赛默认") },
       ]
     case 'Awd':
       return [
@@ -695,6 +680,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'checkerIntervalSeconds', label: translate("检查间隔(秒)"), type: 'int', min: 1 },
         { key: 'serviceHealthyPoints', label: translate("服务正常得分"), type: 'int', min: 0 },
         { key: 'serviceUnhealthyPenalty', label: translate("服务异常扣分"), type: 'int', min: 0 },
+        { key: 'flagTemplate', label: translate("队伍 Flag 模板"), type: 'flagTemplate', description: translate("仅用于本场比赛该题目今后生成的每队每轮 Flag；未覆盖时继承竞赛默认") },
       ]
     case 'Awdp':
       return [

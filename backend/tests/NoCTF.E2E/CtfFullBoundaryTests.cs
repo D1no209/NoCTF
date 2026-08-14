@@ -114,7 +114,7 @@ public sealed class CtfFullBoundaryTests
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { baseScore = 500, order = 0, isPublished = true, expectedRevision = challengeRevision },
+            new { customTitle = (string?)null, baseScore = 500, order = 0, isPublished = true, expectedRevision = challengeRevision },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -183,6 +183,7 @@ public sealed class CtfFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}",
             new
             {
+                customTitle = (string?)null,
                 baseScore = 250,
                 order = 1,
                 isPublished = true,
@@ -213,7 +214,7 @@ public sealed class CtfFullBoundaryTests
             player,
             HttpMethod.Post,
             $"/api/v1/competitions/{competitionId}/teams",
-            new { name = "Boundary Team" },
+            new { name = "Boundary Team", trackKey = "default" },
             HttpStatusCode.Created,
             cancellationToken);
         var teamId = team.GetProperty("id").GetGuid();

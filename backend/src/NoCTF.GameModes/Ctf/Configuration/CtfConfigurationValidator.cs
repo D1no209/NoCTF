@@ -64,11 +64,6 @@ public static class CtfConfigurationValidator
         }
         ValidateMaxAttempts(configuration.MaxFlagAttempts, errors);
         ValidateFlagTemplate(configuration.FlagTemplate, errors);
-        if (configuration.FlagTemplate is not null
-            && configuration.Runtime?.FlagSource != RuntimeFlagSource.PerTeam)
-        {
-            errors.Add("FlagTemplate requires a PerTeam runtime FlagSource.");
-        }
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         if (configuration.Runtime is { Allocation: not RuntimeAllocation.PerTeam })
             errors.Add("CTF runtimes must use PerTeam allocation.");

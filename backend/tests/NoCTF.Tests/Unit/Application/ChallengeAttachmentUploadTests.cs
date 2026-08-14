@@ -172,6 +172,161 @@ public sealed class ChallengeAttachmentUploadTests
             default);
     }
 
+    [Test]
+    public async Task Random_batch_uses_complete_source_names_as_flags_and_one_download_name()
+    {
+        var harness = CreateHarness();
+        harness.Store.AddRandomBatchAsync(
+                ChallengeId,
+                ActorId,
+                false,
+                "challenge.zip",
+                Arg.Any<IReadOnlyList<RandomAttachmentBatchEntry>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(AddChallengeAttachmentState.Added);
+        using var first = new MemoryStream([1]);
+        using var second = new MemoryStream([2]);
+
+        var result = await harness.UseCase.UploadRandomBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            "challenge.zip",
+            [
+                new("flag{one}.zip", "application/zip", first),
+                new("flag{two}.tar.gz", "application/gzip", second)
+            ],
+            DateTimeOffset.Parse("2026-08-14T00:00:00Z"));
+
+        await Assert.That(result.FailureCode).IsNull();
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(result.Value!.Items.Select(item => item.ExactFlag!))
+            .IsEquivalentTo(["flag{one}.zip", "flag{two}.tar.gz"]);
+        await Assert.That(result.Value.Items.All(item => item.FileName == "challenge.zip")).IsTrue();
+        await harness.Store.Received(1).AddRandomBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            "challenge.zip",
+            Arg.Is<IReadOnlyList<RandomAttachmentBatchEntry>>(entries =>
+                entries != null && entries.Select(entry => entry.ExactFlag).SequenceEqual(
+                    new[] { "flag{one}.zip", "flag{two}.tar.gz" })),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task Duplicate_random_batch_flag_is_rejected_before_storage()
+    {
+        var harness = CreateHarness();
+        using var first = new MemoryStream([1]);
+        using var second = new MemoryStream([2]);
+
+        var result = await harness.UseCase.UploadRandomBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            "challenge.zip",
+            [
+                new("flag{same}", "application/zip", first),
+                new("flag{same}", "application/zip", second)
+            ],
+            DateTimeOffset.Parse("2026-08-14T00:00:00Z"));
+
+        await Assert.That(result.FailureCode).IsEqualTo(ChallengeAttachmentFailureCode.DuplicateFlag);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default, default!, default, default);
+        await harness.Store.DidNotReceiveWithAnyArgs().AddRandomBatchAsync(
+            default, default, default, default!, default!, default);
+    }
+
+    [Test]
+    [Arguments("../flag{escape}")]
+    [Arguments("folder/flag{nested}")]
+    [Arguments("folder\\flag{nested}")]
+    [Arguments(".")]
+    [Arguments("..")]
+    public async Task Invalid_random_variant_file_name_is_rejected_before_storage(string fileName)
+    {
+        var harness = CreateHarness();
+        using var content = new MemoryStream([1]);
+
+        var result = await harness.UseCase.UploadRandomBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            "challenge.zip",
+            [new(fileName, "application/octet-stream", content)],
+            DateTimeOffset.Parse("2026-08-14T00:00:00Z"));
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(ChallengeAttachmentFailureCode.InvalidVariantFileName);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default, default!, default, default);
+        await harness.Store.DidNotReceiveWithAnyArgs().AddRandomBatchAsync(
+            default, default, default, default!, default!, default);
+    }
+
+    [Test]
+    public async Task Empty_random_batch_is_rejected_before_storage()
+    {
+        var harness = CreateHarness();
+
+        var result = await harness.UseCase.UploadRandomBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            "challenge.zip",
+            [],
+            DateTimeOffset.Parse("2026-08-14T00:00:00Z"));
+
+        await Assert.That(result.FailureCode).IsEqualTo(ChallengeAttachmentFailureCode.EmptyBatch);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default, default!, default, default);
+    }
+
+    [Test]
+    public async Task Partial_random_batch_storage_failure_compensates_every_registered_file()
+    {
+        var harness = CreateHarness();
+        var puts = 0;
+        harness.Objects.PutAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<Stream>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                puts++;
+                return puts == 2
+                    ? Task.FromException<StoredObject>(new IOException("storage failed"))
+                    : Task.FromResult(new StoredObject(
+                        call.ArgAt<string>(0),
+                        call.ArgAt<string>(1),
+                        call.ArgAt<string>(2),
+                        1,
+                        Convert.ToHexString(SHA256.HashData([1]))));
+            });
+        using var first = new MemoryStream([1]);
+        using var second = new MemoryStream([2]);
+
+        var result = await harness.UseCase.UploadRandomBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            "challenge.zip",
+            [
+                new("flag{one}", "application/zip", first),
+                new("flag{two}", "application/zip", second)
+            ],
+            DateTimeOffset.Parse("2026-08-14T00:00:00Z"));
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(ChallengeAttachmentFailureCode.BatchStorageFailed);
+        await harness.Registry.Received(2).AbandonAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<CancellationToken>());
+        await harness.Store.DidNotReceiveWithAnyArgs().AddRandomBatchAsync(
+            default, default, default, default!, default!, default);
+    }
+
     private static Harness CreateHarness(bool canWrite = true)
     {
         var store = Substitute.For<IChallengeAttachmentStore>();
@@ -186,19 +341,26 @@ public sealed class ChallengeAttachmentUploadTests
         store.AttachmentIdExistsAsync(AttachmentId, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(false));
         objects.PutAsync(
-                StoredObjectKey,
-                "attachment.bin",
-                "application/octet-stream",
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<string>(),
                 Arg.Any<Stream>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult(new StoredObject(
-                StoredObjectKey,
-                "attachment.bin",
-                "application/octet-stream",
-                3,
-                Convert.ToHexString(SHA256.HashData(new byte[] { 1, 2, 3 })))));
+            .Returns(call =>
+            {
+                using var copy = new MemoryStream();
+                call.ArgAt<Stream>(3).CopyTo(copy);
+                var bytes = copy.ToArray();
+                return Task.FromResult(new StoredObject(
+                    call.ArgAt<string>(0),
+                    call.ArgAt<string>(1),
+                    call.ArgAt<string>(2),
+                    bytes.Length,
+                    Convert.ToHexString(SHA256.HashData(bytes))));
+            });
         return new(
             store,
+            objects,
             registry,
             new ManageChallengeAttachments(
                 store,
@@ -229,6 +391,7 @@ public sealed class ChallengeAttachmentUploadTests
 
     private sealed record Harness(
         IChallengeAttachmentStore Store,
+        IObjectStorage Objects,
         IManagedFileUploadRegistry Registry,
         ManageChallengeAttachments UseCase);
 
