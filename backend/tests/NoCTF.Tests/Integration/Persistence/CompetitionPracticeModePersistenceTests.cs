@@ -88,18 +88,23 @@ public sealed class CompetitionPracticeModePersistenceTests
 
             await using (var db = new NoCtfDbContext(options))
             {
+                var runtimeFlag = await db.ChallengeFlags.SingleAsync(
+                    item => item.TeamId == fixture.TeamId
+                        && item.SpecificationKind == SpecificationKind.RuntimeDefinition
+                        && item.SpecificationId == fixture.CompetitionChallengeId,
+                    ct);
                 var judge = new JudgePracticeFlag(new PracticeFlagJudge(db));
                 var correct = await judge.ExecuteAsync(new(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
                     fixture.UserId,
-                    fixture.Flag,
+                    runtimeFlag.Flag,
                     fixture.Now.AddMinutes(1)), ct);
                 var wrong = await judge.ExecuteAsync(new(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
                     fixture.UserId,
-                    "flag{wrong}",
+                    fixture.Flag,
                     fixture.Now.AddMinutes(1)), ct);
 
                 await Assert.That(correct.Judgement)
@@ -113,27 +118,18 @@ public sealed class CompetitionPracticeModePersistenceTests
                     .Select(item => item.LeaderboardDirty)
                     .SingleAsync(ct)).IsFalse();
 
-                var storedFlag = await db.ChallengeFlags.SingleAsync(ct);
-                storedFlag.Flag = @"flag\{practice-[a-z-]+\}";
-                storedFlag.FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(storedFlag.Flag));
-                storedFlag.MatchKind = ChallengeFlagMatchKind.RegularExpression;
+                runtimeFlag.Flag = @"flag\{practice-[a-z-]+\}";
+                runtimeFlag.FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(runtimeFlag.Flag));
+                runtimeFlag.MatchKind = ChallengeFlagMatchKind.RegularExpression;
                 await db.SaveChangesAsync(ct);
-                var regexCorrect = await judge.ExecuteAsync(new(
+                var regexRejected = await judge.ExecuteAsync(new(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
                     fixture.UserId,
-                    fixture.Flag,
-                    fixture.Now.AddMinutes(1)), ct);
-                var regexPartial = await judge.ExecuteAsync(new(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
-                    fixture.UserId,
-                    $"prefix-{fixture.Flag}",
+                    "flag{practice-dynamic}",
                     fixture.Now.AddMinutes(1)), ct);
 
-                await Assert.That(regexCorrect.Judgement)
-                    .IsEqualTo(PracticeFlagJudgement.Correct);
-                await Assert.That(regexPartial.Judgement)
+                await Assert.That(regexRejected.Judgement)
                     .IsEqualTo(PracticeFlagJudgement.Wrong);
                 await Assert.That(await db.GameplayFacts.CountAsync(ct)).IsEqualTo(0);
             }
@@ -251,8 +247,11 @@ public sealed class CompetitionPracticeModePersistenceTests
                     null,
                     Runtime: new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
-                        new ContainerRuntimeDefinition("registry.example/practice:v1"),
-                        new RuntimeResourceLimits(67_108_864, 100_000_000, 64))),
+                        new ContainerRuntimeDefinition(
+                            "registry.example/practice:v1",
+                            FlagEnvironmentVariableName: "FLAG"),
+                        new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                        FlagSource: RuntimeFlagSource.PerTeam)),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             CreatedAt = now,
             UpdatedAt = now

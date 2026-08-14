@@ -153,6 +153,9 @@ const flagForm = ref({
 const flagError = ref<string | null>(null)
 const savingFlag = ref(false)
 const pendingFlagId = ref<string | null>(null)
+const usesRuntimeFlagInjection = computed(() =>
+  competition.value?.mode === 'Ctf' && !flagsLoading.value && !flagsLoadError.value && !supportsRegularExpression.value,
+)
 
 async function loadFlags() {
   flagsLoading.value = true
@@ -480,9 +483,14 @@ onMounted(() => {
                 <Checkbox id="show-deleted-flags" v-model="includeDeletedFlags" />
                 <label for="show-deleted-flags" class="text-sm text-muted-foreground">{{ $t('显示已删除') }}</label>
               </div>
-              <Button v-if="canWrite" size="sm" @click="openFlagDialog()">
+              <Button v-if="canWrite && !usesRuntimeFlagInjection" size="sm" @click="openFlagDialog()">
                 <Plus data-icon="inline-start" /> {{ $t('添加 Flag') }} </Button>
             </div>
+            <Alert v-if="usesRuntimeFlagInjection">
+              <AlertDescription>
+                {{ $t('该题使用运行环境动态 Flag。平台会为每支队伍生成 Flag，并在启动容器时注入环境变量；无需维护精确或正则 Flag。') }}
+              </AlertDescription>
+            </Alert>
             <Alert v-if="flagsLoadError" variant="destructive">
               <AlertDescription>{{ flagsLoadError }}</AlertDescription>
             </Alert>
@@ -500,7 +508,7 @@ onMounted(() => {
                   <TableHead>{{ $t('规格') }}</TableHead>
                   <TableHead>{{ $t('有效期') }}</TableHead>
                   <TableHead>{{ $t('状态') }}</TableHead>
-                  <TableHead v-if="canWrite" class="w-44 text-right">{{ $t('操作') }}</TableHead>
+                  <TableHead v-if="canWrite && !usesRuntimeFlagInjection" class="w-44 text-right">{{ $t('操作') }}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -508,7 +516,7 @@ onMounted(() => {
                   <TableCell class="max-w-64">
                     <div class="flex min-w-0 items-center gap-2">
                       <Badge variant="outline">
-                        {{ f.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
+                        {{ usesRuntimeFlagInjection ? $t('环境变量注入') : f.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
                       </Badge>
                       <span class="truncate font-mono text-xs">{{ f.flag }}</span>
                     </div>
@@ -527,7 +535,7 @@ onMounted(() => {
                     <Badge v-if="f.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
                     <Badge v-else variant="secondary">{{ $t('有效') }}</Badge>
                   </TableCell>
-                  <TableCell v-if="canWrite" class="text-right">
+                  <TableCell v-if="canWrite && !usesRuntimeFlagInjection" class="text-right">
                     <div class="flex justify-end gap-1">
                       <template v-if="!f.deletedAt">
                         <Button variant="ghost" size="sm" :disabled="pendingFlagId === f.id" @click="openFlagDialog(f)">{{ $t('编辑') }}</Button>

@@ -4134,7 +4134,7 @@
           "Admin"
         ],
         "summary": "Assigns a team to a competition track.",
-        "description": "Allows competition administrators to assign public or internal tracks before start.",
+        "description": "Allows competition administrators to move a team to an existing public or internal track, including after start.",
         "operationId": "AdminTeamTrack_Assign",
         "parameters": [
           {
@@ -12514,10 +12514,12 @@
       "NoCTFAPIEndpointsTeamsCreateTeamRequest": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "trackKey"
+        ],
         "properties": {
           "trackKey": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "name": {
             "type": "string"

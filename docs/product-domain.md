@@ -43,9 +43,9 @@ Team 只属于一个 Competition。字段包含稳定、大小写不敏感的 `T
 
 ### Competition Track
 
-Competition 以自己的 `TrackConfigurationJson` 定义 1–32 条跨模式赛道；赛道不是业务表，GameplayFact 也不复制赛道。每场比赛恰有一个公开、非内部的默认赛道，旧比赛的空配置按唯一 `default` 赛道解释。Team.TrackKey 是事实发生时的稳定归属；Competition 首次进入 Running 后，Running/Paused/Finished 都冻结赛道定义和队伍赛道归属。
+Competition 以自己的 `TrackConfigurationJson` 定义 1–32 条跨模式赛道；赛道不是业务表，GameplayFact 也不复制赛道。每场比赛恰有一个公开、非内部的默认赛道，旧比赛的空配置按唯一 `default` 赛道解释。Team.TrackKey 是事实发生时的稳定归属。Competition 首次进入 Running 后，Running/Paused/Finished 冻结赛道定义；队伍赛道归属仍可由 Administrator、Owner、Manager 调整，并以不可变事件记录变更。
 
-每条赛道独立声明是否允许公开选择、计分、参与 CTF 血榜、影响 CTF 动态分值、出现在公开排行榜以及影响 AWD/AWDP/KoH 的竞争性结果。内部赛道必须关闭所有公开与竞争开关，但仍可正常查看题目、运行 Runtime/Checker 并产生永久 GameplayFact 和工作人员事件。Administrator、Owner、Manager 可在开赛前配置/分配；Judge、Observer 只读；普通参赛者只能选择公开赛道。
+每条赛道独立声明是否允许公开选择、计分、参与 CTF 血榜、影响 CTF 动态分值、出现在公开排行榜以及影响 AWD/AWDP/KoH 的竞争性结果。内部赛道必须关闭所有公开与竞争开关，但仍可正常查看题目、运行 Runtime/Checker 并产生永久 GameplayFact 和工作人员事件。Administrator、Owner、Manager 可在开赛前配置赛道，并可在任意生命周期调整队伍归属；Judge、Observer 只读。普通参赛者创建队伍时必须显式选择一条公开赛道，不由服务端自动套用默认赛道。
 
 团队拥有一个全局唯一、明文的 32 字符 Base62 InvitationToken。字母表固定为 `0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz`，使用 CSPRNG rejection sampling 逐字符无偏生成；若撞全局唯一索引就整体重生。持有 Token 的已登录用户在 Published 状态直接加入；轮换立即使旧值失效。
 

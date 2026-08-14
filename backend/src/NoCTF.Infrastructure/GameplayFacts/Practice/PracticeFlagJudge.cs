@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.GameplayFacts.Practice;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
@@ -68,15 +69,20 @@ public sealed class PracticeFlagJudge(
             return new(FailureCode: PracticeFlagFailureCode.RuntimeNotRunning);
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(command.Flag));
-        var supportsRegularExpression = runtimeTemplates
-            .Get(GameMode.Ctf, scope.DefinitionJson)?.FlagSource
-                is null or RuntimeFlagSource.Static;
+        var runtimeTemplate = runtimeTemplates.Get(GameMode.Ctf, scope.DefinitionJson);
+        var usesRuntimeInjection = runtimeTemplate?.FlagSource == RuntimeFlagSource.PerTeam;
+        var supportsRegularExpression = runtimeTemplate?.FlagSource
+            is null or RuntimeFlagSource.Static;
         var candidates = await db.ChallengeFlags.AsNoTracking()
             .IgnoreQueryFilters()
             .Where(flag => flag.DeletedAt == null
                 && (flag.ChallengeId == scope.ChallengeId
                     || flag.CompetitionChallengeId == command.CompetitionChallengeId)
                 && (flag.TeamId == null || flag.TeamId == team.Id)
+                && (!usesRuntimeInjection
+                    || flag.TeamId == team.Id
+                    && flag.SpecificationKind == SpecificationKind.RuntimeDefinition
+                    && flag.SpecificationId == command.CompetitionChallengeId)
                 && (flag.ValidStart == null || flag.ValidStart <= command.SubmittedAt)
                 && (flag.ValidUntil == null || command.SubmittedAt < flag.ValidUntil)
                 && (flag.FlagSha256 == hash

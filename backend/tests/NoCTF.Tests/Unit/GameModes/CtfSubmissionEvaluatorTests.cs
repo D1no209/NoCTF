@@ -65,6 +65,42 @@ public sealed class CtfGameplayFactEvaluatorTests
     }
 
     [Test]
+    public async Task Dynamic_ctf_runtime_only_accepts_the_team_runtime_injected_flag()
+    {
+        var fixture = CreateFixture("flag{dynamic}");
+        var globalStatic = fixture.Flag(null);
+        var runtimeInjected = fixture.Flag(fixture.GameplayFact.TeamId);
+        runtimeInjected.SpecificationKind = SpecificationKind.RuntimeDefinition;
+        runtimeInjected.SpecificationId = fixture.GameplayFact.CompetitionChallengeId;
+        var definition = JsonSerializer.Serialize(new CtfChallengeConfiguration(
+            CtfChallengeConfiguration.CurrentSchemaVersion,
+            null,
+            null,
+            Runtime: new ChallengeRuntimeTemplate(
+                RuntimeAllocation.PerTeam,
+                new ContainerRuntimeDefinition(
+                    "registry.example/challenge:v1",
+                    FlagEnvironmentVariableName: "FLAG"),
+                FlagSource: RuntimeFlagSource.PerTeam)),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        var evaluator = new CtfGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator());
+        var accepted = evaluator.Evaluate(fixture.Context([globalStatic, runtimeInjected]) with
+        {
+            ChallengeDefinitionJson = definition
+        });
+        runtimeInjected.Flag = "flag{different}";
+        runtimeInjected.FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(runtimeInjected.Flag));
+        var staticOnly = evaluator.Evaluate(fixture.Context([globalStatic, runtimeInjected]) with
+        {
+            ChallengeDefinitionJson = definition
+        });
+
+        await Assert.That(accepted.Result).IsEqualTo(GameplayFactResult.Correct);
+        await Assert.That(staticOnly.Result).IsEqualTo(GameplayFactResult.Wrong);
+    }
+
+    [Test]
     public async Task Foreign_team_flag_is_rejected_with_owner_team_evidence()
     {
         var fixture = CreateFixture("flag{foreign}");

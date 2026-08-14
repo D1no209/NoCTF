@@ -64,9 +64,6 @@ onMounted(async () => {
   ).length
   if (!trackResult.error && trackResult.data) {
     selectableTracks.value = (trackResult.data.items ?? []).filter(track => track.isPublicSelectable)
-    createTrackKey.value = selectableTracks.value.find(track => track.isDefault)?.key
-      ?? selectableTracks.value[0]?.key
-      ?? ''
   }
 })
 
@@ -113,13 +110,13 @@ const createTrackKey = ref('')
 const createPending = ref(false)
 
 async function submitCreate() {
-  if (!createName.value.trim()) return
+  if (!createName.value.trim() || !createTrackKey.value) return
   createPending.value = true
   const { data, error } = await createTeamEndpoint({
     path: { competitionId },
     body: {
       name: createName.value.trim(),
-      trackKey: createTrackKey.value || undefined,
+      trackKey: createTrackKey.value,
     },
   })
   createPending.value = false
@@ -218,7 +215,7 @@ const isCaptain = computed(
                         <FieldLabel for="team-name">{{ $t('队伍名称') }}</FieldLabel>
                         <Input id="team-name" v-model="createName" required maxlength="64" />
                       </Field>
-                      <Field v-if="selectableTracks.length > 1">
+                      <Field v-if="selectableTracks.length > 0">
                         <FieldLabel for="team-track">{{ $t('参赛赛道') }}</FieldLabel>
                         <Select v-model="createTrackKey" required>
                           <SelectTrigger id="team-track"><SelectValue :placeholder="$t('选择赛道')" /></SelectTrigger>
@@ -228,10 +225,10 @@ const isCaptain = computed(
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                        <FieldDescription>{{ $t('队伍创建后，开赛前可由比赛管理员调整。') }}</FieldDescription>
+                        <FieldDescription>{{ $t('请选择队伍参加的赛道；创建后比赛管理员仍可调整。') }}</FieldDescription>
                       </Field>
                       <Field>
-                        <Button type="submit" class="w-full" :disabled="createPending">
+                        <Button type="submit" class="w-full" :disabled="createPending || !createTrackKey">
                           <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('创建') }} </Button>
                       </Field>
                     </FieldGroup>

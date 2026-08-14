@@ -14,7 +14,7 @@ Challenge 只声明 RuntimeKind、镜像/Compose 内容、命令、环境、逻�
 
 | 模式/用途 | Container | Compose | OvaVm |
 |---|---:|---:|---:|
-| CTF Static/PerTeamRuntime | 是 | 是 | 否 |
+| CTF PerTeamRuntime | 是 | 是 | 否 |
 | AWD 长期按队 Runtime | 是 | 是 | 否 |
 | AWDP 一次性 Fix target | 是 | 否 | 否 |
 | KoH shared Hill | 是 | 是 | 否 |

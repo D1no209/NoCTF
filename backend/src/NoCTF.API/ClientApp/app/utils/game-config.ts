@@ -156,7 +156,7 @@ export interface DefinitionModel {
 export const DEFAULT_MAXIMUM_PATCH_UPLOAD_BYTES = 256 * 1024 * 1024
 export const HARD_MAXIMUM_PATCH_UPLOAD_BYTES = 1024 * 1024 * 1024
 
-export function emptyContainerDefinition(): ContainerDefinitionModel {
+export function emptyContainerDefinition(withFlagInjection = false): ContainerDefinitionModel {
   return {
     kind: 'container',
     image: '',
@@ -165,7 +165,7 @@ export function emptyContainerDefinition(): ContainerDefinitionModel {
     labels: {},
     containerPorts: [],
     security: { noNewPrivileges: false, readonlyRootfs: false, runAsNonRoot: false, capDrop: [], capAdd: [] },
-    flagEnvironmentVariableName: '',
+    flagEnvironmentVariableName: withFlagInjection ? 'FLAG' : '',
     internalPorts: [],
   }
 }
@@ -181,12 +181,12 @@ export function emptyUrlBinding(): UrlBindingModel {
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
   return {
     allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
-    definition: emptyContainerDefinition(),
+    definition: emptyContainerDefinition(mode === 'Ctf'),
     limits: { memoryBytes: null, nanoCpus: null, pidsLimit: null },
     ttlSeconds: null,
     operationTimeoutSeconds: null,
     urlBindings: [],
-    flagSource: mode === 'Awd' || mode === 'Awdp' ? FlagSource.AwdRotation : FlagSource.Static,
+    flagSource: mode === 'Ctf' ? FlagSource.PerTeam : mode === 'Awd' || mode === 'Awdp' ? FlagSource.AwdRotation : FlagSource.Static,
     controlCheckUrlBinding: null,
   }
 }
