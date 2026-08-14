@@ -1,5 +1,16 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-14 随机附件交付与比赛级动态 Flag 配置
+
+- 功能提交 `4ff6a257` 重构题目附件与 Flag 管理。普通 `All` 模式允许上传并向选手展示全部附件；`RandomOnePerTeam` 模式由工作人员设置统一下载文件名并批量上传变体，原始上传文件名完整解析为对应的精确 Flag，不删除扩展名，也不向选手、下载响应、对象存储公开地址或普通日志暴露。批次会在写入前完整验证，文件暂存、数据库写入与失败补偿组成原子流程；没有新增附件—Flag 映射表。
+- 随机附件在队伍第一次下载时分配。PostgreSQL 对比赛题目取得临界区锁：同队并发始终得到同一变体；仍有未使用变体时不同队伍不会重复，耗尽后才从全部变体随机复用。文件可用性在保存首次分配前确认，历史分配继续复用现有 `ChallengeFlag`、`ChallengeAttachment` 与 `File`，队伍封禁、解散或账号匿名化不会触发静默改派。
+- 判题链路区分全局静态 Flag、当前队伍附件 Flag 与其他附件变体 Flag。共享 Flag 已分配给当前队伍时合法；已知但未分配给当前队伍的附件 Flag 拒绝得分并产生脱敏作弊事件，只有唯一归属队伍时才记录受影响队伍。相同队伍重复或并发提交同一外队 Flag 由既有 GameplayFact 顺序和幂等链路收敛，不重复计分或重复创建作弊事实，事件、通知和普通日志均不保存明文 Flag。
+- 普通静态 CTF Flag 表单只保留精确/正则匹配和规则正文；规格类型、规格 ID、队伍 ID及生效窗口从手工界面移除。系统生成的动态 Flag 只读展示，不能作为普通静态 Flag 编辑、删除或恢复。AWDP 继续保持 Break/Fix 语义，AWD 与 KoH 的动态 Flag 生命周期没有改成手工 Flag。
+- 按产品补充要求，容器动态 Flag 的每场比赛差异配置归属 `CompetitionChallenge.RulesJson`：CTF 与 AWD 的 `FlagTemplate` 可在比赛题目管理中覆盖并继承比赛默认值；题库 `Challenge.DefinitionJson` 只保留 Runtime、Checker、环境变量或目标文件等技术注入定义。不同比赛可以为同一题库模板配置不同 Flag 头，既有 Runtime generation 不会被热更新。
+- 新增强类型批量上传端点 `POST /api/v1/admin/challenges/{challengeId}/attachments/random-batch`，使用请求 DTO 的 `IReadOnlyList<IFormFile>`、`AllowFileUploads()`、`ExecuteAsync`、`Results<T...>` 与 `TypedResults`。两份 OpenAPI 由工具导出、TypeScript SDK 由 `bun run api:gen` 生成；连续第二轮生成无漂移，两份 OpenAPI SHA-256 均为 `777B9FE0B0B4D98D51D98FFDEC5D2B06046DD214EB2ADDFB4CB23A0107D92128`。前端只调用生成 SDK，没有手写 URL、DTO、枚举或失败码。
+- 验证通过：Release solution build 0 warning/0 error；完整非 Integration TUnit 777/777；完整 Integration 173 项中 171 通过、0 失败，2 项仅因未配置真实 Kubernetes 集群和 Libvirt disk path 按设计跳过；真实 PostgreSQL 随机附件并发/对象可用性、CTF Runtime Flag 与 AWD 轮次协调定向测试全部通过；CTF、AWD、AWDP、KoH Full E2E 各 1/1；前端 `bun test` 199/199、`bun run typecheck`、production `bun run build`；analyzers、EF `has-pending-model-changes`、OpenAPI/SDK 双次幂等与 `git diff --check` 均通过。E2E Docker 资源已精确清理。
+- 本阶段没有新增业务表、列、migration 或 snapshot，没有修改平台版本。功能在独立分支 `codex/random-attachment-delivery-20260814` / 工作树 `E:\SourceCode\NoCTF-random-attachment-delivery-20260814` 完成，未覆盖 `E:\SourceCode\NoCTF` 中用户已有修改；尚未推送、部署或操作生产数据。
+
 ## 2026-08-14 alpha.37 队伍赛道选择与 CTF Runtime Flag 注入
 
 - 功能提交 `fae710a1` 将队伍赛道归属改为显式选择：参赛者创建队伍时必须从当前比赛可公开选择的赛道中选择一条，API 的 `CreateTeamRequest.trackKey` 从可空可选字段改为必填非空字符串；服务端不再静默回退默认赛道。Administrator、Competition Owner 和 Manager 仍可配置内部或公开赛道，并可在 Running、Paused、Finished 等生命周期中通过队伍管理页调整既有队伍归属；赛道定义本身在首次开赛后继续冻结。每次归属变化仍写入既有不可变 `TeamTrackChanged` 事件，没有新增赛道或分配表。
