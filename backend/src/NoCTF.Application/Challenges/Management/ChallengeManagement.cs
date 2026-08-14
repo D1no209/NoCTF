@@ -36,6 +36,7 @@ public sealed record ChallengeView(
     bool IsPublished,
     int Revision,
     DateTimeOffset? DeletedAt,
+    bool HasRuntime,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 

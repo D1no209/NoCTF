@@ -572,6 +572,7 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     isPublished?: boolean;
     revision?: number;
     deletedAt?: string | null;
+    hasRuntime?: boolean;
     createdAt?: string;
     updatedAt?: string;
     controlFlag?: string | null;

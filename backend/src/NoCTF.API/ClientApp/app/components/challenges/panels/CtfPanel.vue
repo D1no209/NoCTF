@@ -13,7 +13,7 @@ defineProps<{
 <template>
   <div class="flex flex-col gap-6">
     <RuntimeCard
-      v-if="competition.status === 'Running' || competition.status === 'Finished' && competition.practiceModeEnabled === true"
+      v-if="challenge.hasRuntime === true && (competition.status === 'Running' || competition.status === 'Finished' && competition.practiceModeEnabled === true)"
       :competition-id="competition.id!"
       :competition-challenge-id="challenge.id!"
       controls="full"
