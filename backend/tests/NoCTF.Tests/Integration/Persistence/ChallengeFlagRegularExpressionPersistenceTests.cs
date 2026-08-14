@@ -39,6 +39,7 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
             var managerId = Guid.CreateVersion7(now.AddTicks(1));
             var outsiderId = Guid.CreateVersion7(now.AddTicks(2));
             var challengeId = Guid.CreateVersion7(now.AddTicks(3));
+            var awdpChallengeId = Guid.CreateVersion7(now.AddTicks(4));
 
             await using var db = new NoCtfDbContext(options);
             await db.Database.MigrateAsync(ct);
@@ -55,6 +56,19 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
                 Visibility = ChallengeVisibility.Private,
                 Title = "Static regex challenge",
                 Direction = "Web",
+                DefinitionJson = """{"schemaVersion":1}""",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            db.Challenges.Add(new Challenge
+            {
+                Id = awdpChallengeId,
+                OwnerId = ownerId,
+                ManagerIds = [],
+                Mode = GameMode.Awdp,
+                Visibility = ChallengeVisibility.Private,
+                Title = "AWDP break challenge",
+                Direction = "Pwn",
                 DefinitionJson = """{"schemaVersion":1}""",
                 CreatedAt = now,
                 UpdatedAt = now
@@ -83,7 +97,21 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
             await Assert.That(ownerSave.Value!.Id).IsNotEqualTo(managerSave.Value!.Id);
             await Assert.That(outsiderSave.FailureCode)
                 .IsEqualTo(ChallengeFlagFailureCode.FlagNotFound);
-            await Assert.That(await db.ChallengeFlags.CountAsync(ct)).IsEqualTo(2);
+            var awdpExact = await flags.SaveAsync(
+                ExactCommand(awdpChallengeId, "flag{awdp-break}", now.AddTicks(3)),
+                ownerId,
+                false,
+                ct);
+            var awdpRegex = await flags.SaveAsync(
+                Command(awdpChallengeId, @"flag\{awdp-[0-9]+\}", now.AddTicks(4)),
+                ownerId,
+                false,
+                ct);
+
+            await Assert.That(awdpExact.Succeeded).IsTrue();
+            await Assert.That(awdpRegex.FailureCode)
+                .IsEqualTo(ChallengeFlagFailureCode.RegularExpressionNotSupported);
+            await Assert.That(await db.ChallengeFlags.CountAsync(ct)).IsEqualTo(3);
 
             var dynamicDefinition = JsonSerializer.Serialize(
                 new CtfChallengeConfiguration(
@@ -134,6 +162,7 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
             await Assert.That(ownerDeleted.Succeeded).IsTrue();
             await Assert.That(managerDeleted.Succeeded).IsTrue();
             var activeFlagIds = await mutationDb.ChallengeFlags.AsNoTracking()
+                .Where(item => item.ChallengeId == challengeId)
                 .Select(item => item.Id)
                 .ToArrayAsync(ct);
             await Assert.That(activeFlagIds).IsEmpty()
@@ -165,7 +194,8 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
                 .Because(converted.Detail ?? "No detail was returned.");
             await Assert.That(restored.Succeeded).IsFalse();
             await Assert.That(await restoreDb.ChallengeFlags.IgnoreQueryFilters()
-                .CountAsync(item => item.DeletedAt == null, ct)).IsEqualTo(0);
+                .CountAsync(item => item.ChallengeId == challengeId && item.DeletedAt == null, ct))
+                .IsEqualTo(0);
         });
     }
 
@@ -184,6 +214,22 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
         null,
         now,
         ChallengeFlagMatchKind.RegularExpression);
+
+    private static SaveChallengeFlagCommand ExactCommand(
+        Guid challengeId,
+        string flag,
+        DateTimeOffset now) => new(
+        ChallengeFlagScope.Template(challengeId),
+        null,
+        true,
+        null,
+        flag,
+        null,
+        null,
+        null,
+        null,
+        now,
+        ChallengeFlagMatchKind.Exact);
 
     private static User User(Guid id, string name, DateTimeOffset now) => new()
     {

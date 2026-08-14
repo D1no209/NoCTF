@@ -56,6 +56,23 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue(BearerScheme, "test-token");
 
+            using var allList = await client.GetAsync(
+                AttachmentListUri(fixture.CompetitionId, fixture.AllCompetitionChallengeId),
+                cancellationToken);
+            using var allListJson = JsonDocument.Parse(await allList.Content.ReadAsStringAsync(cancellationToken));
+            await Assert.That(allList.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(allListJson.RootElement.GetProperty("deliveryPolicy").GetString()).IsEqualTo("All");
+            await Assert.That(allListJson.RootElement.GetProperty("items").GetArrayLength()).IsEqualTo(2);
+
+            using var randomList = await client.GetAsync(
+                AttachmentListUri(fixture.CompetitionId, fixture.RandomCompetitionChallengeId),
+                cancellationToken);
+            using var randomListJson = JsonDocument.Parse(await randomList.Content.ReadAsStringAsync(cancellationToken));
+            await Assert.That(randomList.StatusCode).IsEqualTo(HttpStatusCode.OK);
+            await Assert.That(randomListJson.RootElement.GetProperty("deliveryPolicy").GetString())
+                .IsEqualTo("RandomOnePerTeam");
+            await Assert.That(randomListJson.RootElement.GetProperty("items").GetArrayLength()).IsEqualTo(0);
+
             using var sameChallenge = await client.GetAsync(
                 AttachmentUri(
                     fixture.CompetitionId,
@@ -113,6 +130,9 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             await Assert.That(randomSameChallenge.StatusCode).IsEqualTo(HttpStatusCode.OK);
             await Assert.That(await randomSameChallenge.Content.ReadAsStringAsync(cancellationToken))
                 .IsEqualTo("random-scope");
+            var disposition = randomSameChallenge.Content.Headers.ContentDisposition?.ToString() ?? string.Empty;
+            await Assert.That(disposition).Contains("challenge.zip");
+            await Assert.That(disposition).DoesNotContain("flag{random}");
 
             using var randomCrossChallenge = await client.GetAsync(
                 RandomAttachmentUri(
@@ -142,6 +162,11 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
         Guid attachmentId) =>
         $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments/{attachmentId}";
 
+    private static string AttachmentListUri(
+        Guid competitionId,
+        Guid competitionChallengeId) =>
+        $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/attachments";
+
     private static string RandomAttachmentUri(
         Guid competitionId,
         Guid competitionChallengeId) =>
@@ -160,7 +185,8 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             options.DisableAutoDiscovery = true;
             options.Assemblies = [typeof(DownloadChallengeAttachmentEndpoint).Assembly];
             options.Filter = type =>
-                type == typeof(DownloadChallengeAttachmentEndpoint)
+                type == typeof(ListChallengeAttachmentsEndpoint)
+                || type == typeof(DownloadChallengeAttachmentEndpoint)
                 || type == typeof(DownloadRandomChallengeAttachmentEndpoint);
         });
         builder.Services
@@ -207,16 +233,19 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
         var randomCompetitionChallengeId = Guid.CreateVersion7();
         var crossRandomCompetitionChallengeId = Guid.CreateVersion7();
         var allAttachmentId = Guid.CreateVersion7();
+        var allSecondAttachmentId = Guid.CreateVersion7();
         var otherAttachmentId = Guid.CreateVersion7();
         var randomAttachmentId = Guid.CreateVersion7();
         var deletedAttachmentId = Guid.CreateVersion7();
         var allFileId = Guid.CreateVersion7();
+        var allSecondFileId = Guid.CreateVersion7();
         var otherFileId = Guid.CreateVersion7();
         var randomFileId = Guid.CreateVersion7();
         var deletedFileId = Guid.CreateVersion7();
         var objects = new Dictionary<string, byte[]>
         {
             ["attachments/all"] = Encoding.UTF8.GetBytes("all-scope"),
+            ["attachments/all-second"] = Encoding.UTF8.GetBytes("all-second-scope"),
             ["attachments/other"] = Encoding.UTF8.GetBytes("other-scope"),
             ["attachments/random"] = Encoding.UTF8.GetBytes("random-scope"),
             ["attachments/deleted"] = Encoding.UTF8.GetBytes("deleted-scope")
@@ -300,11 +329,13 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
                 now));
         db.Files.AddRange(
             File(allFileId, "attachments/all", "all.txt", objects["attachments/all"], now),
+            File(allSecondFileId, "attachments/all-second", "all-second.txt", objects["attachments/all-second"], now),
             File(otherFileId, "attachments/other", "other.txt", objects["attachments/other"], now),
-            File(randomFileId, "attachments/random", "random.txt", objects["attachments/random"], now),
+            File(randomFileId, "attachments/random", "challenge.zip", objects["attachments/random"], now),
             File(deletedFileId, "attachments/deleted", "deleted.txt", objects["attachments/deleted"], now));
         db.Set<ChallengeAttachment>().AddRange(
             Attachment(allAttachmentId, allChallengeId, allFileId, now),
+            Attachment(allSecondAttachmentId, allChallengeId, allSecondFileId, now),
             Attachment(otherAttachmentId, otherChallengeId, otherFileId, now),
             Attachment(randomAttachmentId, randomChallengeId, randomFileId, now),
             Attachment(deletedAttachmentId, allChallengeId, deletedFileId, now, now));

@@ -1,4 +1,5 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Flags;
@@ -8,7 +9,7 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 public sealed class DeleteChallengeFlagEndpoint(
     ManageChallengeFlags flags,
     IUserContext user)
-    : EndpointWithoutRequest<Results<NoContent, NotFound>>
+    : EndpointWithoutRequest<Results<NoContent, NotFound, Conflict<ChallengeFlagFailureResponse>>>
 {
     public override void Configure()
     {
@@ -22,7 +23,7 @@ public sealed class DeleteChallengeFlagEndpoint(
         });
     }
 
-    public override async Task<Results<NoContent, NotFound>> ExecuteAsync(CancellationToken ct)
+    public override async Task<Results<NoContent, NotFound, Conflict<ChallengeFlagFailureResponse>>> ExecuteAsync(CancellationToken ct)
     {
         var result = await flags.DeleteAsync(
             ChallengeFlagScope.Template(Route<Guid>("challengeId")),
@@ -31,6 +32,10 @@ public sealed class DeleteChallengeFlagEndpoint(
             user.IsAdministrator,
             DateTimeOffset.UtcNow,
             ct);
-        return result.Succeeded ? TypedResults.NoContent() : TypedResults.NotFound();
+        if (result.Succeeded)
+            return TypedResults.NoContent();
+        return result.FailureCode == ChallengeFlagFailureCode.SystemManagedFlag
+            ? TypedResults.Conflict(ChallengeFlagFailureMapping.ToResponse(result.FailureCode.Value, result.ErrorMessage))
+            : TypedResults.NotFound();
     }
 }

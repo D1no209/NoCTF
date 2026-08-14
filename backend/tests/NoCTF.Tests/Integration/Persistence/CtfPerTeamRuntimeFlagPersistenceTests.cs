@@ -474,11 +474,7 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             OwnerId = ownerId,
             Mode = GameMode.Ctf,
             Title = title,
-            DefinitionJson = flagTemplate is null
-                ? configurationJson
-                : RuntimeConfiguration(
-                    CtfConfigurationUpgrader.ParseChallenge(configurationJson).Runtime!,
-                    flagTemplate),
+            DefinitionJson = configurationJson,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -493,22 +489,20 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 new CtfChallengeConfiguration(
                     CtfChallengeConfiguration.CurrentSchemaVersion,
                     null,
-                    null),
+                    null,
+                    FlagTemplate: flagTemplate),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             UpdatedAt = now
         });
     }
 
-    private static string RuntimeConfiguration(
-        ChallengeRuntimeTemplate runtime,
-        NoCTF.GameModes.Flags.PerTeamFlagTemplate? flagTemplate = null) =>
+    private static string RuntimeConfiguration(ChallengeRuntimeTemplate runtime) =>
         JsonSerializer.Serialize(
             new CtfChallengeConfiguration(
                 CtfChallengeConfiguration.CurrentSchemaVersion,
                 null,
                 null,
-                Runtime: runtime,
-                FlagTemplate: flagTemplate),
+                Runtime: runtime),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
     private sealed record Fixture(

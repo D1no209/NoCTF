@@ -2829,8 +2829,8 @@
         "tags": [
           "Competitions"
         ],
-        "summary": "Lists All-policy challenge attachments.",
-        "description": "RandomOnePerTeam challenges deliberately return 404 from this route.",
+        "summary": "Lists the player attachment delivery surface.",
+        "description": "All returns every attachment; RandomOnePerTeam returns one assigned-download entry without exposing variants.",
         "operationId": "ListChallengeAttachmentsEndpoint",
         "parameters": [
           {
@@ -10110,6 +10110,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -10603,6 +10613,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -10746,6 +10766,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -11240,6 +11270,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -11353,6 +11393,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -11621,6 +11671,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -11747,6 +11807,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
+                }
+              }
+            }
           },
           "401": {
             "description": "Unauthorized"
@@ -12153,6 +12223,16 @@
           "404": {
             "description": "Not Found"
           },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -12346,6 +12426,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeTemplateConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/challenges/{challengeId}/attachments/random-batch": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Uploads one atomic RandomOnePerTeam attachment batch.",
+        "description": "Each original multipart file name is used verbatim as an exact protected Flag, while every stored file uses the common player-facing download name.",
+        "operationId": "AdminChallengeBankUploadRandomAttachmentBatch",
+        "parameters": [
+          {
+            "name": "challengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UploadRandomChallengeAttachmentBatchRequest",
+          "description": "",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankUploadRandomChallengeAttachmentBatchRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentListResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse"
                 }
               }
             }
@@ -14804,6 +14963,9 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "deliveryPolicy": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol"
+          },
           "items": {
             "type": "array",
             "items": {
@@ -14811,6 +14973,18 @@
             }
           }
         }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "All",
+          "RandomOnePerTeam"
+        ],
+        "enum": [
+          "All",
+          "RandomOnePerTeam"
+        ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeAttachmentResponse": {
         "type": "object",
@@ -14836,6 +15010,10 @@
           },
           "sha256": {
             "type": "string"
+          },
+          "exactFlag": {
+            "type": "string",
+            "nullable": true
           },
           "deletedAt": {
             "type": "string",
@@ -18433,10 +18611,12 @@
           },
           "ownerTeamId": {
             "type": "string",
-            "format": "guid"
+            "format": "guid",
+            "nullable": true
           },
           "ownerTeamName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "actorUserId": {
             "type": "string",
@@ -18583,10 +18763,12 @@
           },
           "ownerTeamId": {
             "type": "string",
-            "format": "guid"
+            "format": "guid",
+            "nullable": true
           },
           "ownerTeamName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "actorUserId": {
             "type": "string",
@@ -18779,6 +18961,9 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "systemManaged": {
+            "type": "boolean"
           }
         }
       },
@@ -18810,6 +18995,46 @@
           "Hint"
         ]
       },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "InvalidFlag",
+          "InvalidRegularExpression",
+          "RegularExpressionNotSupported",
+          "InvalidSpecification",
+          "InvalidValidityWindow",
+          "InvalidTemplateFlagScope",
+          "ResourceIdConflict",
+          "ManualFlagNotSupported",
+          "SystemManagedFlag",
+          "DeliveryModeConflict"
+        ],
+        "enum": [
+          "InvalidFlag",
+          "InvalidRegularExpression",
+          "RegularExpressionNotSupported",
+          "InvalidSpecification",
+          "InvalidValidityWindow",
+          "InvalidTemplateFlagScope",
+          "ResourceIdConflict",
+          "ManualFlagNotSupported",
+          "SystemManagedFlag",
+          "DeliveryModeConflict"
+        ]
+      },
       "NoCTFAPIEndpointsAdministrationChallengeBankSaveChallengeFlagRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -18822,11 +19047,6 @@
             "format": "guid",
             "nullable": true
           },
-          "teamId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
           "flag": {
             "type": "string",
             "maxLength": 4096,
@@ -18835,29 +19055,6 @@
           },
           "matchKind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol"
-          },
-          "specificationKind": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankSpecificationKindProtocol"
-              }
-            ]
-          },
-          "specificationId": {
-            "type": "string",
-            "format": "guid",
-            "nullable": true
-          },
-          "validStart": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "validUntil": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
           }
         }
       },
@@ -19383,6 +19580,69 @@
             "type": "string",
             "format": "binary",
             "nullable": false
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureCodeProtocol"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "UploadTooLarge",
+          "InvalidFileName",
+          "InvalidVariantFileName",
+          "EmptyBatch",
+          "DuplicateFlag",
+          "DeliveryModeConflict",
+          "BatchStorageFailed",
+          "BatchPersistenceFailed",
+          "ResourceIdConflict"
+        ],
+        "enum": [
+          "UploadTooLarge",
+          "InvalidFileName",
+          "InvalidVariantFileName",
+          "EmptyBatch",
+          "DuplicateFlag",
+          "DeliveryModeConflict",
+          "BatchStorageFailed",
+          "BatchPersistenceFailed",
+          "ResourceIdConflict"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationChallengeBankUploadRandomChallengeAttachmentBatchRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "downloadFileName",
+          "files"
+        ],
+        "properties": {
+          "downloadFileName": {
+            "type": "string",
+            "maxLength": 260,
+            "minLength": 0,
+            "nullable": false
+          },
+          "files": {
+            "type": "array",
+            "minLength": 1,
+            "nullable": false,
+            "items": {
+              "type": "string",
+              "format": "binary"
+            }
           }
         }
       }

@@ -275,6 +275,7 @@ PUT  /api/v1/admin/challenges/{challengeId}/permissions
 POST /api/v1/admin/challenges/{challengeId}/owner/transfer
 GET  /api/v1/admin/challenges/{challengeId}/attachments
 POST /api/v1/admin/challenges/{challengeId}/attachments
+POST /api/v1/admin/challenges/{challengeId}/attachments/random-batch
 DELETE /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}
 POST /api/v1/admin/challenges/{challengeId}/attachments/{attachmentId}/restore
 GET  /api/v1/admin/challenges/{challengeId}/flags

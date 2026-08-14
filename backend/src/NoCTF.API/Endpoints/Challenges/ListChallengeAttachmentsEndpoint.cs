@@ -17,8 +17,8 @@ public sealed class ListChallengeAttachmentsEndpoint(
         AuthSchemes("Bearer");
         Summary(summary =>
         {
-            summary.Summary = "Lists All-policy challenge attachments.";
-            summary.Description = "RandomOnePerTeam challenges deliberately return 404 from this route.";
+            summary.Summary = "Lists the player attachment delivery surface.";
+            summary.Description = "All returns every attachment; RandomOnePerTeam returns one assigned-download entry without exposing variants.";
         });
     }
 
@@ -33,6 +33,9 @@ public sealed class ListChallengeAttachmentsEndpoint(
         return items is null
             ? TypedResults.NotFound()
             : TypedResults.Ok(new ChallengeAttachmentListResponse(
-                items.Select(ChallengeAttachmentMapping.ToResponse).ToArray()));
+                ChallengeAttachmentMapping.ToProtocol(items.DeliveryPolicy),
+                items.Items.Select(item => ChallengeAttachmentMapping.ToResponse(
+                    item,
+                    includeProtectedFlag: false)).ToArray()));
     }
 }

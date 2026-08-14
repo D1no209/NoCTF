@@ -108,7 +108,7 @@ public sealed class AwdFullBoundaryTests
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { baseScore = 100, order = 0, isPublished = true, expectedRevision = challengeRevision },
+            new { customTitle = (string?)null, baseScore = 100, order = 0, isPublished = true, expectedRevision = challengeRevision },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -476,7 +476,7 @@ public sealed class AwdFullBoundaryTests
             client,
             HttpMethod.Post,
             $"/api/v1/competitions/{competitionId}/teams",
-            new { name = teamName },
+            new { name = teamName, trackKey = "default" },
             HttpStatusCode.Created,
             cancellationToken);
         return new(client, team.GetProperty("id").GetGuid());

@@ -18,7 +18,8 @@ public sealed record ChallengeFlagResponse(
     DateTimeOffset? ValidStart,
     DateTimeOffset? ValidUntil,
     DateTimeOffset? DeletedAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    bool SystemManaged);
 
 public sealed record ChallengeFlagListResponse(
     IReadOnlyList<ChallengeFlagResponse> Items,
@@ -40,7 +41,11 @@ internal static class ChallengeFlagMapping
                 ? null
                 : ChallengeTemplateMapper.ToProtocol(view.SpecificationKind.Value),
             view.SpecificationId,
-            view.ValidStart, view.ValidUntil, view.DeletedAt, view.CreatedAt);
+            view.ValidStart, view.ValidUntil, view.DeletedAt, view.CreatedAt,
+            view.TeamId is not null
+                || view.SpecificationKind is not null
+                || view.ValidStart is not null
+                || view.ValidUntil is not null);
 }
 
 public sealed class ListChallengeFlagsRequest

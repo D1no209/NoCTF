@@ -180,7 +180,7 @@ public sealed class GitOpsPersistenceContractTests
                 botId,
                 false,
                 true,
-                cancellationToken))!.Single().DeletedAt).IsNotNull();
+                cancellationToken))!.Items.Single().DeletedAt).IsNotNull();
             await Assert.That(await attachmentStore.RestoreAsync(
                 challengeId,
                 attachmentId,
@@ -214,7 +214,7 @@ public sealed class GitOpsPersistenceContractTests
                 botId,
                 false,
                 now,
-                cancellationToken)).IsTrue();
+                cancellationToken)).IsEqualTo(ChallengeFlagMutationState.Updated);
             await Assert.That((await flagStore.ListAsync(
                 flagScope,
                 botId,
@@ -227,7 +227,7 @@ public sealed class GitOpsPersistenceContractTests
                 botId,
                 false,
                 now,
-                cancellationToken)).IsTrue();
+                cancellationToken)).IsEqualTo(ChallengeFlagMutationState.Updated);
 
             var hintId = Guid.CreateVersion7(now.AddMilliseconds(7));
             var hintStore = new ChallengeHintStore(

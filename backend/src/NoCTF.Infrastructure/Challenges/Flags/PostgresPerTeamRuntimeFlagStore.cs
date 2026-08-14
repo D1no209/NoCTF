@@ -52,16 +52,16 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
                 (target, challenge) => new
                 {
                     target.Challenge.ChallengeId,
+                    target.Challenge.RulesJson,
                     target.Competition.FlagDerivationSecret,
-                    target.Competition.ConfigurationJson,
-                    challenge.DefinitionJson
+                    target.Competition.ConfigurationJson
                 })
             .SingleOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException(
                 "The competition challenge does not belong to the competition.");
         var template = CtfFlagTemplateResolver.Resolve(
             scope.ConfigurationJson,
-            scope.DefinitionJson);
+            scope.RulesJson);
         var flag = PerTeamFlagGenerator.Generate(
             template,
             new(

@@ -20,11 +20,11 @@ import {
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
   NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationResponse,
   NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
-  NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 import type { GameModeValue } from '~/utils/game-config'
@@ -144,11 +144,6 @@ const editingFlag = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeFla
 const flagForm = ref({
   flag: '',
   matchKind: 'Exact' as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
-  teamId: '',
-  specificationKind: '',
-  specificationId: '',
-  validStart: '',
-  validUntil: '',
 })
 const flagError = ref<string | null>(null)
 const savingFlag = ref(false)
@@ -156,6 +151,22 @@ const pendingFlagId = ref<string | null>(null)
 const usesRuntimeFlagInjection = computed(() =>
   competition.value?.mode === 'Ctf' && !flagsLoading.value && !flagsLoadError.value && !supportsRegularExpression.value,
 )
+const staticFlags = computed(() => flags.value.filter(flag => !flag.systemManaged))
+const systemFlags = computed(() => flags.value.filter(flag => flag.systemManaged))
+
+function challengeFlagErrorMessage(error: unknown): string {
+  const failure = error as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse
+  switch (failure.code) {
+    case 'InvalidFlag': return translate('Flag 内容无效')
+    case 'InvalidRegularExpression': return translate('Flag 正则表达式无效')
+    case 'RegularExpressionNotSupported': return translate('当前题目不支持正则 Flag')
+    case 'ManualFlagNotSupported': return translate('动态容器 Flag 由平台自动生成和注入')
+    case 'SystemManagedFlag': return translate('系统生成的动态 Flag 只读，不能手工修改')
+    case 'DeliveryModeConflict': return translate('普通附件或静态 Flag 不能与每队随机附件混用')
+    case 'ResourceIdConflict': return translate('Flag 资源标识冲突，请重新添加')
+    default: return parseApiError(error).message
+  }
+}
 
 async function loadFlags() {
   flagsLoading.value = true
@@ -184,11 +195,6 @@ function openFlagDialog(flag?: NoCtfapiEndpointsAdministrationChallengeBankChall
   flagForm.value = {
     flag: flag?.flag ?? '',
     matchKind: flag?.matchKind ?? 'Exact',
-    teamId: flag?.teamId ?? '',
-    specificationKind: flag?.specificationKind !== null && flag?.specificationKind !== undefined ? String(flag.specificationKind) : '',
-    specificationId: flag?.specificationId ?? '',
-    validStart: isoToLocalInput(flag?.validStart),
-    validUntil: isoToLocalInput(flag?.validUntil),
   }
   flagDialogOpen.value = true
 }
@@ -203,13 +209,6 @@ async function saveFlag() {
   const body = {
     flag: flagForm.value.flag,
     matchKind: flagForm.value.matchKind,
-    teamId: flagForm.value.teamId.trim() || null,
-    specificationKind: flagForm.value.specificationKind === ''
-      ? null
-      : flagForm.value.specificationKind as NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
-    specificationId: flagForm.value.specificationId.trim() || null,
-    validStart: localInputToIso(flagForm.value.validStart) ?? null,
-    validUntil: localInputToIso(flagForm.value.validUntil) ?? null,
   }
   try {
     const path = { competitionId, competitionChallengeId: ccId }
@@ -222,7 +221,7 @@ async function saveFlag() {
     await loadFlags()
   }
   catch (e) {
-    flagError.value = parseApiError(e).message
+    flagError.value = challengeFlagErrorMessage(e)
   }
   finally {
     savingFlag.value = false
@@ -241,7 +240,7 @@ async function deleteFlag(f: NoCtfapiEndpointsAdministrationChallengeBankChallen
     await loadFlags()
   }
   catch (e) {
-    toast.error(parseApiError(e).message)
+    toast.error(challengeFlagErrorMessage(e))
   }
   finally {
     pendingFlagId.value = null
@@ -260,7 +259,7 @@ async function restoreFlag(f: NoCtfapiEndpointsAdministrationChallengeBankChalle
     await loadFlags()
   }
   catch (e) {
-    toast.error(parseApiError(e).message)
+    toast.error(challengeFlagErrorMessage(e))
   }
   finally {
     pendingFlagId.value = null
@@ -495,47 +494,34 @@ onMounted(() => {
               <AlertDescription>{{ flagsLoadError }}</AlertDescription>
             </Alert>
             <Skeleton v-if="flagsLoading" class="h-32 w-full" />
-            <Empty v-else-if="!flagsLoadError && flags.length === 0" class="border border-dashed py-12">
+            <Empty v-else-if="!flagsLoadError && staticFlags.length === 0 && systemFlags.length === 0" class="border border-dashed py-12">
               <EmptyHeader>
                 <EmptyTitle>{{ $t('暂无 Flag') }}</EmptyTitle>
               </EmptyHeader>
             </Empty>
-            <Table v-else-if="flags.length > 0">
+            <Table v-if="!flagsLoading && staticFlags.length > 0">
               <TableHeader>
                 <TableRow>
                   <TableHead>Flag</TableHead>
-                  <TableHead>{{ $t('队伍') }}</TableHead>
-                  <TableHead>{{ $t('规格') }}</TableHead>
-                  <TableHead>{{ $t('有效期') }}</TableHead>
                   <TableHead>{{ $t('状态') }}</TableHead>
-                  <TableHead v-if="canWrite && !usesRuntimeFlagInjection" class="w-44 text-right">{{ $t('操作') }}</TableHead>
+                  <TableHead v-if="canWrite" class="w-44 text-right">{{ $t('操作') }}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-for="f in flags" :key="f.id" :class="{ 'opacity-60': f.deletedAt }">
+                <TableRow v-for="f in staticFlags" :key="f.id" :class="{ 'opacity-60': f.deletedAt }">
                   <TableCell class="max-w-64">
                     <div class="flex min-w-0 items-center gap-2">
                       <Badge variant="outline">
-                        {{ usesRuntimeFlagInjection ? $t('环境变量注入') : f.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
+                        {{ f.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
                       </Badge>
                       <span class="truncate font-mono text-xs">{{ f.flag }}</span>
                     </div>
-                  </TableCell>
-                  <TableCell class="font-mono text-xs">{{ f.teamId ?? $t('全部') }}</TableCell>
-                  <TableCell>
-                    <span v-if="f.specificationKind !== null && f.specificationKind !== undefined">
-                      {{ enumLabel(SpecificationKindLabel, f.specificationKind) }}
-                    </span>
-                    <span v-else>-</span>
-                  </TableCell>
-                  <TableCell class="font-mono text-xs tabular-nums">
-                    {{ adminFormatDateTime(f.validStart) }} ~ {{ adminFormatDateTime(f.validUntil) }}
                   </TableCell>
                   <TableCell>
                     <Badge v-if="f.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
                     <Badge v-else variant="secondary">{{ $t('有效') }}</Badge>
                   </TableCell>
-                  <TableCell v-if="canWrite && !usesRuntimeFlagInjection" class="text-right">
+                  <TableCell v-if="canWrite" class="text-right">
                     <div class="flex justify-end gap-1">
                       <template v-if="!f.deletedAt">
                         <Button variant="ghost" size="sm" :disabled="pendingFlagId === f.id" @click="openFlagDialog(f)">{{ $t('编辑') }}</Button>
@@ -547,6 +533,39 @@ onMounted(() => {
                 </TableRow>
               </TableBody>
             </Table>
+            <div v-if="!flagsLoading && systemFlags.length > 0" class="space-y-2">
+              <div>
+                <h3 class="text-sm font-semibold">{{ $t('系统生成的动态 Flag') }}</h3>
+                <p class="text-sm text-muted-foreground">{{ $t('由平台自动关联附件、队伍、轮次或运行环境，仅供查看。') }}</p>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Flag</TableHead>
+                    <TableHead>{{ $t('队伍') }}</TableHead>
+                    <TableHead>{{ $t('内部关联') }}</TableHead>
+                    <TableHead>{{ $t('有效期') }}</TableHead>
+                    <TableHead>{{ $t('状态') }}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="f in systemFlags" :key="f.id" :class="{ 'opacity-60': f.deletedAt }">
+                    <TableCell class="max-w-64 truncate font-mono text-xs" :title="f.flag">{{ f.flag }}</TableCell>
+                    <TableCell class="font-mono text-xs">{{ f.teamId ?? '—' }}</TableCell>
+                    <TableCell class="font-mono text-xs">
+                      {{ f.specificationKind ?? '—' }}<span v-if="f.specificationId"> · {{ f.specificationId }}</span>
+                    </TableCell>
+                    <TableCell class="font-mono text-xs tabular-nums">
+                      {{ adminFormatDateTime(f.validStart) }} ~ {{ adminFormatDateTime(f.validUntil) }}
+                    </TableCell>
+                    <TableCell>
+                      <Badge v-if="f.deletedAt" variant="destructive">{{ $t('已失效') }}</Badge>
+                      <Badge v-else variant="secondary">{{ $t('已注入') }}</Badge>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </TabsContent>
 
@@ -610,7 +629,7 @@ onMounted(() => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{{ editingFlag ? $t('编辑 Flag') : $t('添加 Flag') }}</DialogTitle>
-            <DialogDescription>{{ $t('队伍留空表示适用于全部队伍的静态 Flag') }}</DialogDescription>
+            <DialogDescription>{{ $t('普通静态 Flag 只需要选择匹配方式并填写内容。') }}</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <Alert v-if="flagError" variant="destructive">
@@ -645,42 +664,6 @@ onMounted(() => {
                 :placeholder="flagForm.matchKind === 'RegularExpression' ? 'flag\\{[0-9a-f-]{36}\\}' : 'flag{...}'"
               />
             </Field>
-            <Field>
-              <FieldLabel for="flag-team">{{ $t('队伍 ID(可选)') }}</FieldLabel>
-              <Input id="flag-team" v-model="flagForm.teamId" class="font-mono" :placeholder="$t('留空 = 全部队伍')" />
-            </Field>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel for="flag-spec-kind">{{ $t('规格类型(可选)') }}</FieldLabel>
-                <Select id="flag-spec-kind" v-model="flagForm.specificationKind">
-                  <SelectTrigger class="w-full">
-                    <SelectValue :placeholder="$t('无')" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="Attachment">{{ $t('附件') }}</SelectItem>
-                      <SelectItem value="AwdRound">{{ $t('AWD 轮次') }}</SelectItem>
-                      <SelectItem value="RuntimeDefinition">{{ $t('运行时定义') }}</SelectItem>
-                      <SelectItem value="Hint">{{ $t('提示') }}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel for="flag-spec-id">{{ $t('规格 ID(可选)') }}</FieldLabel>
-                <Input id="flag-spec-id" v-model="flagForm.specificationId" class="font-mono" />
-              </Field>
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldLabel for="flag-valid-start">{{ $t('生效时间(可选)') }}</FieldLabel>
-                <Input id="flag-valid-start" v-model="flagForm.validStart" type="datetime-local" />
-              </Field>
-              <Field>
-                <FieldLabel for="flag-valid-until">{{ $t('失效时间(可选)') }}</FieldLabel>
-                <Input id="flag-valid-until" v-model="flagForm.validUntil" type="datetime-local" />
-              </Field>
-            </div>
           </FieldGroup>
           <DialogFooter>
             <Button variant="outline" @click="flagDialogOpen = false">{{ $t('取消') }}</Button>

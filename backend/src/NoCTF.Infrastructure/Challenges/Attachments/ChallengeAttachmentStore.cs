@@ -1,6 +1,5 @@
 using NoCTF.Infrastructure.Persistence;
 using System.Security.Cryptography;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Challenges.Attachments;
 using NoCTF.Application.Storage;
@@ -15,14 +14,10 @@ namespace NoCTF.Infrastructure.Challenges.Attachments;
 
 public sealed class ChallengeAttachmentStore(
     NoCtfDbContext db,
-    TeamChallengeCriticalSection criticalSection,
     FileReferenceLock fileLock) : IChallengeAttachmentStore
 {
     public ChallengeAttachmentStore(NoCtfDbContext db)
-        : this(
-            db,
-            new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry()),
-            new FileReferenceLock()) { }
+        : this(db, new FileReferenceLock()) { }
 
     public Task<bool> CanWriteAsync(
         Guid challengeId,
@@ -39,7 +34,7 @@ public sealed class ChallengeAttachmentStore(
         db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
             .AnyAsync(item => item.Id == attachmentId, ct);
 
-    public async Task<IReadOnlyList<ChallengeAttachmentView>?> ListAdminAsync(
+    public async Task<ChallengeAttachmentSet?> ListAdminAsync(
         Guid challengeId,
         Guid actorId,
         bool isAdministrator,
@@ -50,10 +45,35 @@ public sealed class ChallengeAttachmentStore(
             .Include(item => item.Attachments)
             .ThenInclude(item => item.File)
             .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
-        return challenge is null
-            ? null
-            : challenge.Attachments.Where(item => includeDeleted || item.DeletedAt == null)
-                .OrderBy(item => item.CreatedAt).ThenBy(item => item.Id).Select(Map).ToArray();
+        if (challenge is null)
+            return null;
+        var flags = await (includeDeleted
+                ? db.ChallengeFlags.IgnoreQueryFilters()
+                : db.ChallengeFlags)
+            .AsNoTracking()
+            .Where(flag => flag.ChallengeId == challengeId
+                && flag.SpecificationKind == SpecificationKind.Attachment
+                && flag.SpecificationId != null
+                && flag.MatchKind == ChallengeFlagMatchKind.Exact)
+            .OrderBy(flag => flag.CreatedAt)
+            .ThenBy(flag => flag.Id)
+            .ToArrayAsync(ct);
+        var flagsByAttachment = flags
+            .GroupBy(flag => flag.SpecificationId!.Value)
+            .ToDictionary(group => group.Key, group => group.First().Flag);
+        var activeRandom = flags.Any(flag => flag.DeletedAt == null);
+        return new(
+            activeRandom
+                ? AttachmentDeliveryPolicy.RandomOnePerTeam
+                : AttachmentDeliveryPolicy.All,
+            challenge.Attachments.Where(item => includeDeleted || item.DeletedAt == null)
+                .OrderBy(item => item.CreatedAt)
+                .ThenBy(item => item.Id)
+                .Select(item => Map(
+                    item,
+                    item.File,
+                    flagsByAttachment.GetValueOrDefault(item.Id)))
+                .ToArray());
     }
 
     public async Task<AddChallengeAttachmentState> AddAsync(
@@ -66,10 +86,12 @@ public sealed class ChallengeAttachmentStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var challenge = await WriteAuthorized(actorId, isAdministrator)
-            .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
+        var challenge = await LockWritableChallengeAsync(
+            challengeId, actorId, isAdministrator, ct);
         if (challenge is null)
             return AddChallengeAttachmentState.ChallengeNotFound;
+        if (await HasRandomCandidatesAsync(challengeId, ct))
+            return AddChallengeAttachmentState.DeliveryModeConflict;
         if (await db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
                 .AnyAsync(item => item.Id == attachmentId, ct))
             return AddChallengeAttachmentState.ResourceIdConflict;
@@ -96,6 +118,97 @@ public sealed class ChallengeAttachmentStore(
         }
     }
 
+    public async Task<AddChallengeAttachmentState> AddRandomBatchAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        string downloadFileName,
+        IReadOnlyList<RandomAttachmentBatchEntry> entries,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var challenge = await LockWritableChallengeAsync(
+            challengeId, actorId, isAdministrator, ct);
+        if (challenge is null)
+            return AddChallengeAttachmentState.ChallengeNotFound;
+
+        var activeAttachments = await db.Set<ChallengeAttachment>().AsNoTracking()
+            .Where(attachment => attachment.ChallengeId == challengeId
+                && attachment.DeletedAt == null)
+            .Join(
+                db.Files.AsNoTracking(),
+                attachment => attachment.FileId,
+                file => file.Id,
+                (attachment, file) => new { attachment.Id, file.FileName })
+            .ToArrayAsync(ct);
+        var activeFlags = await db.ChallengeFlags.AsNoTracking()
+            .Where(flag => flag.ChallengeId == challengeId)
+            .ToArrayAsync(ct);
+        var candidateFlags = activeFlags.Where(flag =>
+                flag.SpecificationKind == SpecificationKind.Attachment
+                && flag.SpecificationId != null
+                && flag.MatchKind == ChallengeFlagMatchKind.Exact)
+            .ToArray();
+        if (activeFlags.Length != candidateFlags.Length
+            || activeAttachments.Any(attachment =>
+                candidateFlags.Count(flag => flag.SpecificationId == attachment.Id) != 1)
+            || activeAttachments.Any(attachment =>
+                !string.Equals(attachment.FileName, downloadFileName, StringComparison.Ordinal)))
+        {
+            return AddChallengeAttachmentState.DeliveryModeConflict;
+        }
+
+        var existingFlags = candidateFlags.Select(flag => flag.Flag)
+            .ToHashSet(StringComparer.Ordinal);
+        if (entries.Select(entry => entry.ExactFlag).Any(flag => !existingFlags.Add(flag)))
+            return AddChallengeAttachmentState.DuplicateFlag;
+        if (entries.Any(entry => entry.AttachmentId == Guid.Empty || entry.FileId == Guid.Empty)
+            || entries.Select(entry => entry.AttachmentId).Distinct().Count() != entries.Count
+            || entries.Select(entry => entry.FileId).Distinct().Count() != entries.Count
+            || await db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(attachment => entries.Select(entry => entry.AttachmentId)
+                    .Contains(attachment.Id), ct))
+        {
+            return AddChallengeAttachmentState.ResourceIdConflict;
+        }
+        foreach (var entry in entries)
+        {
+            if (!await fileLock.AcquireAsync(db, entry.FileId, ct))
+                return AddChallengeAttachmentState.ResourceIdConflict;
+        }
+
+        db.Set<ChallengeAttachment>().AddRange(entries.Select(entry => new ChallengeAttachment
+        {
+            Id = entry.AttachmentId,
+            ChallengeId = challengeId,
+            FileId = entry.FileId,
+            CreatedAt = entry.CreatedAt
+        }));
+        db.ChallengeFlags.AddRange(entries.Select(entry => new ChallengeFlag
+        {
+            Id = Guid.CreateVersion7(entry.CreatedAt),
+            ChallengeId = challengeId,
+            Flag = entry.ExactFlag,
+            FlagSha256 = NoCTF.Application.Challenges.Flags.ManageChallengeFlags.Hash(entry.ExactFlag),
+            MatchKind = ChallengeFlagMatchKind.Exact,
+            SpecificationKind = SpecificationKind.Attachment,
+            SpecificationId = entry.AttachmentId,
+            CreatedAt = entry.CreatedAt
+        }));
+        challenge.Revision = checked(challenge.Revision + 1);
+        challenge.UpdatedAt = entries.Max(entry => entry.CreatedAt);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+            return AddChallengeAttachmentState.Added;
+        }
+        catch (DbUpdateException)
+        {
+            return AddChallengeAttachmentState.ResourceIdConflict;
+        }
+    }
+
     public async Task<bool> DeleteAsync(
         Guid challengeId,
         Guid attachmentId,
@@ -105,16 +218,24 @@ public sealed class ChallengeAttachmentStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var challenge = await WriteAuthorized(actorId, isAdministrator)
-            .Include(item => item.Attachments)
-            .ThenInclude(item => item.File)
-            .SingleOrDefaultAsync(item => item.Id == challengeId, ct);
-        var attachment = challenge?.Attachments.SingleOrDefault(item =>
-            item.Id == attachmentId && item.DeletedAt == null);
+        var challenge = await LockWritableChallengeAsync(challengeId, actorId, isAdministrator, ct);
+        if (challenge is null)
+            return false;
+        var attachment = await db.Set<ChallengeAttachment>().SingleOrDefaultAsync(item =>
+            item.ChallengeId == challengeId
+            && item.Id == attachmentId, ct);
         if (attachment is null)
             return false;
         attachment.DeletedAt = now;
-        challenge!.Revision = checked(challenge.Revision + 1);
+        var linkedCandidates = await db.ChallengeFlags.Where(flag =>
+                flag.ChallengeId == challengeId
+                && flag.TeamId == null
+                && flag.SpecificationKind == SpecificationKind.Attachment
+                && flag.SpecificationId == attachmentId)
+            .ToArrayAsync(ct);
+        foreach (var candidate in linkedCandidates)
+            candidate.DeletedAt = now;
+        challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -130,31 +251,44 @@ public sealed class ChallengeAttachmentStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var challenge = await WriteAuthorized(actorId, isAdministrator, includeDeleted: true)
-            .Include(item => item.Attachments)
-            .ThenInclude(item => item.File)
-            .SingleOrDefaultAsync(item => item.Id == challengeId && item.DeletedAt == null, ct);
-        var attachment = challenge?.Attachments.SingleOrDefault(item =>
-            item.Id == attachmentId && item.DeletedAt != null);
+        var challenge = await LockWritableChallengeAsync(challengeId, actorId, isAdministrator, ct);
+        if (challenge is null)
+            return false;
+        var attachment = await db.Set<ChallengeAttachment>().IgnoreQueryFilters()
+            .SingleOrDefaultAsync(item =>
+                item.ChallengeId == challengeId
+                && item.Id == attachmentId
+                && item.DeletedAt != null, ct);
         if (attachment is null)
             return false;
         attachment.DeletedAt = null;
-        challenge!.Revision = checked(challenge.Revision + 1);
+        var linkedCandidates = await db.ChallengeFlags.IgnoreQueryFilters().Where(flag =>
+                flag.ChallengeId == challengeId
+                && flag.TeamId == null
+                && flag.SpecificationKind == SpecificationKind.Attachment
+                && flag.SpecificationId == attachmentId
+                && flag.DeletedAt != null)
+            .ToArrayAsync(ct);
+        foreach (var candidate in linkedCandidates)
+            candidate.DeletedAt = null;
+        challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return true;
     }
 
-    public async Task<IReadOnlyList<ChallengeAttachmentView>?> ListPlayerAsync(
+    public async Task<ChallengeAttachmentSet?> ListPlayerAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid userId,
         CancellationToken ct)
     {
         var scope = await ResolvePlayerScopeAsync(competitionId, competitionChallengeId, userId, ct);
-        if (scope is null || ReadPolicy(scope.ConfigurationJson) != AttachmentDeliveryPolicy.All)
+        if (scope is null)
             return null;
+        if (await HasRandomCandidatesAsync(scope.ChallengeId, ct))
+            return new(AttachmentDeliveryPolicy.RandomOnePerTeam, []);
         var attachments = await db.Challenges.AsNoTracking()
             .Where(challenge => challenge.Id == scope.ChallengeId)
             .SelectMany(challenge => challenge.Attachments)
@@ -165,7 +299,9 @@ public sealed class ChallengeAttachmentStore(
         var fileIds = attachments.Select(item => item.FileId).ToArray();
         var files = await db.Files.AsNoTracking().Where(file => fileIds.Contains(file.Id))
             .ToDictionaryAsync(file => file.Id, ct);
-        return attachments.Select(item => Map(item, files[item.FileId])).ToArray();
+        return new(
+            AttachmentDeliveryPolicy.All,
+            attachments.Select(item => Map(item, files[item.FileId])).ToArray());
     }
 
     public async Task<ChallengeAttachmentContent?> GetPlayerAsync(
@@ -173,28 +309,28 @@ public sealed class ChallengeAttachmentStore(
         Guid competitionChallengeId,
         Guid? attachmentId,
         Guid userId,
+        Func<string, CancellationToken, Task<bool>> objectExistsAsync,
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
         var scope = await ResolvePlayerScopeAsync(competitionId, competitionChallengeId, userId, ct);
         if (scope is null)
             return null;
-        var policy = ReadPolicy(scope.ConfigurationJson);
+        var policy = await HasRandomCandidatesAsync(scope.ChallengeId, ct)
+            ? AttachmentDeliveryPolicy.RandomOnePerTeam
+            : AttachmentDeliveryPolicy.All;
         if ((policy == AttachmentDeliveryPolicy.All) != attachmentId.HasValue)
             return null;
 
         Guid selectedId;
+        ChallengeFlag? pendingAssignment = null;
         if (attachmentId is Guid requested)
         {
             selectedId = requested;
         }
         else
         {
-            await using var assignmentLease = await criticalSection.AcquireAsync(
-                db,
-                scope.TeamId,
-                competitionChallengeId,
-                ct);
+            await AcquireCompetitionChallengeAssignmentLockAsync(competitionChallengeId, ct);
             var existing = await db.ChallengeFlags.SingleOrDefaultAsync(flag =>
                 flag.CompetitionChallengeId == competitionChallengeId &&
                 flag.TeamId == scope.TeamId &&
@@ -210,6 +346,7 @@ public sealed class ChallengeAttachmentStore(
                         flag.ChallengeId == scope.ChallengeId &&
                         flag.SpecificationKind == SpecificationKind.Attachment &&
                         flag.SpecificationId != null &&
+                        flag.MatchKind == ChallengeFlagMatchKind.Exact &&
                         db.Set<ChallengeAttachment>().Any(attachment =>
                             attachment.Id == flag.SpecificationId &&
                             attachment.ChallengeId == scope.ChallengeId &&
@@ -218,9 +355,21 @@ public sealed class ChallengeAttachmentStore(
                     .ToListAsync(ct);
                 if (candidates.Count == 0)
                     return null;
-                var selected = candidates[RandomNumberGenerator.GetInt32(candidates.Count)];
+                var assignedIds = await db.ChallengeFlags.AsNoTracking()
+                    .Where(flag => flag.CompetitionChallengeId == competitionChallengeId
+                        && flag.TeamId != null
+                        && flag.SpecificationKind == SpecificationKind.Attachment
+                        && flag.SpecificationId != null)
+                    .Select(flag => flag.SpecificationId!.Value)
+                    .Distinct()
+                    .ToArrayAsync(ct);
+                var unused = candidates.Where(candidate =>
+                        !assignedIds.Contains(candidate.SpecificationId!.Value))
+                    .ToArray();
+                var selectionPool = unused.Length > 0 ? unused : candidates.ToArray();
+                var selected = selectionPool[RandomNumberGenerator.GetInt32(selectionPool.Length)];
                 selectedId = selected.SpecificationId!.Value;
-                db.ChallengeFlags.Add(new ChallengeFlag
+                pendingAssignment = new ChallengeFlag
                 {
                     Id = Guid.CreateVersion7(),
                     CompetitionChallengeId = competitionChallengeId,
@@ -231,19 +380,25 @@ public sealed class ChallengeAttachmentStore(
                     SpecificationKind = SpecificationKind.Attachment,
                     SpecificationId = selectedId,
                     CreatedAt = DateTimeOffset.UtcNow
-                });
-                await db.SaveChangesAsync(ct);
+                };
             }
         }
 
-        var attachment = await db.Set<ChallengeAttachment>().AsNoTracking()
+        var attachment = await db.Set<ChallengeAttachment>().IgnoreQueryFilters().AsNoTracking()
             .Include(item => item.File)
             .SingleOrDefaultAsync(item =>
                 item.Id == selectedId &&
                 item.ChallengeId == scope.ChallengeId &&
-                item.DeletedAt == null, ct);
+                (policy == AttachmentDeliveryPolicy.RandomOnePerTeam || item.DeletedAt == null), ct);
         if (attachment is null)
             return null;
+        if (!await objectExistsAsync(attachment.File.ObjectKey, ct))
+            return null;
+        if (pendingAssignment is not null)
+        {
+            db.ChallengeFlags.Add(pendingAssignment);
+            await db.SaveChangesAsync(ct);
+        }
         await transaction.CommitAsync(ct);
         return new(Map(attachment), attachment.File.ObjectKey);
     }
@@ -288,30 +443,67 @@ public sealed class ChallengeAttachmentStore(
                 item.Competition.Status == CompetitionStatus.Running)
             .Select(item => new PlayerScope(
                 item.Team.Id,
-                item.Challenge.ChallengeId,
-                item.Challenge.RulesJson))
+                item.Challenge.ChallengeId))
             .SingleOrDefaultAsync(ct);
 
-    private static AttachmentDeliveryPolicy ReadPolicy(string json)
+    private Task<bool> HasRandomCandidatesAsync(Guid challengeId, CancellationToken ct) =>
+        db.ChallengeFlags.AsNoTracking().AnyAsync(flag =>
+            flag.ChallengeId == challengeId
+            && flag.SpecificationKind == SpecificationKind.Attachment
+            && flag.SpecificationId != null
+            && flag.MatchKind == ChallengeFlagMatchKind.Exact,
+            ct);
+
+    private async Task<Challenge?> LockWritableChallengeAsync(
+        Guid challengeId,
+        Guid actorId,
+        bool isAdministrator,
+        CancellationToken ct)
     {
-        using var document = JsonDocument.Parse(json);
-        if (!document.RootElement.TryGetProperty("attachmentPolicy", out var value) &&
-            !document.RootElement.TryGetProperty("AttachmentPolicy", out value))
-            return AttachmentDeliveryPolicy.All;
-        return Enum.TryParse<AttachmentDeliveryPolicy>(value.GetString(), true, out var policy)
-            ? policy
-            : AttachmentDeliveryPolicy.All;
+        var challenge = await db.Challenges
+            .FromSqlInterpolated($"SELECT * FROM challenges WHERE id = {challengeId} FOR UPDATE")
+            .SingleOrDefaultAsync(ct);
+        return challenge is not null
+            && (isAdministrator
+                || challenge.OwnerId == actorId
+                || challenge.ManagerIds.Contains(actorId))
+            ? challenge
+            : null;
     }
 
-    private static ChallengeAttachmentView Map(ChallengeAttachment attachment) => Map(attachment, attachment.File);
+    private async Task AcquireCompetitionChallengeAssignmentLockAsync(
+        Guid competitionChallengeId,
+        CancellationToken ct)
+    {
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        budget.CancelAfter(TimeSpan.FromSeconds(2));
+        try
+        {
+            var affected = await db.CompetitionChallenges
+                .Where(challenge => challenge.Id == competitionChallengeId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    challenge => challenge.CriticalSectionVersion,
+                    challenge => challenge.CriticalSectionVersion + 1), budget.Token);
+            if (affected != 1)
+                throw new DbUpdateConcurrencyException("The attachment assignment scope no longer exists.");
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new FeatureCriticalSectionTimeoutException("attachment-assignment");
+        }
+    }
+
+    private static ChallengeAttachmentView Map(ChallengeAttachment attachment) =>
+        Map(attachment, attachment.File, null);
 
     private static ChallengeAttachmentView Map(
         ChallengeAttachment attachment,
-        StoredFile file) =>
+        StoredFile file,
+        string? exactFlag = null) =>
         new(
             attachment.Id, attachment.ChallengeId, file.FileName,
             file.ContentType, file.ByteLength,
-            Convert.ToHexString(file.Sha256), attachment.DeletedAt, attachment.CreatedAt);
+            Convert.ToHexString(file.Sha256), exactFlag, attachment.DeletedAt, attachment.CreatedAt);
 
-    private sealed record PlayerScope(Guid TeamId, Guid ChallengeId, string ConfigurationJson);
+    private sealed record PlayerScope(Guid TeamId, Guid ChallengeId);
 }

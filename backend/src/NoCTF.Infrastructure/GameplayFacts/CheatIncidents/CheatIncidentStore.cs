@@ -156,8 +156,7 @@ public sealed class CheatIncidentStore(
         if (fact is null
             || fact.CompetitionId != command.CompetitionId
             || fact.FailureCode != GameplayFactFailureCode.ForeignTeamFlagDetected
-            || fact.TeamId is null
-            || fact.VictimTeamId is null)
+            || fact.TeamId is null)
         {
             return new(CheatIncidentResolutionFailure.NotFound);
         }
@@ -330,7 +329,6 @@ public sealed class CheatIncidentStore(
                 && fact.Result == GameplayFactResult.Rejected
                 && fact.FailureCode == GameplayFactFailureCode.ForeignTeamFlagDetected
                 && fact.TeamId != null
-                && fact.VictimTeamId != null
                 && fact.ActorUserId != null);
 
     private IQueryable<IncidentFact> ProjectFacts(IQueryable<GameplayFact> facts) =>
@@ -340,16 +338,19 @@ public sealed class CheatIncidentStore(
                 fact => fact.TeamId,
                 team => (Guid?)team.Id,
                 (fact, sourceTeam) => new { fact, sourceTeam })
-            .Join(
+            .GroupJoin(
                 db.Teams.IgnoreQueryFilters().AsNoTracking(),
                 item => item.fact.VictimTeamId,
                 team => (Guid?)team.Id,
-                (item, ownerTeam) => new
+                (item, ownerTeams) => new
                 {
                     item.fact,
                     item.sourceTeam,
-                    ownerTeam
+                    ownerTeams
                 })
+            .SelectMany(
+                item => item.ownerTeams.DefaultIfEmpty(),
+                (item, ownerTeam) => new { item.fact, item.sourceTeam, ownerTeam })
             .Join(
                 db.Users.AsNoTracking(),
                 item => item.fact.ActorUserId,
@@ -382,8 +383,8 @@ public sealed class CheatIncidentStore(
                     item.fact.Value!,
                     item.sourceTeam.Id,
                     item.sourceTeam.Name,
-                    item.ownerTeam.Id,
-                    item.ownerTeam.Name,
+                    item.ownerTeam == null ? null : item.ownerTeam.Id,
+                    item.ownerTeam == null ? null : item.ownerTeam.Name,
                     item.user.Id,
                     item.user.UserName,
                     item.competitionChallenge.Id,
@@ -579,8 +580,8 @@ public sealed class CheatIncidentStore(
         string Value,
         Guid SourceTeamId,
         string SourceTeamName,
-        Guid OwnerTeamId,
-        string OwnerTeamName,
+        Guid? OwnerTeamId,
+        string? OwnerTeamName,
         Guid ActorUserId,
         string SubmittedByUserName,
         Guid CompetitionChallengeId,

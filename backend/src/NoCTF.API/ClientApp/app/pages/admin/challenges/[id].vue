@@ -16,6 +16,7 @@ import {
   adminChallengeBankUpdatePermissions,
   adminChallengeBankUpdateTemplate,
   adminChallengeBankUploadAttachment,
+  adminChallengeBankUploadRandomAttachmentBatch,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
@@ -24,7 +25,9 @@ import type {
   NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeVisibilityProtocol,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
-  NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol,
+  NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse,
+  NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse,
 } from '~/api'
 import { challengeTemplateWriteErrorMessage } from '~/lib/challenge-template-error'
 import { defaultDefinitionJson, FlagSource, normalizeDefinitionJson } from '~/utils/game-config'
@@ -179,10 +182,26 @@ async function restoreTemplate(): Promise<void> {
 const attachments = ref<Attachment[]>([])
 const attachmentsLoading = ref(false)
 const attachmentsIncludeDeleted = ref(false)
+const attachmentDeliveryPolicy = ref<NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
 const uploading = ref(false)
 const uploadInput = ref<HTMLInputElement | null>(null)
+const randomBatchOpen = ref(false)
+const randomUploading = ref(false)
+const randomDownloadFileName = ref('challenge.zip')
+const randomFiles = ref<File[]>([])
+const randomUploadInput = ref<HTMLInputElement | null>(null)
 const deletingAttachment = ref<Attachment | null>(null)
 const attachmentActionPending = ref(false)
+
+function requestAttachmentDeliveryPolicy(value: unknown): void {
+  if (value !== 'All' && value !== 'RandomOnePerTeam') return
+  if (value === attachmentDeliveryPolicy.value) return
+  if (value === 'RandomOnePerTeam') {
+    randomBatchOpen.value = true
+    return
+  }
+  toast.info(translate('请先删除所有随机附件变体，系统将自动恢复全部附件模式'))
+}
 
 async function loadAttachments(): Promise<void> {
   attachmentsLoading.value = true
@@ -195,6 +214,7 @@ async function loadAttachments(): Promise<void> {
     toast.error(parseApiError(error).message)
     return
   }
+  attachmentDeliveryPolicy.value = data?.deliveryPolicy ?? 'All'
   attachments.value = data?.items ?? []
 }
 
@@ -204,21 +224,86 @@ watch(attachmentsIncludeDeleted, () => {
 
 async function uploadAttachment(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+  const files = [...(input.files ?? [])]
   input.value = ''
-  if (!file) return
+  if (files.length === 0) return
   uploading.value = true
-  const { error } = await adminChallengeBankUploadAttachment({
-    path: { challengeId },
-    body: { file },
-  })
+  let failed: unknown
+  for (const file of files) {
+    const { error } = await adminChallengeBankUploadAttachment({
+      path: { challengeId },
+      body: { file },
+    })
+    if (error) {
+      failed = error
+      break
+    }
+  }
   uploading.value = false
-  if (error) {
-    toast.error(parseApiError(error).message)
+  if (failed) {
+    toast.error(parseApiError(failed).message)
+    await loadAttachments()
     return
   }
-  toast.success(translate('已上传 {file}', { file: file.name }))
+  toast.success(translate('已上传 {count} 个附件', { count: files.length }))
   await loadAttachments()
+}
+
+function selectRandomFiles(event: Event): void {
+  const input = event.target as HTMLInputElement
+  randomFiles.value = [...(input.files ?? [])]
+  input.value = ''
+}
+
+async function uploadRandomBatch(): Promise<void> {
+  if (!randomDownloadFileName.value.trim() || randomFiles.value.length === 0) return
+  randomUploading.value = true
+  const { error } = await adminChallengeBankUploadRandomAttachmentBatch({
+    path: { challengeId },
+    body: {
+      downloadFileName: randomDownloadFileName.value,
+      files: randomFiles.value,
+    },
+  })
+  randomUploading.value = false
+  if (error) {
+    toast.error(randomAttachmentErrorMessage(error))
+    return
+  }
+  toast.success(translate('已创建 {count} 个随机附件变体', { count: randomFiles.value.length }))
+  randomFiles.value = []
+  randomBatchOpen.value = false
+  await Promise.all([loadAttachments(), loadFlags()])
+}
+
+function randomAttachmentErrorMessage(error: unknown): string {
+  const failure = error as NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse
+  switch (failure.code) {
+    case 'UploadTooLarge': return translate('某个附件变体超过上传大小限制')
+    case 'InvalidFileName': return translate('统一下载文件名无效')
+    case 'InvalidVariantFileName': return translate('原始文件名不是有效的精确 Flag')
+    case 'EmptyBatch': return translate('请至少选择一个附件变体')
+    case 'DuplicateFlag': return translate('附件变体的 Flag 必须唯一')
+    case 'DeliveryModeConflict': return translate('普通附件或静态 Flag 不能与每队随机附件混用')
+    case 'BatchStorageFailed': return translate('附件存储失败，整批未生效')
+    case 'BatchPersistenceFailed': return translate('附件批次保存失败，整批未生效')
+    case 'ResourceIdConflict': return translate('附件资源标识冲突，请重新上传')
+    default: return parseApiError(error).message
+  }
+}
+
+function challengeFlagErrorMessage(error: unknown): string {
+  const failure = error as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse
+  switch (failure.code) {
+    case 'InvalidFlag': return translate('Flag 内容无效')
+    case 'InvalidRegularExpression': return translate('Flag 正则表达式无效')
+    case 'RegularExpressionNotSupported': return translate('当前题目不支持正则 Flag')
+    case 'ManualFlagNotSupported': return translate('动态容器 Flag 由平台自动生成和注入')
+    case 'SystemManagedFlag': return translate('系统生成的动态 Flag 只读，不能手工修改')
+    case 'DeliveryModeConflict': return translate('普通附件或静态 Flag 不能与每队随机附件混用')
+    case 'ResourceIdConflict': return translate('Flag 资源标识冲突，请重新添加')
+    default: return parseApiError(error).message
+  }
 }
 
 async function confirmDeleteAttachment(): Promise<void> {
@@ -235,7 +320,7 @@ async function confirmDeleteAttachment(): Promise<void> {
   }
   deletingAttachment.value = null
   toast.success(translate("附件已删除"))
-  await loadAttachments()
+  await Promise.all([loadAttachments(), loadFlags()])
 }
 
 async function restoreAttachment(attachment: Attachment): Promise<void> {
@@ -250,7 +335,7 @@ async function restoreAttachment(attachment: Attachment): Promise<void> {
     return
   }
   toast.success(translate("附件已恢复"))
-  await loadAttachments()
+  await Promise.all([loadAttachments(), loadFlags()])
 }
 
 function formatBytes(value?: number): string {
@@ -270,21 +355,12 @@ const flagCreating = ref(false)
 const flagForm = reactive({
   flag: '',
   matchKind: 'Exact' as NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol,
-  teamId: '',
-  specificationKind: '',
-  specificationId: '',
-  validStart: '',
-  validUntil: '',
 })
 const deletingFlag = ref<Flag | null>(null)
 const flagActionPending = ref(false)
 
-const SPECIFICATION_KINDS = [
-  { value: 'Attachment', label: '附件' },
-  { value: 'AwdRound', label: 'AWD 轮次' },
-  { value: 'RuntimeDefinition', label: '运行时定义' },
-  { value: 'Hint', label: '提示' },
-] as const
+const staticFlags = computed(() => flags.value.filter(flag => !flag.systemManaged))
+const systemFlags = computed(() => flags.value.filter(flag => flag.systemManaged))
 
 async function loadFlags(): Promise<void> {
   flagsLoading.value = true
@@ -310,18 +386,7 @@ watch(flagsIncludeDeleted, () => {
 function openFlagCreate(): void {
   flagForm.flag = ''
   flagForm.matchKind = 'Exact'
-  flagForm.teamId = ''
-  flagForm.specificationKind = ''
-  flagForm.specificationId = ''
-  flagForm.validStart = ''
-  flagForm.validUntil = ''
   flagCreateOpen.value = true
-}
-
-function toIso(local: string): string | null {
-  if (!local) return null
-  const date = new Date(local)
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
 }
 
 async function createFlag(): Promise<void> {
@@ -335,18 +400,11 @@ async function createFlag(): Promise<void> {
     body: {
       flag: flagForm.flag,
       matchKind: flagForm.matchKind,
-      teamId: flagForm.teamId.trim() || null,
-      specificationKind: flagForm.specificationKind === ''
-        ? null
-        : flagForm.specificationKind as NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
-      specificationId: flagForm.specificationId.trim() || null,
-      validStart: toIso(flagForm.validStart),
-      validUntil: toIso(flagForm.validUntil),
     },
   })
   flagCreating.value = false
   if (error) {
-    toast.error(parseApiError(error).message)
+    toast.error(challengeFlagErrorMessage(error))
     return
   }
   flagCreateOpen.value = false
@@ -363,7 +421,7 @@ async function confirmDeleteFlag(): Promise<void> {
   })
   flagActionPending.value = false
   if (error) {
-    toast.error(parseApiError(error).message)
+    toast.error(challengeFlagErrorMessage(error))
     return
   }
   deletingFlag.value = null
@@ -379,17 +437,11 @@ async function restoreFlag(flag: Flag): Promise<void> {
   })
   flagActionPending.value = false
   if (error) {
-    toast.error(parseApiError(error).message)
+    toast.error(challengeFlagErrorMessage(error))
     return
   }
   toast.success(translate("Flag 已恢复"))
   await loadFlags()
-}
-
-function specificationKindLabel(kind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null): string {
-  if (kind === null || kind === undefined) return '—'
-  const label = SPECIFICATION_KINDS.find(item => item.value === kind)?.label
-  return label ? translate(label) : String(kind)
 }
 
 // ---------- 权限 ----------
@@ -666,21 +718,60 @@ onMounted(() => {
 
           <TabsContent value="attachments">
             <Card>
-              <CardHeader class="flex flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-2">
-                  <Switch id="attachments-include-deleted" v-model="attachmentsIncludeDeleted" />
-                  <Label for="attachments-include-deleted">{{ $t('显示已删除') }}</Label>
+              <CardHeader class="gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <CardTitle>{{ $t('附件交付') }}</CardTitle>
+                    <CardDescription>
+                      {{ attachmentDeliveryPolicy === 'RandomOnePerTeam'
+                        ? $t('每支队伍首次下载时固定获得一个随机附件变体。')
+                        : $t('选手可以查看并下载全部普通附件。') }}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline">
+                    {{ attachmentDeliveryPolicy === 'RandomOnePerTeam' ? $t('每队随机一个') : $t('全部附件') }}
+                  </Badge>
                 </div>
-                <div>
-                  <input
-                    ref="uploadInput"
-                    type="file"
-                    class="hidden"
-                    @change="uploadAttachment"
-                  >
-                  <Button :disabled="uploading || isDeleted" @click="uploadInput?.click()">
-                    <Spinner v-if="uploading" data-icon="inline-start" />
-                    <Upload v-else data-icon="inline-start" /> {{ $t('上传附件') }} </Button>
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                  <div class="flex items-center gap-2">
+                    <Switch id="attachments-include-deleted" v-model="attachmentsIncludeDeleted" />
+                    <Label for="attachments-include-deleted">{{ $t('显示已删除') }}</Label>
+                  </div>
+                  <div class="flex flex-wrap items-end gap-2">
+                    <div class="grid min-w-48 gap-1.5">
+                      <Label for="attachment-delivery-policy">{{ $t('交付模式') }}</Label>
+                      <Select
+                        :model-value="attachmentDeliveryPolicy"
+                        :disabled="isDeleted || uploading || randomUploading"
+                        @update:model-value="requestAttachmentDeliveryPolicy"
+                      >
+                        <SelectTrigger id="attachment-delivery-policy" class="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">{{ $t('全部附件') }}</SelectItem>
+                          <SelectItem value="RandomOnePerTeam">{{ $t('每队随机一个') }}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <template v-if="attachmentDeliveryPolicy === 'All'">
+                      <input ref="uploadInput" type="file" multiple class="hidden" @change="uploadAttachment">
+                      <Button :disabled="uploading || isDeleted" @click="uploadInput?.click()">
+                        <Spinner v-if="uploading" data-icon="inline-start" />
+                        <Upload v-else data-icon="inline-start" /> {{ $t('上传普通附件') }}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        :disabled="isDeleted || attachments.some(item => !item.deletedAt)"
+                        @click="randomBatchOpen = true"
+                      >
+                        {{ $t('创建每队随机附件') }}
+                      </Button>
+                    </template>
+                    <Button v-else :disabled="isDeleted" @click="randomBatchOpen = true">
+                      {{ $t('上传随机附件批次') }}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -697,7 +788,8 @@ onMounted(() => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>{{ $t('文件名') }}</TableHead>
-                      <TableHead>{{ $t('类型') }}</TableHead>
+                      <TableHead v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'">{{ $t('精确 Flag') }}</TableHead>
+                      <TableHead v-else>{{ $t('类型') }}</TableHead>
                       <TableHead>{{ $t('大小') }}</TableHead>
                       <TableHead>{{ $t('上传时间') }}</TableHead>
                       <TableHead>{{ $t('状态') }}</TableHead>
@@ -712,7 +804,10 @@ onMounted(() => {
                           {{ attachment.fileName }}
                         </span>
                       </TableCell>
-                      <TableCell class="text-muted-foreground">{{ attachment.contentType }}</TableCell>
+                      <TableCell v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'" class="font-mono text-sm">
+                        {{ attachment.exactFlag ?? '—' }}
+                      </TableCell>
+                      <TableCell v-else class="text-muted-foreground">{{ attachment.contentType }}</TableCell>
                       <TableCell>{{ formatBytes(attachment.byteLength) }}</TableCell>
                       <TableCell>
                         <AdminDateTime :value="attachment.createdAt" />
@@ -763,50 +858,39 @@ onMounted(() => {
                 <div v-if="flagsLoading" class="flex flex-col gap-2">
                   <Skeleton v-for="i in 3" :key="i" class="h-10 w-full" />
                 </div>
-                <Empty v-else-if="flags.length === 0">
+                <Empty v-else-if="staticFlags.length === 0 && systemFlags.length === 0">
                   <EmptyHeader>
                     <EmptyTitle>{{ $t('暂无 Flag') }}</EmptyTitle>
                     <EmptyDescription v-if="!usesRuntimeFlagInjection">{{ $t('添加模板级静态 Flag。') }}</EmptyDescription>
                     <EmptyDescription v-else>{{ $t('动态 Flag 将在队伍启动容器时自动生成。') }}</EmptyDescription>
                   </EmptyHeader>
                 </Empty>
-                <Table v-else>
+                <div v-else class="space-y-6">
+                  <section v-if="staticFlags.length > 0" class="space-y-2">
+                    <h3 class="text-sm font-semibold">{{ $t('静态 Flag') }}</h3>
+                    <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Flag</TableHead>
-                      <TableHead>{{ $t('规格') }}</TableHead>
-                      <TableHead>{{ $t('有效期') }}</TableHead>
                       <TableHead>{{ $t('状态') }}</TableHead>
-                      <TableHead v-if="!usesRuntimeFlagInjection" class="text-right">{{ $t('操作') }}</TableHead>
+                      <TableHead class="text-right">{{ $t('操作') }}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow v-for="flag in flags" :key="flag.id">
+                    <TableRow v-for="flag in staticFlags" :key="flag.id">
                       <TableCell class="max-w-md" :title="flag.flag">
                         <div class="flex min-w-0 items-center gap-2">
                           <Badge variant="outline">
-                            {{ usesRuntimeFlagInjection ? $t('环境变量注入') : flag.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
+                            {{ flag.matchKind === 'RegularExpression' ? $t('正则匹配') : $t('精确匹配') }}
                           </Badge>
                           <span class="truncate font-mono text-sm">{{ flag.flag }}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge v-if="flag.specificationKind !== null && flag.specificationKind !== undefined" variant="outline">
-                          {{ specificationKindLabel(flag.specificationKind) }}
-                        </Badge>
-                        <span v-else class="text-muted-foreground">—</span>
-                      </TableCell>
-                      <TableCell class="text-sm text-muted-foreground">
-                        <template v-if="flag.validStart || flag.validUntil">
-                          <AdminDateTime :value="flag.validStart" /> {{ $t('至') }} <AdminDateTime :value="flag.validUntil" />
-                        </template>
-                        <span v-else>{{ $t('长期有效') }}</span>
-                      </TableCell>
-                      <TableCell>
                         <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
                         <Badge v-else variant="secondary">{{ $t('正常') }}</Badge>
                       </TableCell>
-                      <TableCell v-if="!usesRuntimeFlagInjection" class="text-right">
+                      <TableCell class="text-right">
                         <Button
                           v-if="flag.deletedAt"
                           size="sm"
@@ -818,7 +902,46 @@ onMounted(() => {
                       </TableCell>
                     </TableRow>
                   </TableBody>
-                </Table>
+                    </Table>
+                  </section>
+
+                  <section v-if="systemFlags.length > 0" class="space-y-2">
+                    <div>
+                      <h3 class="text-sm font-semibold">{{ $t('系统生成的动态 Flag') }}</h3>
+                      <p class="text-sm text-muted-foreground">{{ $t('由平台自动关联附件、队伍、轮次或运行环境，仅供查看。') }}</p>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Flag</TableHead>
+                          <TableHead>{{ $t('队伍') }}</TableHead>
+                          <TableHead>{{ $t('内部关联') }}</TableHead>
+                          <TableHead>{{ $t('有效期') }}</TableHead>
+                          <TableHead>{{ $t('状态') }}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        <TableRow v-for="flag in systemFlags" :key="flag.id">
+                          <TableCell class="max-w-md truncate font-mono text-sm" :title="flag.flag">{{ flag.flag }}</TableCell>
+                          <TableCell class="font-mono text-xs">{{ flag.teamId ?? '—' }}</TableCell>
+                          <TableCell class="font-mono text-xs">
+                            {{ flag.specificationKind ?? '—' }}<span v-if="flag.specificationId"> · {{ flag.specificationId }}</span>
+                          </TableCell>
+                          <TableCell class="text-sm text-muted-foreground">
+                            <template v-if="flag.validStart || flag.validUntil">
+                              <AdminDateTime :value="flag.validStart" /> {{ $t('至') }} <AdminDateTime :value="flag.validUntil" />
+                            </template>
+                            <span v-else>{{ $t('长期有效') }}</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge v-if="flag.deletedAt" variant="destructive">{{ $t('已失效') }}</Badge>
+                            <Badge v-else variant="secondary">{{ $t('已注入') }}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </section>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -900,6 +1023,41 @@ onMounted(() => {
       </AlertDialogContent>
     </AlertDialog>
 
+    <Dialog v-model:open="randomBatchOpen">
+      <DialogContent class="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{{ $t('每队随机附件') }}</DialogTitle>
+          <DialogDescription>{{ $t('原始文件名将完整解析为精确 Flag；选手只会看到统一下载文件名。') }}</DialogDescription>
+        </DialogHeader>
+        <FieldGroup>
+          <Field>
+            <FieldLabel for="random-download-name">{{ $t('选手下载文件名') }}</FieldLabel>
+            <Input id="random-download-name" v-model="randomDownloadFileName" placeholder="challenge.zip" />
+          </Field>
+          <Field>
+            <FieldLabel>{{ $t('附件变体') }}</FieldLabel>
+            <input ref="randomUploadInput" type="file" multiple class="hidden" @change="selectRandomFiles">
+            <Button variant="outline" :disabled="randomUploading" @click="randomUploadInput?.click()">
+              <Upload data-icon="inline-start" /> {{ $t('选择多个文件') }}
+            </Button>
+            <FieldDescription>{{ $t('已选择 {count} 个变体；批次内原始文件名必须唯一。', { count: randomFiles.length }) }}</FieldDescription>
+            <div v-if="randomFiles.length" class="max-h-56 overflow-auto rounded-md border p-3">
+              <div v-for="file in randomFiles" :key="`${file.name}-${file.size}-${file.lastModified}`" class="flex justify-between gap-4 py-1 text-sm">
+                <span class="truncate font-mono">{{ file.name }}</span>
+                <span class="shrink-0 text-muted-foreground">{{ formatBytes(file.size) }}</span>
+              </div>
+            </div>
+          </Field>
+        </FieldGroup>
+        <DialogFooter>
+          <Button variant="outline" :disabled="randomUploading" @click="randomBatchOpen = false">{{ $t('取消') }}</Button>
+          <Button :disabled="randomUploading || !randomDownloadFileName.trim() || randomFiles.length === 0" @click="uploadRandomBatch">
+            <Spinner v-if="randomUploading" data-icon="inline-start" /> {{ $t('上传整个批次') }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
     <Dialog v-model:open="flagCreateOpen">
       <DialogContent>
         <DialogHeader>
@@ -936,41 +1094,6 @@ onMounted(() => {
               :placeholder="flagForm.matchKind === 'RegularExpression' ? 'flag\\{[0-9a-f-]{36}\\}' : 'flag{...}'"
             />
           </Field>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel for="flag-spec-kind">{{ $t('规格类型(可选)') }}</FieldLabel>
-              <Select v-model="flagForm.specificationKind">
-                <SelectTrigger id="flag-spec-kind" class="w-full">
-                  <SelectValue :placeholder="$t('无')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem v-for="kind in SPECIFICATION_KINDS" :key="kind.value" :value="kind.value">
-                      {{ $t(kind.label) }}
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field>
-              <FieldLabel for="flag-spec-id">{{ $t('规格 ID(可选)') }}</FieldLabel>
-              <Input id="flag-spec-id" v-model="flagForm.specificationId" class="font-mono text-sm" />
-            </Field>
-          </div>
-          <Field>
-            <FieldLabel for="flag-team">{{ $t('队伍 ID(可选,AWD/AWDP 队伍专属)') }}</FieldLabel>
-            <Input id="flag-team" v-model="flagForm.teamId" class="font-mono text-sm" />
-          </Field>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel for="flag-valid-start">{{ $t('生效时间(可选)') }}</FieldLabel>
-              <Input id="flag-valid-start" v-model="flagForm.validStart" type="datetime-local" />
-            </Field>
-            <Field>
-              <FieldLabel for="flag-valid-until">{{ $t('失效时间(可选)') }}</FieldLabel>
-              <Input id="flag-valid-until" v-model="flagForm.validUntil" type="datetime-local" />
-            </Field>
-          </div>
         </FieldGroup>
         <DialogFooter>
           <Button variant="outline" @click="flagCreateOpen = false">{{ $t('取消') }}</Button>

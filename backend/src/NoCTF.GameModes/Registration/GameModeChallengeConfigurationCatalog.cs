@@ -133,8 +133,8 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
         new HashSet<string>(
             mode switch
             {
-                GameMode.Ctf => ["runtime", "flagTemplate"],
-                GameMode.Awd => ["runtime", "checker", "flagInjection", "flagTemplate"],
+                GameMode.Ctf => ["runtime"],
+                GameMode.Awd => ["runtime", "checker", "flagInjection"],
                 GameMode.Awdp =>
                 [
                     "runtime",
@@ -159,7 +159,8 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     "bloodRewards",
                     "maxFlagAttempts",
                     "scoreExpression",
-                    "wrongSubmissionPenalty"
+                    "wrongSubmissionPenalty",
+                    "flagTemplate"
                 ],
                 GameMode.Awd =>
                 [
@@ -168,7 +169,8 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     "victimDefensePoolPoints",
                     "checkerIntervalSeconds",
                     "serviceHealthyPoints",
-                    "serviceUnhealthyPenalty"
+                    "serviceUnhealthyPenalty",
+                    "flagTemplate"
                 ],
                 GameMode.Awdp =>
                 [

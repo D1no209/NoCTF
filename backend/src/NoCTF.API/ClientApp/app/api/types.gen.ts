@@ -585,8 +585,11 @@ export type NoCtfapiEndpointsChallengesGetChallengeRequest = {
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentListResponse = {
+    deliveryPolicy?: NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol;
     items?: Array<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse>;
 };
+
+export type NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol = 'All' | 'RandomOnePerTeam';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse = {
     id?: string;
@@ -595,6 +598,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentRespo
     contentType?: string;
     byteLength?: number;
     sha256?: string;
+    exactFlag?: string | null;
     deletedAt?: string | null;
     createdAt?: string;
 };
@@ -1523,8 +1527,8 @@ export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentDetailResp
     value?: string;
     sourceTeamId?: string;
     sourceTeamName?: string;
-    ownerTeamId?: string;
-    ownerTeamName?: string;
+    ownerTeamId?: string | null;
+    ownerTeamName?: string | null;
     actorUserId?: string;
     submittedByUserName?: string;
     competitionChallengeId?: string;
@@ -1566,8 +1570,8 @@ export type NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentListItemRe
     gameplayFactId?: string;
     sourceTeamId?: string;
     sourceTeamName?: string;
-    ownerTeamId?: string;
-    ownerTeamName?: string;
+    ownerTeamId?: string | null;
+    ownerTeamName?: string | null;
     actorUserId?: string;
     submittedByUserName?: string;
     competitionChallengeId?: string;
@@ -1616,21 +1620,24 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = 
     validUntil?: string | null;
     deletedAt?: string | null;
     createdAt?: string;
+    systemManaged?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint';
 
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse = {
+    code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol;
+    message?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol = 'InvalidFlag' | 'InvalidRegularExpression' | 'RegularExpressionNotSupported' | 'InvalidSpecification' | 'InvalidValidityWindow' | 'InvalidTemplateFlagScope' | 'ResourceIdConflict' | 'ManualFlagNotSupported' | 'SystemManagedFlag' | 'DeliveryModeConflict';
+
 export type NoCtfapiEndpointsAdministrationChallengeBankSaveChallengeFlagRequest = {
     id?: string | null;
-    teamId?: string | null;
     flag: string;
     matchKind?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol;
-    specificationKind?: NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol | null;
-    specificationId?: string | null;
-    validStart?: string | null;
-    validUntil?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesChallengeHintResponse = {
@@ -1798,6 +1805,18 @@ export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeTemplateP
 export type NoCtfapiEndpointsAdministrationChallengeBankUploadChallengeAttachmentRequest = {
     id?: string | null;
     file: Blob | File;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse = {
+    code?: NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureCodeProtocol;
+    message?: string;
+};
+
+export type NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureCodeProtocol = 'UploadTooLarge' | 'InvalidFileName' | 'InvalidVariantFileName' | 'EmptyBatch' | 'DuplicateFlag' | 'DeliveryModeConflict' | 'BatchStorageFailed' | 'BatchPersistenceFailed' | 'ResourceIdConflict';
+
+export type NoCtfapiEndpointsAdministrationChallengeBankUploadRandomChallengeAttachmentBatchRequest = {
+    downloadFileName: string;
+    files: Array<Blob | File>;
 };
 
 export type HealthEndpointData = {
@@ -7462,6 +7481,7 @@ export type AdminCreateCompetitionChallengeFlagErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
 };
 
 export type AdminCreateCompetitionChallengeFlagError = AdminCreateCompetitionChallengeFlagErrors[keyof AdminCreateCompetitionChallengeFlagErrors];
@@ -7695,7 +7715,10 @@ export type AdminDeleteCompetitionChallengeFlagErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
 };
+
+export type AdminDeleteCompetitionChallengeFlagError = AdminDeleteCompetitionChallengeFlagErrors[keyof AdminDeleteCompetitionChallengeFlagErrors];
 
 export type AdminDeleteCompetitionChallengeFlagResponses = {
     /**
@@ -7771,6 +7794,7 @@ export type AdminUpdateCompetitionChallengeFlagErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
 };
 
 export type AdminUpdateCompetitionChallengeFlagError = AdminUpdateCompetitionChallengeFlagErrors[keyof AdminUpdateCompetitionChallengeFlagErrors];
@@ -8039,7 +8063,10 @@ export type AdminRestoreCompetitionChallengeFlagErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
 };
+
+export type AdminRestoreCompetitionChallengeFlagError = AdminRestoreCompetitionChallengeFlagErrors[keyof AdminRestoreCompetitionChallengeFlagErrors];
 
 export type AdminRestoreCompetitionChallengeFlagResponses = {
     /**
@@ -8146,6 +8173,7 @@ export type AdminChallengeBankCreateFlagErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
 };
 
 export type AdminChallengeBankCreateFlagError = AdminChallengeBankCreateFlagErrors[keyof AdminChallengeBankCreateFlagErrors];
@@ -8279,7 +8307,10 @@ export type AdminChallengeBankDeleteFlagErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
 };
+
+export type AdminChallengeBankDeleteFlagError = AdminChallengeBankDeleteFlagErrors[keyof AdminChallengeBankDeleteFlagErrors];
 
 export type AdminChallengeBankDeleteFlagResponses = {
     /**
@@ -8353,6 +8384,7 @@ export type AdminChallengeBankUpdateFlagErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
 };
 
 export type AdminChallengeBankUpdateFlagError = AdminChallengeBankUpdateFlagErrors[keyof AdminChallengeBankUpdateFlagErrors];
@@ -8606,7 +8638,10 @@ export type AdminChallengeBankRestoreFlagErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse;
 };
+
+export type AdminChallengeBankRestoreFlagError = AdminChallengeBankRestoreFlagErrors[keyof AdminChallengeBankRestoreFlagErrors];
 
 export type AdminChallengeBankRestoreFlagResponses = {
     /**
@@ -8732,3 +8767,43 @@ export type AdminChallengeBankUpdatePermissionsResponses = {
 };
 
 export type AdminChallengeBankUpdatePermissionsResponse = AdminChallengeBankUpdatePermissionsResponses[keyof AdminChallengeBankUpdatePermissionsResponses];
+
+export type AdminChallengeBankUploadRandomAttachmentBatchData = {
+    body: NoCtfapiEndpointsAdministrationChallengeBankUploadRandomChallengeAttachmentBatchRequest;
+    path: {
+        challengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/challenges/{challengeId}/attachments/random-batch';
+};
+
+export type AdminChallengeBankUploadRandomAttachmentBatchErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFailureResponse;
+};
+
+export type AdminChallengeBankUploadRandomAttachmentBatchError = AdminChallengeBankUploadRandomAttachmentBatchErrors[keyof AdminChallengeBankUploadRandomAttachmentBatchErrors];
+
+export type AdminChallengeBankUploadRandomAttachmentBatchResponses = {
+    /**
+     * Created
+     */
+    201: NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentListResponse;
+};
+
+export type AdminChallengeBankUploadRandomAttachmentBatchResponse = AdminChallengeBankUploadRandomAttachmentBatchResponses[keyof AdminChallengeBankUploadRandomAttachmentBatchResponses];

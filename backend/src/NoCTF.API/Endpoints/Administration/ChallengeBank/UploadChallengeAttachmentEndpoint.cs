@@ -77,7 +77,8 @@ public sealed class UploadChallengeAttachmentEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
             return TypedResults.Problem(
-                statusCode: result.FailureCode == ChallengeAttachmentFailureCode.ResourceIdConflict
+                statusCode: result.FailureCode is ChallengeAttachmentFailureCode.ResourceIdConflict
+                    or ChallengeAttachmentFailureCode.DeliveryModeConflict
                     ? StatusCodes.Status409Conflict
                     : StatusCodes.Status400BadRequest,
                 title: "Attachment was not uploaded.",

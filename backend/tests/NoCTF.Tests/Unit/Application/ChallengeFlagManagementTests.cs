@@ -20,6 +20,9 @@ public sealed class ChallengeFlagManagementTests
         store.SupportsRegularExpressionAsync(
                 command.Scope, actorId, false, Arg.Any<CancellationToken>())
             .Returns(true);
+        store.SupportsManualStaticFlagsAsync(
+                command.Scope, actorId, false, Arg.Any<CancellationToken>())
+            .Returns(true);
         store.SaveAsync(command, actorId, false, Arg.Any<CancellationToken>())
             .Returns(new ChallengeFlagSaveResult(saved));
 
@@ -40,6 +43,9 @@ public sealed class ChallengeFlagManagementTests
         var actorId = Guid.NewGuid();
         var invalid = Command(challengeId, "(?=unsupported-lookahead)flag");
         var dynamic = Command(challengeId, @"flag\{.*\}");
+        store.SupportsManualStaticFlagsAsync(
+                Arg.Any<ChallengeFlagScope>(), actorId, false, Arg.Any<CancellationToken>())
+            .Returns(true);
         store.SupportsRegularExpressionAsync(
                 dynamic.Scope, actorId, false, Arg.Any<CancellationToken>())
             .Returns(false);
@@ -52,6 +58,57 @@ public sealed class ChallengeFlagManagementTests
             .IsEqualTo(ChallengeFlagFailureCode.InvalidRegularExpression);
         await Assert.That(dynamicResult.FailureCode)
             .IsEqualTo(ChallengeFlagFailureCode.RegularExpressionNotSupported);
+        await store.DidNotReceiveWithAnyArgs().SaveAsync(default!, default, default, default);
+    }
+
+    [Test]
+    public async Task Updating_a_system_managed_flag_reports_the_read_only_failure_first()
+    {
+        var store = Substitute.For<IChallengeFlagStore>();
+        var competitionId = Guid.NewGuid();
+        var competitionChallengeId = Guid.NewGuid();
+        var flagId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var scope = ChallengeFlagScope.Competition(competitionId, competitionChallengeId);
+        var existing = new ChallengeFlagView(
+            flagId,
+            null,
+            competitionChallengeId,
+            Guid.NewGuid(),
+            "flag{generated}",
+            ChallengeFlagMatchKind.Exact,
+            SpecificationKind.RuntimeDefinition,
+            competitionChallengeId,
+            null,
+            null,
+            null,
+            now);
+        store.FindAsync(scope, flagId, actorId, false, false, Arg.Any<CancellationToken>())
+            .Returns(existing);
+        store.SupportsManualStaticFlagsAsync(
+                scope, actorId, false, Arg.Any<CancellationToken>())
+            .Returns(false);
+        var command = new SaveChallengeFlagCommand(
+            scope,
+            flagId,
+            false,
+            existing.TeamId,
+            "flag{replacement}",
+            existing.SpecificationKind,
+            existing.SpecificationId,
+            null,
+            null,
+            now,
+            ChallengeFlagMatchKind.Exact);
+
+        var result = await new ManageChallengeFlags(store)
+            .SaveAsync(command, actorId, false);
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(ChallengeFlagFailureCode.SystemManagedFlag);
+        await store.DidNotReceiveWithAnyArgs()
+            .SupportsManualStaticFlagsAsync(default, default, default, default);
         await store.DidNotReceiveWithAnyArgs().SaveAsync(default!, default, default, default);
     }
 

@@ -13,13 +13,8 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 public sealed class SaveChallengeFlagRequest
 {
     public Guid? Id { get; set; }
-    public Guid? TeamId { get; set; }
     public string Flag { get; set; } = string.Empty;
     public ChallengeFlagMatchKindProtocol MatchKind { get; set; }
-    public SpecificationKindProtocol? SpecificationKind { get; set; }
-    public Guid? SpecificationId { get; set; }
-    public DateTimeOffset? ValidStart { get; set; }
-    public DateTimeOffset? ValidUntil { get; set; }
 }
 
 public sealed class SaveChallengeFlagValidator : Validator<SaveChallengeFlagRequest>
@@ -31,9 +26,6 @@ public sealed class SaveChallengeFlagValidator : Validator<SaveChallengeFlagRequ
             .WithMessage("Id cannot be empty when supplied.");
         RuleFor(request => request.Flag).NotEmpty().MaximumLength(4096);
         RuleFor(request => request.MatchKind).IsInEnum();
-        RuleFor(request => request.SpecificationKind)
-            .IsInEnum()
-            .When(request => request.SpecificationKind is not null);
     }
 }
 
@@ -46,12 +38,8 @@ internal static class SaveChallengeFlagMapping
         bool isCreate,
         DateTimeOffset now) =>
         new(
-            scope, flagId, isCreate, request.TeamId, request.Flag,
-            request.SpecificationKind is null
-                ? null
-                : ChallengeTemplateMapper.ToDomain(request.SpecificationKind.Value),
-            request.SpecificationId,
-            request.ValidStart, request.ValidUntil, now,
+            scope, flagId, isCreate, null, request.Flag,
+            null, null, null, null, now,
             request.MatchKind switch
             {
                 ChallengeFlagMatchKindProtocol.Exact => ChallengeFlagMatchKind.Exact,
@@ -67,10 +55,55 @@ public enum ChallengeFlagMatchKindProtocol
     RegularExpression
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ChallengeFlagFailureCodeProtocol>))]
+public enum ChallengeFlagFailureCodeProtocol
+{
+    InvalidFlag,
+    InvalidRegularExpression,
+    RegularExpressionNotSupported,
+    InvalidSpecification,
+    InvalidValidityWindow,
+    InvalidTemplateFlagScope,
+    ResourceIdConflict,
+    ManualFlagNotSupported,
+    SystemManagedFlag,
+    DeliveryModeConflict
+}
+
+public sealed record ChallengeFlagFailureResponse(
+    ChallengeFlagFailureCodeProtocol Code,
+    string Message);
+
+internal static class ChallengeFlagFailureMapping
+{
+    public static ChallengeFlagFailureResponse ToResponse(
+        ChallengeFlagFailureCode code,
+        string? message) =>
+        new(
+            code switch
+            {
+                ChallengeFlagFailureCode.InvalidFlag => ChallengeFlagFailureCodeProtocol.InvalidFlag,
+                ChallengeFlagFailureCode.InvalidRegularExpression => ChallengeFlagFailureCodeProtocol.InvalidRegularExpression,
+                ChallengeFlagFailureCode.RegularExpressionNotSupported => ChallengeFlagFailureCodeProtocol.RegularExpressionNotSupported,
+                ChallengeFlagFailureCode.InvalidSpecification => ChallengeFlagFailureCodeProtocol.InvalidSpecification,
+                ChallengeFlagFailureCode.InvalidValidityWindow => ChallengeFlagFailureCodeProtocol.InvalidValidityWindow,
+                ChallengeFlagFailureCode.InvalidTemplateFlagScope => ChallengeFlagFailureCodeProtocol.InvalidTemplateFlagScope,
+                ChallengeFlagFailureCode.ResourceIdConflict => ChallengeFlagFailureCodeProtocol.ResourceIdConflict,
+                ChallengeFlagFailureCode.ManualFlagNotSupported => ChallengeFlagFailureCodeProtocol.ManualFlagNotSupported,
+                ChallengeFlagFailureCode.SystemManagedFlag => ChallengeFlagFailureCodeProtocol.SystemManagedFlag,
+                ChallengeFlagFailureCode.DeliveryModeConflict => ChallengeFlagFailureCodeProtocol.DeliveryModeConflict,
+                _ => throw new ArgumentOutOfRangeException(nameof(code), code, null)
+            },
+            message ?? "Flag operation failed.");
+}
+
 public sealed class CreateChallengeFlagEndpoint(
     ManageChallengeFlags flags,
     IUserContext user)
-    : Endpoint<SaveChallengeFlagRequest, Results<Created<ChallengeFlagResponse>, NotFound, ProblemHttpResult>>
+    : Endpoint<SaveChallengeFlagRequest, Results<
+        Created<ChallengeFlagResponse>,
+        NotFound,
+        Conflict<ChallengeFlagFailureResponse>>>
 {
     public override void Configure()
     {
@@ -84,7 +117,10 @@ public sealed class CreateChallengeFlagEndpoint(
         });
     }
 
-    public override async Task<Results<Created<ChallengeFlagResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<
+        Created<ChallengeFlagResponse>,
+        NotFound,
+        Conflict<ChallengeFlagFailureResponse>>> ExecuteAsync(
         SaveChallengeFlagRequest request,
         CancellationToken ct)
     {
@@ -102,13 +138,10 @@ public sealed class CreateChallengeFlagEndpoint(
         if (result.FailureCode == ChallengeFlagFailureCode.FlagNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)
-            return TypedResults.Problem(
-                statusCode: result.FailureCode == ChallengeFlagFailureCode.ResourceIdConflict
-                    ? StatusCodes.Status409Conflict
-                    : StatusCodes.Status400BadRequest,
-                title: "Flag was not created.",
-                detail: result.ErrorMessage,
-                extensions: new Dictionary<string, object?> { ["code"] = result.FailureCode?.ToString() });
+        {
+            var failure = ChallengeFlagFailureMapping.ToResponse(result.FailureCode!.Value, result.ErrorMessage);
+            return TypedResults.Conflict(failure);
+        }
         var response = ChallengeFlagMapping.ToResponse(result.Value!);
         return TypedResults.Created($"/api/v1/admin/challenges/{challengeId}/flags/{response.Id}", response);
     }

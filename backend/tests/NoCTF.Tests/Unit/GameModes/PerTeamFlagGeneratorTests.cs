@@ -142,7 +142,7 @@ public sealed class PerTeamFlagGeneratorTests
     }
 
     [Test]
-    public async Task Ctf_rejects_invalid_or_static_runtime_template_overrides()
+    public async Task Ctf_rejects_invalid_competition_template_and_accepts_challenge_rule_override()
     {
         var invalidCompetition = new CtfConfiguration(
             CtfConfiguration.CurrentSchemaVersion,
@@ -158,6 +158,6 @@ public sealed class PerTeamFlagGeneratorTests
         await Assert.That(CtfConfigurationValidator.Validate(invalidCompetition))
             .Contains("FlagTemplate is invalid.");
         await Assert.That(CtfConfigurationValidator.Validate(staticChallenge))
-            .Contains("FlagTemplate requires a PerTeam runtime FlagSource.");
+            .IsEmpty();
     }
 }

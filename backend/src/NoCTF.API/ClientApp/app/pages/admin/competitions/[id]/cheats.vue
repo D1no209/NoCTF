@@ -240,7 +240,7 @@ onBeforeUnmount(() => {
               {{ i.sourceTeamName }}
               <Badge v-if="i.sourceTeamIsBanned" variant="destructive" class="ml-1">{{ $t('已封禁') }}</Badge>
             </TableCell>
-            <TableCell>{{ i.ownerTeamName }}</TableCell>
+            <TableCell>{{ i.ownerTeamName ?? $t('多个队伍或未确定') }}</TableCell>
             <TableCell>{{ i.challengeTitle }}</TableCell>
             <TableCell>{{ enumLabel(GameplayFactKindLabel, i.gameplayFactKind) }}</TableCell>
             <TableCell>
@@ -270,7 +270,7 @@ onBeforeUnmount(() => {
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('来源队伍') }}</span><span>{{ detail.sourceTeamName }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('Flag 属主') }}</span><span>{{ detail.ownerTeamName }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('Flag 属主') }}</span><span>{{ detail.ownerTeamName ?? $t('多个队伍或未确定') }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('题目') }}</span><span>{{ detail.challengeTitle }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交人') }}</span><span>{{ detail.submittedByUserName }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.gameplayFactKind) }}</span></div>

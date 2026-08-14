@@ -32,6 +32,11 @@ public sealed class RawSqlPersistenceRulesTests
                 "pg_advisory_",
                 "WITH RECURSIVE"
             ],
+            ["backend/src/NoCTF.Infrastructure/Challenges/Attachments/ChallengeAttachmentStore.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Administration/ActiveHumanAdministratorMutationGuard.cs"] =
             [
                 "ExecuteSqlInterpolated",

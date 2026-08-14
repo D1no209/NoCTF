@@ -8,6 +8,7 @@ import {
   listChallengeAttachmentsEndpoint,
 } from '~/api'
 import type {
+  NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
 } from '~/api'
@@ -37,6 +38,7 @@ onMounted(async () => {
 
 // 附件(需要登录)
 const attachments = ref<NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse[]>([])
+const attachmentDeliveryPolicy = ref<NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol>('All')
 const attachmentsLoaded = ref(false)
 
 async function loadAttachments() {
@@ -46,6 +48,7 @@ async function loadAttachments() {
   })
   attachmentsLoaded.value = true
   if (err || !data) return
+  attachmentDeliveryPolicy.value = data.deliveryPolicy ?? 'All'
   attachments.value = (data.items ?? []).filter((a) => !a.deletedAt)
 }
 
@@ -132,12 +135,22 @@ const mode = computed(() => ctx.competition.value?.mode)
         <CardHeader>
           <div class="flex items-center justify-between gap-2">
             <CardTitle class="text-base">{{ $t('附件') }}</CardTitle>
-            <Button variant="outline" size="sm" :disabled="downloading" @click="downloadRandom">
-              <Dice5 data-icon="inline-start" /> {{ $t('随机下载一个附件') }} </Button>
+            <Button
+              v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'"
+              variant="outline"
+              size="sm"
+              :disabled="downloading"
+              @click="downloadRandom"
+            >
+              <Dice5 data-icon="inline-start" /> {{ $t('下载附件') }}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
           <p v-if="!attachmentsLoaded" class="text-sm text-muted-foreground">{{ $t('加载中…') }}</p>
+          <p v-else-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'" class="text-sm text-muted-foreground">
+            {{ $t('首次下载会为本队随机分配一个附件，之后始终获得同一文件。') }}
+          </p>
           <p v-else-if="!attachments.length" class="text-sm text-muted-foreground">{{ $t('本题没有附件。') }}</p>
           <ul v-else class="flex flex-col gap-2">
             <li

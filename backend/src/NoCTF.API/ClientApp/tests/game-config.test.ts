@@ -3,6 +3,7 @@ import {
   BLOOD_REWARD_POLICIES,
   BloodRewardPolicy,
   FlagSource,
+  challengeRuleFields,
   competitionConfigFields,
   emptyFlagTemplate,
   emptyDefinition,
@@ -46,18 +47,16 @@ describe('dynamic flag templates', () => {
     expect(competitionConfigFields('Ctf').some(field => field.key === 'flagTemplate')).toBeTrue()
   })
 
-  test('serializes a CTF challenge override only for per-team runtime flags', () => {
+  test('keeps CTF dynamic flag overrides in competition challenge rules', () => {
     const model = emptyDefinition('Ctf')
     model.runtime = emptyRuntimeTemplate('Ctf')
     model.runtime.flagSource = FlagSource.PerTeam
     model.flagTemplate = { header: 'NOCTF', bodyTemplate: '[TEAMHASH]', leetLiteralText: false }
 
     const dynamic = JSON.parse(serializeDefinition('Ctf', model))
-    expect(dynamic.flagTemplate.header).toBe('NOCTF')
-
-    model.runtime.flagSource = FlagSource.Static
-    const staticDefinition = JSON.parse(serializeDefinition('Ctf', model))
-    expect(staticDefinition.flagTemplate).toBeUndefined()
+    expect(dynamic.flagTemplate).toBeUndefined()
+    expect(challengeRuleFields('Ctf').some(field => field.key === 'flagTemplate')).toBeTrue()
+    expect(challengeRuleFields('Awd').some(field => field.key === 'flagTemplate')).toBeTrue()
   })
 
   test('creates CTF runtimes with per-team environment injection by default', () => {

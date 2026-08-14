@@ -30,10 +30,7 @@ const { model, parseFailed } = useDefinitionModel(
     <template v-if="mode === 'Awd'">
       <DefinitionFlagInjectionSection :model="model" :disabled="disabled" />
       <DefinitionCheckerSection :model="model" :mode="mode" :disabled="disabled" />
-      <DefinitionFlagTemplateSection :model="model" :mode="mode" :disabled="disabled" />
     </template>
-
-    <DefinitionFlagTemplateSection v-if="mode === 'Ctf'" :model="model" :mode="mode" :disabled="disabled" />
 
     <template v-if="mode === 'Awdp'">
       <DefinitionPatchSection :model="model" :disabled="disabled" />

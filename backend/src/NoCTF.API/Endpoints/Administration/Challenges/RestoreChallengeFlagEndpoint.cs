@@ -1,5 +1,7 @@
 using FastEndpoints;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Endpoints.Administration.ChallengeBank;
 using NoCTF.API.Security;
 using NoCTF.Application.Challenges.Flags;
 using NoCTF.Application.Teams.Moderation;
@@ -10,7 +12,7 @@ public sealed class RestoreChallengeFlagEndpoint(
     ManageChallengeFlags flags,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult>>
+    : EndpointWithoutRequest<Results<NoContent, NotFound, ForbidHttpResult, Conflict<ChallengeFlagFailureResponse>>>
 {
     public override void Configure()
     {
@@ -24,7 +26,7 @@ public sealed class RestoreChallengeFlagEndpoint(
         });
     }
 
-    public override async Task<Results<NoContent, NotFound, ForbidHttpResult>> ExecuteAsync(
+    public override async Task<Results<NoContent, NotFound, ForbidHttpResult, Conflict<ChallengeFlagFailureResponse>>> ExecuteAsync(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
@@ -39,6 +41,10 @@ public sealed class RestoreChallengeFlagEndpoint(
             isAdministrator: true,
             DateTimeOffset.UtcNow,
             ct);
-        return result.Succeeded ? TypedResults.NoContent() : TypedResults.NotFound();
+        if (result.Succeeded)
+            return TypedResults.NoContent();
+        return result.FailureCode == ChallengeFlagFailureCode.SystemManagedFlag
+            ? TypedResults.Conflict(ChallengeFlagFailureMapping.ToResponse(result.FailureCode.Value, result.ErrorMessage))
+            : TypedResults.NotFound();
     }
 }

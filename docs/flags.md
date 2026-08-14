@@ -66,6 +66,8 @@ leetLiteralText: bool
 
 header 非空结果为 `header{body}`；Header 不 Leet。只 Leet bodyTemplate 的字面文本，占位符展开值不 Leet。模板变更只影响以后生成。未指定或仅含空白的 header 自动使用 `flag`；未指定或仅含空白的 bodyTemplate 自动使用 `[GUID]`，即默认生成 `flag{<随机 UUIDv4>}`。
 
+题库 `Challenge.DefinitionJson` 只配置 Runtime/Checker 以及环境变量或目标文件等注入位置；不同比赛可使用不同 Flag 头，因此题目级模板覆盖只写入 `CompetitionChallenge.RulesJson`，由比赛题目管理界面维护。
+
 支持：
 
 ```text
