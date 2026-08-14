@@ -18,7 +18,7 @@ import type {
 } from '~/api'
 import {
   controlScreenChallenges,
-  controlScreenEntries,
+  controlScreenPublicEntries,
   controlScreenSolveFeed,
   reconcileControlScreenSolves,
 } from '~/utils/control-screen'
@@ -36,7 +36,6 @@ const { t } = useLocale()
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 const leaderboard = ref<NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null>(null)
-const selectedTrackKey = ref('')
 const loading = ref(true)
 const refreshing = ref(false)
 const projectionPending = ref(false)
@@ -54,22 +53,11 @@ let celebrationTimer: ReturnType<typeof setTimeout> | undefined
 let seenSolveKeys: Set<string> | null = null
 let unwatch: (() => void) | undefined
 
-const availableTracks = computed(() => (leaderboard.value?.tracks ?? [])
-  .filter(track => !track.isInternal && track.visibleOnLeaderboard))
-
-watch(availableTracks, (tracks) => {
-  if (!tracks.length) {
-    selectedTrackKey.value = ''
-    return
-  }
-  if (!tracks.some(track => track.key === selectedTrackKey.value)) {
-    selectedTrackKey.value = tracks[0]?.key ?? ''
-  }
-}, { immediate: true })
-
-const entries = computed(() => controlScreenEntries(leaderboard.value, selectedTrackKey.value))
+const entries = computed(() => controlScreenPublicEntries(leaderboard.value))
 const rankedEntries = computed(() => [...entries.value]
-  .sort((left, right) => (left.rank ?? Number.MAX_SAFE_INTEGER) - (right.rank ?? Number.MAX_SAFE_INTEGER)))
+  .sort((left, right) =>
+    (right.score ?? 0) - (left.score ?? 0)
+    || (left.teamName ?? '').localeCompare(right.teamName ?? '')))
 const challenges = computed(() => controlScreenChallenges(leaderboard.value, entries.value))
 const solveFeed = computed(() => controlScreenSolveFeed(leaderboard.value, entries.value).slice(0, 10))
 const solvedChallengeCount = computed(() => challenges.value.filter(challenge => challenge.solveCount > 0).length)
@@ -107,8 +95,6 @@ const elapsedText = computed(() => {
   const seconds = total % 60
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
 })
-
-const trackName = computed(() => availableTracks.value.find(track => track.key === selectedTrackKey.value)?.name)
 
 function bloodLabel(rank: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol | null): string {
   if (rank === 'First') return t('一血')
@@ -248,16 +234,6 @@ function syncFullscreen(): void {
   fullscreen.value = Boolean(document.fullscreenElement)
 }
 
-watch(selectedTrackKey, () => {
-  const currentSolves = controlScreenSolveFeed(leaderboard.value, entries.value)
-  seenSolveKeys = new Set(currentSolves.map(solve => solve.key))
-  celebrationQueue.value = []
-  featuredSolve.value = null
-  scene?.setLabelFocus(null)
-  scene?.endFocus()
-  if (celebrationTimer) clearTimeout(celebrationTimer)
-})
-
 onMounted(async () => {
   if (arenaRef.value) scene = new LiveCityScene(arenaRef.value)
   scene?.setChallenges(cityStates.value)
@@ -298,19 +274,8 @@ onUnmounted(() => {
           <h1 class="truncate text-xl font-semibold tracking-tight lg:text-2xl">{{ competition?.title ?? t('3D 大屏') }}</h1>
         </div>
         <p class="mt-1 font-mono text-[0.625rem] uppercase tracking-[0.24em] text-slate-400 lg:text-xs">
-          {{ t('三维实时态势') }} · {{ trackName ?? t('综合赛道') }}
+          {{ t('三维实时态势') }} · {{ t('全部公开赛道') }}
         </p>
-        <div v-if="availableTracks.length > 1" class="mt-2 flex max-w-[38rem] flex-wrap gap-1.5">
-          <button
-            v-for="track in availableTracks"
-            :key="track.key"
-            type="button"
-            :class="['live-screen-track', track.key === selectedTrackKey && 'live-screen-track-active']"
-            @click="selectedTrackKey = track.key ?? ''"
-          >
-            {{ track.name }}
-          </button>
-        </div>
       </div>
 
       <dl class="live-screen-metrics">
@@ -439,7 +404,7 @@ onUnmounted(() => {
         <section class="live-panel min-h-0 flex-1">
           <header class="live-panel-heading">
             <div class="flex items-center gap-2"><Trophy class="size-4 text-primary" />{{ t('排行榜') }}</div>
-            <span>{{ trackName ?? t('综合') }}</span>
+            <span>{{ t('综合') }}</span>
           </header>
           <div v-if="rankedEntries.length" class="live-rank-viewport">
             <div
@@ -447,16 +412,16 @@ onUnmounted(() => {
               :style="marqueeEnabled ? { animationDuration: `${marqueeDuration}s` } : undefined"
             >
               <ol class="live-ranking">
-                <li v-for="entry in rankedEntries" :key="entry.teamId" :class="rankClass(entry.rank)">
-                  <span class="live-rank">{{ entry.rank }}</span>
+                <li v-for="(entry, index) in rankedEntries" :key="entry.teamId" :class="rankClass(index + 1)">
+                  <span class="live-rank">{{ index + 1 }}</span>
                   <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}</span>
                   <span class="font-mono text-[0.625rem] text-slate-500">{{ entry.solveCount ?? 0 }}</span>
                   <strong class="font-mono tabular-nums">{{ entry.score ?? 0 }}</strong>
                 </li>
               </ol>
               <ol v-if="marqueeEnabled" class="live-ranking" aria-hidden="true">
-                <li v-for="entry in rankedEntries" :key="`clone-${entry.teamId}`" :class="rankClass(entry.rank)">
-                  <span class="live-rank">{{ entry.rank }}</span>
+                <li v-for="(entry, index) in rankedEntries" :key="`clone-${entry.teamId}`" :class="rankClass(index + 1)">
+                  <span class="live-rank">{{ index + 1 }}</span>
                   <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}</span>
                   <span class="font-mono text-[0.625rem] text-slate-500">{{ entry.solveCount ?? 0 }}</span>
                   <strong class="font-mono tabular-nums">{{ entry.score ?? 0 }}</strong>
@@ -542,9 +507,6 @@ onUnmounted(() => {
 .live-screen-footer { min-height: 2rem; border-top-width: 1px; padding: .4rem 1.5rem; font-size: .625rem; text-transform: uppercase; letter-spacing: .14em; color: #64748b; }
 .live-screen-wordmark { font-family: var(--font-mono); font-weight: 700; letter-spacing: .18em; color: var(--live-purple); text-transform: uppercase; }
 .live-screen-divider { width: 1px; height: 1.75rem; background: rgba(148, 163, 184, .18); }
-.live-screen-track { border: 1px solid rgba(148, 163, 184, .16); padding: .14rem .5rem; font-family: var(--font-mono); font-size: .55rem; color: #64748b; transition: border-color .15s ease, background-color .15s ease, color .15s ease; }
-.live-screen-track:hover, .live-screen-track:focus-visible { border-color: rgba(96, 165, 250, .5); color: #cbd5e1; outline: none; }
-.live-screen-track-active { border-color: color-mix(in oklch, var(--live-purple) 70%, transparent); background: rgba(115, 72, 173, .18); color: oklch(0.84 0.11 300); }
 .live-screen-metrics { margin-left: auto; display: grid; grid-auto-flow: column; gap: 1.75rem; }
 .live-screen-metrics div { min-width: 4rem; text-align: center; }
 .live-screen-metrics dt { font-size: .625rem; text-transform: uppercase; letter-spacing: .18em; color: #64748b; }

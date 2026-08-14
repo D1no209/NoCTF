@@ -1629,6 +1629,7 @@ export const englishMessages: Record<string, string> = {
   "第 {current} / {total} 组": "Group {current} / {total}",
   "3D 大屏": "3D live screen",
   "三维实时态势": "Live 3D city view",
+  "全部公开赛道": "All public tracks",
   "退出 3D 大屏": "Exit 3D live screen",
   "3D 大屏当前仅支持 CTF 比赛": "The 3D live screen currently supports CTF competitions only",
   "练习 Flag 验证失败": "Failed to verify the practice Flag",

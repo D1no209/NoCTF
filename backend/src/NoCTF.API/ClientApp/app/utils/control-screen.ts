@@ -37,12 +37,18 @@ export interface ControlScreenSolveReconciliation {
   newSolves: ControlScreenSolve[]
 }
 
-export function controlScreenEntries(
+export function controlScreenPublicEntries(
   leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
-  trackKey: string,
 ): LeaderboardEntry[] {
-  const entries = leaderboard?.entries ?? []
-  return trackKey ? entries.filter(entry => entry.trackKey === trackKey) : entries
+  const publicTrackKeys = new Set(
+    (leaderboard?.tracks ?? [])
+      .filter(track => track.isInternal !== true)
+      .map(track => track.key)
+      .filter((key): key is string => Boolean(key)),
+  )
+
+  return (leaderboard?.entries ?? []).filter(entry =>
+    !entry.trackKey || publicTrackKeys.has(entry.trackKey))
 }
 
 export function controlScreenChallenges(

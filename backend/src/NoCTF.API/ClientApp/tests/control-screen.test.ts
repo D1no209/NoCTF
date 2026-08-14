@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse } from '../app/api'
 import {
   controlScreenChallenges,
-  controlScreenEntries,
+  controlScreenPublicEntries,
   controlScreenSolveFeed,
   reconcileControlScreenSolves,
 } from '../app/utils/control-screen'
@@ -14,8 +14,9 @@ const leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
     { competitionChallengeId: '00000000-0000-0000-0000-000000000002', title: 'pwn-200', direction: 'PWN', currentScore: 1000 },
   ],
   tracks: [
-    { key: 'open', name: 'Open', visibleOnLeaderboard: true },
-    { key: 'junior', name: 'Junior', visibleOnLeaderboard: true },
+    { key: 'open', name: 'Open', visibleOnLeaderboard: true, isInternal: false },
+    { key: 'junior', name: 'Junior', visibleOnLeaderboard: false, isInternal: false },
+    { key: 'staff', name: 'Staff', visibleOnLeaderboard: true, isInternal: true },
   ],
   entries: [
     {
@@ -46,32 +47,41 @@ const leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
         bloodRank: 'Second',
       }],
     },
+    {
+      rank: 1,
+      teamId: 'team-staff',
+      teamName: 'Internal',
+      trackKey: 'staff',
+      score: 1500,
+      solveCount: 2,
+      cells: [],
+    },
   ],
 }
 
 describe('CTF control screen projection', () => {
-  test('keeps rankings and solve data isolated by selected track', () => {
-    const entries = controlScreenEntries(leaderboard, 'open')
-    expect(entries.map(entry => entry.teamName)).toEqual(['Alpha'])
+  test('aggregates every non-internal track and excludes internal data', () => {
+    const entries = controlScreenPublicEntries(leaderboard)
+    expect(entries.map(entry => entry.teamName)).toEqual(['Alpha', 'Beta'])
 
     const challenges = controlScreenChallenges(leaderboard, entries)
     expect(challenges.map(challenge => ({ title: challenge.title, solves: challenge.solveCount })))
-      .toEqual([{ title: 'web-100', solves: 1 }, { title: 'pwn-200', solves: 0 }])
-    expect(challenges[0]?.completionPercent).toBe(100)
+      .toEqual([{ title: 'web-100', solves: 1 }, { title: 'pwn-200', solves: 1 }])
+    expect(challenges[0]?.completionPercent).toBe(50)
 
     const feed = controlScreenSolveFeed(leaderboard, entries)
-    expect(feed).toHaveLength(1)
-    expect(feed[0]).toMatchObject({ teamName: 'Alpha', challengeTitle: 'web-100', bloodRank: 'First' })
+    expect(feed).toHaveLength(2)
+    expect(feed.map(item => item.teamName)).not.toContain('Internal')
   })
 
   test('orders the live feed by solve time and normalizes challenge ids', () => {
-    const feed = controlScreenSolveFeed(leaderboard, controlScreenEntries(leaderboard, ''))
+    const feed = controlScreenSolveFeed(leaderboard, controlScreenPublicEntries(leaderboard))
     expect(feed.map(item => item.teamName)).toEqual(['Beta', 'Alpha'])
     expect(feed.map(item => item.challengeTitle)).toEqual(['pwn-200', 'web-100'])
   })
 
   test('baselines historical solves and queues every new solve in occurrence order', () => {
-    const initial = controlScreenSolveFeed(leaderboard, controlScreenEntries(leaderboard, ''))
+    const initial = controlScreenSolveFeed(leaderboard, controlScreenPublicEntries(leaderboard))
     const baseline = reconcileControlScreenSolves(null, initial)
     expect(baseline.newSolves).toEqual([])
 
@@ -85,13 +95,19 @@ describe('CTF control screen projection', () => {
     expect(reconcileControlScreenSolves(reconciled.seenKeys, next).newSolves).toEqual([])
   })
 
-  test('ships as a dedicated CTF screen using generated SDK and realtime invalidation', async () => {
+  test('ships only the collaborator 3D screen with an elevated overview camera', async () => {
     const page = await Bun.file(
-      new URL('../app/pages/competitions/[id]/screen.vue', import.meta.url),
+      new URL('../app/pages/competitions/[id]/live.vue', import.meta.url),
     ).text()
     const shell = await Bun.file(
       new URL('../app/pages/competitions/[id].vue', import.meta.url),
     ).text()
+    const scene = await Bun.file(
+      new URL('../app/lib/live-city-3d.ts', import.meta.url),
+    ).text()
+    const oldScreenExists = await Bun.file(
+      new URL('../app/pages/competitions/[id]/screen.vue', import.meta.url),
+    ).exists()
 
     expect(page).toContain('definePageMeta({ layout: false })')
     expect(page).toContain('getLeaderboardEndpoint({ path: { competitionId } })')
@@ -99,11 +115,19 @@ describe('CTF control screen projection', () => {
     expect(page).toContain('refreshTimer = setInterval(() => void refreshLatest(), 15_000)')
     expect(page).toContain('reconcileControlScreenSolves')
     expect(page).toContain('celebrationQueue')
-    expect(page).toContain('control-screen-impact-ring')
+    expect(page).toContain('LiveCityScene')
+    expect(page).toContain('controlScreenPublicEntries')
+    expect(page).toContain("t('全部公开赛道')")
+    expect(page).not.toContain('selectedTrackKey')
     expect(page).toContain("competition.value.mode !== 'Ctf'")
     expect(page).not.toContain('$fetch(')
     expect(page).not.toContain('/api/v1')
-    expect(shell).toContain('label: translate("中控大屏")')
+    expect(oldScreenExists).toBe(false)
+    expect(shell).not.toContain('/screen')
+    expect(shell).not.toContain('label: translate("中控大屏")')
+    expect(shell).toContain('label: translate("3D 大屏")')
     expect(shell).toContain('competition.value?.mode === \'Ctf\'')
+    expect(scene).toContain('radius: this.citySpan * 0.88 + 28')
+    expect(scene).toContain('height: this.citySpan * 0.62 + 20')
   })
 })
