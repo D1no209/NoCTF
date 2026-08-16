@@ -1,0 +1,13 @@
+services:
+  target:
+    image: ${TARGET_IMAGE:?set TARGET_IMAGE}
+    environment:
+      FLAG: ${BREAK_FLAG:?set BREAK_FLAG}
+    ports:
+      - "${HOST_PORT:-33137}:31337"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped

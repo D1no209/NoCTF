@@ -5,6 +5,7 @@
 - [AWD 出题模板](awd-challenge-template.md)
 - [AWDP 出题模板](awdp-challenge-template.md)
 - [可直接打包的 AWD / AWDP Starter Kit](starter-kits/README.md)
+- [AWDP PWN 示例题 index-vault](examples/awdp-pwn-index-vault/README.md)
 
 使用方法：
 
