@@ -20,7 +20,7 @@ public static class GameModeDefaultConfiguration
             Fix: new(Awdp.Configuration.AchievementSettlement.PerRound, 50),
             ViolationPenalty: 100,
             ServiceDownPenalty: 50,
-            RequireBreakBeforeFix: true,
+            RequireBreakBeforeFix: false,
             BreakWrongPenalty: 0,
             FixFailurePenalty: 0,
             MaxBreakSubmissions: 10,

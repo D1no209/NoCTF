@@ -23,7 +23,8 @@ public sealed class AwdpEffectiveConfigurationTests
         await Assert.That(effective.FixFailurePenalty).IsEqualTo(0L);
         await Assert.That(effective.ViolationPenalty).IsEqualTo(100L);
         await Assert.That(effective.ServiceDownPenalty).IsEqualTo(50L);
-        await Assert.That(effective.RequireBreakBeforeFix).IsTrue();
+        await Assert.That(effective.RequireBreakBeforeFix).IsFalse();
+        await Assert.That(effective.UsesContinuousRoundScoring).IsTrue();
         await Assert.That(effective.MaxBreakSubmissions).IsEqualTo(10);
         await Assert.That(effective.MaxFixSubmissions).IsEqualTo(10);
         await Assert.That(effective.EvaluationDispatchMode)

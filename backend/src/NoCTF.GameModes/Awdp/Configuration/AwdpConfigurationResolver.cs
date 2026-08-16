@@ -32,7 +32,9 @@ public static class AwdpConfigurationResolver
             rules.FixFailurePenalty ?? competition.FixFailurePenalty,
             rules.ViolationPenalty ?? competition.ViolationPenalty,
             rules.ServiceDownPenalty ?? competition.ServiceDownPenalty,
-            rules.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix,
+            competition.UsesContinuousRoundScoring
+                ? false
+                : rules.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix,
             rules.MaxBreakSubmissions ?? competition.MaxBreakSubmissions,
             rules.MaxFixSubmissions ?? competition.MaxFixSubmissions,
             rules.EvaluationDispatchMode ?? competition.EvaluationDispatchMode,
@@ -43,7 +45,8 @@ public static class AwdpConfigurationResolver
             definition.Checker,
             definition.ReadyTimeoutSeconds ?? DefaultReadyTimeoutSeconds,
             definition.MaximumPatchUploadBytes
-                ?? NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.DefaultMaximumArchiveBytes);
+                ?? NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.DefaultMaximumArchiveBytes,
+            competition.SchemaVersion);
 
     public static AwdpEffectiveConfiguration Resolve(
         AwdpConfiguration competition,

@@ -14,6 +14,12 @@ public static class AwdpConfigurationValidator
             errors.Add("Fix achievement configuration is required.");
         if (configuration.Break?.Points < 0 || configuration.Fix?.Points < 0)
             errors.Add("Achievement points cannot be negative.");
+        if (configuration.UsesContinuousRoundScoring
+            && (configuration.Break?.Settlement != AchievementSettlement.PerRound
+                || configuration.Fix?.Settlement != AchievementSettlement.PerRound))
+            errors.Add("AWDP v2 Break and Fix points are continuous per-round values.");
+        if (configuration.UsesContinuousRoundScoring && configuration.RequireBreakBeforeFix)
+            errors.Add("AWDP v2 Fix is independent from Break.");
         if (configuration.Break?.Points > ScoreValueLimits.MaximumConfiguredValue
             || configuration.Fix?.Points > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
@@ -37,6 +43,13 @@ public static class AwdpConfigurationValidator
         var errors = new List<string>();
         if (configuration.Break?.Points < 0 || configuration.Fix?.Points < 0)
             errors.Add("Achievement points cannot be negative.");
+        if (configuration.SchemaVersion == AwdpChallengeConfiguration.CurrentSchemaVersion
+            && (configuration.Break?.Settlement is not null and not AchievementSettlement.PerRound
+                || configuration.Fix?.Settlement is not null and not AchievementSettlement.PerRound))
+            errors.Add("AWDP v2 Break and Fix points are continuous per-round values.");
+        if (configuration.SchemaVersion == AwdpChallengeConfiguration.CurrentSchemaVersion
+            && configuration.RequireBreakBeforeFix == true)
+            errors.Add("AWDP v2 Fix is independent from Break.");
         if (configuration.Break?.Points > ScoreValueLimits.MaximumConfiguredValue
             || configuration.Fix?.Points > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
