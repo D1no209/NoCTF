@@ -12,9 +12,9 @@ import { translate } from './i18n'
 export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 /** 各 JSON 区域当前的 schemaVersion(更高的版本或无 upgrader 的旧版本会被后端拒绝)。 */
-export const DEFINITION_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 1, Koh: 1 }
-export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 2, Awdp: 1, Koh: 1 }
-export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 1, Koh: 1 }
+export const DEFINITION_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 2, Koh: 1 }
+export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 2, Awdp: 2, Koh: 1 }
+export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 2, Koh: 1 }
 
 // ---------- 配置 JSON 内的整数枚举 ----------
 
@@ -30,6 +30,7 @@ export const BloodRewardPolicy = {
 } as const
 export const AwardSettlement = { Milestone: 0, PerRound: 1 } as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
+export const AwdpFlagInjectionKind = { EnvironmentVariable: 0, File: 1 } as const
 
 export const ATTACK_REWARD_MODES = [
   { value: 'FixedPerAttack', label: '每次攻击固定得分' },
@@ -138,6 +139,12 @@ export interface FlagInjectionModel {
   serviceName: string
 }
 
+export interface AwdpFlagInjectionModel {
+  kind: number
+  environmentVariableName: string
+  filePath: string
+}
+
 export interface DefinitionModel {
   runtime: RuntimeTemplateModel | null
   /** AWD:checker(包装 job + targetServiceName)。 */
@@ -145,6 +152,7 @@ export interface DefinitionModel {
   /** AWDP:checker 直接是 RunnerJobConfiguration。 */
   checkerJob: RunnerJobModel | null
   flagInjection: FlagInjectionModel | null
+  awdpFlagInjection: AwdpFlagInjectionModel | null
   flagTemplate: FlagTemplateModel | null
   patchEntrypoint: string
   patchCommand: string[]
@@ -186,7 +194,9 @@ export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel 
     ttlSeconds: null,
     operationTimeoutSeconds: null,
     urlBindings: [],
-    flagSource: mode === 'Ctf' ? FlagSource.PerTeam : mode === 'Awd' || mode === 'Awdp' ? FlagSource.AwdRotation : FlagSource.Static,
+    // AWDP generation Flags are injected by its dedicated attack-runtime plan,
+    // not by the AWD round-rotation source.
+    flagSource: mode === 'Ctf' ? FlagSource.PerTeam : mode === 'Awd' ? FlagSource.AwdRotation : FlagSource.Static,
     controlCheckUrlBinding: null,
   }
 }
@@ -205,6 +215,9 @@ export function emptyDefinition(mode: GameModeValue): DefinitionModel {
     checker: mode === 'Awd' ? { job: emptyRunnerJob(), targetServiceName: '' } : null,
     checkerJob: null,
     flagInjection: null,
+    awdpFlagInjection: mode === 'Awdp'
+      ? { kind: AwdpFlagInjectionKind.EnvironmentVariable, environmentVariableName: 'FLAG', filePath: '' }
+      : null,
     flagTemplate: null,
     patchEntrypoint: '',
     patchCommand: [],
@@ -380,10 +393,19 @@ export function parseDefinition(json: string | null | undefined): DefinitionMode
   }
   if (obj.flagInjection) {
     const injection = asObject(obj.flagInjection) ?? {}
-    model.flagInjection = {
-      command: asString(injection.command),
-      timeoutSeconds: asNumber(injection.timeoutSeconds),
-      serviceName: asString(injection.serviceName),
+    if ('kind' in injection) {
+      model.awdpFlagInjection = {
+        kind: asNumber(injection.kind) ?? AwdpFlagInjectionKind.EnvironmentVariable,
+        environmentVariableName: asString(injection.environmentVariableName),
+        filePath: asString(injection.filePath),
+      }
+    }
+    else {
+      model.flagInjection = {
+        command: asString(injection.command),
+        timeoutSeconds: asNumber(injection.timeoutSeconds),
+        serviceName: asString(injection.serviceName),
+      }
     }
   }
   model.flagTemplate = obj.flagTemplate ? parseFlagTemplate(obj.flagTemplate) : null
@@ -536,6 +558,16 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
     if (model.checkerJob) obj.checker = serializeRunnerJob(model.checkerJob)
     putNumber(obj, 'readyTimeoutSeconds', model.readyTimeoutSeconds)
     putNumber(obj, 'maximumPatchUploadBytes', model.maximumPatchUploadBytes)
+    if (model.awdpFlagInjection) {
+      const injection: JsonObject = { kind: model.awdpFlagInjection.kind }
+      if (model.awdpFlagInjection.kind === AwdpFlagInjectionKind.EnvironmentVariable) {
+        putString(injection, 'environmentVariableName', model.awdpFlagInjection.environmentVariableName)
+      }
+      else {
+        putString(injection, 'filePath', model.awdpFlagInjection.filePath)
+      }
+      obj.flagInjection = injection
+    }
   }
   return JSON.stringify(obj, null, 2)
 }
@@ -643,7 +675,6 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'roundDurationSeconds', label: translate("轮次时长(秒)"), type: 'int', min: 1, defaultValue: 300 },
         { key: 'break', label: translate("Break 得分"), type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: translate("攻破(正确提交 Flag)的得分与结算方式") },
         { key: 'fix', label: translate("Fix 得分"), type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: translate("修复(提交补丁存档)的得分与结算方式") },
-        { key: 'requireBreakBeforeFix', label: translate("先 Break 才能 Fix"), type: 'bool', defaultValue: true },
         { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'breakWrongPenalty', label: translate("Break 错误扣分"), type: 'int', min: 0, defaultValue: 0 },
@@ -686,7 +717,6 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
       return [
         { key: 'break', label: translate("Break 得分"), type: 'milestonePoints' },
         { key: 'fix', label: translate("Fix 得分"), type: 'milestonePoints' },
-        { key: 'requireBreakBeforeFix', label: translate("先 Break 才能 Fix"), type: 'bool' },
         { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1 },
         { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1 },
         { key: 'breakWrongPenalty', label: translate("Break 错误扣分"), type: 'int', min: 0 },
