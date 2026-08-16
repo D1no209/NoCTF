@@ -21,6 +21,7 @@
 15. [开发规范](development.md)、[测试规范](testing.md)、[部署边界](deployment.md)
 16. [PostgreSQL、对象存储与 Wolverine 备份恢复](backup-recovery.md)
 17. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
+18. [AWD、AWDP 出题规范](challenge-authoring-awd-awdp.md)
 
 ## 强制边界
 
