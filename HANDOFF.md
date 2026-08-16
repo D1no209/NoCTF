@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-16 alpha.40 平台图标、AWD/AWDP 出题文档与模板
+
+- 前端提交 `d1dfcd90` 将浏览器 favicon 与平台配置中的 Logo 统一：应用启动时读取既有平台配置，使用带修订号的 `logoUrl` 更新页签图标；管理员更换 Logo 后无需维护另一份图标资源。该改动没有新增 API、DTO、业务枚举、表或 migration，也没有手工修改生成 SDK。
+- 文档提交 `10a1569c` 新增中文《AWD / AWDP 出题规范》，覆盖两种模式的职责边界、镜像与 Checker 契约、动态 Flag、Break/Fix、Runtime、暂停/恢复、常见失败、发布清单和验收流程。模板提交 `8010b60a` 在 `docs/challenge-authoring-templates/` 新增可复制的 AWD、AWDP 出题模板及索引，供出题人逐项填写题目信息、运行环境、Checker、Flag/Fix 和交付验收内容。
+- 发布提交 `5e1037ce` 将平台版本从 `0.1.0-alpha.39` 递增为 `0.1.0-alpha.40`。Release solution build 通过，0 warning / 0 error；favicon 定向前端测试 2/2、`bun run typecheck` 与 production build 通过；文档 Markdown 本地链接扫描和 `git diff --check` 通过。
+- 功能、出题规范、模板及版本提交已快进推送到远程 `main@5e1037ce`。生产 `/root/NoCTF` 通过校验后的增量 Git bundle 快进到同一提交；Git bundle SHA-256 为 `98795BCE62571A834EFFD6CF097D246F71AD26E8A282A01FB51DEC08474EC999`，Linux/amd64 API 镜像归档 SHA-256 为 `5369B245182DC06D65EDEB8D2728B06A1551712ED1C9FCB5A0F89F5584AC7A3C`，运行镜像为 `sha256:a6a8aecdb6f8a228bfa9115f7b78b3785bc1530b9d1aeb10901e39fbc6292e54`；上一版镜像保留 `rollback-10a1569c` 标签。
+- 部署只用 `--no-deps --no-build --force-recreate` 重建 API；Worker、Runner、PostgreSQL、Redis、证书、上传卷、生产数据和题目 Runtime 均未重建。部署后五项服务全部 healthy、restart count 均为 0，公开 `https://101.43.46.244/health` 返回 `Ok`，API 程序集确认包含 `0.1.0-alpha.40`，部署后 API 日志无 Fatal、Critical、Unhandled、Exception 或 fail 匹配，服务器仍有约 16 GB 可用空间。
+- 已将本机现有 SSH 公钥添加到服务器并以 `BatchMode=yes` 独立验证免密登录；未在仓库、远程文件、命令行参数、环境变量或交接文档中保存口令。生产仓库继续保留未跟踪的 `deploy/docker-compose.prod.yml`，未覆盖该运维文件。
+
 ## 2026-08-14 静态题目运行环境入口与 3D 中控大屏收口
 
 - 功能提交 `dab289d1` 为选手题目接口新增只读 `hasRuntime` 契约，由后端使用现有 Runtime 模板目录解析题库定义；无 Container/Compose Runtime 的静态 CTF 题目不再挂载 Runtime 组件，也不会请求实例状态或显示“启动环境”。该字段已通过 OpenAPI 工具导出并重新生成 TypeScript SDK，没有手写 DTO、URL 或端点路径。
