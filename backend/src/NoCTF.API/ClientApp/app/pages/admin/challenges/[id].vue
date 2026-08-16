@@ -92,11 +92,15 @@ function changeMode(value: unknown): void {
 
 function syncForm(value: Template): void {
   form.title = value.title ?? ''
-  form.mode = value.mode ?? 'Ctf'
   form.visibility = value.visibility ?? 'Private'
   form.direction = value.direction ?? ''
   form.description = value.description ?? ''
+  // Keep definitionJson ahead of mode while loading existing templates.
+  // useDefinitionModel watches mode and serializes the current parsed model;
+  // setting mode first can briefly serialize the empty initial CTF model as the
+  // loaded mode and hide persisted runtime/checker settings in the editor.
   form.definitionJson = value.definitionJson ?? '{}'
+  form.mode = value.mode ?? 'Ctf'
 }
 
 async function loadTemplate(): Promise<void> {
