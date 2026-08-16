@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   BLOOD_REWARD_POLICIES,
+  AwdpFlagInjectionKind,
   BloodRewardPolicy,
   FlagSource,
   challengeRuleFields,
@@ -111,10 +112,36 @@ describe('AWDP patch upload limits', () => {
   test('keeps the visible default and serializes challenge-managed bytes', () => {
     const model = emptyDefinition('Awdp')
     expect(model.maximumPatchUploadBytes).toBe(256 * 1024 * 1024)
+    expect(emptyRuntimeTemplate('Awdp').flagSource).toBe(FlagSource.Static)
+    expect(model.awdpFlagInjection).toEqual({
+      kind: AwdpFlagInjectionKind.EnvironmentVariable,
+      environmentVariableName: 'FLAG',
+      filePath: '',
+    })
     model.maximumPatchUploadBytes = 512 * 1024 * 1024
 
     const json = serializeDefinition('Awdp', model)
     expect(JSON.parse(json).maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
     expect(parseDefinition(json)?.maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
+    expect(JSON.parse(json)).toMatchObject({
+      schemaVersion: 2,
+      flagInjection: { kind: AwdpFlagInjectionKind.EnvironmentVariable, environmentVariableName: 'FLAG' },
+    })
+    expect(competitionConfigFields('Awdp').some(field => field.key === 'requireBreakBeforeFix')).toBeFalse()
+    expect(challengeRuleFields('Awdp').some(field => field.key === 'requireBreakBeforeFix')).toBeFalse()
+  })
+
+  test('serializes AWDP file injection without leaking an environment field', () => {
+    const model = emptyDefinition('Awdp')
+    model.awdpFlagInjection = {
+      kind: AwdpFlagInjectionKind.File,
+      environmentVariableName: '',
+      filePath: '/run/noctf/flag',
+    }
+
+    const json = JSON.parse(serializeDefinition('Awdp', model))
+
+    expect(json.flagInjection).toEqual({ kind: AwdpFlagInjectionKind.File, filePath: '/run/noctf/flag' })
+    expect(parseDefinition(JSON.stringify(json))?.awdpFlagInjection).toEqual(model.awdpFlagInjection)
   })
 })
