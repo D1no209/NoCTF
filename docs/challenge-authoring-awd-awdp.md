@@ -2,6 +2,8 @@
 
 本文面向题目 Owner、题目 Manager、比赛 Owner/Manager/Judge，以及负责制作 Runtime、Checker 和 Fix 验证环境的出题人员。文中描述的是 NoCTF 当前实现所接受的配置和运行语义；如果旧题目包、历史文档或其他平台的做法与本文冲突，以本文及 [AWD 模式规范](game-modes/awd.md)、[AWDP 模式规范](game-modes/awdp.md) 为准。
 
+新题目可以直接复制 [AWD 出题模板](challenge-authoring-templates/awd-challenge-template.md) 或 [AWDP 出题模板](challenge-authoring-templates/awdp-challenge-template.md)，逐项填写并随题目资产一同评审。
+
 ## 1. 先理解三个配置层级
 
 NoCTF 将“可复用题目模板”和“某场比赛中的题目”严格分开。绝大多数出题错误都来自把字段放错层级。
