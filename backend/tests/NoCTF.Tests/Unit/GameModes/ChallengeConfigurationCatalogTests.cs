@@ -682,13 +682,14 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task Awdp_target_rejects_public_ports_and_urls()
+    public async Task Awdp_v2_attack_runtime_allows_public_ports_and_urls()
     {
         var runtime = new ChallengeRuntimeTemplate(
                         RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/target:v1",
-                PortMappings: new Dictionary<int, int> { [8080] = 0 }),
+                PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                InternalPorts: [8080]),
             Limits: new(268_435_456, 500_000_000, 128),
             UrlBindings:
             [
@@ -704,7 +705,56 @@ public class ChallengeConfigurationCatalogTests
             WithRuntime(catalog.GetDefaultJson(GameMode.Awdp), runtime));
 
         await Assert.That(errors)
-            .Contains("AWDP disposable targets cannot configure public ports or URLs.");
+            .DoesNotContain("AWDP disposable targets cannot configure public ports or URLs.");
+    }
+
+    [Test]
+    public async Task Awdp_v2_attack_runtime_rejects_awd_round_flag_source()
+    {
+        var runtime = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "registry.example/target:v1",
+                PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                InternalPorts: [8080]),
+            Limits: new(268_435_456, 500_000_000, 128),
+            UrlBindings:
+            [
+                new(
+                    "http://{HOST}:{PORT}",
+                    RuntimeExposure.OwnerOnly,
+                    ContainerPort: 8080)
+            ],
+            FlagSource: RuntimeFlagSource.AwdRotation);
+        var catalog = new GameModeChallengeConfigurationCatalog();
+
+        var errors = catalog.Validate(
+            GameMode.Awdp,
+            WithRuntime(catalog.GetDefaultJson(GameMode.Awdp), runtime));
+
+        await Assert.That(errors)
+            .Contains(
+                "AWDP v2 Runtime flags use the dedicated generation injection configuration, not a shared Runtime FlagSource.");
+    }
+
+    [Test]
+    public async Task Awdp_v2_flag_injection_requires_one_valid_destination()
+    {
+        var root = JsonNode.Parse(
+            new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awdp))!
+            .AsObject();
+        root["flagInjection"] = new JsonObject
+        {
+            ["kind"] = 0,
+            ["environmentVariableName"] = "1INVALID"
+        };
+
+        var errors = new GameModeChallengeConfigurationCatalog().Validate(
+            GameMode.Awdp,
+            root.ToJsonString());
+
+        await Assert.That(errors)
+            .Contains("FlagInjection.EnvironmentVariableName is invalid.");
     }
 
     [Test]

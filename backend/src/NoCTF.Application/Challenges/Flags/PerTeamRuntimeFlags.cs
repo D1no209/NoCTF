@@ -11,6 +11,19 @@ public interface IPerTeamRuntimeFlagStore
         Guid teamId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+
+    Task<string> EnsureGenerationAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid teamId,
+        Guid runtimeInstanceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+
+    Task InvalidateGenerationAsync(
+        Guid runtimeInstanceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
 }
 
 public static class PerTeamRuntimeFlagDerivation

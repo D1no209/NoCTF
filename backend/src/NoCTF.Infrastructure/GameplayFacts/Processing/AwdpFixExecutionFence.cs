@@ -32,6 +32,7 @@ public sealed class PostgresAwdpFixExecutionFence(
             return AwdpFixExecutionFenceResult.Superseded(request);
 
         if (runtime!.State == RuntimeState.Running
+            && runtime.AwdpFixStage == AwdpFixStage.PatchApplying
             && runtime.ProcessingVersion == request.RuntimeProcessingVersion)
         {
             if (timeProvider.GetUtcNow() >= request.Deadline)
@@ -71,6 +72,46 @@ public sealed class PostgresAwdpFixExecutionFence(
         }
 
         return AwdpFixExecutionFenceResult.Superseded(request);
+    }
+
+    public async Task<bool> TryAdvanceStageAsync(
+        AwdpFixStageTransitionRequest request,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var runtime = await db.RuntimeInstances
+            .FromSqlInterpolated($"""
+                SELECT *
+                FROM runtime_instances
+                WHERE id = {request.RuntimeInstanceId}
+                FOR UPDATE
+                """)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (runtime is not
+            {
+                Purpose: RuntimePurpose.AwdpTarget,
+                State: RuntimeState.Running,
+                GameplayFactId: not null
+            }
+            || runtime.GameplayFactId != request.GameplayFactId
+            || runtime.Generation != request.Generation
+            || runtime.ProcessingVersion != request.RuntimeProcessingVersion)
+        {
+            return false;
+        }
+
+        if (runtime.AwdpFixStage == request.NextStage)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return true;
+        }
+        if (runtime.AwdpFixStage != request.ExpectedStage)
+            return false;
+
+        runtime.AwdpFixStage = request.NextStage;
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     private static bool IsSameOperation(

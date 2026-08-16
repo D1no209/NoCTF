@@ -23,7 +23,16 @@ public enum RuntimePurpose : short
 {
     Player,
     AwdpTarget,
-    Practice
+    Practice,
+    AwdpAttack
+}
+
+public enum AwdpFixStage : short
+{
+    TargetProvisioning,
+    PatchApplying,
+    CheckerRunning,
+    Completed
 }
 
 public enum RuntimeFailureCode : short
@@ -64,6 +73,7 @@ public sealed class RuntimeInstance
     public Guid? TeamId { get; set; }
     public RuntimePurpose Purpose { get; set; }
     public Guid? GameplayFactId { get; set; }
+    public AwdpFixStage? AwdpFixStage { get; set; }
     public int SourceCompetitionConfigurationRevision { get; set; }
     public int SourceCompetitionChallengeRevision { get; set; }
     public int SourceChallengeDefinitionRevision { get; set; }

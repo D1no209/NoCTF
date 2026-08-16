@@ -40,6 +40,7 @@ public static class AwdpTargetRuntimeFactory
             TeamId = null,
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = gameplayFactId,
+            AwdpFixStage = AwdpFixStage.TargetProvisioning,
             SourceCompetitionConfigurationRevision = competitionConfigurationRevision,
             SourceCompetitionChallengeRevision = competitionChallengeRevision,
             SourceChallengeDefinitionRevision = challengeDefinitionRevision,

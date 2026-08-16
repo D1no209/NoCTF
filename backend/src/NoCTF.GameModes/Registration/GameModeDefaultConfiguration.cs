@@ -1,6 +1,7 @@
 using System.Text.Json;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
+using NoCTF.GameModes.Flags;
 
 namespace NoCTF.GameModes.Registration;
 
@@ -25,7 +26,8 @@ public static class GameModeDefaultConfiguration
             FixFailurePenalty: 0,
             MaxBreakSubmissions: 10,
             MaxFixSubmissions: 10,
-            EvaluationDispatchMode: EvaluationDispatchMode.Automatic), Options),
+            EvaluationDispatchMode: EvaluationDispatchMode.Automatic,
+            FlagTemplate: PerTeamFlagTemplate.Default), Options),
         GameMode.Koh => JsonSerializer.Serialize(new Koh.Configuration.KohConfiguration(1, 5, 10), Options),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported game mode.")
     };

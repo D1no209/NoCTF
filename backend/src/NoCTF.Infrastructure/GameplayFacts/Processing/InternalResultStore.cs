@@ -180,6 +180,7 @@ public sealed class InternalResultStore(
                 RuntimeGeneration: runtime.Generation), ct);
         }
         fact.UpdatedAt = DateTimeOffset.UtcNow;
+        runtime.AwdpFixStage = AwdpFixStage.Completed;
         runtime.State = RuntimeState.Stopping;
         runtime.RunnerAssignmentReleaseToken = null;
         runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);

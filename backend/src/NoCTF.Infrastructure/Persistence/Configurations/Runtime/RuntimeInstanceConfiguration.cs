@@ -22,11 +22,15 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
             table.HasCheckConstraint(
                 "ck_runtime_instances_awdp_gameplay_fact",
                 "(purpose = 1) = (gameplay_fact_id IS NOT NULL)");
+            table.HasCheckConstraint(
+                "ck_runtime_instances_awdp_fix_stage",
+                "awdp_fix_stage IS NULL OR purpose = 1");
         });
         builder.HasKey(instance => instance.Id);
         builder.HasAlternateKey(instance => new { instance.Id, instance.CompetitionId });
         builder.Property(instance => instance.RuntimeKind).HasConversion<short>();
         builder.Property(instance => instance.Purpose).HasConversion<short>();
+        builder.Property(instance => instance.AwdpFixStage).HasConversion<short>();
         builder.Property(instance => instance.RuntimeProvider).HasConversion<short>();
         builder.Property(instance => instance.State).HasConversion<short>();
         builder.Property(instance => instance.FailureCode).HasConversion<short>();
@@ -45,7 +49,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
         {
             instance.CompetitionChallengeId,
             instance.TeamId
-        }).IsUnique().HasFilter("purpose IN (0, 2) AND state IN (0, 1, 2)");
+        }).IsUnique().HasFilter("purpose IN (0, 2, 3) AND state IN (0, 1, 2)");
         builder.HasIndex(instance => instance.GameplayFactId)
             .IsUnique()
             .HasFilter("purpose = 1 AND gameplay_fact_id IS NOT NULL AND state IN (0, 1, 2, 3)");
