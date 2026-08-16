@@ -1,5 +1,13 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-16 AWDP PWN 示例题 index-vault
+
+- 文档提交 `33b72f7a` 在 `docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/` 新增一套可直接打包交付的 AWDP PWN 示例题。示例包含 vulnerable/fixed/rule-violation 三个目标二进制构建、可信 AWDP Checker、6 类 Fix 样例、可选外部 Break 靶机 compose、作者 exploit、交付单和测试生产环境部署说明，并在出题模板索引中加入入口链接。
+- 示例漏洞为 TCP note 服务越界读：`READ 4` 在漏洞版本中泄露 `FLAG` 环境变量；合法 Fix 保留 `READ 0` 正常业务并将 `READ 4` 收敛为 `ERR range`。Checker 会区分 `Fixed`、`StillVulnerable`、`RuleViolation` 和 `ServiceUnavailable`；额外 Fix 包覆盖补丁非零退出和补丁超时，用于平台侧验证 `AwdpPatchFailed` 与 `AwdpPatchTimeout`。
+- 本地生成产物位于 `docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/artifacts/fixes/` 与 `dist/noctf-awdp-pwn-index-vault.tar.gz`；这些产物按示例 `.gitignore` 保留在本机，不提交到 Git。最终交付包 SHA-256 为 `013CDE7D4A96C9991C8CD4CDF74892AEFB3D6366FB517C40D740FF7AD4AE2FF8`，包内包含 6 个已生成 Fix 归档，不包含 `__pycache__`、`.pyc`、平台地址、Token、SSH 口令、私钥或生产凭据。
+- 验证通过：`bash -n` 覆盖全部 shell/Fix 脚本；`python -m py_compile` 覆盖 Checker、callback server 和 exploit；`bash scripts/build-fix-packages.sh` 成功生成 6 个 Fix 包；逐包 `tar -tzf` 确认条目仅为 `fix.sh` 或 `fix.sh + payload/pwn-note`；`bash tests/smoke.sh` 真实构建 target/checker/callback Docker 镜像并验证 StillVulnerable、Fixed、RuleViolation、ServiceUnavailable、非零退出和超时；`bash scripts/package-delivery.sh` 成功生成交付包；敏感关键字扫描和 `git diff --check` 均通过。
+- 本阶段只新增出题示例和文档，没有修改业务代码、API、OpenAPI、TypeScript SDK、数据模型、migration、平台配置或运行版本；没有推送、部署或操作测试生产环境。部署测试说明见示例目录 `DEPLOYMENT.md`，其中明确 NoCTF 当前 AWDP Fix 验证 target/checker 是内部 disposable runtime；若要演示 Break，可由工作人员单独启动可控外部靶机并在 NoCTF 中配置相同静态精确 Flag。
+
 ## 2026-08-16 AWD / AWDP 可打包出题 Starter Kit
 
 - 文档提交 `718d742e` 将原先仅供阅读和复制的 Markdown 表单具象为可直接交付的目录树，新增 `docs/challenge-authoring-templates/starter-kits/awd/` 与 `awdp/`。两套 Starter Kit 均包含可构建的 Runtime/Target、Checker、平台配置说明、出题交付清单和本地烟测；AWDP 另附合法 Fix 以及 StillVulnerable、RuleViolation、ServiceUnavailable、非零退出和超时等失败样例与批量打包脚本。
