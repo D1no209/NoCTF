@@ -34,6 +34,19 @@ public class GameplayFactAdmissionModePolicyTests
     }
 
     [Test]
+    public async Task AwdpCurrentConfiguration_DoesNotRequireBreakBeforeFix()
+    {
+        var policy = new GameModeGameplayFactAdmissionPolicy();
+
+        var rules = policy.GetRules(
+            GameMode.Awdp,
+            GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
+            new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awdp));
+
+        await Assert.That(rules.RequireBreakBeforeFix).IsFalse();
+    }
+
+    [Test]
     public async Task Awdp_Challenge_null_inherits_competition_break_requirement()
     {
         const string competition =

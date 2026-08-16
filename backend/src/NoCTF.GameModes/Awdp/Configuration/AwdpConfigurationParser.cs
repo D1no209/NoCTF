@@ -5,10 +5,14 @@ namespace NoCTF.GameModes.Awdp.Configuration;
 public static class AwdpConfigurationParser
 {
     public static AwdpConfiguration ParseCompetition(string json) =>
-        VersionedConfiguration.ParseCurrent<AwdpConfiguration>(
-            json, AwdpConfiguration.CurrentSchemaVersion);
+        VersionedConfiguration.ParseSupported<AwdpConfiguration>(
+            json,
+            AwdpConfiguration.LegacySchemaVersion,
+            AwdpConfiguration.CurrentSchemaVersion);
 
     public static AwdpChallengeConfiguration ParseChallenge(string json) =>
-        VersionedConfiguration.ParseCurrent<AwdpChallengeConfiguration>(
-            json, AwdpChallengeConfiguration.CurrentSchemaVersion);
+        VersionedConfiguration.ParseSupported<AwdpChallengeConfiguration>(
+            json,
+            AwdpChallengeConfiguration.LegacySchemaVersion,
+            AwdpChallengeConfiguration.CurrentSchemaVersion);
 }

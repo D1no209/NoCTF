@@ -47,6 +47,21 @@ internal static class VersionedConfiguration
         return Deserialize<T>(root);
     }
 
+    internal static T ParseSupported<T>(string json, params int[] supportedVersions)
+    {
+        var root = JsonNode.Parse(json)?.AsObject()
+            ?? throw new GameModeConfigurationException("Configuration must be a JSON object.");
+        var version = root["schemaVersion"]?.GetValue<int>()
+            ?? throw new GameModeConfigurationException("schemaVersion is required.");
+        if (!supportedVersions.Contains(version))
+        {
+            throw new GameModeConfigurationException(
+                $"schemaVersion {version} is unsupported; supported versions are {string.Join(", ", supportedVersions)}.");
+        }
+
+        return Deserialize<T>(root);
+    }
+
     private static T Deserialize<T>(JsonObject root)
     {
         try

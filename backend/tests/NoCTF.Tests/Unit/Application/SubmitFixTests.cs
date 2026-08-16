@@ -9,7 +9,7 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class SubmitFixTests
 {
     [Test]
-    public async Task Required_break_is_rejected_before_patch_upload_consumption()
+    public async Task Current_awdp_fix_is_accepted_without_a_break()
     {
         var store = new Store();
         var useCase = new SubmitFix(store, new GameModeGameplayFactAdmissionPolicy());
@@ -21,8 +21,8 @@ public sealed class SubmitFixTests
             Guid.NewGuid(),
             DateTimeOffset.UtcNow));
 
-        await Assert.That(result.FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.BreakRequired);
-        await Assert.That(store.FixWrites).IsEqualTo(0);
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.FixWrites).IsEqualTo(1);
     }
 
     private sealed class Store : IGameplayFactIntakeStore

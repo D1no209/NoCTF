@@ -37,7 +37,7 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task Awdp_defaults_put_break_requirement_at_competition_scope()
+    public async Task Awdp_defaults_make_fix_independent_from_break()
     {
         using var competition = JsonDocument.Parse(
             GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp));
@@ -46,7 +46,7 @@ public class ChallengeConfigurationCatalogTests
 
         await Assert.That(
                 competition.RootElement.GetProperty("requireBreakBeforeFix").GetBoolean())
-            .IsTrue();
+            .IsFalse();
         await Assert.That(
                 challenge.RootElement.TryGetProperty("requireBreakBeforeFix", out _))
             .IsFalse();

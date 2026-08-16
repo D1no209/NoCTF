@@ -26,7 +26,10 @@ public sealed record AwdpConfiguration(
     int MaxFixSubmissions = 10,
     EvaluationDispatchMode EvaluationDispatchMode = EvaluationDispatchMode.Automatic)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+    public const int LegacySchemaVersion = 1;
+
+    public bool UsesContinuousRoundScoring => SchemaVersion == CurrentSchemaVersion;
 }
 
 public sealed record AwdpChallengeConfiguration(
@@ -49,7 +52,8 @@ public sealed record AwdpChallengeConfiguration(
     EvaluationDispatchMode? EvaluationDispatchMode = null,
     long? MaximumPatchUploadBytes = null)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+    public const int LegacySchemaVersion = 1;
 }
 
 public sealed record AwdpEffectiveConfiguration(
@@ -70,4 +74,8 @@ public sealed record AwdpEffectiveConfiguration(
     int PatchTimeoutSeconds,
     RunnerJobConfiguration? Checker,
     int ReadyTimeoutSeconds,
-    long MaximumPatchUploadBytes);
+    long MaximumPatchUploadBytes,
+    int SchemaVersion = AwdpConfiguration.LegacySchemaVersion)
+{
+    public bool UsesContinuousRoundScoring => SchemaVersion == AwdpConfiguration.CurrentSchemaVersion;
+}
