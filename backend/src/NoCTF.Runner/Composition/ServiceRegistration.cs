@@ -232,6 +232,8 @@ public static class ServiceRegistration
         services.AddSingleton<IAwdCheckerExecutor, AwdCheckerExecutor>();
         services.AddSingleton<IAwdpFixWorkReader, AwdpFixWorkReader>();
         services.AddSingleton<IAwdpCheckerExecutor, AwdpCheckerExecutor>();
+        services.AddSingleton<IAwdpAttackProvisioningPlanReader,
+            AwdpAttackProvisioningPlanReader>();
         services.AddSingleton<AwdpFixArchiveDownloader>();
         services.AddSingleton<FixArchivePreparer>();
         services.AddSingleton<IRuntimeNodeWorkReader, RuntimeNodeWorkReader>();

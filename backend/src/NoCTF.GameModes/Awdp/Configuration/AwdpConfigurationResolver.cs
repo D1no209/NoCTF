@@ -1,3 +1,5 @@
+using NoCTF.GameModes.Flags;
+
 namespace NoCTF.GameModes.Awdp.Configuration;
 
 public static class AwdpConfigurationResolver
@@ -46,6 +48,8 @@ public static class AwdpConfigurationResolver
             definition.ReadyTimeoutSeconds ?? DefaultReadyTimeoutSeconds,
             definition.MaximumPatchUploadBytes
                 ?? NoCTF.Application.GameplayFacts.PatchUploads.PatchUploadRules.DefaultMaximumArchiveBytes,
+            rules.FlagTemplate ?? competition.FlagTemplate ?? PerTeamFlagTemplate.Default,
+            definition.FlagInjection,
             competition.SchemaVersion);
 
     public static AwdpEffectiveConfiguration Resolve(

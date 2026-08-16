@@ -17,6 +17,9 @@ internal sealed class ChallengeFlagConfiguration : IEntityTypeConfiguration<Chal
         {
             x.CompetitionChallengeId, x.TeamId, x.SpecificationKind, x.SpecificationId
         });
+        builder.HasIndex(x => new { x.SpecificationKind, x.SpecificationId })
+            .IsUnique()
+            .HasFilter("specification_kind = 4 AND deleted_at IS NULL");
         builder.HasIndex(x => new { x.ChallengeId, x.FlagSha256 })
             .HasFilter("deleted_at IS NULL");
         builder.HasIndex(x => new { x.CompetitionChallengeId, x.FlagSha256 })

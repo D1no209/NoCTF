@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Teams.Membership;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Competitions;
@@ -83,6 +84,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
                     new RefreshDirtyLeaderboards(now),
                     refreshDb,
                     new NoopOutbox(),
+                    new EmptyLeaderboardCache(),
                     ct)
                 .WaitAsync(TimeSpan.FromSeconds(30), ct);
         }
@@ -425,5 +427,19 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             FlushCount++;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class EmptyLeaderboardCache : ILeaderboardCache
+    {
+        public Task<LeaderboardResponse?> GetAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LeaderboardResponse?>(null);
+
+        public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 }

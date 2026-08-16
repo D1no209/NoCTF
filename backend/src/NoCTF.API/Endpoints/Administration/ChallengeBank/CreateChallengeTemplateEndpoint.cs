@@ -27,7 +27,8 @@ public enum SpecificationKindProtocol
     Attachment,
     AwdRound,
     RuntimeDefinition,
-    Hint
+    Hint,
+    RuntimeGeneration
 }
 
 public sealed class CreateChallengeTemplateRequest

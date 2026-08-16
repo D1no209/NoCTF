@@ -1,4 +1,5 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import os
 from pathlib import Path
 
 
@@ -7,6 +8,13 @@ fixed_path = Path("/dev/shm/fixed")
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/flag":
+            flag = os.environ.get("FLAG")
+            if flag:
+                self.respond(200, flag)
+            else:
+                self.respond(404, "not found")
+            return
         if self.path != "/status":
             self.respond(404, "not found")
             return

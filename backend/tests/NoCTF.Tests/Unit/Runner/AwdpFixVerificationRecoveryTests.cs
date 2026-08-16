@@ -70,6 +70,7 @@ public sealed class AwdpFixVerificationRecoveryTests
             new FixArchivePreparer(configuration),
             Substitute.For<IRuntimeProviderCatalog>(),
             Substitute.For<IAwdpCheckerExecutor>(),
+            Substitute.For<IAwdpFixExecutionFence>(),
             [],
             Substitute.For<IRunnerCapacityGate>(),
             outbox,
@@ -146,6 +147,11 @@ public sealed class AwdpFixVerificationRecoveryTests
             .Returns(AwdpCheckerExecutionOutcome.Completed);
         var outbox = new RecordingOutbox();
         var configuration = Configuration(message);
+        var executionFence = Substitute.For<IAwdpFixExecutionFence>();
+        executionFence.TryAdvanceStageAsync(
+                Arg.Any<AwdpFixStageTransitionRequest>(),
+                Arg.Any<CancellationToken>())
+            .Returns(true);
         var handler = new AwdpFixVerificationHandler(
             reader,
             new AwdpFixArchiveDownloader(new StaticHttpClientFactory(
@@ -153,6 +159,7 @@ public sealed class AwdpFixVerificationRecoveryTests
             new FixArchivePreparer(configuration),
             providers,
             checker,
+            executionFence,
             [],
             Substitute.For<IRunnerCapacityGate>(),
             outbox,
@@ -242,6 +249,7 @@ public sealed class AwdpFixVerificationRecoveryTests
             new FixArchivePreparer(configuration),
             Substitute.For<IRuntimeProviderCatalog>(),
             Substitute.For<IAwdpCheckerExecutor>(),
+            Substitute.For<IAwdpFixExecutionFence>(),
             [reconciler],
             capacity,
             outbox,

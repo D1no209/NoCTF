@@ -41,9 +41,21 @@ public sealed record AwdpFixExecutionFenceResult(
             request.RunnerId);
 }
 
+public sealed record AwdpFixStageTransitionRequest(
+    Guid GameplayFactId,
+    Guid RuntimeInstanceId,
+    int Generation,
+    long RuntimeProcessingVersion,
+    AwdpFixStage ExpectedStage,
+    AwdpFixStage NextStage);
+
 public interface IAwdpFixExecutionFence
 {
     Task<AwdpFixExecutionFenceResult> AcquireAsync(
         AwdpFixExecutionFenceRequest request,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryAdvanceStageAsync(
+        AwdpFixStageTransitionRequest request,
         CancellationToken cancellationToken);
 }

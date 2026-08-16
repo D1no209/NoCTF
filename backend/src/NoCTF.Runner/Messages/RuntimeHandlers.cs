@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
@@ -17,7 +18,8 @@ public sealed class RuntimeProviderHandler(
     IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
     IConfiguration configuration,
     IRunnerCapacityGate capacity,
-    IRuntimeNodeWorkReader workReader)
+    IRuntimeNodeWorkReader workReader,
+    IAwdpAttackProvisioningPlanReader? awdpAttackPlans = null)
 {
     public async Task<object> Handle(
         ProvisionContainerRuntime message,
@@ -46,20 +48,35 @@ public sealed class RuntimeProviderHandler(
         RuntimeFailureCode? failureCode = null;
         try
         {
+            var awdpPlan = awdpAttackPlans is null
+                ? new AwdpAttackProvisioningPlan(AwdpAttackProvisioningPlanState.NotApplicable)
+                : await awdpAttackPlans.ReadAsync(message, cancellationToken);
+            if (awdpPlan.State == AwdpAttackProvisioningPlanState.Invalid)
+                throw new RuntimeConfigurationException(
+                    "The AWDP attack Runtime provisioning plan is invalid.");
+            var definition = awdpPlan.Definition ?? message.Definition;
             var receipt = await IsolatedContainerProvisioner.ProvisionAsync(
-                providers.Containers(message.Definition.Provider),
-                providers.Sandbox(message.Definition.Provider),
-                message.Definition,
+                providers.Containers(definition.Provider),
+                providers.Sandbox(definition.Provider),
+                definition,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
+            if (awdpPlan.FileInjection is { } fileInjection)
+            {
+                await InjectAwdpAttackFileAsync(
+                    definition.Provider,
+                    receipt,
+                    fileInjection,
+                    cancellationToken);
+            }
             ExpandedRuntimeUrls? expanded = null;
             try
             {
                 expanded = RuntimeUrlExpander.ExpandContainer(
                     receipt,
-                    message.Definition.UrlBindings,
-                    message.Definition.ControlCheckUrlBinding,
-                    message.Definition.AwdCheckerTargetBinding);
+                    definition.UrlBindings,
+                    definition.ControlCheckUrlBinding,
+                    definition.AwdCheckerTargetBinding);
             }
             catch (InvalidOperationException)
             {
@@ -75,10 +92,10 @@ public sealed class RuntimeProviderHandler(
                     JsonSerializer.Serialize(receipt),
                     expanded.Urls,
                     expanded.ParticipantUrlIndexes,
-                    message.Definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
+                    definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
                     expanded.ControlCheckUrl,
                     expanded.AwdCheckerTargetHost,
-                    message.Definition.Provider == RuntimeProvider.Docker
+                    definition.Provider == RuntimeProvider.Docker
                         ? receipt.PortMappings
                             .OrderBy(mapping => mapping.Key)
                             .Select(mapping => new RuntimePublishedPortMapping(
@@ -446,6 +463,45 @@ public sealed class RuntimeProviderHandler(
     private string ReadRunnerId() => configuration["Runner:Id"]
         ?? throw new InvalidOperationException("Runner:Id is required.");
 
+    private async Task InjectAwdpAttackFileAsync(
+        RuntimeProvider provider,
+        ContainerReceipt receipt,
+        AwdpAttackFileInjection injection,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            IReadOnlyList<string> command =
+            [
+                "/bin/sh",
+                "-c",
+                "set -eu; target=$1; parent=${target%/*}; "
+                    + "if [ -z \"$parent\" ]; then parent=/; fi; mkdir -p -- \"$parent\"; "
+                    + "umask 077; cat > \"$target\"",
+                "noctf-awdp-flag",
+                injection.Path
+            ];
+            var result = await providers.Sandbox(provider).ExecWithInputAsync(
+                receipt,
+                command,
+                Encoding.UTF8.GetBytes(injection.Flag),
+                TimeSpan.FromSeconds(15),
+                cancellationToken);
+            if (result.TimedOut || result.ExitCode != 0)
+                throw new RuntimeConfigurationException(
+                    "The AWDP attack Runtime flag file could not be injected.");
+        }
+        catch
+        {
+            await IsolatedContainerProvisioner.DestroyAsync(
+                providers.Containers(provider),
+                providers.Sandbox(provider),
+                receipt,
+                cancellationToken);
+            throw;
+        }
+    }
+
     private async Task<object> CompleteProvisionFailureAsync(
         IRuntimeProvisionMessage message,
         RuntimeProvider provider,
@@ -641,6 +697,7 @@ public static class RuntimeWriteBackHandler
                 instance, message, events, DateTimeOffset.UtcNow, cancellationToken);
             instance.RunnerAssignmentReleaseToken = null;
             instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+            await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
@@ -664,6 +721,7 @@ public static class RuntimeWriteBackHandler
             instance.ControlCheckUrl = null;
             instance.State = RuntimeState.Stopping;
             instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+            await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await RecordRuntimeStateAsync(
                 events,
@@ -688,6 +746,7 @@ public static class RuntimeWriteBackHandler
         instance.RunningAt = runningAt;
         instance.ExpiresAt = message.ExpiresAt;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await ActivateAwdpAttackFlagAsync(db, instance, runningAt, cancellationToken);
         await ReplacePublishedPortsAsync(
             instance, message, events, runningAt, cancellationToken);
         if (message.AwdCheckerTargetHost is not null)
@@ -695,6 +754,7 @@ public static class RuntimeWriteBackHandler
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.GameplayFactId is Guid gameplayFactId)
         {
+            instance.AwdpFixStage = AwdpFixStage.PatchApplying;
             var submission = await db.GameplayFacts
                 .SingleOrDefaultAsync(item => item.Id == gameplayFactId, cancellationToken);
             if (submission is null
@@ -854,6 +914,7 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                 && candidate.State == RuntimeState.Queued,
@@ -883,6 +944,7 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Failed;
         instance.FailureCode = failureCode;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.GameplayFactId is Guid gameplayFactId)
         {
@@ -932,6 +994,7 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                 && candidate.State == RuntimeState.Queued,
@@ -969,6 +1032,7 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = message.CompletedAt;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                 && candidate.State == RuntimeState.Queued,
@@ -1053,6 +1117,7 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Failed;
         instance.FailureCode = message.FailureCode;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                 && candidate.State == RuntimeState.Queued,
@@ -1103,6 +1168,7 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
         instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+        await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                 && candidate.State == RuntimeState.Queued,
@@ -1142,6 +1208,45 @@ public static class RuntimeWriteBackHandler
             RuntimeState: instance.State,
             RuntimeGeneration: instance.Generation),
             cancellationToken);
+
+    private static async Task ActivateAwdpAttackFlagAsync(
+        NoCtfDbContext db,
+        RuntimeInstance instance,
+        DateTimeOffset runningAt,
+        CancellationToken cancellationToken)
+    {
+        if (instance.Purpose != RuntimePurpose.AwdpAttack)
+            return;
+        var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
+            candidate => candidate.SpecificationKind
+                    == NoCTF.Domain.Challenges.SpecificationKind.RuntimeGeneration
+                && candidate.SpecificationId == instance.Id
+                && candidate.CompetitionChallengeId == instance.CompetitionChallengeId
+                && candidate.TeamId == instance.TeamId
+                && candidate.DeletedAt == null,
+            cancellationToken)
+            ?? throw new InvalidOperationException(
+                "The AWDP attack Runtime generation flag is unavailable.");
+        flag.ValidStart ??= runningAt;
+    }
+
+    private static async Task InvalidateAwdpAttackFlagAsync(
+        NoCtfDbContext db,
+        RuntimeInstance instance,
+        DateTimeOffset stoppedAt,
+        CancellationToken cancellationToken)
+    {
+        if (instance.Purpose != RuntimePurpose.AwdpAttack)
+            return;
+        var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
+            candidate => candidate.SpecificationKind
+                    == NoCTF.Domain.Challenges.SpecificationKind.RuntimeGeneration
+                && candidate.SpecificationId == instance.Id
+                && candidate.DeletedAt == null,
+            cancellationToken);
+        if (flag is not null && (flag.ValidUntil is null || flag.ValidUntil > stoppedAt))
+            flag.ValidUntil = stoppedAt;
+    }
 
     private static bool IsLateProvisionSuccessAwaitingCleanup(
         RuntimeInstance instance,

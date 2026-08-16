@@ -142,7 +142,8 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     "patchCommand",
                     "patchTimeoutSeconds",
                     "checker",
-                    "readyTimeoutSeconds"
+                    "readyTimeoutSeconds",
+                    "flagInjection"
                 ],
                 GameMode.Koh => ["runtime"],
                 _ => []
@@ -183,7 +184,8 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     "fixFailurePenalty",
                     "violationPenalty",
                     "serviceDownPenalty",
-                    "evaluationDispatchMode"
+                    "evaluationDispatchMode",
+                    "flagTemplate"
                 ],
                 GameMode.Koh => ["pollIntervalSeconds", "controlPointsPerInterval"],
                 _ => []
