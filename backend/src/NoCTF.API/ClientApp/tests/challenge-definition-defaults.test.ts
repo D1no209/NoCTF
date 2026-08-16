@@ -20,7 +20,8 @@ describe('challenge definition defaults', () => {
 
     expect(createPage).toContain('ref(defaultDefinitionJson(mode.value))')
     expect(createPage).toContain('definitionJson.value = defaultDefinitionJson(value)\n  mode.value = value')
-    expect(editPage).toContain('form.definitionJson = defaultDefinitionJson(value)\n  form.mode = value')
+    expect(editPage).toContain('form.definitionJson = value.definitionJson ??')
+    expect(editPage).toContain("form.mode = value.mode ?? 'Ctf'")
     expect(createPage).toContain('normalizeDefinitionJson(mode.value, definitionJson.value)')
     expect(editPage).toContain('normalizeDefinitionJson(form.mode, form.definitionJson)')
   })
