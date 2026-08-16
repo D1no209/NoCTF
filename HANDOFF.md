@@ -1,5 +1,13 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-16 AWD / AWDP 可打包出题 Starter Kit
+
+- 文档提交 `718d742e` 将原先仅供阅读和复制的 Markdown 表单具象为可直接交付的目录树，新增 `docs/challenge-authoring-templates/starter-kits/awd/` 与 `awdp/`。两套 Starter Kit 均包含可构建的 Runtime/Target、Checker、平台配置说明、出题交付清单和本地烟测；AWDP 另附合法 Fix 以及 StillVulnerable、RuleViolation、ServiceUnavailable、非零退出和超时等失败样例与批量打包脚本。
+- 根目录 `starter-kits/pack.ps1` 与 `pack.sh` 可分别在 Windows 和 Linux/WSL 中生成独立的 `noctf-awd-authoring-kit.tar.gz`、`noctf-awdp-authoring-kit.tar.gz`。归档固定以 `awd/` 或 `awdp/` 为唯一顶层目录，不包含本地 `dist/`、AWDP `artifacts/`、生产地址、Token、Flag 或凭据；脚本文件在 Git 中保留 executable bit，并通过 `.gitattributes` 固定 LF。
+- AWD 烟测真实构建并运行 Runtime、Checker 与本地回调接收器，验证动态 `FLAG` 环境变量注入和 `Up` 回调；AWDP 烟测真实构建并运行漏洞 Target、Checker 与回调接收器，先验证 `StillVulnerable`，再应用合法 Fix 并验证 `Fixed`。首次 AWD 烟测发现非 root Python 进程无法穿越错误权限的 `/app` 目录，随后将入口文件调整为与仓库既有 E2E 一致的根目录只读脚本并完成复验；最终 AWD、AWDP 均为 1/1 通过，测试容器、网络和镜像为 0 残留。
+- 额外验证通过：全部 Starter Kit shell 脚本 `sh -n`；4 个 Python 文件语法编译；11 个相关 Markdown 文件本地链接扫描，0 个断链；敏感平台域名、生产 IP 与私钥头扫描 0 命中；`git diff --check` 通过。最终本地交付归档分别为 17、33 个条目，均无路径穿越条目且不含 `artifacts/`；SHA-256 为 AWD `6728DFBBB992652595A9B5E8109EF89822A8F0C53D9B109F806B18DD44438A32`、AWDP `95846B247F3D51EE2505D5CE4CD12B7311D50FC6E4A9B03957B81371F859E5C1`。
+- 本阶段只新增和更新出题文档、示例与打包工具，没有修改业务代码、API、OpenAPI、TypeScript SDK、数据模型、migration 或生产配置，也没有部署需求；平台运行版本继续为 `0.1.0-alpha.40`。
+
 ## 2026-08-16 alpha.40 平台图标、AWD/AWDP 出题文档与模板
 
 - 前端提交 `d1dfcd90` 将浏览器 favicon 与平台配置中的 Logo 统一：应用启动时读取既有平台配置，使用带修订号的 `logoUrl` 更新页签图标；管理员更换 Logo 后无需维护另一份图标资源。该改动没有新增 API、DTO、业务枚举、表或 migration，也没有手工修改生成 SDK。
