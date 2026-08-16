@@ -42,7 +42,8 @@
   Guest Agent、VmId URL expansion、幂等 cleanup、Pool inventory dispatch 与
   数据库 assignment 精确 orphan reconciliation；
 - 网络隔离与 orphan reaper；
-- AWDP target/checker callback、timeout、清理；
+- AWDP 按队 Attack Runtime、generation Flag 环境变量/文件注入、Reset 失效、公开 URL；
+- AWDP disposable Fix target 与 Attack Runtime 隔离、Patch/一次 Checker callback、非零退出、无 callback、timeout、重放与清理；
 - AWD raw command injection 与轮次截止重试。
 
 Provider 测试可按环境标记，但 Release 流水线必须至少在受控 Runner 环境执行。
@@ -150,7 +151,7 @@ Smoke 覆盖每种模式至少一条真实依赖流程：
 
 - CTF：注册/队伍/附件或 Runtime/Flag/血奖/Hint/重判；
 - AWD：加固/轮换/批量攻击/重复/服务 Up-Down/轮末投影；
-- AWDP：Break/Upload/Trigger/Patch/Checker/重判；
+- AWDP：两队独立 Attack Runtime/端口、真实动态 Flag、错误/外队/旧 generation Break、无需 Break 的 Fix、一次 Checker、Break/Fix 持续按轮叠加、Pause/Resume/Finish 冻结、页面状态恢复；
 - KoH：共享 Runtime/Control Flag、正确/错误/不可用/超时/歧义行为、暂停恢复。
 
 Full 在模式业务流程之后还会验证 API 重启后原 JWT 有效、Redis 停止时认证回退
