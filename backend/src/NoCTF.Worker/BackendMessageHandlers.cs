@@ -492,7 +492,7 @@ public static class BackendMessageHandlers
                 Competition = competition,
                 Configuration = TryParseAwdpCompetition(competition.ConfigurationJson)
             })
-            .Where(item => item.Configuration?.UsesContinuousRoundScoring == true)
+            .Where(item => item.Configuration is not null)
             .ToArray();
         if (continuous.Length == 0)
             return;

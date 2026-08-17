@@ -350,7 +350,6 @@ transaction lock，并在同一事务内递增父聚合 revision 与 leaderboard
 ```text
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences
-GET  /api/v1/admin/awdp/scoring-impact-preview
 GET  /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/{gameplayFactId}/flag-access
 POST /api/v1/admin/competitions/{competitionId}/gameplay-facts/queue-evaluation
@@ -365,7 +364,7 @@ queue-evaluation 用于 Pending/首次 PlatformFailed 集合；rejudge 选择已
 
 ManualAdjustment 请求为 `{ teamId, competitionChallengeId, delta: int }`，仅 Administrator/Owner/Manager 可用，零值返回 400。delta 以 canonical signed Int32 十进制写入 GameplayFact.Value，事实直接为 Completed/Applied，不增加分数字段。
 
-`awdp/scoring-impact-preview` 只允许平台 Administrator 读取。它在一致只读快照中比较历史 AWDP v1 当前计分与假设采用 v2 连续按轮计分后的队伍分差；最多扫描一个有界批次，不修改 GameplayFact、CompetitionEvent、Notification 或排行榜缓存，也不提供自动迁移/纠正入口。
+AWDP v3 计分配置不兼容旧版本，平台不再提供旧版计分影响预览或自动迁移入口。
 
 ## Notifications
 

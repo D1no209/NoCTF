@@ -2,7 +2,7 @@
 
 ## 配置契约
 
-Competition 配置提供 `MinimumPoints`、`DecayParameter`、`DecayExpression`、`WrongSubmissionPenalty` 和三个血位 Reward 默认值。CompetitionChallenge 配置可用 nullable 字段逐项覆盖，并另外必须定义：
+Competition 配置 schema v2 提供 `DefaultScoreCurve`、`WrongSubmissionPenalty` 和三个血位 Reward 默认值。CompetitionChallenge 配置 schema v2 可用 nullable `ScoreCurve` 整体覆盖，并另外定义：
 
 ```text
 FlagSelectionPolicy: All | RandomOnePerTeam
@@ -12,7 +12,7 @@ Runtime?                               // 按队 Runtime 配置
 Runtime.FlagSource: PerTeam
 ```
 
-数值约束：MinimumPoints 0..BaseScore，DecayParameter>1，Penalty/Reward 非负，百分比 0..100。覆盖值为 0 时就是显式 0，不表示继承；只有 null 表示继承。所有配置对象带 `schemaVersion`，未知版本拒绝保存。
+`ScoreCurve` 包含 `InitialPoints`、`MinimumPoints`、`DecayTeamCount`、`DecayMode` 和仅在 Custom 模式使用的 `CustomExpression`。数值约束：InitialPoints 为 1..1,000,000，MinimumPoints 为 0..InitialPoints，DecayTeamCount>1，Penalty/Reward 非负，百分比 0..100。覆盖值为 0 时就是显式 0，不表示继承；只有 null 表示继承。所有配置对象带 `schemaVersion`，未知版本拒绝保存。
 
 ## 题目形态
 
@@ -48,7 +48,7 @@ Attachment 策略：
 
 ## 动态题值
 
-InitialPoints=CompetitionChallenge.BaseScore。Competition 提供 MinimumPoints、DecayParameter、DynamicExpresso 表达式，题目可覆盖 Minimum/Parameter/表达式。表达式变量、默认公式、安全与错误行为见 [计分规范](../scoring-projection.md#dynamicexpresso-ctf-衰减)。
+CTF 题值完全来自有效 `ScoreCurve`，不再以 CompetitionChallenge.BaseScore 作为曲线初始分。内置 Fixed、Linear、Quadratic、Exponential、Logarithmic 五种模式，也可以使用受限的 DynamicExpresso 自定义公式。变量、取整、安全与错误行为见 [计分规范](../scoring-projection.md#共享分值衰减曲线)。
 
 当前所有有效 solve 共享同一当前题值。配置变更立即使榜单 dirty，但不重判 GameplayFact。
 

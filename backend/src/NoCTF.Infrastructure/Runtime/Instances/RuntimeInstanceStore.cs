@@ -10,6 +10,7 @@ using NoCTF.Domain.Teams;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
@@ -398,7 +399,7 @@ public sealed class RuntimeInstanceStore(
 
     private static bool AllowsRuntimeActions(RuntimeScope scope) =>
         scope.Status == CompetitionStatus.Running
-            && (scope.Mode != GameMode.Awdp || IsAwdpV2(scope))
+            && (scope.Mode != GameMode.Awdp || IsValidAwdpConfiguration(scope))
         || scope is
         {
             Mode: GameMode.Ctf,
@@ -411,9 +412,18 @@ public sealed class RuntimeInstanceStore(
             ? RuntimePurpose.Practice
             : RuntimePurpose.Player;
 
-    private static bool IsAwdpV2(RuntimeScope scope) =>
-        AwdpConfigurationParser.ParseCompetition(scope.CompetitionConfigurationJson)
-            .UsesContinuousRoundScoring;
+    private static bool IsValidAwdpConfiguration(RuntimeScope scope)
+    {
+        try
+        {
+            _ = AwdpConfigurationParser.ParseCompetition(scope.CompetitionConfigurationJson);
+            return true;
+        }
+        catch (GameModeConfigurationException)
+        {
+            return false;
+        }
+    }
 
     private static bool CanReset(RuntimeInstance instance) =>
         instance.State is RuntimeState.Provisioning or RuntimeState.Running

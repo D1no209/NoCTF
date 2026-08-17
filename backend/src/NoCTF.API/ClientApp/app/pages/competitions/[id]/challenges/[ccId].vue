@@ -5,12 +5,14 @@ import {
   downloadChallengeAttachmentEndpoint,
   downloadRandomChallengeAttachmentEndpoint,
   getChallengeEndpoint,
+  getLeaderboardEndpoint,
   listChallengeAttachmentsEndpoint,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankAttachmentDeliveryPolicyProtocol,
   NoCtfapiEndpointsAdministrationChallengeBankChallengeAttachmentResponse,
   NoCtfapiEndpointsChallengesChallengeResponse,
+  NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse,
 } from '~/api'
 import { downloadSdkFile } from '~/utils/download'
 
@@ -23,17 +25,23 @@ const { isLoggedIn } = useAuth()
 const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const leaderboardChallenge = ref<NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse | null>(null)
 
 onMounted(async () => {
-  const { data, error: err } = await getChallengeEndpoint({
-    path: { competitionId, competitionChallengeId },
-  })
+  const [{ data, error: err }, leaderboardResult] = await Promise.all([
+    getChallengeEndpoint({ path: { competitionId, competitionChallengeId } }),
+    getLeaderboardEndpoint({ path: { competitionId } }),
+  ])
   loading.value = false
   if (err || !data) {
     error.value = parseApiError(err, translate("加载题目失败")).message
     return
   }
   challenge.value = data
+  const leaderboardData = leaderboardResult.data
+  leaderboardChallenge.value = leaderboardData && 'challenges' in leaderboardData
+    ? leaderboardData.challenges?.find(item => item.competitionChallengeId === competitionChallengeId) ?? null
+    : null
 })
 
 // 附件(需要登录)
@@ -115,7 +123,12 @@ const mode = computed(() => ctx.competition.value?.mode)
         <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
           {{ challenge.direction }}
         </Badge>
-        <Badge v-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
+        <template v-if="mode === 'Awdp'">
+          <Badge v-if="leaderboardChallenge?.currentBreakScore === null || leaderboardChallenge?.currentBreakScore === undefined" variant="secondary">{{ $t('分数隐藏') }}</Badge>
+          <span v-else class="font-mono text-sm font-semibold text-primary tabular-nums">Break {{ leaderboardChallenge.currentBreakScore }} pts</span>
+          <span v-if="leaderboardChallenge?.currentFixScore !== null && leaderboardChallenge?.currentFixScore !== undefined" class="font-mono text-sm font-semibold text-primary tabular-nums">Fix {{ leaderboardChallenge.currentFixScore }} pts</span>
+        </template>
+        <Badge v-else-if="challenge.baseScore === null || challenge.baseScore === undefined" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
         <span v-else class="font-mono text-lg font-semibold text-primary tabular-nums">{{ $t('{score} 分', { score: challenge.baseScore }) }}</span>
       </div>
 

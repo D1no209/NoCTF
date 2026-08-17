@@ -198,31 +198,25 @@ public sealed class AwdpGameplayFactEvaluator(IGameplayFactEvaluator inner) : IG
         if (submission.Kind != GameplayFactKind.BreakAttempt)
             return inner.Evaluate(context);
 
-        var configuration = AwdpConfigurationParser.ParseCompetition(
-            context.CompetitionConfigurationJson);
         var exactContext = context with
         {
             ApplicableFlags = context.ApplicableFlags
                 .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact)
-                .Where(flag => !configuration.UsesContinuousRoundScoring
-                    || flag.SpecificationKind == SpecificationKind.RuntimeGeneration)
+                .Where(flag => flag.SpecificationKind == SpecificationKind.RuntimeGeneration)
                 .ToArray(),
             PriorFacts = []
         };
-        if (configuration.UsesContinuousRoundScoring)
+        var matching = exactContext.ApplicableFlags
+            .Where(flag => DefaultEfGameplayFactEvaluator.Matches(submission, flag))
+            .ToArray();
+        if (matching.Length > 0 && matching.All(flag =>
+                flag.ValidStart is null || flag.ValidStart > submission.OccurredAt
+                || flag.ValidUntil is not null && submission.OccurredAt >= flag.ValidUntil))
         {
-            var matching = exactContext.ApplicableFlags
-                .Where(flag => DefaultEfGameplayFactEvaluator.Matches(submission, flag))
-                .ToArray();
-            if (matching.Length > 0 && matching.All(flag =>
-                    flag.ValidStart is null || flag.ValidStart > submission.OccurredAt
-                    || flag.ValidUntil is not null && submission.OccurredAt >= flag.ValidUntil))
-            {
-                return new(
-                    GameplayFactResult.Wrong,
-                    GameplayFactFailureCode.FlagExpired,
-                    submission.OccurredAt);
-            }
+            return new(
+                GameplayFactResult.Wrong,
+                GameplayFactFailureCode.FlagExpired,
+                submission.OccurredAt);
         }
         var normalDecision = inner.Evaluate(exactContext);
         return ModeGameplayFactEvaluatorRules.DetectForeignTeamFlag(exactContext, normalDecision);

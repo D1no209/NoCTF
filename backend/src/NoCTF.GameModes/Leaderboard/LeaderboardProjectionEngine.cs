@@ -46,7 +46,9 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
                 challenge.Id,
                 challenge.Title,
                 challenge.Direction,
-                projection.CurrentScores?.GetValueOrDefault(challenge.Id)))
+                projection.CurrentScores?.GetValueOrDefault(challenge.Id),
+                projection.CurrentBreakScores?.GetValueOrDefault(challenge.Id),
+                projection.CurrentFixScores?.GetValueOrDefault(challenge.Id)))
             .ToList();
         return new(entriesWithCells, challenges);
     }

@@ -7395,62 +7395,6 @@
         ]
       }
     },
-    "/api/v1/admin/awdp/scoring-impact-preview": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Previews legacy AWDP scoring differences.",
-        "description": "Read-only comparison of current legacy scores and continuous-round scores. It never changes gameplay facts, events or cached leaderboards.",
-        "operationId": "AdminPreviewAwdpScoringImpact",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactPreviewResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [
-              "Administrator"
-            ]
-          }
-        ]
-      }
-    },
     "/api/v1/admin/competitions/{competitionId}/gameplay-facts/adjudication-differences": {
       "get": {
         "tags": [
@@ -14548,6 +14492,16 @@
             "type": "integer",
             "format": "int64",
             "nullable": true
+          },
+          "currentBreakScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "currentFixScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },
@@ -17625,74 +17579,6 @@
         "additionalProperties": false
       },
       "NoCTFAPIEndpointsAdministrationGameplayFactsListAdminGameplayFactsRequest": {
-        "type": "object",
-        "additionalProperties": false
-      },
-      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactPreviewResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "projectedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "competitions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactCompetitionResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactCompetitionResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "competitionId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "competitionTitle": {
-            "type": "string"
-          },
-          "currentSchemaVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "teams": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactTeamResponse"
-            }
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactTeamResponse": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "teamId": {
-            "type": "string",
-            "format": "guid"
-          },
-          "teamName": {
-            "type": "string"
-          },
-          "currentScore": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "continuousScore": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "delta": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "NoCTFAPIEndpointsAdministrationGameplayFactsPreviewAwdpScoringImpactRequest": {
         "type": "object",
         "additionalProperties": false
       },

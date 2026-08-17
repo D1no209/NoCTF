@@ -30,7 +30,9 @@ public sealed record LeaderboardChallengeInfo(
     Guid CompetitionChallengeId,
     string Title,
     string Direction,
-    long? CurrentScore);
+    long? CurrentScore,
+    long? CurrentBreakScore,
+    long? CurrentFixScore);
 
 public sealed record LeaderboardEntry(
     int Rank,

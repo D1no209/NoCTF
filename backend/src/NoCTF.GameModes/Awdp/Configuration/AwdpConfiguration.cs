@@ -2,16 +2,9 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Flags;
+using NoCTF.GameModes.Scoring;
 
 namespace NoCTF.GameModes.Awdp.Configuration;
-
-public enum AchievementSettlement
-{
-    Milestone,
-    PerRound
-}
-
-public sealed record AwdpAchievementConfiguration(AchievementSettlement Settlement, long Points);
 
 public enum AwdpFlagInjectionKind
 {
@@ -27,8 +20,8 @@ public sealed record AwdpFlagInjectionConfiguration(
 public sealed record AwdpConfiguration(
     int SchemaVersion,
     int RoundDurationSeconds,
-    AwdpAchievementConfiguration Break,
-    AwdpAchievementConfiguration Fix,
+    ScoreCurveConfiguration Break,
+    ScoreCurveConfiguration Fix,
     long ViolationPenalty = 100,
     long ServiceDownPenalty = 50,
     bool RequireBreakBeforeFix = true,
@@ -39,16 +32,13 @@ public sealed record AwdpConfiguration(
     EvaluationDispatchMode EvaluationDispatchMode = EvaluationDispatchMode.Automatic,
     PerTeamFlagTemplate? FlagTemplate = null)
 {
-    public const int CurrentSchemaVersion = 2;
-    public const int LegacySchemaVersion = 1;
-
-    public bool UsesContinuousRoundScoring => SchemaVersion == CurrentSchemaVersion;
+    public const int CurrentSchemaVersion = 3;
 }
 
 public sealed record AwdpChallengeConfiguration(
     int SchemaVersion,
-    AwdpAchievementConfiguration? Break,
-    AwdpAchievementConfiguration? Fix,
+    ScoreCurveConfiguration? Break,
+    ScoreCurveConfiguration? Fix,
     bool? RequireBreakBeforeFix,
     int? MaxBreakSubmissions,
     int? MaxFixSubmissions,
@@ -67,14 +57,13 @@ public sealed record AwdpChallengeConfiguration(
     PerTeamFlagTemplate? FlagTemplate = null,
     AwdpFlagInjectionConfiguration? FlagInjection = null)
 {
-    public const int CurrentSchemaVersion = 2;
-    public const int LegacySchemaVersion = 1;
+    public const int CurrentSchemaVersion = 3;
 }
 
 public sealed record AwdpEffectiveConfiguration(
     int RoundDurationSeconds,
-    AwdpAchievementConfiguration Break,
-    AwdpAchievementConfiguration Fix,
+    ScoreCurveConfiguration Break,
+    ScoreCurveConfiguration Fix,
     long BreakWrongPenalty,
     long FixFailurePenalty,
     long ViolationPenalty,
@@ -91,8 +80,4 @@ public sealed record AwdpEffectiveConfiguration(
     int ReadyTimeoutSeconds,
     long MaximumPatchUploadBytes,
     PerTeamFlagTemplate FlagTemplate,
-    AwdpFlagInjectionConfiguration? FlagInjection,
-    int SchemaVersion = AwdpConfiguration.LegacySchemaVersion)
-{
-    public bool UsesContinuousRoundScoring => SchemaVersion == AwdpConfiguration.CurrentSchemaVersion;
-}
+    AwdpFlagInjectionConfiguration? FlagInjection);

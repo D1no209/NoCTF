@@ -134,8 +134,7 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
             scope.ConfigurationJson,
             scope.RulesJson,
             scope.DefinitionJson);
-        if (!configuration.UsesContinuousRoundScoring
-            || configuration.Runtime is not
+        if (configuration.Runtime is not
             {
                 Allocation: NoCTF.Application.Runtime.Provisioning.RuntimeAllocation.PerTeam,
                 FlagSource: NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam,

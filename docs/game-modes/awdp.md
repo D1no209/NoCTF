@@ -5,18 +5,18 @@
 AWDP 由攻击与防御两条独立事实流组成；是否允许未完成 Break 就提交 Fix，
 由当前比赛题目的 `RequireBreakBeforeFix` 决定：
 
-- 攻击轨 `BreakAttempt`：队伍启动自己的长期攻击 Runtime，利用漏洞取得该 Runtime generation 的动态 Flag；首次有效 Correct 从所属逻辑轮开始持续累计攻击分。
-- 防御轨 `FixAttempt`：队伍上传不可变 `tar.gz` Patch，平台在全新的临时 Fix Target 中应用 Patch，并只运行一次 Checker；首次有效 Correct 从所属逻辑轮开始持续累计防御分。
+- 攻击轨 `BreakAttempt`：队伍启动自己的长期攻击 Runtime，利用漏洞取得该 Runtime generation 的动态 Flag；每个逻辑轮内首次有效 Correct 参与该轮攻击分结算。
+- 防御轨 `FixAttempt`：队伍上传不可变 `tar.gz` Patch，平台在全新的临时 Fix Target 中应用 Patch，并只运行一次 Checker；每个逻辑轮内首次有效 Correct 参与该轮防御分结算。
 
 AWDP 不是 AWD，不使用 `FlagAttempt`、`AwdRound`、加固期、周期服务上下线检查、批量提交其他队伍轮次 Flag 或 AWD 目标列表。AWDP 的 Checker 只属于一次 Fix 验证，不会周期运行，也不会修改队伍的长期攻击 Runtime。
 
-## schema v2 配置
+## schema v3 配置
 
-新建 AWDP 比赛、比赛题目规则和题目定义均使用 `schemaVersion: 2`。Competition 配置包含：
+新建 AWDP 比赛与比赛题目规则使用 `schemaVersion: 3`；题库技术定义继续使用其独立的 definition schema。Competition 配置包含：
 
 ```text
 RoundDurationSeconds: int > 0
-Break.Points / Fix.Points: bigint >= 0       // 每个有效逻辑轮的分值
+Break / Fix: ScoreCurveConfiguration         // 两条互不影响的动态曲线
 BreakWrongPenalty / FixFailurePenalty: bigint >= 0
 ViolationPenalty / ServiceDownPenalty: bigint >= 0
 MaxBreakSubmissions / MaxFixSubmissions: int // <= 0 表示无限
@@ -24,7 +24,7 @@ EvaluationDispatchMode: Automatic | ManualBatch
 FlagTemplate: PerTeamFlagTemplate
 ```
 
-`CompetitionChallenge.RulesJson` 可以逐项覆盖 Break/Fix 结算方式、分值、罚分、次数、
+`Break` 与 `Fix` 分别包含 InitialPoints、MinimumPoints、DecayTeamCount、DecayMode 与可选 CustomExpression。内置 Fixed、Linear、Quadratic、Exponential、Logarithmic，也可使用受限自定义公式。`CompetitionChallenge.RulesJson` 可以逐项覆盖 Break/Fix 曲线、罚分、次数、
 派发方式、`RequireBreakBeforeFix` 和 `FlagTemplate`。覆盖值 `0` 是显式零，只有
 `null` 表示继承。不同比赛可以为同一题目使用不同 Flag 前缀与正文模板。
 
@@ -46,13 +46,9 @@ MaximumPatchUploadBytes
 未知 schema、缺失 Runtime/Checker、公开端点无有效 OwnerOnly URL、非法环境变量名，
 以及与模式不兼容的 Runtime 均在保存或 Start Gate 阶段拒绝。
 
-## schema v1 历史兼容
+## 不兼容旧计分配置
 
-`schemaVersion: 1` 仅用于读取既有比赛，不自动迁移，也不改写历史 GameplayFact、
-CompetitionEvent 或排行榜事实。当前 schema 的 `Milestone | PerRound` 与
-`RequireBreakBeforeFix` 均是有效产品配置；前者控制计分投影，后者控制 Fix 接入资格。
-
-平台管理员可调用只读历史影响预览，比较 v1 当前分数与按 v2 持续计分规则推导的预期分数。预览只读取 PostgreSQL 一致快照，不写事实、不启用 v2、不更新排行榜；是否迁移指定历史比赛必须另行审批。
+AWDP schema v3 是刻意的不兼容重设计，不读取或升级旧 `Milestone`、`PerRound`、固定 Points 或持续激活配置。旧 JSON 在保存、发布和 Start Gate 均被拒绝；工作人员必须明确重配两条分值曲线。GameplayFact 与永久比赛事件不被删除或改写，禁赛、解禁及重判通过同一确定性投影重新结算。
 
 ## 攻击 Runtime
 
@@ -131,7 +127,7 @@ Provider Running 后，Runner 在执行 Patch 前用 PostgreSQL 事务把 dispos
 
 创建 Target 时固化 Competition configuration revision、CompetitionChallenge revision 和 Challenge definition revision。结果落库前任一 revision 变化都使该次验证 PlatformFailed；不得隐式拿新定义解释旧请求。
 
-## 按轮持续计分
+## 按轮动态结算
 
 逻辑轮使用 Competition 生命周期事件计算的 EffectiveRunningTime：
 
@@ -139,17 +135,16 @@ Provider Running 后，Runner 在执行 Patch 前用 PostgreSQL 事务把 dispos
 round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 ```
 
-- Break 在轮 N 首次有效 Correct：从 N 到当前逻辑轮，每轮增加 `Break.Points`；
-- Fix 在轮 M 首次有效 Correct：从 M 到当前逻辑轮，每轮增加 `Fix.Points`；
-- 当前进行中的轮次立即计入；
-- 两轨分数可同时激活并相加；启用 `RequireBreakBeforeFix` 后，Break 被重判为非
-  Correct 时，依赖它的 Fix 暂停贡献，恢复 Correct 后再参与投影；
-- 每个 Team/CompetitionChallenge/Kind 只选择最早有效 Correct，不建立重叠区间；
-- Correct 被重判为非 Correct 时改选下一条有效 Correct；Wrong 被重判为 Correct 时按原 OccurredAt 重新计算起点；
+- 每个 Team/CompetitionChallenge/Kind/round 只选 `(OccurredAt, GameplayFactId)` 最早的有效 Correct；
+- 同一题目的 Break 与 Fix 分开统计该轮成功的、`AffectsDynamicChallengeScore=true` 的不同队伍数；
+- 分别把该计数代入 Break/Fix 曲线，得到该轮的整数攻击分和防御分；该轮每个可计分成功队伍获得对应轨道的同一分值；
+- 当前进行中的轮次为暂定结算，随着本轮成功队伍增加会重投影；进入后续轮后，前一轮使用前一轮自己的最终人数，后续人数不追溯改变它；
+- 两轨分数独立后相加。启用 `RequireBreakBeforeFix` 时，Fix 必须存在按权威顺序更早的 Correct Break；该 Break 被重判后会确定性重盘依赖结果；
+- Correct/Wrong 重判、队伍禁赛或解禁都会从原始事实全量重播所有轮次，不修改 GameplayFact 或永久事件；
 - Pause 不增加 EffectiveRunningTime，因此不推进收益；Resume 从原逻辑时间继续；Finish 使用结束时点冻结；
 - Break/Fix 失败罚分仍按每条事实一次性应用；Hint、ManualAdjustment、赛道过滤和 checked Int64 聚合保持原规则。
 
-即使没有新 GameplayFact，轮次边界也会改变分数。singular maintenance 每 15 秒最多检查 500 场 Running AWDP v2 比赛，比较缓存快照 `DataAsOf` 对应轮次与当前逻辑轮；只有跨轮或缺失快照时设置 `LeaderboardDirty`。随后复用现有 `RefreshDirtyLeaderboards -> ProjectLeaderboard`、PostgreSQL 行锁、Wolverine Outbox 和原子缓存替换。没有新增 schedule 或积分状态表，也不会每秒写库。
+即使没有新 GameplayFact，轮次边界也会冻结上一轮并开始显示新一轮的初始曲线值。singular maintenance 每 15 秒最多检查 500 场 Running AWDP schema v3 比赛，比较缓存快照 `DataAsOf` 对应轮次与当前逻辑轮；只有跨轮或缺失快照时设置 `LeaderboardDirty`。随后复用现有 `RefreshDirtyLeaderboards -> ProjectLeaderboard`、PostgreSQL 行锁、Wolverine Outbox 和原子缓存替换。没有新增 schedule 或积分状态表，也不会每秒写库。
 
 ## 玩家状态接口
 

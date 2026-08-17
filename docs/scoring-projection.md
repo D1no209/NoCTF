@@ -6,8 +6,7 @@
 
 - CTF：Correct FlagAttempt、Wrong 罚分、Unlocked Hint、Applied ManualAdjustment。
 - AWD：带 VictimTeam/AwdRound 的 Correct FlagAttempt，以及状态变化产生的 AwdServiceTransition。
-- AWDP schema v1：Correct BreakAttempt/FixAttempt 的历史 Milestone/PerRound 单次成就、模式罚分、Hint 和 ManualAdjustment。
-- AWDP schema v2：每队每题分别选择最早有效 Correct BreakAttempt/FixAttempt 作为攻击/防御激活点，从激活轮到 ProjectedAt 所属逻辑轮逐轮累计；失败事实只应用一次罚分。
+- AWDP schema v3：按 Team/CompetitionChallenge/Kind/round 选择最早 Correct，按该轮不同成功队伍数分别计算 Break/Fix 动态曲线；失败事实只应用一次罚分。
 - KoH：每次完成轮询产生的 Controlled/Uncontrolled KohControlObservation；连续同队控制仍分别计分。
 
 配置修改立即影响下一次全量投影，不保存历史配置，也不支持按过去时点重建。冻结排行榜在冻结命令内同步使用当前事实和配置完整生成，并把完整 JSON 保存到 Competition；冻结失败不改变可见性。
@@ -20,7 +19,7 @@
 
 `ProjectLeaderboard` 获取 CompetitionId 对应的 PostgreSQL transaction advisory lock，从 PostgreSQL 全量加载并计算完整不可变 `LeaderboardResponse`，然后原子替换缓存并发布 `leaderboardRefreshed`。同一比赛的投影串行，旧任务不能在新任务之后覆盖快照。
 
-AWDP v2 的分数会在没有新 GameplayFact 的逻辑轮边界变化。singular maintenance 的 15 秒刷新消息每批最多检查 500 场 Running AWDP v2 比赛；它用生命周期事件分别计算缓存 `DataAsOf` 与当前时刻的 EffectiveRunningTime/轮次，只在跨轮或缓存缺失时设置 Dirty。Pause 不跨轮，Finished 不再进入扫描，最终生命周期投影冻结分数。该机制不新增计划表，也不保存派生攻击/防御状态。
+AWDP v3 的分数会在没有新 GameplayFact 的逻辑轮边界变化。singular maintenance 的 15 秒刷新消息每批最多检查 500 场 Running AWDP v3 比赛；它用生命周期事件分别计算缓存 `DataAsOf` 与当前时刻的 EffectiveRunningTime/轮次，只在跨轮或缓存缺失时设置 Dirty。Pause 不跨轮，Finished 不再进入扫描，最终生命周期投影冻结分数。该机制不新增计划表，也不保存派生攻击/防御状态。
 
 失败时保留旧快照、记录 `leaderboard:{competitionId:N}:last-failure`、重新置 Dirty 并让 Wolverine 重试。没有旧快照时 GET 返回 503 `LeaderboardProjectionFailed`；有旧快照时继续返回 200。
 
@@ -39,9 +38,23 @@ FusionCache 提供 L1，生产环境使用 Redis L2 与 backplane。排行榜业
 - 缓存不存在：原子置 Dirty 并返回 202 Processing。
 - 响应不包含 SnapshotRevision、TargetRevision、Stale 或 LastFailureAt。
 
-## 数值与 CTF 表达式
+## 共享分值衰减曲线
 
-Points、Penalty、Hint Cost、ManualAdjustment 和最终分数使用 checked signed Int64；溢出使整场投影失败并保留旧快照。所有可配置的单项 Points、Penalty、CompetitionChallenge BaseScore 与 Hint Cost 必须位于 0–1,000,000；CTF InitialPoints 最小为 1。百分比血奖仍使用 0–100。该边界不改变 ManualAdjustment 的规范 Int32 文本边界，也不截断最终聚合分数。CTF DynamicExpresso 只注入 `initialPoints`、`minimumPoints`、`solveCount`、`eligibleTeamCount`、`decayParameter`，禁止 Reflection、assignment、额外程序集和复杂对象。Correct solve 及血奖顺序统一按 `(OccurredAt, GameplayFactId)`。
+CTF 题值以及 AWDP Break/Fix 分值都使用 `ScoreCurveConfiguration`：
+
+```text
+InitialPoints: 1..1,000,000
+MinimumPoints: 0..InitialPoints
+DecayTeamCount: int > 1
+DecayMode: Fixed | Linear | Quadratic | Exponential | Logarithmic | Custom
+CustomExpression?: string
+```
+
+令 `x=clamp((solveCount-1)/(decayTeamCount-1),0,1)`。Linear 为 `initial+(minimum-initial)*x`；Quadratic 使用 `x²`；Exponential 使用归一化 `e^(-4x)`；Logarithmic 使用 `log10(1+9x)`；Fixed 恒为 InitialPoints。结果先钳制到 `[MinimumPoints, InitialPoints]`，再使用 AwayFromZero 取整为 signed Int64。`solveCount` 在 CTF 表示当前有效解题队伍数，在 AWDP 表示当前题目、当前轮、当前 Break 或 Fix 轨道的不同成功队伍数。
+
+Custom 使用受限 DynamicExpresso，仅注入 `initialPoints`、`minimumPoints`、`solveCount`、`eligibleTeamCount`、`decayTeamCount`；禁止 Reflection、assignment、额外程序集和复杂对象。保存前对 0..eligibleTeamCount 的所有整数点验证，运行时同样钳制与取整。任何公式或 checked 聚合错误使整场投影失败并保留旧快照。
+
+Points、Penalty、Hint Cost、ManualAdjustment 和最终分数使用 checked signed Int64。可配置单项分值、Penalty 与 Hint Cost 位于 0–1,000,000；百分比血奖仍为 0–100。该边界不改变 ManualAdjustment 的规范 Int32 文本边界，也不截断最终聚合分数。Correct solve 及血奖顺序统一按 `(OccurredAt, GameplayFactId)`。
 
 公共响应仍是 `challenges[]` 与排序后的 `entries[]` 稀疏矩阵，并返回可见的 `tracks[]`。每条 Entry 带 TrackKey，名次在各赛道内独立计算。普通访问者只读取 VisibleOnLeaderboard 的非内部赛道（以及本队赛道的自身条目）；工作人员可查看全部赛道。EarnsScore=false 不生成排行榜条目。
 

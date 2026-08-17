@@ -2,6 +2,7 @@ using System.Text.Json;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Flags;
+using NoCTF.GameModes.Scoring;
 
 namespace NoCTF.GameModes.Registration;
 
@@ -11,14 +12,16 @@ public static class GameModeDefaultConfiguration
 
     public static string GetCompetitionJson(GameMode mode) => mode switch
     {
-        GameMode.Ctf => JsonSerializer.Serialize(new Ctf.Configuration.CtfConfiguration(1,
-            new(500, 100, 10), []), Options),
+        GameMode.Ctf => JsonSerializer.Serialize(new Ctf.Configuration.CtfConfiguration(
+            Ctf.Configuration.CtfConfiguration.CurrentSchemaVersion,
+            ScoreCurveConfiguration.Default,
+            []), Options),
         GameMode.Awd => JsonSerializer.Serialize(Awd.Configuration.AwdConfiguration.Default, Options),
         GameMode.Awdp => JsonSerializer.Serialize(new Awdp.Configuration.AwdpConfiguration(
             Awdp.Configuration.AwdpConfiguration.CurrentSchemaVersion,
             RoundDurationSeconds: 300,
-            Break: new(Awdp.Configuration.AchievementSettlement.PerRound, 50),
-            Fix: new(Awdp.Configuration.AchievementSettlement.PerRound, 50),
+            Break: ScoreCurveConfiguration.Default,
+            Fix: ScoreCurveConfiguration.Default,
             ViolationPenalty: 100,
             ServiceDownPenalty: 50,
             RequireBreakBeforeFix: false,

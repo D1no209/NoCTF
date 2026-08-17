@@ -110,8 +110,7 @@ public sealed class AwdpAttackProvisioningPlanReader(IServiceScopeFactory scopes
         {
             return new(AwdpAttackProvisioningPlanState.Invalid);
         }
-        if (!configuration.UsesContinuousRoundScoring
-            || configuration.FlagInjection is not { } injection)
+        if (configuration.FlagInjection is not { } injection)
             return new(AwdpAttackProvisioningPlanState.Invalid);
 
         return injection.Kind switch

@@ -6,6 +6,7 @@ using NoCTF.GameModes.Registration;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Scoring;
+using NoCTF.GameModes.Scoring;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -20,14 +21,13 @@ public sealed class AwdpEffectiveConfigurationTests
             new GameModeChallengeConfigurationCatalog().GetDefaultJson(
                 NoCTF.Domain.Competitions.GameMode.Awdp));
 
-        await Assert.That(effective.Break.Points).IsEqualTo(50L);
-        await Assert.That(effective.Fix.Points).IsEqualTo(50L);
+        await Assert.That(effective.Break.InitialPoints).IsEqualTo(500L);
+        await Assert.That(effective.Fix.InitialPoints).IsEqualTo(500L);
         await Assert.That(effective.BreakWrongPenalty).IsEqualTo(0L);
         await Assert.That(effective.FixFailurePenalty).IsEqualTo(0L);
         await Assert.That(effective.ViolationPenalty).IsEqualTo(100L);
         await Assert.That(effective.ServiceDownPenalty).IsEqualTo(50L);
         await Assert.That(effective.RequireBreakBeforeFix).IsFalse();
-        await Assert.That(effective.UsesContinuousRoundScoring).IsTrue();
         await Assert.That(effective.MaxBreakSubmissions).IsEqualTo(10);
         await Assert.That(effective.MaxFixSubmissions).IsEqualTo(10);
         await Assert.That(effective.EvaluationDispatchMode)
@@ -82,15 +82,15 @@ public sealed class AwdpEffectiveConfigurationTests
     }
 
     [Test]
-    public async Task Current_awdp_accepts_player_runtime_milestones_and_break_gated_fixes()
+    public async Task Current_awdp_accepts_independent_curves_and_break_gated_fixes()
     {
         var competition = AwdpConfigurationParser.ParseCompetition(
             GameModeDefaultConfiguration.GetCompetitionJson(
                 NoCTF.Domain.Competitions.GameMode.Awdp));
         var challenge = new AwdpChallengeConfiguration(
             AwdpChallengeConfiguration.CurrentSchemaVersion,
-            new(AchievementSettlement.Milestone, 100),
-            new(AchievementSettlement.PerRound, 25),
+            new(100, 20, 8, ScoreDecayMode.Exponential),
+            new(80, 10, 6, ScoreDecayMode.Logarithmic),
             RequireBreakBeforeFix: true,
             MaxBreakSubmissions: null,
             MaxFixSubmissions: null,
@@ -111,8 +111,10 @@ public sealed class AwdpEffectiveConfigurationTests
         var effective = AwdpConfigurationResolver.Resolve(competition, challenge);
 
         await Assert.That(effective.RequireBreakBeforeFix).IsTrue();
-        await Assert.That(effective.Break.Settlement)
-            .IsEqualTo(AchievementSettlement.Milestone);
+        await Assert.That(effective.Break.DecayMode)
+            .IsEqualTo(ScoreDecayMode.Exponential);
+        await Assert.That(effective.Fix.DecayMode)
+            .IsEqualTo(ScoreDecayMode.Logarithmic);
         await Assert.That(AwdpConfigurationValidator.Validate(challenge)).IsEmpty();
         await Assert.That(AwdpConfigurationValidator.ValidateForStart(effective)).IsEmpty();
     }

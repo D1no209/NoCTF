@@ -97,8 +97,8 @@ public sealed class CtfFullBoundaryTests
 
         var configurationJson = JsonSerializer.Serialize(new
         {
-            schemaVersion = 1,
-            points = new { initialPoints = 500, minimumPoints = 100, decayFactor = 10 },
+            schemaVersion = 2,
+            scoreCurve = new { initialPoints = 500, minimumPoints = 100, decayTeamCount = 10, decayMode = 2 },
             bloodRewards = new[] { new { policy = 0, value = 25m } },
             maxFlagAttempts = 5
         }, JsonOptions);
@@ -158,8 +158,8 @@ public sealed class CtfFullBoundaryTests
         var composeChallengeRevision = composeChallenge.GetProperty("revision").GetInt32();
         var composeConfigurationJson = JsonSerializer.Serialize(new
         {
-            schemaVersion = 1,
-            points = new { initialPoints = 250, minimumPoints = 100, decayFactor = 10 },
+            schemaVersion = 2,
+            scoreCurve = new { initialPoints = 250, minimumPoints = 100, decayTeamCount = 10, decayMode = 2 },
             bloodRewards = Array.Empty<object>(),
             maxFlagAttempts = 5
         }, JsonOptions);
@@ -546,7 +546,7 @@ public sealed class CtfFullBoundaryTests
     private static string BuildContainerDefinition(string runtimeImage) =>
         JsonSerializer.Serialize(new
         {
-            schemaVersion = 1,
+            schemaVersion = 2,
             runtime = new
             {
                 allocation = 1,
@@ -585,7 +585,7 @@ public sealed class CtfFullBoundaryTests
     private static string BuildComposeDefinition(string runtimeImage) =>
         JsonSerializer.Serialize(new
         {
-            schemaVersion = 1,
+            schemaVersion = 2,
             runtime = new
             {
                 allocation = 1,

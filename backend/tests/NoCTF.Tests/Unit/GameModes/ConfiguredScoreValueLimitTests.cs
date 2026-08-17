@@ -3,6 +3,7 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Ctf.Configuration;
 using NoCTF.GameModes.Koh.Configuration;
+using NoCTF.GameModes.Scoring;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -16,7 +17,7 @@ public sealed class ConfiguredScoreValueLimitTests
     {
         var ctf = new CtfConfiguration(
             CtfConfiguration.CurrentSchemaVersion,
-            new((int)Maximum, (int)Maximum, 10),
+            new(Maximum, Maximum, 10),
             [new(BloodRewardPolicy.FixedPoints, Maximum)],
             WrongSubmissionPenalty: Maximum);
         var awd = AwdConfiguration.Default with
@@ -47,10 +48,10 @@ public sealed class ConfiguredScoreValueLimitTests
             []);
         foreach (var configuration in new[]
                  {
-                     ctfBase with { DefaultPoints = new((int)OverMaximum, 100, 10) },
+                     ctfBase with { DefaultScoreCurve = new(OverMaximum, 100, 10) },
                      ctfBase with
                      {
-                         DefaultPoints = new((int)OverMaximum, (int)OverMaximum, 10)
+                          DefaultScoreCurve = new(OverMaximum, OverMaximum, 10)
                      },
                      ctfBase with
                      {
@@ -80,9 +81,9 @@ public sealed class ConfiguredScoreValueLimitTests
                  {
                      awdpBase with
                      {
-                         Break = awdpBase.Break with { Points = OverMaximum }
+                          Break = awdpBase.Break with { InitialPoints = OverMaximum }
                      },
-                     awdpBase with { Fix = awdpBase.Fix with { Points = OverMaximum } },
+                      awdpBase with { Fix = awdpBase.Fix with { InitialPoints = OverMaximum } },
                      awdpBase with { BreakWrongPenalty = OverMaximum },
                      awdpBase with { FixFailurePenalty = OverMaximum },
                      awdpBase with { ViolationPenalty = OverMaximum },
@@ -129,14 +130,14 @@ public sealed class ConfiguredScoreValueLimitTests
     {
         var ctfBase = new CtfChallengeConfiguration(
             CtfChallengeConfiguration.CurrentSchemaVersion,
-            Points: null,
+            ScoreCurve: null,
             BloodRewards: null);
         foreach (var configuration in new[]
                  {
-                     ctfBase with { Points = new((int)OverMaximum, 100, 10) },
+                      ctfBase with { ScoreCurve = new(OverMaximum, 100, 10) },
                      ctfBase with
                      {
-                         Points = new((int)OverMaximum, (int)OverMaximum, 10)
+                          ScoreCurve = new(OverMaximum, OverMaximum, 10)
                      },
                      ctfBase with
                      {
@@ -167,9 +168,9 @@ public sealed class ConfiguredScoreValueLimitTests
                  {
                      awdpBase with
                      {
-                         Break = awdpBase.Break! with { Points = OverMaximum }
+                          Break = awdpBase.Break! with { InitialPoints = OverMaximum }
                      },
-                     awdpBase with { Fix = awdpBase.Fix! with { Points = OverMaximum } },
+                      awdpBase with { Fix = awdpBase.Fix! with { InitialPoints = OverMaximum } },
                      awdpBase with { BreakWrongPenalty = OverMaximum },
                      awdpBase with { FixFailurePenalty = OverMaximum },
                      awdpBase with { ViolationPenalty = OverMaximum },
@@ -210,8 +211,8 @@ public sealed class ConfiguredScoreValueLimitTests
     private static AwdpConfiguration CreateAwdpCompetition(long value) => new(
         AwdpConfiguration.CurrentSchemaVersion,
         RoundDurationSeconds: 300,
-        Break: new(AchievementSettlement.PerRound, value),
-        Fix: new(AchievementSettlement.PerRound, value),
+        Break: new(value, value, 2, ScoreDecayMode.Fixed),
+        Fix: new(value, value, 2, ScoreDecayMode.Fixed),
         ViolationPenalty: value,
         ServiceDownPenalty: value,
         RequireBreakBeforeFix: false,
@@ -220,8 +221,8 @@ public sealed class ConfiguredScoreValueLimitTests
 
     private static AwdpChallengeConfiguration CreateAwdpChallenge(long value) => new(
         AwdpChallengeConfiguration.CurrentSchemaVersion,
-        Break: new(AchievementSettlement.PerRound, value),
-        Fix: new(AchievementSettlement.PerRound, value),
+        Break: new(value, value, 2, ScoreDecayMode.Fixed),
+        Fix: new(value, value, 2, ScoreDecayMode.Fixed),
         RequireBreakBeforeFix: null,
         MaxBreakSubmissions: null,
         MaxFixSubmissions: null,

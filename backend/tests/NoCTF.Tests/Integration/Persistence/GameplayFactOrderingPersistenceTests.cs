@@ -302,7 +302,7 @@ public sealed class GameplayFactOrderingPersistenceTests
                     Order = 1,
                     BaseScore = 100,
                     IsPublished = true,
-                    RulesJson = """{"schemaVersion":1}""",
+                    RulesJson = """{"schemaVersion":2}""",
                     UpdatedAt = fixture.Now
                 });
                 setup.GameplayFacts.Add(Fact(
@@ -422,7 +422,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             OwnerId = ownerId,
             Title = "Gameplay fact ordering",
             Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ConfigurationJson = """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
             ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddMinutes(-5),
@@ -450,7 +450,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             ChallengeId = challengeId,
             BaseScore = 100,
             IsPublished = true,
-            RulesJson = """{"schemaVersion":1}""",
+            RulesJson = """{"schemaVersion":2}""",
             UpdatedAt = now
         });
         db.ChallengeFlags.Add(new ChallengeFlag
