@@ -86,7 +86,10 @@ function resultText(submission: Submission) {
   if (isGameplayFactPending(submission.state)) {
     return gameplayFactStateLabel(submission.state)
   }
-  return gameplayFactResultLabel(submission.result)
+  const result = gameplayFactResultLabel(submission.result)
+  return submission.failureCode
+    ? `${result} · ${gameplayFactFailureCodeLabel(submission.failureCode)}`
+    : result
 }
 </script>
 

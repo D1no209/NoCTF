@@ -16,7 +16,7 @@ public sealed class AwdpFullBoundaryTests
 
     [Test]
     [Timeout(420_000)]
-    public async Task Awdp_v3_keeps_attack_runtime_fix_verification_and_round_scoring_independent(
+    public async Task Awdp_v4_keeps_attack_runtime_fix_verification_and_round_scoring_independent(
         CancellationToken cancellationToken)
     {
         var baseUrl = RequiredEnvironment("NOCTF_E2E_BASE_URL");
@@ -51,7 +51,7 @@ public sealed class AwdpFullBoundaryTests
 
         var competitionConfigurationJson = JsonSerializer.Serialize(new
         {
-            schemaVersion = 3,
+            schemaVersion = 4,
             roundDurationSeconds = 5,
             @break = new
             {
@@ -67,11 +67,10 @@ public sealed class AwdpFullBoundaryTests
                 decayTeamCount = 10,
                 decayMode = 1
             },
-            violationPenalty = 19,
-            serviceDownPenalty = 13,
+            serviceAbnormalPenalty = 13,
             requireBreakBeforeFix = false,
-            breakWrongPenalty = 7,
-            fixFailurePenalty = 11,
+            flagWrongPenalty = 7,
+            exploitSucceededPenalty = 11,
             maxBreakSubmissions = 5,
             maxFixSubmissions = 20,
             evaluationDispatchMode = 0
@@ -112,7 +111,7 @@ public sealed class AwdpFullBoundaryTests
 
         var challengeConfigurationJson = JsonSerializer.Serialize(new
         {
-            schemaVersion = 3,
+            schemaVersion = 4,
             requireBreakBeforeFix = false,
             maxBreakSubmissions = 5,
             maxFixSubmissions = 20,
@@ -317,7 +316,7 @@ public sealed class AwdpFullBoundaryTests
             competitionId,
             competitionChallengeId,
             fixedArchive,
-            "fixed.tar.gz",
+            "defense-succeeded.tar.gz",
             cancellationToken);
         var blueFixId = await SubmitFixAsync(
             blueClient,
@@ -351,21 +350,21 @@ public sealed class AwdpFullBoundaryTests
             competitionId,
             competitionChallengeId,
             CreatePatchArchive("#!/bin/sh\nset -eu\n"),
-            "still-vulnerable.tar.gz",
+            "exploit-succeeded.tar.gz",
             "FixAttempt",
             "Wrong",
-            "AwdpFixFailed",
+            "AwdpExploitSucceeded",
             TimeSpan.FromSeconds(90),
             cancellationToken);
         await SubmitFixAndAssertAsync(
             greenClient,
             competitionId,
             competitionChallengeId,
-            CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/rule-violation\n"),
-            "rule-violation.tar.gz",
+            CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/service-abnormal-bypass\n"),
+            "service-abnormal-bypass.tar.gz",
             "FixAttempt",
-            "Rejected",
-            "AwdpViolation",
+            "Wrong",
+            "AwdpServiceAbnormal",
             TimeSpan.FromSeconds(90),
             cancellationToken);
         await SubmitFixAndAssertAsync(
@@ -373,10 +372,10 @@ public sealed class AwdpFullBoundaryTests
             competitionId,
             competitionChallengeId,
             CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/service-down\n"),
-            "service-unavailable.tar.gz",
+            "service-abnormal-down.tar.gz",
             "FixAttempt",
             "Wrong",
-            "AwdpServiceDown",
+            "AwdpServiceAbnormal",
             TimeSpan.FromSeconds(90),
             cancellationToken);
         await SubmitFixAndAssertAsync(
@@ -408,8 +407,8 @@ public sealed class AwdpFullBoundaryTests
             CreateTarGzipArchive(("payload/readme.txt", "missing entrypoint\n")),
             "missing-fix-sh.tar.gz",
             "FixAttempt",
-            "Rejected",
-            "AwdpViolation",
+            "Wrong",
+            "AwdpPatchFailed",
             TimeSpan.FromSeconds(90),
             cancellationToken);
 
@@ -467,21 +466,21 @@ public sealed class AwdpFullBoundaryTests
             anonymous,
             competitionId,
             red.TeamId,
-            expectedScore: 22,
+            expectedScore: 33,
             TimeSpan.FromSeconds(45),
             cancellationToken);
         await PollLeaderboardAsync(
             anonymous,
             competitionId,
             blue.TeamId,
-            expectedScore: 60,
+            expectedScore: 53,
             TimeSpan.FromSeconds(45),
             cancellationToken);
         await PollLeaderboardAsync(
             anonymous,
             competitionId,
             green.TeamId,
-            expectedScore: -84,
+            expectedScore: -37,
             TimeSpan.FromSeconds(45),
             cancellationToken);
         var firstRoundScores = await ReadScoresAsync(anonymous, competitionId, cancellationToken);
@@ -554,7 +553,7 @@ public sealed class AwdpFullBoundaryTests
             anonymous,
             competitionId,
             red.TeamId,
-            expectedScore: 55,
+            expectedScore: 66,
             TimeSpan.FromSeconds(45),
             cancellationToken);
 
@@ -615,7 +614,7 @@ public sealed class AwdpFullBoundaryTests
     private static string BuildDefinition(string targetImage, string checkerImage) =>
         JsonSerializer.Serialize(new
         {
-            schemaVersion = 3,
+            schemaVersion = 4,
             runtime = new
             {
                 allocation = 1,

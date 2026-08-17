@@ -170,6 +170,9 @@ onUnmounted(() => {
               <span v-if="state.defense.result">
                 {{ $t('评测结果:') }}<strong>{{ gameplayFactResultLabel(state.defense.result) }}</strong>
               </span>
+              <span v-if="state.defense.failureCode" class="text-muted-foreground">
+                {{ $t('失败原因') }}：{{ gameplayFactFailureCodeLabel(state.defense.failureCode) }}
+              </span>
             </div>
           </CardContent>
         </Card>

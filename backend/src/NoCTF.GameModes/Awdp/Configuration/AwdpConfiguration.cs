@@ -22,17 +22,16 @@ public sealed record AwdpConfiguration(
     int RoundDurationSeconds,
     ScoreCurveConfiguration Break,
     ScoreCurveConfiguration Fix,
-    long ViolationPenalty = 100,
-    long ServiceDownPenalty = 50,
+    long FlagWrongPenalty = 0,
+    long ExploitSucceededPenalty = 0,
+    long ServiceAbnormalPenalty = 0,
     bool RequireBreakBeforeFix = true,
-    long BreakWrongPenalty = 0,
-    long FixFailurePenalty = 0,
     int MaxBreakSubmissions = 10,
     int MaxFixSubmissions = 10,
     EvaluationDispatchMode EvaluationDispatchMode = EvaluationDispatchMode.Automatic,
     PerTeamFlagTemplate? FlagTemplate = null)
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 }
 
 public sealed record AwdpChallengeConfiguration(
@@ -48,26 +47,24 @@ public sealed record AwdpChallengeConfiguration(
     int? PatchTimeoutSeconds = null,
     RunnerJobConfiguration? Checker = null,
     int? ReadyTimeoutSeconds = null,
-    long? BreakWrongPenalty = null,
-    long? FixFailurePenalty = null,
-    long? ViolationPenalty = null,
-    long? ServiceDownPenalty = null,
+    long? FlagWrongPenalty = null,
+    long? ExploitSucceededPenalty = null,
+    long? ServiceAbnormalPenalty = null,
     EvaluationDispatchMode? EvaluationDispatchMode = null,
     long? MaximumPatchUploadBytes = null,
     PerTeamFlagTemplate? FlagTemplate = null,
     AwdpFlagInjectionConfiguration? FlagInjection = null)
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 }
 
 public sealed record AwdpEffectiveConfiguration(
     int RoundDurationSeconds,
     ScoreCurveConfiguration Break,
     ScoreCurveConfiguration Fix,
-    long BreakWrongPenalty,
-    long FixFailurePenalty,
-    long ViolationPenalty,
-    long ServiceDownPenalty,
+    long FlagWrongPenalty,
+    long ExploitSucceededPenalty,
+    long ServiceAbnormalPenalty,
     bool RequireBreakBeforeFix,
     int MaxBreakSubmissions,
     int MaxFixSubmissions,

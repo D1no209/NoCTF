@@ -13561,16 +13561,14 @@
         "type": "string",
         "description": "",
         "x-enumNames": [
-          "Fixed",
-          "StillVulnerable",
-          "RuleViolation",
-          "ServiceUnavailable"
+          "ExploitSucceeded",
+          "DefenseSucceeded",
+          "ServiceAbnormal"
         ],
         "enum": [
-          "Fixed",
-          "StillVulnerable",
-          "RuleViolation",
-          "ServiceUnavailable"
+          "ExploitSucceeded",
+          "DefenseSucceeded",
+          "ServiceAbnormal"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse": {
@@ -13770,10 +13768,10 @@
           "FlagExpired",
           "RoundOutOfRange",
           "HardeningActive",
-          "AwdpFixFailed",
+          "AwdpExploitSucceeded",
           "AwdpPatchFailed",
           "AwdpPatchTimeout",
-          "AwdpServiceDown",
+          "AwdpServiceAbnormal",
           "AwdpViolation",
           "ForeignTeamFlagDetected",
           "InsufficientScore",
@@ -13804,10 +13802,10 @@
           "FlagExpired",
           "RoundOutOfRange",
           "HardeningActive",
-          "AwdpFixFailed",
+          "AwdpExploitSucceeded",
           "AwdpPatchFailed",
           "AwdpPatchTimeout",
-          "AwdpServiceDown",
+          "AwdpServiceAbnormal",
           "AwdpViolation",
           "ForeignTeamFlagDetected",
           "InsufficientScore",

@@ -80,7 +80,7 @@ public static class AwdpCheckerCompletionPolicy
     {
         AwdpCheckerExecutionOutcome.Completed => null,
         AwdpCheckerExecutionOutcome.AbnormalExit => AwdpFixOutcome.PlatformFailed,
-        AwdpCheckerExecutionOutcome.TimedOut => AwdpFixOutcome.PlatformFailed,
+        AwdpCheckerExecutionOutcome.TimedOut => AwdpFixOutcome.ServiceAbnormal,
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
     };
 }
@@ -455,7 +455,7 @@ public sealed class AwdpFixVerificationHandler(
         }
         catch (InvalidDataException)
         {
-            outcome = AwdpFixOutcome.RuleViolation;
+            outcome = AwdpFixOutcome.PatchFailed;
         }
         catch (FileNotFoundException)
         {

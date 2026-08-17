@@ -214,7 +214,38 @@ public sealed class AwdpGameplayFactEvaluatorTests
             Fact(GameplayFactKind.BreakAttempt, startedAt.AddSeconds(130), GameplayFactResult.Correct),
             Fact(GameplayFactKind.FixAttempt, startedAt.AddSeconds(130), GameplayFactResult.Correct),
             Fact(GameplayFactKind.FixAttempt, startedAt.AddSeconds(140), GameplayFactResult.Correct),
-            Fact(GameplayFactKind.BreakAttempt, startedAt.AddSeconds(150), GameplayFactResult.Wrong)
+            Fact(GameplayFactKind.BreakAttempt, startedAt.AddSeconds(150), GameplayFactResult.Wrong),
+            Fact(
+                GameplayFactKind.BreakAttempt,
+                startedAt.AddSeconds(155),
+                GameplayFactResult.Rejected,
+                GameplayFactFailureCode.ForeignTeamFlagDetected),
+            Fact(
+                GameplayFactKind.FixAttempt,
+                startedAt.AddSeconds(160),
+                GameplayFactResult.Wrong,
+                GameplayFactFailureCode.AwdpExploitSucceeded),
+            Fact(
+                GameplayFactKind.FixAttempt,
+                startedAt.AddSeconds(170),
+                GameplayFactResult.Wrong,
+                GameplayFactFailureCode.AwdpServiceAbnormal),
+            Fact(
+                GameplayFactKind.FixAttempt,
+                startedAt.AddSeconds(180),
+                GameplayFactResult.Wrong,
+                GameplayFactFailureCode.AwdpPatchFailed),
+            Fact(
+                GameplayFactKind.FixAttempt,
+                startedAt.AddSeconds(190),
+                GameplayFactResult.Wrong,
+                GameplayFactFailureCode.AwdpPatchTimeout),
+            Fact(
+                GameplayFactKind.FixAttempt,
+                startedAt.AddSeconds(200),
+                null,
+                GameplayFactFailureCode.CheckerPlatformError,
+                GameplayFactState.PlatformFailed)
         };
         var configuration = JsonSerializer.Serialize(
             new AwdpConfiguration(
@@ -222,35 +253,39 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 60,
                 FixedCurve(40),
                 FixedCurve(60),
-                BreakWrongPenalty: 7),
+                FlagWrongPenalty: 7,
+                ExploitSucceededPenalty: 11,
+                ServiceAbnormalPenalty: 13),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var projection = new AwdpLeaderboardProjector().Project(new(
             competitionId,
             GameMode.Awdp,
             [new LeaderboardTeamFact(teamId, "Team", false, false, startedAt)],
             facts,
-            [new LeaderboardChallengeFact(challengeId, "Pwn", "Challenge", false, "{\"schemaVersion\":2}")],
+            [new LeaderboardChallengeFact(challengeId, "Pwn", "Challenge", false, "{\"schemaVersion\":4}")],
             configuration,
             startedAt,
             ProjectedAt: startedAt.AddSeconds(250)));
 
         var entry = projection.Entries.Single();
-        await Assert.That(entry.Score).IsEqualTo(133L);
+        await Assert.That(entry.Score).IsEqualTo(102L);
         await Assert.That(entry.SolveCount).IsEqualTo(3);
         await Assert.That(projection.Cells.Single().Score).IsEqualTo(140L);
 
         LeaderboardGameplayFact Fact(
             GameplayFactKind kind,
             DateTimeOffset occurredAt,
-            GameplayFactResult result) => new(
+            GameplayFactResult? result,
+            GameplayFactFailureCode? failureCode = null,
+            GameplayFactState state = GameplayFactState.Completed) => new(
                 Guid.CreateVersion7(occurredAt),
                 teamId,
                 challengeId,
                 kind,
                 occurredAt,
-                GameplayFactState.Completed,
+                state,
                 result,
-                null);
+                failureCode);
     }
 
     [Test]
@@ -285,7 +320,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 new LeaderboardTeamFact(teamB, "B", banTeamB, false, startedAt)
             ],
             facts,
-            [new LeaderboardChallengeFact(challengeId, "Pwn", "Challenge", false, "{\"schemaVersion\":3}")],
+            [new LeaderboardChallengeFact(challengeId, "Pwn", "Challenge", false, "{\"schemaVersion\":4}")],
             configuration,
             startedAt,
             ProjectedAt: projectedAt);
@@ -352,7 +387,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 GameplayFactState.Completed,
                 GameplayFactResult.Correct,
                 null)],
-            [new LeaderboardChallengeFact(challengeId, "Pwn", "Challenge", false, "{\"schemaVersion\":2}")],
+            [new LeaderboardChallengeFact(challengeId, "Pwn", "Challenge", false, "{\"schemaVersion\":4}")],
             configuration,
             startedAt,
             transitions,

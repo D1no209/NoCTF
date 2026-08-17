@@ -143,7 +143,7 @@ describe('AWDP patch upload limits', () => {
     expect(JSON.parse(json).maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
     expect(parseDefinition(json)?.maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
     expect(JSON.parse(json)).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 4,
     })
     expect(JSON.parse(json).flagInjection).toBeUndefined()
     expect(competitionConfigFields('Awdp').some(field => field.key === 'requireBreakBeforeFix')).toBeTrue()

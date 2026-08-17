@@ -3,6 +3,8 @@
 import json
 import os
 import socket
+import subprocess
+import sys
 import time
 import urllib.request
 
@@ -35,24 +37,39 @@ def wait_until_ready(host: str, timeout_seconds: int) -> bool:
     return False
 
 
-def evaluate(host: str, ready_timeout: int) -> str:
-    if not wait_until_ready(host, ready_timeout):
-        return "ServiceUnavailable"
-
+def run_exploit(host: str, timeout_seconds: int) -> tuple[bool, bool]:
     try:
-        legitimate = exchange(host, "READ 0")
-        if legitimate != "VALUE:training-service-online":
-            return "RuleViolation"
-
-        exploit = exchange(host, "READ 4")
+        result = subprocess.run(
+            [sys.executable, "/checker/exploit.py", host, str(TARGET_PORT)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=max(1, timeout_seconds),
+        )
+        return result.returncode == 0, False
+    except subprocess.TimeoutExpired:
+        return False, True
     except OSError:
-        return "ServiceUnavailable"
+        # EXP 子进程自身崩溃不等于 Checker 主进程失败，仍须检查正常服务。
+        return False, False
 
-    if exploit == "ERR range":
-        return "Fixed"
-    if exploit.startswith("VALUE:") and len(exploit) > len("VALUE:"):
-        return "StillVulnerable"
-    return "RuleViolation"
+
+def service_is_healthy(host: str, ready_timeout: int) -> bool:
+    if not wait_until_ready(host, ready_timeout):
+        return False
+    try:
+        return exchange(host, "READ 0") == "VALUE:training-service-online"
+    except (OSError, TimeoutError):
+        return False
+
+
+def evaluate(host: str, ready_timeout: int) -> str:
+    exp_succeeded, exp_timed_out = run_exploit(host, ready_timeout)
+    service_healthy = service_is_healthy(host, ready_timeout)
+    if exp_timed_out or not service_healthy:
+        return "ServiceAbnormal"
+    return "ExploitSucceeded" if exp_succeeded else "DefenseSucceeded"
 
 
 def publish(outcome: str) -> None:

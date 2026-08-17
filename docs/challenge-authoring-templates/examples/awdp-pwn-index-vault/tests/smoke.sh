@@ -78,7 +78,7 @@ docker run -d --name "${callback}" --network "${network}" --network-alias callba
 wait_callback
 
 restart_target
-run_checker_expect StillVulnerable
+run_checker_expect ExploitSucceeded
 leak="$(docker exec "${target}" /bin/sh -c "printf 'READ 4\\n' | /opt/challenge/bin/pwn-note")"
 [ "${leak}" = "VALUE:${injected_value}" ] || {
     printf '%s\n' 'vulnerable target did not expose the injected prefix-independent value' >&2
@@ -86,20 +86,20 @@ leak="$(docker exec "${target}" /bin/sh -c "printf 'READ 4\\n' | /opt/challenge/
 }
 
 restart_target
-apply_fix_archive "${root}/artifacts/fixes/fixed.tar.gz"
-run_checker_expect Fixed
+apply_fix_archive "${root}/artifacts/fixes/defense-succeeded.tar.gz"
+run_checker_expect DefenseSucceeded
 
 restart_target
-apply_fix_archive "${root}/artifacts/fixes/still-vulnerable.tar.gz"
-run_checker_expect StillVulnerable
+apply_fix_archive "${root}/artifacts/fixes/exploit-succeeded.tar.gz"
+run_checker_expect ExploitSucceeded
 
 restart_target
-apply_fix_archive "${root}/artifacts/fixes/rule-violation.tar.gz"
-run_checker_expect RuleViolation
+apply_fix_archive "${root}/artifacts/fixes/service-abnormal-bypass.tar.gz"
+run_checker_expect ServiceAbnormal
 
 restart_target
-apply_fix_archive "${root}/artifacts/fixes/service-unavailable.tar.gz"
-run_checker_expect ServiceUnavailable
+apply_fix_archive "${root}/artifacts/fixes/service-abnormal-down.tar.gz"
+run_checker_expect ServiceAbnormal
 
 restart_target
 if apply_fix_archive "${root}/artifacts/fixes/nonzero.tar.gz"; then

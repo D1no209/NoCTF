@@ -82,7 +82,7 @@ public sealed class AwdpCheckerExecutorTests
             .IsEqualTo(NoCTF.Domain.Gameplay.AwdpFixOutcome.PlatformFailed);
         await Assert.That(AwdpCheckerCompletionPolicy.ResultFor(
                 AwdpCheckerExecutionOutcome.TimedOut))
-            .IsEqualTo(NoCTF.Domain.Gameplay.AwdpFixOutcome.PlatformFailed);
+            .IsEqualTo(NoCTF.Domain.Gameplay.AwdpFixOutcome.ServiceAbnormal);
     }
 
     private static AwdpCheckerWork Work() => new(

@@ -73,16 +73,15 @@ generation 生成精确 Flag，并在 Provider 创建前覆盖注入 `FLAG`。
 3. 分别运行 `python tools/exploit.py HOST PORT`，确认得到的动态 Flag 不同。
 4. 提交本队 Flag，确认 `BreakAttempt=Correct`；提交外队 Flag，确认不得分。
 5. Reset 一队 Runtime，确认新 Flag 生效且旧 Flag 返回 `FlagExpired`。
-6. 上传六个 `artifacts/fixes/*.tar.gz`，核对 Fixed、StillVulnerable、RuleViolation、
-   ServiceUnavailable、PatchFailed 和 PatchTimeout。
+6. 上传六个 `artifacts/fixes/*.tar.gz`，核对 DefenseSucceeded、ExploitSucceeded、
+   ServiceAbnormal、PatchFailed 和 PatchTimeout。
 7. 上传九类非法归档，确认在上传或安全解包边界被拒绝且不留下 target。
-8. 验证 PerRound 在暂停时冻结、恢复后继续、结束后冻结。
+8. 验证按轮动态分值在暂停时冻结、恢复后继续、结束后冻结。
 9. 检查 GameplayFact、排行榜、CompetitionEvent 与 Runtime 状态一致。
 
 ## 5. 故障定位
 
 - Player `InvalidConfiguration`：检查 PerTeam、`FLAG`、31337 端口、OwnerOnly URL 以及资源正数。
 - Fix 长期 Processing：检查 Wolverine 死信、一次性 target、Patch 退出码和 Checker callback。
-- `ServiceUnavailable`：确认服务监听 `0.0.0.0:31337`，Fix 未删除或停止服务。
-- `RuleViolation`：确认 `READ 0` 仍返回 `VALUE:training-service-online`。
+- `ServiceAbnormal`：确认服务监听 `0.0.0.0:31337`，Fix 未删除或停止服务，且 `READ 0` 仍返回 `VALUE:training-service-online`。
 - Checker 非零：按平台失败处理；日志只能记录阶段和稳定错误，不得打印回调地址或敏感值。

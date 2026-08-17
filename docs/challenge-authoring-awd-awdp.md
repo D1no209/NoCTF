@@ -218,32 +218,29 @@ Fix 不是 Flag，不能把修复包、修复状态或补丁 ID 塞进 Flag 接�
    不得另起工作人员维护的外部靶机替代。
 4. 配置补丁入口、执行命令、补丁超时、就绪等待时间和上传上限。
 5. 配置 Checker 镜像、唯一内部端口和超时。Fix target 会忽略 Player 的公网端口和 URL。
-6. 在比赛中添加题目，配置本场 Flag 模板，以及 Break/Fix 分值、结算方式、次数、
+6. 在比赛中添加题目，配置本场 Flag 模板，以及 Break/Fix 分值曲线、次数、
    `RequireBreakBeforeFix` 和罚分覆盖。
-7. 准备合法 Fix、仍可利用 Fix、规则违规 Fix、服务破坏 Fix 和恶意归档样本。
+7. 准备防御成功、EXP 仍可利用、服务异常、Patch 非零/超时和恶意归档样本。
 8. 用完整 E2E 验证 Player Runtime→动态 Flag→Break，以及上传→一次性 Target→Checker→Fix 闭环。
 
 ### 4.3 比赛与题目规则
 
 | 字段 | 常用默认 | 含义 |
 | --- | ---: | --- |
-| 轮次长度 | 300 秒 | `PerRound` 成就的有效逻辑轮次 |
-| Break 结算 | PerRound | `Milestone` 全场一次；`PerRound` 每轮一次 |
-| Break 分值 | 50 | 达成 Break 成就所得 |
-| Fix 结算 | PerRound | `Milestone` 全场一次；`PerRound` 每轮一次 |
-| Fix 分值 | 50 | 达成 Fix 成就所得 |
-| 规则违规罚分 | 100 | Checker 返回 RuleViolation 时扣除 |
-| 服务不可用罚分 | 50 | Checker 无法使用目标服务时扣除 |
-| Break 错误罚分 | 0 | 错误 Break 提交的可选扣分 |
-| Fix 失败罚分 | 0 | 漏洞仍存在、补丁失败或超时的可选扣分 |
+| 轮次长度 | 300 秒 | Break/Fix 每轮动态结算的逻辑轮次 |
+| Break 分值曲线 | 默认曲线 | 当前轮 Break 成功队伍数决定本轮攻击得分 |
+| Fix 分值曲线 | 默认曲线 | 当前轮 DefenseSucceeded 队伍数决定本轮防御得分 |
+| Flag 错误罚分 | 0 | 错误 Break 提交的可选单次扣分 |
+| EXP 利用成功罚分 | 0 | Fix 验证仍可被 EXP 利用时的可选单次扣分 |
+| 服务异常罚分 | 0 | Fix 验证中正常服务异常、超时或崩溃时的可选单次扣分 |
 | 先 Break 后 Fix | 开启 | 未取得当前要求的 Break 时拒绝 Fix |
 | 最大 Break 次数 | 10 | 每队每题接入上限；后端值 `<=0` 表示无限 |
 | 最大 Fix 次数 | 10 | 每队每题接入上限；后端值 `<=0` 表示无限 |
 | 评测派发 | Automatic | 自动派发；也可选择 ManualBatch |
 
-题目规则可覆盖 Break/Fix 结算和分值、是否要求先 Break、次数、罚分和评测派发。未覆盖的字段继承比赛配置。
+题目规则可覆盖 Break/Fix 分值曲线、是否要求先 Break、次数、罚分和评测派发。未覆盖的字段继承比赛配置。
 
-`Milestone` 与 `PerRound` 只控制计分投影。后续合法 Break 的 GameplayFact 仍保持 `Correct`，不能为了避免重复得分而把它错误改判为 `Duplicate`。
+同一轮内每个队伍每题每条轨道只取最早 Correct 参与该轮结算。后续合法 Break/Fix 的 GameplayFact 仍保持 `Correct`，不能为了避免重复得分而把它错误改判为 `Duplicate`。
 
 ### 4.4 Player Runtime 与一次性 Fix Target
 
@@ -330,25 +327,35 @@ tar --format=ustar -czf fix.tar.gz fix.sh
 
 ```sh
 #!/bin/sh
-set -eu
+set -u
 
-target="http://${TARGET_HOST}:8080/status"
+target="http://${TARGET_HOST}:8080"
 remaining="${TARGET_READY_TIMEOUT_SECONDS}"
-state=''
+exp_succeeded=0
+service_healthy=0
 
 while [ "${remaining}" -gt 0 ]; do
-  state="$(wget -qO- -T 2 "${target}" 2>/dev/null || true)"
-  [ -n "${state}" ] && break
+  wget -qO- -T 2 "${target}/health" >/dev/null 2>&1 && break
   remaining=$((remaining - 1))
   sleep 1
 done
 
-case "${state}" in
-  fixed) outcome='Fixed' ;;
-  vulnerable) outcome='StillVulnerable' ;;
-  '') outcome='ServiceUnavailable' ;;
-  *) outcome='RuleViolation' ;;
-esac
+if timeout 10 /checker/exploit.sh "${target}"; then
+  exp_succeeded=1
+fi
+
+health="$(wget -qO- -T 3 "${target}/health" 2>/dev/null || true)"
+if [ "${health}" = "ok" ]; then
+  service_healthy=1
+fi
+
+if [ "${service_healthy}" -ne 1 ]; then
+  outcome='ServiceAbnormal'
+elif [ "${exp_succeeded}" -eq 1 ]; then
+  outcome='ExploitSucceeded'
+else
+  outcome='DefenseSucceeded'
+fi
 
 wget -qO /dev/null -T 5 \
   --header "Authorization: Bearer ${NOCTF_CALLBACK_TOKEN}" \
@@ -361,14 +368,13 @@ wget -qO /dev/null -T 5 \
 
 | 回调结果 | GameplayFact | 含义 |
 | --- | --- | --- |
-| `Fixed` | Correct | 漏洞修复且服务满足规则 |
-| `StillVulnerable` | Wrong / AwdpFixFailed | 漏洞仍可利用 |
-| `RuleViolation` | Rejected / AwdpViolation | 使用禁用方法、伪造结果或违反题目规则 |
-| `ServiceUnavailable` | Wrong / AwdpServiceDown | 修复导致服务不可用 |
+| `DefenseSucceeded` | Correct | EXP 未能利用且服务满足规则 |
+| `ExploitSucceeded` | Wrong / AwdpExploitSucceeded | EXP 仍可利用 |
+| `ServiceAbnormal` | Wrong / AwdpServiceAbnormal | 正常服务交互失败、超时或崩溃 |
 
-Checker 必须进行功能与安全两方面验证。只检测“某个文件存在”通常不足以证明真实题目已修复；正式题应实际请求漏洞路径、正常业务路径和禁止绕过路径。
+Checker 必须把 EXP 作为子进程运行并捕获失败/崩溃，然后继续做正常服务交互；服务异常优先级高于 EXP 结果。只检测“某个文件存在”通常不足以证明真实题目已修复；正式题应实际请求漏洞路径、正常业务路径和禁止绕过路径。
 
-Checker 成功回调后以 0 退出。非零退出、超时、存储或 Provider 故障属于平台失败，不应冒充选手错误并消耗其正常计分机会。
+Checker 成功回调后以 0 退出。Runner 级验证超时会判为 `ServiceAbnormal`；Checker 主进程异常退出且没有可信业务结果、存储或 Provider 故障属于平台失败，不应冒充选手错误并消耗其正常计分机会。
 
 ### 4.7 Break Flag
 
@@ -385,10 +391,10 @@ Checker 成功回调后以 0 退出。非零退出、超时、存储或 Provider
 - [ ] 开启“先 Break 后 Fix”时，未 Break 的 Fix 被明确拒绝。
 - [ ] 合法 `tar.gz` 能执行；空包、非 gzip、路径穿越、链接、设备文件、超限包全部拒绝。
 - [ ] 补丁入口位于归档预期路径，命令中的 `{entrypoint}` 正确替换。
-- [ ] Fixed、StillVulnerable、RuleViolation、ServiceUnavailable 四种 Checker 结果均验证。
+- [ ] ExploitSucceeded、DefenseSucceeded、ServiceAbnormal 三种 Checker 结果均验证。
 - [ ] 补丁非零退出和超时得到明确失败，不出现一直 Processing。
 - [ ] Fix 不产生 Break、血榜或普通 Flag 分数。
-- [ ] Milestone 与 PerRound 在暂停、恢复和跨轮情况下只按规则投影。
+- [ ] 按轮动态分值在暂停、恢复和跨轮情况下只按当前轮成功队伍数投影。
 - [ ] Worker 重投、Runner 重试和回调迟到不会重复执行计分副作用。
 - [ ] 一次性目标、Checker、网络、端口和 Runner 容量最终释放。
 
@@ -437,7 +443,7 @@ dotnet test backend/NoCTF.slnx -c Release
 
 检查 Worker/Runner/Wolverine 死信、一次性目标 Runtime、补丁执行结果和 Checker 回调。Checker 必须回调并正常退出；当前实现会把非零 Checker 退出收敛为平台失败，不应等待到 Runtime TTL 才显现。
 
-### AWDP Fix 总是 ServiceUnavailable
+### AWDP Fix 总是 ServiceAbnormal
 
 确认目标服务监听 `0.0.0.0` 而非 `127.0.0.1`，`InternalPorts` 恰好声明真实端口，Checker 使用 `TARGET_HOST`，就绪等待时间覆盖实际启动耗时，并且补丁没有停止主服务。
 

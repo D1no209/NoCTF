@@ -6,7 +6,7 @@ describe('challenge definition defaults', () => {
   test.each([
     ['Ctf', 1],
     ['Awd', 4],
-    ['Awdp', 2],
+    ['Awdp', 4],
     ['Koh', 1],
   ] as const)('creates a complete %s default definition', (mode, schemaVersion) => {
     expect(JSON.parse(defaultDefinitionJson(mode)).schemaVersion).toBe(schemaVersion)

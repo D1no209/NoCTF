@@ -1,8 +1,10 @@
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
+using NoCTF.API.Serialization;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Gameplay;
 using Riok.Mapperly.Abstractions;
@@ -15,16 +17,40 @@ public sealed class RecordAwdpCheckResultRequest
     public AwdpFixResultOutcome Outcome { get; set; }
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdpFixResultOutcome>))]
 public enum AwdpFixResultOutcome
 {
-    Fixed,
-    StillVulnerable,
-    RuleViolation,
-    ServiceUnavailable
+    ExploitSucceeded,
+    DefenseSucceeded,
+    ServiceAbnormal
 }
 
-public sealed class AwdpFixOutcomeJsonConverter()
-    : JsonStringEnumConverter<AwdpFixResultOutcome>(namingPolicy: null, allowIntegerValues: false);
+public sealed class AwdpFixOutcomeJsonConverter : JsonConverter<AwdpFixResultOutcome>
+{
+    public override AwdpFixResultOutcome Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.String)
+            throw new JsonException("AWDP fix outcome must be a string.");
+        return reader.GetString() switch
+        {
+            nameof(AwdpFixResultOutcome.ExploitSucceeded) or "StillVulnerable" =>
+                AwdpFixResultOutcome.ExploitSucceeded,
+            nameof(AwdpFixResultOutcome.DefenseSucceeded) or "Fixed" =>
+                AwdpFixResultOutcome.DefenseSucceeded,
+            nameof(AwdpFixResultOutcome.ServiceAbnormal) or "RuleViolation" or "ServiceUnavailable" =>
+                AwdpFixResultOutcome.ServiceAbnormal,
+            _ => throw new JsonException("AWDP fix outcome is invalid.")
+        };
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        AwdpFixResultOutcome value,
+        JsonSerializerOptions options) => writer.WriteStringValue(value.ToString());
+}
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]
 internal static partial class AwdpFixOutcomeMapper

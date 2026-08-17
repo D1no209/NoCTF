@@ -69,7 +69,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                         fixture.RuntimeInstanceId,
                         1,
                         first.RuntimeProcessingVersion,
-                        AwdpFixOutcome.Fixed,
+                        AwdpFixOutcome.DefenseSucceeded,
                         fixture.Now.AddSeconds(1)), cancellationToken);
                 await Assert.That(staleResult).IsEqualTo(InternalResultDisposition.Superseded);
             }
@@ -224,7 +224,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                         fixture.RuntimeInstanceId,
                         1,
                         first.RuntimeProcessingVersion,
-                        AwdpFixOutcome.Fixed,
+                        AwdpFixOutcome.DefenseSucceeded,
                         fixture.Now.AddSeconds(1)), cancellationToken);
                 await Assert.That(applied).IsEqualTo(InternalResultDisposition.Applied);
             }

@@ -310,14 +310,16 @@ internal static class AwdpDynamicLeaderboardProjection
         (fact.Kind, fact.Result, fact.FailureCode) switch
         {
             (GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong, _)
-                => configuration.BreakWrongPenalty,
-            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpFixFailed
-                or GameplayFactFailureCode.AwdpPatchFailed or GameplayFactFailureCode.AwdpPatchTimeout)
-                => configuration.FixFailurePenalty,
-            (GameplayFactKind.FixAttempt, GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpViolation)
-                => configuration.ViolationPenalty,
-            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceDown)
-                => configuration.ServiceDownPenalty,
+                => configuration.FlagWrongPenalty,
+            (GameplayFactKind.BreakAttempt, GameplayFactResult.Rejected,
+                GameplayFactFailureCode.ForeignTeamFlagDetected or GameplayFactFailureCode.AmbiguousFlagMatch)
+                => configuration.FlagWrongPenalty,
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong,
+                GameplayFactFailureCode.AwdpExploitSucceeded)
+                => configuration.ExploitSucceededPenalty,
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong,
+                GameplayFactFailureCode.AwdpServiceAbnormal)
+                => configuration.ServiceAbnormalPenalty,
             _ => 0L
         };
 

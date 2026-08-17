@@ -20,15 +20,13 @@ public static class AwdpConfigurationValidator
             errors.AddRange(ScoreCurve.Validate(configuration.Break, eligibleTeamCount));
         if (configuration.Fix is not null)
             errors.AddRange(ScoreCurve.Validate(configuration.Fix, eligibleTeamCount));
-        if (configuration.BreakWrongPenalty < 0
-            || configuration.FixFailurePenalty < 0
-            || configuration.ViolationPenalty < 0
-            || configuration.ServiceDownPenalty < 0)
+        if (configuration.FlagWrongPenalty < 0
+            || configuration.ExploitSucceededPenalty < 0
+            || configuration.ServiceAbnormalPenalty < 0)
             errors.Add("Penalty values cannot be negative.");
-        if (configuration.BreakWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.FixFailurePenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.ViolationPenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.ServiceDownPenalty > ScoreValueLimits.MaximumConfiguredValue)
+        if (configuration.FlagWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ExploitSucceededPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceAbnormalPenalty > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"Penalty values cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (!Enum.IsDefined(configuration.EvaluationDispatchMode))
             errors.Add("EvaluationDispatchMode is invalid.");
@@ -47,15 +45,13 @@ public static class AwdpConfigurationValidator
             errors.AddRange(ScoreCurve.Validate(configuration.Break, eligibleTeamCount));
         if (configuration.Fix is not null)
             errors.AddRange(ScoreCurve.Validate(configuration.Fix, eligibleTeamCount));
-        if (configuration.BreakWrongPenalty is < 0
-            || configuration.FixFailurePenalty is < 0
-            || configuration.ViolationPenalty is < 0
-            || configuration.ServiceDownPenalty is < 0)
+        if (configuration.FlagWrongPenalty is < 0
+            || configuration.ExploitSucceededPenalty is < 0
+            || configuration.ServiceAbnormalPenalty is < 0)
             errors.Add("Penalty values cannot be negative.");
-        if (configuration.BreakWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.FixFailurePenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.ViolationPenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.ServiceDownPenalty > ScoreValueLimits.MaximumConfiguredValue)
+        if (configuration.FlagWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ExploitSucceededPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceAbnormalPenalty > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"Penalty values cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (configuration.EvaluationDispatchMode is { } dispatchMode
             && !Enum.IsDefined(dispatchMode))
@@ -63,6 +59,7 @@ public static class AwdpConfigurationValidator
         if (configuration.FlagTemplate is { } flagTemplate
             && !PerTeamFlagGenerator.IsValidTemplate(flagTemplate))
             errors.Add("FlagTemplate is invalid.");
+        ValidateFlagInjection(configuration.FlagInjection, errors);
         if (configuration.PatchEntrypoint is { } patchEntrypoint)
             ValidatePatchEntrypoint(patchEntrypoint, errors);
         if (configuration.PatchTimeoutSeconds is <= 0)
@@ -91,20 +88,19 @@ public static class AwdpConfigurationValidator
             errors.Add("RoundDurationSeconds must be positive.");
         errors.AddRange(ScoreCurve.Validate(configuration.Break, eligibleTeamCount));
         errors.AddRange(ScoreCurve.Validate(configuration.Fix, eligibleTeamCount));
-        if (configuration.BreakWrongPenalty < 0
-            || configuration.FixFailurePenalty < 0
-            || configuration.ViolationPenalty < 0
-            || configuration.ServiceDownPenalty < 0)
+        if (configuration.FlagWrongPenalty < 0
+            || configuration.ExploitSucceededPenalty < 0
+            || configuration.ServiceAbnormalPenalty < 0)
             errors.Add("Penalty values cannot be negative.");
-        if (configuration.BreakWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.FixFailurePenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.ViolationPenalty > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.ServiceDownPenalty > ScoreValueLimits.MaximumConfiguredValue)
+        if (configuration.FlagWrongPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ExploitSucceededPenalty > ScoreValueLimits.MaximumConfiguredValue
+            || configuration.ServiceAbnormalPenalty > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"Penalty values cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
         if (!Enum.IsDefined(configuration.EvaluationDispatchMode))
             errors.Add("EvaluationDispatchMode is invalid.");
         if (!PerTeamFlagGenerator.IsValidTemplate(configuration.FlagTemplate))
             errors.Add("FlagTemplate is invalid.");
+        ValidateFlagInjection(configuration.FlagInjection, errors);
         ValidatePatchEntrypoint(configuration.PatchEntrypoint, errors);
         if (configuration.PatchTimeoutSeconds <= 0)
             errors.Add("PatchTimeoutSeconds must be positive.");

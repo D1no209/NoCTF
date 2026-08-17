@@ -26,9 +26,8 @@
 
 ## 比赛题目规则
 
-- Break / Fix 结算：`Milestone` 或 `PerRound`
-- Break / Fix 分值：`待填写`
-- 规则违规、服务不可用、错误 Break、失败 Fix 罚分：`待填写`
+- Break / Fix 分值曲线：`待填写`
+- Flag 错误、EXP 利用成功、服务异常罚分：`待填写`
 - 先 Break 后 Fix：`待填写`
 - 最大 Break / Fix 次数：`待填写`；后端值 `<=0` 表示无限
 - 评测派发：`Automatic` 或 `ManualBatch`

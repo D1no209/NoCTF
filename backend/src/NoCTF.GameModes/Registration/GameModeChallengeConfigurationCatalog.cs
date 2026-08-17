@@ -187,9 +187,9 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     "maxBreakSubmissions",
                     "maxFixSubmissions",
                     "breakWrongPenalty",
-                    "fixFailurePenalty",
-                    "violationPenalty",
-                    "serviceDownPenalty",
+                    "flagWrongPenalty",
+                    "exploitSucceededPenalty",
+                    "serviceAbnormalPenalty",
                     "evaluationDispatchMode",
                     "flagTemplate"
                 ],

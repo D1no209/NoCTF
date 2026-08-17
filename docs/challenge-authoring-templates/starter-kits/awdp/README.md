@@ -10,10 +10,10 @@ awdp/
 │  ├─ Dockerfile
 │  └─ check.sh
 ├─ examples/fixes/
-│  ├─ valid/fix.sh
-│  ├─ still-vulnerable/fix.sh
-│  ├─ rule-violation/fix.sh
-│  ├─ service-unavailable/fix.sh
+│  ├─ defense-succeeded/fix.sh
+│  ├─ exploit-succeeded/fix.sh
+│  ├─ service-abnormal-bypass/fix.sh
+│  ├─ service-abnormal-down/fix.sh
 │  ├─ nonzero/fix.sh
 │  └─ timeout/fix.sh
 ├─ platform/CONFIGURATION.md

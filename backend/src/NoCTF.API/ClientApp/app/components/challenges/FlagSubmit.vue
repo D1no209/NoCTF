@@ -77,7 +77,13 @@ async function refreshOne(id: string): Promise<void> {
       toast.success(translate("提交评测完成:正确"))
       celebrateCorrectFlag()
     }
-    else toast.error(translate('提交评测完成：{result}', { result: gameplayFactResultLabel(data.result) }))
+    else {
+      const result = gameplayFactResultLabel(data.result)
+      const reason = data.failureCode ? gameplayFactFailureCodeLabel(data.failureCode) : null
+      toast.error(reason
+        ? translate('提交评测完成：{result}（{reason}）', { result, reason })
+        : translate('提交评测完成：{result}', { result }))
+    }
     emit('evaluated')
   }
 }
@@ -236,6 +242,9 @@ function resultVariant(result?: string | null) {
               {{ gameplayFactStateLabel(item.state) }}…
             </span>
             <span v-else> {{ $t('评测结果:') }}<strong>{{ gameplayFactResultLabel(item.result) }}</strong>
+              <span v-if="item.failureCode" class="text-muted-foreground">
+                · {{ gameplayFactFailureCodeLabel(item.failureCode) }}
+              </span>
             </span>
           </AlertDescription>
         </Alert>

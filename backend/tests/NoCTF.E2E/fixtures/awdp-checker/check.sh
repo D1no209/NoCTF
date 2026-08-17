@@ -1,26 +1,23 @@
 #!/bin/sh
 set -eu
 
-target="http://${TARGET_HOST}:8080/status"
-remaining="$TARGET_READY_TIMEOUT_SECONDS"
-state=''
-while [ "$remaining" -gt 0 ]; do
-    state="$(wget -qO- -T 2 "$target" 2>/dev/null || true)"
-    if [ -n "$state" ]; then
-        break
-    fi
-    remaining=$((remaining - 1))
-    sleep 1
-done
-
-if [ "$state" = 'fixed' ]; then
-    outcome='Fixed'
-elif [ "$state" = 'vulnerable' ]; then
-    outcome='StillVulnerable'
-elif [ -n "$state" ]; then
-    outcome='RuleViolation'
+exp_succeeded=false
+exp_timed_out=false
+if timeout "$TARGET_READY_TIMEOUT_SECONDS" /exploit.sh "$TARGET_HOST"; then
+    exp_succeeded=true
 else
-    outcome='ServiceUnavailable'
+    exp_status=$?
+    [ "$exp_status" -ne 124 ] || exp_timed_out=true
+fi
+
+# EXP 的失败或崩溃不能跳过正常服务验证；服务异常拥有最高优先级。
+health="$(wget -qO- -T 2 "http://${TARGET_HOST}:8080/health" 2>/dev/null || true)"
+if [ "$exp_timed_out" = true ] || [ "$health" != 'ok' ]; then
+    outcome='ServiceAbnormal'
+elif [ "$exp_succeeded" = true ]; then
+    outcome='ExploitSucceeded'
+else
+    outcome='DefenseSucceeded'
 fi
 
 wget -qO /dev/null -T 5 \

@@ -78,9 +78,40 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task AwdpDefinition_rejects_fix_scoring_owned_by_rules()
+    {
+        var errors = new GameModeChallengeConfigurationCatalog().ValidateDefinition(
+            GameMode.Awdp,
+            """{"schemaVersion":4,"exploitSucceededPenalty":1}""");
+
+        await Assert.That(errors)
+            .Contains(
+                "DefinitionJson cannot contain 'exploitSucceededPenalty' because it belongs to the other challenge section.");
+    }
+
+    [Test]
+    public async Task AwdpDefinition_validates_flag_injection()
+    {
+        var errors = new GameModeChallengeConfigurationCatalog().ValidateDefinition(
+            GameMode.Awdp,
+            """
+            {
+              "schemaVersion": 4,
+              "flagInjection": {
+                "kind": 0,
+                "environmentVariableName": "INVALID-NAME"
+              }
+            }
+            """);
+
+        await Assert.That(errors)
+            .Contains("FlagInjection.EnvironmentVariableName is invalid.");
+    }
+
+    [Test]
     [Arguments(GameMode.Ctf, "{\"schemaVersion\":1,\"points\":{\"initialPoints\":0,\"minimumPoints\":0,\"decayFactor\":1},\"bloodRewards\":[]}")]
     [Arguments(GameMode.Awd, "{\"schemaVersion\":1,\"flagFormat\":\"\"}")]
-    [Arguments(GameMode.Awdp, "{\"schemaVersion\":1,\"break\":null,\"fix\":null,\"requireBreakBeforeFix\":false,\"maxBreakSubmissions\":0,\"maxFixSubmissions\":0,\"violationPenalty\":-1}")]
+    [Arguments(GameMode.Awdp, "{\"schemaVersion\":4,\"break\":null,\"fix\":null,\"requireBreakBeforeFix\":false,\"maxBreakSubmissions\":0,\"maxFixSubmissions\":0,\"serviceAbnormalPenalty\":-1}")]
     [Arguments(GameMode.Koh, "{\"schemaVersion\":1,\"pollIntervalSeconds\":0}")]
     public async Task Validate_InvalidModeSpecificConfiguration_ReturnsErrors(GameMode mode, string json)
     {
@@ -749,7 +780,7 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task Awdp_v2_ignores_legacy_dedicated_flag_injection()
+    public async Task AwdpDefinition_rejects_invalid_dedicated_flag_injection()
     {
         var root = JsonNode.Parse(
             new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awdp))!
@@ -765,7 +796,7 @@ public class ChallengeConfigurationCatalogTests
             root.ToJsonString());
 
         await Assert.That(errors)
-            .DoesNotContain("FlagInjection.EnvironmentVariableName is invalid.");
+            .Contains("FlagInjection.EnvironmentVariableName is invalid.");
     }
 
     [Test]

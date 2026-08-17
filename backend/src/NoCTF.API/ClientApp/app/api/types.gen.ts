@@ -259,7 +259,7 @@ export type NoCtfapiEndpointsInternalRecordAwdpCheckResultRequest = {
     outcome?: NoCtfapiEndpointsInternalAwdpFixResultOutcome;
 };
 
-export type NoCtfapiEndpointsInternalAwdpFixResultOutcome = 'Fixed' | 'StillVulnerable' | 'RuleViolation' | 'ServiceUnavailable';
+export type NoCtfapiEndpointsInternalAwdpFixResultOutcome = 'ExploitSucceeded' | 'DefenseSucceeded' | 'ServiceAbnormal';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse = {
     currentRound?: number | null;
@@ -289,7 +289,7 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol = 'Pending' 
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled';
 
-export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpFixFailed' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceDown' | 'AwdpViolation' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable';
+export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpExploitSucceeded' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceAbnormal' | 'AwdpViolation' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable';
 
 export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
     gameplayFactId?: string;
