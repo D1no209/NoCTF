@@ -1680,6 +1680,7 @@ export const englishMessages: Record<string, string> = {
   "创建每队随机附件": "Create per-team random attachments",
   "上传随机附件批次": "Upload random attachment batch",
   "精确 Flag": "Exact Flag",
+  "哈希": "Hash",
   "已上传 {count} 个附件": "Uploaded {count} attachments",
   "已创建 {count} 个随机附件变体": "Created {count} random attachment variants",
   "统一下载文件名无效": "The shared download filename is invalid",
