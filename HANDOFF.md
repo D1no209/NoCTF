@@ -1,5 +1,30 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-17 alpha.45 题目列表布局、3D 视角与附件哈希标识
+
+- `9373b679` 按最终确认将协作者 3D 大屏相机由约 50° 调整为 45°：初始相机高度调整为 101，巡航高度调整为
+  `1.1 * citySpan + 42`；保留旋转、题目分值与解题数量、一二三血标识以及解题更新后的持续聚焦行为。
+- `ab86b9d2` 调整选手题目页的双栏布局：题目列表使用更靠左的主内容列，赛事播报作为右侧窄栏稍向右展开；
+  响应式窄屏布局保持单列。`918ebc3b` 在题库模板附件表新增“哈希”列，展示附件 SHA-256 前 8 位并通过
+  `title` 保留完整哈希，便于区分统一下载名下的多个附件变体；没有向选手端暴露内部附件哈希或 Flag。
+- `88b04a7a` 将平台版本由 `0.1.0-alpha.44` 递增为 `0.1.0-alpha.45`。本阶段没有修改 HTTP/OpenAPI/
+  TypeScript SDK、数据模型、migration 或 snapshot，也没有修改题目 Runtime/Checker 镜像策略。
+- 验证通过：附件定向测试 4/4；ClientApp 完整 `bun test` 203/203（1544 assertions）、
+  `bun run typecheck`、production `bun run build`；后端 `dotnet build backend/NoCTF.slnx -c Release --no-restore`
+  0 warning / 0 error；`git diff --check` 通过。构建仅保留既有的大 chunk、plugin timing 与第三方 Node exports
+  deprecation warning。
+- 功能与版本提交已快进推送到远程 `main@88b04a7a`，生产 `/root/NoCTF` 快进到同一提交；未跟踪的
+  `deploy/docker-compose.prod.yml` 保持原样。Linux/amd64 三服务镜像归档 SHA-256 为
+  `BEF59CCC6CFA524E2F51DC68B13F79B8A61B013486C4D6D9A03C96A28FEB5429`；导入后 API、Worker、
+  Runner 镜像分别为 `sha256:ed280f519b77cbb000d703d62905f442f8e288dfe6495955cbf06cd8f60de595`、
+  `sha256:c49c7b8725ce6d344c7352b378e4ee87d6c47768d728cdbdc8cd3ca980c02e0f`、
+  `sha256:645dd61d30699b3a025351326faf6945545a54c5f90414eb59cd282d7d729e2a`；原 Alpha.44 镜像保留
+  `rollback-a3f40386` 标签。
+- 生产只以 `--no-deps --no-build --force-recreate` 重建 API、Worker、Runner；PostgreSQL、Redis、卷、
+  生产数据及题目容器均未重建。三服务均为 running/healthy、restart count 0，程序集均确认
+  `0.1.0-alpha.45`；公开首页返回 200，`/health` 返回 `{"status":"Ok"}`，部署资源确认包含“哈希”列，
+  发布后 API/Worker/Runner 的 Fatal、Critical、Unhandled、Exception 和失败日志匹配均为 0。
+
 ## 2026-08-17 alpha.44 CTF 3D 大屏高位俯视修正
 
 - `3707f499` 将协作者 3D 大屏的初始相机高度由 68 提升为 108，巡航高度由
