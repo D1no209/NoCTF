@@ -1,5 +1,23 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.47 AWDP 示例题镜像构建修复
+
+- `dcdc7870` 修正 `docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/checker/.dockerignore`，
+  将 `exploit.py` 放入 checker 镜像构建上下文。此前 checker Dockerfile 已引用该文件，但白名单式
+  `.dockerignore` 仅放行 `Dockerfile` 与 `checker.py`，导致本地构建失败并可能误用旧本地镜像。
+- 已重新构建并推送示例题测试镜像：
+  - `crpi-263xwliy5b2vru33.cn-chengdu.personal.cr.aliyuncs.com/noctf_challenge/noctf-awdp-index-vault-target:test`
+    → `sha256:7ab6dbc757b333bdc127cb5c8eaeadd4575936f257623e0c499bc9c2be2c661a`
+  - `crpi-263xwliy5b2vru33.cn-chengdu.personal.cr.aliyuncs.com/noctf_challenge/noctf-awdp-index-vault-checker:test`
+    → `sha256:0401a01fe2522ca38fdad682e48e314e6d3f0d8bfa1616ded22b246dd7cb764d`
+- 验证通过：
+  - `docker build -t noctf-awdp-index-vault-target:local docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/target`
+  - `docker build -t noctf-awdp-index-vault-checker:local docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/checker`
+  - `bash docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/scripts/build-fix-packages.sh`
+  - `bash docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/tests/invalid-archives.sh`
+  - `bash docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/tests/smoke.sh`
+- 本小节仅涉及示例题构建上下文和测试镜像；没有新增业务表、迁移、OpenAPI/SDK 或平台运行时代码变更。
+
 ## 2026-08-18 alpha.47 AWDP Fix 三态验证语义修正
 
 - `b2678ded` 将 AWDP Fix 验证统一为产品三态：`ExploitSucceeded`、`DefenseSucceeded`、
