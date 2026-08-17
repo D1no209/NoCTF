@@ -95,7 +95,7 @@ describe('CTF control screen projection', () => {
     expect(reconcileControlScreenSolves(reconciled.seenKeys, next).newSolves).toEqual([])
   })
 
-  test('ships only the collaborator 3D screen with an elevated overview camera', async () => {
+  test('keeps challenge telemetry readable from a lower overview camera', async () => {
     const page = await Bun.file(
       new URL('../app/pages/competitions/[id]/live.vue', import.meta.url),
     ).text()
@@ -127,8 +127,13 @@ describe('CTF control screen projection', () => {
     expect(shell).not.toContain('label: translate("中控大屏")')
     expect(shell).toContain('label: translate("3D 大屏")')
     expect(shell).toContain('competition.value?.mode === \'Ctf\'')
-    expect(scene).toContain('radius: this.citySpan * 1.08 + 34')
-    expect(scene).toContain('height: this.citySpan * 0.82 + 26')
+    expect(scene).toContain('radius: this.citySpan * 1.1 + 36')
+    expect(scene).toContain('height: this.citySpan * 0.5 + 18')
+    expect(scene).toContain("els.labelPts.textContent = `${state.score} pts`")
+    expect(scene).toContain('els.labelSolves.textContent = state.solvesText')
+    expect(page).toContain('bloodToneOrder[left.tone] - bloodToneOrder[right.tone]')
+    expect(page).toContain('const sameChallengeUpdates = activeChallengeId')
+    expect(page).toContain('if (sameChallengeUpdates.length) focusSolve(sameChallengeUpdates.at(-1)!)')
     expect(scene).toContain('minHeight: 6, maxHeight: 24')
     expect(scene).toContain('minHeight: 4, maxHeight: 18')
   })
