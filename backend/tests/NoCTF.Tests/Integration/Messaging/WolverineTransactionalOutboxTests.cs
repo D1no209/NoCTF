@@ -956,6 +956,12 @@ public sealed class WolverineTransactionalOutboxTests
                 awdpFixExecution.HttpClientFactory));
             builder.Services.AddSingleton<FixArchivePreparer>();
             builder.Services.AddSingleton(Substitute.For<IRunnerCapacityGate>());
+            var executionFence = Substitute.For<IAwdpFixExecutionFence>();
+            executionFence.TryAdvanceStageAsync(
+                    Arg.Any<AwdpFixStageTransitionRequest>(),
+                    Arg.Any<CancellationToken>())
+                .Returns(true);
+            builder.Services.AddSingleton(executionFence);
         }
         builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
             options => options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());

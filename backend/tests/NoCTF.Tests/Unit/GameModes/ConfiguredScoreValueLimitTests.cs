@@ -214,6 +214,7 @@ public sealed class ConfiguredScoreValueLimitTests
         Fix: new(AchievementSettlement.PerRound, value),
         ViolationPenalty: value,
         ServiceDownPenalty: value,
+        RequireBreakBeforeFix: false,
         BreakWrongPenalty: value,
         FixFailurePenalty: value);
 

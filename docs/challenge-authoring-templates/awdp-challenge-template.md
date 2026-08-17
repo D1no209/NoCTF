@@ -17,6 +17,8 @@
 | 预计目标 PID | 待填写 |
 | 目标镜像 | 待填写，可用 tag 或 digest |
 | Checker 镜像 | 待填写，可用 tag 或 digest |
+| Player URL | 待填写，例如 `tcp://{HOST}:{PORT}` |
+| Flag 环境变量 | `FLAG` 或题目实际采用名称 |
 
 ## 2. 漏洞、Break 与修复判据
 
@@ -29,7 +31,9 @@
 | 项目 | 内容 |
 | --- | --- |
 | 匹配方式 | 精确匹配 |
-| Flag 管理位置 | 题库模板 Flag |
+| Flag 管理位置 | 平台按比赛题目、队伍和 Runtime generation 自动生成 |
+| 比赛专属模板 | 在 CompetitionChallenge 规则中配置前缀、正文与 Leet 选项 |
+| 注入位置 | 题库 Runtime 定义中的环境变量名，不填写 Flag 明文 |
 | 是否包含在附件/镜像公开层 | 必须为否 |
 | 正确性验证 | 待填写 |
 
@@ -41,11 +45,14 @@
 
 待填写：例如关闭服务、固定返回、删除功能、阻断 Checker、伪造状态或使用题目明确禁止的方法。
 
-## 3. 一次性目标 Runtime
+## 3. Player Runtime 与一次性 Fix Target
 
 - [ ] Runtime 为 Container，不是 Compose 或 OVA。
-- [ ] 分配语义为 `PerTeam`。
-- [ ] 不配置公网端口和 URL。
+- [ ] 分配语义为 `PerTeam`，Flag 来源为 `PerTeam`。
+- [ ] Player 使用 host port `0` 和 OwnerOnly URL。
+- [ ] Player 有 TeamId，Purpose 为 `Player`。
+- [ ] Fix Target 无 TeamId、Purpose 为 `AwdpTarget`，并绑定 Fix GameplayFact。
+- [ ] Fix Target 忽略 Player 的公网端口和 URL。
 - [ ] `InternalPorts` 恰好包含一个真实监听端口。
 - [ ] 服务监听 `0.0.0.0`，Checker 可以从隔离网络访问。
 - [ ] 每次在全新容器中都能稳定复现漏洞。
@@ -59,6 +66,9 @@
 | 目标镜像 | 待填写 |
 | 启动命令 argv | 待填写或“镜像默认入口” |
 | 内部端口 | 待填写 |
+| Player PortMapping | 容器端口：待填写；HostPort：`0` |
+| Player URL / Exposure | 待填写 / `OwnerOnly` |
+| FlagSource / 环境变量 | `PerTeam` / 待填写 |
 | 内存 / CPU / PID | 待填写 |
 | Runtime TTL | 待填写，必须覆盖补丁、就绪和 Checker 总耗时 |
 | 操作超时 | 待填写 |
@@ -182,7 +192,8 @@ dotnet run --file backend/tests/e2e.cs -- --mode awdp --suite full
 
 - [ ] Break 与 Fix 使用不同接口和事实类型。
 - [ ] 题库模板没有比赛 ID、队伍 ID、Runner Pool 或平台凭据。
-- [ ] 目标 Runtime 没有公网入口，且仅一个内部端口。
+- [ ] Player Runtime 使用随机公网端口和 OwnerOnly URL；Fix Target 没有公网入口。
+- [ ] 动态 Flag 只由平台生成，镜像不烘焙真实或测试 Flag。
 - [ ] 合法 Fix、失败 Fix、违规 Fix、服务破坏和恶意归档均有测试资产。
 - [ ] Checker 同时验证漏洞和业务功能，回调及日志已脱敏。
 - [ ] Patch、Checker、目标镜像和题面版本相互对应。

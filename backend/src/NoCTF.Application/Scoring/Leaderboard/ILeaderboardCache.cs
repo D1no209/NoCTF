@@ -49,4 +49,11 @@ public interface ILeaderboardSnapshotFactory
         Guid competitionId,
         DateTimeOffset projectedAt,
         CancellationToken cancellationToken);
+
+    Task<LeaderboardResponse?> CreateWithConfigurationAsync(
+        Guid competitionId,
+        string competitionConfigurationJson,
+        DateTimeOffset projectedAt,
+        CancellationToken cancellationToken) =>
+        CreateAsync(competitionId, projectedAt, cancellationToken);
 }

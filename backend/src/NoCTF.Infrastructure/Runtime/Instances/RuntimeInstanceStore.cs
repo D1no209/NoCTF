@@ -9,6 +9,7 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
+using NoCTF.GameModes.Awdp.Configuration;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
@@ -49,14 +50,18 @@ public sealed class RuntimeInstanceStore(
         var scope = await ResolveScopeAsync(competitionId, competitionChallengeId, userId, ct);
         if (scope is null
             || !AllowsRuntimeActions(scope)
-            || scope.Mode is GameMode.Koh or GameMode.Awdp)
+            || scope.Mode == GameMode.Koh)
             return null;
         var purpose = PurposeFor(scope);
+        var includesLegacyAwdpPurpose = scope.Mode == GameMode.Awdp
+            && purpose == RuntimePurpose.Player;
         return await db.RuntimeInstances.AsNoTracking()
             .Where(instance =>
                 instance.CompetitionId == competitionId &&
                 instance.CompetitionChallengeId == competitionChallengeId &&
-                instance.Purpose == purpose &&
+                (instance.Purpose == purpose
+                    || includesLegacyAwdpPurpose
+                    && instance.Purpose == RuntimePurpose.AwdpAttack) &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .Select(instance => new RuntimeInstanceView(
@@ -80,11 +85,13 @@ public sealed class RuntimeInstanceStore(
             ct);
         if (scope is null || !AllowsRuntimeActions(scope))
             return new(null, RuntimeMutationFailure.NotFound);
-        if (scope.Mode is GameMode.Koh or GameMode.Awdp)
+        if (scope.Mode == GameMode.Koh)
             return new(null, RuntimeMutationFailure.Unsupported);
         if (scope.Mode == GameMode.Awd && command.Action is RuntimeAction.Start or RuntimeAction.Stop or RuntimeAction.Extend)
             return new(null, RuntimeMutationFailure.Unsupported);
         var purpose = PurposeFor(scope);
+        var includesLegacyAwdpPurpose = scope.Mode == GameMode.Awdp
+            && purpose == RuntimePurpose.Player;
 
         await using var quotaLease = await runtimeQuota.AcquireLockAsync(
             db,
@@ -94,7 +101,9 @@ public sealed class RuntimeInstanceStore(
         var current = await db.RuntimeInstances
             .Where(instance =>
                 instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                instance.Purpose == purpose &&
+                (instance.Purpose == purpose
+                    || includesLegacyAwdpPurpose
+                    && instance.Purpose == RuntimePurpose.AwdpAttack) &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .FirstOrDefaultAsync(ct);
@@ -109,11 +118,15 @@ public sealed class RuntimeInstanceStore(
         {
             case RuntimeAction.Start:
                 if (current is not null && IsActive(current.State))
-                    return new(null, RuntimeMutationFailure.InvalidState);
+                    return scope.Mode == GameMode.Awdp
+                        ? new(Map(current))
+                        : new(null, RuntimeMutationFailure.InvalidState);
                 if (await db.RuntimeInstances.AnyAsync(instance =>
                         instance.CompetitionId == command.CompetitionId &&
                         instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                        instance.Purpose == purpose &&
+                        (instance.Purpose == purpose
+                            || includesLegacyAwdpPurpose
+                            && instance.Purpose == RuntimePurpose.AwdpAttack) &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Stopping,
                         ct))
@@ -130,7 +143,9 @@ public sealed class RuntimeInstanceStore(
                     .Where(instance =>
                         instance.CompetitionId == command.CompetitionId &&
                         instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                        instance.Purpose == purpose &&
+                        (instance.Purpose == purpose
+                            || includesLegacyAwdpPurpose
+                            && instance.Purpose == RuntimePurpose.AwdpAttack) &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Failed &&
                         instance.RunnerId != null &&
@@ -189,6 +204,8 @@ public sealed class RuntimeInstanceStore(
                 current.State = RuntimeState.Stopping;
                 current.RunnerAssignmentReleaseToken = null;
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
+                if (scope.Mode == GameMode.Awdp)
+                    await runtimeFlags.InvalidateGenerationAsync(current.Id, command.Now, ct);
                 await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
                 try
                 {
@@ -209,6 +226,8 @@ public sealed class RuntimeInstanceStore(
                     return new(Map(current));
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 entity = current;
+                if (scope.Mode == GameMode.Awdp)
+                    await runtimeFlags.InvalidateGenerationAsync(current.Id, command.Now, ct);
                 if (current.State == RuntimeState.Queued)
                 {
                     current.State = RuntimeState.Stopped;
@@ -285,6 +304,7 @@ public sealed class RuntimeInstanceStore(
             throw new InvalidOperationException(
                 "Practice mode supports only Container and Compose Runtime templates.");
         }
+        var id = Guid.CreateVersion7(command.Now);
         if (scope.Mode == GameMode.Ctf
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {
@@ -295,10 +315,20 @@ public sealed class RuntimeInstanceStore(
                 command.Now,
                 cancellationToken);
         }
+        if (scope.Mode == GameMode.Awdp)
+        {
+            _ = await runtimeFlags.EnsureGenerationAsync(
+                command.CompetitionId,
+                command.CompetitionChallengeId,
+                scope.TeamId,
+                id,
+                command.Now,
+                cancellationToken);
+        }
         var placement = placementPolicy.Resolve(template.RuntimeKind);
         return new RuntimeInstance
         {
-            Id = Guid.CreateVersion7(command.Now),
+            Id = id,
             CompetitionId = command.CompetitionId,
             CompetitionChallengeId = command.CompetitionChallengeId,
             TeamId = scope.TeamId,
@@ -353,6 +383,8 @@ public sealed class RuntimeInstanceStore(
                 item.Competition.Status,
                 item.Competition.PracticeModeEnabled,
                 item.Competition.MaxConcurrentRuntimeInstancesPerTeam,
+                item.Competition.ConfigurationJson,
+                item.Challenge.RulesJson,
                 item.Template.DefinitionJson))
             .SingleOrDefaultAsync(ct);
 
@@ -366,6 +398,7 @@ public sealed class RuntimeInstanceStore(
 
     private static bool AllowsRuntimeActions(RuntimeScope scope) =>
         scope.Status == CompetitionStatus.Running
+            && (scope.Mode != GameMode.Awdp || IsAwdpV2(scope))
         || scope is
         {
             Mode: GameMode.Ctf,
@@ -377,6 +410,10 @@ public sealed class RuntimeInstanceStore(
         scope.Status == CompetitionStatus.Finished
             ? RuntimePurpose.Practice
             : RuntimePurpose.Player;
+
+    private static bool IsAwdpV2(RuntimeScope scope) =>
+        AwdpConfigurationParser.ParseCompetition(scope.CompetitionConfigurationJson)
+            .UsesContinuousRoundScoring;
 
     private static bool CanReset(RuntimeInstance instance) =>
         instance.State is RuntimeState.Provisioning or RuntimeState.Running
@@ -399,5 +436,7 @@ public sealed class RuntimeInstanceStore(
         CompetitionStatus Status,
         bool PracticeModeEnabled,
         int MaxConcurrentRuntimeInstances,
+        string CompetitionConfigurationJson,
+        string RulesJson,
         string DefinitionJson);
 }

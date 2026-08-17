@@ -3,6 +3,9 @@ using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
+using NoCTF.Application.Runtime.Configuration;
+using NoCTF.Application.Runtime.Provisioning;
+using NoCTF.Application.Scoring;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -23,7 +26,8 @@ public sealed class AwdpEffectiveConfigurationTests
         await Assert.That(effective.FixFailurePenalty).IsEqualTo(0L);
         await Assert.That(effective.ViolationPenalty).IsEqualTo(100L);
         await Assert.That(effective.ServiceDownPenalty).IsEqualTo(50L);
-        await Assert.That(effective.RequireBreakBeforeFix).IsTrue();
+        await Assert.That(effective.RequireBreakBeforeFix).IsFalse();
+        await Assert.That(effective.UsesContinuousRoundScoring).IsTrue();
         await Assert.That(effective.MaxBreakSubmissions).IsEqualTo(10);
         await Assert.That(effective.MaxFixSubmissions).IsEqualTo(10);
         await Assert.That(effective.EvaluationDispatchMode)
@@ -75,6 +79,42 @@ public sealed class AwdpEffectiveConfigurationTests
                 1,
                 [challenge]))
             .Contains("Runtime is required before an AWDP competition can start.");
+    }
+
+    [Test]
+    public async Task Current_awdp_accepts_player_runtime_milestones_and_break_gated_fixes()
+    {
+        var competition = AwdpConfigurationParser.ParseCompetition(
+            GameModeDefaultConfiguration.GetCompetitionJson(
+                NoCTF.Domain.Competitions.GameMode.Awdp));
+        var challenge = new AwdpChallengeConfiguration(
+            AwdpChallengeConfiguration.CurrentSchemaVersion,
+            new(AchievementSettlement.Milestone, 100),
+            new(AchievementSettlement.PerRound, 25),
+            RequireBreakBeforeFix: true,
+            MaxBreakSubmissions: null,
+            MaxFixSubmissions: null,
+            Runtime: new(
+                RuntimeAllocation.PerTeam,
+                new ContainerRuntimeDefinition(
+                    "awdp-target:latest",
+                    PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                    FlagEnvironmentVariableName: "FLAG",
+                    InternalPorts: [31337]),
+                new RuntimeResourceLimits(268_435_456, 500_000_000, 128),
+                UrlBindings: [new(
+                    "tcp://{HOST}:{PORT}",
+                    RuntimeExposure.OwnerOnly,
+                    31337)],
+                FlagSource: RuntimeFlagSource.PerTeam),
+            Checker: new RunnerJobConfiguration("awdp-checker:latest"));
+        var effective = AwdpConfigurationResolver.Resolve(competition, challenge);
+
+        await Assert.That(effective.RequireBreakBeforeFix).IsTrue();
+        await Assert.That(effective.Break.Settlement)
+            .IsEqualTo(AchievementSettlement.Milestone);
+        await Assert.That(AwdpConfigurationValidator.Validate(challenge)).IsEmpty();
+        await Assert.That(AwdpConfigurationValidator.ValidateForStart(effective)).IsEmpty();
     }
 
     [Test]

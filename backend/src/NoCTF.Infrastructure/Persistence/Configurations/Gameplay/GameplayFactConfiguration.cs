@@ -48,7 +48,7 @@ internal sealed class GameplayFactConfiguration : IEntityTypeConfiguration<Gamep
                 "state <> 3 OR result IS NOT NULL");
             table.HasCheckConstraint(
                 "ck_gameplay_facts_victim",
-                "victim_team_id IS NULL OR kind = 0");
+                "victim_team_id IS NULL OR kind IN (0, 1)");
             table.HasCheckConstraint(
                 "ck_gameplay_facts_shape",
                 "(kind = 0 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NOT NULL AND octet_length(value_sha256) = 32 AND (reference_kind IS NULL OR reference_kind = 2)) "

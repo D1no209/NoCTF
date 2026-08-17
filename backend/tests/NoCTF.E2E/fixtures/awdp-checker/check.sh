@@ -17,6 +17,8 @@ if [ "$state" = 'fixed' ]; then
     outcome='Fixed'
 elif [ "$state" = 'vulnerable' ]; then
     outcome='StillVulnerable'
+elif [ -n "$state" ]; then
+    outcome='RuleViolation'
 else
     outcome='ServiceUnavailable'
 fi

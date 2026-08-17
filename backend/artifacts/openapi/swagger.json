@@ -1684,6 +1684,60 @@
         }
       }
     },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state": {
+      "get": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Gets the current team's AWDP attack and defense state.",
+        "description": "Returns the current attack Runtime, Break activation, one-shot Fix stage and defense activation.",
+        "operationId": "GetAwdpParticipantStateEndpoint",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}": {
       "get": {
         "tags": [
@@ -7337,6 +7391,62 @@
         "security": [
           {
             "Bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/awdp/scoring-impact-preview": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Previews legacy AWDP scoring differences.",
+        "description": "Read-only comparison of current legacy scores and continuous-round scores. It never changes gameplay facts, events or cached leaderboards.",
+        "operationId": "AdminPreviewAwdpScoringImpact",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactPreviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
           }
         ]
       }
@@ -13519,6 +13629,52 @@
           "ServiceUnavailable"
         ]
       },
+      "NoCTFAPIEndpointsGameplayFactsAwdpParticipantStateResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "currentRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "attackRuntime": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeResponse"
+              }
+            ]
+          },
+          "latestBreakAttempt": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse"
+              }
+            ]
+          },
+          "breakActivation": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpAchievementActivationResponse"
+              }
+            ]
+          },
+          "defense": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpDefenseProgressResponse"
+          },
+          "fixActivation": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpAchievementActivationResponse"
+              }
+            ]
+          }
+        }
+      },
       "NoCTFAPIEndpointsGameplayFactsGameplayFactStatusResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -13712,6 +13868,93 @@
           "ForeignTeamFlagDetected",
           "InsufficientScore",
           "HintUnavailable"
+        ]
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdpAchievementActivationResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "effectiveRound": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdpDefenseProgressResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "patchUploadId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "state": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol"
+              }
+            ]
+          },
+          "result": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactResultProtocol"
+              }
+            ]
+          },
+          "failureCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactFailureCodeProtocol"
+              }
+            ]
+          },
+          "stage": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpFixStageProtocol"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdpFixStageProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "TargetProvisioning",
+          "PatchApplying",
+          "CheckerRunning",
+          "Completed"
+        ],
+        "enum": [
+          "TargetProvisioning",
+          "PatchApplying",
+          "CheckerRunning",
+          "Completed"
         ]
       },
       "NoCTFAPIEndpointsGameplayFactsGetGameplayFactStatusRequest": {
@@ -17385,6 +17628,74 @@
         "type": "object",
         "additionalProperties": false
       },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactPreviewResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "projectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "competitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactCompetitionResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactCompetitionResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "competitionTitle": {
+            "type": "string"
+          },
+          "currentSchemaVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactTeamResponse"
+            }
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsAwdpScoringImpactTeamResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "teamId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "currentScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "continuousScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "delta": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationGameplayFactsPreviewAwdpScoringImpactRequest": {
+        "type": "object",
+        "additionalProperties": false
+      },
       "NoCTFAPIEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse": {
         "type": "object",
         "additionalProperties": false,
@@ -18989,13 +19300,15 @@
           "Attachment",
           "AwdRound",
           "RuntimeDefinition",
-          "Hint"
+          "Hint",
+          "RuntimeGeneration"
         ],
         "enum": [
           "Attachment",
           "AwdRound",
           "RuntimeDefinition",
-          "Hint"
+          "Hint",
+          "RuntimeGeneration"
         ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse": {

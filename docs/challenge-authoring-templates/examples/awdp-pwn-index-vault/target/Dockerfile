@@ -15,12 +15,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 challenge \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin challenge \
-    && install -d -o 10001 -g 10001 -m 0755 /opt/challenge/bin
+    && install -d -o 10001 -g 10001 -m 0755 /opt/challenge/bin /noctf/fix
 
 COPY --from=builder --chown=10001:10001 --chmod=0555 /out/pwn-note-vulnerable /opt/challenge/bin/pwn-note
 
 USER 10001:10001
 EXPOSE 31337
-ENV FLAG=flag{replace-this-test-only-value}
 
 ENTRYPOINT ["socat", "TCP-LISTEN:31337,reuseaddr,fork", "EXEC:/opt/challenge/bin/pwn-note"]

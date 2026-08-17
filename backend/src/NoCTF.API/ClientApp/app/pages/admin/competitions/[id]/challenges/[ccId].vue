@@ -149,7 +149,11 @@ const flagError = ref<string | null>(null)
 const savingFlag = ref(false)
 const pendingFlagId = ref<string | null>(null)
 const usesRuntimeFlagInjection = computed(() =>
-  competition.value?.mode === 'Ctf' && !flagsLoading.value && !flagsLoadError.value && !supportsRegularExpression.value,
+  competition.value?.mode === 'Awdp'
+  || competition.value?.mode === 'Ctf'
+  && !flagsLoading.value
+  && !flagsLoadError.value
+  && !supportsRegularExpression.value,
 )
 const staticFlags = computed(() => flags.value.filter(flag => !flag.systemManaged))
 const systemFlags = computed(() => flags.value.filter(flag => flag.systemManaged))

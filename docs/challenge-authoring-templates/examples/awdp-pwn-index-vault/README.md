@@ -1,67 +1,62 @@
 # AWDP PWN 示例题：index-vault
 
-`index-vault` 是一套基于 NoCTF AWDP Starter Kit 约定制作的完整 PWN 示例题。目录中包含一个存在越界读漏洞的 TCP note 服务、可信 Checker、多种预期结果的 Fix 归档、本地烟测脚本，以及用于测试环境部署的说明文档。
+`index-vault` 演示 NoCTF 的完整 AWDP 产品语义：每队拥有一个 `Player` 攻击实例，
+平台按 Runtime generation 生成精确 Flag 并注入 `FLAG` 环境变量；Fix 则在独立的
+`AwdpTarget` 中只执行和检查一次。
 
-本题演示一个简单的越界读漏洞：
+服务是一个存在越界读的 TCP note vault：
 
-- `READ 0` 是正常业务路径，修复后必须继续可用。
-- `READ 4` 在漏洞版本中会读出进程的 `FLAG` 环境变量。
-- 合法 Fix 会在保留 `READ 0` 的同时，让 `READ 4` 返回 `ERR range`。
+- `PING` 返回 `PONG`；
+- `READ 0` 返回 `VALUE:training-service-online`；
+- 漏洞版本的 `READ 4` 返回运行时注入的动态值；
+- 合法 Fix 保留正常业务，并让 `READ 4` 返回 `ERR range`。
 
-## 目录结构
+镜像不包含比赛 Flag。缺少 `FLAG` 时只使用不可被误判为正确答案的
+`NOCTF_RUNTIME_FLAG_UNAVAILABLE`。
+
+## 文件树
 
 ```text
 awdp-pwn-index-vault/
 ├─ DEPLOYMENT.md
 ├─ NOCTF-DELIVERY.md
 ├─ README.md
-├─ checker/
-│  ├─ Dockerfile
-│  └─ checker.py
-├─ deploy/
-│  └─ docker-compose.attack.yml.example
-├─ fixes/
-│  ├─ fixed/fix.sh
-│  ├─ nonzero/fix.sh
-│  ├─ rule-violation/fix.sh
-│  ├─ service-unavailable/fix.sh
-│  ├─ still-vulnerable/fix.sh
-│  └─ timeout/fix.sh
-├─ scripts/
-│  ├─ build-fix-packages.sh
-│  └─ package-delivery.sh
-├─ target/
-│  ├─ Dockerfile
-│  └─ src/pwn_note.c
-├─ tests/
-│  ├─ callback/
-│  └─ smoke.sh
-└─ tools/
-   └─ exploit.py
+├─ checker/{Dockerfile,checker.py}
+├─ deploy/docker-compose.attack.yml.example
+├─ fixes/{fixed,still-vulnerable,rule-violation,service-unavailable,nonzero,timeout}/fix.sh
+├─ scripts/{build-fix-packages.sh,build-invalid-fix-packages.py,package-delivery.sh}
+├─ target/{Dockerfile,src/pwn_note.c}
+├─ tests/{callback/,invalid-archives.sh,smoke.sh}
+└─ tools/exploit.py
 ```
 
-## 快速开始
+## 本地验证
 
-需要 POSIX shell 和 Docker Engine：
+需要 POSIX shell、Python 3 和 Docker Engine：
 
 ```sh
-chmod +x scripts/*.sh tests/smoke.sh fixes/*/fix.sh tools/exploit.py
+chmod +x scripts/*.sh scripts/*.py tests/*.sh fixes/*/fix.sh tools/exploit.py
 ./scripts/build-fix-packages.sh
+./tests/invalid-archives.sh
 ./tests/smoke.sh
 ./scripts/package-delivery.sh
 ```
 
-生成的 Fix 归档位于 `artifacts/fixes/`。完整交付包位于 `dist/noctf-awdp-pwn-index-vault.tar.gz`。
+生成的 `artifacts/`、`dist/` 和所有二进制归档均被 `.gitignore` 忽略。
 
-## 预期结果
+## 六种合法归档结果
 
-| Fix 归档 | 平台预期结果 |
+| 归档 | 平台结果 |
 | --- | --- |
-| `fixed.tar.gz` | `Fixed` / 修复成功 |
-| `still-vulnerable.tar.gz` | `StillVulnerable` / 漏洞仍存在 |
-| `rule-violation.tar.gz` | `RuleViolation` / 正常业务路径被破坏 |
-| `service-unavailable.tar.gz` | `ServiceUnavailable` / 目标服务不可用 |
-| `nonzero.tar.gz` | Patch 脚本非零退出 |
-| `timeout.tar.gz` | Patch 脚本执行超时 |
+| `fixed.tar.gz` | `Fixed` |
+| `still-vulnerable.tar.gz` | `StillVulnerable` |
+| `rule-violation.tar.gz` | `RuleViolation` |
+| `service-unavailable.tar.gz` | `ServiceUnavailable` |
+| `nonzero.tar.gz` | `AwdpPatchFailed` |
+| `timeout.tar.gz` | `AwdpPatchTimeout` |
 
-在 NoCTF 当前 AWDP 语义中，Fix 验证使用的是内部一次性 target 与 checker 镜像。如果还需要用浏览器和选手账号手工验证 Break 流程，可以由工作人员使用 `deploy/docker-compose.attack.yml.example` 在受控主机上单独启动一个可攻击靶机，并在 NoCTF 中配置相同的静态精确 Flag。
+`build-invalid-fix-packages.py` 还会生成空归档、缺少入口、绝对路径、路径穿越、
+符号链接、硬链接、重复路径、非 gzip tar 和超限上传九类拒绝样本。
+
+`deploy/docker-compose.attack.yml.example` 只用于作者离线 smoke。正式比赛的攻击入口
+必须由 NoCTF Player Runtime 提供，不能以工作人员额外运行的 compose 靶机替代。

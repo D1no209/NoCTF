@@ -92,6 +92,60 @@ public sealed class RuntimeClaimFactoryTests
     }
 
     [Test]
+    public async Task Awdp_per_team_container_uses_the_generation_flag_and_owner_only_url()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        instance.Purpose = RuntimePurpose.Player;
+        var ownerOnlyUrl = new RuntimeUrlBinding(
+            "tcp://{HOST}:{PORT}",
+            RuntimeExposure.OwnerOnly,
+            31337);
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "awdp-target:latest",
+                Environment: new Dictionary<string, string> { ["FLAG"] = "author-value" },
+                PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                FlagEnvironmentVariableName: "FLAG",
+                InternalPorts: [31337]),
+            UrlBindings: [ownerOnlyUrl],
+            FlagSource: RuntimeFlagSource.PerTeam);
+
+        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+            instance,
+            GameMode.Awdp,
+            template,
+            "{}",
+            "flag{generation-one}");
+
+        await Assert.That(claim.Definition.Environment["FLAG"])
+            .IsEqualTo("flag{generation-one}");
+        await Assert.That(claim.Definition.PortMappings[31337]).IsEqualTo(0);
+        await Assert.That(claim.Definition.UrlBindings).IsEquivalentTo([ownerOnlyUrl]);
+    }
+
+    [Test]
+    public async Task Awdp_per_team_container_rejects_a_missing_generation_flag()
+    {
+        var instance = CreateInstance(RuntimeKind.Container, RuntimeProvider.Docker);
+        instance.Purpose = RuntimePurpose.Player;
+        var template = new ChallengeRuntimeTemplate(
+            RuntimeAllocation.PerTeam,
+            new ContainerRuntimeDefinition(
+                "awdp-target:latest",
+                FlagEnvironmentVariableName: "FLAG"),
+            FlagSource: RuntimeFlagSource.PerTeam);
+
+        var action = () => RuntimeClaimFactory.Create(
+            instance,
+            GameMode.Awdp,
+            template,
+            "{}");
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task Compose_definition_creates_only_a_compose_claim()
     {
         var instance = CreateInstance(RuntimeKind.Compose, RuntimeProvider.Docker);

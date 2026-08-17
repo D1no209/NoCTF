@@ -111,10 +111,22 @@ describe('AWDP patch upload limits', () => {
   test('keeps the visible default and serializes challenge-managed bytes', () => {
     const model = emptyDefinition('Awdp')
     expect(model.maximumPatchUploadBytes).toBe(256 * 1024 * 1024)
+    const runtime = emptyRuntimeTemplate('Awdp')
+    expect(runtime.flagSource).toBe(FlagSource.PerTeam)
+    expect(runtime.definition.kind).toBe('container')
+    if (runtime.definition.kind !== 'container') throw new Error('Expected AWDP container')
+    expect(runtime.definition.flagEnvironmentVariableName).toBe('FLAG')
+    expect(model.awdpFlagInjection).toBeNull()
     model.maximumPatchUploadBytes = 512 * 1024 * 1024
 
     const json = serializeDefinition('Awdp', model)
     expect(JSON.parse(json).maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
     expect(parseDefinition(json)?.maximumPatchUploadBytes).toBe(512 * 1024 * 1024)
+    expect(JSON.parse(json)).toMatchObject({
+      schemaVersion: 2,
+    })
+    expect(JSON.parse(json).flagInjection).toBeUndefined()
+    expect(competitionConfigFields('Awdp').some(field => field.key === 'requireBreakBeforeFix')).toBeTrue()
+    expect(challengeRuleFields('Awdp').some(field => field.key === 'requireBreakBeforeFix')).toBeTrue()
   })
 })

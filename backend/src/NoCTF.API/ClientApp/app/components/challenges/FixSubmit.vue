@@ -15,7 +15,7 @@ const props = defineProps<{
   disabledReason?: string
 }>()
 
-const emit = defineEmits<{ evaluated: [] }>()
+const emit = defineEmits<{ accepted: [], evaluated: [] }>()
 
 const file = ref<File | null>(null)
 const pending = ref(false)
@@ -77,6 +77,7 @@ async function submit() {
     result.value = { state: 'Pending', result: null }
     stage.value = 'evaluating'
     toast.success(translate("Fix 已受理,等待评测"))
+    emit('accepted')
     startPolling()
   }
   finally {

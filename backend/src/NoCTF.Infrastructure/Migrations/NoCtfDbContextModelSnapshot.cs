@@ -207,6 +207,11 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasDatabaseName("ix_challenge_flags_competition_challenge_id_flag_sha256")
                         .HasFilter("deleted_at IS NULL");
 
+                    b.HasIndex("SpecificationKind", "SpecificationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_challenge_flags_specification_kind_specification_id")
+                        .HasFilter("specification_kind = 4 AND deleted_at IS NULL");
+
                     b.HasIndex("CompetitionChallengeId", "TeamId", "SpecificationKind", "SpecificationId")
                         .HasDatabaseName("ix_challenge_flags_competition_challenge_id_team_id_specificat");
 
@@ -822,7 +827,7 @@ namespace NoCTF.Infrastructure.Migrations
 
                             t.HasCheckConstraint("ck_gameplay_facts_state_result", "state <> 3 OR result IS NOT NULL");
 
-                            t.HasCheckConstraint("ck_gameplay_facts_victim", "victim_team_id IS NULL OR kind = 0");
+                            t.HasCheckConstraint("ck_gameplay_facts_victim", "victim_team_id IS NULL OR kind IN (0, 1)");
                         });
                 });
 
@@ -1273,6 +1278,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("awd_checker_target_host");
 
+                    b.Property<short?>("AwdpFixStage")
+                        .HasColumnType("smallint")
+                        .HasColumnName("awdp_fix_stage");
+
                     b.Property<DateTimeOffset?>("CheckerDeadlineAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("checker_deadline_at");
@@ -1434,7 +1443,7 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("CompetitionChallengeId", "TeamId")
                         .IsUnique()
                         .HasDatabaseName("ix_runtime_instances_competition_challenge_id_team_id")
-                        .HasFilter("purpose IN (0, 2) AND state IN (0, 1, 2)");
+                        .HasFilter("purpose IN (0, 2, 3) AND state IN (0, 1, 2)");
 
                     b.HasIndex("State", "NextCheckerDueAt")
                         .HasDatabaseName("ix_runtime_instances_state_next_checker_due_at")
@@ -1450,6 +1459,8 @@ namespace NoCTF.Infrastructure.Migrations
                     b.ToTable("runtime_instances", null, t =>
                         {
                             t.HasCheckConstraint("ck_runtime_instances_awd_checker_target", "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
+
+                            t.HasCheckConstraint("ck_runtime_instances_awdp_fix_stage", "awdp_fix_stage IS NULL OR purpose = 1");
 
                             t.HasCheckConstraint("ck_runtime_instances_awdp_gameplay_fact", "(purpose = 1) = (gameplay_fact_id IS NOT NULL)");
 

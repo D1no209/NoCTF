@@ -1,5 +1,119 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-17 alpha.42 AWDP 队伍攻击实例与一次性 Fix 语义收口
+
+- 本阶段以 `origin/main@b96f4cc5` 为基线，在独立分支
+  `codex/awdp-player-fix-20260817` / 工作树
+  `E:\SourceCode\NoCTF-awdp-player-fix-20260817` 完成，没有覆盖主工作区
+  `E:\SourceCode\NoCTF` 中的其他修改。提交依次为：`0eca4032`（AWDP 队伍攻击
+  Runtime、generation Flag 注入与按模式判定）、`8a9be67a`（前端 AWDP 攻击/防御配置体验）、
+  `d2c2f010`（AWDP Full E2E、Fix 归档边界测试与 index-vault 示例题更新）和
+  `957d865b`（版本由 `0.1.0-alpha.41` 递增为 `0.1.0-alpha.42`）。
+- AWDP 现在严格区分队伍攻击实例与一次性 Fix 验证实例：选手侧可为本队启动 Player/PerTeam
+  攻击 Runtime，平台在每个 Runtime generation 自动生成并注入本队精确 Flag；Fix 验证仍使用
+  TeamId 为空、无公开入口的一次性 `AwdpTarget`，不会把 Fix 建模为 Flag 操作，也不会复用 AWD
+  的轮询服务语义。容器题目的动态 Flag 配置留在比赛题目管理处，题库模板只保留 Runtime/Checker
+  与注入位置等技术定义，方便不同比赛使用不同 Flag 头。
+- Runner 在 AWDP Player Runtime 领取时会要求存在当前 generation 的 exact Flag，并在容器创建前通过
+  Runtime claim 注入环境变量；Runner 成功创建后激活该 generation 的 Flag，停止、重置或 generation
+  变化时旧 Flag 失效。AWDP Break 只接受本队当前 generation 的 Flag；本队 Flag、其他队伍 Flag、过期
+  Flag、重复 Flag 与错误 Flag 继续按强类型 GameplayFact 规则判定。
+- 前端 AWDP 配置默认展示“攻击轨 · Break”和“防御轨 · Fix”：攻击 Runtime 使用本队独立实例、`FLAG`
+  环境变量和 OwnerOnly 访问 URL；Fix 区域强调补丁包只执行一次 Checker。前端没有新增手写 API URL、
+  DTO 或枚举；本阶段 API/OpenAPI/TypeScript SDK 无实质契约变化，`bun run api:gen` 后 `app/api`
+  内容无漂移。
+- AWDP Full E2E 已覆盖：开赛前不能启动环境、三支队伍 Player Runtime 分配、Break 成功/错误/重复/过期/
+  外队 Flag、Fix 成功、StillVulnerable、RuleViolation、ServiceUnavailable、补丁非零退出、超时、
+  缺少 `fix.sh`、空包、绝对路径、`../` 路径穿越、符号链接、硬链接、重复路径、非 gzip、超限包、
+  pause 后逻辑轮冻结、resume 后继续计分、finish 后释放 Runtime。测试夹具同步更新为可区分
+  `Fixed`、`StillVulnerable`、`RuleViolation` 和 `ServiceUnavailable`。
+- `docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/` 已同步到新模型：目标镜像不再烘焙真实
+  Flag，服务从环境变量读取动态 Flag；Checker 不依赖固定 Flag 前缀；新增非法 Fix 包生成脚本和烟测，
+  覆盖合法 Fix 与多类非法归档。starter-kit 和权威文档同步强调：AWDP 出题人配置攻击 Runtime、
+  Checker 和 Fix 契约，不手工创建队伍 Flag 或把 Break/Fix 混为同一操作。
+- 验证通过：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：0 warning / 0 error。
+  - `powershell -ExecutionPolicy Bypass -File backend/scripts/Verify-Backend.ps1 -RequireDockerIntegration`：
+    Release build 0 warning / 0 error；非 Integration TUnit 793/793；真实 PostgreSQL、Redis、Wolverine、
+    Docker Integration 175/177 通过、0 失败，Kubernetes 与 Libvirt 两项因专用环境未配置按设计跳过；
+    EF model drift 无变化；OpenAPI export 与 artifact drift 通过；`git diff --check` 通过。
+  - `dotnet run --file backend/tests/e2e.cs -- --mode awdp --suite full`：AWDP Full E2E 1/1，通过后 resilience
+    检查也通过；E2E Docker 容器、网络、卷和本地镜像已由编排器精确清理。
+  - `bun test`：203/203；`bun run typecheck`：通过；`bun run build`：通过，仅保留既有大 chunk、
+    plugin timing 与 Node exports deprecation 警告。
+  - `bun run api:gen; git diff --exit-code -- app/api`：通过，无 SDK 内容漂移。
+  - WSL 下 `tests/invalid-archives.sh` 与 `tests/smoke.sh`：均通过。
+- 本阶段没有新增业务表、列、migration 或 snapshot，没有固定或改写题目 Runtime/Checker/Compose 镜像
+  digest，没有新增 registry allowlist，没有推送、部署或操作生产数据。生产仍以既有远程 `main` 和当前
+  部署为准，等待新的明确授权。
+
+## 2026-08-17 alpha.41 AWDP 持续攻击、防御与按轮计分模型
+
+- 本阶段以 `origin/main@40722584` 为基线，在独立分支
+  `codex/awdp-product-model-20260817` / 工作树
+  `E:\SourceCode\NoCTF-awdp-product-model-20260817` 完成。提交依次为：
+  `761e65b0`（AWDP schema v2 配置与 v1 只读兼容）、`9e4e0c54`（攻击 Runtime、动态
+  Flag、一次性 Fix 阶段、持续计分、维护刷新、参赛者状态和历史影响预览）、
+  `c94c8854`（生成 SDK 与中英文攻击/防御前端）、`57220ace`（权威 AWDP 文档）和
+  `550c85da`（版本由 `0.1.0-alpha.40` 递增为 `0.1.0-alpha.41`）。
+- AWDP v2 明确分离攻击轨 `BreakAttempt` 与防御轨 `FixAttempt`。玩家攻击环境使用新的
+  `RuntimePurpose.AwdpAttack`，按队伍、比赛题目和 Runtime generation 生成、注入并失效
+  `SpecificationKind.RuntimeGeneration` 动态 Flag；环境变量与绝对文件两种注入均由题库技术定义配置，
+  比赛专属 Flag 模板留在 Competition/CompetitionChallenge 配置。未复用 AWD 的
+  `FlagAttempt`、`AwdRound`、目标列表或周期服务 Checker。
+- Fix 无需先 Break。每次 Fix 使用 TeamId 为空、无公开入口的全新 `AwdpTarget`，阶段为
+  TargetProvisioning、PatchApplying、CheckerRunning、Completed；Patch 与一次 Checker 的 durable
+  revision/processing fence 保持幂等，exit 0 但没有认证 `Fixed` callback 不会被推导为 Correct。
+- schema v2 的 Break/Fix 分别选取每队每题最早有效 Correct 作为激活点，从所属逻辑轮开始持续累计；
+  当前轮立即计入，两轨可叠加，失败罚分只应用一次。Pause 使用 EffectiveRunningTime 冻结轮次，Resume
+  接续，Finish 最终投影后冻结，Rejudge 会重新选择激活事实。singular maintenance 每 15 秒有界检查最多
+  500 场 Running AWDP v2，只在逻辑轮前进或缓存缺失时置脏，不新增 schedule/积分状态业务表。
+- 新增强类型 API：`GET /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state`
+  返回本队攻击 Runtime、Break/Fix 激活轮与一次性 Fix 阶段；
+  `GET /api/v1/admin/awdp/scoring-impact-preview` 只允许平台 Administrator 只读比较历史 v1 当前分数与
+  假设 v2 分数。历史 GameplayFact、CompetitionEvent 与排行榜未自动修改，也没有提供应用纠正端点。
+  OpenAPI 两份制品由工具导出且 SHA-256 均为
+  `274407C7E946619445B972FBE3F26DF34937D39D4BE62E465CD92E097D5923BC`；TypeScript SDK 由工具生成，
+  两次导出和两次生成均无漂移。
+- EF migration `20260816181000_AddAwdpContinuousRuntime` 由 `dotnet ef` 生成，新增
+  `runtime_instances.awdp_fix_stage`、AWDP Attack 活动实例唯一索引、Runtime generation Flag 唯一索引，
+  并将外队 Flag 的 victim 约束扩展至 BreakAttempt。没有新增业务表；`dotnet ef migrations
+  has-pending-model-changes`（dotnet-ef 10.0.9）确认无模型漂移。
+- 最终验证：Release solution build 0 warning / 0 error；完整非 Integration TUnit 784/784；强制真实
+  PostgreSQL、Redis、Wolverine、Docker Integration 175/177 通过、0 失败，Kubernetes 与 Libvirt 两项因
+  专用环境未配置按设计跳过；CTF、AWD、AWDP、KoH Full E2E 均 1/1 并通过各自 resilience 检查，其中
+  AWDP Full E2E 最终再次以保留环境模式 1/1 通过（2m17s），随后精确清理该 Compose project 的容器、
+  网络、卷和本地镜像，残留均为 0。C# analyzer、EF drift、两份 Compose config、kubeconform
+  46 valid / 3 Cilium schema skipped / 0 invalid、`git diff --check` 均通过。
+- 前端完整 `bun test` 202/202、`bun run typecheck` 与 production `bun run build` 通过；仓库没有 lint
+  script。构建仅保留既有大 chunk、插件耗时和依赖 exports deprecation 警告。Microsoft Edge 自动化在
+  读取已有 Edge 窗口时因无法可靠确认当前 URL 而由 Computer Use 安全策略终止；没有回退到内置浏览器，
+  因此本阶段的 Edge 人工交互、Console 与 Network 验收准确标记为阻塞，不能误报为通过。
+- 本阶段未固定或改写题目 Runtime/Checker/Compose 镜像 digest，没有新增 registry allowlist；镜像 tag/digest
+  继续按可信出题人定义原样使用。
+- 功能、前端、文档、版本与初始 HANDOFF 共 6 个提交已快进推送到远程 `main@d19cff91`。生产
+  `/root/NoCTF` 通过 SHA-256 校验后的增量 Git bundle 快进到同一提交，既有未跟踪
+  `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、PostgreSQL/Redis/上传卷和题目数据均保持原样。
+  Git bundle SHA-256 为 `677CBD0F596665D222836EF9BD4D8FC96CFFF1007A7B41707F2C9A890E5457F4`，
+  三服务 Linux/amd64 镜像归档 SHA-256 为
+  `5665BA975EB16CB34F07D45DD71997E746CB2FEE2F90E93B5BED1F03F157B4AC`。
+- 部署前使用生产 PostgreSQL 容器内凭据创建 custom-format 备份
+  `/root/noctf-backups/pre-alpha41-d19cff91-20260817.dump`，并通过 `pg_restore --list` 验证；备份
+  SHA-256 为 `26F07A44F7F2BA035532AF62FF4CDB3F1A226E335C2F8D287E5FF9EC4744D8AF`。Migration 容器成功应用
+  `20260816181000_AddAwdpContinuousRuntime`，生产复核确认 `runtime_instances.awdp_fix_stage` 与
+  Runtime-generation Flag 唯一索引均存在。
+- API、Worker、Runner 均使用 `--no-deps --no-build --force-recreate` 切换，PostgreSQL、Redis、上传卷和
+  题目 Runtime 没有重建。运行镜像分别为 API
+  `sha256:7888f3936ed49c1f2dc81757b76764b113ad691deb5f16854bbfd0cd40675c9d`、Worker
+  `sha256:c221a7e361fca04f6ce7dae50e76d7193eba3fe7d21457b572ddb51d86a94e67`、Runner
+  `sha256:e548f6a181c917b6fb8c31d36e3992c0f68a5a5915d8ae74c3a2607bcbe2401b`；原三服务与 Migration 镜像保留
+  `rollback-40722584` 标签。
+- 部署后五项服务均 healthy；API、Worker、Runner restart count 均为 0，程序集均确认
+  `0.1.0-alpha.41`。公网 `https://101.43.46.244/` 与 `/health` 返回 200，健康正文为 `Ok`；生产 OpenAPI
+  包含 AWDP participant state 与管理员 scoring-impact preview 路由，两条路由未认证访问均返回预期 401。
+  部署后 15 分钟 API/Worker/Runner 日志中 Fatal、Critical、Unhandled、Exception 与失败匹配均为 0。
+  远端精确传输目录已删除，未执行全局 Docker prune，根分区仍有约 15 GB 可用空间。
+
 ## 2026-08-16 AWDP PWN 示例题 index-vault
 
 - 文档提交 `33b72f7a` 在 `docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/` 新增一套可直接打包交付的 AWDP PWN 示例题。示例包含 vulnerable/fixed/rule-violation 三个目标二进制构建、可信 AWDP Checker、6 类 Fix 样例、可选外部 Break 靶机 compose、作者 exploit、交付单和测试生产环境部署说明，并在出题模板索引中加入入口链接。

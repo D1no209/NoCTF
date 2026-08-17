@@ -1,3 +1,4 @@
+# 仅供作者离线 smoke；正式比赛必须使用 NoCTF Player Runtime 与平台动态 Flag。
 services:
   target:
     image: ${TARGET_IMAGE:?set TARGET_IMAGE}

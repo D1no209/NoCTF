@@ -200,6 +200,21 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var request = Request(fixture);
             var first = await AcquireAsync(options, request, cancellationToken);
 
+            await using (var stageDb = new NoCtfDbContext(options))
+            {
+                var advanced = await new PostgresAwdpFixExecutionFence(
+                    stageDb,
+                    new RecordingOutbox(),
+                    TimeProvider.System).TryAdvanceStageAsync(new(
+                        fixture.GameplayFactId,
+                        fixture.RuntimeInstanceId,
+                        1,
+                        first.RuntimeProcessingVersion,
+                        AwdpFixStage.PatchApplying,
+                        AwdpFixStage.CheckerRunning), cancellationToken);
+                await Assert.That(advanced).IsTrue();
+            }
+
             await using (var resultDb = new NoCtfDbContext(options))
             {
                 var applied = await new InternalResultStore(
@@ -225,6 +240,9 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                 .SingleAsync(item => item.Id == fixture.GameplayFactId, cancellationToken);
             await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
             await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
+            var runtime = await verification.RuntimeInstances.AsNoTracking()
+                .SingleAsync(item => item.Id == fixture.RuntimeInstanceId, cancellationToken);
+            await Assert.That(runtime.AwdpFixStage).IsEqualTo(AwdpFixStage.Completed);
         });
     }
 
@@ -397,6 +415,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             CompetitionChallengeId = competitionChallengeId,
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = factId,
+            AwdpFixStage = AwdpFixStage.PatchApplying,
             SourceCompetitionConfigurationRevision = 3,
             SourceCompetitionChallengeRevision = 7,
             SourceChallengeDefinitionRevision = 5,

@@ -1,6 +1,7 @@
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Domain.Gameplay;
+using NoCTF.GameModes.Flags;
 
 namespace NoCTF.GameModes.Awdp.Configuration;
 
@@ -11,6 +12,17 @@ public enum AchievementSettlement
 }
 
 public sealed record AwdpAchievementConfiguration(AchievementSettlement Settlement, long Points);
+
+public enum AwdpFlagInjectionKind
+{
+    EnvironmentVariable,
+    File
+}
+
+public sealed record AwdpFlagInjectionConfiguration(
+    AwdpFlagInjectionKind Kind,
+    string? EnvironmentVariableName = null,
+    string? FilePath = null);
 
 public sealed record AwdpConfiguration(
     int SchemaVersion,
@@ -24,9 +36,13 @@ public sealed record AwdpConfiguration(
     long FixFailurePenalty = 0,
     int MaxBreakSubmissions = 10,
     int MaxFixSubmissions = 10,
-    EvaluationDispatchMode EvaluationDispatchMode = EvaluationDispatchMode.Automatic)
+    EvaluationDispatchMode EvaluationDispatchMode = EvaluationDispatchMode.Automatic,
+    PerTeamFlagTemplate? FlagTemplate = null)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+    public const int LegacySchemaVersion = 1;
+
+    public bool UsesContinuousRoundScoring => SchemaVersion == CurrentSchemaVersion;
 }
 
 public sealed record AwdpChallengeConfiguration(
@@ -47,9 +63,12 @@ public sealed record AwdpChallengeConfiguration(
     long? ViolationPenalty = null,
     long? ServiceDownPenalty = null,
     EvaluationDispatchMode? EvaluationDispatchMode = null,
-    long? MaximumPatchUploadBytes = null)
+    long? MaximumPatchUploadBytes = null,
+    PerTeamFlagTemplate? FlagTemplate = null,
+    AwdpFlagInjectionConfiguration? FlagInjection = null)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+    public const int LegacySchemaVersion = 1;
 }
 
 public sealed record AwdpEffectiveConfiguration(
@@ -70,4 +89,10 @@ public sealed record AwdpEffectiveConfiguration(
     int PatchTimeoutSeconds,
     RunnerJobConfiguration? Checker,
     int ReadyTimeoutSeconds,
-    long MaximumPatchUploadBytes);
+    long MaximumPatchUploadBytes,
+    PerTeamFlagTemplate FlagTemplate,
+    AwdpFlagInjectionConfiguration? FlagInjection,
+    int SchemaVersion = AwdpConfiguration.LegacySchemaVersion)
+{
+    public bool UsesContinuousRoundScoring => SchemaVersion == AwdpConfiguration.CurrentSchemaVersion;
+}

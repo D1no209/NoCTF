@@ -46,19 +46,32 @@ public class CompetitionConfigurationValidatorTests
     }
 
     [Test]
-    public async Task AwdpCurrentConfiguration_ParsesFinalPenaltyFieldsWithoutUpgrade()
+    public async Task AwdpLegacyConfiguration_RemainsReadableWithoutChangingItsSemantics()
     {
         const string current = """{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"violationPenalty":5,"serviceDownPenalty":7}""";
 
         var parsed = NoCTF.GameModes.Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(current);
 
         await Assert.That(parsed.SchemaVersion).IsEqualTo(1);
+        await Assert.That(parsed.UsesContinuousRoundScoring).IsFalse();
         await Assert.That(parsed.ViolationPenalty).IsEqualTo(5L);
         await Assert.That(parsed.ServiceDownPenalty).IsEqualTo(7L);
     }
 
     [Test]
-    public async Task AwdpNonCurrentConfiguration_IsRejectedWithoutUpgrade()
+    public async Task AwdpCurrentConfiguration_UsesContinuousRoundScoringAndIndependentFix()
+    {
+        var json = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp);
+
+        var parsed = NoCTF.GameModes.Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(json);
+
+        await Assert.That(parsed.SchemaVersion).IsEqualTo(2);
+        await Assert.That(parsed.UsesContinuousRoundScoring).IsTrue();
+        await Assert.That(parsed.RequireBreakBeforeFix).IsFalse();
+    }
+
+    [Test]
+    public async Task AwdpUnsupportedConfiguration_IsRejectedWithoutUpgrade()
     {
         const string obsolete = """{"schemaVersion":0,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50}}""";
 
