@@ -1,5 +1,32 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-17 alpha.43 CTF 3D 大屏总览与实时聚焦
+
+- 本阶段在协作者 3D 大屏实现上完成定向修正。`e04bf87e` 扩大巡航范围并调整题目标签，
+  `aeacd8f6` 让每个题目标牌持续显示当前分值、解题数量及按一血、二血、三血排序的血榜标记；
+  同一题目在聚焦期间出现新解题时会刷新展示并重新计算 5.2 秒聚焦窗口，其他题目的解题更新继续排队。
+  `5ce279a5` 按最终产品确认将相机改为高位俯视：保留拉远半径，初始高度由 44 提升为 68，
+  巡航高度使用 `0.82 * citySpan + 26`，旋转时可以同时观察题目矩阵、柱体与遥测标签。
+- `b396981f` 将平台版本从 `0.1.0-alpha.42` 递增为 `0.1.0-alpha.43`。本阶段没有修改
+  HTTP/OpenAPI/TypeScript SDK、数据模型、migration 或 snapshot，也没有修改题目 Runtime/Checker
+  镜像策略。
+- 验证通过：ClientApp 完整 `bun test` 203/203（1539 assertions）、`bun run typecheck`、production
+  `bun run build` 与 `git diff --check`。构建仅保留既有的大 chunk、plugin timing 与第三方 Node exports
+  deprecation warning。
+- 功能、远程 `main` 合并与版本提交已推送至 `main@b396981f`。生产 `/root/NoCTF` 快进到同一提交，
+  既有未跟踪 `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、PostgreSQL/Redis/上传卷、题目数据和
+  题目 Runtime 均保持原样。本地构建并传输的三服务 Linux/amd64 镜像归档 SHA-256 为
+  `E012ABE731010B5D11C94D613C06335DDD862862A85B5A426C3972ED5BAAEDEA`；导入后 API、Worker、Runner
+  镜像分别为 `sha256:43b544ae31c503e50cf156d3ecf9bf95d0c4c21a6378908c34d811dbd2f08d30`、
+  `sha256:c50e0524388de8679d544aacfffb9af066cd45a22f7e685cb0ddb58068653cd1`、
+  `sha256:172c40f3f6c543fae9be60a7d4b164031f5fc85ab5d0efac3bf303d6211badd8`；原 Alpha.42 三镜像保留
+  `rollback-1a71f0bd` 标签。
+- 生产只用 `--no-deps --no-build --force-recreate` 重建 API、Worker、Runner，没有执行 migration，
+  没有重建 PostgreSQL、Redis、卷或题目容器。三服务均为 running/healthy、restart count 0，程序集均确认
+  `0.1.0-alpha.43`；公开 `https://101.43.46.244/` 与 `/health` 返回 200，健康正文为 `Ok`，发布后
+  API/Worker/Runner 的 Fatal、Critical、Unhandled、Exception 和失败日志匹配均为 0。服务器根分区仍有
+  约 14 GB 可用空间，本地与远端本次精确传输归档均已删除，没有执行全局 Docker prune。
+
 ## 2026-08-17 alpha.42 AWDP 队伍攻击实例与一次性 Fix 语义收口
 
 - 本阶段以 `origin/main@b96f4cc5` 为基线，在独立分支
