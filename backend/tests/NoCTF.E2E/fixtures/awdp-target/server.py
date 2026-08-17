@@ -4,6 +4,8 @@ from pathlib import Path
 
 
 fixed_path = Path("/dev/shm/fixed")
+rule_violation_path = Path("/dev/shm/rule-violation")
+service_down_path = Path("/dev/shm/service-down")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -17,6 +19,12 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path != "/status":
             self.respond(404, "not found")
+            return
+        if service_down_path.exists():
+            self.respond(503, "unavailable")
+            return
+        if rule_violation_path.exists():
+            self.respond(200, "broken")
             return
         self.respond(200, "fixed" if fixed_path.exists() else "vulnerable")
 

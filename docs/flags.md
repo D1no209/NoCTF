@@ -159,8 +159,8 @@ All 判定使用模板中未绑定 Attachment 的 Flag和全部 Attachment-bound
 - OVA：只支持 Static Flag，平台不注入。
 - KoH：Running 前为全部有效队/题生成固定 Control Flag，SpecificationKind=RuntimeDefinition；新批准队/新发布题增量生成；Team 详情仅返回本队值。
 - AWD：每个 RoundStart 后为每队/题生成一条，Specification=AwdRound，窗口严格为该逻辑轮次；失败注入重试同一条，不重新生成。
-- AWDP v2：每次创建 `AwdpAttack` Runtime generation 时幂等生成一条
-  Specification=RuntimeGeneration 的精确 Flag。Challenge 定义只配置环境变量名或绝对文件路径，
+- AWDP：每次创建 `Player` 攻击 Runtime generation 时幂等生成一条
+  Specification=RuntimeGeneration 的精确 Flag。Challenge 定义只配置环境变量名，
   Competition/CompetitionChallenge 配置 Flag 模板。Provider Running 且注入成功后才设置 ValidStart；
   Stop、Reset、过期或失败设置 ValidUntil。AWDP 不使用 AwdRound，不允许出题人手工建立正常攻击路径的
   静态 Break Flag，也不把动态 Flag 返回给玩家 API。

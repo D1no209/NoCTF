@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -60,7 +61,7 @@ public sealed class AwdpFullBoundaryTests
             breakWrongPenalty = 7,
             fixFailurePenalty = 11,
             maxBreakSubmissions = 5,
-            maxFixSubmissions = 5,
+            maxFixSubmissions = 20,
             evaluationDispatchMode = 0
         }, JsonOptions);
         await SendJsonAsync(
@@ -102,7 +103,8 @@ public sealed class AwdpFullBoundaryTests
             schemaVersion = 2,
             requireBreakBeforeFix = false,
             maxBreakSubmissions = 5,
-            maxFixSubmissions = 5,
+            maxFixSubmissions = 20,
+            maximumPatchUploadBytes = 1_048_576,
             flagTemplate = new
             {
                 header = "flag",
@@ -144,8 +146,23 @@ public sealed class AwdpFullBoundaryTests
             competitionId,
             "blue",
             cancellationToken);
+        var green = await RegisterTeamAsync(
+            anonymous,
+            baseUrl,
+            competitionId,
+            "green",
+            cancellationToken);
         using var redClient = red.Client;
         using var blueClient = blue.Client;
+        using var greenClient = green.Client;
+
+        await AssertRuntimeStartRejectedAsync(
+            redClient,
+            competitionId,
+            competitionChallengeId,
+            HttpStatusCode.NotFound,
+            cancellationToken);
+
         await E2ELifecycle.MakeScheduleDueAsync(admin, competitionId, cancellationToken);
         await SendWithoutBodyAsync(
             admin,
@@ -155,17 +172,70 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
 
-        using (var invalidPatch = new MultipartFormDataContent())
-        using (var invalidContent = new ByteArrayContent(Encoding.UTF8.GetBytes("not-a-tar-gzip")))
-        {
-            invalidContent.Headers.ContentType = new MediaTypeHeaderValue("application/gzip");
-            invalidPatch.Add(invalidContent, "File", "invalid.tar.gz");
-            using var invalidResponse = await blueClient.PostAsync(
-                $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload",
-                invalidPatch,
-                cancellationToken);
-            await Assert.That(invalidResponse.StatusCode).IsEqualTo(HttpStatusCode.UnprocessableEntity);
-        }
+        await AssertPatchUploadRejectedAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            CreateEmptyArchive(),
+            "empty.tar.gz",
+            HttpStatusCode.UnprocessableEntity,
+            cancellationToken);
+        await AssertPatchUploadRejectedAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            CreateTarGzipArchive(("/fix.sh", "echo bad")),
+            "absolute-path.tar.gz",
+            HttpStatusCode.UnprocessableEntity,
+            cancellationToken);
+        await AssertPatchUploadRejectedAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            CreateTarGzipArchive(("../fix.sh", "echo bad")),
+            "path-traversal.tar.gz",
+            HttpStatusCode.UnprocessableEntity,
+            cancellationToken);
+        await AssertPatchUploadRejectedAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            CreateLinkArchive(TarEntryType.SymbolicLink),
+            "symbolic-link.tar.gz",
+            HttpStatusCode.UnprocessableEntity,
+            cancellationToken);
+        await AssertPatchUploadRejectedAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            CreateLinkArchive(TarEntryType.HardLink),
+            "hard-link.tar.gz",
+            HttpStatusCode.UnprocessableEntity,
+            cancellationToken);
+        await AssertPatchUploadRejectedAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            CreateTarGzipArchive(("fix.sh", "echo one"), ("fix.sh", "echo two")),
+            "duplicate-path.tar.gz",
+            HttpStatusCode.UnprocessableEntity,
+            cancellationToken);
+        await AssertPatchUploadRejectedAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            CreateRawTarArchive(("fix.sh", "echo ok")),
+            "not-gzip.tar.gz",
+            HttpStatusCode.UnprocessableEntity,
+            cancellationToken);
+        await AssertPatchUploadRejectedAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            CreateOversizedArchive(1_048_577),
+            "oversized.tar.gz",
+            HttpStatusCode.UnprocessableEntity,
+            cancellationToken);
 
         var redRuntime = await StartAndPollRuntimeAsync(
             redClient,
@@ -263,6 +333,73 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         await Assert.That(blueState.GetProperty("breakActivation").ValueKind)
             .IsEqualTo(JsonValueKind.Null);
+
+        await SubmitFixAndAssertAsync(
+            greenClient,
+            competitionId,
+            competitionChallengeId,
+            CreatePatchArchive("#!/bin/sh\nset -eu\n"),
+            "still-vulnerable.tar.gz",
+            "FixAttempt",
+            "Wrong",
+            "AwdpFixFailed",
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
+        await SubmitFixAndAssertAsync(
+            greenClient,
+            competitionId,
+            competitionChallengeId,
+            CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/rule-violation\n"),
+            "rule-violation.tar.gz",
+            "FixAttempt",
+            "Rejected",
+            "AwdpViolation",
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
+        await SubmitFixAndAssertAsync(
+            greenClient,
+            competitionId,
+            competitionChallengeId,
+            CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/service-down\n"),
+            "service-unavailable.tar.gz",
+            "FixAttempt",
+            "Wrong",
+            "AwdpServiceDown",
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
+        await SubmitFixAndAssertAsync(
+            greenClient,
+            competitionId,
+            competitionChallengeId,
+            CreatePatchArchive("#!/bin/sh\nexit 9\n"),
+            "nonzero.tar.gz",
+            "FixAttempt",
+            "Wrong",
+            "AwdpPatchFailed",
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
+        await SubmitFixAndAssertAsync(
+            greenClient,
+            competitionId,
+            competitionChallengeId,
+            CreatePatchArchive("#!/bin/sh\nsleep 30\n"),
+            "timeout.tar.gz",
+            "FixAttempt",
+            "Wrong",
+            "AwdpPatchTimeout",
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
+        await SubmitFixAndAssertAsync(
+            greenClient,
+            competitionId,
+            competitionChallengeId,
+            CreateTarGzipArchive(("payload/readme.txt", "missing entrypoint\n")),
+            "missing-fix-sh.tar.gz",
+            "FixAttempt",
+            "Rejected",
+            "AwdpViolation",
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
 
         var correctBreakId = await SubmitBreakAsync(
             redClient,
@@ -397,21 +534,20 @@ public sealed class AwdpFullBoundaryTests
             redClient,
             $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
             cancellationToken);
-        var pausedRound = pausedState.GetProperty("currentRound").GetInt32();
-        var pausedScores = await PollScoresEqualAsync(
-            anonymous,
+        await Assert.That(pausedState.GetProperty("currentRound").GetInt32())
+            .IsGreaterThanOrEqualTo(Math.Max(redActivationRound, blueActivationRound));
+        await AssertAwdpRoundStableAsync(
+            redClient,
             competitionId,
-            new Dictionary<Guid, long>
-            {
-                [red.TeamId] = checked((pausedRound - redActivationRound + 1L) * 40 - 25),
-                [blue.TeamId] = checked((pausedRound - blueActivationRound + 1L) * 60)
-            },
-            cancellationToken);
-        await AssertScoresStableAsync(
-            anonymous,
-            competitionId,
-            pausedScores,
+            competitionChallengeId,
+            pausedState.GetProperty("currentRound").GetInt32(),
             TimeSpan.FromSeconds(11),
+            cancellationToken);
+        var pausedScores = await PollScoresSettledAsync(
+            anonymous,
+            competitionId,
+            TimeSpan.FromSeconds(18),
+            TimeSpan.FromSeconds(70),
             cancellationToken);
         await SendWithoutBodyAsync(
             admin,
@@ -457,6 +593,7 @@ public sealed class AwdpFullBoundaryTests
                     environment = new Dictionary<string, string>(),
                     labels = new Dictionary<string, string>(),
                     portMappings = new Dictionary<string, int> { ["8080"] = 0 },
+                    flagEnvironmentVariableName = "FLAG",
                     security = new
                     {
                         noNewPrivileges = true,
@@ -474,7 +611,7 @@ public sealed class AwdpFullBoundaryTests
                     nanoCpus = 100_000_000,
                     pidsLimit = 64
                 },
-                ttlSeconds = 120,
+                ttlSeconds = 600,
                 operationTimeoutSeconds = 60,
                 urlBindings = new[]
                 {
@@ -485,12 +622,7 @@ public sealed class AwdpFullBoundaryTests
                         containerPort = 8080
                     }
                 },
-                flagSource = 0
-            },
-            flagInjection = new
-            {
-                kind = 0,
-                environmentVariableName = "FLAG"
+                flagSource = 1
             },
             patchEntrypoint = "fix.sh",
             patchCommand = new[] { "/bin/sh", "{entrypoint}" },
@@ -573,6 +705,40 @@ public sealed class AwdpFullBoundaryTests
         return accepted.GetProperty("gameplayFactId").GetGuid();
     }
 
+    private static async Task SubmitFixAndAssertAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid competitionChallengeId,
+        byte[] archive,
+        string fileName,
+        string kind,
+        string result,
+        string? failureCode,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var patchId = await UploadPatchAsync(
+            client,
+            competitionId,
+            competitionChallengeId,
+            archive,
+            fileName,
+            cancellationToken);
+        var factId = await SubmitFixAsync(
+            client,
+            competitionId,
+            competitionChallengeId,
+            patchId,
+            cancellationToken);
+        var fact = await PollCompletedSubmissionAsync(
+            client,
+            competitionId,
+            factId,
+            timeout,
+            cancellationToken);
+        await AssertSubmissionAsync(fact, kind, result, failureCode);
+    }
+
     private static async Task<Guid> UploadPatchAsync(
         HttpClient client,
         Guid competitionId,
@@ -591,6 +757,26 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         var body = await ReadExpectedJsonAsync(response, HttpStatusCode.Created, cancellationToken);
         return body.GetProperty("patchUploadId").GetGuid();
+    }
+
+    private static async Task AssertPatchUploadRejectedAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid competitionChallengeId,
+        byte[] archive,
+        string fileName,
+        HttpStatusCode expected,
+        CancellationToken cancellationToken)
+    {
+        using var form = new MultipartFormDataContent();
+        using var content = new ByteArrayContent(archive);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/gzip");
+        form.Add(content, "File", fileName);
+        using var response = await client.PostAsync(
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload",
+            form,
+            cancellationToken);
+        await Assert.That(response.StatusCode).IsEqualTo(expected);
     }
 
     private static async Task<JsonElement> StartAndPollRuntimeAsync(
@@ -613,20 +799,90 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
     }
 
+    private static async Task AssertRuntimeStartRejectedAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid competitionChallengeId,
+        HttpStatusCode expected,
+        CancellationToken cancellationToken)
+    {
+        using var response = await client.PostAsync(
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/start",
+            content: null,
+            cancellationToken);
+        await Assert.That(response.StatusCode).IsEqualTo(expected);
+    }
+
     private static byte[] CreatePatchArchive(string script)
+    {
+        return CreateTarGzipArchive(("fix.sh", script));
+    }
+
+    private static byte[] CreateEmptyArchive()
+    {
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
+        using (new TarWriter(gzip, TarEntryFormat.Pax, leaveOpen: true))
+        {
+        }
+        return output.ToArray();
+    }
+
+    private static byte[] CreateTarGzipArchive(params (string Name, string Content)[] files)
     {
         using var output = new MemoryStream();
         using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
         using (var writer = new TarWriter(gzip, TarEntryFormat.Pax, leaveOpen: true))
-        using (var data = new MemoryStream(Encoding.UTF8.GetBytes(script)))
+            WriteTarEntries(writer, files);
+        return output.ToArray();
+    }
+
+    private static byte[] CreateRawTarArchive(params (string Name, string Content)[] files)
+    {
+        using var output = new MemoryStream();
+        using (var writer = new TarWriter(output, TarEntryFormat.Pax, leaveOpen: true))
+            WriteTarEntries(writer, files);
+        return output.ToArray();
+    }
+
+    private static byte[] CreateLinkArchive(TarEntryType entryType)
+    {
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
+        using (var writer = new TarWriter(gzip, TarEntryFormat.Pax, leaveOpen: true))
+        using (var data = new MemoryStream(Encoding.UTF8.GetBytes("#!/bin/sh\nexit 0\n")))
         {
-            var entry = new PaxTarEntry(TarEntryType.RegularFile, "fix.sh")
+            writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "fix.sh")
             {
                 DataStream = data
-            };
-            writer.WriteEntry(entry);
+            });
+            writer.WriteEntry(new PaxTarEntry(entryType, "payload/link")
+            {
+                LinkName = "fix.sh"
+            });
         }
         return output.ToArray();
+    }
+
+    private static byte[] CreateOversizedArchive(int bytes)
+    {
+        var payload = new byte[bytes];
+        RandomNumberGenerator.Fill(payload);
+        return payload;
+    }
+
+    private static void WriteTarEntries(
+        TarWriter writer,
+        params (string Name, string Content)[] files)
+    {
+        foreach (var file in files)
+        {
+            using var data = new MemoryStream(Encoding.UTF8.GetBytes(file.Content));
+            writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, file.Name)
+            {
+                DataStream = data
+            });
+        }
     }
 
     private static Task<JsonElement> PollCompletedSubmissionAsync(
@@ -737,6 +993,26 @@ public sealed class AwdpFullBoundaryTests
         throw new TimeoutException($"AWDP scores did not grow. Last scores: {FormatScores(last)}");
     }
 
+    private static async Task AssertAwdpRoundStableAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid competitionChallengeId,
+        int expectedRound,
+        TimeSpan duration,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(duration);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var state = await GetJsonAsync(
+                client,
+                $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
+                cancellationToken);
+            await Assert.That(state.GetProperty("currentRound").GetInt32()).IsEqualTo(expectedRound);
+            await Task.Delay(TimeSpan.FromMilliseconds(750), cancellationToken);
+        }
+    }
+
     private static async Task AssertScoresStableAsync(
         HttpClient client,
         Guid competitionId,
@@ -752,6 +1028,37 @@ public sealed class AwdpFullBoundaryTests
                 .IsEquivalentTo(expected.OrderBy(item => item.Key).ToArray());
             await Task.Delay(TimeSpan.FromMilliseconds(750), cancellationToken);
         }
+    }
+
+    private static async Task<IReadOnlyDictionary<Guid, long>> PollScoresSettledAsync(
+        HttpClient client,
+        Guid competitionId,
+        TimeSpan stableFor,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(timeout);
+        IReadOnlyDictionary<Guid, long>? last = null;
+        var stableSince = DateTimeOffset.UtcNow;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var current = await TryReadScoresAsync(client, competitionId, cancellationToken);
+            if (current is not null)
+            {
+                if (last is not null && ScoresEqual(last, current))
+                {
+                    if (DateTimeOffset.UtcNow - stableSince >= stableFor)
+                        return current;
+                }
+                else
+                {
+                    last = current;
+                    stableSince = DateTimeOffset.UtcNow;
+                }
+            }
+            await Task.Delay(TimeSpan.FromMilliseconds(750), cancellationToken);
+        }
+        throw new TimeoutException($"AWDP leaderboard did not settle after pause. Last scores: {FormatScores(last)}");
     }
 
     private static async Task<IReadOnlyDictionary<Guid, long>> PollScoresEqualAsync(
@@ -810,6 +1117,12 @@ public sealed class AwdpFullBoundaryTests
         scores is null
             ? "unavailable"
             : string.Join(", ", scores.Select(item => $"{item.Key:N}={item.Value}"));
+
+    private static bool ScoresEqual(
+        IReadOnlyDictionary<Guid, long> left,
+        IReadOnlyDictionary<Guid, long> right) =>
+        left.Count == right.Count
+        && left.OrderBy(item => item.Key).SequenceEqual(right.OrderBy(item => item.Key));
 
     private static Task<JsonElement> PollStoppedRuntimesAsync(
         HttpClient admin,

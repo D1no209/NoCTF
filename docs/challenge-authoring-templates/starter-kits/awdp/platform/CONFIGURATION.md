@@ -5,11 +5,12 @@
 ## 题库模板
 
 - 游戏模式：`AWDP`
-- Break Flag：精确匹配，由题库 Flag 管理，不放入公开附件
-- 分配语义：`PerTeam`
+- Break Flag：平台按比赛题目、队伍和 Runtime generation 生成的精确 Flag
+- 分配语义 / FlagSource：`PerTeam` / `PerTeam`
+- Flag 环境变量：`FLAG` 或题目采用的合法变量名
 - Runtime：Container；不使用 Compose 或 OVA
 - 目标镜像：`待填写`
-- 公网端口 / URL：不配置
+- Player 公网端口 / URL：容器端口映射到 host `0`；OwnerOnly URL
 - 唯一内部端口：`8080`
 - Patch 入口：`fix.sh`
 - Patch 命令：`["/bin/sh", "{entrypoint}"]`
@@ -19,6 +20,9 @@
 - Checker 镜像：`待填写`
 - Checker 目标端口：`8080`
 - Checker 超时：`待填写`
+
+公开端口和 URL 只用于 Player Runtime。一次性 Fix target 无 TeamId、无公开入口，
+只通过隔离内部网络连接 Checker。比赛专属 Flag 模板在比赛题目规则中配置。
 
 ## 比赛题目规则
 

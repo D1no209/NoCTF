@@ -16,15 +16,17 @@
 ## 2. 漏洞、Break 与修复判据
 
 - 漏洞位置、触发条件和利用步骤：待填写。
-- Break Flag 来源和精确匹配验证：待填写。
+- 动态 Break Flag 的环境变量、漏洞泄露路径和精确匹配验证：待填写。
 - Fix 成功后漏洞路径应如何失效：待填写。
 - 必须继续可用的正常业务功能：待填写。
 - RuleViolation 判据：待填写，例如删功能、固定返回、阻断 Checker 或伪造结果。
 
-## 3. 一次性目标
+## 3. Player Runtime 与一次性 Fix target
 
 - [ ] Container、`PerTeam`，不是 Compose 或 OVA。
-- [ ] 不配置公网端口或 URL。
+- [ ] FlagSource 为 `PerTeam`，只填写注入环境变量名。
+- [ ] Player 使用 host port `0` 和 OwnerOnly URL。
+- [ ] Fix target 自动忽略公网端口和 URL，TeamId 为空。
 - [ ] `InternalPorts` 恰好一个，服务监听 `0.0.0.0`。
 - [ ] 全新容器稳定复现漏洞，Fix 目标路径可写。
 - [ ] 不依赖宿主路径、Docker Socket、其他队伍、平台网络或外网。

@@ -10,7 +10,7 @@ NoCTF 将“可复用题目模板”和“某场比赛中的题目”严格分�
 
 | 配置位置 | 保存什么 | 不应保存什么 |
 | --- | --- | --- |
-| 题库模板 `Challenge` | 题面、方向、附件、基础 Flag、Runtime 镜像与启动方式、Checker、Flag 注入命令、AWDP 补丁入口 | 比赛 ID、队伍 ID、题目顺序、题目分值、比赛专属 Flag 前缀、Runner Pool |
+| 题库模板 `Challenge` | 题面、方向、附件、静态 Flag、Runtime 镜像与启动方式、Checker、动态 Flag 注入位置、AWDP 补丁入口 | 比赛 ID、队伍 ID、题目顺序、题目分值、比赛专属 Flag 前缀、Runner Pool |
 | 比赛配置 `Competition` | 轮次长度、硬化期、全局计分、默认 Checker 周期、AWDP 默认 Break/Fix 规则 | 镜像、容器命令、Checker 镜像、补丁脚本 |
 | 比赛题目 `CompetitionChallenge` | 自定义题目名称、顺序、发布状态、基础分、题目规则覆盖、比赛专属 Flag 模板 | Runtime Provider、Runner Pool、平台内部 UUID |
 
@@ -211,14 +211,17 @@ Fix 不是 Flag，不能把修复包、修复状态或补丁 ID 塞进 Flag 接�
 
 ### 4.2 推荐出题流程
 
-1. 在题库中新建 `AWDP` 模板。
-2. 配置 Break 使用的精确 Flag。AWDP Runtime 题不使用正则 Flag。
-3. 配置一次性 Container 目标，只声明一个内部服务端口，不配置公网 URL。
+1. 在题库中新建 `AWDP` 模板，配置可被选手攻击的单 Container 服务。
+2. Runtime 选择 `PerTeam`，Flag 来源选择 `PerTeam`，只填写注入环境变量名；
+   不手工创建队伍 Flag，不填写内部 UUID。
+3. 为 Player Runtime 配置 Docker host port `0` 和 OwnerOnly URL；这就是正式 Break 入口，
+   不得另起工作人员维护的外部靶机替代。
 4. 配置补丁入口、执行命令、补丁超时、就绪等待时间和上传上限。
-5. 配置 Checker 镜像和超时。
-6. 在比赛中添加题目，配置 Break/Fix 分值、结算方式、次数和罚分覆盖。
+5. 配置 Checker 镜像、唯一内部端口和超时。Fix target 会忽略 Player 的公网端口和 URL。
+6. 在比赛中添加题目，配置本场 Flag 模板，以及 Break/Fix 分值、结算方式、次数、
+   `RequireBreakBeforeFix` 和罚分覆盖。
 7. 准备合法 Fix、仍可利用 Fix、规则违规 Fix、服务破坏 Fix 和恶意归档样本。
-8. 用完整 E2E 验证 Break→上传→Fix→Checker→计分闭环。
+8. 用完整 E2E 验证 Player Runtime→动态 Flag→Break，以及上传→一次性 Target→Checker→Fix 闭环。
 
 ### 4.3 比赛与题目规则
 
@@ -242,20 +245,29 @@ Fix 不是 Flag，不能把修复包、修复状态或补丁 ID 塞进 Flag 接�
 
 `Milestone` 与 `PerRound` 只控制计分投影。后续合法 Break 的 GameplayFact 仍保持 `Correct`，不能为了避免重复得分而把它错误改判为 `Duplicate`。
 
-### 4.4 一次性目标 Runtime
+### 4.4 Player Runtime 与一次性 Fix Target
 
-AWDP 目标必须满足：
+题库只保存一份 Container 技术定义，但平台按用途生成两类不同实例：
+
+- Player Runtime：`Purpose=Player`、有 TeamId，使用 `PerTeam` 动态精确 Flag、host port `0`
+  和 OwnerOnly URL；选手 Start/Stop/Reset/Extend 并从自己的实例取得 Break Flag。
+- Fix Target：`Purpose=AwdpTarget`、TeamId 为空、绑定 Fix GameplayFact；复用干净镜像与唯一
+  内部端口，但忽略公开 PortMappings/URL，不向选手提供入口，验证结束后销毁。
+
+共同约束：
 
 - 仅 Container，不支持 Compose 或 OVA；
-- `PerTeam` 分配语义；
-- 不配置公网端口或 URL；
+- `Allocation=PerTeam`、`FlagSource=PerTeam`，只配置环境变量名；
 - `InternalPorts` 恰好一个有效端口；
-- 能在全新容器中复现漏洞，并能在补丁写入后重新判定；
+- Player 的公开映射必须指向该端口且 Exposure 为 OwnerOnly；
+- 服务能在全新容器中稳定复现漏洞，并能在补丁写入后重新判定；
 - 不依赖另一个队伍 Runtime、宿主路径或外网服务。
 
 典型配置参数：
 
-- 目标内部端口：`8080`；
+- 目标内部端口：例如 `31337`；
+- Player 端口：`31337 -> 0`，URL：`tcp://{HOST}:{PORT}`，OwnerOnly；
+- Flag 注入：环境变量 `FLAG`；
 - Runtime TTL：建议大于补丁超时、就绪等待和 Checker 超时之和，例如 120 秒；
 - 操作超时：例如 60 秒；
 - 根文件系统：如果 Fix 需要修改目标文件，不要开启会阻止补丁的只读根文件系统；
@@ -362,12 +374,14 @@ Checker 成功回调后以 0 退出。非零退出、超时、存储或 Provider
 
 - Break 通过普通 Flag 提交进入，但只允许单个 Flag，不支持 AWD 式批量。
 - AWDP Runtime 生成/使用的 Flag始终精确比较，不使用正则匹配。
-- 错误、过期、本队或不属于目标的 Flag按模式规则拒绝。
+- 本队当前 generation Flag 才能产生 Break；错误、外队、已停止或旧 generation Flag按模式规则拒绝。
+- Reset 为新 generation 生成新 Flag，并立刻使旧 generation 失效；Flag 不通过 URL、事件或普通日志返回。
 - 开启“先 Break 后 Fix”后，未满足当前规则时上传可以保留，但触发 Fix 会稳定拒绝，不创建 Fix GameplayFact，也不会错误消耗补丁。
 
 ### 4.8 AWDP 验收清单
 
 - [ ] 正确 Break、错误 Break、重复 Break 和次数上限符合配置。
+- [ ] 两支队伍的 Player Runtime/端口/Flag 相互独立，Reset 后旧 Flag 失效。
 - [ ] 开启“先 Break 后 Fix”时，未 Break 的 Fix 被明确拒绝。
 - [ ] 合法 `tar.gz` 能执行；空包、非 gzip、路径穿越、链接、设备文件、超限包全部拒绝。
 - [ ] 补丁入口位于归档预期路径，命令中的 `{entrypoint}` 正确替换。
