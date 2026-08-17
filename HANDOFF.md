@@ -1,5 +1,30 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.47 推送与生产测试环境部署
+
+- 已将 `main` 从 `0a3cd3f9` 快进推送到 `45d1e878`。生产测试环境
+  `https://101.43.46.244/` 已同步到该提交并完成部署。
+- 部署过程：
+  - 远端 `/root/NoCTF` 保留未跟踪的 `deploy/docker-compose.prod.yml` 与 `.env`，执行
+    `git fetch origin main && git reset --hard origin/main`。
+  - 使用 `deploy/docker-compose.yml` + `deploy/docker-compose.prod.yml` 和 `.env` 构建
+    `migration`、`backend`、`worker`、`runner`。远端 `backend`、`worker`、`migration` 构建成功；远端
+    runner 构建卡在 GitHub `kompose` 下载步骤，已改为在本机用同一源码构建 `deploy-runner:latest`，
+    上传 tar 后在远端 `docker load`。
+  - 新镜像已打标签：`deploy-backend:alpha47-45d1e878`、`deploy-worker:alpha47-45d1e878`、
+    `deploy-runner:alpha47-45d1e878`。
+  - `docker compose ... run --rm migration` 返回 “No migrations were applied. The database is already up to date.”。
+  - 已重建 `backend`、`worker`、`runner`，并删除远端 `/root/deploy-runner-45d1e878.tar` 与本地临时 runner tar。
+- 部署后验证：
+  - `deploy-backend-1`、`deploy-worker-1`、`deploy-runner-1` 均为 `healthy`。
+  - 运行中的镜像 ID：
+    - backend `sha256:f0582ed0ea37982dc7f61bda0c92ba8cc507bc9a60e085f5822c87f469607cf6`
+    - worker `sha256:d79b84a5ec3d757516760fdfef2d9020e30158493f07174f71b99a8b7b908d62`
+    - runner `sha256:02a86867620b5d268134e42805d11901cad34a794ba02f13e514d8847adf68b5`
+  - 外部 HTTPS 检查：`https://101.43.46.244/health` 返回 `{"status":"Ok"}`；
+    `https://101.43.46.244/health/ready` 返回 `Healthy`；首页 HTML 正常返回。
+  - 启动日志尾部未发现新的 `fail` / `error` / `exception` / `critical` 关键字输出。
+
 ## 2026-08-18 alpha.47 AWDP 示例题镜像构建修复
 
 - `dcdc7870` 修正 `docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/checker/.dockerignore`，
@@ -55,7 +80,7 @@
     均通过；构建仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
   - EF model drift 与 `git diff --check` 均通过；OpenAPI 导出期间本地 Redis 未启动产生 FusionCache
     backplane 连接警告，但导出进程成功完成且生成物幂等。
-- 本阶段尚未推送、部署或操作生产数据；工作区中既有未跟踪的临时归档、Runner Properties、local ports、
+- 本阶段代码随后已按上方部署小节推送并部署；工作区中既有未跟踪的临时归档、Runner Properties、local ports、
   `frontend/` 与 `scripts/` 均未纳入提交。
 
 ## 2026-08-18 alpha.46 CTF/AWDP 可配置动态分值与按轮结算
