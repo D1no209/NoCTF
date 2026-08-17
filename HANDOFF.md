@@ -1,5 +1,45 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.47 AWDP Fix 三态验证语义修正
+
+- `b2678ded` 将 AWDP Fix 验证统一为产品三态：`ExploitSucceeded`、`DefenseSucceeded`、
+  `ServiceAbnormal`。内部回调协议边界临时兼容旧值：`Fixed -> DefenseSucceeded`、
+  `StillVulnerable -> ExploitSucceeded`、`RuleViolation/ServiceUnavailable -> ServiceAbnormal`；
+  新导出的 OpenAPI 与 TypeScript SDK 只公开新三态。新增 OpenAPI document processor 是为了在使用自定义
+  JSON converter 的同时保持协议 schema 为严格字符串枚举，未手写 SDK。
+- Domain/Application 映射同步调整：`DefenseSucceeded` 记录为 Correct；`ExploitSucceeded` 记录为 Wrong +
+  `AwdpExploitSucceeded`；`ServiceAbnormal` 记录为 Wrong + `AwdpServiceAbnormal`；Runner / Provider /
+  存储 / 消息派发等平台问题继续使用 `PlatformFailed`，不进入选手计分。Runner 中 checker 整体验证超时现在
+  判为 `ServiceAbnormal`；checker 主进程异常且没有可信业务结果判为 `PlatformFailed`；exit 0 且无回调不再
+  猜测为防御成功。
+- AWDP 配置升级为 schema v4，保留三类可选单次罚分并默认 0：`FlagWrongPenalty`、
+  `ExploitSucceededPenalty`、`ServiceAbnormalPenalty`。删除旧语义 `FixFailurePenalty`、
+  `ViolationPenalty`、`ServiceDownPenalty`；Patch 解包失败、Patch 命令异常、Patch 超时、平台错误均不会套用
+  上述玩家罚分。动态排行榜投影按轮累计 Break/Fix 正确事实分数，同时只对唯一 GameplayFact 应用一次对应罚分；
+  外队 Flag 被接入为 Rejected 时也归入 Flag 错误罚分。
+- ClientApp 管理配置、选手 AWDP 面板、Flag 提交提示、选手/管理员提交列表均改为新三态和新失败原因文案；
+  英文资源已补齐。AWDP starter kit 与 `awdp-pwn-index-vault` 示例题改为真实编排 checker：先运行 EXP 子进程，
+  再执行正常服务交互，最终只回调一次三态结果；示例 Fix 包目录同步改为
+  `defense-succeeded`、`exploit-succeeded`、`service-abnormal-bypass`、`service-abnormal-down`。
+- `c37b174d` 将平台版本由 `0.1.0-alpha.46` 递增为 `0.1.0-alpha.47`。本阶段没有新增业务表、列、EF
+  migration 或 snapshot；`dotnet ef migrations has-pending-model-changes` 返回无模型变化。
+- 验证通过：
+  - OpenAPI export + `bun run api:gen` 连续两轮幂等；OpenAPI 与 SDK 文件 SHA-256 前后完全一致，AWDP
+    checker 回调 schema 仅包含 `ExploitSucceeded`、`DefenseSucceeded`、`ServiceAbnormal`。
+  - `dotnet build backend/NoCTF.slnx --configuration Release --no-restore`：0 warning / 0 error。
+  - `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj --configuration Release --no-build`：
+    981 总计，979 成功、0 失败、2 个环境型跳过（Kubernetes 与 Libvirt 专用环境未配置）。
+  - AWDP Full E2E：`$env:NuGetAudit='false'; dotnet run --file backend/tests/e2e.cs -- --mode awdp --suite full`
+    1/1 通过，包含 API/Redis/PostgreSQL resilience 检查与 Docker 资源精确清理。首次 `dotnet run` 未带
+    `NuGetAudit=false` 时因 NuGet audit 无法访问 `https://api.nuget.org/v3/index.json` 在恢复阶段失败，
+    不是业务测试失败。
+  - ClientApp `bun test` 205/205（1556 assertions）、`bun run typecheck`、production `bun run build`
+    均通过；构建仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - EF model drift 与 `git diff --check` 均通过；OpenAPI 导出期间本地 Redis 未启动产生 FusionCache
+    backplane 连接警告，但导出进程成功完成且生成物幂等。
+- 本阶段尚未推送、部署或操作生产数据；工作区中既有未跟踪的临时归档、Runner Properties、local ports、
+  `frontend/` 与 `scripts/` 均未纳入提交。
+
 ## 2026-08-18 alpha.46 CTF/AWDP 可配置动态分值与按轮结算
 
 - `8be9031b` 以不兼容升级方式统一了 CTF/AWDP 分值曲线。两种模式均支持 `Fixed`、`Linear`、
