@@ -3,15 +3,14 @@ import type {
   BloodRewardValue,
   ConfigFieldDef,
   FlagTemplateModel,
-  MilestonePointsValue,
   PointsCurveValue,
 } from '~/utils/game-config'
 import {
-  AWARD_SETTLEMENTS,
-  AwardSettlement,
   BLOOD_REWARD_POLICIES,
   BloodRewardPolicy,
   emptyFlagTemplate,
+  SCORE_DECAY_MODES,
+  ScoreDecayMode,
 } from '~/utils/game-config'
 
 const props = withDefaults(defineProps<{
@@ -55,7 +54,9 @@ const curve = computed<PointsCurveValue>(() => {
   return {
     initialPoints: v?.initialPoints ?? null,
     minimumPoints: v?.minimumPoints ?? null,
-    decayFactor: v?.decayFactor ?? null,
+    decayTeamCount: v?.decayTeamCount ?? null,
+    decayMode: v?.decayMode ?? ScoreDecayMode.Quadratic,
+    customExpression: v?.customExpression ?? null,
   }
 })
 
@@ -63,17 +64,12 @@ function updateCurve(part: Partial<PointsCurveValue>) {
   emitValue({ ...curve.value, ...part })
 }
 
-// ---- milestonePoints ----
-const milestone = computed<MilestonePointsValue>(() => {
-  const v = props.modelValue as Partial<MilestonePointsValue> | undefined
-  return {
-    settlement: v?.settlement ?? AwardSettlement.PerRound,
-    points: v?.points ?? null,
-  }
-})
-
-function updateMilestone(part: Partial<MilestonePointsValue>) {
-  emitValue({ ...milestone.value, ...part })
+function updateDecayMode(value: unknown) {
+  const decayMode = parseNullableNumber(value) ?? curve.value.decayMode
+  updateCurve({
+    decayMode,
+    customExpression: decayMode === ScoreDecayMode.Custom ? curve.value.customExpression : null,
+  })
 }
 
 // ---- bloodRewards ----
@@ -159,7 +155,26 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
   </Select>
 
   <div v-else-if="field.type === 'pointsCurve'" class="flex flex-col gap-3">
-    <div class="grid gap-3 sm:grid-cols-3">
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div class="flex flex-col gap-1.5">
+        <span class="text-xs text-muted-foreground">{{ $t('衰减模式') }}</span>
+        <Select
+          :model-value="curve.decayMode"
+          :disabled="disabled"
+          @update:model-value="updateDecayMode"
+        >
+          <SelectTrigger class="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem v-for="option in SCORE_DECAY_MODES" :key="String(option.value)" :value="option.value">
+                {{ $t(option.label) }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
       <div class="flex flex-col gap-1.5">
         <span class="text-xs text-muted-foreground">{{ $t('初始分') }}</span>
         <Input
@@ -179,48 +194,29 @@ function updateFlagTemplate(part: Partial<FlagTemplateModel>) {
         />
       </div>
       <div class="flex flex-col gap-1.5">
-        <span class="text-xs text-muted-foreground">{{ $t('衰减系数') }}</span>
+        <span class="text-xs text-muted-foreground">{{ $t('降至最低分时的队伍数') }}</span>
         <Input
           type="number"
-          step="any"
-          :model-value="curve.decayFactor ?? ''"
+          min="2"
+          step="1"
+          :model-value="curve.decayTeamCount ?? ''"
           :disabled="disabled"
-          @update:model-value="updateCurve({ decayFactor: parseNullableNumber($event) })"
+          @update:model-value="updateCurve({ decayTeamCount: parseNullableNumber($event) })"
         />
       </div>
     </div>
-    <PointsDecayCurve :curve="curve" />
-  </div>
-
-  <div v-else-if="field.type === 'milestonePoints'" class="grid gap-3 sm:grid-cols-2">
-    <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">{{ $t('结算方式') }}</span>
-      <Select
-        :model-value="milestone.settlement"
+    <div v-if="curve.decayMode === ScoreDecayMode.Custom" class="flex flex-col gap-1.5">
+      <span class="text-xs text-muted-foreground">{{ $t('自定义衰减公式') }}</span>
+      <Textarea
+        :model-value="curve.customExpression ?? ''"
+        :rows="3"
+        class="font-mono"
         :disabled="disabled"
-        @update:model-value="updateMilestone({ settlement: parseNullableNumber($event) ?? milestone.settlement })"
-      >
-        <SelectTrigger class="w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectItem v-for="option in AWARD_SETTLEMENTS" :key="String(option.value)" :value="option.value">
-              {{ $t(option.label) }}
-            </SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-    </div>
-    <div class="flex flex-col gap-1.5">
-      <span class="text-xs text-muted-foreground">{{ $t('分值') }}</span>
-      <Input
-        type="number"
-        :model-value="milestone.points ?? ''"
-        :disabled="disabled"
-        @update:model-value="updateMilestone({ points: parseNullableNumber($event) })"
+        :placeholder="$t('变量：initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayTeamCount')"
+        @update:model-value="updateCurve({ customExpression: String($event) })"
       />
     </div>
+    <PointsDecayCurve :curve="curve" />
   </div>
 
   <div v-else-if="field.type === 'bloodRewards'" class="flex flex-col gap-2">

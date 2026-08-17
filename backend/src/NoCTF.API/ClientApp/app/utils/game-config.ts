@@ -13,8 +13,8 @@ export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 /** 各 JSON 区域当前的 schemaVersion(更高的版本或无 upgrader 的旧版本会被后端拒绝)。 */
 export const DEFINITION_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 2, Koh: 1 }
-export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 2, Awdp: 2, Koh: 1 }
-export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 2, Koh: 1 }
+export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 2, Awdp: 3, Koh: 1 }
+export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 4, Awdp: 3, Koh: 1 }
 
 // ---------- 配置 JSON 内的整数枚举 ----------
 
@@ -28,7 +28,14 @@ export const BloodRewardPolicy = {
   SolveTimePointsPercentage: 2,
   CurrentPointsPercentage: 3,
 } as const
-export const AwardSettlement = { Milestone: 0, PerRound: 1 } as const
+export const ScoreDecayMode = {
+  Fixed: 0,
+  Linear: 1,
+  Quadratic: 2,
+  Exponential: 3,
+  Logarithmic: 4,
+  Custom: 5,
+} as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
 export const AwdpFlagInjectionKind = { EnvironmentVariable: 0, File: 1 } as const
 
@@ -44,9 +51,13 @@ export const BLOOD_REWARD_POLICIES = [
   { value: BloodRewardPolicy.CurrentPointsPercentage, label: '当前分值百分比' },
 ] as const
 
-export const AWARD_SETTLEMENTS = [
-  { value: AwardSettlement.Milestone, label: '里程碑结算(一次性)' },
-  { value: AwardSettlement.PerRound, label: '按轮次结算' },
+export const SCORE_DECAY_MODES = [
+  { value: ScoreDecayMode.Fixed, label: '固定分值' },
+  { value: ScoreDecayMode.Linear, label: '线性衰减' },
+  { value: ScoreDecayMode.Quadratic, label: '二次衰减' },
+  { value: ScoreDecayMode.Exponential, label: '指数衰减' },
+  { value: ScoreDecayMode.Logarithmic, label: '对数衰减' },
+  { value: ScoreDecayMode.Custom, label: '自定义公式' },
 ] as const
 
 export const EVALUATION_DISPATCH_MODES = [
@@ -582,7 +593,6 @@ export type ConfigFieldType =
   | 'bool'
   | 'select'
   | 'pointsCurve'
-  | 'milestonePoints'
   | 'bloodRewards'
   | 'flagTemplate'
 
@@ -608,24 +618,44 @@ export interface ConfigFieldDef {
 export interface PointsCurveValue {
   initialPoints: number | null
   minimumPoints: number | null
-  decayFactor: number | null
+  decayTeamCount: number | null
+  decayMode: number
+  customExpression: string | null
 }
 
 export function ctfPointsAtSolveCount(curve: PointsCurveValue, solveCount: number): number | null {
-  const { initialPoints, minimumPoints, decayFactor } = curve
-  if (initialPoints === null || minimumPoints === null || decayFactor === null
-    || initialPoints < minimumPoints || minimumPoints < 0 || decayFactor <= 1)
+  const { initialPoints, minimumPoints, decayTeamCount, decayMode } = curve
+  if (initialPoints === null || minimumPoints === null || decayTeamCount === null
+    || initialPoints < minimumPoints || minimumPoints < 0 || decayTeamCount <= 1)
     return null
 
-  if (solveCount <= 1) return initialPoints
-  if (solveCount >= decayFactor) return minimumPoints
-  const progress = (solveCount - 1) / (decayFactor - 1)
-  return initialPoints + (minimumPoints - initialPoints) * progress * progress
-}
-
-export interface MilestonePointsValue {
-  settlement: number
-  points: number | null
+  const normalizedCount = Math.max(1, solveCount)
+  const progress = Math.min(1, Math.max(0, (normalizedCount - 1) / (decayTeamCount - 1)))
+  let score: number
+  switch (decayMode) {
+    case ScoreDecayMode.Fixed:
+      score = initialPoints
+      break
+    case ScoreDecayMode.Linear:
+      score = initialPoints + (minimumPoints - initialPoints) * progress
+      break
+    case ScoreDecayMode.Quadratic:
+      score = initialPoints + (minimumPoints - initialPoints) * progress * progress
+      break
+    case ScoreDecayMode.Exponential: {
+      const steepness = 4
+      const normalized = (Math.exp(-steepness * progress) - Math.exp(-steepness))
+        / (1 - Math.exp(-steepness))
+      score = minimumPoints + (initialPoints - minimumPoints) * normalized
+      break
+    }
+    case ScoreDecayMode.Logarithmic:
+      score = initialPoints + (minimumPoints - initialPoints) * Math.log10(1 + 9 * progress)
+      break
+    default:
+      return null
+  }
+  return Math.round(Math.min(initialPoints, Math.max(minimumPoints, score)))
 }
 
 export interface BloodRewardValue {
@@ -635,16 +665,20 @@ export interface BloodRewardValue {
 
 export type ConfigValues = Record<string, unknown>
 
-const POINTS_CURVE_DEFAULT: PointsCurveValue = { initialPoints: 500, minimumPoints: 100, decayFactor: 10 }
-const AWDP_AWARD_DEFAULT: MilestonePointsValue = { settlement: AwardSettlement.PerRound, points: 50 }
+const POINTS_CURVE_DEFAULT: PointsCurveValue = {
+  initialPoints: 500,
+  minimumPoints: 100,
+  decayTeamCount: 10,
+  decayMode: ScoreDecayMode.Quadratic,
+  customExpression: null,
+}
 
 export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
-        { key: 'defaultPoints', label: translate("默认分值曲线"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("未单独设置规则的题目继承的初始分/最低分/衰减系数") },
+        { key: 'defaultScoreCurve', label: translate("默认分值曲线"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("未单独设置规则的题目继承此衰减曲线") },
         { key: 'bloodRewards', label: translate("血榜奖励"), type: 'bloodRewards', defaultValue: [], description: translate("前三个解题队伍的额外奖励,最多 3 条") },
-        { key: 'scoreExpression', label: translate("自定义计分表达式"), type: 'text', description: translate("可选;变量:initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayParameter") },
         { key: 'wrongSubmissionPenalty', label: translate("错误提交扣分"), type: 'int', min: 0, defaultValue: 0 },
         { key: 'flagTemplate', label: translate("动态 Flag 模板"), type: 'flagTemplate', description: translate("仅用于系统今后生成的每队容器 Flag；手工或静态 Flag 不受影响") },
       ]
@@ -663,8 +697,8 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
     case 'Awdp':
       return [
         { key: 'roundDurationSeconds', label: translate("轮次时长(秒)"), type: 'int', min: 1, defaultValue: 300 },
-        { key: 'break', label: translate("Break 得分"), type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: translate("攻破(正确提交 Flag)的得分与结算方式") },
-        { key: 'fix', label: translate("Fix 得分"), type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: translate("修复(提交补丁存档)的得分与结算方式") },
+        { key: 'break', label: translate("Break 分值曲线"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("每轮按本轮成功攻击队伍数独立结算") },
+        { key: 'fix', label: translate("Fix 分值曲线"), type: 'pointsCurve', defaultValue: POINTS_CURVE_DEFAULT, description: translate("每轮按本轮成功修复队伍数独立结算") },
         { key: 'requireBreakBeforeFix', label: translate("Fix 前必须先完成 Break"), type: 'bool', defaultValue: false },
         { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
@@ -687,10 +721,9 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
   switch (mode) {
     case 'Ctf':
       return [
-        { key: 'points', label: translate("分值曲线"), type: 'pointsCurve' },
+        { key: 'scoreCurve', label: translate("分值曲线"), type: 'pointsCurve' },
         { key: 'bloodRewards', label: translate("血榜奖励"), type: 'bloodRewards', description: translate("最多 3 条") },
         { key: 'maxFlagAttempts', label: translate("Flag 提交次数上限"), type: 'int', min: 1 },
-        { key: 'scoreExpression', label: translate("自定义计分表达式"), type: 'text', description: translate("变量:initialPoints、minimumPoints、solveCount、eligibleTeamCount、decayParameter") },
         { key: 'wrongSubmissionPenalty', label: translate("错误提交扣分"), type: 'int', min: 0 },
         { key: 'flagTemplate', label: translate("动态 Flag 模板"), type: 'flagTemplate', description: translate("仅用于本场比赛该题目今后生成的每队容器 Flag；未覆盖时继承竞赛默认") },
       ]
@@ -706,8 +739,8 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
       ]
     case 'Awdp':
       return [
-        { key: 'break', label: translate("Break 得分"), type: 'milestonePoints' },
-        { key: 'fix', label: translate("Fix 得分"), type: 'milestonePoints' },
+        { key: 'break', label: translate("Break 分值曲线"), type: 'pointsCurve' },
+        { key: 'fix', label: translate("Fix 分值曲线"), type: 'pointsCurve' },
         { key: 'requireBreakBeforeFix', label: translate("Fix 前必须先完成 Break"), type: 'bool' },
         { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1 },
         { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1 },
@@ -730,15 +763,9 @@ function parsePointsCurve(raw: unknown): PointsCurveValue {
   return {
     initialPoints: asNumber(obj.initialPoints),
     minimumPoints: asNumber(obj.minimumPoints),
-    decayFactor: asNumber(obj.decayFactor),
-  }
-}
-
-function parseMilestonePoints(raw: unknown): MilestonePointsValue {
-  const obj = asObject(raw) ?? {}
-  return {
-    settlement: asNumber(obj.settlement) ?? AwardSettlement.PerRound,
-    points: asNumber(obj.points),
+    decayTeamCount: asNumber(obj.decayTeamCount),
+    decayMode: asNumber(obj.decayMode) ?? ScoreDecayMode.Quadratic,
+    customExpression: asString(obj.customExpression),
   }
 }
 
@@ -768,9 +795,13 @@ export function fieldDefaultValue(field: ConfigFieldDef): unknown {
     case 'select':
       return field.options?.[0]?.value ?? ''
     case 'pointsCurve':
-      return { initialPoints: null, minimumPoints: null, decayFactor: null }
-    case 'milestonePoints':
-      return { settlement: AwardSettlement.PerRound, points: null }
+      return {
+        initialPoints: null,
+        minimumPoints: null,
+        decayTeamCount: null,
+        decayMode: ScoreDecayMode.Quadratic,
+        customExpression: null,
+      }
     case 'bloodRewards':
       return []
     case 'flagTemplate':
@@ -792,8 +823,6 @@ function readFieldValue(field: ConfigFieldDef, raw: unknown): unknown {
       return typeof raw === 'string' || typeof raw === 'number' ? raw : (field.options?.[0]?.value ?? '')
     case 'pointsCurve':
       return parsePointsCurve(raw)
-    case 'milestonePoints':
-      return parseMilestonePoints(raw)
     case 'bloodRewards':
       return parseBloodRewards(raw)
     case 'flagTemplate':
@@ -851,15 +880,11 @@ function writeFieldValue(out: JsonObject, field: ConfigFieldDef, value: unknown)
       const obj: JsonObject = {}
       putNumber(obj, 'initialPoints', curve?.initialPoints ?? null)
       putNumber(obj, 'minimumPoints', curve?.minimumPoints ?? null)
-      putNumber(obj, 'decayFactor', curve?.decayFactor ?? null)
+      putNumber(obj, 'decayTeamCount', curve?.decayTeamCount ?? null)
+      obj.decayMode = curve?.decayMode ?? ScoreDecayMode.Quadratic
+      if (curve?.decayMode === ScoreDecayMode.Custom && curve.customExpression?.trim())
+        obj.customExpression = curve.customExpression.trim()
       if (Object.keys(obj).length > 0) out[field.key] = obj
-      return
-    }
-    case 'milestonePoints': {
-      const award = value as MilestonePointsValue
-      const obj: JsonObject = { settlement: award?.settlement ?? AwardSettlement.PerRound }
-      putNumber(obj, 'points', award?.points ?? null)
-      out[field.key] = obj
       return
     }
     case 'bloodRewards': {

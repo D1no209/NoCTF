@@ -2,6 +2,7 @@ using System.Text.Json;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Scoring;
 using NoCTF.GameModes.Registration;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -67,7 +68,7 @@ public sealed class SubmitFixTests
                     new AwdpChallengeConfiguration(
                         AwdpChallengeConfiguration.CurrentSchemaVersion,
                         null,
-                        new AwdpAchievementConfiguration(AchievementSettlement.Milestone, 20),
+                        new ScoreCurveConfiguration(20, 20, 2, ScoreDecayMode.Fixed),
                         requireBreakBeforeFix,
                         10,
                         10),

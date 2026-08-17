@@ -34,6 +34,7 @@ definePageMeta({ middleware: 'auth' })
 const route = useRoute()
 const ccId = route.params.ccId as string
 const { competitionId, competition, canWrite } = useCompetitionAdmin()
+const isAwdp = computed(() => competition.value?.mode === 'Awdp')
 
 // ---- Challenge detail ----
 const challenge = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
@@ -74,7 +75,7 @@ async function saveEdit() {
       path: { competitionId, competitionChallengeId: ccId },
       body: {
         customTitle: editCustomTitle.value.trim() || null,
-        baseScore: editBaseScore.value,
+        baseScore: isAwdp.value ? 0 : editBaseScore.value,
         order: editOrder.value,
         isPublished: editPublished.value,
         expectedRevision: challenge.value.revision ?? 0,
@@ -435,7 +436,7 @@ onMounted(() => {
                     <FieldDescription>{{ $t('只修改本场比赛中的展示名称,不会更改题库模板') }}</FieldDescription>
                   </Field>
                   <div class="grid gap-4 sm:grid-cols-2">
-                    <Field>
+                    <Field v-if="!isAwdp">
                       <FieldLabel for="cc-score">{{ $t('基础分') }}</FieldLabel>
                       <Input id="cc-score" v-model.number="editBaseScore" type="number" min="0" :readonly="!canWrite" />
                     </Field>

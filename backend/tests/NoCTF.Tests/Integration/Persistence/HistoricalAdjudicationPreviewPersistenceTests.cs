@@ -13,6 +13,7 @@ using NoCTF.Domain.Identity;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Scoring;
 using NoCTF.Infrastructure.GameplayFacts.AdjudicationPreview;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Teams.Moderation;
@@ -254,10 +255,8 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
                 await migrationDb.Database.MigrateAsync(cancellationToken);
             var fixtures = new[]
             {
-                await SeedAwdpHistoryAsync(
-                    options, AchievementSettlement.Milestone, 'm', cancellationToken),
-                await SeedAwdpHistoryAsync(
-                    options, AchievementSettlement.PerRound, 'p', cancellationToken)
+                await SeedAwdpHistoryAsync(options, "legacy-a", 'm', cancellationToken),
+                await SeedAwdpHistoryAsync(options, "legacy-b", 'p', cancellationToken)
             };
 
             foreach (var fixture in fixtures)
@@ -379,7 +378,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
 
     private static async Task<AwdpFixture> SeedAwdpHistoryAsync(
         DbContextOptions<NoCtfDbContext> options,
-        AchievementSettlement settlement,
+        string fixtureName,
         char tokenCharacter,
         CancellationToken ct)
     {
@@ -395,12 +394,12 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         var crossRoundDuplicateId = Guid.CreateVersion7(now.AddSeconds(90));
         var currentCorrectId = Guid.CreateVersion7(now.AddSeconds(120));
         var otherDuplicateId = Guid.CreateVersion7(now.AddSeconds(150));
-        var suffix = settlement.ToString().ToLowerInvariant();
+        var suffix = fixtureName;
         var configuration = new AwdpConfiguration(
             AwdpConfiguration.CurrentSchemaVersion,
             60,
-            new(settlement, 50),
-            new(settlement, 50));
+            new(50, 50, 2, ScoreDecayMode.Fixed),
+            new(50, 50, 2, ScoreDecayMode.Fixed));
         await using var db = new NoCtfDbContext(options);
         db.Users.AddRange(
             User(ownerId, $"awdp-preview-owner-{suffix}", UserRole.Organizer, now),
@@ -409,7 +408,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         {
             Id = competitionId,
             OwnerId = ownerId,
-            Title = $"AWDP {settlement} adjudication preview",
+            Title = $"AWDP {fixtureName} adjudication preview",
             Mode = GameMode.Awdp,
             ConfigurationJson = JsonSerializer.Serialize(configuration),
             ConfigurationUpdatedAt = now,
@@ -424,8 +423,8 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
         {
             Id = teamId,
             CompetitionId = competitionId,
-            Name = $"AWDP {settlement} Team",
-            NormalizedName = $"AWDP {settlement} TEAM".ToUpperInvariant(),
+            Name = $"AWDP {fixtureName} Team",
+            NormalizedName = $"AWDP {fixtureName} TEAM".ToUpperInvariant(),
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = new string(tokenCharacter, 32),
@@ -437,7 +436,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             Id = challengeId,
             OwnerId = ownerId,
             Mode = GameMode.Awdp,
-            Title = $"AWDP {settlement} challenge",
+            Title = $"AWDP {fixtureName} challenge",
             Direction = "Pwn",
             CreatedAt = now,
             UpdatedAt = now

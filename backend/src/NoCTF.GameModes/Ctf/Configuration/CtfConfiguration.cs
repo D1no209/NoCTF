@@ -1,5 +1,6 @@
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Flags;
+using NoCTF.GameModes.Scoring;
 
 namespace NoCTF.GameModes.Ctf.Configuration;
 
@@ -12,28 +13,24 @@ public enum BloodRewardPolicy
 }
 
 public sealed record BloodReward(BloodRewardPolicy Policy, decimal Value);
-public sealed record CtfPointConfiguration(int InitialPoints, int MinimumPoints, decimal DecayFactor);
-
 public sealed record CtfConfiguration(
     int SchemaVersion,
-    CtfPointConfiguration DefaultPoints,
+    ScoreCurveConfiguration DefaultScoreCurve,
     IReadOnlyList<BloodReward> BloodRewards,
-    string? ScoreExpression = null,
     long WrongSubmissionPenalty = 0,
     PerTeamFlagTemplate? FlagTemplate = null)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 }
 
 public sealed record CtfChallengeConfiguration(
     int SchemaVersion,
-    CtfPointConfiguration? Points,
+    ScoreCurveConfiguration? ScoreCurve,
     IReadOnlyList<BloodReward>? BloodRewards,
     int? MaxFlagAttempts = null,
     ChallengeRuntimeTemplate? Runtime = null,
-    string? ScoreExpression = null,
     long? WrongSubmissionPenalty = null,
     PerTeamFlagTemplate? FlagTemplate = null)
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 }

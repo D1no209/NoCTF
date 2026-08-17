@@ -77,7 +77,10 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
                     CtfConfigurationUpgrader.ParseCompetition(competitionConfigurationJson),
                     eligibleTeamCount),
                 GameMode.Awd => AwdConfigurationValidator.Validate(AwdConfigurationUpgrader.ParseChallenge(json)),
-                GameMode.Awdp => ValidateAwdp(json, competitionConfigurationJson),
+                GameMode.Awdp => ValidateAwdp(
+                    json,
+                    competitionConfigurationJson,
+                    eligibleTeamCount),
                 GameMode.Koh => KohConfigurationValidator.Validate(KohConfigurationUpgrader.ParseChallenge(json)),
                 _ => ["Unsupported game mode."]
             };
@@ -90,19 +93,23 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
 
     private static IReadOnlyList<string> ValidateAwdp(
         string json,
-        string competitionConfigurationJson)
+        string competitionConfigurationJson,
+        int eligibleTeamCount)
     {
         var competition = AwdpConfigurationParser.ParseCompetition(
             competitionConfigurationJson);
         var challenge = AwdpConfigurationParser.ParseChallenge(json);
-        var competitionErrors = AwdpConfigurationValidator.Validate(competition);
+        var competitionErrors = AwdpConfigurationValidator.Validate(
+            competition,
+            eligibleTeamCount);
         if (competitionErrors.Count > 0)
             return competitionErrors;
         return
         [
-            .. AwdpConfigurationValidator.Validate(challenge),
+            .. AwdpConfigurationValidator.Validate(challenge, eligibleTeamCount),
             .. AwdpConfigurationValidator.Validate(
-                AwdpConfigurationResolver.Resolve(competition, challenge))
+                AwdpConfigurationResolver.Resolve(competition, challenge),
+                eligibleTeamCount)
         ];
     }
 
@@ -156,10 +163,9 @@ public sealed class GameModeChallengeConfigurationCatalog : IChallengeConfigurat
             {
                 GameMode.Ctf =>
                 [
-                    "points",
+                    "scoreCurve",
                     "bloodRewards",
                     "maxFlagAttempts",
-                    "scoreExpression",
                     "wrongSubmissionPenalty",
                     "flagTemplate"
                 ],

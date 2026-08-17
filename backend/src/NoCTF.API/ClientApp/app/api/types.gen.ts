@@ -465,6 +465,8 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse = {
     title?: string;
     direction?: string;
     currentScore?: number | null;
+    currentBreakScore?: number | null;
+    currentFixScore?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardTrackInfoResponse = {
@@ -1246,30 +1248,6 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsGetAdminGameplayFactStat
 };
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsListAdminGameplayFactsRequest = {
-    [key: string]: never;
-};
-
-export type NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactPreviewResponse = {
-    projectedAt?: string;
-    competitions?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactCompetitionResponse>;
-};
-
-export type NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactCompetitionResponse = {
-    competitionId?: string;
-    competitionTitle?: string;
-    currentSchemaVersion?: number;
-    teams?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactTeamResponse>;
-};
-
-export type NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactTeamResponse = {
-    teamId?: string;
-    teamName?: string;
-    currentScore?: number;
-    continuousScore?: number;
-    delta?: number;
-};
-
-export type NoCtfapiEndpointsAdministrationGameplayFactsPreviewAwdpScoringImpactRequest = {
     [key: string]: never;
 };
 
@@ -5856,41 +5834,6 @@ export type AdminListGameplayFactsResponses = {
 };
 
 export type AdminListGameplayFactsResponse = AdminListGameplayFactsResponses[keyof AdminListGameplayFactsResponses];
-
-export type AdminPreviewAwdpScoringImpactData = {
-    body?: never;
-    path?: never;
-    query: {
-        limit: number;
-    };
-    url: '/api/v1/admin/awdp/scoring-impact-preview';
-};
-
-export type AdminPreviewAwdpScoringImpactErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-};
-
-export type AdminPreviewAwdpScoringImpactError = AdminPreviewAwdpScoringImpactErrors[keyof AdminPreviewAwdpScoringImpactErrors];
-
-export type AdminPreviewAwdpScoringImpactResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactPreviewResponse;
-};
-
-export type AdminPreviewAwdpScoringImpactResponse = AdminPreviewAwdpScoringImpactResponses[keyof AdminPreviewAwdpScoringImpactResponses];
 
 export type AdminPreviewHistoricalAdjudicationDifferencesData = {
     body?: never;

@@ -110,7 +110,7 @@ onUnmounted(() => {
             </Badge>
           </div>
           <p class="text-sm text-muted-foreground">
-            {{ $t('创建本队独立攻击实例，利用漏洞取得当前 Runtime generation 的动态 Flag。Break 按本题配置的一次性或按轮结算规则计分。') }}
+            {{ $t('创建本队独立攻击实例，利用漏洞取得当前 Runtime generation 的动态 Flag。每轮首次正确 Break 按本轮独立动态分值结算。') }}
           </p>
         </div>
 

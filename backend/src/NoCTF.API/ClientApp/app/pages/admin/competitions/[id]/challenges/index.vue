@@ -54,6 +54,7 @@ const addError = ref<string | null>(null)
 const modeTemplates = computed(() =>
   templates.value.filter(t => t.mode === competition.value?.mode && !t.deletedAt),
 )
+const isAwdp = computed(() => competition.value?.mode === 'Awdp')
 
 async function openAdd() {
   addOpen.value = true
@@ -81,7 +82,7 @@ async function addChallenge() {
       body: {
         challengeId: selectedTemplateId.value,
         customTitle: newCustomTitle.value.trim() || null,
-        baseScore: newBaseScore.value,
+        baseScore: isAwdp.value ? 0 : newBaseScore.value,
         order: newOrder.value,
       },
     })
@@ -177,7 +178,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
           <TableHead class="w-16">{{ $t('顺序') }}</TableHead>
           <TableHead>{{ $t('标题') }}</TableHead>
           <TableHead>{{ $t('方向') }}</TableHead>
-          <TableHead class="w-24">{{ $t('基础分') }}</TableHead>
+          <TableHead v-if="!isAwdp" class="w-24">{{ $t('基础分') }}</TableHead>
           <TableHead class="w-28">{{ $t('状态') }}</TableHead>
           <TableHead v-if="canWrite" class="w-40 text-right">{{ $t('操作') }}</TableHead>
         </TableRow>
@@ -200,7 +201,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
               {{ c.direction }}
             </Badge>
           </TableCell>
-          <TableCell class="font-mono tabular-nums">{{ c.baseScore ?? '-' }}</TableCell>
+          <TableCell v-if="!isAwdp" class="font-mono tabular-nums">{{ c.baseScore ?? '-' }}</TableCell>
           <TableCell>
             <Badge v-if="c.deletedAt" variant="destructive">{{ $t('已删除') }}</Badge>
             <Badge v-else :variant="c.isPublished ? 'default' : 'outline'">
@@ -270,7 +271,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
             <FieldDescription>{{ $t('只修改本场比赛中的展示名称,不会更改题库模板') }}</FieldDescription>
           </Field>
           <div class="grid gap-4 sm:grid-cols-2">
-            <Field>
+            <Field v-if="!isAwdp">
               <FieldLabel for="new-score">{{ $t('基础分') }}</FieldLabel>
               <Input id="new-score" v-model.number="newBaseScore" type="number" min="0" />
             </Field>

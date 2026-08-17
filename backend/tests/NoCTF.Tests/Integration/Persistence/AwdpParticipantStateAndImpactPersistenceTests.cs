@@ -15,17 +15,17 @@ using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awdp.Configuration;
+using NoCTF.GameModes.Scoring;
 using NoCTF.Infrastructure.GameplayFacts.Awdp;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Infrastructure.Scoring.Awdp;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
-[Category("AwdpContinuousScoring")]
-public sealed class AwdpParticipantStateAndImpactPersistenceTests
+[Category("AwdpRoundScoring")]
+public sealed class AwdpParticipantStatePersistenceTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -68,42 +68,6 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
                 now,
                 cancellationToken);
             await Assert.That(outsider).IsNull();
-        });
-    }
-
-    [Test]
-    [Timeout(300_000)]
-    public async Task Historical_impact_preview_is_bounded_read_only_and_skips_v2(
-        CancellationToken cancellationToken)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = await StartPostgresAsync(cancellationToken);
-            var options = Options(postgres);
-            var now = DateTimeOffset.UtcNow;
-            var ids = await SeedImpactPreviewAsync(options, now, cancellationToken);
-            await using var db = new NoCtfDbContext(options);
-            var beforeCompetitions = await db.Competitions.CountAsync(cancellationToken);
-            var beforeFacts = await db.GameplayFacts.CountAsync(cancellationToken);
-            var snapshots = new RecordingSnapshotFactory(ids.LegacyCompetitionId, ids.TeamId, now);
-
-            var results = await new AwdpScoringImpactPreviewStore(db, snapshots)
-                .PreviewAsync(10, now, cancellationToken);
-
-            var result = results.Single();
-            await Assert.That(result.CompetitionId).IsEqualTo(ids.LegacyCompetitionId);
-            await Assert.That(result.CurrentSchemaVersion).IsEqualTo(1);
-            await Assert.That(result.Teams.Single().CurrentScore).IsEqualTo(100);
-            await Assert.That(result.Teams.Single().ContinuousScore).IsEqualTo(300);
-            await Assert.That(result.Teams.Single().Delta).IsEqualTo(200);
-            await Assert.That(snapshots.CurrentCalls).IsEqualTo(1);
-            await Assert.That(snapshots.ContinuousCalls).IsEqualTo(1);
-
-            db.ChangeTracker.Clear();
-            await Assert.That(await db.Competitions.CountAsync(cancellationToken))
-                .IsEqualTo(beforeCompetitions);
-            await Assert.That(await db.GameplayFacts.CountAsync(cancellationToken))
-                .IsEqualTo(beforeFacts);
         });
     }
 
@@ -191,7 +155,7 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
             OwnerId = userId,
             Mode = GameMode.Awdp,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = ContinuousConfiguration(roundDurationSeconds: 60),
+            ConfigurationJson = RoundConfiguration(roundDurationSeconds: 60),
             ConfigurationUpdatedAt = now,
             StartAt = now.AddMinutes(-10),
             EndAt = now.AddHours(1),
@@ -206,7 +170,7 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
             OwnerId = userId,
             Mode = GameMode.Awdp,
             Title = "AWDP state",
-            DefinitionJson = "{\"schemaVersion\":2}",
+            DefinitionJson = "{\"schemaVersion\":3}",
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -217,7 +181,7 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
             ChallengeId = challengeId,
             IsPublished = true,
             BaseScore = 100,
-            RulesJson = "{\"schemaVersion\":2}",
+            RulesJson = "{\"schemaVersion\":3}",
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -292,25 +256,6 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
             fixFactId);
     }
 
-    private static async Task<ImpactFixture> SeedImpactPreviewAsync(
-        DbContextOptions<NoCtfDbContext> options,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
-        var ownerId = Guid.CreateVersion7(now);
-        var teamId = Guid.CreateVersion7(now.AddMilliseconds(1));
-        var legacyCompetitionId = Guid.CreateVersion7(now.AddMilliseconds(2));
-        var continuousCompetitionId = Guid.CreateVersion7(now.AddMilliseconds(3));
-        db.Users.Add(User(ownerId, "impact-owner", now));
-        db.Competitions.AddRange(
-            Competition(legacyCompetitionId, ownerId, "Legacy AWDP", LegacyConfiguration(), now),
-            Competition(continuousCompetitionId, ownerId, "Continuous AWDP", ContinuousConfiguration(60), now));
-        await db.SaveChangesAsync(cancellationToken);
-        return new(legacyCompetitionId, continuousCompetitionId, teamId);
-    }
-
     private static async Task<Guid> SeedDueLeaderboardAsync(
         DbContextOptions<NoCtfDbContext> options,
         DateTimeOffset now,
@@ -328,7 +273,7 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
             OwnerId = ownerId,
             Mode = GameMode.Awdp,
             Status = CompetitionStatus.Running,
-            ConfigurationJson = ContinuousConfiguration(60),
+            ConfigurationJson = RoundConfiguration(60),
             ConfigurationUpdatedAt = now,
             StartAt = now.AddMinutes(-10),
             EndAt = now.AddHours(1),
@@ -356,28 +301,6 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
         Email = $"{name}@example.test",
         NormalizedEmail = $"{name.ToUpperInvariant()}@EXAMPLE.TEST",
         PasswordHash = "test",
-        CreatedAt = now,
-        UpdatedAt = now
-    };
-
-    private static Competition Competition(
-        Guid id,
-        Guid ownerId,
-        string title,
-        string configurationJson,
-        DateTimeOffset now) => new()
-    {
-        Id = id,
-        Title = title,
-        OwnerId = ownerId,
-        Mode = GameMode.Awdp,
-        Status = CompetitionStatus.Finished,
-        ConfigurationJson = configurationJson,
-        ConfigurationUpdatedAt = now,
-        StartAt = now.AddHours(-1),
-        EndAt = now,
-        FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
-        MaxConcurrentRuntimeInstancesPerTeam = 2,
         CreatedAt = now,
         UpdatedAt = now
     };
@@ -438,20 +361,12 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
             OccurredAt = occurredAt
         });
 
-    private static string LegacyConfiguration() => JsonSerializer.Serialize(
-        new AwdpConfiguration(
-            AwdpConfiguration.LegacySchemaVersion,
-            60,
-            new(AchievementSettlement.Milestone, 100),
-            new(AchievementSettlement.Milestone, 50)),
-        JsonOptions);
-
-    private static string ContinuousConfiguration(int roundDurationSeconds) => JsonSerializer.Serialize(
+    private static string RoundConfiguration(int roundDurationSeconds) => JsonSerializer.Serialize(
         new AwdpConfiguration(
             AwdpConfiguration.CurrentSchemaVersion,
             roundDurationSeconds,
-            new(AchievementSettlement.PerRound, 100),
-            new(AchievementSettlement.PerRound, 50),
+            new(100, 100, 2, ScoreDecayMode.Fixed),
+            new(50, 50, 2, ScoreDecayMode.Fixed),
             RequireBreakBeforeFix: false),
         JsonOptions);
 
@@ -472,49 +387,6 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
             .UseNpgsql(postgres.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
-
-    private sealed class RecordingSnapshotFactory(
-        Guid competitionId,
-        Guid teamId,
-        DateTimeOffset now) : ILeaderboardSnapshotFactory
-    {
-        public int CurrentCalls { get; private set; }
-        public int ContinuousCalls { get; private set; }
-
-        public Task<LeaderboardResponse?> CreateAsync(
-            Guid requestedCompetitionId,
-            DateTimeOffset projectedAt,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            CurrentCalls++;
-            return Task.FromResult<LeaderboardResponse?>(Snapshot(requestedCompetitionId, 100));
-        }
-
-        public Task<LeaderboardResponse?> CreateWithConfigurationAsync(
-            Guid requestedCompetitionId,
-            string competitionConfigurationJson,
-            DateTimeOffset projectedAt,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var configuration = AwdpConfigurationParser.ParseCompetition(competitionConfigurationJson);
-            if (!configuration.UsesContinuousRoundScoring)
-                throw new InvalidOperationException("The impact preview did not request AWDP v2 scoring.");
-            ContinuousCalls++;
-            return Task.FromResult<LeaderboardResponse?>(Snapshot(requestedCompetitionId, 300));
-        }
-
-        private LeaderboardResponse Snapshot(Guid requestedCompetitionId, long score)
-        {
-            if (requestedCompetitionId != competitionId)
-                throw new InvalidOperationException("AWDP v2 competitions must be skipped by the preview.");
-            return new(
-                competitionId,
-                now,
-                [new LeaderboardEntry(1, teamId, "Impact Team", score, 1, now)]);
-        }
-    }
 
     private sealed class MutableLeaderboardCache(
         Guid competitionId,
@@ -583,8 +455,4 @@ public sealed class AwdpParticipantStateAndImpactPersistenceTests
         Guid BreakFactId,
         Guid FixFactId);
 
-    private sealed record ImpactFixture(
-        Guid LegacyCompetitionId,
-        Guid ContinuousCompetitionId,
-        Guid TeamId);
 }

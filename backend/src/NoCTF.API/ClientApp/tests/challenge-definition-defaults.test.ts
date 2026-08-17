@@ -48,7 +48,7 @@ describe('challenge definition defaults', () => {
 })
 
 describe('CTF score decay preview', () => {
-  const curve = { initialPoints: 500, minimumPoints: 100, decayFactor: 10 }
+  const curve = { initialPoints: 500, minimumPoints: 100, decayTeamCount: 10, decayMode: 2, customExpression: null }
 
   test('matches the authoritative quadratic scoring curve', () => {
     expect(ctfPointsAtSolveCount(curve, 1)).toBe(500)
@@ -57,10 +57,13 @@ describe('CTF score decay preview', () => {
     expect(ctfPointsAtSolveCount(curve, 20)).toBe(100)
   })
 
-  test('renders the concrete curve as an accessible dashed plot', async () => {
+  test('renders a detailed accessible curve with hover inspection', async () => {
     const source = await Bun.file(new URL('../app/components/admin/PointsDecayCurve.vue', import.meta.url)).text()
     expect(source).toContain('ctfPointsAtSolveCount')
-    expect(source).toContain('stroke-dasharray="8 6"')
+    expect(source).toContain('@pointermove="onPointerMove"')
+    expect(source).toContain('preview.active.score')
+    expect(source).toContain('yTickCount = 8')
+    expect(source).toContain('xTickCount')
     expect(source).toContain('role="img"')
   })
 

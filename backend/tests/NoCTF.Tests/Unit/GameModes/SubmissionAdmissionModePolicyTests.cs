@@ -19,7 +19,7 @@ public class GameplayFactAdmissionModePolicyTests
     [Test]
     public async Task Awdp_UsesConfiguredBreakAndFixAttemptLimits()
     {
-        const string json = """{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":true,"maxBreakSubmissions":3,"maxFixSubmissions":2,"runtime":{"allocation":1,"definition":{"kind":"container","image":"target:v1","internalPorts":[8080]},"limits":{"memoryBytes":268435456,"nanoCpus":500000000,"pidsLimit":128}},"patchEntrypoint":"fix.sh","patchCommand":["/bin/sh","{entrypoint}"],"patchTimeoutSeconds":60,"checker":{"image":"checker:v1","timeoutSeconds":60},"readyTimeoutSeconds":30}""";
+        const string json = """{"schemaVersion":3,"break":{"initialPoints":10,"minimumPoints":10,"decayTeamCount":10,"decayMode":0},"fix":{"initialPoints":20,"minimumPoints":20,"decayTeamCount":10,"decayMode":0},"requireBreakBeforeFix":true,"maxBreakSubmissions":3,"maxFixSubmissions":2,"runtime":{"allocation":1,"definition":{"kind":"container","image":"target:v1","internalPorts":[8080]},"limits":{"memoryBytes":268435456,"nanoCpus":500000000,"pidsLimit":128}},"patchEntrypoint":"fix.sh","patchCommand":["/bin/sh","{entrypoint}"],"patchTimeoutSeconds":60,"checker":{"image":"checker:v1","timeoutSeconds":60},"readyTimeoutSeconds":30}""";
         var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(
@@ -50,9 +50,9 @@ public class GameplayFactAdmissionModePolicyTests
     public async Task Awdp_Challenge_null_inherits_competition_break_requirement()
     {
         const string competition =
-            """{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"violationPenalty":100,"serviceDownPenalty":50,"requireBreakBeforeFix":true}""";
+            """{"schemaVersion":3,"roundDurationSeconds":300,"break":{"initialPoints":50,"minimumPoints":50,"decayTeamCount":10,"decayMode":0},"fix":{"initialPoints":50,"minimumPoints":50,"decayTeamCount":10,"decayMode":0},"violationPenalty":100,"serviceDownPenalty":50,"requireBreakBeforeFix":true}""";
         const string challenge =
-            """{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":null,"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
+            """{"schemaVersion":3,"break":{"initialPoints":10,"minimumPoints":10,"decayTeamCount":10,"decayMode":0},"fix":{"initialPoints":20,"minimumPoints":20,"decayTeamCount":10,"decayMode":0},"requireBreakBeforeFix":null,"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
         var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(GameMode.Awdp, competition, challenge);
@@ -64,9 +64,9 @@ public class GameplayFactAdmissionModePolicyTests
     public async Task Awdp_Missing_competition_break_requirement_uses_true_default()
     {
         const string competition =
-            """{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"violationPenalty":100,"serviceDownPenalty":50}""";
+            """{"schemaVersion":3,"roundDurationSeconds":300,"break":{"initialPoints":50,"minimumPoints":50,"decayTeamCount":10,"decayMode":0},"fix":{"initialPoints":50,"minimumPoints":50,"decayTeamCount":10,"decayMode":0},"violationPenalty":100,"serviceDownPenalty":50}""";
         const string challenge =
-            """{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":null,"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
+            """{"schemaVersion":3,"break":{"initialPoints":10,"minimumPoints":10,"decayTeamCount":10,"decayMode":0},"fix":{"initialPoints":20,"minimumPoints":20,"decayTeamCount":10,"decayMode":0},"requireBreakBeforeFix":null,"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
         var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(GameMode.Awdp, competition, challenge);
@@ -83,9 +83,9 @@ public class GameplayFactAdmissionModePolicyTests
         bool expected)
     {
         var competition =
-            $$"""{"schemaVersion":1,"roundDurationSeconds":300,"break":{"settlement":1,"points":50},"fix":{"settlement":1,"points":50},"violationPenalty":100,"serviceDownPenalty":50,"requireBreakBeforeFix":{{competitionValue.ToString().ToLowerInvariant()}}}""";
+            $$"""{"schemaVersion":3,"roundDurationSeconds":300,"break":{"initialPoints":50,"minimumPoints":50,"decayTeamCount":10,"decayMode":0},"fix":{"initialPoints":50,"minimumPoints":50,"decayTeamCount":10,"decayMode":0},"violationPenalty":100,"serviceDownPenalty":50,"requireBreakBeforeFix":{{competitionValue.ToString().ToLowerInvariant()}}}""";
         var challenge =
-            $$"""{"schemaVersion":1,"break":{"settlement":1,"points":10},"fix":{"settlement":1,"points":20},"requireBreakBeforeFix":{{challengeValue.ToString().ToLowerInvariant()}},"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
+            $$"""{"schemaVersion":3,"break":{"initialPoints":10,"minimumPoints":10,"decayTeamCount":10,"decayMode":0},"fix":{"initialPoints":20,"minimumPoints":20,"decayTeamCount":10,"decayMode":0},"requireBreakBeforeFix":{{challengeValue.ToString().ToLowerInvariant()}},"maxBreakSubmissions":3,"maxFixSubmissions":2}""";
         var policy = new GameModeGameplayFactAdmissionPolicy();
 
         var rules = policy.GetRules(GameMode.Awdp, competition, challenge);

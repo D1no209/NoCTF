@@ -59,8 +59,6 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             return null;
 
         var configuration = AwdpConfigurationParser.ParseCompetition(scope.ConfigurationJson);
-        if (!configuration.UsesContinuousRoundScoring)
-            return null;
 
         var facts = await db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId

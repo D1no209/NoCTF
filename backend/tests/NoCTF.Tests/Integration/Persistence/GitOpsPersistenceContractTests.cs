@@ -87,7 +87,7 @@ public sealed class GitOpsPersistenceContractTests
                 Title = "GitOps contract",
                 Mode = GameMode.Ctf,
                 ConfigurationJson =
-                    """{"schemaVersion":1,"defaultPoints":{"initialPoints":500,"minimumPoints":100,"decayFactor":10},"bloodRewards":[]}""",
+                    """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
                 ConfigurationUpdatedAt = now,
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(1),
@@ -136,7 +136,7 @@ public sealed class GitOpsPersistenceContractTests
                     1,
                     now,
                     "Finals Web"),
-                """{"schemaVersion":1}""",
+                """{"schemaVersion":2}""",
                 cancellationToken);
             await Assert.That(linked.Challenge!.Id).IsEqualTo(competitionChallengeId);
             await Assert.That(linked.Challenge.Title).IsEqualTo("Finals Web");

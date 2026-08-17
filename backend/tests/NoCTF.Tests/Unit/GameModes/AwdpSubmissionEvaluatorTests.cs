@@ -9,6 +9,7 @@ using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.GameplayFact;
 using NoCTF.GameModes.Leaderboard;
+using NoCTF.GameModes.Scoring;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -41,16 +42,13 @@ public sealed class AwdpGameplayFactEvaluatorTests
         };
 
         var decision = new AwdpGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
-            .Evaluate(new(submission, [], [expression], null, LegacyCompetitionJson(), "{}"));
+            .Evaluate(new(submission, [], [expression], null, CompetitionJson(), "{}"));
 
         await Assert.That(decision.Result).IsEqualTo(GameplayFactResult.Wrong);
     }
 
     [Test]
-    [Arguments(AchievementSettlement.Milestone)]
-    [Arguments(AchievementSettlement.PerRound)]
-    public async Task Break_after_prior_correct_remains_correct(
-        AchievementSettlement settlement)
+    public async Task Break_after_prior_correct_remains_correct()
     {
         const string flag = "flag{awdp-repeat}";
         var receivedAt = DateTimeOffset.UtcNow;
@@ -95,8 +93,8 @@ public sealed class AwdpGameplayFactEvaluatorTests
             JsonSerializer.Serialize(new AwdpConfiguration(
                 AwdpConfiguration.CurrentSchemaVersion,
                 300,
-                new(settlement, 100),
-                new(AchievementSettlement.Milestone, 50)),
+                FixedCurve(100),
+                FixedCurve(50)),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             "{}");
 
@@ -143,8 +141,8 @@ public sealed class AwdpGameplayFactEvaluatorTests
             JsonSerializer.Serialize(new AwdpConfiguration(
                 AwdpConfiguration.CurrentSchemaVersion,
                 300,
-                new(AchievementSettlement.PerRound, 100),
-                new(AchievementSettlement.PerRound, 50),
+                FixedCurve(100),
+                FixedCurve(50),
                 RequireBreakBeforeFix: false),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             "{}");
@@ -155,56 +153,6 @@ public sealed class AwdpGameplayFactEvaluatorTests
         await Assert.That(decision.Result).IsEqualTo(GameplayFactResult.Wrong);
         await Assert.That(decision.FailureCode)
             .IsEqualTo(GameplayFactFailureCode.FlagExpired);
-    }
-
-    [Test]
-    [Arguments(AchievementSettlement.Milestone, 100L, 1)]
-    [Arguments(AchievementSettlement.PerRound, 200L, 2)]
-    public async Task Legacy_projection_deduplicates_unsorted_breaks_by_configured_settlement(
-        AchievementSettlement settlement,
-        long expectedScore,
-        int expectedSolveCount)
-    {
-        var startedAt = DateTimeOffset.UtcNow.AddHours(-1);
-        var competitionId = Guid.NewGuid();
-        var challengeId = Guid.NewGuid();
-        var teamId = Guid.NewGuid();
-        var facts = new[]
-        {
-            Fact(startedAt.AddSeconds(70)),
-            Fact(startedAt.AddSeconds(20)),
-            Fact(startedAt.AddSeconds(10))
-        };
-        var configuration = JsonSerializer.Serialize(
-            new AwdpConfiguration(
-                AwdpConfiguration.LegacySchemaVersion,
-                60,
-                new(settlement, 100),
-                new(AchievementSettlement.Milestone, 50)),
-            new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        var projection = new AwdpLeaderboardProjector().Project(new(
-            competitionId,
-            GameMode.Awdp,
-            [new LeaderboardTeamFact(teamId, "Team", false, false, startedAt)],
-            facts,
-            [new LeaderboardChallengeFact(challengeId, "Web", "Challenge", false, "{}")],
-            configuration,
-            startedAt));
-
-        var entry = projection.Entries.Single();
-        await Assert.That(entry.Score).IsEqualTo(expectedScore);
-        await Assert.That(entry.SolveCount).IsEqualTo(expectedSolveCount);
-        await Assert.That(projection.Cells.Single().Score).IsEqualTo(expectedScore);
-
-        LeaderboardGameplayFact Fact(DateTimeOffset occurredAt) => new(
-            Guid.CreateVersion7(occurredAt),
-            teamId,
-            challengeId,
-            GameplayFactKind.BreakAttempt,
-            occurredAt,
-            GameplayFactState.Completed,
-            GameplayFactResult.Correct,
-            null);
     }
 
     [Test]
@@ -234,10 +182,13 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 TeamId = ownerTeamId,
                 Flag = flag,
                 FlagSha256 = submission.ValueSha256,
+                SpecificationKind = SpecificationKind.RuntimeGeneration,
+                SpecificationId = Guid.NewGuid(),
+                ValidStart = receivedAt.AddSeconds(-1),
                 CreatedAt = receivedAt
             }],
             null,
-            LegacyCompetitionJson(),
+            CompetitionJson(),
             "{}");
 
         var decision = new AwdpGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
@@ -250,7 +201,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
     }
 
     [Test]
-    public async Task Continuous_projection_accumulates_one_break_and_fix_activation_per_round()
+    public async Task Projection_scores_one_break_and_fix_per_team_in_each_round()
     {
         var startedAt = DateTimeOffset.UtcNow.AddHours(-1);
         var competitionId = Guid.NewGuid();
@@ -269,8 +220,8 @@ public sealed class AwdpGameplayFactEvaluatorTests
             new AwdpConfiguration(
                 AwdpConfiguration.CurrentSchemaVersion,
                 60,
-                new(AchievementSettlement.PerRound, 40),
-                new(AchievementSettlement.PerRound, 60),
+                FixedCurve(40),
+                FixedCurve(60),
                 BreakWrongPenalty: 7),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var projection = new AwdpLeaderboardProjector().Project(new(
@@ -284,9 +235,9 @@ public sealed class AwdpGameplayFactEvaluatorTests
             ProjectedAt: startedAt.AddSeconds(250)));
 
         var entry = projection.Entries.Single();
-        await Assert.That(entry.Score).IsEqualTo(333L);
-        await Assert.That(entry.SolveCount).IsEqualTo(2);
-        await Assert.That(projection.Cells.Single().Score).IsEqualTo(340L);
+        await Assert.That(entry.Score).IsEqualTo(133L);
+        await Assert.That(entry.SolveCount).IsEqualTo(3);
+        await Assert.That(projection.Cells.Single().Score).IsEqualTo(140L);
 
         LeaderboardGameplayFact Fact(
             GameplayFactKind kind,
@@ -300,6 +251,70 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 GameplayFactState.Completed,
                 result,
                 null);
+    }
+
+    [Test]
+    public async Task Projection_settles_independent_dynamic_break_and_fix_curves_per_round()
+    {
+        var startedAt = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamA = Guid.NewGuid();
+        var teamB = Guid.NewGuid();
+        var configuration = JsonSerializer.Serialize(
+            new AwdpConfiguration(
+                AwdpConfiguration.CurrentSchemaVersion,
+                60,
+                new(100, 10, 3, ScoreDecayMode.Linear),
+                new(80, 20, 2, ScoreDecayMode.Linear)),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var facts = new[]
+        {
+            Fact(teamA, GameplayFactKind.BreakAttempt, 20),
+            Fact(teamA, GameplayFactKind.FixAttempt, 30),
+            Fact(teamA, GameplayFactKind.BreakAttempt, 70),
+            Fact(teamB, GameplayFactKind.BreakAttempt, 75),
+            Fact(teamA, GameplayFactKind.FixAttempt, 80)
+        };
+
+        LeaderboardProjectionInput Input(bool banTeamB, DateTimeOffset projectedAt) => new(
+            competitionId,
+            GameMode.Awdp,
+            [
+                new LeaderboardTeamFact(teamA, "A", false, false, startedAt),
+                new LeaderboardTeamFact(teamB, "B", banTeamB, false, startedAt)
+            ],
+            facts,
+            [new LeaderboardChallengeFact(challengeId, "Pwn", "Challenge", false, "{\"schemaVersion\":3}")],
+            configuration,
+            startedAt,
+            ProjectedAt: projectedAt);
+
+        var roundOne = new AwdpLeaderboardProjector().Project(Input(false, startedAt.AddSeconds(50)));
+        var roundTwo = new AwdpLeaderboardProjector().Project(Input(false, startedAt.AddSeconds(100)));
+        var replayAfterBan = new AwdpLeaderboardProjector().Project(Input(true, startedAt.AddSeconds(100)));
+
+        await Assert.That(roundOne.Entries.Single(entry => entry.TeamId == teamA).Score).IsEqualTo(180L);
+        await Assert.That(roundTwo.Entries.Single(entry => entry.TeamId == teamA).Score).IsEqualTo(315L);
+        await Assert.That(roundTwo.Entries.Single(entry => entry.TeamId == teamB).Score).IsEqualTo(55L);
+        await Assert.That(roundTwo.CurrentBreakScores![challengeId]).IsEqualTo(55L);
+        await Assert.That(roundTwo.CurrentFixScores![challengeId]).IsEqualTo(80L);
+        await Assert.That(replayAfterBan.Entries.Single().Score).IsEqualTo(360L);
+        await Assert.That(replayAfterBan.CurrentBreakScores![challengeId]).IsEqualTo(100L);
+
+        LeaderboardGameplayFact Fact(Guid teamId, GameplayFactKind kind, int seconds)
+        {
+            var occurredAt = startedAt.AddSeconds(seconds);
+            return new(
+                Guid.CreateVersion7(occurredAt),
+                teamId,
+                challengeId,
+                kind,
+                occurredAt,
+                GameplayFactState.Completed,
+                GameplayFactResult.Correct,
+                null);
+        }
     }
 
     [Test]
@@ -321,8 +336,8 @@ public sealed class AwdpGameplayFactEvaluatorTests
             new AwdpConfiguration(
                 AwdpConfiguration.CurrentSchemaVersion,
                 60,
-                new(AchievementSettlement.PerRound, 25),
-                new(AchievementSettlement.PerRound, 50)),
+                FixedCurve(25),
+                FixedCurve(50)),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var input = new LeaderboardProjectionInput(
             competitionId,
@@ -345,7 +360,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
 
         var projection = new AwdpLeaderboardProjector().Project(input);
 
-        await Assert.That(projection.Entries.Single().Score).IsEqualTo(75L);
+        await Assert.That(projection.Entries.Single().Score).IsEqualTo(25L);
 
         CompetitionLifecycleTransition Transition(
             CompetitionStatus from,
@@ -361,7 +376,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
     }
 
     [Test]
-    public async Task Continuous_projection_honors_milestones_and_break_gated_fix_rejudges()
+    public async Task Projection_replays_break_gated_fix_after_rejudge()
     {
         var startedAt = DateTimeOffset.UtcNow.AddMinutes(-10);
         var competitionId = Guid.NewGuid();
@@ -373,14 +388,14 @@ public sealed class AwdpGameplayFactEvaluatorTests
             new AwdpConfiguration(
                 AwdpConfiguration.CurrentSchemaVersion,
                 60,
-                new(AchievementSettlement.PerRound, 1),
-                new(AchievementSettlement.PerRound, 1)),
+                FixedCurve(1),
+                FixedCurve(1)),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var challengeConfiguration = JsonSerializer.Serialize(
             new AwdpChallengeConfiguration(
                 AwdpChallengeConfiguration.CurrentSchemaVersion,
-                new(AchievementSettlement.Milestone, 100),
-                new(AchievementSettlement.PerRound, 25),
+                FixedCurve(100),
+                FixedCurve(25),
                 RequireBreakBeforeFix: true,
                 MaxBreakSubmissions: null,
                 MaxFixSubmissions: null),
@@ -414,11 +429,11 @@ public sealed class AwdpGameplayFactEvaluatorTests
         var restored = new AwdpLeaderboardProjector().Project(
             Input(GameplayFactResult.Correct));
 
-        await Assert.That(beforeCorrection.Entries.Single().Score).IsEqualTo(175L);
+        await Assert.That(beforeCorrection.Entries.Single().Score).IsEqualTo(125L);
         await Assert.That(beforeCorrection.Entries.Single().SolveCount).IsEqualTo(2);
         await Assert.That(afterCorrection.Entries.Single().Score).IsEqualTo(0L);
         await Assert.That(afterCorrection.Entries.Single().SolveCount).IsEqualTo(0);
-        await Assert.That(restored.Entries.Single().Score).IsEqualTo(175L);
+        await Assert.That(restored.Entries.Single().Score).IsEqualTo(125L);
     }
 
     [Test]
@@ -454,7 +469,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 new AwdpChallengeConfiguration(
                     AwdpChallengeConfiguration.CurrentSchemaVersion,
                     null,
-                    new AwdpAchievementConfiguration(AchievementSettlement.Milestone, 20),
+                    FixedCurve(20),
                     true,
                     10,
                     10),
@@ -468,11 +483,14 @@ public sealed class AwdpGameplayFactEvaluatorTests
             .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
     }
 
-    private static string LegacyCompetitionJson() => JsonSerializer.Serialize(
+    private static ScoreCurveConfiguration FixedCurve(long points) =>
+        new(points, points, 2, ScoreDecayMode.Fixed);
+
+    private static string CompetitionJson() => JsonSerializer.Serialize(
         new AwdpConfiguration(
-            AwdpConfiguration.LegacySchemaVersion,
+            AwdpConfiguration.CurrentSchemaVersion,
             300,
-            new(AchievementSettlement.Milestone, 100),
-            new(AchievementSettlement.Milestone, 50)),
+            FixedCurve(100),
+            FixedCurve(50)),
         new JsonSerializerOptions(JsonSerializerDefaults.Web));
 }

@@ -50,7 +50,9 @@ public sealed record LeaderboardChallengeInfoResponse(
     Guid CompetitionChallengeId,
     string Title,
     string Direction,
-    long? CurrentScore);
+    long? CurrentScore,
+    long? CurrentBreakScore,
+    long? CurrentFixScore);
 
 public sealed record LeaderboardTrackInfoResponse(
     string Key,

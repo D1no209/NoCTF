@@ -6,6 +6,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Registration;
+using NoCTF.GameModes.Scoring;
 
 namespace NoCTF.Tests.Unit.GameModes;
 
@@ -70,10 +71,10 @@ public class ChallengeConfigurationCatalogTests
     {
         var errors = new GameModeChallengeConfigurationCatalog().ValidateDefinition(
             GameMode.Ctf,
-            """{"schemaVersion":1,"points":null}""");
+            """{"schemaVersion":1,"scoreCurve":null}""");
 
         await Assert.That(errors)
-            .Contains("DefinitionJson cannot contain 'points' because it belongs to the other challenge section.");
+            .Contains("DefinitionJson cannot contain 'scoreCurve' because it belongs to the other challenge section.");
     }
 
     [Test]
@@ -99,13 +100,13 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task CtfChallengeExpression_IsValidatedWhenPointsAreInherited()
+    public async Task CtfChallengeCustomCurveExpression_IsValidated()
     {
         var configuration = new NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration(
             NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration.CurrentSchemaVersion,
-            Points: null,
-            BloodRewards: null,
-            ScoreExpression: "initialPoints = minimumPoints");
+            ScoreCurve: new(500, 100, 10, ScoreDecayMode.Custom,
+                "initialPoints = minimumPoints"),
+            BloodRewards: null);
         var json = JsonSerializer.Serialize(configuration, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
         var errors = new GameModeChallengeConfigurationCatalog().Validate(GameMode.Ctf, json);
@@ -114,12 +115,16 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task CtfChallengeExpression_UsesInheritedPointsAndEligibleTeamBoundary()
+    public async Task CtfChallengeExpression_UsesEligibleTeamBoundary()
     {
         var challenge = new NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration(
-            1, Points: null, BloodRewards: null, ScoreExpression: "1m / (solveCount - 2)");
+            NoCTF.GameModes.Ctf.Configuration.CtfChallengeConfiguration.CurrentSchemaVersion,
+            ScoreCurve: new(500, 100, 10, ScoreDecayMode.Custom,
+                "1m / (solveCount - 2)"),
+            BloodRewards: null);
         var competition = new NoCTF.GameModes.Ctf.Configuration.CtfConfiguration(
-            1, new(500, 100, 10), []);
+            NoCTF.GameModes.Ctf.Configuration.CtfConfiguration.CurrentSchemaVersion,
+            new(500, 100, 10), []);
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 
         var errors = new GameModeChallengeConfigurationCatalog().Validate(

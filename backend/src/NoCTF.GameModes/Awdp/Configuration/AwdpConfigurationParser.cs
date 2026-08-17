@@ -7,12 +7,10 @@ public static class AwdpConfigurationParser
     public static AwdpConfiguration ParseCompetition(string json) =>
         VersionedConfiguration.ParseSupported<AwdpConfiguration>(
             json,
-            AwdpConfiguration.LegacySchemaVersion,
             AwdpConfiguration.CurrentSchemaVersion);
 
     public static AwdpChallengeConfiguration ParseChallenge(string json) =>
         VersionedConfiguration.ParseSupported<AwdpChallengeConfiguration>(
             json,
-            AwdpChallengeConfiguration.LegacySchemaVersion,
             AwdpChallengeConfiguration.CurrentSchemaVersion);
 }

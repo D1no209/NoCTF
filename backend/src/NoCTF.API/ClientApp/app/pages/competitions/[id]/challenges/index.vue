@@ -12,7 +12,9 @@ type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
 
 const route = useRoute()
 const competitionId = route.params.id as string
+const ctx = inject(competitionContextKey)!
 const { isLoggedIn } = useAuth()
+const isAwdp = computed(() => ctx.competition.value?.mode === 'Awdp')
 
 const items = ref<Challenge[]>([])
 const loading = ref(true)
@@ -128,19 +130,26 @@ function progressFor(challengeId?: string): ChallengeProgress | null {
     ?? { solveCount: 0, solvedByMyTeam: false, myScore: null, bloodRank: null }
 }
 
-const currentScoreByChallenge = computed(() => new Map(
+const scoreInfoByChallenge = computed(() => new Map(
   (leaderboard.value?.challenges ?? []).map(challenge => [
     normalizeChallengeKey(challenge.competitionChallengeId),
-    challenge.currentScore,
+    challenge,
   ]),
 ))
 
 function currentScoreFor(challenge: Challenge): number | null {
+  if (isAwdp.value) return null
   if (!leaderboard.value) return null
   if (leaderboard.value.dataScope === 'Hidden')
     return challenge.baseScore ?? null
-  const score = currentScoreByChallenge.value.get(normalizeChallengeKey(challenge.id))
-  return score ?? challenge.baseScore ?? null
+  const info = scoreInfoByChallenge.value.get(normalizeChallengeKey(challenge.id))
+  return info?.currentScore ?? challenge.baseScore ?? null
+}
+
+function awdpScoreFor(challenge: Challenge, kind: 'Break' | 'Fix'): number | null {
+  if (!isAwdp.value || !leaderboard.value || leaderboard.value.dataScope === 'Hidden') return null
+  const info = scoreInfoByChallenge.value.get(normalizeChallengeKey(challenge.id))
+  return kind === 'Break' ? info?.currentBreakScore ?? null : info?.currentFixScore ?? null
 }
 
 const groups = computed(() => {
@@ -229,11 +238,20 @@ const groups = computed(() => {
                     <div class="flex flex-col items-start gap-2">
                       <Badge v-if="!leaderboard && leaderboardError" variant="destructive"> {{ $t('加载记分板失败') }} </Badge>
                       <Badge v-else-if="!leaderboard && leaderboardPending" variant="secondary"> {{ $t('记分板数据投影中,请稍候…') }} </Badge>
-                      <Badge v-else-if="currentScoreFor(challenge) === null" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
+                      <div v-else-if="isAwdp && (awdpScoreFor(challenge, 'Break') !== null || awdpScoreFor(challenge, 'Fix') !== null)" class="flex flex-wrap gap-x-4 gap-y-1">
+                        <span class="font-mono text-sm font-semibold text-primary tabular-nums">
+                          Break {{ awdpScoreFor(challenge, 'Break') ?? '-' }} pts
+                        </span>
+                        <span class="font-mono text-sm font-semibold text-primary tabular-nums">
+                          Fix {{ awdpScoreFor(challenge, 'Fix') ?? '-' }} pts
+                        </span>
+                      </div>
+                      <Badge v-else-if="isAwdp || currentScoreFor(challenge) === null" variant="secondary"> {{ $t('分数隐藏') }} </Badge>
                       <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
                         {{ currentScoreFor(challenge) }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
                       </span>
-                      <span v-if="currentScoreFor(challenge) !== null" class="text-xs text-muted-foreground">{{ $t('当前动态分值') }}</span>
+                      <span v-if="isAwdp && (awdpScoreFor(challenge, 'Break') !== null || awdpScoreFor(challenge, 'Fix') !== null)" class="text-xs text-muted-foreground">{{ $t('当前轮次动态分值') }}</span>
+                      <span v-else-if="currentScoreFor(challenge) !== null" class="text-xs text-muted-foreground">{{ $t('当前动态分值') }}</span>
                       <Badge v-if="progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
                         <Flag class="size-3" />
                         {{ progressFor(challenge.id)?.bloodRank

@@ -57,7 +57,7 @@ public sealed class ConfigurationRevisionFenceTests
                     new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,
                     competitionSnapshot.Revision,
-                    """{"schemaVersion":1,"defaultPoints":{"initialPoints":600,"minimumPoints":100,"decayFactor":10},"bloodRewards":[]}""",
+                    """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":600,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
                     true,
                     competitionSnapshot.ChallengeConfigurations.ToDictionary(
                         challenge => challenge.Id, challenge => challenge.Revision),
@@ -91,7 +91,7 @@ public sealed class ConfigurationRevisionFenceTests
                     ids.CompetitionChallengeId,
                     challengeSnapshot.Revision,
                     challengeSnapshot.CompetitionConfigurationRevision,
-                    """{"schemaVersion":1,"points":{"initialPoints":700,"minimumPoints":100,"decayFactor":10},"bloodRewards":[]}""",
+                    """{"schemaVersion":2,"scoreCurve":{"initialPoints":700,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
                     DateTimeOffset.UtcNow,
                     cancellationToken);
                 await Assert.That(result.Failure).IsEqualTo(ChallengeConfigurationUpdateFailure.RevisionConflict);
@@ -102,12 +102,12 @@ public sealed class ConfigurationRevisionFenceTests
                 .SingleAsync(challenge => challenge.Id == ids.CompetitionChallengeId, cancellationToken);
             await Assert.That(JsonNode.DeepEquals(
                 JsonNode.Parse(persisted.RulesJson),
-                JsonNode.Parse("""{"schemaVersion":1}"""))).IsTrue();
+                JsonNode.Parse("""{"schemaVersion":2}"""))).IsTrue();
             var persistedCompetition = await verifyDb.Competitions.AsNoTracking()
                 .SingleAsync(competition => competition.Id == ids.CompetitionId, cancellationToken);
             await Assert.That(JsonNode.DeepEquals(
                 JsonNode.Parse(persistedCompetition.ConfigurationJson),
-                JsonNode.Parse("""{"schemaVersion":1}"""))).IsTrue();
+                JsonNode.Parse("""{"schemaVersion":2}"""))).IsTrue();
         });
     }
 
@@ -139,7 +139,7 @@ public sealed class ConfigurationRevisionFenceTests
             Title = "Configuration fences",
             OwnerId = ownerId,
             Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":1}""",
+            ConfigurationJson = """{"schemaVersion":2}""",
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),
@@ -161,7 +161,7 @@ public sealed class ConfigurationRevisionFenceTests
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
-            RulesJson = """{"schemaVersion":1}""",
+            RulesJson = """{"schemaVersion":2}""",
             UpdatedAt = now
         });
         await db.SaveChangesAsync(cancellationToken);

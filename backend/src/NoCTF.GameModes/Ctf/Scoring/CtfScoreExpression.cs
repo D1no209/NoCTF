@@ -2,16 +2,16 @@ using System.Security.Cryptography;
 using System.Text;
 using DynamicExpresso;
 
-namespace NoCTF.GameModes.Ctf.Scoring;
+namespace NoCTF.GameModes.Scoring;
 
-public sealed record CtfScoreVariables(
+public sealed record ScoreCurveVariables(
     decimal InitialPoints,
     decimal MinimumPoints,
     int SolveCount,
     int EligibleTeamCount,
-    decimal DecayParameter);
+    decimal DecayTeamCount);
 
-public sealed class CtfScoreExpression
+public sealed class ScoreCurveExpression
 {
     public const int MaximumExpressionBytes = 4096;
     private const int Capacity = 1024;
@@ -19,7 +19,7 @@ public sealed class CtfScoreExpression
     private readonly Dictionary<string, CacheEntry> cache = new(StringComparer.Ordinal);
     private readonly LinkedList<string> recency = [];
 
-    public long Evaluate(string expression, CtfScoreVariables variables)
+    public decimal Evaluate(string expression, ScoreCurveVariables variables)
     {
         var compiled = GetOrCompile(expression);
         var raw = (decimal)compiled.Invoke(
@@ -27,17 +27,16 @@ public sealed class CtfScoreExpression
             variables.MinimumPoints,
             variables.SolveCount,
             variables.EligibleTeamCount,
-            variables.DecayParameter);
-        var bounded = decimal.Clamp(raw, variables.MinimumPoints, variables.InitialPoints);
-        return checked((long)decimal.Round(bounded, 0, MidpointRounding.AwayFromZero));
+            variables.DecayTeamCount);
+        return raw;
     }
 
-    public void Validate(string expression, decimal initialPoints, decimal minimumPoints, decimal decayParameter, int eligibleTeamCount)
+    public void Validate(string expression, decimal initialPoints, decimal minimumPoints, decimal decayTeamCount, int eligibleTeamCount)
     {
         if (initialPoints <= 0
             || minimumPoints < 0
             || minimumPoints > initialPoints
-            || decayParameter <= 1
+            || decayTeamCount <= 1
             || eligibleTeamCount < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(expression), "Score expression boundaries are invalid.");
@@ -47,7 +46,7 @@ public sealed class CtfScoreExpression
         {
             Evaluate(
                 expression,
-                new(initialPoints, minimumPoints, solveCount, eligibleTeamCount, decayParameter));
+                new(initialPoints, minimumPoints, solveCount, eligibleTeamCount, decayTeamCount));
             if (solveCount == eligibleTeamCount)
             {
                 break;
@@ -56,6 +55,13 @@ public sealed class CtfScoreExpression
     }
 
     public void ValidateSyntax(string expression) => _ = GetOrCompile(expression);
+
+    public static bool IsValidationException(Exception exception) =>
+        exception is DynamicExpresso.Exceptions.DynamicExpressoException
+            or ArgumentException
+            or InvalidOperationException
+            or OverflowException
+            or DivideByZeroException;
 
     private Lambda GetOrCompile(string expression)
     {
@@ -88,7 +94,7 @@ public sealed class CtfScoreExpression
                 new Parameter("minimumPoints", typeof(decimal)),
                 new Parameter("solveCount", typeof(int)),
                 new Parameter("eligibleTeamCount", typeof(int)),
-                new Parameter("decayParameter", typeof(decimal)));
+                new Parameter("decayTeamCount", typeof(decimal)));
             var node = recency.AddFirst(key);
             cache.Add(key, new(compiled, node));
             if (cache.Count > Capacity)

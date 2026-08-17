@@ -16,7 +16,7 @@ public sealed class AwdpFullBoundaryTests
 
     [Test]
     [Timeout(420_000)]
-    public async Task Awdp_v2_keeps_attack_runtime_fix_verification_and_round_scoring_independent(
+    public async Task Awdp_v3_keeps_attack_runtime_fix_verification_and_round_scoring_independent(
         CancellationToken cancellationToken)
     {
         var baseUrl = RequiredEnvironment("NOCTF_E2E_BASE_URL");
@@ -51,10 +51,22 @@ public sealed class AwdpFullBoundaryTests
 
         var competitionConfigurationJson = JsonSerializer.Serialize(new
         {
-            schemaVersion = 2,
+            schemaVersion = 3,
             roundDurationSeconds = 5,
-            @break = new { settlement = 1, points = 40 },
-            fix = new { settlement = 1, points = 60 },
+            @break = new
+            {
+                initialPoints = 40,
+                minimumPoints = 20,
+                decayTeamCount = 10,
+                decayMode = 1
+            },
+            fix = new
+            {
+                initialPoints = 60,
+                minimumPoints = 30,
+                decayTeamCount = 10,
+                decayMode = 1
+            },
             violationPenalty = 19,
             serviceDownPenalty = 13,
             requireBreakBeforeFix = false,
@@ -92,7 +104,7 @@ public sealed class AwdpFullBoundaryTests
             admin,
             HttpMethod.Post,
             $"/api/v1/admin/competitions/{competitionId}/challenges",
-            new { challengeId = templateId, baseScore = 100, order = 0 },
+            new { challengeId = templateId, baseScore = 0, order = 0 },
             HttpStatusCode.Created,
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
@@ -100,7 +112,7 @@ public sealed class AwdpFullBoundaryTests
 
         var challengeConfigurationJson = JsonSerializer.Serialize(new
         {
-            schemaVersion = 2,
+            schemaVersion = 3,
             requireBreakBeforeFix = false,
             maxBreakSubmissions = 5,
             maxFixSubmissions = 20,
@@ -124,7 +136,7 @@ public sealed class AwdpFullBoundaryTests
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, baseScore = 100, order = 0, isPublished = true, expectedRevision = challengeRevision },
+            new { customTitle = (string?)null, baseScore = 0, order = 0, isPublished = true, expectedRevision = challengeRevision },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -451,25 +463,34 @@ public sealed class AwdpFullBoundaryTests
             result: "Wrong",
             failureCode: "AwdpPatchFailed");
 
-        var firstScores = await PollContinuousScoresAsync(
+        await PollLeaderboardAsync(
             anonymous,
             competitionId,
             red.TeamId,
-            blue.TeamId,
-            redActivationRound,
-            blueActivationRound,
-            minimumRound: Math.Max(redActivationRound, blueActivationRound),
+            expectedScore: 22,
+            TimeSpan.FromSeconds(45),
             cancellationToken);
-        await Task.Delay(TimeSpan.FromSeconds(6), cancellationToken);
-        var grownScores = await PollScoresGreaterAsync(
+        await PollLeaderboardAsync(
             anonymous,
             competitionId,
-            red.TeamId,
             blue.TeamId,
-            firstScores,
+            expectedScore: 60,
+            TimeSpan.FromSeconds(45),
             cancellationToken);
-        await Assert.That((grownScores[red.TeamId] + 18) % 40).IsEqualTo(0);
-        await Assert.That(grownScores[blue.TeamId] % 60).IsEqualTo(0);
+        await PollLeaderboardAsync(
+            anonymous,
+            competitionId,
+            green.TeamId,
+            expectedScore: -84,
+            TimeSpan.FromSeconds(45),
+            cancellationToken);
+        var firstRoundScores = await ReadScoresAsync(anonymous, competitionId, cancellationToken);
+        await AssertScoresStableAsync(
+            anonymous,
+            competitionId,
+            firstRoundScores,
+            TimeSpan.FromSeconds(6),
+            cancellationToken);
 
         var reset = await SendWithoutBodyForJsonAsync(
             redClient,
@@ -510,6 +531,12 @@ public sealed class AwdpFullBoundaryTests
             "BreakAttempt",
             "Wrong",
             "FlagExpired");
+        _ = await PollJsonAsync(
+            redClient,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
+            value => value.GetProperty("currentRound").GetInt32() > redActivationRound,
+            TimeSpan.FromSeconds(30),
+            cancellationToken);
         var currentGenerationBreakId = await SubmitBreakAsync(
             redClient,
             competitionId,
@@ -523,6 +550,13 @@ public sealed class AwdpFullBoundaryTests
             TimeSpan.FromSeconds(30),
             cancellationToken);
         await AssertSubmissionAsync(currentGenerationBreak, "BreakAttempt", "Correct", null);
+        await PollLeaderboardAsync(
+            anonymous,
+            competitionId,
+            red.TeamId,
+            expectedScore: 55,
+            TimeSpan.FromSeconds(45),
+            cancellationToken);
 
         await SendWithoutBodyAsync(
             admin,
@@ -555,12 +589,11 @@ public sealed class AwdpFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/resume",
             HttpStatusCode.NoContent,
             cancellationToken);
-        _ = await PollScoresGreaterAsync(
+        await AssertScoresStableAsync(
             anonymous,
             competitionId,
-            red.TeamId,
-            blue.TeamId,
             pausedScores,
+            TimeSpan.FromSeconds(7),
             cancellationToken);
 
         await SendWithoutBodyAsync(
@@ -582,7 +615,7 @@ public sealed class AwdpFullBoundaryTests
     private static string BuildDefinition(string targetImage, string checkerImage) =>
         JsonSerializer.Serialize(new
         {
-            schemaVersion = 2,
+            schemaVersion = 3,
             runtime = new
             {
                 allocation = 1,
@@ -937,60 +970,6 @@ public sealed class AwdpFullBoundaryTests
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
         }
         throw new TimeoutException($"Runtime URL {url} did not become reachable.");
-    }
-
-    private static async Task<IReadOnlyDictionary<Guid, long>> PollContinuousScoresAsync(
-        HttpClient client,
-        Guid competitionId,
-        Guid redTeamId,
-        Guid blueTeamId,
-        int redActivationRound,
-        int blueActivationRound,
-        int minimumRound,
-        CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(45);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            var scores = await TryReadScoresAsync(client, competitionId, cancellationToken);
-            if (scores is not null
-                && scores.TryGetValue(redTeamId, out var redScore)
-                && scores.TryGetValue(blueTeamId, out var blueScore)
-                && redScore + 18 > 0
-                && (redScore + 18) % 40 == 0
-                && blueScore > 0
-                && blueScore % 60 == 0)
-            {
-                var redRound = checked((int)((redScore + 18) / 40) + redActivationRound - 1);
-                var blueRound = checked((int)(blueScore / 60) + blueActivationRound - 1);
-                if (redRound == blueRound && redRound >= minimumRound)
-                    return scores;
-            }
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        }
-        throw new TimeoutException("AWDP leaderboard did not reach a coherent continuous score.");
-    }
-
-    private static async Task<IReadOnlyDictionary<Guid, long>> PollScoresGreaterAsync(
-        HttpClient client,
-        Guid competitionId,
-        Guid redTeamId,
-        Guid blueTeamId,
-        IReadOnlyDictionary<Guid, long> previous,
-        CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(45);
-        IReadOnlyDictionary<Guid, long>? last = null;
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            last = await TryReadScoresAsync(client, competitionId, cancellationToken);
-            if (last is not null
-                && last.GetValueOrDefault(redTeamId) > previous.GetValueOrDefault(redTeamId)
-                && last.GetValueOrDefault(blueTeamId) > previous.GetValueOrDefault(blueTeamId))
-                return last;
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        }
-        throw new TimeoutException($"AWDP scores did not grow. Last scores: {FormatScores(last)}");
     }
 
     private static async Task AssertAwdpRoundStableAsync(

@@ -2,10 +2,13 @@ namespace NoCTF.GameModes.Awdp.Configuration;
 
 using NoCTF.Application.Scoring;
 using NoCTF.GameModes.Flags;
+using NoCTF.GameModes.Scoring;
 
 public static class AwdpConfigurationValidator
 {
-    public static IReadOnlyList<string> Validate(AwdpConfiguration configuration)
+    private static readonly ScoreCurveEvaluator ScoreCurve = new();
+
+    public static IReadOnlyList<string> Validate(AwdpConfiguration configuration, int eligibleTeamCount = 1)
     {
         var errors = new List<string>();
         if (configuration.RoundDurationSeconds <= 0) errors.Add("RoundDurationSeconds must be positive.");
@@ -13,11 +16,10 @@ public static class AwdpConfigurationValidator
             errors.Add("Break achievement configuration is required.");
         if (configuration.Fix is null)
             errors.Add("Fix achievement configuration is required.");
-        if (configuration.Break?.Points < 0 || configuration.Fix?.Points < 0)
-            errors.Add("Achievement points cannot be negative.");
-        if (configuration.Break?.Points > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.Fix?.Points > ScoreValueLimits.MaximumConfiguredValue)
-            errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
+        if (configuration.Break is not null)
+            errors.AddRange(ScoreCurve.Validate(configuration.Break, eligibleTeamCount));
+        if (configuration.Fix is not null)
+            errors.AddRange(ScoreCurve.Validate(configuration.Fix, eligibleTeamCount));
         if (configuration.BreakWrongPenalty < 0
             || configuration.FixFailurePenalty < 0
             || configuration.ViolationPenalty < 0
@@ -36,14 +38,15 @@ public static class AwdpConfigurationValidator
         return errors;
     }
 
-    public static IReadOnlyList<string> Validate(AwdpChallengeConfiguration configuration)
+    public static IReadOnlyList<string> Validate(
+        AwdpChallengeConfiguration configuration,
+        int eligibleTeamCount = 1)
     {
         var errors = new List<string>();
-        if (configuration.Break?.Points < 0 || configuration.Fix?.Points < 0)
-            errors.Add("Achievement points cannot be negative.");
-        if (configuration.Break?.Points > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.Fix?.Points > ScoreValueLimits.MaximumConfiguredValue)
-            errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
+        if (configuration.Break is not null)
+            errors.AddRange(ScoreCurve.Validate(configuration.Break, eligibleTeamCount));
+        if (configuration.Fix is not null)
+            errors.AddRange(ScoreCurve.Validate(configuration.Fix, eligibleTeamCount));
         if (configuration.BreakWrongPenalty is < 0
             || configuration.FixFailurePenalty is < 0
             || configuration.ViolationPenalty is < 0
@@ -74,26 +77,20 @@ public static class AwdpConfigurationValidator
         }
         errors.AddRange(Registration.ChallengeRuntimeTemplateValidator.Validate(configuration.Runtime));
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(configuration.Checker, "Checker"));
-        ValidateRuntime(
-            configuration.Runtime,
-            configuration.SchemaVersion == AwdpChallengeConfiguration.CurrentSchemaVersion,
-            errors);
-        if (configuration.SchemaVersion != AwdpChallengeConfiguration.CurrentSchemaVersion)
-            ValidateFlagInjection(configuration.FlagInjection, errors);
+        ValidateRuntime(configuration.Runtime, true, errors);
         ValidateChecker(configuration.Checker, errors);
         return errors;
     }
 
-    public static IReadOnlyList<string> Validate(AwdpEffectiveConfiguration configuration)
+    public static IReadOnlyList<string> Validate(
+        AwdpEffectiveConfiguration configuration,
+        int eligibleTeamCount = 1)
     {
         var errors = new List<string>();
         if (configuration.RoundDurationSeconds <= 0)
             errors.Add("RoundDurationSeconds must be positive.");
-        if (configuration.Break.Points < 0 || configuration.Fix.Points < 0)
-            errors.Add("Achievement points cannot be negative.");
-        if (configuration.Break.Points > ScoreValueLimits.MaximumConfiguredValue
-            || configuration.Fix.Points > ScoreValueLimits.MaximumConfiguredValue)
-            errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
+        errors.AddRange(ScoreCurve.Validate(configuration.Break, eligibleTeamCount));
+        errors.AddRange(ScoreCurve.Validate(configuration.Fix, eligibleTeamCount));
         if (configuration.BreakWrongPenalty < 0
             || configuration.FixFailurePenalty < 0
             || configuration.ViolationPenalty < 0
@@ -124,9 +121,7 @@ public static class AwdpConfigurationValidator
         errors.AddRange(Registration.RunnerJobConfigurationValidator.Validate(
             configuration.Checker,
             "Checker"));
-        ValidateRuntime(configuration.Runtime, configuration.UsesContinuousRoundScoring, errors);
-        if (!configuration.UsesContinuousRoundScoring)
-            ValidateFlagInjection(configuration.FlagInjection, errors);
+        ValidateRuntime(configuration.Runtime, true, errors);
         ValidateChecker(configuration.Checker, errors);
         return errors;
     }
@@ -139,9 +134,7 @@ public static class AwdpConfigurationValidator
             errors.Add("Runtime is required before an AWDP competition can start.");
         if (configuration.Checker is null)
             errors.Add("Checker is required before an AWDP competition can start.");
-        ValidateRuntime(configuration.Runtime, configuration.UsesContinuousRoundScoring, errors);
-        if (!configuration.UsesContinuousRoundScoring)
-            ValidateFlagInjection(configuration.FlagInjection, errors);
+        ValidateRuntime(configuration.Runtime, true, errors);
         ValidateChecker(configuration.Checker, errors);
         return errors;
     }

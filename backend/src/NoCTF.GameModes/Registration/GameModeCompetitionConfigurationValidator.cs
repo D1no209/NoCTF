@@ -22,7 +22,7 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
             {
                 GameMode.Ctf => ValidateCtf(json, eligibleTeamCount, challengeConfigurationJsons),
                 GameMode.Awd => Awd.Configuration.AwdConfigurationValidator.Validate(Awd.Configuration.AwdConfigurationUpgrader.ParseCompetition(json)),
-                GameMode.Awdp => ValidateAwdp(json, challengeConfigurationJsons),
+                GameMode.Awdp => ValidateAwdp(json, eligibleTeamCount, challengeConfigurationJsons),
                 GameMode.Koh => Koh.Configuration.KohConfigurationValidator.Validate(Koh.Configuration.KohConfigurationUpgrader.ParseCompetition(json)),
                 _ => ["Unsupported game mode."]
             };
@@ -139,21 +139,27 @@ public sealed class GameModeCompetitionConfigurationValidator : ICompetitionConf
 
     private static IReadOnlyList<string> ValidateAwdp(
         string json,
+        int eligibleTeamCount,
         IReadOnlyList<string> challengeConfigurationJsons)
     {
         var competition = Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(json);
-        var errors = Awdp.Configuration.AwdpConfigurationValidator.Validate(competition).ToList();
+        var errors = Awdp.Configuration.AwdpConfigurationValidator.Validate(
+            competition,
+            eligibleTeamCount).ToList();
         if (errors.Count > 0)
             return errors;
         foreach (var challengeJson in challengeConfigurationJsons)
         {
             var challenge = Awdp.Configuration.AwdpConfigurationParser.ParseChallenge(
                 challengeJson);
-            errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.Validate(challenge));
+            errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.Validate(
+                challenge,
+                eligibleTeamCount));
             errors.AddRange(Awdp.Configuration.AwdpConfigurationValidator.Validate(
                 Awdp.Configuration.AwdpConfigurationResolver.Resolve(
                     competition,
-                    challenge)));
+                    challenge),
+                eligibleTeamCount));
         }
         return errors;
     }

@@ -2,9 +2,11 @@ import { describe, expect, test } from 'bun:test'
 import {
   BLOOD_REWARD_POLICIES,
   BloodRewardPolicy,
+  ScoreDecayMode,
   FlagSource,
   challengeRuleFields,
   competitionConfigFields,
+  ctfPointsAtSolveCount,
   emptyFlagTemplate,
   emptyDefinition,
   emptyRuntimeTemplate,
@@ -19,6 +21,24 @@ describe('CTF blood reward policies', () => {
       value: BloodRewardPolicy.CurrentPointsPercentage,
       label: '当前分值百分比',
     })
+  })
+})
+
+describe('shared dynamic score curves', () => {
+  test('offers independent CTF and AWDP score curves with all preset modes', () => {
+    expect(competitionConfigFields('Ctf').find(field => field.key === 'defaultScoreCurve')?.type).toBe('pointsCurve')
+    expect(competitionConfigFields('Awdp').filter(field => field.type === 'pointsCurve').map(field => field.key))
+      .toEqual(['break', 'fix'])
+    expect(challengeRuleFields('Awdp').filter(field => field.type === 'pointsCurve').map(field => field.key))
+      .toEqual(['break', 'fix'])
+  })
+
+  test('matches backend preset formulas and integer rounding', () => {
+    const base = { initialPoints: 1000, minimumPoints: 100, decayTeamCount: 10, customExpression: null }
+    expect(ctfPointsAtSolveCount({ ...base, decayMode: ScoreDecayMode.Linear }, 5)).toBe(600)
+    expect(ctfPointsAtSolveCount({ ...base, decayMode: ScoreDecayMode.Quadratic }, 5)).toBe(822)
+    expect(ctfPointsAtSolveCount({ ...base, decayMode: ScoreDecayMode.Exponential }, 5)).toBe(238)
+    expect(ctfPointsAtSolveCount({ ...base, decayMode: ScoreDecayMode.Logarithmic }, 5)).toBe(371)
   })
 })
 
