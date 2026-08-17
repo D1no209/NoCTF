@@ -35,7 +35,7 @@ function switchKind(kind: string): void {
   if (kind === props.runtime.definition.kind) return
   props.runtime.definition = kind === 'compose'
     ? emptyComposeDefinition()
-    : emptyContainerDefinition(props.mode === 'Ctf')
+    : emptyContainerDefinition(props.mode === 'Ctf' || props.mode === 'Awdp')
 }
 
 const flagSourceOptions = computed(() => {
@@ -44,11 +44,11 @@ const flagSourceOptions = computed(() => {
     { value: FlagSource.PerTeam, label: translate("每队独立 Flag") },
     { value: FlagSource.AwdRotation, label: translate("按轮次轮换(AWD)") },
   ]
-  return props.mode === 'Ctf' ? all.slice(0, 2) : all
+  return props.mode === 'Ctf' || props.mode === 'Awdp' ? all.slice(0, 2) : all
 })
 
 const exposureOptions = computed(() => {
-  if (props.mode === 'Ctf') {
+  if (props.mode === 'Ctf' || props.mode === 'Awdp') {
     return [{ value: UrlExposure.OwnerOnly, label: translate("仅队伍自己可见") }]
   }
   return [
@@ -72,19 +72,15 @@ watch(
     const runtime = props.runtime
     runtime.allocation = mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam
     if (mode !== 'Koh') runtime.controlCheckUrlBinding = null
-    if (mode === 'Ctf') {
+    if (mode === 'Ctf' || mode === 'Awdp') {
       runtime.flagSource = FlagSource.PerTeam
       if (runtime.definition.kind === 'container' && !runtime.definition.flagEnvironmentVariableName.trim())
         runtime.definition.flagEnvironmentVariableName = 'FLAG'
       for (const binding of runtime.urlBindings) binding.exposure = UrlExposure.OwnerOnly
     }
     if (mode === 'Awdp') {
-      runtime.urlBindings = []
       if (runtime.definition.kind === 'compose') {
-        runtime.definition = emptyContainerDefinition()
-      }
-      else {
-        runtime.definition.containerPorts = []
+        runtime.definition = emptyContainerDefinition(true)
       }
     }
   },
@@ -200,7 +196,7 @@ watch(
     </DefinitionSection>
 
     <DefinitionSection :title="$t('Flag 与访问')" :collapsible="false">
-      <Field v-if="mode !== 'Ctf'">
+      <Field v-if="mode !== 'Ctf' && mode !== 'Awdp'">
         <FieldLabel>{{ $t('Flag 来源') }}</FieldLabel>
         <Select
           :model-value="String(runtime.flagSource)"
@@ -227,7 +223,7 @@ watch(
         <FieldDescription>{{ $t('容器题由平台生成队伍专属 Flag，并在启动环境时注入配置的环境变量。') }}</FieldDescription>
       </Field>
 
-      <Field v-if="mode !== 'Awdp'">
+      <Field>
         <FieldLabel>{{ $t('访问入口') }}</FieldLabel>
         <UrlBindingList
           :model-value="runtime.urlBindings"
@@ -238,6 +234,7 @@ watch(
         />
         <FieldDescription v-if="mode === 'Koh'"> {{ $t('KoH 开赛时要求至少一个「所有参赛者可见」的入口。') }} </FieldDescription>
         <FieldDescription v-else-if="mode === 'Awd'"> {{ $t('AWD 中选手互相访问对方服务,通常需要「所有参赛者可见」的入口。') }} </FieldDescription>
+        <FieldDescription v-else-if="mode === 'Awdp'"> {{ $t('AWDP 攻击实例入口仅对所属队伍可见。') }} </FieldDescription>
       </Field>
 
       <Field v-if="mode === 'Koh'">

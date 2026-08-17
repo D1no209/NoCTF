@@ -189,14 +189,16 @@ export function emptyUrlBinding(): UrlBindingModel {
 export function emptyRuntimeTemplate(mode: GameModeValue): RuntimeTemplateModel {
   return {
     allocation: mode === 'Koh' ? RuntimeAllocation.Shared : RuntimeAllocation.PerTeam,
-    definition: emptyContainerDefinition(mode === 'Ctf'),
+    definition: emptyContainerDefinition(mode === 'Ctf' || mode === 'Awdp'),
     limits: { memoryBytes: null, nanoCpus: null, pidsLimit: null },
     ttlSeconds: null,
     operationTimeoutSeconds: null,
     urlBindings: [],
-    // AWDP generation Flags are injected by its dedicated attack-runtime plan,
-    // not by the AWD round-rotation source.
-    flagSource: mode === 'Ctf' ? FlagSource.PerTeam : mode === 'Awd' ? FlagSource.AwdRotation : FlagSource.Static,
+    flagSource: mode === 'Ctf' || mode === 'Awdp'
+      ? FlagSource.PerTeam
+      : mode === 'Awd'
+        ? FlagSource.AwdRotation
+        : FlagSource.Static,
     controlCheckUrlBinding: null,
   }
 }
@@ -215,9 +217,7 @@ export function emptyDefinition(mode: GameModeValue): DefinitionModel {
     checker: mode === 'Awd' ? { job: emptyRunnerJob(), targetServiceName: '' } : null,
     checkerJob: null,
     flagInjection: null,
-    awdpFlagInjection: mode === 'Awdp'
-      ? { kind: AwdpFlagInjectionKind.EnvironmentVariable, environmentVariableName: 'FLAG', filePath: '' }
-      : null,
+    awdpFlagInjection: null,
     flagTemplate: null,
     patchEntrypoint: '',
     patchCommand: [],
@@ -558,16 +558,6 @@ export function serializeDefinition(mode: GameModeValue, model: DefinitionModel)
     if (model.checkerJob) obj.checker = serializeRunnerJob(model.checkerJob)
     putNumber(obj, 'readyTimeoutSeconds', model.readyTimeoutSeconds)
     putNumber(obj, 'maximumPatchUploadBytes', model.maximumPatchUploadBytes)
-    if (model.awdpFlagInjection) {
-      const injection: JsonObject = { kind: model.awdpFlagInjection.kind }
-      if (model.awdpFlagInjection.kind === AwdpFlagInjectionKind.EnvironmentVariable) {
-        putString(injection, 'environmentVariableName', model.awdpFlagInjection.environmentVariableName)
-      }
-      else {
-        putString(injection, 'filePath', model.awdpFlagInjection.filePath)
-      }
-      obj.flagInjection = injection
-    }
   }
   return JSON.stringify(obj, null, 2)
 }
@@ -675,6 +665,7 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'roundDurationSeconds', label: translate("轮次时长(秒)"), type: 'int', min: 1, defaultValue: 300 },
         { key: 'break', label: translate("Break 得分"), type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: translate("攻破(正确提交 Flag)的得分与结算方式") },
         { key: 'fix', label: translate("Fix 得分"), type: 'milestonePoints', defaultValue: AWDP_AWARD_DEFAULT, description: translate("修复(提交补丁存档)的得分与结算方式") },
+        { key: 'requireBreakBeforeFix', label: translate("Fix 前必须先完成 Break"), type: 'bool', defaultValue: false },
         { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'breakWrongPenalty', label: translate("Break 错误扣分"), type: 'int', min: 0, defaultValue: 0 },
@@ -717,6 +708,7 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
       return [
         { key: 'break', label: translate("Break 得分"), type: 'milestonePoints' },
         { key: 'fix', label: translate("Fix 得分"), type: 'milestonePoints' },
+        { key: 'requireBreakBeforeFix', label: translate("Fix 前必须先完成 Break"), type: 'bool' },
         { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1 },
         { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1 },
         { key: 'breakWrongPenalty', label: translate("Break 错误扣分"), type: 'int', min: 0 },

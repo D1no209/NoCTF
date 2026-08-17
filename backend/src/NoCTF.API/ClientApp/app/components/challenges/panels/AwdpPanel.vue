@@ -84,7 +84,7 @@ onUnmounted(() => {
   <div class="flex flex-col gap-6">
     <Alert>
       <AlertDescription>
-        {{ $t('AWDP 包含相互独立的攻击与防御轨道。创建本队攻击实例并利用漏洞取得动态 Flag；Fix 使用独立的干净环境进行一次性验证。') }}
+        {{ $t('AWDP 使用本队独立攻击实例承载动态 Flag；Fix 始终在独立的干净环境中进行一次性验证。') }}
       </AlertDescription>
     </Alert>
 
@@ -110,7 +110,7 @@ onUnmounted(() => {
             </Badge>
           </div>
           <p class="text-sm text-muted-foreground">
-            {{ $t('创建本队独立攻击实例，利用漏洞取得当前 Runtime generation 的动态 Flag。首次正确 Break 后，从所属轮次起持续累计攻击分。') }}
+            {{ $t('创建本队独立攻击实例，利用漏洞取得当前 Runtime generation 的动态 Flag。Break 按本题配置的一次性或按轮结算规则计分。') }}
           </p>
         </div>
 
@@ -138,7 +138,7 @@ onUnmounted(() => {
             </Badge>
           </div>
           <p class="text-sm text-muted-foreground">
-            {{ $t('防御与 Break 相互独立。平台会创建全新的干净验证环境、应用补丁，并只执行一次 Checker。') }}
+            {{ $t('平台会创建全新的干净验证环境、应用补丁，并只执行一次 Checker；本题也可以要求完成 Break 后才允许提交 Fix。') }}
           </p>
         </div>
 

@@ -66,7 +66,7 @@ const hasSecurity = computed(() => {
 
     <DefinitionSection :title="$t('网络')" :collapsible="false">
       <div class="grid gap-4 sm:grid-cols-2">
-        <Field v-if="!isAwdp">
+        <Field>
           <FieldLabel>{{ $t('对外端口') }}</FieldLabel>
           <NumberListEditor
             :model-value="definition.containerPorts"
