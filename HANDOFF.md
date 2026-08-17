@@ -1,5 +1,30 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-17 alpha.44 CTF 3D 大屏高位俯视修正
+
+- `3707f499` 将协作者 3D 大屏的初始相机高度由 68 提升为 108，巡航高度由
+  `0.82 * citySpan + 26` 提升为 `1.35 * citySpan + 40`；拉远半径、旋转、题目分值、解题数量、
+  一二三血标记及解题后持续聚焦行为保持不变。默认题目矩阵下视角由约 35° 提升至接近 50°，可以从
+  更高位置同时观察完整柱体矩阵与遥测标签。
+- `1454f742` 将平台版本从 `0.1.0-alpha.43` 递增为 `0.1.0-alpha.44`。本阶段没有修改
+  HTTP/OpenAPI/TypeScript SDK、数据模型、migration 或 snapshot，也没有修改题目 Runtime/Checker
+  镜像策略。
+- 验证通过：ClientApp 定向 `bun test tests/control-screen.test.ts` 4/4、完整 `bun test` 203/203
+  （1539 assertions）、`bun run typecheck`、production `bun run build` 与 `git diff --check`。构建仅保留
+  既有的大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+- 功能与版本提交已快进推送到远程 `main@1454f742`，生产 `/root/NoCTF` 快进到同一提交；未跟踪的
+  `deploy/docker-compose.prod.yml` 保持原样。Linux/amd64 三服务镜像归档 SHA-256 为
+  `F8C8E9A03DB1E9AB27C9AE10C4CF7B642CF115B428A9D9DC611CDBDCAAF9D68C`；导入后 API、Worker、
+  Runner 镜像分别为 `sha256:56fb6f5c4d01c2a4def67bea6ec593286c956970b07a9b58ef1a2ab5b8dc01d5`、
+  `sha256:dea6983060c26a4683f49cf47cb3b2114e9b8ec5a7d82fe5d2425d138438c418`、
+  `sha256:ab0e2573697c1bd24e1cd25c896653cf2383bf3309db754635efd13dbfb2fbc1`；原 Alpha.43 镜像保留
+  `rollback-9da6f2f3` 标签。
+- 生产只以 `--no-deps --no-build --force-recreate` 重建 API、Worker、Runner；PostgreSQL、Redis、
+  卷、生产数据及题目容器均未重建。三服务均为 running/healthy、restart count 0，程序集均确认
+  `0.1.0-alpha.44`；公开 `https://101.43.46.244/` 与 `/health` 返回 200，健康正文为 `Ok`，发布后
+  API/Worker/Runner 的 Fatal、Critical、Unhandled、Exception 和失败日志匹配均为 0。服务器根分区
+  仍有约 13 GB 可用空间，远端本次精确传输归档已删除，没有执行全局 Docker prune。
+
 ## 2026-08-17 alpha.43 CTF 3D 大屏总览与实时聚焦
 
 - 本阶段在协作者 3D 大屏实现上完成定向修正。`e04bf87e` 扩大巡航范围并调整题目标签，
