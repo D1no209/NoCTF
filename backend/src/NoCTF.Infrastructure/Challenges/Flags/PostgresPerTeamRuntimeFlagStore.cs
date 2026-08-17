@@ -134,8 +134,20 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
             scope.ConfigurationJson,
             scope.RulesJson,
             scope.DefinitionJson);
-        if (!configuration.UsesContinuousRoundScoring || configuration.FlagInjection is null)
-            throw new InvalidOperationException("AWDP generation flags require v2 flag injection.");
+        if (!configuration.UsesContinuousRoundScoring
+            || configuration.Runtime is not
+            {
+                Allocation: NoCTF.Application.Runtime.Provisioning.RuntimeAllocation.PerTeam,
+                FlagSource: NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam,
+                Definition: NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
+                {
+                    FlagEnvironmentVariableName.Length: > 0
+                }
+            })
+        {
+            throw new InvalidOperationException(
+                "AWDP generation flags require a PerTeam Container runtime flag environment variable.");
+        }
         var flag = PerTeamFlagGenerator.Generate(
             configuration.FlagTemplate,
             new(

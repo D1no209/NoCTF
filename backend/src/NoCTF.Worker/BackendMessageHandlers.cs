@@ -889,17 +889,26 @@ public static class BackendMessageHandlers
         }
 
         string? perTeamFlag = null;
-        if (target.Competition.Mode == GameMode.Ctf
+        if (target.Competition.Mode is GameMode.Ctf or GameMode.Awdp
+            && target.Instance.Purpose != RuntimePurpose.AwdpTarget
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {
             if (target.Instance.TeamId is Guid teamId)
             {
+                var specificationKind = target.Competition.Mode == GameMode.Awdp
+                    ? SpecificationKind.RuntimeGeneration
+                    : SpecificationKind.RuntimeDefinition;
+                var specificationId = target.Competition.Mode == GameMode.Awdp
+                    ? target.Instance.Id
+                    : target.Challenge.Id;
                 perTeamFlag = await db.ChallengeFlags.AsNoTracking()
                     .Where(flag =>
                         flag.CompetitionChallengeId == target.Challenge.Id
                         && flag.TeamId == teamId
-                        && flag.SpecificationKind == SpecificationKind.RuntimeDefinition
-                        && flag.SpecificationId == target.Challenge.Id)
+                        && flag.SpecificationKind == specificationKind
+                        && flag.SpecificationId == specificationId
+                        && flag.DeletedAt == null
+                        && flag.ValidUntil == null)
                     .Select(flag => flag.Flag)
                     .SingleOrDefaultAsync(cancellationToken);
             }

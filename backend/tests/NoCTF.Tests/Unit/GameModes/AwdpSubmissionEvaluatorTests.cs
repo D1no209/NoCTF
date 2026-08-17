@@ -361,6 +361,67 @@ public sealed class AwdpGameplayFactEvaluatorTests
     }
 
     [Test]
+    public async Task Continuous_projection_honors_milestones_and_break_gated_fix_rejudges()
+    {
+        var startedAt = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var breakId = Guid.CreateVersion7(startedAt.AddSeconds(20));
+        var fixId = Guid.CreateVersion7(startedAt.AddSeconds(30));
+        var configuration = JsonSerializer.Serialize(
+            new AwdpConfiguration(
+                AwdpConfiguration.CurrentSchemaVersion,
+                60,
+                new(AchievementSettlement.PerRound, 1),
+                new(AchievementSettlement.PerRound, 1)),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var challengeConfiguration = JsonSerializer.Serialize(
+            new AwdpChallengeConfiguration(
+                AwdpChallengeConfiguration.CurrentSchemaVersion,
+                new(AchievementSettlement.Milestone, 100),
+                new(AchievementSettlement.PerRound, 25),
+                RequireBreakBeforeFix: true,
+                MaxBreakSubmissions: null,
+                MaxFixSubmissions: null),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        LeaderboardProjectionInput Input(GameplayFactResult breakResult) => new(
+            competitionId,
+            GameMode.Awdp,
+            [new LeaderboardTeamFact(teamId, "Team", false, false, startedAt)],
+            [
+                new(breakId, teamId, challengeId, GameplayFactKind.BreakAttempt,
+                    startedAt.AddSeconds(20), GameplayFactState.Completed, breakResult, null),
+                new(fixId, teamId, challengeId, GameplayFactKind.FixAttempt,
+                    startedAt.AddSeconds(30), GameplayFactState.Completed,
+                    GameplayFactResult.Correct, null)
+            ],
+            [new LeaderboardChallengeFact(
+                challengeId,
+                "Pwn",
+                "Challenge",
+                false,
+                challengeConfiguration)],
+            configuration,
+            startedAt,
+            ProjectedAt: startedAt.AddSeconds(130));
+
+        var beforeCorrection = new AwdpLeaderboardProjector().Project(
+            Input(GameplayFactResult.Correct));
+        var afterCorrection = new AwdpLeaderboardProjector().Project(
+            Input(GameplayFactResult.Wrong));
+        var restored = new AwdpLeaderboardProjector().Project(
+            Input(GameplayFactResult.Correct));
+
+        await Assert.That(beforeCorrection.Entries.Single().Score).IsEqualTo(175L);
+        await Assert.That(beforeCorrection.Entries.Single().SolveCount).IsEqualTo(2);
+        await Assert.That(afterCorrection.Entries.Single().Score).IsEqualTo(0L);
+        await Assert.That(afterCorrection.Entries.Single().SolveCount).IsEqualTo(0);
+        await Assert.That(restored.Entries.Single().Score).IsEqualTo(175L);
+    }
+
+    [Test]
     public async Task Accepted_fix_after_prior_correct_fix_still_requires_runner()
     {
         var submission = new GameplayFact
