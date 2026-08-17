@@ -7,6 +7,7 @@ import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
 const route = useRoute()
 const competitionId = computed(() => route.params.id as string)
 const isControlScreen = computed(() => route.path === `/competitions/${competitionId.value}/live`)
+const isChallengeIndex = computed(() => route.path === `/competitions/${competitionId.value}/challenges`)
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 const loading = ref(true)
@@ -76,7 +77,10 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
   <NuxtPage v-if="isControlScreen" />
 
   <AppWorkspaceNav v-else-if="competition" :groups="navGroups" :title="competition.title">
-    <div class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
+    <div
+      class="mx-auto flex w-full flex-col gap-6 px-4 py-8 md:px-6"
+      :class="isChallengeIndex ? 'max-w-6xl' : 'max-w-5xl'"
+    >
       <div class="flex flex-col gap-2">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
@@ -100,7 +104,11 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
     </div>
   </AppWorkspaceNav>
 
-  <div v-else class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+  <div
+    v-else
+    class="mx-auto flex w-full flex-col gap-6 px-4 py-8"
+    :class="isChallengeIndex ? 'max-w-6xl' : 'max-w-5xl'"
+  >
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>

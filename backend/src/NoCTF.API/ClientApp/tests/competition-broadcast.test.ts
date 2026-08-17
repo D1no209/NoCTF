@@ -72,6 +72,8 @@ describe('competition broadcast projection', () => {
 
     expect(challengePage).toContain('<CompetitionBroadcastPanel :competition-id="competitionId" />')
     expect(challengePage).toContain('xl:grid-cols-[minmax(0,1fr)_18rem]')
+    expect(shell).toContain('isChallengeIndex')
+    expect(shell).toContain("isChallengeIndex ? 'max-w-6xl' : 'max-w-5xl'")
     expect(shell).not.toContain("label: '公告/通知'")
     expect(panel).toContain('kinds: competitionBroadcastKinds')
     expect(panel).toContain('competitionEventChanged: () => void load()')
