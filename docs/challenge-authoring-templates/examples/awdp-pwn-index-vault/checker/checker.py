@@ -50,7 +50,7 @@ def evaluate(host: str, ready_timeout: int) -> str:
 
     if exploit == "ERR range":
         return "Fixed"
-    if exploit.startswith("VALUE:flag{") and exploit.endswith("}"):
+    if exploit.startswith("VALUE:") and len(exploit) > len("VALUE:"):
         return "StillVulnerable"
     return "RuleViolation"
 

@@ -2,7 +2,8 @@
 
 ## 模式边界
 
-AWDP 由两条彼此独立、可以同时生效的轨道组成：
+AWDP 由攻击与防御两条独立事实流组成；是否允许未完成 Break 就提交 Fix，
+由当前比赛题目的 `RequireBreakBeforeFix` 决定：
 
 - 攻击轨 `BreakAttempt`：队伍启动自己的长期攻击 Runtime，利用漏洞取得该 Runtime generation 的动态 Flag；首次有效 Correct 从所属逻辑轮开始持续累计攻击分。
 - 防御轨 `FixAttempt`：队伍上传不可变 `tar.gz` Patch，平台在全新的临时 Fix Target 中应用 Patch，并只运行一次 Checker；首次有效 Correct 从所属逻辑轮开始持续累计防御分。
@@ -23,41 +24,40 @@ EvaluationDispatchMode: Automatic | ManualBatch
 FlagTemplate: PerTeamFlagTemplate
 ```
 
-`CompetitionChallenge.RulesJson` 可以逐项覆盖 Break/Fix 分值、罚分、次数、派发方式和 `FlagTemplate`。覆盖值 `0` 是显式零，只有 `null` 表示继承。不同比赛可以为同一题目使用不同 Flag 前缀与正文模板。
+`CompetitionChallenge.RulesJson` 可以逐项覆盖 Break/Fix 结算方式、分值、罚分、次数、
+派发方式、`RequireBreakBeforeFix` 和 `FlagTemplate`。覆盖值 `0` 是显式零，只有
+`null` 表示继承。不同比赛可以为同一题目使用不同 Flag 前缀与正文模板。
 
 题库 `Challenge.DefinitionJson` 只保存可复用的技术定义：
 
 ```text
-Runtime                        // 漏洞服务，Container
-FlagInjection                  // EnvironmentVariable 或 File
+Runtime                        // 玩家攻击服务，Container、PerTeam
+Runtime.Definition.FlagEnvironmentVariableName
 PatchEntrypoint / PatchCommand / PatchTimeoutSeconds
 Checker / ReadyTimeoutSeconds
 MaximumPatchUploadBytes
 ```
 
-题目定义不得保存 CompetitionId、TeamId、具体 Flag 或比赛专属 Flag 前缀。AWDP v2 的 Runtime `FlagSource` 必须保持 `Static`；这是防止把 AWD 的 `AwdRotation` 误用于 AWDP，实际动态 Flag 由 AWDP generation 注入流程管理。
+题目定义不得保存 CompetitionId、TeamId、具体 Flag 或比赛专属 Flag 前缀。AWDP Runtime
+固定使用 `Allocation=PerTeam`、`FlagSource=PerTeam`，并通过 Container 的
+`FlagEnvironmentVariableName`（例如 `FLAG`）声明注入位置。它不使用 AWD 的
+`AwdRotation`，也不另设一套 AWDP 专属 Flag 注入对象。
 
-`FlagInjection` 二选一：
-
-```json
-{ "kind": "EnvironmentVariable", "environmentVariableName": "FLAG" }
-```
-
-```json
-{ "kind": "File", "filePath": "/run/noctf/flag" }
-```
-
-未知 schema、缺失 Runtime/Checker/FlagInjection、公开端点无有效 URL、非法注入名或路径、以及与模式不兼容的 Runtime 均在保存或 Start Gate 阶段拒绝。
+未知 schema、缺失 Runtime/Checker、公开端点无有效 OwnerOnly URL、非法环境变量名，
+以及与模式不兼容的 Runtime 均在保存或 Start Gate 阶段拒绝。
 
 ## schema v1 历史兼容
 
-`schemaVersion: 1` 仅用于读取既有比赛，不自动迁移，也不改写历史 GameplayFact、CompetitionEvent 或排行榜事实。v1 保留原 Milestone/PerRound 单次成就与 `RequireBreakBeforeFix` 解释；v2 固定 Break/Fix 独立，`RequireBreakBeforeFix` 不再影响新比赛。
+`schemaVersion: 1` 仅用于读取既有比赛，不自动迁移，也不改写历史 GameplayFact、
+CompetitionEvent 或排行榜事实。当前 schema 的 `Milestone | PerRound` 与
+`RequireBreakBeforeFix` 均是有效产品配置；前者控制计分投影，后者控制 Fix 接入资格。
 
 平台管理员可调用只读历史影响预览，比较 v1 当前分数与按 v2 持续计分规则推导的预期分数。预览只读取 PostgreSQL 一致快照，不写事实、不启用 v2、不更新排行榜；是否迁移指定历史比赛必须另行审批。
 
 ## 攻击 Runtime
 
-玩家在题目页创建攻击实例。平台使用 `RuntimePurpose.AwdpAttack` 创建队伍绑定、可公开访问的长期 Runtime：
+玩家在题目页创建攻击实例。平台复用标准 `RuntimePurpose.Player` 创建队伍绑定、
+对本队开放的长期 Runtime：
 
 - 绑定 CompetitionId、CompetitionChallengeId、TeamId 和 Generation；
 - 同队同题并发 Start 只得到一个活动实例，重复请求返回稳定当前实例；
@@ -68,10 +68,9 @@ MaximumPatchUploadBytes
 
 Runtime 进入创建流程时，平台在 PostgreSQL 临界区为 `(CompetitionChallengeId, TeamId, RuntimeInstanceId)` 幂等创建一条 `SpecificationKind.RuntimeGeneration` 的精确 Flag。相同 generation 的 Wolverine 重投复用同一条 Flag，不生成第二条有效 Flag。
 
-Runner 在 Provider 创建前读取当前 generation 的 Flag 和最新有效题目配置：
+Worker 在派发 Provider 创建请求前读取当前 generation 的 Flag 和最新有效题目配置：
 
-- 环境变量模式将 Flag 合并进指定变量；
-- 文件模式在容器创建后通过标准输入写入指定绝对路径，Flag 不拼接进 shell 命令；
+- 将 Flag 合并进题目声明的环境变量，并覆盖镜像中的同名默认值；
 - 只有 Provider Running 写回成功后才设置 `ValidStart`，防止未完成注入的 Flag 被判为有效；
 - Stop、Reset、失败或过期会设置 `ValidUntil`，旧 generation 立即失效。
 
@@ -91,7 +90,8 @@ AWDP Break 不写 `GameplayFactReferenceKind.AwdRound`，也不创建 AWD 服务
 
 ## Fix 与一次性验证
 
-Fix 无需先完成 Break。标准流程是：
+若 `RequireBreakBeforeFix=false`，Fix 可独立提交；开启后，后端必须在创建 FixAttempt
+前确认当前仍存在有效 Correct Break。标准流程是：
 
 1. 上传不可变 `tar.gz` PatchUpload；
 2. 创建独立 `FixAttempt`；
@@ -142,7 +142,8 @@ round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 - Break 在轮 N 首次有效 Correct：从 N 到当前逻辑轮，每轮增加 `Break.Points`；
 - Fix 在轮 M 首次有效 Correct：从 M 到当前逻辑轮，每轮增加 `Fix.Points`；
 - 当前进行中的轮次立即计入；
-- 两轨独立且可同时激活，分数相加；
+- 两轨分数可同时激活并相加；启用 `RequireBreakBeforeFix` 后，Break 被重判为非
+  Correct 时，依赖它的 Fix 暂停贡献，恢复 Correct 后再参与投影；
 - 每个 Team/CompetitionChallenge/Kind 只选择最早有效 Correct，不建立重叠区间；
 - Correct 被重判为非 Correct 时改选下一条有效 Correct；Wrong 被重判为 Correct 时按原 OccurredAt 重新计算起点；
 - Pause 不增加 EffectiveRunningTime，因此不推进收益；Resume 从原逻辑时间继续；Finish 使用结束时点冻结；
