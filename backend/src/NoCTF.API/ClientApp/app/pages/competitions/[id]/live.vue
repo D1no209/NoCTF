@@ -65,6 +65,7 @@ const totalSolveCount = computed(() => challenges.value.reduce((sum, challenge) 
 const dataAsOf = computed(() => leaderboard.value?.dataAsOf ?? leaderboard.value?.generatedAt)
 const marqueeEnabled = computed(() => rankedEntries.value.length > 7)
 const marqueeDuration = computed(() => Math.max(14, rankedEntries.value.length * 2.2))
+const bloodToneOrder: Record<LiveCityBlood['tone'], number> = { first: 0, second: 1, third: 2 }
 
 const celebrationParticles = Array.from({ length: 30 }, (_, index) => ({
   id: index,
@@ -136,6 +137,7 @@ const bloodsByChallenge = computed(() => {
       map.set(key, list)
     }
   }
+  for (const list of map.values()) list.sort((left, right) => bloodToneOrder[left.tone] - bloodToneOrder[right.tone])
   return map
 })
 
@@ -153,26 +155,48 @@ watch(cityStates, (states) => {
   scene?.setChallenges(states)
 }, { deep: true })
 
-function playNextCelebration(): void {
-  if (featuredSolve.value || !celebrationQueue.value.length) return
-  featuredSolve.value = celebrationQueue.value.shift() ?? null
-  if (!featuredSolve.value) return
-  const id = challengeKey(featuredSolve.value.competitionChallengeId)
-  scene?.setLabelFocus(id)
-  scene?.focus(id)
+function scheduleCelebrationEnd(): void {
+  if (celebrationTimer) clearTimeout(celebrationTimer)
   celebrationTimer = setTimeout(() => {
+    celebrationTimer = undefined
     featuredSolve.value = null
     scene?.setLabelFocus(null)
     scene?.endFocus()
-    celebrationTimer = setTimeout(playNextCelebration, 450)
+    celebrationTimer = setTimeout(() => {
+      celebrationTimer = undefined
+      playNextCelebration()
+    }, 450)
   }, 5_200)
+}
+
+function focusSolve(solve: ControlScreenSolve): void {
+  featuredSolve.value = solve
+  const id = challengeKey(solve.competitionChallengeId)
+  scene?.setLabelFocus(id)
+  scene?.focus(id)
+  scheduleCelebrationEnd()
+}
+
+function playNextCelebration(): void {
+  if (featuredSolve.value || !celebrationQueue.value.length) return
+  const next = celebrationQueue.value.shift()
+  if (next) focusSolve(next)
 }
 
 function reconcileCelebrations(currentSolves: readonly ControlScreenSolve[]): void {
   const reconciled = reconcileControlScreenSolves(seenSolveKeys, currentSolves)
   seenSolveKeys = reconciled.seenKeys
   if (!reconciled.newSolves.length) return
-  celebrationQueue.value.push(...reconciled.newSolves)
+
+  const activeChallengeId = challengeKey(featuredSolve.value?.competitionChallengeId)
+  const sameChallengeUpdates = activeChallengeId
+    ? reconciled.newSolves.filter(solve => challengeKey(solve.competitionChallengeId) === activeChallengeId)
+    : []
+  if (sameChallengeUpdates.length) focusSolve(sameChallengeUpdates.at(-1)!)
+
+  celebrationQueue.value.push(...reconciled.newSolves.filter(
+    solve => !activeChallengeId || challengeKey(solve.competitionChallengeId) !== activeChallengeId,
+  ))
   playNextCelebration()
 }
 
@@ -581,11 +605,11 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   gap: .18rem;
-  min-width: 7rem;
-  max-width: 12rem;
-  padding: .34rem .6rem .4rem;
+  min-width: 8.5rem;
+  max-width: 14rem;
+  padding: .42rem .7rem .48rem;
   border: 1px solid rgba(62, 166, 255, .5);
-  background: linear-gradient(180deg, rgba(8, 6, 20, .88), rgba(8, 6, 20, .68));
+  background: linear-gradient(180deg, rgba(8, 6, 20, .94), rgba(8, 6, 20, .84));
   box-shadow: 0 0 16px rgba(62, 166, 255, .18), inset 0 0 12px rgba(62, 166, 255, .07);
   clip-path: polygon(0 0, calc(100% - .55rem) 0, 100% .55rem, 100% 100%, .55rem 100%, 0 calc(100% - .55rem));
   text-align: center;
@@ -602,15 +626,15 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: .68rem;
+  font-size: .74rem;
   font-weight: 700;
   letter-spacing: .04em;
   color: #eaf2ff;
 }
 .live-arena :deep(.live-label-meta) { display: flex; align-items: baseline; gap: .5rem; }
-.live-arena :deep(.live-label-pts) { font-family: var(--font-mono); font-size: .72rem; font-weight: 700; color: var(--live-blue); text-shadow: 0 0 10px rgba(62, 166, 255, .6); }
+.live-arena :deep(.live-label-pts) { font-family: var(--font-mono); font-size: .78rem; font-weight: 700; color: var(--live-blue); text-shadow: 0 0 10px rgba(62, 166, 255, .6); }
 .live-arena :deep(.live-label[data-state="solved"] .live-label-pts) { color: var(--live-red); text-shadow: 0 0 10px rgba(255, 61, 94, .55); }
-.live-arena :deep(.live-label-solves) { font-family: var(--font-mono); font-size: .55rem; color: #7c8aa5; }
+.live-arena :deep(.live-label-solves) { font-family: var(--font-mono); font-size: .62rem; color: #a9b5ca; }
 .live-arena :deep(.live-label-bloods) { display: flex; flex-direction: column; gap: .12rem; margin-top: .08rem; }
 .live-arena :deep(.live-label-blood) {
   max-width: 11rem;
@@ -620,7 +644,7 @@ onUnmounted(() => {
   border: 1px solid currentColor;
   border-radius: 999px;
   padding: .04rem .42rem;
-  font-size: .52rem;
+  font-size: .56rem;
   font-weight: 700;
 }
 .live-arena :deep(.live-label-blood-first) { color: #ffd166; text-shadow: 0 0 8px rgba(255, 209, 102, .6); }
