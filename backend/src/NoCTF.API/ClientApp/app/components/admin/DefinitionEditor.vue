@@ -33,7 +33,6 @@ const { model, parseFailed } = useDefinitionModel(
     </template>
 
     <template v-if="mode === 'Awdp'">
-      <DefinitionAwdpFlagInjectionSection :model="model" :disabled="disabled" />
       <DefinitionPatchSection :model="model" :disabled="disabled" />
       <DefinitionCheckerSection :model="model" :mode="mode" :disabled="disabled" />
     </template>
