@@ -15,12 +15,6 @@ public static class AwdpConfigurationValidator
             errors.Add("Fix achievement configuration is required.");
         if (configuration.Break?.Points < 0 || configuration.Fix?.Points < 0)
             errors.Add("Achievement points cannot be negative.");
-        if (configuration.UsesContinuousRoundScoring
-            && (configuration.Break?.Settlement != AchievementSettlement.PerRound
-                || configuration.Fix?.Settlement != AchievementSettlement.PerRound))
-            errors.Add("AWDP v2 Break and Fix points are continuous per-round values.");
-        if (configuration.UsesContinuousRoundScoring && configuration.RequireBreakBeforeFix)
-            errors.Add("AWDP v2 Fix is independent from Break.");
         if (configuration.Break?.Points > ScoreValueLimits.MaximumConfiguredValue
             || configuration.Fix?.Points > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
@@ -47,13 +41,6 @@ public static class AwdpConfigurationValidator
         var errors = new List<string>();
         if (configuration.Break?.Points < 0 || configuration.Fix?.Points < 0)
             errors.Add("Achievement points cannot be negative.");
-        if (configuration.SchemaVersion == AwdpChallengeConfiguration.CurrentSchemaVersion
-            && (configuration.Break?.Settlement is not null and not AchievementSettlement.PerRound
-                || configuration.Fix?.Settlement is not null and not AchievementSettlement.PerRound))
-            errors.Add("AWDP v2 Break and Fix points are continuous per-round values.");
-        if (configuration.SchemaVersion == AwdpChallengeConfiguration.CurrentSchemaVersion
-            && configuration.RequireBreakBeforeFix == true)
-            errors.Add("AWDP v2 Fix is independent from Break.");
         if (configuration.Break?.Points > ScoreValueLimits.MaximumConfiguredValue
             || configuration.Fix?.Points > ScoreValueLimits.MaximumConfiguredValue)
             errors.Add($"Achievement points cannot exceed {ScoreValueLimits.MaximumConfiguredValue}.");
@@ -91,7 +78,8 @@ public static class AwdpConfigurationValidator
             configuration.Runtime,
             configuration.SchemaVersion == AwdpChallengeConfiguration.CurrentSchemaVersion,
             errors);
-        ValidateFlagInjection(configuration.FlagInjection, errors);
+        if (configuration.SchemaVersion != AwdpChallengeConfiguration.CurrentSchemaVersion)
+            ValidateFlagInjection(configuration.FlagInjection, errors);
         ValidateChecker(configuration.Checker, errors);
         return errors;
     }
@@ -137,7 +125,8 @@ public static class AwdpConfigurationValidator
             configuration.Checker,
             "Checker"));
         ValidateRuntime(configuration.Runtime, configuration.UsesContinuousRoundScoring, errors);
-        ValidateFlagInjection(configuration.FlagInjection, errors);
+        if (!configuration.UsesContinuousRoundScoring)
+            ValidateFlagInjection(configuration.FlagInjection, errors);
         ValidateChecker(configuration.Checker, errors);
         return errors;
     }
@@ -150,10 +139,9 @@ public static class AwdpConfigurationValidator
             errors.Add("Runtime is required before an AWDP competition can start.");
         if (configuration.Checker is null)
             errors.Add("Checker is required before an AWDP competition can start.");
-        if (configuration.UsesContinuousRoundScoring && configuration.FlagInjection is null)
-            errors.Add("FlagInjection is required before an AWDP v2 competition can start.");
         ValidateRuntime(configuration.Runtime, configuration.UsesContinuousRoundScoring, errors);
-        ValidateFlagInjection(configuration.FlagInjection, errors);
+        if (!configuration.UsesContinuousRoundScoring)
+            ValidateFlagInjection(configuration.FlagInjection, errors);
         ValidateChecker(configuration.Checker, errors);
         return errors;
     }
@@ -176,15 +164,15 @@ public static class AwdpConfigurationValidator
         bool allowsAttackExposure,
         List<string> errors)
     {
-        if (allowsAttackExposure && runtime is { FlagSource: not NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.Static })
-        {
-            errors.Add(
-                "AWDP v2 Runtime flags use the dedicated generation injection configuration, not a shared Runtime FlagSource.");
-        }
+        if (allowsAttackExposure
+            && runtime is { Allocation: not NoCTF.Application.Runtime.Provisioning.RuntimeAllocation.PerTeam })
+            errors.Add("AWDP player Runtime allocation must be PerTeam.");
+        if (allowsAttackExposure
+            && runtime is { FlagSource: not NoCTF.Application.Runtime.Provisioning.RuntimeFlagSource.PerTeam })
+            errors.Add("AWDP player Runtime FlagSource must be PerTeam.");
         if (runtime is not null
             && runtime.Definition is not NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition)
-            errors.Add(
-                "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
+            errors.Add("AWDP requires a Docker or Kubernetes Container runtime.");
         if (!allowsAttackExposure
             && (runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
             {
@@ -200,6 +188,36 @@ public static class AwdpConfigurationValidator
         {
             errors.Add("AWDP target Runtime must declare exactly one InternalPort.");
         }
+        if (allowsAttackExposure
+            && runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
+            {
+                PortMappings: not { Count: 1 }
+            })
+            errors.Add("AWDP player Runtime must publish exactly one attack port.");
+        if (allowsAttackExposure
+            && runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
+            {
+                PortMappings: { Count: 1 } portMappings,
+                InternalPorts: { Count: 1 } internalPorts
+            }
+            && portMappings.Keys.Single() != internalPorts[0])
+            errors.Add("AWDP player Runtime must publish its single checker target port.");
+        if (allowsAttackExposure
+            && runtime is not null
+            && runtime.UrlBindings is not { Count: > 0 })
+            errors.Add("AWDP player Runtime must publish an OwnerOnly access URL.");
+        if (allowsAttackExposure
+            && runtime?.UrlBindings?.Any(binding =>
+                binding.Exposure != NoCTF.Application.Runtime.Provisioning.RuntimeExposure.OwnerOnly) == true)
+            errors.Add("AWDP player Runtime URL bindings must use OwnerOnly exposure.");
+        if (allowsAttackExposure
+            && runtime?.Definition is NoCTF.Application.Runtime.Provisioning.ContainerRuntimeDefinition
+            {
+                InternalPorts: { Count: 1 } internalPortsForUrl
+            }
+            && runtime.UrlBindings?.Any(binding =>
+                binding.ContainerPort != internalPortsForUrl[0]) == true)
+            errors.Add("AWDP player Runtime URL bindings must target its checker port.");
     }
 
     private static void ValidateFlagInjection(

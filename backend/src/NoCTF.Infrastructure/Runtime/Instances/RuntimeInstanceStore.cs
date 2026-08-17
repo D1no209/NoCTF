@@ -53,11 +53,15 @@ public sealed class RuntimeInstanceStore(
             || scope.Mode == GameMode.Koh)
             return null;
         var purpose = PurposeFor(scope);
+        var includesLegacyAwdpPurpose = scope.Mode == GameMode.Awdp
+            && purpose == RuntimePurpose.Player;
         return await db.RuntimeInstances.AsNoTracking()
             .Where(instance =>
                 instance.CompetitionId == competitionId &&
                 instance.CompetitionChallengeId == competitionChallengeId &&
-                instance.Purpose == purpose &&
+                (instance.Purpose == purpose
+                    || includesLegacyAwdpPurpose
+                    && instance.Purpose == RuntimePurpose.AwdpAttack) &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .Select(instance => new RuntimeInstanceView(
@@ -86,6 +90,8 @@ public sealed class RuntimeInstanceStore(
         if (scope.Mode == GameMode.Awd && command.Action is RuntimeAction.Start or RuntimeAction.Stop or RuntimeAction.Extend)
             return new(null, RuntimeMutationFailure.Unsupported);
         var purpose = PurposeFor(scope);
+        var includesLegacyAwdpPurpose = scope.Mode == GameMode.Awdp
+            && purpose == RuntimePurpose.Player;
 
         await using var quotaLease = await runtimeQuota.AcquireLockAsync(
             db,
@@ -95,7 +101,9 @@ public sealed class RuntimeInstanceStore(
         var current = await db.RuntimeInstances
             .Where(instance =>
                 instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                instance.Purpose == purpose &&
+                (instance.Purpose == purpose
+                    || includesLegacyAwdpPurpose
+                    && instance.Purpose == RuntimePurpose.AwdpAttack) &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .FirstOrDefaultAsync(ct);
@@ -116,7 +124,9 @@ public sealed class RuntimeInstanceStore(
                 if (await db.RuntimeInstances.AnyAsync(instance =>
                         instance.CompetitionId == command.CompetitionId &&
                         instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                        instance.Purpose == purpose &&
+                        (instance.Purpose == purpose
+                            || includesLegacyAwdpPurpose
+                            && instance.Purpose == RuntimePurpose.AwdpAttack) &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Stopping,
                         ct))
@@ -133,7 +143,9 @@ public sealed class RuntimeInstanceStore(
                     .Where(instance =>
                         instance.CompetitionId == command.CompetitionId &&
                         instance.CompetitionChallengeId == command.CompetitionChallengeId &&
-                        instance.Purpose == purpose &&
+                        (instance.Purpose == purpose
+                            || includesLegacyAwdpPurpose
+                            && instance.Purpose == RuntimePurpose.AwdpAttack) &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Failed &&
                         instance.RunnerId != null &&
@@ -192,7 +204,7 @@ public sealed class RuntimeInstanceStore(
                 current.State = RuntimeState.Stopping;
                 current.RunnerAssignmentReleaseToken = null;
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
-                if (current.Purpose == RuntimePurpose.AwdpAttack)
+                if (scope.Mode == GameMode.Awdp)
                     await runtimeFlags.InvalidateGenerationAsync(current.Id, command.Now, ct);
                 await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
                 try
@@ -214,7 +226,7 @@ public sealed class RuntimeInstanceStore(
                     return new(Map(current));
                 current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 entity = current;
-                if (current.Purpose == RuntimePurpose.AwdpAttack)
+                if (scope.Mode == GameMode.Awdp)
                     await runtimeFlags.InvalidateGenerationAsync(current.Id, command.Now, ct);
                 if (current.State == RuntimeState.Queued)
                 {
@@ -397,9 +409,7 @@ public sealed class RuntimeInstanceStore(
     private static RuntimePurpose PurposeFor(RuntimeScope scope) =>
         scope.Status == CompetitionStatus.Finished
             ? RuntimePurpose.Practice
-            : scope.Mode == GameMode.Awdp
-                ? RuntimePurpose.AwdpAttack
-                : RuntimePurpose.Player;
+            : RuntimePurpose.Player;
 
     private static bool IsAwdpV2(RuntimeScope scope) =>
         AwdpConfigurationParser.ParseCompetition(scope.CompetitionConfigurationJson)

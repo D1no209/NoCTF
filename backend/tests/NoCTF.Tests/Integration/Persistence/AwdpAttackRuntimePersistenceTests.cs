@@ -23,7 +23,7 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
-[Category("AwdpAttackRuntime")]
+[Category("AwdpPlayerRuntime")]
 public sealed class AwdpAttackRuntimePersistenceTests
 {
     [Test]
@@ -64,7 +64,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
             await using (var verify = new NoCtfDbContext(options))
             {
                 var runtimes = await verify.RuntimeInstances.AsNoTracking()
-                    .Where(runtime => runtime.Purpose == RuntimePurpose.AwdpAttack)
+                    .Where(runtime => runtime.Purpose == RuntimePurpose.Player)
                     .OrderBy(runtime => runtime.TeamId)
                     .ToArrayAsync(cancellationToken);
                 await Assert.That(runtimes.Length).IsEqualTo(2);
@@ -104,6 +104,23 @@ public sealed class AwdpAttackRuntimePersistenceTests
             await Assert.That(secondGeneration.ValidStart).IsNull();
             await Assert.That(secondGeneration.ValidUntil).IsNull();
             await Assert.That(secondGeneration.Flag).IsNotEqualTo(firstGeneration.Flag);
+
+            await AssertEnvironmentInjectionAsync(
+                options,
+                reset.Runtime!,
+                secondGeneration.Flag,
+                cancellationToken);
+            await MarkRunningAsync(options, reset.Runtime!, cancellationToken);
+            var stopped = await StopAsync(
+                options,
+                fixture,
+                fixture.UserIds[0],
+                cancellationToken);
+            await Assert.That(stopped.Failure).IsNull();
+            await using var stoppedVerification = new NoCtfDbContext(options);
+            var invalidated = await stoppedVerification.ChallengeFlags.AsNoTracking()
+                .SingleAsync(flag => flag.Id == secondGeneration.Id, cancellationToken);
+            await Assert.That(invalidated.ValidUntil).IsNotNull();
         });
     }
 
@@ -139,6 +156,22 @@ public sealed class AwdpAttackRuntimePersistenceTests
             fixture.Now.AddMinutes(1)), cancellationToken);
     }
 
+    private static async Task<RuntimeMutationResult> StopAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        return await CreateStore(db).MutatePlayerRuntimeAsync(new(
+            fixture.CompetitionId,
+            fixture.CompetitionChallengeId,
+            userId,
+            RuntimeAction.Stop,
+            null,
+            fixture.Now.AddMinutes(2)), cancellationToken);
+    }
+
     private static RuntimeInstanceStore CreateStore(NoCtfDbContext db) => new(
         db,
         new ChallengeRuntimeTemplateCatalog(),
@@ -152,82 +185,37 @@ public sealed class AwdpAttackRuntimePersistenceTests
         string expectedFlag,
         CancellationToken cancellationToken)
     {
-        await using (var db = new NoCtfDbContext(options))
-        {
-            var entity = await db.RuntimeInstances.SingleAsync(
-                item => item.Id == runtime.Id,
-                cancellationToken);
-            entity.State = RuntimeState.Provisioning;
-            entity.ProcessingVersion = 1;
-            entity.RunnerId = "runner-1";
-            await db.SaveChangesAsync(cancellationToken);
-        }
+        await using var db = new NoCtfDbContext(options);
+        var entity = await db.RuntimeInstances.SingleAsync(
+            item => item.Id == runtime.Id,
+            cancellationToken);
+        var challengeDefinition = await db.CompetitionChallenges.AsNoTracking()
+            .Where(item => item.Id == runtime.CompetitionChallengeId)
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.ChallengeId,
+                challenge => challenge.Id,
+                (_, challenge) => challenge.DefinitionJson)
+            .SingleAsync(cancellationToken);
+        var template = new ChallengeRuntimeTemplateCatalog().Get(
+            GameMode.Awdp,
+            challengeDefinition)!;
+        var claim = (ClaimContainerRuntime)NoCTF.Worker.Runtime.RuntimeClaimFactory.Create(
+            entity,
+            GameMode.Awdp,
+            template,
+            challengeDefinition,
+            expectedFlag);
 
-        var services = new ServiceCollection();
-        services.AddScoped(_ => new NoCtfDbContext(options));
-        await using var provider = services.BuildServiceProvider();
-        var reader = new AwdpAttackProvisioningPlanReader(provider.GetRequiredService<IServiceScopeFactory>());
-        var definition = new ContainerRequest(
-            runtime.Id,
-            RuntimeProvider.Docker,
-            "awdp-target:latest",
-            [],
-            new Dictionary<string, string>(),
-            new Dictionary<string, string>(),
-            new Dictionary<int, int> { [8080] = 0 },
-            new RuntimeResourceLimits(64 * 1024 * 1024, 100_000_000, 64),
-            new ContainerSecurityPolicy(false, false, false, [], []),
-            null);
-        var plan = await reader.ReadAsync(new(
-            runtime.Id,
-            1,
-            runtime.Generation,
-            "awdp-tests",
-            "runner-1",
-            definition), cancellationToken);
-
-        await Assert.That(plan.State).IsEqualTo(AwdpAttackProvisioningPlanState.Ready);
-        await Assert.That(plan.Definition!.Environment["FLAG"]).IsEqualTo(expectedFlag);
-        await Assert.That(plan.FileInjection).IsNull();
-
-        await using (var db = new NoCtfDbContext(options))
-        {
-            var challengeId = await db.CompetitionChallenges.AsNoTracking()
-                .Where(item => item.Id == runtime.CompetitionChallengeId)
-                .Select(item => item.ChallengeId)
-                .SingleAsync(cancellationToken);
-            var challenge = await db.Challenges.SingleAsync(
-                item => item.Id == challengeId,
-                cancellationToken);
-            challenge.DefinitionJson = JsonSerializer.Serialize(new AwdpChallengeConfiguration(
-                AwdpChallengeConfiguration.CurrentSchemaVersion,
-                null,
-                null,
-                null,
-                null,
-                null,
-                Runtime: new(
-                    RuntimeAllocation.PerTeam,
-                    new ContainerRuntimeDefinition(
-                        "awdp-target:latest",
-                        PortMappings: new Dictionary<int, int> { [8080] = 0 }),
-                    new RuntimeResourceLimits(64 * 1024 * 1024, 100_000_000, 64),
-                    UrlBindings: [new("tcp://{HOST}:{PORT}", RuntimeExposure.Participants, 8080)]),
-                FlagInjection: new(AwdpFlagInjectionKind.File, FilePath: "/run/noctf/flag")),
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        var filePlan = await reader.ReadAsync(new(
-            runtime.Id,
-            1,
-            runtime.Generation,
-            "awdp-tests",
-            "runner-1",
-            definition), cancellationToken);
-        await Assert.That(filePlan.State).IsEqualTo(AwdpAttackProvisioningPlanState.Ready);
-        await Assert.That(filePlan.Definition!.Environment.ContainsKey("FLAG")).IsFalse();
-        await Assert.That(filePlan.FileInjection?.Path).IsEqualTo("/run/noctf/flag");
-        await Assert.That(filePlan.FileInjection?.Flag).IsEqualTo(expectedFlag);
+        await Assert.That(entity.Purpose).IsEqualTo(RuntimePurpose.Player);
+        await Assert.That(claim.Definition.Environment["FLAG"]).IsEqualTo(expectedFlag);
+        await Assert.That(claim.Definition.PortMappings[31337]).IsEqualTo(0);
+        await Assert.That(claim.Definition.UrlBindings!.Single().Exposure)
+            .IsEqualTo(RuntimeExposure.OwnerOnly);
+        entity.State = RuntimeState.Provisioning;
+        entity.ProcessingVersion = 1;
+        entity.RunnerId = "runner-1";
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task MarkRunningAsync(
@@ -320,12 +308,12 @@ public sealed class AwdpAttackRuntimePersistenceTests
                     RuntimeAllocation.PerTeam,
                     new ContainerRuntimeDefinition(
                         "awdp-target:latest",
-                        PortMappings: new Dictionary<int, int> { [8080] = 0 }),
+                        PortMappings: new Dictionary<int, int> { [31337] = 0 },
+                        FlagEnvironmentVariableName: "FLAG",
+                        InternalPorts: [31337]),
                     new RuntimeResourceLimits(64 * 1024 * 1024, 100_000_000, 64),
-                    UrlBindings: [new("tcp://{HOST}:{PORT}", RuntimeExposure.Participants, 8080)]),
-                FlagInjection: new(
-                    AwdpFlagInjectionKind.EnvironmentVariable,
-                    EnvironmentVariableName: "FLAG")), json),
+                    UrlBindings: [new("tcp://{HOST}:{PORT}", RuntimeExposure.OwnerOnly, 31337)],
+                    FlagSource: RuntimeFlagSource.PerTeam)), json),
             CreatedAt = now,
             UpdatedAt = now
         });

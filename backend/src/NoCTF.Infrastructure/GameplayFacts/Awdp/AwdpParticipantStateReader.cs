@@ -76,7 +76,8 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             .Where(runtime => runtime.CompetitionId == competitionId
                 && runtime.CompetitionChallengeId == competitionChallengeId
                 && runtime.TeamId == scope.TeamId
-                && runtime.Purpose == RuntimePurpose.AwdpAttack)
+                && (runtime.Purpose == RuntimePurpose.Player
+                    || runtime.Purpose == RuntimePurpose.AwdpAttack))
             .OrderByDescending(runtime => runtime.Generation)
             .Select(runtime => new RuntimeInstanceView(
                 runtime.Id,

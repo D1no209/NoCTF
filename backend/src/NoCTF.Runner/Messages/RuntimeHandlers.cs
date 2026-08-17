@@ -9,6 +9,7 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Competitions.Events;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 
 namespace NoCTF.Runner.Messages;
@@ -1215,7 +1216,7 @@ public static class RuntimeWriteBackHandler
         DateTimeOffset runningAt,
         CancellationToken cancellationToken)
     {
-        if (instance.Purpose != RuntimePurpose.AwdpAttack)
+        if (!await IsAwdpPlayerRuntimeAsync(db, instance, cancellationToken))
             return;
         var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
             candidate => candidate.SpecificationKind
@@ -1236,7 +1237,7 @@ public static class RuntimeWriteBackHandler
         DateTimeOffset stoppedAt,
         CancellationToken cancellationToken)
     {
-        if (instance.Purpose != RuntimePurpose.AwdpAttack)
+        if (!await IsAwdpPlayerRuntimeAsync(db, instance, cancellationToken))
             return;
         var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
             candidate => candidate.SpecificationKind
@@ -1247,6 +1248,17 @@ public static class RuntimeWriteBackHandler
         if (flag is not null && (flag.ValidUntil is null || flag.ValidUntil > stoppedAt))
             flag.ValidUntil = stoppedAt;
     }
+
+    private static Task<bool> IsAwdpPlayerRuntimeAsync(
+        NoCtfDbContext db,
+        RuntimeInstance instance,
+        CancellationToken cancellationToken) =>
+        instance.Purpose is RuntimePurpose.Player or RuntimePurpose.AwdpAttack
+            ? db.Competitions.AsNoTracking().AnyAsync(
+                competition => competition.Id == instance.CompetitionId
+                    && competition.Mode == GameMode.Awdp,
+                cancellationToken)
+            : Task.FromResult(false);
 
     private static bool IsLateProvisionSuccessAwaitingCleanup(
         RuntimeInstance instance,

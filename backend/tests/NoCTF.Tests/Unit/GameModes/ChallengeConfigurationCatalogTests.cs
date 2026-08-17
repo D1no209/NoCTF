@@ -156,17 +156,23 @@ public class ChallengeConfigurationCatalogTests
             var modeTemplate = template with
             {
                 Allocation = expectedAllocation,
-                FlagSource = mode == GameMode.Ctf
+                FlagSource = mode is GameMode.Ctf or GameMode.Awdp
                     ? RuntimeFlagSource.PerTeam
                     : template.FlagSource,
+                UrlBindings = mode == GameMode.Awdp
+                    ?
+                    [
+                        new RuntimeUrlBinding(
+                            "http://{HOST}:{PORT}",
+                            RuntimeExposure.OwnerOnly,
+                            ContainerPort: 8080)
+                    ]
+                    : template.UrlBindings,
                 Definition = ((ContainerRuntimeDefinition)template.Definition) with
                 {
-                    FlagEnvironmentVariableName = mode == GameMode.Ctf
+                    FlagEnvironmentVariableName = mode is GameMode.Ctf or GameMode.Awdp
                         ? "FLAG"
                         : ((ContainerRuntimeDefinition)template.Definition).FlagEnvironmentVariableName,
-                    PortMappings = mode == GameMode.Awdp
-                        ? new Dictionary<int, int>()
-                        : ((ContainerRuntimeDefinition)template.Definition).PortMappings,
                     InternalPorts = mode == GameMode.Awdp ? [8080] : null
                 }
             };
@@ -682,13 +688,14 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task Awdp_v2_attack_runtime_allows_public_ports_and_urls()
+    public async Task Awdp_v2_player_runtime_accepts_one_owner_only_attack_port()
     {
         var runtime = new ChallengeRuntimeTemplate(
-                        RuntimeAllocation.PerTeam,
+            RuntimeAllocation.PerTeam,
             new ContainerRuntimeDefinition(
                 "registry.example/target:v1",
                 PortMappings: new Dictionary<int, int> { [8080] = 0 },
+                FlagEnvironmentVariableName: "FLAG",
                 InternalPorts: [8080]),
             Limits: new(268_435_456, 500_000_000, 128),
             UrlBindings:
@@ -697,15 +704,15 @@ public class ChallengeConfigurationCatalogTests
                     "http://{HOST}:{PORT}",
                     RuntimeExposure.OwnerOnly,
                     ContainerPort: 8080)
-            ]);
+            ],
+            FlagSource: RuntimeFlagSource.PerTeam);
         var catalog = new GameModeChallengeConfigurationCatalog();
 
         var errors = catalog.Validate(
             GameMode.Awdp,
             WithRuntime(catalog.GetDefaultJson(GameMode.Awdp), runtime));
 
-        await Assert.That(errors)
-            .DoesNotContain("AWDP disposable targets cannot configure public ports or URLs.");
+        await Assert.That(errors).IsEmpty();
     }
 
     [Test]
@@ -733,12 +740,11 @@ public class ChallengeConfigurationCatalogTests
             WithRuntime(catalog.GetDefaultJson(GameMode.Awdp), runtime));
 
         await Assert.That(errors)
-            .Contains(
-                "AWDP v2 Runtime flags use the dedicated generation injection configuration, not a shared Runtime FlagSource.");
+            .Contains("AWDP player Runtime FlagSource must be PerTeam.");
     }
 
     [Test]
-    public async Task Awdp_v2_flag_injection_requires_one_valid_destination()
+    public async Task Awdp_v2_ignores_legacy_dedicated_flag_injection()
     {
         var root = JsonNode.Parse(
             new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awdp))!
@@ -754,7 +760,7 @@ public class ChallengeConfigurationCatalogTests
             root.ToJsonString());
 
         await Assert.That(errors)
-            .Contains("FlagInjection.EnvironmentVariableName is invalid.");
+            .DoesNotContain("FlagInjection.EnvironmentVariableName is invalid.");
     }
 
     [Test]

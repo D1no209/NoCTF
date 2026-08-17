@@ -162,12 +162,13 @@ public static class RuntimeClaimFactory
         ChallengeRuntimeTemplate template,
         string? perTeamFlag)
     {
-        if (mode != GameMode.Ctf || template.FlagSource != RuntimeFlagSource.PerTeam)
+        if (mode is not (GameMode.Ctf or GameMode.Awdp)
+            || template.FlagSource != RuntimeFlagSource.PerTeam)
             return null;
         return !string.IsNullOrEmpty(perTeamFlag)
             ? perTeamFlag
             : throw new InvalidOperationException(
-                "A CTF PerTeam runtime requires its fixed team flag.");
+                "A PerTeam runtime requires its fixed team flag.");
     }
 
     private static IReadOnlyDictionary<string, string> ContainerEnvironment(

@@ -661,7 +661,7 @@ internal static class AwdpLeaderboardProjection
             input.LifecycleAudits,
             input.CompetitionStartTime,
             competition.RoundDurationSeconds);
-        var activations = input.GameplayFacts
+        var correctFacts = input.GameplayFacts
             .Where(fact => fact.TeamId is Guid teamId
                 && teams.ContainsKey(teamId)
                 && fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
@@ -674,6 +674,25 @@ internal static class AwdpLeaderboardProjection
                         || competitiveTeams.Contains(fact.VictimTeamId.Value))))
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
+            .ToList();
+        var correctBreaks = correctFacts
+            .Where(fact => fact.Kind == GameplayFactKind.BreakAttempt)
+            .Select(fact => (
+                fact.TeamId!.Value,
+                fact.CompetitionChallengeId!.Value))
+            .ToHashSet();
+        var activations = correctFacts
+            .Where(fact =>
+            {
+                if (fact.Kind != GameplayFactKind.FixAttempt)
+                    return true;
+                var challengeId = fact.CompetitionChallengeId!.Value;
+                var configuration = Effective(
+                    competition,
+                    challenges.GetValueOrDefault(challengeId)?.ConfigurationJson);
+                return !configuration.RequireBreakBeforeFix
+                    || correctBreaks.Contains((fact.TeamId!.Value, challengeId));
+            })
             .GroupBy(fact => new
             {
                 TeamId = fact.TeamId!.Value,
@@ -692,13 +711,19 @@ internal static class AwdpLeaderboardProjection
                     input.LifecycleAudits,
                     input.CompetitionStartTime,
                     competition.RoundDurationSeconds);
-                var activeRounds = checked(Math.Max(0, currentRound - activationRound + 1));
-                var pointsPerRound = fact.Kind == GameplayFactKind.BreakAttempt
+                var achievement = fact.Kind == GameplayFactKind.BreakAttempt
                     ? configuration.Break.Points
                     : configuration.Fix.Points;
+                var settlement = fact.Kind == GameplayFactKind.BreakAttempt
+                    ? configuration.Break.Settlement
+                    : configuration.Fix.Settlement;
+                var points = settlement == AchievementSettlement.Milestone
+                    ? achievement
+                    : checked(achievement
+                        * Math.Max(0, currentRound - activationRound + 1));
                 return new ContinuousAward(
                     fact,
-                    checked(pointsPerRound * activeRounds),
+                    points,
                     activationRound,
                     currentRound);
             })

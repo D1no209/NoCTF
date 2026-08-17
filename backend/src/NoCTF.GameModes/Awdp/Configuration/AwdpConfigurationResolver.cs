@@ -34,9 +34,7 @@ public static class AwdpConfigurationResolver
             rules.FixFailurePenalty ?? competition.FixFailurePenalty,
             rules.ViolationPenalty ?? competition.ViolationPenalty,
             rules.ServiceDownPenalty ?? competition.ServiceDownPenalty,
-            competition.UsesContinuousRoundScoring
-                ? false
-                : rules.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix,
+            rules.RequireBreakBeforeFix ?? competition.RequireBreakBeforeFix,
             rules.MaxBreakSubmissions ?? competition.MaxBreakSubmissions,
             rules.MaxFixSubmissions ?? competition.MaxFixSubmissions,
             rules.EvaluationDispatchMode ?? competition.EvaluationDispatchMode,
