@@ -1,5 +1,37 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.46 CTF/AWDP 可配置动态分值与按轮结算
+
+- `8be9031b` 以不兼容升级方式统一了 CTF/AWDP 分值曲线。两种模式均支持 `Fixed`、`Linear`、
+  `Quadratic`、`Exponential`、`Logarithmic` 与 `Custom` 六种衰减模式；曲线使用初始分、最低分、
+  衰减队伍数和可选自定义公式描述，最终分值统一钳制后按 AwayFromZero 取整。CTF 配置升级为 schema v2，
+  AWDP 配置升级为 schema v3，不保留旧 schema 兼容分支。
+- AWDP Break 与 Fix 使用两条完全独立的动态曲线，分别按本轮取得对应 Correct 事实的不同队伍数量结算。
+  每轮在事实发生时固化该轮所得分，后续轮次的队伍数量和曲线分值不会追溯改变此前轮次；队伍封禁、解禁和
+  rejudge 仍通过全量权威投影重盘。AWDP 不再使用 `CompetitionChallenge.BaseScore` 参与计分，管理端也不再
+  暴露该字段；排行榜/题目卡分别返回和显示当前 Break/Fix 分值。
+- 删除了旧的一次性 AWDP 计分影响预览端点及其 Application/Infrastructure 实现；OpenAPI 路由基线同步由
+  202 调整为 201，管理端路由基线由 132 调整为 131。两份 OpenAPI 制品由工具导出，SHA-256 均为
+  `0BED6B5A6462E47B6B66AB4727CA21EE33080051461E1F6F5E3D7A4F2F62104A`；TypeScript SDK 由工具重新
+  生成，连续两次 OpenAPI export 与 SDK generation 的全部文件哈希完全一致。
+- 管理端曲线预览扩大为带坐标轴的详细图：Y 轴 9 个取整分值刻度、X 轴最多 13 个计分队伍数刻度，辅以虚线
+  网格；鼠标移动会吸附到最近的整数队伍数并显示取整后的具体分值，键盘左右键、Home、End 也可逐点查看。
+  自定义公式仍由后端权威解析和逐点校验，前端不会用不一致的 JavaScript 表达式模拟结果。
+- `f3e66613` 将平台版本由 `0.1.0-alpha.45` 递增为 `0.1.0-alpha.46`。本阶段没有新增业务表、列、
+  migration 或 snapshot；`dotnet ef migrations has-pending-model-changes` 返回无模型变化。
+- 验证通过：
+  - `dotnet build backend/NoCTF.slnx --configuration Release --no-restore`：0 warning / 0 error。
+  - 非 Integration TUnit：794/794；`ScoreCurveEvaluatorTests` 8/8；AWDP evaluator 9/9。
+  - 真实 PostgreSQL、Redis、Wolverine、Docker Integration：174/176 通过、0 失败；Kubernetes 与
+    Libvirt 两项因专用环境未配置按设计跳过。
+  - CTF Full E2E 1/1、AWDP Full E2E 1/1，均通过 API/Redis/PostgreSQL resilience 检查并精确清理
+    本轮 Docker 资源；AWDP E2E 验证 Break/Fix 独立按轮结算、空轮不增长及暂停/恢复行为。
+  - ClientApp `bun test` 205/205（1556 assertions）、`bun run typecheck`、production `bun run build`；
+    构建仅保留既有 chunk/plugin timing 与第三方 Node exports deprecation warning。
+  - OpenAPI/SDK 双次生成幂等、EF model drift、`git diff --check` 均通过。
+- 本阶段尚未推送、部署或操作生产数据；工作区中既有未跟踪的临时归档、Runner Properties、local ports、
+  `frontend/` 与 `scripts/` 均未纳入提交。
+
 ## 2026-08-17 alpha.45 题目列表布局、3D 视角与附件哈希标识
 
 - `9373b679` 按最终确认将协作者 3D 大屏相机由约 50° 调整为 45°：初始相机高度调整为 101，巡航高度调整为
