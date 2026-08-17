@@ -78,7 +78,8 @@ const hasModeDefinition = computed(() => {
 })
 
 const usesRuntimeFlagInjection = computed(() =>
-  form.mode === 'Ctf' && definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam,
+  (form.mode === 'Ctf' || form.mode === 'Awdp')
+  && definitionModel.value?.runtime?.flagSource === FlagSource.PerTeam,
 )
 
 // 依赖运行环境的模式定义块在未启用运行环境时不生效。

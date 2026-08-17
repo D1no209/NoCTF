@@ -363,6 +363,21 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             DateTimeOffset now,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("AWD runtime reset must not request a CTF flag.");
+
+        public Task<string> EnsureGenerationAsync(
+            Guid competitionId,
+            Guid competitionChallengeId,
+            Guid teamId,
+            Guid runtimeInstanceId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("AWD runtime reset must not request an AWDP flag.");
+
+        public Task InvalidateGenerationAsync(
+            Guid runtimeInstanceId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("AWD runtime reset must not invalidate an AWDP flag.");
     }
 
     private sealed class NoopOutbox : ITransactionalMessageOutbox

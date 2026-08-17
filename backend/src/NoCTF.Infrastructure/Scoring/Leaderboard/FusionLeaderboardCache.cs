@@ -46,6 +46,20 @@ public sealed class FusionLeaderboardCache(
     public async Task<LeaderboardResponse?> CreateAsync(
         Guid competitionId,
         DateTimeOffset projectedAt,
+        CancellationToken ct) =>
+        await CreateCoreAsync(competitionId, null, projectedAt, ct);
+
+    public async Task<LeaderboardResponse?> CreateWithConfigurationAsync(
+        Guid competitionId,
+        string competitionConfigurationJson,
+        DateTimeOffset projectedAt,
+        CancellationToken ct) =>
+        await CreateCoreAsync(competitionId, competitionConfigurationJson, projectedAt, ct);
+
+    private async Task<LeaderboardResponse?> CreateCoreAsync(
+        Guid competitionId,
+        string? competitionConfigurationJson,
+        DateTimeOffset projectedAt,
         CancellationToken ct)
     {
         var competition = await db.Competitions.AsNoTracking()
@@ -187,7 +201,7 @@ public sealed class FusionLeaderboardCache(
             teamFacts,
             facts,
             challenges,
-            competition.ConfigurationJson,
+            competitionConfigurationJson ?? competition.ConfigurationJson,
             competition.StartAt,
             lifecycle,
             awdRounds,

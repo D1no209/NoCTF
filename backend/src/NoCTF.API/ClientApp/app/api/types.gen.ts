@@ -261,6 +261,15 @@ export type NoCtfapiEndpointsInternalRecordAwdpCheckResultRequest = {
 
 export type NoCtfapiEndpointsInternalAwdpFixResultOutcome = 'Fixed' | 'StillVulnerable' | 'RuleViolation' | 'ServiceUnavailable';
 
+export type NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse = {
+    currentRound?: number | null;
+    attackRuntime?: NoCtfapiEndpointsRuntimeRuntimeResponse | null;
+    latestBreakAttempt?: NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse | null;
+    breakActivation?: NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse | null;
+    defense?: NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse;
+    fixActivation?: NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse | null;
+};
+
 export type NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse = {
     gameplayFactId?: string;
     competitionId?: string;
@@ -281,6 +290,24 @@ export type NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol = 'Pending' 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol = 'Correct' | 'Wrong' | 'Duplicate' | 'AttemptsExhausted' | 'Rejected' | 'Unlocked' | 'Applied' | 'ServiceUp' | 'ServiceDown' | 'Controlled' | 'Uncontrolled';
 
 export type NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol = 'FlagNotSupported' | 'FixNotSupported' | 'BreakAttemptsExhausted' | 'FixAttemptsExhausted' | 'BreakRequired' | 'ArchiveValidationUnavailable' | 'FixArchiveMissing' | 'FixArchiveLengthMismatch' | 'FixArchiveContentTypeMismatch' | 'FixArchiveHashMismatch' | 'StorageTimeout' | 'StorageUnavailable' | 'CheckerPlatformError' | 'SelfAttackRejected' | 'DuplicateAttack' | 'DuplicateAchievement' | 'UnknownTeamIdentifier' | 'InvalidObservation' | 'ProducerTimeout' | 'ProducerUnavailable' | 'AmbiguousFlagMatch' | 'FlagExpired' | 'RoundOutOfRange' | 'HardeningActive' | 'AwdpFixFailed' | 'AwdpPatchFailed' | 'AwdpPatchTimeout' | 'AwdpServiceDown' | 'AwdpViolation' | 'ForeignTeamFlagDetected' | 'InsufficientScore' | 'HintUnavailable';
+
+export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
+    gameplayFactId?: string;
+    effectiveRound?: number;
+    effectiveAt?: string;
+};
+
+export type NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse = {
+    gameplayFactId?: string | null;
+    patchUploadId?: string | null;
+    state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
+    result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
+    failureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
+    stage?: NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol | null;
+    updatedAt?: string | null;
+};
+
+export type NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol = 'TargetProvisioning' | 'PatchApplying' | 'CheckerRunning' | 'Completed';
 
 export type NoCtfapiEndpointsGameplayFactsGetGameplayFactStatusRequest = {
     [key: string]: never;
@@ -1222,6 +1249,30 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsListAdminGameplayFactsRe
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactPreviewResponse = {
+    projectedAt?: string;
+    competitions?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactCompetitionResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactCompetitionResponse = {
+    competitionId?: string;
+    competitionTitle?: string;
+    currentSchemaVersion?: number;
+    teams?: Array<NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactTeamResponse>;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactTeamResponse = {
+    teamId?: string;
+    teamName?: string;
+    currentScore?: number;
+    continuousScore?: number;
+    delta?: number;
+};
+
+export type NoCtfapiEndpointsAdministrationGameplayFactsPreviewAwdpScoringImpactRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferencePageResponse = {
     items?: Array<NoCtfapiEndpointsAdministrationGameplayFactsHistoricalAdjudicationDifferenceItemResponse>;
     nextCursor?: string | null;
@@ -1626,7 +1677,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = 
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
 
-export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint';
+export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeGeneration';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol;
@@ -2850,6 +2901,40 @@ export type RecordAwdpCheckResultEndpointResponses = {
 };
 
 export type RecordAwdpCheckResultEndpointResponse = RecordAwdpCheckResultEndpointResponses[keyof RecordAwdpCheckResultEndpointResponses];
+
+export type GetAwdpParticipantStateEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state';
+};
+
+export type GetAwdpParticipantStateEndpointErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetAwdpParticipantStateEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse;
+};
+
+export type GetAwdpParticipantStateEndpointResponse = GetAwdpParticipantStateEndpointResponses[keyof GetAwdpParticipantStateEndpointResponses];
 
 export type GetGameplayFactStatusEndpointData = {
     body?: never;
@@ -5771,6 +5856,41 @@ export type AdminListGameplayFactsResponses = {
 };
 
 export type AdminListGameplayFactsResponse = AdminListGameplayFactsResponses[keyof AdminListGameplayFactsResponses];
+
+export type AdminPreviewAwdpScoringImpactData = {
+    body?: never;
+    path?: never;
+    query: {
+        limit: number;
+    };
+    url: '/api/v1/admin/awdp/scoring-impact-preview';
+};
+
+export type AdminPreviewAwdpScoringImpactErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPreviewAwdpScoringImpactError = AdminPreviewAwdpScoringImpactErrors[keyof AdminPreviewAwdpScoringImpactErrors];
+
+export type AdminPreviewAwdpScoringImpactResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationGameplayFactsAwdpScoringImpactPreviewResponse;
+};
+
+export type AdminPreviewAwdpScoringImpactResponse = AdminPreviewAwdpScoringImpactResponses[keyof AdminPreviewAwdpScoringImpactResponses];
 
 export type AdminPreviewHistoricalAdjudicationDifferencesData = {
     body?: never;

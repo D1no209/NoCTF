@@ -18,6 +18,8 @@ using NoCTF.Application.GameplayFacts.AdjudicationPreview;
 using NoCTF.Infrastructure.GameplayFacts.AdjudicationPreview;
 using NoCTF.Application.GameplayFacts.Practice;
 using NoCTF.Infrastructure.GameplayFacts.Practice;
+using NoCTF.Application.GameplayFacts.Awdp;
+using NoCTF.Infrastructure.GameplayFacts.Awdp;
 
 namespace NoCTF.Infrastructure.GameplayFacts;
 
@@ -29,6 +31,8 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<IGameplayFactIntakeStore, GameplayFactIntakeStore>();
         services.AddScoped<IPracticeFlagJudge, PracticeFlagJudge>();
         services.AddScoped<JudgePracticeFlag>();
+        services.AddScoped<IAwdpParticipantStateReader, AwdpParticipantStateReader>();
+        services.AddScoped<GetAwdpParticipantState>();
         services.AddScoped<CreateManualAdjustment>();
         services.AddScoped<IPatchUploadStore, PatchUploadStore>();
         services.AddScoped<CreatePatchUpload>();

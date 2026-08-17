@@ -28,5 +28,6 @@ public enum SpecificationKind : short
     Attachment,
     AwdRound,
     RuntimeDefinition,
-    Hint
+    Hint,
+    RuntimeGeneration
 }

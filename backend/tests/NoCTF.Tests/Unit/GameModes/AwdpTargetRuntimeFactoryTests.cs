@@ -28,6 +28,7 @@ public sealed class AwdpTargetRuntimeFactoryTests
             now: DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(target.Purpose).IsEqualTo(RuntimePurpose.AwdpTarget);
+        await Assert.That(target.AwdpFixStage).IsEqualTo(AwdpFixStage.TargetProvisioning);
         await Assert.That(target.GameplayFactId).IsEqualTo(gameplayFactId);
         await Assert.That(target.TeamId).IsNull();
         await Assert.That(target.Generation).IsEqualTo(2);

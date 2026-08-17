@@ -10,6 +10,7 @@ target_image="noctf-awdp-pwn-target:${suffix}"
 checker_image="noctf-awdp-pwn-checker:${suffix}"
 callback_image="noctf-awdp-pwn-callback:${suffix}"
 token="smoke-token-${suffix}"
+injected_value="TRAINING_DYNAMIC_SECRET_${suffix}"
 
 cleanup() {
     docker rm -f "${target}" "${callback}" >/dev/null 2>&1 || true
@@ -55,16 +56,15 @@ run_checker_expect() {
 restart_target() {
     docker rm -f "${target}" >/dev/null 2>&1 || true
     docker run -d --name "${target}" --network "${network}" --network-alias target \
-        -e FLAG='flag{awdp-index-vault-test}' \
+        -e FLAG="${injected_value}" \
         "${target_image}" >/dev/null
 }
 
 apply_fix_archive() {
     archive="$1"
-    docker exec --user 0 "${target}" rm -rf /noctf/fix
-    docker exec --user 0 "${target}" mkdir -p /noctf/fix
+    docker exec "${target}" /bin/sh -c 'rm -rf /noctf/fix/*'
     docker cp "${archive}" "${target}:/tmp/fix.tar.gz"
-    docker exec --user 0 "${target}" tar -xzf /tmp/fix.tar.gz -C /noctf/fix
+    docker exec "${target}" tar -xzf /tmp/fix.tar.gz -C /noctf/fix
     docker exec "${target}" /bin/sh /noctf/fix/fix.sh
 }
 
@@ -79,6 +79,11 @@ wait_callback
 
 restart_target
 run_checker_expect StillVulnerable
+leak="$(docker exec "${target}" /bin/sh -c "printf 'READ 4\\n' | /opt/challenge/bin/pwn-note")"
+[ "${leak}" = "VALUE:${injected_value}" ] || {
+    printf '%s\n' 'vulnerable target did not expose the injected prefix-independent value' >&2
+    exit 1
+}
 
 restart_target
 apply_fix_archive "${root}/artifacts/fixes/fixed.tar.gz"
@@ -103,10 +108,9 @@ if apply_fix_archive "${root}/artifacts/fixes/nonzero.tar.gz"; then
 fi
 
 restart_target
-docker exec --user 0 "${target}" rm -rf /noctf/fix
-docker exec --user 0 "${target}" mkdir -p /noctf/fix
+docker exec "${target}" /bin/sh -c 'rm -rf /noctf/fix/*'
 docker cp "${root}/artifacts/fixes/timeout.tar.gz" "${target}:/tmp/fix.tar.gz"
-docker exec --user 0 "${target}" tar -xzf /tmp/fix.tar.gz -C /noctf/fix
+docker exec "${target}" tar -xzf /tmp/fix.tar.gz -C /noctf/fix
 if docker exec "${target}" timeout 2 /bin/sh /noctf/fix/fix.sh; then
     printf '%s\n' 'timeout fix unexpectedly completed' >&2
     exit 1

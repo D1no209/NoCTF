@@ -367,6 +367,7 @@ public sealed class AwdpFixVerificationHandler(
     FixArchivePreparer preparer,
     IRuntimeProviderCatalog providers,
     IAwdpCheckerExecutor checker,
+    IAwdpFixExecutionFence executionFence,
     IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
     IRunnerCapacityGate capacity,
     ITransactionalMessageOutbox outbox,
@@ -437,6 +438,15 @@ public sealed class AwdpFixVerificationHandler(
                     outcome = AwdpFixOutcome.PatchFailed;
                 else
                 {
+                    var advanced = await executionFence.TryAdvanceStageAsync(new(
+                        message.GameplayFactId,
+                        message.RuntimeInstanceId,
+                        message.Generation,
+                        work.RuntimeProcessingVersion,
+                        AwdpFixStage.PatchApplying,
+                        AwdpFixStage.CheckerRunning), cancellationToken);
+                    if (!advanced)
+                        return;
                     var execution = await checker.ExecuteAsync(
                         work.Checker, cancellationToken);
                     outcome = AwdpCheckerCompletionPolicy.ResultFor(execution);

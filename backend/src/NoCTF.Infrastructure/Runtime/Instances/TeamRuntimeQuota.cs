@@ -51,7 +51,8 @@ public sealed class TeamRuntimeQuota(LocalCriticalSectionRegistry localLeases)
                 runtime.CompetitionId == competitionId &&
                 runtime.TeamId == teamId &&
                 (runtime.Purpose == RuntimePurpose.Player
-                    || runtime.Purpose == RuntimePurpose.Practice) &&
+                    || runtime.Purpose == RuntimePurpose.Practice
+                    || runtime.Purpose == RuntimePurpose.AwdpAttack) &&
                 (runtime.State == RuntimeState.Queued ||
                  runtime.State == RuntimeState.Provisioning ||
                  runtime.State == RuntimeState.Running ||

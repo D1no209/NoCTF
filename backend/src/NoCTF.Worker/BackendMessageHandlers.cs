@@ -21,8 +21,10 @@ using System.Text.Json;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Awdp.Runtime;
+using NoCTF.GameModes.Registration;
 using NoCTF.Worker.Runtime;
 using CompetitionLifecycleAdvancer = NoCTF.Application.Competitions.Lifecycle.AdvanceCompetitionLifecycleUseCase;
 using NoCTF.Application.Competitions.Events;
@@ -410,9 +412,14 @@ public static class BackendMessageHandlers
         RefreshDirtyLeaderboards message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
+        ILeaderboardCache leaderboard,
         CancellationToken cancellationToken)
     {
-        _ = message;
+        await MarkDueAwdpLeaderboardsAsync(
+            message.TriggeredAt,
+            db,
+            leaderboard,
+            cancellationToken);
         if (db.Database.IsInMemory())
         {
             while (true)
@@ -463,6 +470,128 @@ public static class BackendMessageHandlers
             db.ChangeTracker.Clear();
         }
     }
+
+    private static async Task MarkDueAwdpLeaderboardsAsync(
+        DateTimeOffset now,
+        NoCtfDbContext db,
+        ILeaderboardCache leaderboard,
+        CancellationToken cancellationToken)
+    {
+        var competitions = await db.Competitions
+            .Where(competition => competition.Mode == GameMode.Awdp
+                && competition.Status == CompetitionStatus.Running
+                && competition.DeletedAt == null)
+            .OrderBy(competition => competition.Id)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+        if (competitions.Count == 0)
+            return;
+        var continuous = competitions
+            .Select(competition => new
+            {
+                Competition = competition,
+                Configuration = TryParseAwdpCompetition(competition.ConfigurationJson)
+            })
+            .Where(item => item.Configuration?.UsesContinuousRoundScoring == true)
+            .ToArray();
+        if (continuous.Length == 0)
+            return;
+
+        var competitionIds = continuous.Select(item => item.Competition.Id).ToArray();
+        var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
+            .Where(@event => competitionIds.Contains(@event.CompetitionId)
+                && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged
+                && @event.OccurredAt <= now)
+            .OrderBy(@event => @event.OccurredAt)
+            .ThenBy(@event => @event.Id)
+            .Select(@event => new
+            {
+                @event.Id,
+                @event.CompetitionId,
+                @event.OccurredAt,
+                @event.ActorUserId,
+                @event.PayloadJson
+            })
+            .ToListAsync(cancellationToken);
+        var transitions = lifecycleEvents
+            .Select(@event =>
+            {
+                var payload = JsonSerializer.Deserialize<CompetitionLifecyclePayload>(
+                    @event.PayloadJson,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                    ?? throw new InvalidOperationException(
+                        "Competition lifecycle event payload is invalid.");
+                return new CompetitionLifecycleTransition
+                {
+                    Id = @event.Id,
+                    CompetitionId = @event.CompetitionId,
+                    From = payload.From,
+                    To = payload.To,
+                    ActorId = @event.ActorUserId,
+                    Reason = payload.Reason,
+                    Automatic = payload.Automatic,
+                    OccurredAt = @event.OccurredAt
+                };
+            })
+            .GroupBy(transition => transition.CompetitionId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<CompetitionLifecycleTransition>)group.ToArray());
+
+        foreach (var item in continuous)
+        {
+            if (item.Competition.LeaderboardDirty)
+                continue;
+            var snapshot = await leaderboard.GetAsync(
+                item.Competition.Id,
+                cancellationToken);
+            if (snapshot?.DataAsOf is not DateTimeOffset dataAsOf)
+            {
+                item.Competition.LeaderboardDirty = true;
+                continue;
+            }
+            var competitionTransitions = transitions.GetValueOrDefault(item.Competition.Id) ?? [];
+            var duration = item.Configuration!.RoundDurationSeconds;
+            var projectedRound = LogicalAwdpRound(
+                competitionTransitions,
+                dataAsOf,
+                duration);
+            var currentRound = LogicalAwdpRound(
+                competitionTransitions,
+                now,
+                duration);
+            if (currentRound > projectedRound)
+                item.Competition.LeaderboardDirty = true;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static int LogicalAwdpRound(
+        IReadOnlyList<CompetitionLifecycleTransition> transitions,
+        DateTimeOffset at,
+        int durationSeconds)
+    {
+        var elapsed = AwdEffectiveRunningClock.Calculate(transitions, at);
+        var seconds = Math.Max(0, elapsed.TotalSeconds);
+        return checked((int)(seconds / durationSeconds) + 1);
+    }
+
+    private static AwdpConfiguration? TryParseAwdpCompetition(string json)
+    {
+        try
+        {
+            return AwdpConfigurationParser.ParseCompetition(json);
+        }
+        catch (GameModeConfigurationException)
+        {
+            return null;
+        }
+    }
+
+    private sealed record CompetitionLifecyclePayload(
+        int SchemaVersion,
+        CompetitionStatus From,
+        CompetitionStatus To,
+        bool Automatic,
+        string? Reason);
 
     public static Task Handle(
         AwdpFixResult message,
@@ -659,6 +788,7 @@ public static class BackendMessageHandlers
         submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
         submission.UpdatedAt = DateTimeOffset.UtcNow;
         await outbox.PublishAsync(new GameplayFactStateChanged(submission.Id, submission.State));
+        runtime.AwdpFixStage = AwdpFixStage.Completed;
         runtime.State = RuntimeState.Stopping;
         runtime.RunnerAssignmentReleaseToken = null;
         runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
@@ -759,17 +889,26 @@ public static class BackendMessageHandlers
         }
 
         string? perTeamFlag = null;
-        if (target.Competition.Mode == GameMode.Ctf
+        if (target.Competition.Mode is GameMode.Ctf or GameMode.Awdp
+            && target.Instance.Purpose != RuntimePurpose.AwdpTarget
             && template.FlagSource == RuntimeFlagSource.PerTeam)
         {
             if (target.Instance.TeamId is Guid teamId)
             {
+                var specificationKind = target.Competition.Mode == GameMode.Awdp
+                    ? SpecificationKind.RuntimeGeneration
+                    : SpecificationKind.RuntimeDefinition;
+                var specificationId = target.Competition.Mode == GameMode.Awdp
+                    ? target.Instance.Id
+                    : target.Challenge.Id;
                 perTeamFlag = await db.ChallengeFlags.AsNoTracking()
                     .Where(flag =>
                         flag.CompetitionChallengeId == target.Challenge.Id
                         && flag.TeamId == teamId
-                        && flag.SpecificationKind == SpecificationKind.RuntimeDefinition
-                        && flag.SpecificationId == target.Challenge.Id)
+                        && flag.SpecificationKind == specificationKind
+                        && flag.SpecificationId == specificationId
+                        && flag.DeletedAt == null
+                        && flag.ValidUntil == null)
                     .Select(flag => flag.Flag)
                     .SingleOrDefaultAsync(cancellationToken);
             }

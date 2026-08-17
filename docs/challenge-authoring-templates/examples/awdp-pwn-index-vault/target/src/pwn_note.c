@@ -46,7 +46,7 @@ static void initialize_vault(void)
 
     const char *flag = getenv("FLAG");
     if (flag == NULL || flag[0] == '\0')
-        flag = "flag{missing-runtime-flag}";
+        flag = "NOCTF_RUNTIME_FLAG_UNAVAILABLE";
     snprintf(vault.secret, NOTE_SIZE, "%s", flag);
 }
 

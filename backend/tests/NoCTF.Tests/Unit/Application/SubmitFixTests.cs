@@ -9,9 +9,9 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class SubmitFixTests
 {
     [Test]
-    public async Task Required_break_is_rejected_before_patch_upload_consumption()
+    public async Task Current_awdp_fix_is_accepted_when_break_is_not_required()
     {
-        var store = new Store();
+        var store = new Store(requireBreakBeforeFix: false);
         var useCase = new SubmitFix(store, new GameModeGameplayFactAdmissionPolicy());
 
         var result = await useCase.ExecuteAsync(new(
@@ -21,11 +21,29 @@ public sealed class SubmitFixTests
             Guid.NewGuid(),
             DateTimeOffset.UtcNow));
 
+        await Assert.That(result.Succeeded).IsTrue();
+        await Assert.That(store.FixWrites).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Current_awdp_fix_requires_a_break_when_configured()
+    {
+        var store = new Store(requireBreakBeforeFix: true);
+        var useCase = new SubmitFix(store, new GameModeGameplayFactAdmissionPolicy());
+
+        var result = await useCase.ExecuteAsync(new(
+            store.CompetitionId,
+            store.CompetitionChallengeId,
+            store.UserId,
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow));
+
+        await Assert.That(result.Succeeded).IsFalse();
         await Assert.That(result.FailureCode).IsEqualTo(GameplayFactAdmissionFailureCode.BreakRequired);
         await Assert.That(store.FixWrites).IsEqualTo(0);
     }
 
-    private sealed class Store : IGameplayFactIntakeStore
+    private sealed class Store(bool requireBreakBeforeFix) : IGameplayFactIntakeStore
     {
         public Guid CompetitionId { get; } = Guid.NewGuid();
         public Guid CompetitionChallengeId { get; } = Guid.NewGuid();
@@ -50,7 +68,7 @@ public sealed class SubmitFixTests
                         AwdpChallengeConfiguration.CurrentSchemaVersion,
                         null,
                         new AwdpAchievementConfiguration(AchievementSettlement.Milestone, 20),
-                        true,
+                        requireBreakBeforeFix,
                         10,
                         10),
                     new JsonSerializerOptions(JsonSerializerDefaults.Web)),

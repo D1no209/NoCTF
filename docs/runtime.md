@@ -16,6 +16,7 @@ Challenge 只声明 RuntimeKind、镜像/Compose 内容、命令、环境、逻�
 |---|---:|---:|---:|
 | CTF PerTeamRuntime | 是 | 是 | 否 |
 | AWD 长期按队 Runtime | 是 | 是 | 否 |
+| AWDP 长期按队 Attack Runtime | 是 | 否 | 否 |
 | AWDP 一次性 Fix target | 是 | 否 | 否 |
 | KoH shared Hill | 是 | 是 | 否 |
 
@@ -33,7 +34,7 @@ Challenge 只声明 RuntimeKind、镜像/Compose 内容、命令、环境、逻�
 
 API Start/Stop/Reset/Extend 返回 202、RuntimeInstanceId 与状态 URL。相同实例同时只允许一个状态变更；通过 State+ProcessingVersion 防重复/迟到。Failed 不公开 URL，可再次 Start 新 Generation。
 
-玩家动作按模式固定：CTF 允许 Start/Stop/Reset/Extend；AWD Runtime 由比赛生命周期自动 Start/Stop，玩家只允许 Reset；KoH shared Runtime 仅 Manager 管理；AWDP 一次性 target 没有玩家 Runtime API。管理动作也必须遵守相同状态机，只有系统 Competition Finish/Ban 清理可跳过玩家动作权限，但不能跳过版本栅栏。
+玩家动作按模式固定：CTF 允许 Start/Stop/Reset/Extend；AWD Runtime 由比赛生命周期自动 Start/Stop，玩家只允许 Reset；KoH shared Runtime 仅 Manager 管理；AWDP 允许玩家 Start/Stop/Reset/Extend 自己的 `Player` 攻击 Runtime，但一次性 `AwdpTarget` 没有玩家 Runtime API。管理动作也必须遵守相同状态机，只有系统 Competition Finish/Ban 清理可跳过玩家动作权限，但不能跳过版本栅栏。
 
 状态动作固定如下：
 
@@ -63,7 +64,7 @@ CTF PerTeamRuntime 不预创建。首次 Start 时创建，每个 Team/Competiti
 - MaxConcurrentRuntimeInstancesPerTeam 在 Competition Create/Update 时必须显式提交，<=0
   表示无限；Container/Compose/OvaVm 各算一个实例。额度统计
   Queued/Provisioning/Running/Stopping，Reset 的前后 Generation 合并算一个替换槽。
-  AWD Start Gate 要求额度覆盖全部已发布题；AWDP disposable/KoH shared 不计每队额度。
+  AWD Start Gate 要求额度覆盖全部已发布题；AWDP `Player` 攻击实例计入每队额度，AWDP disposable/KoH shared 不计每队额度。
 
 ## URL Binding
 
