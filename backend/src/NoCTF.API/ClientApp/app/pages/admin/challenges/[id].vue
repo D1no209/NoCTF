@@ -795,6 +795,7 @@ onMounted(() => {
                       <TableHead>{{ $t('文件名') }}</TableHead>
                       <TableHead v-if="attachmentDeliveryPolicy === 'RandomOnePerTeam'">{{ $t('精确 Flag') }}</TableHead>
                       <TableHead v-else>{{ $t('类型') }}</TableHead>
+                      <TableHead>{{ $t('哈希') }}</TableHead>
                       <TableHead>{{ $t('大小') }}</TableHead>
                       <TableHead>{{ $t('上传时间') }}</TableHead>
                       <TableHead>{{ $t('状态') }}</TableHead>
@@ -813,6 +814,12 @@ onMounted(() => {
                         {{ attachment.exactFlag ?? '—' }}
                       </TableCell>
                       <TableCell v-else class="text-muted-foreground">{{ attachment.contentType }}</TableCell>
+                      <TableCell
+                        class="font-mono text-xs tabular-nums text-muted-foreground"
+                        :title="attachment.sha256"
+                      >
+                        {{ attachment.sha256?.slice(0, 8) ?? '—' }}
+                      </TableCell>
                       <TableCell>{{ formatBytes(attachment.byteLength) }}</TableCell>
                       <TableCell>
                         <AdminDateTime :value="attachment.createdAt" />
