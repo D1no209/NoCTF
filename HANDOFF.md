@@ -43,7 +43,29 @@
   读取已有 Edge 窗口时因无法可靠确认当前 URL 而由 Computer Use 安全策略终止；没有回退到内置浏览器，
   因此本阶段的 Edge 人工交互、Console 与 Network 验收准确标记为阻塞，不能误报为通过。
 - 本阶段未固定或改写题目 Runtime/Checker/Compose 镜像 digest，没有新增 registry allowlist；镜像 tag/digest
-  继续按可信出题人定义原样使用。当前只创建本地提交，未 push、未部署、未修改生产配置或生产数据。
+  继续按可信出题人定义原样使用。
+- 功能、前端、文档、版本与初始 HANDOFF 共 6 个提交已快进推送到远程 `main@d19cff91`。生产
+  `/root/NoCTF` 通过 SHA-256 校验后的增量 Git bundle 快进到同一提交，既有未跟踪
+  `deploy/docker-compose.prod.yml`、`.env`、HTTPS 证书、PostgreSQL/Redis/上传卷和题目数据均保持原样。
+  Git bundle SHA-256 为 `677CBD0F596665D222836EF9BD4D8FC96CFFF1007A7B41707F2C9A890E5457F4`，
+  三服务 Linux/amd64 镜像归档 SHA-256 为
+  `5665BA975EB16CB34F07D45DD71997E746CB2FEE2F90E93B5BED1F03F157B4AC`。
+- 部署前使用生产 PostgreSQL 容器内凭据创建 custom-format 备份
+  `/root/noctf-backups/pre-alpha41-d19cff91-20260817.dump`，并通过 `pg_restore --list` 验证；备份
+  SHA-256 为 `26F07A44F7F2BA035532AF62FF4CDB3F1A226E335C2F8D287E5FF9EC4744D8AF`。Migration 容器成功应用
+  `20260816181000_AddAwdpContinuousRuntime`，生产复核确认 `runtime_instances.awdp_fix_stage` 与
+  Runtime-generation Flag 唯一索引均存在。
+- API、Worker、Runner 均使用 `--no-deps --no-build --force-recreate` 切换，PostgreSQL、Redis、上传卷和
+  题目 Runtime 没有重建。运行镜像分别为 API
+  `sha256:7888f3936ed49c1f2dc81757b76764b113ad691deb5f16854bbfd0cd40675c9d`、Worker
+  `sha256:c221a7e361fca04f6ce7dae50e76d7193eba3fe7d21457b572ddb51d86a94e67`、Runner
+  `sha256:e548f6a181c917b6fb8c31d36e3992c0f68a5a5915d8ae74c3a2607bcbe2401b`；原三服务与 Migration 镜像保留
+  `rollback-40722584` 标签。
+- 部署后五项服务均 healthy；API、Worker、Runner restart count 均为 0，程序集均确认
+  `0.1.0-alpha.41`。公网 `https://101.43.46.244/` 与 `/health` 返回 200，健康正文为 `Ok`；生产 OpenAPI
+  包含 AWDP participant state 与管理员 scoring-impact preview 路由，两条路由未认证访问均返回预期 401。
+  部署后 15 分钟 API/Worker/Runner 日志中 Fatal、Critical、Unhandled、Exception 与失败匹配均为 0。
+  远端精确传输目录已删除，未执行全局 Docker prune，根分区仍有约 15 GB 可用空间。
 
 ## 2026-08-16 AWDP PWN 示例题 index-vault
 
