@@ -232,7 +232,7 @@ export class LiveCityScene {
   private readonly podiumMaterial = new THREE.MeshStandardMaterial()
   private readonly grid: THREE.GridHelper
 
-  private rig: CameraRig = { azimuth: 0.7, radius: 82, height: 54, lookX: 0, lookY: 6, lookZ: 0 }
+  private rig: CameraRig = { azimuth: 0.7, radius: 92, height: 66, lookX: 0, lookY: 6, lookZ: 0 }
   private cruise: CameraRig = { ...this.rig }
   private tween: { from: CameraRig; to: CameraRig; elapsed: number; duration: number } | null = null
   private focusing = false
@@ -479,10 +479,10 @@ export class LiveCityScene {
     this.citySpan = Math.max(cols, rows) * CELL_SIZE
     this.cruise = {
       azimuth: this.rig.azimuth,
-      radius: this.citySpan * 0.88 + 28,
-      height: this.citySpan * 0.62 + 20,
+      radius: this.citySpan * 1.08 + 34,
+      height: this.citySpan * 0.82 + 26,
       lookX: 0,
-      lookY: Math.min(10, this.citySpan * 0.1 + 4),
+      lookY: Math.min(8, this.citySpan * 0.08 + 3),
       lookZ: 0,
     }
     if (!this.focusing && !this.tween) {
@@ -827,8 +827,8 @@ export class LiveCityScene {
     }
     const rand = mulberry32(Math.floor(maxScoreSpan) * 31 + 5)
     const rings = [
-      { count: 26, from: 1.12, to: 1.5, minHeight: 12, maxHeight: 40 },
-      { count: 36, from: 1.55, to: 2.1, minHeight: 8, maxHeight: 30 },
+      { count: 26, from: 1.18, to: 1.55, minHeight: 6, maxHeight: 24 },
+      { count: 36, from: 1.65, to: 2.15, minHeight: 4, maxHeight: 18 },
     ]
     for (const ring of rings) {
       for (let index = 0; index < ring.count; index++) {
