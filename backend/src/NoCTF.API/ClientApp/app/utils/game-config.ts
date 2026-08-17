@@ -12,9 +12,9 @@ import { translate } from './i18n'
 export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 /** 各 JSON 区域当前的 schemaVersion(更高的版本或无 upgrader 的旧版本会被后端拒绝)。 */
-export const DEFINITION_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 2, Koh: 1 }
-export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 2, Awdp: 3, Koh: 1 }
-export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 4, Awdp: 3, Koh: 1 }
+export const DEFINITION_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 4, Koh: 1 }
+export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 2, Awdp: 4, Koh: 1 }
+export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 }
 
 // ---------- 配置 JSON 内的整数枚举 ----------
 
@@ -702,10 +702,9 @@ export function competitionConfigFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'requireBreakBeforeFix', label: translate("Fix 前必须先完成 Break"), type: 'bool', defaultValue: false },
         { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
         { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1, defaultValue: 10 },
-        { key: 'breakWrongPenalty', label: translate("Break 错误扣分"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'fixFailurePenalty', label: translate("Fix 失败扣分"), type: 'int', min: 0, defaultValue: 0 },
-        { key: 'violationPenalty', label: translate("违规扣分"), type: 'int', min: 0, defaultValue: 100 },
-        { key: 'serviceDownPenalty', label: translate("服务宕机扣分"), type: 'int', min: 0, defaultValue: 50 },
+        { key: 'flagWrongPenalty', label: translate("Flag 错误扣分"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'exploitSucceededPenalty', label: translate("EXP 成功扣分"), type: 'int', min: 0, defaultValue: 0 },
+        { key: 'serviceAbnormalPenalty', label: translate("服务异常扣分"), type: 'int', min: 0, defaultValue: 0 },
         { key: 'evaluationDispatchMode', label: translate("评测调度方式"), type: 'select', options: EVALUATION_DISPATCH_MODES, defaultValue: EvaluationDispatch.Automatic },
       ]
     case 'Koh':
@@ -744,10 +743,9 @@ export function challengeRuleFields(mode: GameModeValue): ConfigFieldDef[] {
         { key: 'requireBreakBeforeFix', label: translate("Fix 前必须先完成 Break"), type: 'bool' },
         { key: 'maxBreakSubmissions', label: translate("Break 提交次数上限"), type: 'int', min: 1 },
         { key: 'maxFixSubmissions', label: translate("Fix 提交次数上限"), type: 'int', min: 1 },
-        { key: 'breakWrongPenalty', label: translate("Break 错误扣分"), type: 'int', min: 0 },
-        { key: 'fixFailurePenalty', label: translate("Fix 失败扣分"), type: 'int', min: 0 },
-        { key: 'violationPenalty', label: translate("违规扣分"), type: 'int', min: 0 },
-        { key: 'serviceDownPenalty', label: translate("服务宕机扣分"), type: 'int', min: 0 },
+        { key: 'flagWrongPenalty', label: translate("Flag 错误扣分"), type: 'int', min: 0 },
+        { key: 'exploitSucceededPenalty', label: translate("EXP 成功扣分"), type: 'int', min: 0 },
+        { key: 'serviceAbnormalPenalty', label: translate("服务异常扣分"), type: 'int', min: 0 },
         { key: 'evaluationDispatchMode', label: translate("评测调度方式"), type: 'select', options: EVALUATION_DISPATCH_MODES },
       ]
     case 'Koh':

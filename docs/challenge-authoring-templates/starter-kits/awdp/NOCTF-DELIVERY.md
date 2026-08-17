@@ -19,7 +19,7 @@
 - 动态 Break Flag 的环境变量、漏洞泄露路径和精确匹配验证：待填写。
 - Fix 成功后漏洞路径应如何失效：待填写。
 - 必须继续可用的正常业务功能：待填写。
-- RuleViolation 判据：待填写，例如删功能、固定返回、阻断 Checker 或伪造结果。
+- 服务异常判据：待填写，例如删功能、固定返回、阻断 Checker、伪造结果、正常业务失败或目标崩溃。
 
 ## 3. Player Runtime 与一次性 Fix target
 
@@ -59,10 +59,9 @@
 
 | 工作人员样例 | 路径 | 预期结果 |
 | --- | --- | --- |
-| 合法修复 | `examples/fixes/valid/fix.sh` | Fixed |
-| 仍有漏洞 | `examples/fixes/still-vulnerable/fix.sh` | StillVulnerable |
-| 规则违规 | `examples/fixes/rule-violation/fix.sh` | RuleViolation |
-| 服务破坏 | `examples/fixes/service-unavailable/fix.sh` | ServiceUnavailable |
+| 合法修复 | `examples/fixes/valid/fix.sh` | DefenseSucceeded |
+| 仍有漏洞 | `examples/fixes/exploit-succeeded/fix.sh` | ExploitSucceeded |
+| 服务异常或禁止绕过 | `examples/fixes/service-abnormal-bypass/fix.sh` 或 `examples/fixes/service-abnormal-down/fix.sh` | ServiceAbnormal |
 | 非零退出 | `examples/fixes/nonzero/fix.sh` | AwdpPatchFailed |
 | 超时 | `examples/fixes/timeout/fix.sh` | AwdpPatchTimeout |
 
@@ -70,9 +69,10 @@
 
 - [ ] 使用 `TARGET_HOST` 和唯一内部端口。
 - [ ] 在 `TARGET_READY_TIMEOUT_SECONDS` 内有界等待。
-- [ ] 同时验证漏洞路径、正常业务路径和禁止绕过路径。
+- [ ] 将 EXP 作为子进程执行，捕获失败/崩溃后继续验证正常业务路径。
+- [ ] 同时验证漏洞路径、正常业务路径和禁止绕过路径；服务异常优先级高于 EXP 结果。
 - [ ] 使用 Bearer `NOCTF_CALLBACK_TOKEN` 回调 `NOCTF_CALLBACK_URL`。
-- [ ] 只提交 `Fixed`、`StillVulnerable`、`RuleViolation` 或 `ServiceUnavailable`。
+- [ ] 只提交 `ExploitSucceeded`、`DefenseSucceeded` 或 `ServiceAbnormal`。
 - [ ] 成功回调后以 0 退出；不输出 Token、Flag、补丁正文或敏感响应。
 
 ## 6. 比赛与本题规则
@@ -80,10 +80,8 @@
 | 项目 | 比赛默认 / 本题覆盖 | 采用值 |
 | --- | --- | --- |
 | 轮次长度 | 比赛默认 | 待填写 |
-| Break 结算 / 分值 | 待填写 | 待填写 |
-| Fix 结算 / 分值 | 待填写 | 待填写 |
-| 规则违规 / 服务不可用罚分 | 待填写 | 待填写 |
-| Break 错误 / Fix 失败罚分 | 待填写 | 待填写 |
+| Break / Fix 分值曲线 | 待填写 | 待填写 |
+| Flag 错误 / EXP 成功 / 服务异常罚分 | 待填写 | 待填写 |
 | 先 Break 后 Fix | 待填写 | 待填写 |
 | 最大 Break / Fix 次数 | 待填写 | 待填写 |
 | 评测派发 | Automatic / ManualBatch | 待填写 |
@@ -92,9 +90,9 @@
 
 - [ ] 正确、错误、重复 Break 和次数上限。
 - [ ] 先 Break 后 Fix 门禁。
-- [ ] Fixed、StillVulnerable、RuleViolation、ServiceUnavailable。
+- [ ] ExploitSucceeded、DefenseSucceeded、ServiceAbnormal。
 - [ ] 非零退出、超时、空包、非 gzip、穿越、链接、设备文件和超限包。
-- [ ] Milestone / PerRound、暂停、恢复与结束。
+- [ ] 按轮动态分值、暂停、恢复与结束。
 - [ ] Worker/Runner 重投幂等，Fix 不产生 Break 或普通 Flag 分数。
 - [ ] 一次性目标、Checker、网络和容量全部回收。
 

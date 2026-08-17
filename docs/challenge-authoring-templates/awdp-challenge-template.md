@@ -41,9 +41,9 @@
 
 待填写：漏洞路径必须失效，同时哪些正常业务行为必须继续可用。
 
-### 2.4 规则违规判据
+### 2.4 服务异常与禁止绕过判据
 
-待填写：例如关闭服务、固定返回、删除功能、阻断 Checker、伪造状态或使用题目明确禁止的方法。
+待填写：哪些正常业务交互失败、超时、崩溃、固定返回、删除功能、阻断 Checker、伪造状态或使用题目明确禁止的方法时，应统一视为 `ServiceAbnormal`。
 
 ## 3. Player Runtime 与一次性 Fix Target
 
@@ -100,10 +100,9 @@ Fix 包要求：
 
 | 样本 | 文件位置 | 预期结果 |
 | --- | --- | --- |
-| 合法修复 | 待填写 | Fixed |
-| 漏洞仍存在 | 待填写 | StillVulnerable |
-| 规则违规 | 待填写 | RuleViolation |
-| 服务破坏 | 待填写 | ServiceUnavailable |
+| 合法修复 | 待填写 | DefenseSucceeded |
+| 漏洞仍存在 | 待填写 | ExploitSucceeded |
+| 服务异常或禁止绕过 | 待填写 | ServiceAbnormal |
 | 脚本非零退出 | 待填写 | AwdpPatchFailed |
 | 脚本超时 | 待填写 | AwdpPatchTimeout |
 | 非法归档 | 待填写 | 上传阶段拒绝 |
@@ -116,18 +115,18 @@ Fix 包要求：
 | 启动命令 argv | 待填写或“镜像默认入口” |
 | 目标内部端口 | 待填写 |
 | Checker 超时 | 待填写 |
-| Fixed 判据 | 待填写 |
-| StillVulnerable 判据 | 待填写 |
-| RuleViolation 判据 | 待填写 |
-| ServiceUnavailable 判据 | 待填写 |
+| EXP 利用成功判据 | 待填写 |
+| 防御成功判据 | 待填写 |
+| 服务异常判据 | 待填写 |
 
 Checker 必须完成：
 
 - [ ] 使用 `TARGET_HOST` 和内部端口访问一次性目标。
 - [ ] 在 `TARGET_READY_TIMEOUT_SECONDS` 内有界等待。
-- [ ] 同时验证漏洞路径与正常业务路径。
+- [ ] 把 EXP 作为子进程执行并捕获失败/崩溃，不让 EXP 崩溃直接结束 Checker 主进程。
+- [ ] EXP 后继续验证正常业务路径；服务异常优先级高于 EXP 结果。
 - [ ] 使用 Bearer `NOCTF_CALLBACK_TOKEN` 回调 `NOCTF_CALLBACK_URL`。
-- [ ] 只回调 `Fixed`、`StillVulnerable`、`RuleViolation` 或 `ServiceUnavailable`。
+- [ ] 只回调 `ExploitSucceeded`、`DefenseSucceeded` 或 `ServiceAbnormal`。
 - [ ] 回调成功后以 0 退出；异常时返回非零。
 - [ ] 日志不包含 Flag、Token、补丁正文或敏感响应。
 
@@ -138,14 +137,11 @@ Checker 必须完成：
 | 项目 | 建议初值 | 采用值 |
 | --- | ---: | ---: |
 | 轮次长度 | 300 秒 | 待填写 |
-| Break 结算 | PerRound | 待填写 |
-| Break 分值 | 50 | 待填写 |
-| Fix 结算 | PerRound | 待填写 |
-| Fix 分值 | 50 | 待填写 |
-| 规则违规罚分 | 100 | 待填写 |
-| 服务不可用罚分 | 50 | 待填写 |
-| Break 错误罚分 | 0 | 待填写 |
-| Fix 失败罚分 | 0 | 待填写 |
+| Break 分值曲线 | 默认曲线 | 待填写 |
+| Fix 分值曲线 | 默认曲线 | 待填写 |
+| Flag 错误罚分 | 0 | 待填写 |
+| EXP 利用成功罚分 | 0 | 待填写 |
+| 服务异常罚分 | 0 | 待填写 |
 | 先 Break 后 Fix | 开启 | 待填写 |
 | 最大 Break 次数 | 10 | 待填写 |
 | 最大 Fix 次数 | 10 | 待填写 |
@@ -155,8 +151,7 @@ Checker 必须完成：
 
 | 字段 | 继承比赛 / 覆盖 | 覆盖值与原因 |
 | --- | --- | --- |
-| Break 结算与分值 | 待填写 | 待填写 |
-| Fix 结算与分值 | 待填写 | 待填写 |
+| Break / Fix 分值曲线 | 待填写 | 待填写 |
 | 先 Break 后 Fix | 待填写 | 待填写 |
 | Break / Fix 次数 | 待填写 | 待填写 |
 | 各类罚分 | 待填写 | 待填写 |
@@ -171,11 +166,11 @@ Checker 必须完成：
 | 先 Break 后 Fix 门禁 | 待测试 | 待填写 |
 | 合法 Fix 完整闭环 | 待测试 | 待填写 |
 | 漏洞仍存在 | 待测试 | 待填写 |
-| 规则违规 | 待测试 | 待填写 |
-| 服务不可用 | 待测试 | 待填写 |
+| EXP 仍可利用 | 待测试 | 待填写 |
+| 服务异常 | 待测试 | 待填写 |
 | 补丁非零退出与超时 | 待测试 | 待填写 |
 | 非法和恶意归档拒绝 | 待测试 | 待填写 |
-| Milestone / PerRound | 待测试 | 待填写 |
+| 按轮动态分值 | 待测试 | 待填写 |
 | 暂停、恢复、结束 | 待测试 | 待填写 |
 | Worker/Runner 重投幂等 | 待测试 | 待填写 |
 | 一次性资源和容量回收 | 待测试 | 待填写 |

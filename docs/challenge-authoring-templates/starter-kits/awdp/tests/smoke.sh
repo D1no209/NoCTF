@@ -41,9 +41,9 @@ docker run --rm --network "${network}" \
     -e NOCTF_CALLBACK_URL=http://callback:8090/result \
     -e NOCTF_CALLBACK_TOKEN=starter-kit-token \
     "${checker_image}"
-docker logs "${callback}" 2>&1 | grep -q '"outcome":"StillVulnerable"'
+docker logs "${callback}" 2>&1 | grep -q '"outcome":"ExploitSucceeded"'
 
-docker cp "${root}/examples/fixes/valid/fix.sh" "${target}:/tmp/fix.sh"
+docker cp "${root}/examples/fixes/defense-succeeded/fix.sh" "${target}:/tmp/fix.sh"
 docker exec "${target}" /bin/sh /tmp/fix.sh
 
 docker run --rm --network "${network}" \
@@ -52,6 +52,6 @@ docker run --rm --network "${network}" \
     -e NOCTF_CALLBACK_URL=http://callback:8090/result \
     -e NOCTF_CALLBACK_TOKEN=starter-kit-token \
     "${checker_image}"
-docker logs "${callback}" 2>&1 | grep -q '"outcome":"Fixed"'
+docker logs "${callback}" 2>&1 | grep -q '"outcome":"DefenseSucceeded"'
 
 printf '%s\n' 'AWDP starter kit smoke test passed.'

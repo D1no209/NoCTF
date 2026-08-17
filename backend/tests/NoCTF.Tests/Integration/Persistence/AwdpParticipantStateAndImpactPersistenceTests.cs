@@ -170,7 +170,7 @@ public sealed class AwdpParticipantStatePersistenceTests
             OwnerId = userId,
             Mode = GameMode.Awdp,
             Title = "AWDP state",
-            DefinitionJson = "{\"schemaVersion\":3}",
+            DefinitionJson = "{\"schemaVersion\":4}",
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -181,7 +181,7 @@ public sealed class AwdpParticipantStatePersistenceTests
             ChallengeId = challengeId,
             IsPublished = true,
             BaseScore = 100,
-            RulesJson = "{\"schemaVersion\":3}",
+            RulesJson = "{\"schemaVersion\":4}",
             UpdatedAt = now
         });
         db.Teams.Add(new Team

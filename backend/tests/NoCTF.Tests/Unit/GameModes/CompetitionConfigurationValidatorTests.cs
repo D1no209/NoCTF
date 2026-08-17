@@ -62,7 +62,7 @@ public class CompetitionConfigurationValidatorTests
 
         var parsed = NoCTF.GameModes.Awdp.Configuration.AwdpConfigurationParser.ParseCompetition(json);
 
-        await Assert.That(parsed.SchemaVersion).IsEqualTo(3);
+        await Assert.That(parsed.SchemaVersion).IsEqualTo(4);
         await Assert.That(parsed.Break.DecayMode)
             .IsEqualTo(NoCTF.GameModes.Scoring.ScoreDecayMode.Quadratic);
         await Assert.That(parsed.Fix.DecayMode)
@@ -84,7 +84,7 @@ public class CompetitionConfigurationValidatorTests
     public async Task AwdpCompetitionConfiguration_RejectsChallengeDefinitionFields()
     {
         const string invalid =
-            """{"schemaVersion":3,"roundDurationSeconds":300,"break":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"fix":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"runtime":null}""";
+            """{"schemaVersion":4,"roundDurationSeconds":300,"break":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"fix":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"runtime":null}""";
 
         var errors = new GameModeCompetitionConfigurationValidator().Validate(
             GameMode.Awdp,

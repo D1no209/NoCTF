@@ -2,10 +2,9 @@ namespace NoCTF.Domain.Gameplay;
 
 public enum AwdpFixOutcome
 {
-    Fixed,
-    StillVulnerable,
-    RuleViolation,
-    ServiceUnavailable,
+    ExploitSucceeded,
+    DefenseSucceeded,
+    ServiceAbnormal,
     PatchFailed,
     PatchTimeout,
     PlatformFailed

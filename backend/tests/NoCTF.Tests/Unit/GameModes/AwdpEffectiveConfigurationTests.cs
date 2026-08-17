@@ -23,10 +23,9 @@ public sealed class AwdpEffectiveConfigurationTests
 
         await Assert.That(effective.Break.InitialPoints).IsEqualTo(500L);
         await Assert.That(effective.Fix.InitialPoints).IsEqualTo(500L);
-        await Assert.That(effective.BreakWrongPenalty).IsEqualTo(0L);
-        await Assert.That(effective.FixFailurePenalty).IsEqualTo(0L);
-        await Assert.That(effective.ViolationPenalty).IsEqualTo(100L);
-        await Assert.That(effective.ServiceDownPenalty).IsEqualTo(50L);
+        await Assert.That(effective.FlagWrongPenalty).IsEqualTo(0L);
+        await Assert.That(effective.ExploitSucceededPenalty).IsEqualTo(0L);
+        await Assert.That(effective.ServiceAbnormalPenalty).IsEqualTo(0L);
         await Assert.That(effective.RequireBreakBeforeFix).IsFalse();
         await Assert.That(effective.MaxBreakSubmissions).IsEqualTo(10);
         await Assert.That(effective.MaxFixSubmissions).IsEqualTo(10);

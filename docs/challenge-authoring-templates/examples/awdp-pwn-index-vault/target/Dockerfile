@@ -5,8 +5,8 @@ COPY src/pwn_note.c ./pwn_note.c
 
 RUN mkdir -p /out \
     && gcc -std=c17 -O2 -Wall -Wextra -Werror -DVARIANT=0 pwn_note.c -o /out/pwn-note-vulnerable \
-    && gcc -std=c17 -O2 -Wall -Wextra -Werror -DVARIANT=1 pwn_note.c -o /out/pwn-note-fixed \
-    && gcc -std=c17 -O2 -Wall -Wextra -Werror -DVARIANT=2 pwn_note.c -o /out/pwn-note-rule-violation
+    && gcc -std=c17 -O2 -Wall -Wextra -Werror -DVARIANT=1 pwn_note.c -o /out/pwn-note-defense-succeeded \
+    && gcc -std=c17 -O2 -Wall -Wextra -Werror -DVARIANT=2 pwn_note.c -o /out/pwn-note-service-abnormal-bypass
 
 FROM debian:bookworm-slim
 

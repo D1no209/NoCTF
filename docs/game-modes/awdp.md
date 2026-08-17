@@ -10,15 +10,15 @@ AWDP 由攻击与防御两条独立事实流组成；是否允许未完成 Break
 
 AWDP 不是 AWD，不使用 `FlagAttempt`、`AwdRound`、加固期、周期服务上下线检查、批量提交其他队伍轮次 Flag 或 AWD 目标列表。AWDP 的 Checker 只属于一次 Fix 验证，不会周期运行，也不会修改队伍的长期攻击 Runtime。
 
-## schema v3 配置
+## schema v4 配置
 
-新建 AWDP 比赛与比赛题目规则使用 `schemaVersion: 3`；题库技术定义继续使用其独立的 definition schema。Competition 配置包含：
+新建 AWDP 比赛与比赛题目规则使用 `schemaVersion: 4`；题库技术定义继续使用其独立的 definition schema。Competition 配置包含：
 
 ```text
 RoundDurationSeconds: int > 0
 Break / Fix: ScoreCurveConfiguration         // 两条互不影响的动态曲线
-BreakWrongPenalty / FixFailurePenalty: bigint >= 0
-ViolationPenalty / ServiceDownPenalty: bigint >= 0
+FlagWrongPenalty / ExploitSucceededPenalty: bigint >= 0
+ServiceAbnormalPenalty: bigint >= 0
 MaxBreakSubmissions / MaxFixSubmissions: int // <= 0 表示无限
 EvaluationDispatchMode: Automatic | ManualBatch
 FlagTemplate: PerTeamFlagTemplate
@@ -48,7 +48,7 @@ MaximumPatchUploadBytes
 
 ## 不兼容旧计分配置
 
-AWDP schema v3 是刻意的不兼容重设计，不读取或升级旧 `Milestone`、`PerRound`、固定 Points 或持续激活配置。旧 JSON 在保存、发布和 Start Gate 均被拒绝；工作人员必须明确重配两条分值曲线。GameplayFact 与永久比赛事件不被删除或改写，禁赛、解禁及重判通过同一确定性投影重新结算。
+AWDP schema v4 是刻意的不兼容重设计，不读取或升级旧 `Milestone`、`PerRound`、固定 Points、持续激活配置，或旧的 `FixFailurePenalty`、`ViolationPenalty`、`ServiceDownPenalty`。旧 JSON 在保存、发布和 Start Gate 均被拒绝；工作人员必须明确重配两条分值曲线与三类单次罚分。GameplayFact 与永久比赛事件不被删除或改写，禁赛、解禁及重判通过同一确定性投影重新结算。
 
 ## 攻击 Runtime
 
@@ -74,7 +74,7 @@ Flag 明文不得出现在 Runtime URL、普通 API 响应、前端状态、事�
 
 ## Break 判定
 
-AWDP 只接受单个 `BreakAttempt`。v2 只匹配当前 CompetitionChallenge 的精确 `RuntimeGeneration` Flag：
+AWDP 只接受单个 `BreakAttempt`，只匹配当前 CompetitionChallenge 的精确 `RuntimeGeneration` Flag：
 
 - 当前队伍当前 generation 的有效 Flag：`Correct`；
 - 普通错误 Flag：`Wrong`；
@@ -103,17 +103,16 @@ Checker 获得 `TARGET_HOST`、`TARGET_READY_TIMEOUT_SECONDS`、`NOCTF_CALLBACK_
 
 ```text
 POST /api/internal/v1/awdp/fix-results
-outcome: Fixed | StillVulnerable | RuleViolation | ServiceUnavailable
+outcome: ExploitSucceeded | DefenseSucceeded | ServiceAbnormal
 ```
 
 | outcome | Result / Failure |
 |---|---|
-| Fixed | Correct |
-| StillVulnerable | Wrong / AwdpFixFailed |
-| RuleViolation | Rejected / AwdpViolation |
-| ServiceUnavailable | Wrong / AwdpServiceDown |
+| DefenseSucceeded | Correct |
+| ExploitSucceeded | Wrong / AwdpExploitSucceeded |
+| ServiceAbnormal | Wrong / AwdpServiceAbnormal |
 
-Checker exit 0 只表示进程正常结束；没有成功 callback 时绝不能推导为 Fixed。非零退出、超时、无 callback、Runner、Provider 或存储故障为 PlatformFailed/稳定平台失败，不得记为 Correct。管理员显式 Rejudge 才会重新创建一次干净验证环境。
+Checker 应先把 EXP 作为子进程执行并捕获失败/崩溃，再执行正常服务交互；服务异常优先级高于 EXP 结果。Checker exit 0 只表示进程正常结束；没有成功 callback 时绝不能推导为 DefenseSucceeded。Runner 级整体验证超时会判为 `ServiceAbnormal`；Checker 主进程异常退出且没有可信业务结果、Runner、Provider 或存储故障为 `PlatformFailed`/稳定平台失败，不得记为 Correct。管理员显式 Rejudge 才会重新创建一次干净验证环境。
 
 ## Fix 重放与 revision fence
 
@@ -142,9 +141,9 @@ round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 - 两轨分数独立后相加。启用 `RequireBreakBeforeFix` 时，Fix 必须存在按权威顺序更早的 Correct Break；该 Break 被重判后会确定性重盘依赖结果；
 - Correct/Wrong 重判、队伍禁赛或解禁都会从原始事实全量重播所有轮次，不修改 GameplayFact 或永久事件；
 - Pause 不增加 EffectiveRunningTime，因此不推进收益；Resume 从原逻辑时间继续；Finish 使用结束时点冻结；
-- Break/Fix 失败罚分仍按每条事实一次性应用；Hint、ManualAdjustment、赛道过滤和 checked Int64 聚合保持原规则。
+- 三类单次罚分按每条唯一事实最多应用一次：Flag 错误使用 `FlagWrongPenalty`，Fix 验证得到 `ExploitSucceeded` 使用 `ExploitSucceededPenalty`，Fix 验证得到 `ServiceAbnormal` 使用 `ServiceAbnormalPenalty`；Patch 解包错误、Patch 命令非零/超时、Runner/Provider/存储平台失败不套用这三类选手业务罚分。Hint、ManualAdjustment、赛道过滤和 checked Int64 聚合保持原规则。
 
-即使没有新 GameplayFact，轮次边界也会冻结上一轮并开始显示新一轮的初始曲线值。singular maintenance 每 15 秒最多检查 500 场 Running AWDP schema v3 比赛，比较缓存快照 `DataAsOf` 对应轮次与当前逻辑轮；只有跨轮或缺失快照时设置 `LeaderboardDirty`。随后复用现有 `RefreshDirtyLeaderboards -> ProjectLeaderboard`、PostgreSQL 行锁、Wolverine Outbox 和原子缓存替换。没有新增 schedule 或积分状态表，也不会每秒写库。
+即使没有新 GameplayFact，轮次边界也会冻结上一轮并开始显示新一轮的初始曲线值。singular maintenance 每 15 秒最多检查 500 场 Running AWDP schema v4 比赛，比较缓存快照 `DataAsOf` 对应轮次与当前逻辑轮；只有跨轮或缺失快照时设置 `LeaderboardDirty`。随后复用现有 `RefreshDirtyLeaderboards -> ProjectLeaderboard`、PostgreSQL 行锁、Wolverine Outbox 和原子缓存替换。没有新增 schedule 或积分状态表，也不会每秒写库。
 
 ## 玩家状态接口
 

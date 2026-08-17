@@ -11,6 +11,7 @@ import type {
   NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol,
   NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol,
   NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
   NoCtfapiEndpointsNotificationsNotificationKindProtocol,
 } from '~/api'
@@ -65,6 +66,45 @@ export function gameplayFactResultLabel(result?: NoCtfapiEndpointsGameplayFactsG
   if (result === null || result === undefined) return translate('评测中')
   const labels = { Correct: translate("正确"), Wrong: translate("错误"), Duplicate: translate("重复"), AttemptsExhausted: translate("次数耗尽"), Rejected: translate("已拒绝"), Unlocked: translate("已解锁"), Applied: translate("已应用"), ServiceUp: translate("服务正常"), ServiceDown: translate("服务异常"), Controlled: translate("已控制"), Uncontrolled: translate("未控制") } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol, string>
   return labels[result]
+}
+
+export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null): string {
+  if (!code) return '—'
+  const labels = {
+    FlagNotSupported: translate('当前模式不支持 Flag 提交'),
+    FixNotSupported: translate('当前模式不支持 Fix 提交'),
+    BreakAttemptsExhausted: translate('Break 提交次数已用尽'),
+    FixAttemptsExhausted: translate('Fix 提交次数已用尽'),
+    BreakRequired: translate('需要先完成 Break'),
+    ArchiveValidationUnavailable: translate('Fix 归档验证不可用'),
+    FixArchiveMissing: translate('缺少 Fix 归档'),
+    FixArchiveLengthMismatch: translate('Fix 归档大小不一致'),
+    FixArchiveContentTypeMismatch: translate('Fix 归档类型不一致'),
+    FixArchiveHashMismatch: translate('Fix 归档哈希不一致'),
+    StorageTimeout: translate('存储访问超时'),
+    StorageUnavailable: translate('存储不可用'),
+    CheckerPlatformError: translate('Checker 平台错误'),
+    SelfAttackRejected: translate('不能攻击本队'),
+    DuplicateAttack: translate('重复攻击'),
+    DuplicateAchievement: translate('重复达成'),
+    UnknownTeamIdentifier: translate('未知队伍标识'),
+    InvalidObservation: translate('观测结果无效'),
+    ProducerTimeout: translate('Flag 生成超时'),
+    ProducerUnavailable: translate('Flag 生成器不可用'),
+    AmbiguousFlagMatch: translate('Flag 匹配不唯一'),
+    FlagExpired: translate('Flag 已过期'),
+    RoundOutOfRange: translate('轮次超出范围'),
+    HardeningActive: translate('黑灯期暂不可提交'),
+    AwdpExploitSucceeded: translate('EXP 仍可利用'),
+    AwdpPatchFailed: translate('Patch 执行失败'),
+    AwdpPatchTimeout: translate('Patch 执行超时'),
+    AwdpServiceAbnormal: translate('服务异常'),
+    AwdpViolation: translate('旧 AWDP 违规记录'),
+    ForeignTeamFlagDetected: translate('提交了非本队 Flag'),
+    InsufficientScore: translate('分数不足'),
+    HintUnavailable: translate('提示不可用'),
+  } satisfies Record<NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol, string>
+  return labels[code]
 }
 
 /** 评测是否仍在进行中(需要继续轮询)。 */

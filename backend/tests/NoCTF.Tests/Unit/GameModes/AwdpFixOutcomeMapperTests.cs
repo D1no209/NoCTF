@@ -7,10 +7,9 @@ namespace NoCTF.Tests.Unit.GameModes;
 public sealed class AwdpFixOutcomeMapperTests
 {
     [Test]
-    [Arguments(AwdpFixOutcome.Fixed, GameplayFactResult.Correct, null)]
-    [Arguments(AwdpFixOutcome.StillVulnerable, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpFixFailed)]
-    [Arguments(AwdpFixOutcome.RuleViolation, GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpViolation)]
-    [Arguments(AwdpFixOutcome.ServiceUnavailable, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceDown)]
+    [Arguments(AwdpFixOutcome.DefenseSucceeded, GameplayFactResult.Correct, null)]
+    [Arguments(AwdpFixOutcome.ExploitSucceeded, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpExploitSucceeded)]
+    [Arguments(AwdpFixOutcome.ServiceAbnormal, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceAbnormal)]
     [Arguments(AwdpFixOutcome.PatchFailed, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchFailed)]
     [Arguments(AwdpFixOutcome.PatchTimeout, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchTimeout)]
     [Arguments(AwdpFixOutcome.PlatformFailed, null, GameplayFactFailureCode.CheckerPlatformError)]
@@ -33,7 +32,7 @@ public sealed class AwdpFixOutcomeMapperTests
             Guid.Parse("22222222-2222-2222-2222-222222222222"),
             generation: 3,
             runtimeProcessingVersion: 5,
-            AwdpFixOutcome.RuleViolation,
+            AwdpFixOutcome.ServiceAbnormal,
             DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(result.GameplayFactId)

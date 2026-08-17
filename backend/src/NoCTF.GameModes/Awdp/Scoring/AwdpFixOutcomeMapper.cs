@@ -10,13 +10,11 @@ public static class AwdpFixOutcomeMapper
 {
     public static AwdpFixDecision Map(AwdpFixOutcome outcome) => outcome switch
     {
-        AwdpFixOutcome.Fixed => new(GameplayFactResult.Correct, null),
-        AwdpFixOutcome.StillVulnerable =>
-            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpFixFailed),
-        AwdpFixOutcome.RuleViolation =>
-            new(GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpViolation),
-        AwdpFixOutcome.ServiceUnavailable =>
-            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceDown),
+        AwdpFixOutcome.DefenseSucceeded => new(GameplayFactResult.Correct, null),
+        AwdpFixOutcome.ExploitSucceeded =>
+            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpExploitSucceeded),
+        AwdpFixOutcome.ServiceAbnormal =>
+            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceAbnormal),
         AwdpFixOutcome.PatchFailed =>
             new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchFailed),
         AwdpFixOutcome.PatchTimeout =>

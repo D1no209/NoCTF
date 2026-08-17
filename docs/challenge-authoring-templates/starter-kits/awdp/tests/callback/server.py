@@ -5,10 +5,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 EXPECTED_TOKEN = os.environ["EXPECTED_TOKEN"]
 ALLOWED_OUTCOMES = {
-    "Fixed",
-    "StillVulnerable",
-    "RuleViolation",
-    "ServiceUnavailable",
+    "ExploitSucceeded",
+    "DefenseSucceeded",
+    "ServiceAbnormal",
 }
 
 

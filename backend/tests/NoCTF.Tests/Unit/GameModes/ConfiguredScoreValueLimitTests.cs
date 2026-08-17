@@ -84,10 +84,9 @@ public sealed class ConfiguredScoreValueLimitTests
                           Break = awdpBase.Break with { InitialPoints = OverMaximum }
                      },
                       awdpBase with { Fix = awdpBase.Fix with { InitialPoints = OverMaximum } },
-                     awdpBase with { BreakWrongPenalty = OverMaximum },
-                     awdpBase with { FixFailurePenalty = OverMaximum },
-                     awdpBase with { ViolationPenalty = OverMaximum },
-                     awdpBase with { ServiceDownPenalty = OverMaximum }
+                     awdpBase with { FlagWrongPenalty = OverMaximum },
+                     awdpBase with { ExploitSucceededPenalty = OverMaximum },
+                     awdpBase with { ServiceAbnormalPenalty = OverMaximum }
                  })
         {
             await Assert.That(AwdpConfigurationValidator.Validate(configuration)).IsNotEmpty();
@@ -171,10 +170,9 @@ public sealed class ConfiguredScoreValueLimitTests
                           Break = awdpBase.Break! with { InitialPoints = OverMaximum }
                      },
                       awdpBase with { Fix = awdpBase.Fix! with { InitialPoints = OverMaximum } },
-                     awdpBase with { BreakWrongPenalty = OverMaximum },
-                     awdpBase with { FixFailurePenalty = OverMaximum },
-                     awdpBase with { ViolationPenalty = OverMaximum },
-                     awdpBase with { ServiceDownPenalty = OverMaximum }
+                     awdpBase with { FlagWrongPenalty = OverMaximum },
+                     awdpBase with { ExploitSucceededPenalty = OverMaximum },
+                     awdpBase with { ServiceAbnormalPenalty = OverMaximum }
                  })
         {
             await Assert.That(AwdpConfigurationValidator.Validate(configuration)).IsNotEmpty();
@@ -213,11 +211,12 @@ public sealed class ConfiguredScoreValueLimitTests
         RoundDurationSeconds: 300,
         Break: new(value, value, 2, ScoreDecayMode.Fixed),
         Fix: new(value, value, 2, ScoreDecayMode.Fixed),
-        ViolationPenalty: value,
-        ServiceDownPenalty: value,
+        FlagWrongPenalty: value,
+        ExploitSucceededPenalty: value,
+        ServiceAbnormalPenalty: value,
         RequireBreakBeforeFix: false,
-        BreakWrongPenalty: value,
-        FixFailurePenalty: value);
+        MaxBreakSubmissions: 10,
+        MaxFixSubmissions: 10);
 
     private static AwdpChallengeConfiguration CreateAwdpChallenge(long value) => new(
         AwdpChallengeConfiguration.CurrentSchemaVersion,
@@ -226,8 +225,7 @@ public sealed class ConfiguredScoreValueLimitTests
         RequireBreakBeforeFix: null,
         MaxBreakSubmissions: null,
         MaxFixSubmissions: null,
-        BreakWrongPenalty: value,
-        FixFailurePenalty: value,
-        ViolationPenalty: value,
-        ServiceDownPenalty: value);
+        FlagWrongPenalty: value,
+        ExploitSucceededPenalty: value,
+        ServiceAbnormalPenalty: value);
 }

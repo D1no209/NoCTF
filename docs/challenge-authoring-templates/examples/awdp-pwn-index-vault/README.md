@@ -23,7 +23,7 @@ awdp-pwn-index-vault/
 ├─ README.md
 ├─ checker/{Dockerfile,checker.py}
 ├─ deploy/docker-compose.attack.yml.example
-├─ fixes/{fixed,still-vulnerable,rule-violation,service-unavailable,nonzero,timeout}/fix.sh
+├─ fixes/{defense-succeeded,exploit-succeeded,service-abnormal-bypass,service-abnormal-down,nonzero,timeout}/fix.sh
 ├─ scripts/{build-fix-packages.sh,build-invalid-fix-packages.py,package-delivery.sh}
 ├─ target/{Dockerfile,src/pwn_note.c}
 ├─ tests/{callback/,invalid-archives.sh,smoke.sh}
@@ -48,10 +48,10 @@ chmod +x scripts/*.sh scripts/*.py tests/*.sh fixes/*/fix.sh tools/exploit.py
 
 | 归档 | 平台结果 |
 | --- | --- |
-| `fixed.tar.gz` | `Fixed` |
-| `still-vulnerable.tar.gz` | `StillVulnerable` |
-| `rule-violation.tar.gz` | `RuleViolation` |
-| `service-unavailable.tar.gz` | `ServiceUnavailable` |
+| `defense-succeeded.tar.gz` | `DefenseSucceeded` |
+| `exploit-succeeded.tar.gz` | `ExploitSucceeded` |
+| `service-abnormal-bypass.tar.gz` | `ServiceAbnormal` |
+| `service-abnormal-down.tar.gz` | `ServiceAbnormal` |
 | `nonzero.tar.gz` | `AwdpPatchFailed` |
 | `timeout.tar.gz` | `AwdpPatchTimeout` |
 

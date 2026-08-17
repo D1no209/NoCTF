@@ -4,12 +4,20 @@ from pathlib import Path
 
 
 fixed_path = Path("/dev/shm/fixed")
-rule_violation_path = Path("/dev/shm/rule-violation")
+service_abnormal_bypass_path = Path("/dev/shm/service-abnormal-bypass")
 service_down_path = Path("/dev/shm/service-down")
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path == "/health":
+            if service_down_path.exists():
+                self.respond(503, "down")
+            elif service_abnormal_bypass_path.exists():
+                self.respond(200, "tampered")
+            else:
+                self.respond(200, "ok")
+            return
         if self.path == "/flag":
             flag = os.environ.get("FLAG")
             if flag:
@@ -23,7 +31,7 @@ class Handler(BaseHTTPRequestHandler):
         if service_down_path.exists():
             self.respond(503, "unavailable")
             return
-        if rule_violation_path.exists():
+        if service_abnormal_bypass_path.exists():
             self.respond(200, "broken")
             return
         self.respond(200, "fixed" if fixed_path.exists() else "vulnerable")

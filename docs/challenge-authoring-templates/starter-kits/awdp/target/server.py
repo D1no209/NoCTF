@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 FIXED = Path("/dev/shm/fixed")
-RULE_VIOLATION = Path("/dev/shm/rule-violation")
+SERVICE_ABNORMAL_BYPASS = Path("/dev/shm/service-abnormal-bypass")
 SERVICE_DOWN = Path("/dev/shm/service-down")
 
 
@@ -12,7 +12,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/health":
             if SERVICE_DOWN.exists():
                 self.respond(503, "down")
-            elif RULE_VIOLATION.exists():
+            elif SERVICE_ABNORMAL_BYPASS.exists():
                 self.respond(200, "tampered")
             else:
                 self.respond(200, "ok")

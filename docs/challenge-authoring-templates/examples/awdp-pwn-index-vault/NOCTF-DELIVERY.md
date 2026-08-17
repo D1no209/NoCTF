@@ -48,11 +48,10 @@ Runtime generation 的动态 Flag。Break 必须从本队 Player 实例中取得
 | 字段 | 建议 |
 | --- | --- |
 | 轮次 | `300` 秒 |
-| Break / Fix | `PerRound 50` / `PerRound 50` |
+| Break / Fix 分值曲线 | 以 `50` 为初始分的比赛默认曲线 |
 | RequireBreakBeforeFix | 按比赛需求开启或关闭 |
 | 最大 Break / Fix | `10` / `10` |
-| 违规 / 服务不可用罚分 | `100` / `50` |
-| 错误 Break / Fix 失败罚分 | `0` / `0` |
+| Flag 错误 / EXP 成功 / 服务异常罚分 | `0` / `0` / `0` |
 | 派发 | `Automatic` |
 
 本场比赛的 Flag 头、正文模板和 Leet 选项在比赛题目规则中配置。题库只声明 `FLAG`
@@ -63,7 +62,7 @@ Runtime generation 的动态 Flag。Break 必须从本队 Player 实例中取得
 - [ ] 两支队伍的 Player Runtime、端口与动态 Flag 相互独立。
 - [ ] Reset 后新 generation Flag 可用，旧 Flag 变为 `FlagExpired`。
 - [ ] 外队 Flag 被拒绝并生成工作人员可见证据。
-- [ ] 六类 Fix 结果与九类非法归档全部符合预期。
+- [ ] 三态 Fix 业务结果、Patch 非零/超时诊断与九类非法归档全部符合预期。
 - [ ] Checker 只回调一次，回调失败或非零退出收敛为平台失败。
 - [ ] Fix 完成后 target、checker、网络、工作目录、端口和容量已回收。
 - [ ] 日志和响应不含 Flag、Token 或 callback URL。

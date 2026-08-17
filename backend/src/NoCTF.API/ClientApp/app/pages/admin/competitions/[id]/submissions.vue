@@ -472,9 +472,14 @@ onMounted(() => {
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge v-if="s.result !== null && s.result !== undefined" :variant="s.result === 'Correct' ? 'default' : 'outline'">
-                {{ enumLabel(GameplayFactResultLabel, s.result) }}
-              </Badge>
+              <div v-if="s.result !== null && s.result !== undefined || s.failureCode" class="flex flex-col items-start gap-1">
+                <Badge v-if="s.result !== null && s.result !== undefined" :variant="s.result === 'Correct' ? 'default' : 'outline'">
+                  {{ enumLabel(GameplayFactResultLabel, s.result) }}
+                </Badge>
+                <span v-if="s.failureCode" class="text-xs text-muted-foreground">
+                  {{ gameplayFactFailureCodeLabel(s.failureCode) }}
+                </span>
+              </div>
               <span v-else class="text-muted-foreground">-</span>
             </TableCell>
             <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(s.occurredAt) }}</TableCell>
@@ -509,7 +514,7 @@ onMounted(() => {
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(GameplayFactKindLabel, detail.kind) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('评测状态') }}</span><span>{{ enumLabel(GameplayFactStateLabel, detail.state) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('结果') }}</span><span>{{ detail.result !== null && detail.result !== undefined ? enumLabel(GameplayFactResultLabel, detail.result) : '-' }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败代码') }}</span><span>{{ detail.failureCode ?? '-' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败原因') }}</span><span>{{ gameplayFactFailureCodeLabel(detail.failureCode) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('提交时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.occurredAt) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('更新时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.updatedAt) }}</span></div>
         </div>

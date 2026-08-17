@@ -1,27 +1,23 @@
 #!/bin/sh
 set -eu
 
-remaining="${TARGET_READY_TIMEOUT_SECONDS}"
-health=''
-while [ "${remaining}" -gt 0 ]; do
-    health="$(wget -qO- -T 2 "http://${TARGET_HOST}:8080/health" 2>/dev/null || true)"
-    [ -n "${health}" ] && break
-    remaining=$((remaining - 1))
-    sleep 1
-done
-
-if [ -z "${health}" ]; then
-    outcome='ServiceUnavailable'
-elif [ "${health}" != 'ok' ]; then
-    outcome='RuleViolation'
+exp_succeeded=false
+exp_timed_out=false
+if timeout "${TARGET_READY_TIMEOUT_SECONDS}" /exploit.sh "${TARGET_HOST}"; then
+    exp_succeeded=true
 else
-    state="$(wget -qO- -T 2 "http://${TARGET_HOST}:8080/status" 2>/dev/null || true)"
-    case "${state}" in
-        fixed) outcome='Fixed' ;;
-        vulnerable) outcome='StillVulnerable' ;;
-        '') outcome='ServiceUnavailable' ;;
-        *) outcome='RuleViolation' ;;
-    esac
+    exp_status=$?
+    [ "${exp_status}" -ne 124 ] || exp_timed_out=true
+fi
+
+# EXP 的失败或崩溃不会终止 Checker；正常服务检查拥有最终优先级。
+health="$(wget -qO- -T 2 "http://${TARGET_HOST}:8080/health" 2>/dev/null || true)"
+if [ "${exp_timed_out}" = true ] || [ "${health}" != 'ok' ]; then
+    outcome='ServiceAbnormal'
+elif [ "${exp_succeeded}" = true ]; then
+    outcome='ExploitSucceeded'
+else
+    outcome='DefenseSucceeded'
 fi
 
 wget -qO /dev/null -T 5 \
