@@ -1,5 +1,52 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-17 alpha.42 AWDP 队伍攻击实例与一次性 Fix 语义收口
+
+- 本阶段以 `origin/main@b96f4cc5` 为基线，在独立分支
+  `codex/awdp-player-fix-20260817` / 工作树
+  `E:\SourceCode\NoCTF-awdp-player-fix-20260817` 完成，没有覆盖主工作区
+  `E:\SourceCode\NoCTF` 中的其他修改。提交依次为：`0eca4032`（AWDP 队伍攻击
+  Runtime、generation Flag 注入与按模式判定）、`8a9be67a`（前端 AWDP 攻击/防御配置体验）、
+  `d2c2f010`（AWDP Full E2E、Fix 归档边界测试与 index-vault 示例题更新）和
+  `957d865b`（版本由 `0.1.0-alpha.41` 递增为 `0.1.0-alpha.42`）。
+- AWDP 现在严格区分队伍攻击实例与一次性 Fix 验证实例：选手侧可为本队启动 Player/PerTeam
+  攻击 Runtime，平台在每个 Runtime generation 自动生成并注入本队精确 Flag；Fix 验证仍使用
+  TeamId 为空、无公开入口的一次性 `AwdpTarget`，不会把 Fix 建模为 Flag 操作，也不会复用 AWD
+  的轮询服务语义。容器题目的动态 Flag 配置留在比赛题目管理处，题库模板只保留 Runtime/Checker
+  与注入位置等技术定义，方便不同比赛使用不同 Flag 头。
+- Runner 在 AWDP Player Runtime 领取时会要求存在当前 generation 的 exact Flag，并在容器创建前通过
+  Runtime claim 注入环境变量；Runner 成功创建后激活该 generation 的 Flag，停止、重置或 generation
+  变化时旧 Flag 失效。AWDP Break 只接受本队当前 generation 的 Flag；本队 Flag、其他队伍 Flag、过期
+  Flag、重复 Flag 与错误 Flag 继续按强类型 GameplayFact 规则判定。
+- 前端 AWDP 配置默认展示“攻击轨 · Break”和“防御轨 · Fix”：攻击 Runtime 使用本队独立实例、`FLAG`
+  环境变量和 OwnerOnly 访问 URL；Fix 区域强调补丁包只执行一次 Checker。前端没有新增手写 API URL、
+  DTO 或枚举；本阶段 API/OpenAPI/TypeScript SDK 无实质契约变化，`bun run api:gen` 后 `app/api`
+  内容无漂移。
+- AWDP Full E2E 已覆盖：开赛前不能启动环境、三支队伍 Player Runtime 分配、Break 成功/错误/重复/过期/
+  外队 Flag、Fix 成功、StillVulnerable、RuleViolation、ServiceUnavailable、补丁非零退出、超时、
+  缺少 `fix.sh`、空包、绝对路径、`../` 路径穿越、符号链接、硬链接、重复路径、非 gzip、超限包、
+  pause 后逻辑轮冻结、resume 后继续计分、finish 后释放 Runtime。测试夹具同步更新为可区分
+  `Fixed`、`StillVulnerable`、`RuleViolation` 和 `ServiceUnavailable`。
+- `docs/challenge-authoring-templates/examples/awdp-pwn-index-vault/` 已同步到新模型：目标镜像不再烘焙真实
+  Flag，服务从环境变量读取动态 Flag；Checker 不依赖固定 Flag 前缀；新增非法 Fix 包生成脚本和烟测，
+  覆盖合法 Fix 与多类非法归档。starter-kit 和权威文档同步强调：AWDP 出题人配置攻击 Runtime、
+  Checker 和 Fix 契约，不手工创建队伍 Flag 或把 Break/Fix 混为同一操作。
+- 验证通过：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：0 warning / 0 error。
+  - `powershell -ExecutionPolicy Bypass -File backend/scripts/Verify-Backend.ps1 -RequireDockerIntegration`：
+    Release build 0 warning / 0 error；非 Integration TUnit 793/793；真实 PostgreSQL、Redis、Wolverine、
+    Docker Integration 175/177 通过、0 失败，Kubernetes 与 Libvirt 两项因专用环境未配置按设计跳过；
+    EF model drift 无变化；OpenAPI export 与 artifact drift 通过；`git diff --check` 通过。
+  - `dotnet run --file backend/tests/e2e.cs -- --mode awdp --suite full`：AWDP Full E2E 1/1，通过后 resilience
+    检查也通过；E2E Docker 容器、网络、卷和本地镜像已由编排器精确清理。
+  - `bun test`：203/203；`bun run typecheck`：通过；`bun run build`：通过，仅保留既有大 chunk、
+    plugin timing 与 Node exports deprecation 警告。
+  - `bun run api:gen; git diff --exit-code -- app/api`：通过，无 SDK 内容漂移。
+  - WSL 下 `tests/invalid-archives.sh` 与 `tests/smoke.sh`：均通过。
+- 本阶段没有新增业务表、列、migration 或 snapshot，没有固定或改写题目 Runtime/Checker/Compose 镜像
+  digest，没有新增 registry allowlist，没有推送、部署或操作生产数据。生产仍以既有远程 `main` 和当前
+  部署为准，等待新的明确授权。
+
 ## 2026-08-17 alpha.41 AWDP 持续攻击、防御与按轮计分模型
 
 - 本阶段以 `origin/main@40722584` 为基线，在独立分支
