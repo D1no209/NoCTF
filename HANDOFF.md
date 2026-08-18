@@ -8,7 +8,13 @@
 - StartGate 中包含不支持 `schemaVersion` 的 `CompetitionConfigurationInvalid`、`RuntimeDefinitionInvalid`、`ChallengeRulesInvalid` 已按强类型 code 显示中文/英文可操作提示，并保留关联题目的“查看题目”入口。
 - OpenAPI 与 TypeScript SDK 已由工具重新生成：创建/更新题目模板的 `definitionJson` 变为可选；缺省语义由 Application 负责。二次导出和生成哈希一致，未手工修改生成文件。
 - `cc54f615` 将平台版本从 `0.1.0-alpha.49` 递增为 `0.1.0-alpha.50`。
-- 本阶段没有新增业务表、字段或 EF migration；未查询或修改生产数据，因请求未提供待检查的具体比赛 ID；未推送、未部署。
+- 本阶段没有新增业务表、字段或 EF migration；未查询或修改业务数据，因请求未提供待检查的具体比赛 ID。
+- 已将远程 `main` 从 `35186e2b` 快进到 `4befa3b9`，并部署生产测试环境 `https://101.43.46.244/`：
+  - 远端 `/root/NoCTF` 保留 `.env` 与未跟踪的 `deploy/docker-compose.prod.yml`，同步到 `4befa3b9`。
+  - 后端、Worker、Runner 与 migration 镜像均在远端由同一源码成功构建；留存标签为 `alpha50-4befa3b9`。
+  - migration 返回数据库已是最新状态，没有应用新迁移；随后重建 backend、worker、runner。
+  - 新容器镜像 ID：backend `sha256:e7915ac6b1fff53c8ebe66367c6fe5a7f17b4b9bbcfea56383694d003f752f7e`、worker `sha256:f02b67ccb9508a48f0ecaa00bad8b8abd871bef6fbac027820a0517c933ae8f0`、runner `sha256:de41f9b8dc85bd06d1142e4dad7bd9327b81bcfefd642e92b9c3b455115f53da`。
+  - 三个应用容器均为 `running/healthy`；外部 `/health`、`/health/ready` 与首页均返回 HTTP 200；启动后五分钟日志未发现新的 `fail`、`error`、`exception` 或 `critical` 输出。
 - 验证结果：
   - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error（版本递增后复跑）。
   - 非 Integration TUnit：810/810 通过。
