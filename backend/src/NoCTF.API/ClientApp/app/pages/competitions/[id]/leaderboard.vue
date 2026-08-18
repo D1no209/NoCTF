@@ -2,6 +2,8 @@
 import {
   Download,
   Medal,
+  ShieldCheck,
+  Swords,
   Trophy,
 } from '@lucide/vue'
 import { getLeaderboardEndpoint } from '~/api'
@@ -15,6 +17,7 @@ import type { ChallengeInfo, LeaderboardCell, MatrixEntry, TrendSeries } from '~
 const route = useRoute()
 const competitionId = route.params.id as string
 const ctx = inject(competitionContextKey)!
+const isAwdp = computed(() => ctx.competition.value?.mode === 'Awdp')
 
 const leaderboard = ref<NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null>(null)
 const loading = ref(true)
@@ -110,6 +113,11 @@ function slotFor(teamId?: string, challengeId?: string) {
 
 function cellText(slot: LeaderboardCell, title: string): string {
   const parts = [title]
+  if (isAwdp.value) {
+    parts.push(translate('攻击 {score} 分', { score: slot.attackScore ?? 0 }))
+    parts.push(translate('防御 {score} 分', { score: slot.defenseScore ?? 0 }))
+    return parts.join(' · ')
+  }
   if (slot.score !== undefined) parts.push(translate('{score} 分', { score: slot.score }))
   if (slot.bloodRank) parts.push(bloodRankLabel(slot.bloodRank))
   if (slot.solvedAt) parts.push(formatDateTime(slot.solvedAt))
@@ -182,17 +190,22 @@ function openDetail(entry: (typeof entries.value)[number]) {
 function exportCsv() {
   const board = leaderboard.value
   if (!board) return
-  const header = [translate("名次"), translate("队伍"), translate("总分"), translate("解题数"), translate("最后得分"), ...challenges.value.map((c) => c.title ?? '题目')]
+  const scoreHeaders = isAwdp.value
+    ? [translate('攻击分'), translate('防御分'), translate('罚分'), translate('总分')]
+    : [translate('总分'), translate('解题数'), translate('最后得分')]
+  const header = [translate('名次'), translate('队伍'), ...scoreHeaders, ...challenges.value.map((c) => c.title ?? translate('题目'))]
   const rows = entries.value.map((entry) => [
     entry.rank ?? '',
     entry.teamName ?? '',
-    entry.score ?? 0,
-    entry.solveCount ?? 0,
-    entry.lastScoreAt ? formatDateTime(entry.lastScoreAt) : '',
+    ...(isAwdp.value
+      ? [entry.attackScore ?? 0, entry.defenseScore ?? 0, entry.penaltyScore ?? 0, entry.score ?? 0]
+      : [entry.score ?? 0, entry.solveCount ?? 0, entry.lastScoreAt ? formatDateTime(entry.lastScoreAt) : '']),
     ...challenges.value.map((challenge) => {
       const slot = slotFor(entry.teamId, challenge.competitionChallengeId)
       if (!slot) return ''
-      return slot.score ?? 0
+      return isAwdp.value
+        ? `${translate('攻击')} ${slot.attackScore ?? 0} / ${translate('防御')} ${slot.defenseScore ?? 0}`
+        : slot.score ?? 0
     }),
   ])
   const escape = (value: unknown) => `"${String(value).replaceAll('"', '""')}"`
@@ -250,6 +263,17 @@ function exportCsv() {
           {{ $t('排行榜已冻结，以下为截至 {time} 的快照。', { time: formatDateTime(leaderboard.dataAsOf) }) }}
         </AlertDescription>
       </Alert>
+      <Alert v-if="isAwdp && leaderboard.dataScope !== 'Hidden'">
+        <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
+          <span>
+            {{ $t('当前第 {current} 轮，已结算至第 {settled} 轮。', {
+              current: leaderboard.currentRound ?? 1,
+              settled: leaderboard.settledThroughRound ?? 0,
+            }) }}
+          </span>
+          <span class="text-muted-foreground">{{ $t('本轮攻击与防御成绩将在轮次结束后统一结算。') }}</span>
+        </AlertDescription>
+      </Alert>
       <Empty v-if="leaderboard.dataScope === 'Hidden'" class="border py-12">
         <EmptyHeader>
           <EmptyTitle>{{ $t('排行榜暂不公开') }}</EmptyTitle>
@@ -258,7 +282,7 @@ function exportCsv() {
       </Empty>
 
       <template v-else>
-        <Card v-if="hasAnySeries">
+        <Card v-if="hasAnySeries && !isAwdp">
           <CardContent class="pt-6">
             <ScoreTrendChart
               :title="`${ctx.competition.value?.title ?? ''} - TOP10`"
@@ -282,7 +306,7 @@ function exportCsv() {
                 <Table>
                   <TableHeader>
                     <TableRow v-if="showGroupLabels && directionGroups.length">
-                      <TableHead colspan="3" />
+                      <TableHead :colspan="isAwdp ? 6 : 3" />
                       <TableHead
                         v-for="group in directionGroups"
                         :key="group.direction"
@@ -302,6 +326,11 @@ function exportCsv() {
                     <TableRow>
                       <TableHead class="w-14">{{ $t('名次') }}</TableHead>
                       <TableHead class="sticky left-0 z-10 min-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
+                      <template v-if="isAwdp">
+                        <TableHead class="w-24 text-right">{{ $t('攻击分') }}</TableHead>
+                        <TableHead class="w-24 text-right">{{ $t('防御分') }}</TableHead>
+                        <TableHead class="w-24 text-right">{{ $t('罚分') }}</TableHead>
+                      </template>
                       <TableHead class="w-24 text-right">{{ $t('总分') }}</TableHead>
                       <TableHead
                         v-for="challenge in challenges"
@@ -340,13 +369,29 @@ function exportCsv() {
                           </Badge>
                         </span>
                       </TableCell>
+                      <template v-if="isAwdp">
+                        <TableCell class="text-right font-mono tabular-nums">{{ entry.attackScore ?? 0 }} pts</TableCell>
+                        <TableCell class="text-right font-mono tabular-nums">{{ entry.defenseScore ?? 0 }} pts</TableCell>
+                        <TableCell class="text-right font-mono tabular-nums" :class="(entry.penaltyScore ?? 0) > 0 ? 'text-destructive' : 'text-muted-foreground'">
+                          {{ entry.penaltyScore ?? 0 }} pts
+                        </TableCell>
+                      </template>
                       <TableCell class="text-right font-mono font-semibold tabular-nums">{{ entry.score }} pts</TableCell>
                       <TableCell
                         v-for="challenge in challenges"
                         :key="challenge.competitionChallengeId"
                         class="border-l text-center"
                       >
-                        <template v-if="slotFor(entry.teamId, challenge.competitionChallengeId)">
+                        <template v-if="isAwdp && slotFor(entry.teamId, challenge.competitionChallengeId)">
+                          <div
+                            class="flex items-center justify-center gap-2 font-mono text-xs tabular-nums"
+                            :title="cellText(slotFor(entry.teamId, challenge.competitionChallengeId)!, challenge.title ?? '')"
+                          >
+                            <span class="inline-flex items-center gap-1"><Swords class="size-3.5 text-primary" />{{ slotFor(entry.teamId, challenge.competitionChallengeId)?.attackScore ?? 0 }}</span>
+                            <span class="inline-flex items-center gap-1"><ShieldCheck class="size-3.5 text-emerald-600" />{{ slotFor(entry.teamId, challenge.competitionChallengeId)?.defenseScore ?? 0 }}</span>
+                          </div>
+                        </template>
+                        <template v-else-if="slotFor(entry.teamId, challenge.competitionChallengeId)">
                           <Medal
                             class="mx-auto size-5"
                             :class="medalBloodRankClass(slotFor(entry.teamId, challenge.competitionChallengeId)?.bloodRank) ?? 'text-muted-foreground/50'"
@@ -376,6 +421,7 @@ function exportCsv() {
         v-model:open="detailOpen"
         :competition-id="competitionId"
         :entry="detailEntry"
+        :mode="ctx.competition.value?.mode"
         :series="detailSeries"
         :challenges="challenges"
         :range-start="ctx.competition.value?.startTime"

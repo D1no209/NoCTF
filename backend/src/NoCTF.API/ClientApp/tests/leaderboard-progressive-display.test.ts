@@ -19,4 +19,21 @@ describe('leaderboard progressive display', () => {
     expect(page).not.toContain('@click="page--"')
     expect(page).not.toContain('@click="page++"')
   })
+
+  test('renders AWDP as settled attack and defense scores', async () => {
+    const detail = await Bun.file(
+      new URL('../app/components/leaderboard/TeamDetailDialog.vue', import.meta.url),
+    ).text()
+
+    expect(page).toContain('leaderboard.currentRound')
+    expect(page).toContain('leaderboard.settledThroughRound')
+    expect(page).toContain('本轮攻击与防御成绩将在轮次结束后统一结算')
+    expect(page).toContain('entry.attackScore')
+    expect(page).toContain('entry.defenseScore')
+    expect(page).toContain('entry.penaltyScore')
+    expect(detail).toContain('题目攻击与防御得分')
+    expect(detail).toContain('entry.attackScore')
+    expect(detail).toContain('entry.defenseScore')
+    expect(detail).toContain('entry.penaltyScore')
+  })
 })

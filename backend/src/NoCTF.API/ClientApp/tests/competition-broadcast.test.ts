@@ -31,6 +31,8 @@ describe('competition broadcast projection', () => {
       'HintPublished',
       'ChallengeDescriptionUpdated',
       'ChallengePublished',
+      'AwdpBreakAttempted',
+      'AwdpFixAttempted',
     ])
   })
 
@@ -51,6 +53,10 @@ describe('competition broadcast projection', () => {
       .toBe('题目「Web 100」已更新描述')
     expect(competitionBroadcastText(event('ChallengePublished')))
       .toBe('题目「Web 100」已开放')
+    expect(competitionBroadcastText(event('AwdpBreakAttempted')))
+      .toBe('队伍「Alpha」对题目「Web 100」进行了一次攻击操作')
+    expect(competitionBroadcastText(event('AwdpFixAttempted')))
+      .toBe('队伍「Alpha」对题目「Web 100」提交了一次防御操作')
   })
 
   test('links challenge broadcasts to the matching challenge', () => {

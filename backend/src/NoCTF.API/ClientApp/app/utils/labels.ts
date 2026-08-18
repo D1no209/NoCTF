@@ -157,6 +157,7 @@ export function competitionEventText(
     TeamMemberJoined: translate('队伍「{team}」加入了新成员', { team }), TeamBanned: translate('队伍「{team}」被封禁', { team }), TeamUnbanned: translate('队伍「{team}」已解除封禁', { team }), TeamBanCorrectionPublished: translate('队伍「{team}」的封禁纠正已发布', { team }), GameplayFactReceived: translate('队伍「{team}」提交了题目「{challenge}」', { team, challenge }),
     GameplayFactAdjudicated: translate('队伍「{team}」在题目「{challenge}」的提交已评测', { team, challenge }), FirstBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的一血', { team, challenge }), SecondBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的二血', { team, challenge }),
     ThirdBloodAwarded: translate('队伍「{team}」拿下了题目「{challenge}」的三血', { team, challenge }), RuntimeCreated: translate('队伍「{team}」申请了题目「{challenge}」的环境', { team, challenge }), RuntimeStateChanged: translate('队伍「{team}」的题目「{challenge}」环境状态已变更', { team, challenge }),
+    AwdpBreakAttempted: translate('队伍「{team}」对题目「{challenge}」进行了一次攻击操作', { team, challenge }), AwdpFixAttempted: translate('队伍「{team}」对题目「{challenge}」提交了一次防御操作', { team, challenge }),
     AnnouncementPublished: translate('官方发布了一条公告'), QuestionOpened: translate('{actor}提出了咨询', { actor }), QuestionReplied: translate('咨询已有回复'), QuestionStatusChanged: translate('咨询状态已变更'),
   }
   return event.kind ? templates[event.kind] ?? translate('发生了一条竞赛动态') : translate('发生了一条竞赛动态')

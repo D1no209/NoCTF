@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Flag, Users } from '@lucide/vue'
+import { Flag, ShieldCheck, Swords, Users } from '@lucide/vue'
 import { getLeaderboardEndpoint, getMyTeamEndpoint, listChallengesEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
@@ -94,6 +94,12 @@ interface ChallengeProgress {
   solvedByMyTeam: boolean
   myScore: number | null
   bloodRank: string | null
+  attackCount: number
+  defenseCount: number
+  attackSucceeded: boolean
+  defenseSucceeded: boolean
+  attackScore: number
+  defenseScore: number
 }
 
 const progressByChallenge = computed(() => {
@@ -110,12 +116,32 @@ const progressByChallenge = computed(() => {
         solvedByMyTeam: false,
         myScore: null,
         bloodRank: null,
+        attackCount: 0,
+        defenseCount: 0,
+        attackSucceeded: false,
+        defenseSucceeded: false,
+        attackScore: 0,
+        defenseScore: 0,
       }
-      current.solveCount += 1
+      const attackScore = cell.attackScore ?? 0
+      const defenseScore = cell.defenseScore ?? 0
+      if (isAwdp.value) {
+        if (attackScore > 0) current.attackCount += 1
+        if (defenseScore > 0) current.defenseCount += 1
+      }
+      else {
+        current.solveCount += 1
+      }
       if (entry.teamId && entry.teamId === myTeamId.value) {
-        current.solvedByMyTeam = true
+        current.attackSucceeded = attackScore > 0
+        current.defenseSucceeded = defenseScore > 0
+        current.solvedByMyTeam = isAwdp.value
+          ? current.attackSucceeded && current.defenseSucceeded
+          : true
         current.myScore = cell.score ?? null
         current.bloodRank = cell.bloodRank ?? null
+        current.attackScore = attackScore
+        current.defenseScore = defenseScore
       }
       progress.set(key, current)
     }
@@ -127,7 +153,26 @@ function progressFor(challengeId?: string): ChallengeProgress | null {
   if (!leaderboard.value || leaderboard.value.dataScope === 'Hidden')
     return null
   return progressByChallenge.value.get(normalizeChallengeKey(challengeId))
-    ?? { solveCount: 0, solvedByMyTeam: false, myScore: null, bloodRank: null }
+    ?? {
+      solveCount: 0,
+      solvedByMyTeam: false,
+      myScore: null,
+      bloodRank: null,
+      attackCount: 0,
+      defenseCount: 0,
+      attackSucceeded: false,
+      defenseSucceeded: false,
+      attackScore: 0,
+      defenseScore: 0,
+    }
+}
+
+function awdpProgressLabel(progress: ChallengeProgress | null): string | null {
+  if (!progress) return null
+  if (progress.attackSucceeded && progress.defenseSucceeded) return translate('已解出')
+  if (progress.attackSucceeded) return translate('攻击成功')
+  if (progress.defenseSucceeded) return translate('防御成功')
+  return null
 }
 
 const scoreInfoByChallenge = computed(() => new Map(
@@ -217,7 +262,7 @@ const groups = computed(() => {
               >
                 <Card
                   class="relative h-full overflow-hidden transition-[transform,border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg"
-                  :class="progressFor(challenge.id)?.solvedByMyTeam ? 'border-primary/50 bg-primary/5' : ''"
+                  :class="progressFor(challenge.id)?.solvedByMyTeam || progressFor(challenge.id)?.attackSucceeded || progressFor(challenge.id)?.defenseSucceeded ? 'border-primary/50 bg-primary/5' : ''"
                 >
                   <Flag
                     v-if="progressFor(challenge.id)?.solvedByMyTeam"
@@ -250,9 +295,15 @@ const groups = computed(() => {
                       <span v-else class="font-mono text-lg font-bold text-primary tabular-nums">
                         {{ currentScoreFor(challenge) }}<span class="ml-1 text-xs font-medium text-muted-foreground">pts</span>
                       </span>
-                      <span v-if="isAwdp && (awdpScoreFor(challenge, 'Break') !== null || awdpScoreFor(challenge, 'Fix') !== null)" class="text-xs text-muted-foreground">{{ $t('当前轮次动态分值') }}</span>
+                      <span v-if="isAwdp && (awdpScoreFor(challenge, 'Break') !== null || awdpScoreFor(challenge, 'Fix') !== null)" class="text-xs text-muted-foreground">{{ $t('本轮参考分值（轮末结算）') }}</span>
                       <span v-else-if="currentScoreFor(challenge) !== null" class="text-xs text-muted-foreground">{{ $t('当前动态分值') }}</span>
-                      <Badge v-if="progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
+                      <Badge v-if="isAwdp && awdpProgressLabel(progressFor(challenge.id))" variant="secondary" class="gap-1">
+                        <Flag v-if="progressFor(challenge.id)?.solvedByMyTeam" class="size-3" />
+                        <Swords v-else-if="progressFor(challenge.id)?.attackSucceeded" class="size-3" />
+                        <ShieldCheck v-else class="size-3" />
+                        {{ awdpProgressLabel(progressFor(challenge.id)) }}
+                      </Badge>
+                      <Badge v-else-if="!isAwdp && progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
                         <Flag class="size-3" />
                         {{ progressFor(challenge.id)?.bloodRank
                           ? bloodRankLabel(progressFor(challenge.id)?.bloodRank)
@@ -266,7 +317,15 @@ const groups = computed(() => {
                       </span>
                     </div>
                     <span
-                      v-if="progressFor(challenge.id)"
+                      v-if="isAwdp && progressFor(challenge.id)"
+                      class="flex items-center gap-2 text-xs text-muted-foreground"
+                      :aria-label="$t('攻击成功 {attack} 支，防御成功 {defense} 支', { attack: progressFor(challenge.id)?.attackCount ?? 0, defense: progressFor(challenge.id)?.defenseCount ?? 0 })"
+                    >
+                      <span class="flex items-center gap-1"><Swords class="size-3.5" aria-hidden="true" /><span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.attackCount ?? 0 }}</span></span>
+                      <span class="flex items-center gap-1"><ShieldCheck class="size-3.5" aria-hidden="true" /><span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.defenseCount ?? 0 }}</span></span>
+                    </span>
+                    <span
+                      v-else-if="progressFor(challenge.id)"
                       class="flex items-center gap-1 text-xs text-muted-foreground"
                       :aria-label="$t('{count} 支队伍已解出', { count: progressFor(challenge.id)?.solveCount ?? 0 })"
                     >
