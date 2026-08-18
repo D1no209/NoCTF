@@ -1,5 +1,21 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.50 后续未发布 AWDP 攻击 Runtime 动态 Flag 模型收口
+
+- `e328dd5f` 移除 AWDP 旧版专属 `flagInjection` 配置模型与管理端组件。AWDP schema v4 不再读取、不升级也不兼容旧 `flagInjection` 字段；旧字段会按未知 JSON 字段在后端保存/校验边界被拒绝，符合当前 Alpha 阶段“不保留旧模型兼容”的决策。
+- Runner 的 `AwdpAttackProvisioningPlanReader` 不再解析 `AwdpChallengeConfiguration.FlagInjection`，也不再自行注入环境变量或写文件。新流程为：Worker 在 PostgreSQL 临界区创建/读取当前 Runtime generation 的 `ChallengeFlag`，用题目 Runtime 定义中的 `FlagEnvironmentVariableName` 写入 Claim 环境变量；Runner 只防御性校验该 Claim 已携带当前 generation 的正确动态 Flag，然后启动容器。
+- `RuntimeHandlers` 删除 AWDP 攻击 Runtime 的旧文件注入路径，避免再次出现“Worker 已注入但 Runner 仍要求旧配置”的失败状态。
+- 前端 `game-config.ts` 删除 `AwdpFlagInjectionKind` / `awdpFlagInjection` 模型；AWDP 题库 UI 仅保留 Runtime 的 `FlagSource=PerTeam` 与环境变量名，比赛题目规则继续承载本场 Flag 模板覆盖。
+- `docs/processes-messaging.md` 已同步新职责边界：Worker 生成并注入动态 Flag，Runner 只校验和启动；不存在 AWDP 专属注入对象。
+- 本阶段没有新增业务表、字段、EF migration、OpenAPI 契约或 TypeScript SDK 变更；未推送、未部署，也未修改生产/测试数据。
+- 验证结果：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error。
+  - `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj -c Release --no-build`：989 total，0 failed，813 succeeded，176 skipped。本机 Docker provider 不可用，因此新增 AWDP 攻击 Runtime PostgreSQL/Docker 集成用例随测试框架跳过，需在远端或 CI 有 Docker 的环境补跑。
+  - `bun test`：214/214 通过。
+  - `bun run typecheck`：通过。
+  - `bun run build`：通过；仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `git diff --check`：通过；Git 仅提示 Windows 工作区 LF/CRLF 行尾替换警告。
+
 ## 2026-08-18 alpha.50 当前模式配置默认值与旧版修复入口
 
 - `7f54f1dc` 删除 Domain 与 Challenge API 中会静默写入 `schemaVersion: 1` 的危险默认值。题目模板创建或更新未提供定义时，由 Application 根据所选游戏模式写入当前默认定义；AWDP 当前写入 schema v4，调用方显式提交 v1 时仍按不支持版本拒绝，不做隐式迁移。
