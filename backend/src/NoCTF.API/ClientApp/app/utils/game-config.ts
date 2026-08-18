@@ -37,7 +37,6 @@ export const ScoreDecayMode = {
   Custom: 5,
 } as const
 export const EvaluationDispatch = { Automatic: 0, ManualBatch: 1 } as const
-export const AwdpFlagInjectionKind = { EnvironmentVariable: 0, File: 1 } as const
 
 export const ATTACK_REWARD_MODES = [
   { value: 'FixedPerAttack', label: '每次攻击固定得分' },
@@ -150,12 +149,6 @@ export interface FlagInjectionModel {
   serviceName: string
 }
 
-export interface AwdpFlagInjectionModel {
-  kind: number
-  environmentVariableName: string
-  filePath: string
-}
-
 export interface DefinitionModel {
   runtime: RuntimeTemplateModel | null
   /** AWD:checker(包装 job + targetServiceName)。 */
@@ -163,7 +156,6 @@ export interface DefinitionModel {
   /** AWDP:checker 直接是 RunnerJobConfiguration。 */
   checkerJob: RunnerJobModel | null
   flagInjection: FlagInjectionModel | null
-  awdpFlagInjection: AwdpFlagInjectionModel | null
   flagTemplate: FlagTemplateModel | null
   patchEntrypoint: string
   patchCommand: string[]
@@ -228,7 +220,6 @@ export function emptyDefinition(mode: GameModeValue): DefinitionModel {
     checker: mode === 'Awd' ? { job: emptyRunnerJob(), targetServiceName: '' } : null,
     checkerJob: null,
     flagInjection: null,
-    awdpFlagInjection: null,
     flagTemplate: null,
     patchEntrypoint: '',
     patchCommand: [],
@@ -404,14 +395,7 @@ export function parseDefinition(json: string | null | undefined): DefinitionMode
   }
   if (obj.flagInjection) {
     const injection = asObject(obj.flagInjection) ?? {}
-    if ('kind' in injection) {
-      model.awdpFlagInjection = {
-        kind: asNumber(injection.kind) ?? AwdpFlagInjectionKind.EnvironmentVariable,
-        environmentVariableName: asString(injection.environmentVariableName),
-        filePath: asString(injection.filePath),
-      }
-    }
-    else {
+    if (!('kind' in injection)) {
       model.flagInjection = {
         command: asString(injection.command),
         timeoutSeconds: asNumber(injection.timeoutSeconds),

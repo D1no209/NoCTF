@@ -59,7 +59,6 @@ public static class AwdpConfigurationValidator
         if (configuration.FlagTemplate is { } flagTemplate
             && !PerTeamFlagGenerator.IsValidTemplate(flagTemplate))
             errors.Add("FlagTemplate is invalid.");
-        ValidateFlagInjection(configuration.FlagInjection, errors);
         if (configuration.PatchEntrypoint is { } patchEntrypoint)
             ValidatePatchEntrypoint(patchEntrypoint, errors);
         if (configuration.PatchTimeoutSeconds is <= 0)
@@ -100,7 +99,6 @@ public static class AwdpConfigurationValidator
             errors.Add("EvaluationDispatchMode is invalid.");
         if (!PerTeamFlagGenerator.IsValidTemplate(configuration.FlagTemplate))
             errors.Add("FlagTemplate is invalid.");
-        ValidateFlagInjection(configuration.FlagInjection, errors);
         ValidatePatchEntrypoint(configuration.PatchEntrypoint, errors);
         if (configuration.PatchTimeoutSeconds <= 0)
             errors.Add("PatchTimeoutSeconds must be positive.");
@@ -207,39 +205,6 @@ public static class AwdpConfigurationValidator
             && runtime.UrlBindings?.Any(binding =>
                 binding.ContainerPort != internalPortsForUrl[0]) == true)
             errors.Add("AWDP player Runtime URL bindings must target its checker port.");
-    }
-
-    private static void ValidateFlagInjection(
-        AwdpFlagInjectionConfiguration? injection,
-        List<string> errors)
-    {
-        if (injection is null)
-            return;
-        if (!Enum.IsDefined(injection.Kind))
-        {
-            errors.Add("FlagInjection.Kind is invalid.");
-            return;
-        }
-        switch (injection.Kind)
-        {
-            case AwdpFlagInjectionKind.EnvironmentVariable:
-                if (string.IsNullOrWhiteSpace(injection.EnvironmentVariableName)
-                    || !System.Text.RegularExpressions.Regex.IsMatch(
-                        injection.EnvironmentVariableName,
-                        "^[A-Za-z_][A-Za-z0-9_]*$",
-                        System.Text.RegularExpressions.RegexOptions.CultureInvariant))
-                    errors.Add("FlagInjection.EnvironmentVariableName is invalid.");
-                if (injection.FilePath is not null)
-                    errors.Add("FlagInjection.FilePath is only valid for file injection.");
-                break;
-            case AwdpFlagInjectionKind.File:
-                if (string.IsNullOrWhiteSpace(injection.FilePath)
-                    || !Path.IsPathRooted(injection.FilePath))
-                    errors.Add("FlagInjection.FilePath must be an absolute path.");
-                if (injection.EnvironmentVariableName is not null)
-                    errors.Add("FlagInjection.EnvironmentVariableName is only valid for environment injection.");
-                break;
-        }
     }
 
     private static void ValidateChecker(

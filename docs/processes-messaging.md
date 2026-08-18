@@ -26,7 +26,7 @@ EF Core 业务事务与 Outbox 必须通过 Wolverine EF Core integration 绑定
 | InjectAwdFlag / RunAwdChecker | Runner Pool |
 | RunAwdpFixVerification | Runner Pool |
 
-Runner 直接在完成事务中更新 RuntimeInstance；AWDP callback 使用 claim 中的 GameplayFactId 和 Runtime 自身的 Generation/ProcessingVersion，覆盖同一 GameplayFact 当前结果。ChallengeFlag 是 Worker 生成的不可变答案事实，Runner 只读取并注入，不写注入状态。不存在 runtime_operations 表。
+Runner 直接在完成事务中更新 RuntimeInstance；AWDP callback 使用 claim 中的 GameplayFactId 和 Runtime 自身的 Generation/ProcessingVersion，覆盖同一 GameplayFact 当前结果。ChallengeFlag 是 Worker 生成的不可变答案事实，Worker 在派发 Runtime 创建请求前把动态 Flag 注入到 Claim 的环境变量中；Runner 只校验本次 Claim 已携带当前 generation 的正确动态 Flag 并启动容器，不另设 AWDP 专属注入配置，也不写注入状态。不存在 runtime_operations 表。
 
 ## 多 Worker 互斥
 
