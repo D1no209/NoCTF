@@ -73,7 +73,7 @@ let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   timer = setInterval(() => {
     now.value = Date.now()
-  }, 30_000)
+  }, 1_000)
 })
 onUnmounted(() => clearInterval(timer))
 
