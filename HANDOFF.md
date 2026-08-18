@@ -1,5 +1,49 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.53 AWDP 一次性防御验证模型
+
+- `e49ef2d4` 将 AWDP 的两类 Runtime 明确分离：选手端“启动环境”只创建长期存在、可重置和续期的
+  `Player / AwdpAttack` 攻击靶机；Fix 改为先申请全新的 `AwdpTarget` 一次性防御验证环境，待其进入
+  `AwaitingPatch` 后才允许上传一个 patch。上传成功即原子绑定该 target、`PatchUpload` 与
+  `FixAttempt`，随后锁定 target、应用一次 patch、运行一次 Checker，并在成功、失败、超时及重投路径中
+  幂等清理 target、checker、网络、端口与 Runner 容量。
+- 参赛者 API 新增强类型 `POST
+  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets`；Fix 上传改为
+  `POST
+  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix`。
+  原先“直接提交 Fix 后再隐式创建 target”的入口已删除。AWDP 状态响应现在同时返回攻击 Runtime 与防御
+  target 的 Runtime、stage、Fix fact、patch、结果及回收时间；OpenAPI 与 TypeScript SDK 均由工具重新生成。
+- 前端 Fix 区域按“未申请 → 创建中 → 可上传 → 验证中 → 已完成且已回收 / 失败可重新申请”展示；请求和上传
+  期间均防止重复操作，失败保留文件选择。管理端及中英文文案统一使用“攻击靶机 / Break 环境”“一次性防御
+  验证环境”“Fix 一次性验证 Checker”，不再把 AWDP Checker 描述成 AWD 的周期性健康检查。
+- EF migration `20260818170133_BindAwdpFixTarget` 由 `dotnet ef` 生成：在现有 `patch_uploads` 增加可空的
+  `runtime_instance_id`，以唯一过滤索引保证一个 target 最多绑定一个 patch，并以 Restrict 外键和 Runtime
+  check constraints 保证未绑定、已锁定和完成阶段合法；Runtime generation 唯一键加入 purpose，使同题同队的
+  攻击 Runtime 与一次性 target 能按用途区分且不会发生唯一键冲突。本阶段没有新增业务表，仍遵守现有 16 张
+  业务表基线。
+- Runner/Worker 收敛补强：Fix archive 使用有界下载并保持路径、大小和压缩包安全校验；receipt 已创建但消息重投
+  时优先按 Runtime identity 清理；Docker/Kubernetes reconciliation 覆盖 target 与 checker 资源；内部
+  checker callback 继续使用隔离网络和认证回调，不套用 AWD 周期调度。
+- `18e70549` 将平台版本从 `0.1.0-alpha.52` 递增为 `0.1.0-alpha.53`。本阶段只创建本地提交，未推送、
+  未部署，也未修改生产或测试业务数据；用户现有 `TODO.md` 修改与未跟踪临时文件均未纳入提交。
+- 验证结果：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error；版本递增后复跑仍通过。
+  - 非 Integration TUnit：818/818 通过；AWDP 定向后端测试 70/70 通过；真实 Docker resource reconciler
+    定向测试 1/1 通过。
+  - AWDP Full E2E：1/1 通过，耗时 3 分 46 秒，覆盖攻击 Runtime、独立 target、恶意/合法 Fix、一次性
+    Checker、结果和资源回收；随后 API 重启、Redis 中断恢复、PostgreSQL 重启韧性检查全部通过，E2E 创建的
+    容器、镜像和网络均已精确清理。
+  - 前端 `bun test`：217/217 通过；`bun run typecheck` 与 production `bun run build` 通过。构建仅保留
+    既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `dotnet format ... analyzers --verify-no-changes` 通过；EF 10.0.9
+    `migrations has-pending-model-changes` 返回无模型漂移；`git diff --check` 通过。
+  - OpenAPI 与 SDK 连续导出/生成两次哈希一致；两份 OpenAPI SHA-256 均为
+    `A2BE1805E4E37954ACE995BB2408EFBEC758A4774C51146FECCA7E92F81105AF`。
+  - 另一次不筛选的完整后端执行共 999 项：956 通过、41 失败、2 个环境型跳过。41 个失败均落在既有集成
+    fixture 将基线 `Competition.ConfigurationJson` / `Challenge.DefinitionJson` 的 `string.Empty` 写入 PostgreSQL
+    `jsonb` 所触发的 `22P02 invalid input syntax for type json`；本阶段 AWDP 定向 PostgreSQL/Redis/Wolverine、
+    Docker 和 Full E2E 全部通过。该基线 fixture 问题未在 AWDP 功能提交中顺手修改，需后续独立修复。
+
 ## 2026-08-18 alpha.52 竞赛概览倒计时实时刷新
 
 - `f9d0cefd` 修复选手端竞赛概览页的大号倒计时仅在刷新页面或等待 30 秒后才更新的问题。页面存活期间现在每秒刷新当前时间，因此“距开始 / 距结束”会连续更新，并在越过开始或结束时刻后立即切换对应文案；组件卸载时继续清理定时器。
