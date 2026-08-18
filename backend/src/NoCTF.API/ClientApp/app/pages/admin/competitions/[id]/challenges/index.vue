@@ -104,10 +104,26 @@ async function addChallenge() {
 
 // ---- Delete / restore ----
 const deleteTarget = ref<NoCtfapiEndpointsChallengesChallengeResponse | null>(null)
+const deletePending = ref(false)
+const deleteError = ref<string | null>(null)
+
+function closeDeleteDialog(open: boolean) {
+  if (!open && !deletePending.value) {
+    deleteTarget.value = null
+    deleteError.value = null
+  }
+}
+
+function beginDeleteChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse) {
+  deleteTarget.value = c
+  deleteError.value = null
+}
 
 async function removeChallenge() {
   const target = deleteTarget.value
-  if (!target?.id) return
+  if (!target?.id || deletePending.value) return
+  deletePending.value = true
+  deleteError.value = null
   pendingId.value = target.id
   try {
     const { error } = await adminDeleteCompetitionChallenge({
@@ -117,12 +133,15 @@ async function removeChallenge() {
     if (error) throw error
     toast.success(translate("题目已删除"))
     deleteTarget.value = null
+    deleteError.value = null
     await load()
   }
   catch (e) {
-    toastWriteError(e, load)
+    deleteError.value = parseApiError(e).message
+    toast.error(deleteError.value)
   }
   finally {
+    deletePending.value = false
     pendingId.value = null
   }
 }
@@ -223,7 +242,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
                 variant="ghost"
                 size="sm"
                 :disabled="pendingId === c.id"
-                @click="deleteTarget = c"
+                @click="beginDeleteChallenge(c)"
               > {{ $t('删除') }} </Button>
             </div>
           </TableCell>
@@ -289,7 +308,7 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
       </DialogContent>
     </Dialog>
 
-    <AlertDialog :open="deleteTarget !== null" @update:open="(v) => { if (!v) deleteTarget = null }">
+    <AlertDialog :open="deleteTarget !== null" @update:open="closeDeleteDialog">
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{{ $t('删除题目') }}</AlertDialogTitle>
@@ -297,9 +316,15 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
             {{ $t('删除「{title}」后选手将无法看到该题，可稍后恢复。确认删除？', { title: deleteTarget?.title ?? '-' }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <Alert v-if="deleteError" variant="destructive">
+          <AlertDescription>{{ deleteError }}</AlertDescription>
+        </Alert>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('取消') }}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" @click="removeChallenge">{{ $t('确认删除') }}</AlertDialogAction>
+          <AlertDialogCancel :disabled="deletePending">{{ $t('取消') }}</AlertDialogCancel>
+          <Button type="button" variant="destructive" :disabled="deletePending" @click="removeChallenge">
+            <Spinner v-if="deletePending" data-icon="inline-start" />
+            {{ deletePending ? $t('处理中') : $t('确认删除') }}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
