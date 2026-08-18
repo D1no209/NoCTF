@@ -34,7 +34,9 @@ public sealed record LeaderboardCellResponse(
     long Score,
     DateTimeOffset? SolvedAt,
     string? SolverName,
-    LeaderboardBloodRankProtocol? BloodRank);
+    LeaderboardBloodRankProtocol? BloodRank,
+    long? AttackScore,
+    long? DefenseScore);
 
 public sealed record LeaderboardEntryResponse(
     int Rank,
@@ -44,7 +46,10 @@ public sealed record LeaderboardEntryResponse(
     long Score,
     int SolveCount,
     DateTimeOffset? LastScoreAt,
-    IReadOnlyList<LeaderboardCellResponse> Cells);
+    IReadOnlyList<LeaderboardCellResponse> Cells,
+    long? AttackScore,
+    long? DefenseScore,
+    long? PenaltyScore);
 
 public sealed record LeaderboardChallengeInfoResponse(
     Guid CompetitionChallengeId,
@@ -70,6 +75,8 @@ public sealed record LeaderboardProtocolResponse(
     public LeaderboardVisibilityProtocol Visibility { get; init; }
     public LeaderboardDataScopeProtocol DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }
+    public int? CurrentRound { get; init; }
+    public int? SettledThroughRound { get; init; }
 }
 
 public sealed record LeaderboardProcessingProtocolResponse(
@@ -103,14 +110,19 @@ internal static partial class LeaderboardProtocolMapper
         value.Score,
         value.SolveCount,
         value.LastScoreAt,
-        value.Cells.Select(ToResponse).ToList());
+        value.Cells.Select(ToResponse).ToList(),
+        value.AttackScore,
+        value.DefenseScore,
+        value.PenaltyScore);
 
     private static LeaderboardCellResponse ToResponse(LeaderboardCell value) => new(
         value.CompetitionChallengeId,
         value.Score,
         value.SolvedAt,
         value.SolverName,
-        value.BloodRank is null ? null : ToProtocol(value.BloodRank.Value));
+        value.BloodRank is null ? null : ToProtocol(value.BloodRank.Value),
+        value.AttackScore,
+        value.DefenseScore);
 
     public static partial LeaderboardProcessingProtocolResponse ToResponse(
         LeaderboardProcessingResponse value);

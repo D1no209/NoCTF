@@ -40,6 +40,9 @@ public sealed class LeaderboardOpenApiTests
             "teamName",
             "trackKey",
             "score",
+            "attackScore",
+            "defenseScore",
+            "penaltyScore",
             "solveCount",
             "lastScoreAt",
             "cells"
@@ -50,10 +53,14 @@ public sealed class LeaderboardOpenApiTests
         await Assert.That(PropertyNames(cell)).IsEquivalentTo([
             "competitionChallengeId",
             "score",
+            "attackScore",
+            "defenseScore",
             "solvedAt",
             "solverName",
             "bloodRank"
         ]);
+        await Assert.That(responseProperties.TryGetProperty("currentRound", out _)).IsTrue();
+        await Assert.That(responseProperties.TryGetProperty("settledThroughRound", out _)).IsTrue();
         var rankProperty = cell.GetProperty("properties").GetProperty("bloodRank");
         await Assert.That(rankProperty.GetProperty("nullable").GetBoolean()).IsTrue();
         var rank = ResolveSchema(root, rankProperty.GetProperty("oneOf")[0]);

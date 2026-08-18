@@ -110,6 +110,20 @@ public sealed class GameplayFactIntakeStore(
                 GameplayFactId: entity.Id,
                 GameplayFactKind: entity.Kind,
                 GameplayFactState: entity.State), cancellationToken);
+            if (current.Mode == GameMode.Awdp
+                && entity.Kind == GameplayFactKind.BreakAttempt)
+            {
+                await events.RecordAsync(new(
+                    entity.CompetitionId,
+                    CompetitionEventKind.AwdpBreakAttempted,
+                    CompetitionEventLevel.Information,
+                    CompetitionEventVisibility.Public,
+                    entity.OccurredAt,
+                    TeamId: entity.TeamId,
+                    CompetitionChallengeId: entity.CompetitionChallengeId,
+                    GameplayFactId: entity.Id,
+                    GameplayFactKind: entity.Kind), cancellationToken);
+            }
         }
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

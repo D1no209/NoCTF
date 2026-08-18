@@ -436,6 +436,14 @@ public sealed class AwdpFullBoundaryTests
             TimeSpan.FromSeconds(30),
             cancellationToken);
         await AssertSubmissionAsync(correctBreak, "BreakAttempt", "Correct", null);
+        var stoppedRedRuntime = await PollJsonAsync(
+            redClient,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime",
+            value => value.GetProperty("state").GetString() == "Stopped",
+            TimeSpan.FromSeconds(60),
+            cancellationToken);
+        await Assert.That(stoppedRedRuntime.GetProperty("id").GetGuid())
+            .IsEqualTo(redRuntime.GetProperty("id").GetGuid());
         var redState = await PollJsonAsync(
             redClient,
             $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
@@ -502,21 +510,14 @@ public sealed class AwdpFullBoundaryTests
             TimeSpan.FromSeconds(6),
             cancellationToken);
 
-        var reset = await SendWithoutBodyForJsonAsync(
+        var redGenerationTwo = await StartAndPollRuntimeAsync(
             redClient,
-            HttpMethod.Post,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset",
-            HttpStatusCode.Accepted,
+            competitionId,
+            competitionChallengeId,
             cancellationToken);
-        await Assert.That(reset.GetProperty("runtimeInstanceId").GetGuid())
+        await Assert.That(redGenerationTwo.GetProperty("id").GetGuid())
             .IsNotEqualTo(redRuntime.GetProperty("id").GetGuid());
-        var redGenerationTwo = await PollJsonAsync(
-            redClient,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime",
-            value => value.GetProperty("state").GetString() == "Running"
-                && value.GetProperty("generation").GetInt32() == 2,
-            TimeSpan.FromSeconds(90),
-            cancellationToken);
+        await Assert.That(redGenerationTwo.GetProperty("generation").GetInt32()).IsEqualTo(2);
         var redGenerationTwoUrl = redGenerationTwo.GetProperty("urls")[0].GetString()
             ?? throw new InvalidOperationException("Reset attack Runtime did not expose a URL.");
         var redGenerationTwoFlag = await PollTextAsync(

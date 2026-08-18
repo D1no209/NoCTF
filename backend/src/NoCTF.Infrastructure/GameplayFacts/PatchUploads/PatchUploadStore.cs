@@ -248,6 +248,16 @@ public sealed class PatchUploadStore(
             GameplayFactState: fact.State,
             RuntimeState: target.State,
             RuntimeGeneration: target.Generation), ct);
+        await events.RecordAsync(new(
+            fact.CompetitionId,
+            CompetitionEventKind.AwdpFixAttempted,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Public,
+            fact.OccurredAt,
+            TeamId: fact.TeamId,
+            CompetitionChallengeId: fact.CompetitionChallengeId,
+            GameplayFactId: fact.Id,
+            GameplayFactKind: fact.Kind), ct);
         try
         {
             await db.SaveChangesAsync(ct);

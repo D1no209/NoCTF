@@ -1,4 +1,5 @@
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Awdp.Configuration;
@@ -32,11 +33,17 @@ internal static class AwdpDynamicLeaderboardProjection
             .Where(challenge => !challenge.IsDeleted)
             .ToDictionary(challenge => challenge.Id);
         var projectedAt = input.ProjectedAt ?? DateTimeOffset.UtcNow;
-        var currentRound = Round(
+        var elapsed = EffectiveElapsed(
             projectedAt,
             input.LifecycleAudits,
-            input.CompetitionStartTime,
-            competition.RoundDurationSeconds);
+            input.CompetitionStartTime);
+        var settledThroughRound = SettledThroughRound(
+            elapsed,
+            competition.RoundDurationSeconds,
+            input.CompetitionStatus == CompetitionStatus.Finished);
+        var currentRound = input.CompetitionStatus == CompetitionStatus.Finished
+            ? Math.Max(1, settledThroughRound)
+            : Round(elapsed, competition.RoundDurationSeconds);
         var correctFacts = input.GameplayFacts
             .Where(fact => fact.OccurredAt <= projectedAt
                 && fact.TeamId is Guid teamId
@@ -88,7 +95,6 @@ internal static class AwdpDynamicLeaderboardProjection
                     input.LifecycleAudits,
                     input.CompetitionStartTime,
                     competition.RoundDurationSeconds)))
-            .Where(activation => activation.Round <= currentRound)
             .ToList();
 
         var awards = new List<Award>();
@@ -109,6 +115,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 scoringTeams.Keys,
                 dynamicTeams,
                 currentRound,
+                settledThroughRound,
                 awards,
                 breakScores);
             ProjectTrack(
@@ -119,6 +126,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 scoringTeams.Keys,
                 dynamicTeams,
                 currentRound,
+                settledThroughRound,
                 awards,
                 fixScores);
         }
@@ -132,6 +140,11 @@ internal static class AwdpDynamicLeaderboardProjection
                 && scoringTeams.ContainsKey(teamId)
                 && fact.Kind is GameplayFactKind.BreakAttempt or GameplayFactKind.FixAttempt
                 && fact.CompetitionChallengeId is Guid challengeId
+                && Round(
+                    fact.OccurredAt,
+                    input.LifecycleAudits,
+                    input.CompetitionStartTime,
+                    competition.RoundDurationSeconds) <= settledThroughRound
                 && (challenges.Count == 0 || challenges.ContainsKey(challengeId)))
             .GroupBy(fact => fact.TeamId!.Value)
             .ToDictionary(
@@ -155,6 +168,12 @@ internal static class AwdpDynamicLeaderboardProjection
                 .OrderByDescending(value => value)
                 .FirstOrDefault();
             var awardScore = own.Aggregate(0L, (total, item) => checked(total + item.Points));
+            var attackScore = own
+                .Where(item => item.Fact.Kind == GameplayFactKind.BreakAttempt)
+                .Aggregate(0L, (total, item) => checked(total + item.Points));
+            var defenseScore = own
+                .Where(item => item.Fact.Kind == GameplayFactKind.FixAttempt)
+                .Aggregate(0L, (total, item) => checked(total + item.Points));
             var penalty = penalties.GetValueOrDefault(team.Id);
             return new RankedEntry(
                 new LeaderboardEntry(
@@ -165,7 +184,12 @@ internal static class AwdpDynamicLeaderboardProjection
                         + manualAdjustments.GetValueOrDefault(team.Id)),
                     own.Count,
                     last == default ? null : last,
-                    team.TrackKey),
+                    team.TrackKey)
+                {
+                    AttackScore = attackScore,
+                    DefenseScore = defenseScore,
+                    PenaltyScore = penalty
+                },
                 own.Count(item => item.Fact.Kind == GameplayFactKind.FixAttempt),
                 own.Count(item => item.Fact.Kind == GameplayFactKind.BreakAttempt),
                 penalty,
@@ -203,10 +227,25 @@ internal static class AwdpDynamicLeaderboardProjection
                     first.Fact.OccurredAt,
                     string.IsNullOrWhiteSpace(first.Fact.SubmitterName)
                         ? null
-                        : first.Fact.SubmitterName);
+                        : first.Fact.SubmitterName)
+                {
+                    AttackScore = group
+                        .Where(item => item.Fact.Kind == GameplayFactKind.BreakAttempt)
+                        .Aggregate(0L, (total, item) => checked(total + item.Points)),
+                    DefenseScore = group
+                        .Where(item => item.Fact.Kind == GameplayFactKind.FixAttempt)
+                        .Aggregate(0L, (total, item) => checked(total + item.Points))
+                };
             })
             .ToList());
-        return new(entries, cells, null, breakScores, fixScores);
+        return new(
+            entries,
+            cells,
+            null,
+            breakScores,
+            fixScores,
+            currentRound,
+            settledThroughRound);
     }
 
     private static void ProjectTrack(
@@ -217,6 +256,7 @@ internal static class AwdpDynamicLeaderboardProjection
         IEnumerable<Guid> scoringTeamIds,
         IReadOnlySet<Guid> dynamicTeamIds,
         int currentRound,
+        int settledThroughRound,
         ICollection<Award> awards,
         IDictionary<Guid, long> currentScores)
     {
@@ -227,7 +267,11 @@ internal static class AwdpDynamicLeaderboardProjection
             .ThenBy(item => item.Fact.OccurredAt)
             .ThenBy(item => item.Fact.GameplayFactId)
             .ToList();
-        foreach (var round in activations.Select(item => item.Round).Distinct().Order())
+        foreach (var round in activations
+                     .Where(item => item.Round <= settledThroughRound)
+                     .Select(item => item.Round)
+                     .Distinct()
+                     .Order())
         {
             var roundActivations = activations
                 .Where(item => item.Round == round)
@@ -255,13 +299,39 @@ internal static class AwdpDynamicLeaderboardProjection
     {
         if (durationSeconds <= 0)
             return 1;
-        var elapsed = lifecycleAudits is not null
-            ? AwdEffectiveRunningClock.Calculate(lifecycleAudits, occurredAt)
-            : start is { } startedAt
-                ? occurredAt - startedAt
-                : TimeSpan.Zero;
+        var elapsed = EffectiveElapsed(occurredAt, lifecycleAudits, start);
+        return Round(elapsed, durationSeconds);
+    }
+
+    private static TimeSpan EffectiveElapsed(
+        DateTimeOffset occurredAt,
+        IReadOnlyList<NoCTF.Domain.Competitions.CompetitionLifecycleTransition>? lifecycleAudits,
+        DateTimeOffset? start) => lifecycleAudits is not null
+        ? AwdEffectiveRunningClock.Calculate(lifecycleAudits, occurredAt)
+        : start is { } startedAt
+            ? occurredAt - startedAt
+            : TimeSpan.Zero;
+
+    private static int Round(TimeSpan elapsed, int durationSeconds)
+    {
+        if (durationSeconds <= 0)
+            return 1;
         var seconds = Math.Max(0, elapsed.TotalSeconds);
         return checked((int)(seconds / durationSeconds) + 1);
+    }
+
+    private static int SettledThroughRound(
+        TimeSpan elapsed,
+        int durationSeconds,
+        bool competitionFinished)
+    {
+        if (durationSeconds <= 0)
+            return competitionFinished ? 1 : 0;
+        var seconds = Math.Max(0, elapsed.TotalSeconds);
+        var completedRounds = checked((int)(seconds / durationSeconds));
+        if (!competitionFinished || seconds <= completedRounds * (double)durationSeconds)
+            return completedRounds;
+        return checked(completedRounds + 1);
     }
 
     private static AwdpConfiguration ParseCompetition(string? json)

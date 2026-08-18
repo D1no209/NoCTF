@@ -56,6 +56,8 @@ public sealed class GameplayFactManagementStore(
     public async Task<IReadOnlyList<GameplayFactListItem>?> ListPlayerAsync(
         Guid competitionId,
         Guid userId,
+        Guid? competitionChallengeId,
+        GameplayFactKind? kind,
         DateTimeOffset? beforeOccurredAt,
         Guid? beforeId,
         int limit,
@@ -75,6 +77,11 @@ public sealed class GameplayFactManagementStore(
                     || submission.Kind == GameplayFactKind.BreakAttempt
                     || submission.Kind == GameplayFactKind.FixAttempt
                     || submission.Kind == GameplayFactKind.HintUnlock));
+        if (competitionChallengeId is Guid challengeId)
+            submissions = submissions.Where(submission =>
+                submission.CompetitionChallengeId == challengeId);
+        if (kind is GameplayFactKind factKind)
+            submissions = submissions.Where(submission => submission.Kind == factKind);
         var items = await Project(Page(
                 submissions,
                 beforeOccurredAt,

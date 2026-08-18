@@ -454,6 +454,8 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
     visibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
     dataAsOf?: string | null;
+    currentRound?: number | null;
+    settledThroughRound?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse = {
@@ -465,6 +467,9 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse = {
     solveCount?: number;
     lastScoreAt?: string | null;
     cells?: Array<NoCtfapiEndpointsCompetitionsLeaderboardCellResponse>;
+    attackScore?: number | null;
+    defenseScore?: number | null;
+    penaltyScore?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardCellResponse = {
@@ -473,6 +478,8 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardCellResponse = {
     solvedAt?: string | null;
     solverName?: string | null;
     bloodRank?: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol | null;
+    attackScore?: number | null;
+    defenseScore?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol = 'First' | 'Second' | 'Third';
@@ -544,7 +551,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'ProtectedCompetitionExportCreated' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'ProtectedCompetitionExportCreated' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'AwdpBreakAttempted' | 'AwdpFixAttempted';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -3019,6 +3026,8 @@ export type ListGameplayFactsEndpointData = {
         competitionId: string;
     };
     query: {
+        competitionChallengeId?: string | null;
+        kind?: NoCtfapiEndpointsGameplayFactsGameplayFactKindProtocol | null;
         cursor?: string | null;
         limit: number;
     };

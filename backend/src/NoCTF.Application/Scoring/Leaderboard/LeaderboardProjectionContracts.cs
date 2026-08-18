@@ -13,7 +13,8 @@ public sealed record LeaderboardProjectionInput(
     DateTimeOffset? CompetitionStartTime = null,
     IReadOnlyList<CompetitionLifecycleTransition>? LifecycleAudits = null,
     IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds = null,
-    DateTimeOffset? ProjectedAt = null);
+    DateTimeOffset? ProjectedAt = null,
+    CompetitionStatus? CompetitionStatus = null);
 
 public sealed record LeaderboardTeamFact(
     Guid Id,
@@ -62,7 +63,9 @@ public sealed record GameModeLeaderboardProjection(
     IReadOnlyList<LeaderboardCellFact> Cells,
     IReadOnlyDictionary<Guid, long>? CurrentScores = null,
     IReadOnlyDictionary<Guid, long>? CurrentBreakScores = null,
-    IReadOnlyDictionary<Guid, long>? CurrentFixScores = null);
+    IReadOnlyDictionary<Guid, long>? CurrentFixScores = null,
+    int? CurrentRound = null,
+    int? SettledThroughRound = null);
 
 public interface IGameModeLeaderboardProjector
 {
@@ -77,7 +80,9 @@ public interface ILeaderboardProjectorCatalog
 
 public sealed record LeaderboardProjectionResult(
     IReadOnlyList<LeaderboardEntry> Entries,
-    IReadOnlyList<LeaderboardChallengeInfo> Challenges);
+    IReadOnlyList<LeaderboardChallengeInfo> Challenges,
+    int? CurrentRound = null,
+    int? SettledThroughRound = null);
 
 public interface ILeaderboardProjectionEngine
 {

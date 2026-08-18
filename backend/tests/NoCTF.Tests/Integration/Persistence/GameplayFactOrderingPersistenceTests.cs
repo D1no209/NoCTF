@@ -13,6 +13,7 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.GameplayFact;
 using NoCTF.GameModes.Registration;
@@ -26,6 +27,82 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class GameplayFactOrderingPersistenceTests
 {
+    [Test]
+    [Arguments(GameMode.Ctf, GameplayFactKind.FlagAttempt, RuntimePurpose.Player)]
+    [Arguments(GameMode.Awdp, GameplayFactKind.BreakAttempt, RuntimePurpose.AwdpAttack)]
+    [Timeout(300_000)]
+    public async Task Correct_flag_stops_only_the_corresponding_attack_runtime(
+        GameMode mode,
+        GameplayFactKind kind,
+        RuntimePurpose purpose,
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(
+                $"noctf_fact_stop_{mode.ToString().ToLowerInvariant()}", cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, 1, cancellationToken, mode);
+            var factId = Guid.CreateVersion7(fixture.Now);
+            var attackRuntimeId = Guid.CreateVersion7(fixture.Now.AddMilliseconds(1));
+            var unrelatedRuntimeId = Guid.CreateVersion7(fixture.Now.AddMilliseconds(2));
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                setup.RuntimeInstances.Add(
+                    Runtime(fixture, attackRuntimeId, fixture.TeamIds[0], purpose));
+                if (mode == GameMode.Awdp)
+                {
+                    var defenseFactId = Guid.CreateVersion7(fixture.Now.AddMilliseconds(3));
+                    var defenseFact = Fact(
+                        fixture,
+                        defenseFactId,
+                        fixture.TeamIds[0],
+                        fixture.Now.AddMilliseconds(-1),
+                        GameplayFactState.Pending,
+                        kind: GameplayFactKind.FixAttempt);
+                    defenseFact.Value = null;
+                    defenseFact.ValueSha256 = null;
+                    defenseFact.ReferenceKind = GameplayFactReferenceKind.PatchUpload;
+                    defenseFact.ReferenceId = Guid.CreateVersion7(fixture.Now.AddMilliseconds(4));
+                    setup.GameplayFacts.Add(defenseFact);
+                    setup.RuntimeInstances.Add(Runtime(
+                        fixture,
+                        unrelatedRuntimeId,
+                        fixture.TeamIds[0],
+                        RuntimePurpose.AwdpTarget,
+                        defenseFactId,
+                        AwdpFixStage.AwaitingPatch));
+                }
+                setup.GameplayFacts.Add(Fact(
+                    fixture,
+                    factId,
+                    fixture.TeamIds[0],
+                    fixture.Now,
+                    kind: kind));
+                await setup.SaveChangesAsync(cancellationToken);
+            }
+            var outbox = new RecordingOutbox();
+            var evaluator = new FixedResultEvaluator(GameplayFactResult.Correct);
+
+            await ProcessAsync(
+                options,
+                factId,
+                outbox,
+                cancellationToken,
+                new FixedResultEvaluatorCatalog(evaluator));
+
+            await using var verification = new NoCtfDbContext(options);
+            var runtimes = await verification.RuntimeInstances.AsNoTracking()
+                .ToDictionaryAsync(item => item.Id, cancellationToken);
+            await Assert.That(runtimes[attackRuntimeId].State).IsEqualTo(RuntimeState.Stopping);
+            if (mode == GameMode.Awdp)
+                await Assert.That(runtimes[unrelatedRuntimeId].State).IsEqualTo(RuntimeState.Running);
+            var stops = outbox.Messages.OfType<StopRuntime>().ToArray();
+            await Assert.That(stops.Length).IsEqualTo(1);
+            await Assert.That(stops[0].RuntimeInstanceId).IsEqualTo(attackRuntimeId);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Later_delivery_processes_earlier_fact_before_same_team_duplicate(
@@ -382,7 +459,8 @@ public sealed class GameplayFactOrderingPersistenceTests
     private static async Task<Fixture> SeedAsync(
         DbContextOptions<NoCtfDbContext> options,
         int teamCount,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        GameMode mode = GameMode.Ctf)
     {
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7();
@@ -420,8 +498,10 @@ public sealed class GameplayFactOrderingPersistenceTests
             Id = competitionId,
             OwnerId = ownerId,
             Title = "Gameplay fact ordering",
-            Mode = GameMode.Ctf,
-            ConfigurationJson = """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
+            Mode = mode,
+            ConfigurationJson = mode == GameMode.Awdp
+                ? """{"schemaVersion":4,"roundDurationSeconds":300,"break":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"fix":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"exploitSucceededPenalty":100,"serviceAbnormalPenalty":50,"requireBreakBeforeFix":false}"""
+                : """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
             ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddMinutes(-5),
@@ -434,11 +514,13 @@ public sealed class GameplayFactOrderingPersistenceTests
         {
             Id = challengeId,
             OwnerId = ownerId,
-            Mode = GameMode.Ctf,
+            Mode = mode,
             Visibility = ChallengeVisibility.Private,
             Title = "Stable challenge",
             Direction = "Web",
-            DefinitionJson = """{"schemaVersion":1}""",
+            DefinitionJson = mode == GameMode.Awdp
+                ? """{"schemaVersion":4}"""
+                : """{"schemaVersion":1}""",
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -449,13 +531,16 @@ public sealed class GameplayFactOrderingPersistenceTests
             ChallengeId = challengeId,
             BaseScore = 100,
             IsPublished = true,
-            RulesJson = """{"schemaVersion":2}""",
+            RulesJson = mode == GameMode.Awdp
+                ? """{"schemaVersion":4}"""
+                : """{"schemaVersion":2}""",
             UpdatedAt = now
         });
         db.ChallengeFlags.Add(new ChallengeFlag
         {
             Id = Guid.CreateVersion7(),
             CompetitionChallengeId = competitionChallengeId,
+            TeamId = mode == GameMode.Awdp ? teamIds[0] : null,
             Flag = flag,
             FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(flag)),
             CreatedAt = now
@@ -488,7 +573,8 @@ public sealed class GameplayFactOrderingPersistenceTests
         Guid teamId,
         DateTimeOffset occurredAt,
         GameplayFactState state = GameplayFactState.Queued,
-        GameplayFactResult? result = null) =>
+        GameplayFactResult? result = null,
+        GameplayFactKind kind = GameplayFactKind.FlagAttempt) =>
         new()
         {
             Id = id,
@@ -496,13 +582,41 @@ public sealed class GameplayFactOrderingPersistenceTests
             CompetitionChallengeId = fixture.CompetitionChallengeId,
             TeamId = teamId,
             ActorUserId = fixture.MemberIds[Array.IndexOf(fixture.TeamIds, teamId)],
-            Kind = GameplayFactKind.FlagAttempt,
+            Kind = kind,
             Value = fixture.Flag,
             ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(fixture.Flag)),
             OccurredAt = occurredAt,
             State = state,
             Result = result,
             UpdatedAt = occurredAt
+        };
+
+    private static RuntimeInstance Runtime(
+        Fixture fixture,
+        Guid id,
+        Guid teamId,
+        RuntimePurpose purpose,
+        Guid? gameplayFactId = null,
+        AwdpFixStage? fixStage = null) => new()
+        {
+            Id = id,
+            CompetitionId = fixture.CompetitionId,
+            CompetitionChallengeId = fixture.CompetitionChallengeId,
+            TeamId = teamId,
+            Purpose = purpose,
+            GameplayFactId = gameplayFactId,
+            AwdpFixStage = fixStage,
+            Generation = 1,
+            RuntimeKind = RuntimeKind.Container,
+            RuntimeProvider = RuntimeProvider.Docker,
+            RunnerPool = "fact-tests",
+            RunnerId = "runner-fact-tests",
+            State = RuntimeState.Running,
+            ProviderReceiptJson = "{}",
+            ProcessingVersion = 1,
+            CreatedAt = fixture.Now.AddMinutes(-1),
+            RunningAt = fixture.Now.AddMinutes(-1),
+            ExpiresAt = fixture.Now.AddMinutes(30)
         };
 
     private static User User(
@@ -591,6 +705,19 @@ public sealed class GameplayFactOrderingPersistenceTests
             Context = context;
             return new(GameplayFactResult.Wrong, null, context.GameplayFact.OccurredAt);
         }
+    }
+
+    private sealed class FixedResultEvaluatorCatalog(FixedResultEvaluator evaluator)
+        : IGameplayFactEvaluatorCatalog
+    {
+        public IGameplayFactEvaluator Get(GameMode mode) => evaluator;
+    }
+
+    private sealed class FixedResultEvaluator(GameplayFactResult result)
+        : IGameplayFactEvaluator
+    {
+        public GameplayFactDecision Evaluate(GameplayFactProcessingContext context) =>
+            new(result, null, context.GameplayFact.OccurredAt);
     }
 
     private sealed record Fixture(

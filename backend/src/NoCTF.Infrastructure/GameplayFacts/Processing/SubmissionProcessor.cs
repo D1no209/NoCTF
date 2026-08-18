@@ -563,15 +563,20 @@ public sealed class GameplayFactProcessor(
         DateTimeOffset occurredAt,
         CancellationToken ct)
     {
-        if (submission.Kind != GameplayFactKind.FlagAttempt
-            || evaluatedFact.Result != GameplayFactResult.Correct)
+        if (evaluatedFact.Result != GameplayFactResult.Correct)
             return;
 
         var competitionMode = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == submission.CompetitionId)
             .Select(competition => competition.Mode)
             .SingleAsync(ct);
-        if (competitionMode != GameMode.Ctf)
+        var runtimePurpose = (competitionMode, submission.Kind) switch
+        {
+            (GameMode.Ctf, GameplayFactKind.FlagAttempt) => RuntimePurpose.Player,
+            (GameMode.Awdp, GameplayFactKind.BreakAttempt) => RuntimePurpose.AwdpAttack,
+            _ => (RuntimePurpose?)null
+        };
+        if (runtimePurpose is null)
             return;
 
         await AcquireTeamScoringLockAsync(
@@ -583,7 +588,7 @@ public sealed class GameplayFactProcessor(
                 instance.CompetitionId == submission.CompetitionId
                 && instance.CompetitionChallengeId == submission.CompetitionChallengeId
                 && instance.TeamId == submission.TeamId
-                && instance.Purpose == RuntimePurpose.Player
+                && instance.Purpose == runtimePurpose.Value
                 && (instance.RuntimeKind == RuntimeKind.Container
                     || instance.RuntimeKind == RuntimeKind.Compose)
                 && (instance.State == RuntimeState.Queued
