@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -87,6 +88,7 @@ public sealed class RunnerAvailabilityPublisherTests
                 $"runner-claim:{fixture.RuntimeInstanceId:N}")).IsTrue();
 
             var reconciler = new RecordingResourceReconciler();
+            var receiptResources = new RecordingReceiptResources();
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -101,14 +103,16 @@ public sealed class RunnerAvailabilityPublisherTests
                     cleanupDb,
                     [reconciler],
                     configuration,
-                    new RedisRunnerCapacityGate(redis));
+                    new RedisRunnerCapacityGate(redis),
+                    new RecordingReceiptProviderCatalog(receiptResources));
                 await handler.Handle(
                     new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now),
                     cancellationToken);
             }
 
-            await Assert.That(reconciler.Destroyed)
-                .IsEquivalentTo([new RuntimeResourceIdentity(fixture.RuntimeInstanceId, 1)]);
+            await Assert.That(reconciler.Destroyed).IsEmpty();
+            await Assert.That(receiptResources.DestroyedContainerIds)
+                .IsEquivalentTo([$"container-{fixture.RuntimeInstanceId:N}"]);
             await Assert.That(await database.KeyExistsAsync(
                 $"runner-claim:{fixture.RuntimeInstanceId:N}")).IsFalse();
             await Assert.That(await database.HashExistsAsync(
@@ -179,6 +183,7 @@ public sealed class RunnerAvailabilityPublisherTests
             Title = "Runner availability",
             OwnerId = ownerId,
             Mode = GameMode.Ctf,
+            ConfigurationJson = "{}",
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -193,6 +198,7 @@ public sealed class RunnerAvailabilityPublisherTests
             OwnerId = ownerId,
             Mode = GameMode.Ctf,
             Title = "Availability target",
+            DefinitionJson = "{}",
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -201,6 +207,7 @@ public sealed class RunnerAvailabilityPublisherTests
             Id = competitionChallengeId,
             CompetitionId = competitionId,
             ChallengeId = challengeId,
+            RulesJson = "{}",
             UpdatedAt = now
         });
         db.RuntimeInstances.AddRange(
@@ -219,7 +226,17 @@ public sealed class RunnerAvailabilityPublisherTests
                 State = RuntimeState.Failed,
                 FailureCode = RuntimeFailureCode.CleanupFailed,
                 ProcessingVersion = 7,
-                ProviderReceiptJson = """{"resourceId":"failed"}""",
+                ProviderReceiptJson = JsonSerializer.Serialize(new ContainerReceipt(
+                    runtimeInstanceId,
+                    RuntimeProvider.Docker,
+                    $"container-{runtimeInstanceId:N}",
+                    RuntimeStatus.Running,
+                    new Dictionary<int, int>(),
+                    null,
+                    $"container-{runtimeInstanceId:N}",
+                    $"network-{runtimeInstanceId:N}",
+                    runtimeInstanceId,
+                    Generation: 1)),
                 CreatedAt = now
             },
             new RuntimeInstance
@@ -263,5 +280,73 @@ public sealed class RunnerAvailabilityPublisherTests
             Destroyed.Add(identity);
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class RecordingReceiptProviderCatalog(
+        RecordingReceiptResources resources) : IRuntimeProviderCatalog
+    {
+        public IContainerLifecycle Containers(RuntimeProvider provider) => resources;
+        public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) => resources;
+        public IComposeRuntime Compose(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+        public IOvaRuntime Appliance(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class RecordingReceiptResources
+        : IContainerLifecycle, IContainerSandboxLifecycle
+    {
+        public List<string> DestroyedContainerIds { get; } = [];
+
+        public Task<ContainerReceipt> CreateAsync(
+            ContainerRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ContainerReceipt> EnsureRunningAsync(
+            ContainerRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DestroyAsync(
+            ContainerReceipt receipt,
+            CancellationToken cancellationToken)
+        {
+            DestroyedContainerIds.Add(receipt.ResourceId);
+            return Task.CompletedTask;
+        }
+
+        public Task<ContainerReceipt?> GetAsync(
+            RuntimeProvider provider,
+            string resourceId,
+            CancellationToken cancellationToken) => Task.FromResult<ContainerReceipt?>(null);
+
+        public Task<string> CreateIsolatedNetworkAsync(
+            ContainerNetworkPolicyRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DeleteIsolatedNetworkAsync(
+            string networkId,
+            CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> IsolatedNetworkExistsAsync(
+            string networkId,
+            CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task CopyArchiveAsync(
+            ContainerReceipt receipt,
+            Stream tarArchive,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ContainerExecResult> ExecAsync(
+            ContainerReceipt receipt,
+            IReadOnlyList<string> command,
+            TimeSpan timeout,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ContainerExecResult> ExecWithInputAsync(
+            ContainerReceipt receipt,
+            IReadOnlyList<string> command,
+            ReadOnlyMemory<byte> standardInput,
+            TimeSpan timeout,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

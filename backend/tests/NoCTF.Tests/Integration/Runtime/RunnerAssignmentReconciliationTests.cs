@@ -764,9 +764,12 @@ public sealed class RunnerAssignmentReconciliationTests
                 await Assert.That(retained.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(retained.RunnerId).IsEqualTo("runner-c");
                 await Assert.That(retained.ProviderReceiptJson).IsNotNull();
-                await Assert.That(JsonNode.DeepEquals(
-                    JsonNode.Parse(retained.ProviderReceiptJson!),
-                    JsonNode.Parse("""{"id":"local"}"""))).IsTrue();
+                var retainedReceipt = JsonSerializer.Deserialize<ContainerReceipt>(
+                    retained.ProviderReceiptJson!);
+                await Assert.That(retainedReceipt).IsNotNull();
+                await Assert.That(retainedReceipt!.RuntimeInstanceId)
+                    .IsEqualTo(fixture.RetainReceiptId);
+                await Assert.That(retainedReceipt.Generation).IsEqualTo(1);
                 await Assert.That(retained.FailureCode).IsNull();
                 await Assert.That(retained.RunnerUnavailableAt).IsEqualTo(fixture.Now);
                 await Assert.That(retained.RunnerAssignmentReleaseToken).IsNull();
@@ -1992,6 +1995,8 @@ public sealed class RunnerAssignmentReconciliationTests
                 [orphan],
                 failedIdentity: orphan);
             var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Online);
+            var receiptResources = new RecordingReceiptResources();
+            var providers = new RecordingReceiptProviderCatalog(receiptResources);
             var configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
@@ -2010,7 +2015,8 @@ public sealed class RunnerAssignmentReconciliationTests
                     db,
                     [reconciler],
                     configuration,
-                    capacity);
+                    capacity,
+                    providers);
                 Func<Task> action = () => handler.Handle(message, cancellationToken);
                 await Assert.That(action).Throws<InvalidOperationException>();
             }
@@ -2020,7 +2026,8 @@ public sealed class RunnerAssignmentReconciliationTests
                     replayDb,
                     [reconciler],
                     configuration,
-                    capacity);
+                    capacity,
+                    providers);
                 Func<Task> action = () => handler.Handle(message, cancellationToken);
                 await Assert.That(action).Throws<InvalidOperationException>();
             }
@@ -2028,10 +2035,10 @@ public sealed class RunnerAssignmentReconciliationTests
             await Assert.That(reconciler.Destroyed)
                 .IsEquivalentTo(
                 [
-                    new RuntimeResourceIdentity(fixture.RetainReceiptId, 1),
                     orphan,
                     orphan
                 ]);
+            await Assert.That(receiptResources.DestroyedContainerIds).Count().IsEqualTo(1);
             await Assert.That(capacity.ReleasedRuntimeIds)
                 .IsEquivalentTo([fixture.RetainReceiptId]);
             await using var verify = new NoCtfDbContext(options);
@@ -2067,8 +2074,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 var runtime = await seed.RuntimeInstances.SingleAsync(
                     instance => instance.Id == fixture.RetainReceiptId,
                     cancellationToken);
-                runtime.RuntimeKind = RuntimeKind.OvaVm;
-                runtime.RuntimeProvider = RuntimeProvider.Libvirt;
                 runtime.RunnerId = "runner-a";
                 runtime.State = RuntimeState.Failed;
                 runtime.FailureCode = RuntimeFailureCode.CleanupFailed;
@@ -2082,13 +2087,14 @@ public sealed class RunnerAssignmentReconciliationTests
                 {
                     ["Runner:Pool"] = "pool-a",
                     ["Runner:Id"] = "runner-a",
-                    ["Runner:Provider"] = nameof(RuntimeProvider.Libvirt)
+                    ["Runner:Provider"] = nameof(RuntimeProvider.Docker)
                 })
                 .Build();
             var cleanupFailure = new RecordingResourceReconciler(
-                RuntimeProvider.Libvirt,
+                RuntimeProvider.Docker,
                 [],
                 failCleanup: true);
+            var failingReceiptResources = new RecordingReceiptResources(failDestroy: true);
             var cleanupCapacity = new ReconciliationCapacityGate(
                 _ => RunnerHeartbeatStatus.Online);
             await using (var cleanupDb = new NoCtfDbContext(options))
@@ -2097,7 +2103,8 @@ public sealed class RunnerAssignmentReconciliationTests
                     cleanupDb,
                     [cleanupFailure],
                     configuration,
-                    cleanupCapacity);
+                    cleanupCapacity,
+                    new RecordingReceiptProviderCatalog(failingReceiptResources));
                 Func<Task> action = () => handler.Handle(
                     new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now),
                     cancellationToken);
@@ -2105,7 +2112,9 @@ public sealed class RunnerAssignmentReconciliationTests
             }
             await Assert.That(cleanupCapacity.ReleasedRuntimeIds).IsEmpty();
 
-            var reconciler = new RecordingResourceReconciler(RuntimeProvider.Libvirt, []);
+            var reconciler = new RecordingResourceReconciler(RuntimeProvider.Docker, []);
+            var receiptResources = new RecordingReceiptResources();
+            var providers = new RecordingReceiptProviderCatalog(receiptResources);
             var mismatchedCapacity = new ReconciliationCapacityGate(
                 _ => RunnerHeartbeatStatus.Online,
                 release: (_, _) => RunnerCapacityReleaseOutcome.OwnerMismatch);
@@ -2115,7 +2124,8 @@ public sealed class RunnerAssignmentReconciliationTests
                     mismatchDb,
                     [reconciler],
                     configuration,
-                    mismatchedCapacity);
+                    mismatchedCapacity,
+                    providers);
                 Func<Task> action = () => handler.Handle(
                     new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now),
                     cancellationToken);
@@ -2146,7 +2156,8 @@ public sealed class RunnerAssignmentReconciliationTests
                     convergeDb,
                     [reconciler],
                     configuration,
-                    capacity);
+                    capacity,
+                    providers);
                 await handler.Handle(message, cancellationToken);
             }
             await using (var replayDb = new NoCtfDbContext(options))
@@ -2155,16 +2166,13 @@ public sealed class RunnerAssignmentReconciliationTests
                     replayDb,
                     [reconciler],
                     configuration,
-                    capacity);
+                    capacity,
+                    providers);
                 await handler.Handle(message, cancellationToken);
             }
 
-            await Assert.That(reconciler.Destroyed)
-                .IsEquivalentTo(
-                [
-                    new RuntimeResourceIdentity(fixture.RetainReceiptId, 1),
-                    new RuntimeResourceIdentity(fixture.RetainReceiptId, 1)
-                ]);
+            await Assert.That(reconciler.Destroyed).IsEmpty();
+            await Assert.That(receiptResources.DestroyedContainerIds).Count().IsEqualTo(2);
             await Assert.That(capacity.ReleasedRuntimeIds)
                 .IsEquivalentTo([fixture.RetainReceiptId]);
             await using var verify = new NoCtfDbContext(options);
@@ -2272,6 +2280,7 @@ public sealed class RunnerAssignmentReconciliationTests
             Title = "Runner reconciliation",
             OwnerId = ownerId,
             Mode = GameMode.Ctf,
+            ConfigurationJson = "{}",
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -2319,6 +2328,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 ChallengeId = challengeId,
                 Order = index,
                 IsPublished = true,
+                RulesJson = "{}",
                 UpdatedAt = now
             });
             db.RuntimeInstances.Add(new RuntimeInstance
@@ -2335,7 +2345,19 @@ public sealed class RunnerAssignmentReconciliationTests
                 RunnerPool = "pool-a",
                 State = states[index],
                 ProcessingVersion = 7,
-                ProviderReceiptJson = index == 2 ? "{\"id\":\"local\"}" : null,
+                ProviderReceiptJson = index == 2
+                    ? JsonSerializer.Serialize(new ContainerReceipt(
+                        runtimeIds[index],
+                        RuntimeProvider.Docker,
+                        $"container-{runtimeIds[index]:N}",
+                        RuntimeStatus.Running,
+                        new Dictionary<int, int>(),
+                        null,
+                        $"container-{runtimeIds[index]:N}",
+                        $"network-{runtimeIds[index]:N}",
+                        runtimeIds[index],
+                        Generation: 1))
+                    : null,
                 CreatedAt = now.AddMinutes(index)
             });
         }
@@ -2428,6 +2450,76 @@ public sealed class RunnerAssignmentReconciliationTests
         }
 
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
+    }
+
+    private sealed class RecordingReceiptProviderCatalog(
+        RecordingReceiptResources resources) : IRuntimeProviderCatalog
+    {
+        public IContainerLifecycle Containers(RuntimeProvider provider) => resources;
+        public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) => resources;
+        public IComposeRuntime Compose(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+        public IOvaRuntime Appliance(RuntimeProvider provider) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class RecordingReceiptResources(bool failDestroy = false)
+        : IContainerLifecycle, IContainerSandboxLifecycle
+    {
+        public List<string> DestroyedContainerIds { get; } = [];
+
+        public Task<ContainerReceipt> CreateAsync(
+            ContainerRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ContainerReceipt> EnsureRunningAsync(
+            ContainerRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DestroyAsync(
+            ContainerReceipt receipt,
+            CancellationToken cancellationToken)
+        {
+            if (failDestroy)
+                throw new InvalidOperationException("receipt cleanup failed");
+            DestroyedContainerIds.Add(receipt.ResourceId);
+            return Task.CompletedTask;
+        }
+
+        public Task<ContainerReceipt?> GetAsync(
+            RuntimeProvider provider,
+            string resourceId,
+            CancellationToken cancellationToken) => Task.FromResult<ContainerReceipt?>(null);
+
+        public Task<string> CreateIsolatedNetworkAsync(
+            ContainerNetworkPolicyRequest request,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DeleteIsolatedNetworkAsync(
+            string networkId,
+            CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> IsolatedNetworkExistsAsync(
+            string networkId,
+            CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task CopyArchiveAsync(
+            ContainerReceipt receipt,
+            Stream tarArchive,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ContainerExecResult> ExecAsync(
+            ContainerReceipt receipt,
+            IReadOnlyList<string> command,
+            TimeSpan timeout,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<ContainerExecResult> ExecWithInputAsync(
+            ContainerReceipt receipt,
+            IReadOnlyList<string> command,
+            ReadOnlyMemory<byte> standardInput,
+            TimeSpan timeout,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class RecordingResourceReconciler(

@@ -136,6 +136,10 @@ public sealed class IsolatedContainerProvisionerTests
             DeletedNetworks.Add(networkId);
             return Task.CompletedTask;
         }
+
+        public Task<bool> IsolatedNetworkExistsAsync(
+            string networkId,
+            CancellationToken cancellationToken) => Task.FromResult(false);
         public Task CopyArchiveAsync(ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<ContainerExecResult> ExecAsync(

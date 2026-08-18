@@ -215,6 +215,7 @@ public interface IContainerSandboxLifecycle
         ContainerNetworkPolicyRequest request,
         CancellationToken cancellationToken);
     Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken);
+    Task<bool> IsolatedNetworkExistsAsync(string networkId, CancellationToken cancellationToken);
     Task CopyArchiveAsync(ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken);
     Task<ContainerExecResult> ExecAsync(
         ContainerReceipt receipt, IReadOnlyList<string> command, TimeSpan timeout, CancellationToken cancellationToken);

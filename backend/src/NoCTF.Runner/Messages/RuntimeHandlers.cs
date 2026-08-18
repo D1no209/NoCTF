@@ -129,12 +129,11 @@ public sealed class RuntimeProviderHandler(
                 return StopSucceeded(message, work);
             if (work.ProviderReceiptJson is { } receiptJson)
             {
-                var receipt = JsonSerializer.Deserialize<ContainerReceipt>(receiptJson)
-                    ?? throw new InvalidOperationException("Provider receipt is invalid.");
-                await IsolatedContainerProvisioner.DestroyAsync(
-                    providers.Containers(work.Provider),
-                    providers.Sandbox(work.Provider),
-                    receipt,
+                await RuntimeReceiptCleanup.CleanupContainerAsync(
+                    providers,
+                    new(message.RuntimeInstanceId, work.Generation),
+                    work.Provider,
+                    receiptJson,
                     cancellationToken);
             }
             else
@@ -172,18 +171,31 @@ public sealed class RuntimeProviderHandler(
                     RuntimeCleanupResult.CleanupFailed);
             }
 
-            var reconciler = ReadResourceReconciler(message.Provider);
             var identity = new RuntimeResourceIdentity(
                 message.RuntimeInstanceId,
                 message.Generation);
-            await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
-            var remaining = await reconciler.ListManagedAsync(cancellationToken);
-            if (remaining.Contains(identity))
+            if (work?.ProviderReceiptJson is { } providerReceiptJson)
             {
-                return ForceTerminationFailed(
-                    message,
-                    DateTimeOffset.UtcNow,
-                    RuntimeCleanupResult.ResourcesRemain);
+                await RuntimeReceiptCleanup.CleanupAsync(
+                    providers,
+                    work.RuntimeKind,
+                    identity,
+                    message.Provider,
+                    providerReceiptJson,
+                    cancellationToken);
+            }
+            else
+            {
+                var reconciler = ReadResourceReconciler(message.Provider);
+                await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+                var remaining = await reconciler.ListManagedAsync(cancellationToken);
+                if (remaining.Contains(identity))
+                {
+                    return ForceTerminationFailed(
+                        message,
+                        DateTimeOffset.UtcNow,
+                        RuntimeCleanupResult.ResourcesRemain);
+                }
             }
 
             var release = await capacity.ReleaseAsync(
@@ -309,9 +321,12 @@ public sealed class RuntimeProviderHandler(
                 return StopSucceeded(message, work);
             if (work.ProviderReceiptJson is { } receiptJson)
             {
-                var receipt = JsonSerializer.Deserialize<ComposeReceipt>(receiptJson)
-                    ?? throw new InvalidOperationException("Provider receipt is invalid.");
-                await providers.Compose(work.Provider).DownAsync(receipt, cancellationToken);
+                await RuntimeReceiptCleanup.CleanupComposeAsync(
+                    providers,
+                    new(message.RuntimeInstanceId, work.Generation),
+                    work.Provider,
+                    receiptJson,
+                    cancellationToken);
             }
             else
             {

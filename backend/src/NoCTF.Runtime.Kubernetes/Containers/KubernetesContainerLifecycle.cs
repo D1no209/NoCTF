@@ -583,6 +583,25 @@ public sealed class KubernetesContainerLifecycle(
         }
     }
 
+    public async Task<bool> IsolatedNetworkExistsAsync(
+        string networkId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _ = await client.NetworkingV1.ReadNamespacedNetworkPolicyAsync(
+                networkId,
+                options.Namespace,
+                cancellationToken: cancellationToken);
+            return true;
+        }
+        catch (k8s.Autorest.HttpOperationException exception)
+            when (exception.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+    }
+
     public async Task CopyArchiveAsync(
         ContainerReceipt receipt, Stream tarArchive, CancellationToken cancellationToken)
     {

@@ -494,31 +494,30 @@ public sealed class AwdpFixVerificationHandler(
         AwdpFixRecoveryWork recovery,
         CancellationToken cancellationToken)
     {
-        var reconciler = resourceReconcilers.SingleOrDefault(
-            candidate => candidate.Provider == recovery.Provider)
-            ?? throw new InvalidOperationException(
-                $"Runtime resource reconciliation is unavailable for '{recovery.Provider}'.");
         var identity = new RuntimeResourceIdentity(
             recovery.RuntimeInstanceId,
             recovery.Generation);
         if (!string.IsNullOrWhiteSpace(recovery.ProviderReceiptJson))
         {
-            var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
-                recovery.ProviderReceiptJson)
-                ?? throw new InvalidOperationException("AWDP target provider receipt is invalid.");
-            if (receipt.Provider != recovery.Provider)
-                throw new InvalidOperationException("AWDP target provider receipt does not match its assignment.");
-            await IsolatedContainerProvisioner.DestroyAsync(
-                providers.Containers(recovery.Provider),
-                providers.Sandbox(recovery.Provider),
-                receipt,
+            await RuntimeReceiptCleanup.CleanupContainerAsync(
+                providers,
+                identity,
+                recovery.Provider,
+                recovery.ProviderReceiptJson,
                 cancellationToken);
         }
-        await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
-        var remaining = await reconciler.ListManagedAsync(cancellationToken);
-        if (remaining.Contains(identity))
-            throw new InvalidOperationException(
-                "AWDP verification resources remain after identity-based cleanup.");
+        else
+        {
+            var reconciler = resourceReconcilers.SingleOrDefault(
+                candidate => candidate.Provider == recovery.Provider)
+                ?? throw new InvalidOperationException(
+                    $"Runtime resource reconciliation is unavailable for '{recovery.Provider}'.");
+            await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+            var remaining = await reconciler.ListManagedAsync(cancellationToken);
+            if (remaining.Contains(identity))
+                throw new InvalidOperationException(
+                    "AWDP verification resources remain after identity-based cleanup.");
+        }
 
         TryDeleteOperationDirectory(recovery.GameplayFactId, recovery.RuntimeInstanceId);
         var release = await capacity.ReleaseAsync(

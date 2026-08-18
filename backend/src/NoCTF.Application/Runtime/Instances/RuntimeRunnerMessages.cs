@@ -102,7 +102,8 @@ public interface IRuntimeStopMessage : IRunnerNodeMessage
 public sealed record RuntimeStopWork(
     RuntimeProvider Provider,
     string? ProviderReceiptJson,
-    int Generation = 0);
+    int Generation = 0,
+    RuntimeKind RuntimeKind = RuntimeKind.Container);
 
 public enum RuntimeProvisionWorkStatus
 {
