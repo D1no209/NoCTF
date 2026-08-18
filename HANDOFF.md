@@ -1,5 +1,21 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.49 管理端竞赛题目删除按钮修复
+
+- `ef04dd5e` 修复管理后台“竞赛管理 / 题目”列表中的删除题目按钮无效问题。
+  删除确认框不再使用会自动关闭并清空目标状态的 `AlertDialogAction`，改为受控 destructive `Button`：
+  删除请求期间显示 loading 并禁止重复提交；成功后关闭确认框并刷新列表；失败时保留确认框、待删除题目和当前输入状态，并在确认框内与 toast 中显示可读错误。
+- 新增 `competition-challenge-delete.test.ts`，锁定删除流程继续通过生成 SDK
+  `adminDeleteCompetitionChallenge` 调用，并携带当前题目的 `expectedRevision`。
+- `92bfb072` 将平台版本从 `0.1.0-alpha.48` 递增为 `0.1.0-alpha.49`。
+- 本阶段没有新增业务表、EF migration、OpenAPI 契约或 TypeScript SDK 变更；未推送、未部署。
+- 验证通过：
+  - `bun test tests/competition-challenge-delete.test.ts`：2/2 通过。
+  - `bun test`：210/210 通过。
+  - `bun run typecheck`：通过。
+  - `bun run build`：通过；仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `git diff --check`：通过。
+
 ## 2026-08-18 alpha.48 分值曲线提示与中文错误提示修复
 
 - `4207856d` 修复管理端分值衰减曲线预览的鼠标提示行为：浮层现在跟随鼠标指针，并与指针保持固定偏移；曲线上高亮点仍按横轴换算为整数“解题队伍数”，显示该解题数对应的取整分值。
