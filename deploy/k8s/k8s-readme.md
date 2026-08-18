@@ -144,6 +144,14 @@ kubectl apply -f runner-deployment.yaml
 kubectl apply -f ingress.yaml
 ```
 
+Before applying `configmap.yaml`, replace `ForwardedHeaders__KnownNetworks__0`
+with the exact ingress-controller Pod CIDR and replace
+`ForwardedHeaders__AllowedHosts__0` with the public NoCTF host. The example CIDR
+is deliberately not a production default. Do not use a trust-all forwarded-header
+setting. TLS, HTTP-to-HTTPS redirects, HSTS and WebSocket upgrade remain owned by
+the ingress; the backend Service and scoring callbacks stay HTTP-only inside the
+cluster.
+
 Email delivery is optional and remains fail-closed under the default-deny policy.
 The stock DNS policy permits only `*.svc.cluster.local` lookups through cluster
 DNS; every external dependency therefore needs its own exact-FQDN policy.

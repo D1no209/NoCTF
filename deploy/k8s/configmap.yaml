@@ -12,7 +12,6 @@ data:
   Authentication__Issuer: "NoCTF"
   Authentication__Audience: "NoCTF.Api"
   Authentication__AccessTokenMinutes: "15"
-  Authentication__RefreshCookieSecure: "true"
   RunnerScoring__Issuer: "NoCTF.Runner"
   RunnerScoring__Audience: "NoCTF.ScoringInput"
   RunnerScoring__LifetimeSeconds: "300"
@@ -45,6 +44,8 @@ data:
   Notifications__RedisStream__MaxPayloadBytes: "65536"
   Koh__MaxConcurrentPolls: "8"
   Awd__MaxConcurrentContainerRefreshes: "4"
-  ForwardedHeaders__TrustAll: "true"
+  # Replace this example with the exact ingress-controller Pod CIDR.
+  ForwardedHeaders__KnownNetworks__0: "10.0.0.0/8"
+  ForwardedHeaders__AllowedHosts__0: "noctf.local"
   Cors__AllowedOrigins__0: "https://noctf.local"
   Database__AutoMigrate: "false"

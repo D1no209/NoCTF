@@ -62,7 +62,6 @@ services:
       Authentication__SigningKey: ${NOCTF_E2E_JWT_SECRET}
       Authentication__Issuer: NoCTF.E2E
       Authentication__Audience: NoCTF.E2E.Api
-      Authentication__RefreshCookieSecure: "false"
       RunnerScoring__SigningKey: ${NOCTF_E2E_JWT_SECRET}
       RunnerScoring__Issuer: NoCTF.E2E.Runner
       RunnerScoring__Audience: NoCTF.E2E.Scoring

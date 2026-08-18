@@ -4,6 +4,7 @@ public static class PipelineConfiguration
 {
     public static WebApplication UseNoCtfPipeline(this WebApplication app)
     {
+        app.UseForwardedHeaders();
         app.UseDefaultFiles();
         app.UseStaticFiles();
         app.UseExceptionHandler();

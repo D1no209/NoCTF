@@ -100,7 +100,22 @@ Runtime Namespace 只放置 `rt-*` Runtime 资源；如确需平台资源，名�
 
 ## 网络
 
-外部 TLS 在可信代理终止或进程端到端 TLS。API 不对内部 HTTP 请求执行 HTTPS 重定向；Runner 的归档读取与 Checker 回调必须能通过部署配置中的内部 HTTP(S) Service 地址直达 API。ForwardedHeaders 只信任明确代理。API CORS 精确 Origin+credentials；Refresh Cookie Secure/SameSite Strict。
+ASP.NET Core 只监听 `http://+:8080`，不执行 HTTPS 重定向，也不加载公网证书。Docker
+Compose 将该端口仅发布到宿主回环地址 `127.0.0.1:${NOCTF_BACKEND_PORT:-8080}`；公网
+HTTP→HTTPS、TLS 终止、HSTS 和 WebSocket upgrade 由宿主 Nginx 完成。仓库样例
+`deploy/nginx/noctf.conf` 中的域名和证书路径必须替换后再启用，Nginx 上游保持
+`http://127.0.0.1:8080`。不得把 API 8080 改回 `0.0.0.0` 公网发布，也不得让内部
+Runner/Checker 绕行公网入口。
+
+Nginx 必须传递 `Host`、`X-Forwarded-Host`、`X-Forwarded-For` 和
+`X-Forwarded-Proto`。API 只接受 `ForwardedHeaders:KnownNetworks`/`KnownProxies` 中明确
+配置的一跳代理；Docker 默认私网 CIDR 仅是样例，生产必须按实际 bridge CIDR 收窄，
+`NOCTF_PUBLIC_HOST` 必须为公网 Host。Kubernetes 的 ConfigMap 同样必须把示例
+`10.0.0.0/8` 换成 ingress-controller 的精确 Pod CIDR，禁止使用 `TrustAll`。内部
+`RunnerScoring__CallbackBaseUrl` 与归档地址继续使用受限网络中的 HTTP Service 地址，
+并由 Runner JWT、audience、resource、Runtime generation 和 processing version 验证。
+Refresh Cookie 始终由 API 显式设置 `Secure=true`、`HttpOnly=true`、`SameSite=Strict`，
+不随上游 HTTP 改为不安全 Cookie。API CORS 继续使用精确 Origin+credentials。
 
 当前威胁模型信任办赛管理员、管理员维护的题目配置、Runner Pool 配置及平台托管镜像，
 不防御管理员内鬼。选手、题目业务容器及其网络输入仍是不可信边界。
