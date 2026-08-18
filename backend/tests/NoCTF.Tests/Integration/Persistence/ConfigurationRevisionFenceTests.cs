@@ -153,6 +153,7 @@ public sealed class ConfigurationRevisionFenceTests
             Id = challengeId,
             OwnerId = ownerId,
             Title = "Challenge",
+            DefinitionJson = "{}",
             CreatedAt = now,
             UpdatedAt = now
         });

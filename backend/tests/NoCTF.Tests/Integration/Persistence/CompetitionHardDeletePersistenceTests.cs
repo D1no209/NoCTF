@@ -83,6 +83,7 @@ public sealed class CompetitionHardDeletePersistenceTests
                     Visibility = ChallengeVisibility.Private,
                     Title = "Historical challenge",
                     Direction = "Web",
+                    DefinitionJson = "{}",
                     CreatedAt = now,
                     UpdatedAt = now
                 });
@@ -93,6 +94,7 @@ public sealed class CompetitionHardDeletePersistenceTests
                     ChallengeId = challengeId,
                     BaseScore = 500,
                     IsPublished = true,
+                    RulesJson = "{}",
                     UpdatedAt = now
                 });
                 setup.Teams.Add(new Team

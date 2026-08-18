@@ -67,6 +67,7 @@ public sealed class UserAccountDeletionPersistenceTests
                     Title = "Historical competition",
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Finished,
+                    ConfigurationJson = "{}",
                     MaxTeamMembers = 5,
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-2),

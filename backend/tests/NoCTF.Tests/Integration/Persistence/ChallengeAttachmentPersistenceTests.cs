@@ -56,6 +56,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                 Id = challengeId,
                 OwnerId = administratorId,
                 Title = "Attachment persistence",
+                DefinitionJson = "{}",
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -137,6 +138,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                 OwnerId = administratorId,
                 Title = "Random batch",
                 Mode = GameMode.Ctf,
+                DefinitionJson = "{}",
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -234,6 +236,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                     Title = "Random attachment assignment",
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Running,
+                    ConfigurationJson = "{}",
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
@@ -260,6 +263,7 @@ public sealed class ChallengeAttachmentPersistenceTests
                     OwnerId = users[0],
                     Title = "Random delivery",
                     Mode = GameMode.Ctf,
+                    DefinitionJson = "{}",
                     CreatedAt = now,
                     UpdatedAt = now
                 });

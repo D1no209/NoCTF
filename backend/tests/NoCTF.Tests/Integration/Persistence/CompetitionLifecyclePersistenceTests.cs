@@ -412,6 +412,7 @@ public sealed class CompetitionLifecyclePersistenceTests
             OwnerId = ownerId,
             Mode = GameMode.Awd,
             Status = CompetitionStatus.Running,
+            ConfigurationJson = "{}",
             RunningSince = now.AddMinutes(-2),
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -424,7 +425,9 @@ public sealed class CompetitionLifecyclePersistenceTests
         {
             Id = challengeId,
             OwnerId = ownerId,
+            Mode = GameMode.Awd,
             Title = "Service",
+            DefinitionJson = "{}",
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -434,6 +437,7 @@ public sealed class CompetitionLifecyclePersistenceTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
+            RulesJson = "{}",
             UpdatedAt = now
         });
         db.RuntimeInstances.Add(new RuntimeInstance

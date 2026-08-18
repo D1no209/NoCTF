@@ -993,6 +993,7 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 OwnerId = ownerId,
                 Mode = GameMode.Ctf,
                 Title = "Unrelated target",
+                DefinitionJson = "{}",
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -1003,6 +1004,7 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 ChallengeId = unrelatedChallengeId,
                 Order = 1,
                 IsPublished = true,
+                RulesJson = "{}",
                 UpdatedAt = now
             });
             db.RuntimeInstances.Add(new RuntimeInstance

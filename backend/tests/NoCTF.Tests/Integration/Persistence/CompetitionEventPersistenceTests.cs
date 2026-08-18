@@ -77,6 +77,7 @@ public sealed class CompetitionEventPersistenceTests
                     Visibility = ChallengeVisibility.Shared,
                     Title = "Event challenge",
                     Direction = "Web",
+                    DefinitionJson = "{}",
                     CreatedAt = now,
                     UpdatedAt = now
                 });
@@ -87,6 +88,7 @@ public sealed class CompetitionEventPersistenceTests
                     ChallengeId = ids.ChallengeId,
                     BaseScore = 500,
                     IsPublished = true,
+                    RulesJson = "{}",
                     UpdatedAt = now,
                     Hints =
                     [

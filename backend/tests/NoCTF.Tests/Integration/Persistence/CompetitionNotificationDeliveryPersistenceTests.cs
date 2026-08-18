@@ -52,6 +52,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 OwnerId = ownerId,
                 Title = "Announcement competition",
                 Mode = GameMode.Ctf,
+                ConfigurationJson = "{}",
                 ConfigurationUpdatedAt = now,
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1),
@@ -131,6 +132,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 ObserverIds = [observerId],
                 Title = "Cheat incident notifications",
                 Mode = GameMode.Ctf,
+                ConfigurationJson = "{}",
                 ConfigurationUpdatedAt = now,
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(-1),
@@ -520,6 +522,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     ChallengeId = challengeId,
                     IsPublished = true,
                     Revision = 1,
+                    RulesJson = "{}",
                     UpdatedAt = now,
                     Hints =
                     [

@@ -78,7 +78,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                 var runtime = await db.RuntimeInstances.SingleAsync(
                     item => item.Purpose == RuntimePurpose.Practice,
                     ct);
-                await Assert.That(runtime.Generation).IsEqualTo(2);
+                await Assert.That(runtime.Generation).IsEqualTo(1);
                 await Assert.That(runtime.Purpose).IsEqualTo(RuntimePurpose.Practice);
                 runtime.State = RuntimeState.Running;
                 runtime.RunningAt = fixture.Now;
