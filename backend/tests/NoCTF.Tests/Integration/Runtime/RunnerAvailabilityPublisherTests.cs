@@ -62,21 +62,28 @@ public sealed class RunnerAvailabilityPublisherTests
                     new HashEntry("pidsLimit", 1)
                 ]);
             var registry = new RedisRunnerAvailabilityRegistry(redis);
+            var availabilityOptions = Options.Create(new RunnerAvailabilityOptions
+            {
+                RunnerId = "runner-a",
+                RunnerPool = "pool-a",
+                Provider = RuntimeProvider.Docker,
+                MemoryBytes = 1024,
+                NanoCpus = 100,
+                PidsLimit = 10,
+                HeartbeatIntervalSeconds = 1,
+                HeartbeatTtlSeconds = 10,
+                ProviderFailureHoldSeconds = 120
+            });
+            var providerHealth = new RunnerProviderHealthState(
+                availabilityOptions,
+                TimeProvider.System,
+                NullLogger<RunnerProviderHealthState>.Instance);
             using var publisher = new RunnerAvailabilityPublisher(
                 serviceProvider.GetRequiredService<IServiceScopeFactory>(),
                 registry,
-                Options.Create(new RunnerAvailabilityOptions
-                {
-                    RunnerId = "runner-a",
-                    RunnerPool = "pool-a",
-                    Provider = RuntimeProvider.Docker,
-                    MemoryBytes = 1024,
-                    NanoCpus = 100,
-                    PidsLimit = 10,
-                    HeartbeatIntervalSeconds = 1,
-                    HeartbeatTtlSeconds = 10
-                }),
-                NullLogger<RunnerAvailabilityPublisher>.Instance);
+                availabilityOptions,
+                NullLogger<RunnerAvailabilityPublisher>.Instance,
+                providerHealth);
 
             var blocked = await publisher.PublishOnceAsync(cancellationToken);
 
@@ -148,6 +155,22 @@ public sealed class RunnerAvailabilityPublisherTests
             await Assert.That((long)(await database.HashGetAsync(
                 "runner:runner-a:capacity",
                 "availableMemoryBytes"))!).IsEqualTo(1024);
+
+            providerHealth.ReportFailure(
+                RuntimeProvider.Docker,
+                RunnerProviderFailureKind.ProvisionRejected,
+                fixture.RuntimeInstanceId);
+            var providerUnavailable = await publisher.PublishOnceAsync(cancellationToken);
+
+            await Assert.That(providerUnavailable)
+                .IsEqualTo(RunnerAvailabilityRegistrationOutcome.OfflineProviderUnavailable);
+            await Assert.That(await database.KeyExistsAsync("runner:runner-a:heartbeat")).IsFalse();
+            await Assert.That(await database.KeyExistsAsync("runner:runner-a:capacity")).IsTrue();
+
+            providerHealth.ReportSuccess(RuntimeProvider.Docker);
+            var recovered = await publisher.PublishOnceAsync(cancellationToken);
+            await Assert.That(recovered).IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
+            await Assert.That(await database.KeyExistsAsync("runner:runner-a:heartbeat")).IsTrue();
         });
     }
 

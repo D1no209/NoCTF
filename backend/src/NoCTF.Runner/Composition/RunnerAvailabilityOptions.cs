@@ -13,6 +13,7 @@ public sealed class RunnerAvailabilityOptions
     public long PidsLimit { get; set; }
     public int HeartbeatIntervalSeconds { get; set; }
     public int HeartbeatTtlSeconds { get; set; }
+    public int ProviderFailureHoldSeconds { get; set; } = 120;
 
     public RuntimeResourceLimits Capacity => new(MemoryBytes, NanoCpus, PidsLimit);
     public TimeSpan HeartbeatInterval => TimeSpan.FromSeconds(HeartbeatIntervalSeconds);

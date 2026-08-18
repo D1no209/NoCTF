@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -106,6 +108,54 @@ public sealed class ContainerRuntimeHandlerTests
         await Assert.That(reconciler.Destroyed).IsEmpty();
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
+    }
+
+    [Test]
+    public async Task Provider_rejection_marks_the_runner_temporarily_unavailable()
+    {
+        var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var lifecycle = new RecordingContainerLifecycle
+        {
+            ProvisionFailure = new InvalidOperationException(
+                "all predefined address pools have been fully subnetted")
+        };
+        var health = new RunnerProviderHealthState(
+            Options.Create(new RunnerAvailabilityOptions
+            {
+                ProviderFailureHoldSeconds = 120
+            }),
+            TimeProvider.System,
+            NullLogger<RunnerProviderHealthState>.Instance);
+        var handler = CreateHandler(
+            lifecycle,
+            new RecordingSandboxLifecycle(),
+            new RecordingCapacity(RunnerCapacityReleaseOutcome.Released),
+            new FixedWorkReader(null),
+            providerHealth: health);
+        var message = new ProvisionContainerRuntime(
+            runtimeInstanceId,
+            ProcessingVersion: 8,
+            Generation: 3,
+            RunnerPool: "default",
+            RunnerId: "runner-a",
+            Definition: new ContainerRequest(
+                runtimeInstanceId,
+                RuntimeProvider.Docker,
+                "challenge:latest",
+                [],
+                new Dictionary<string, string>(),
+                new Dictionary<string, string>(),
+                new Dictionary<int, int>(),
+                new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
+                new ContainerSecurityPolicy(false, false, false, [], []),
+                Ttl: null));
+
+        var result = await handler.Handle(message, CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeProvisionTerminated>();
+        await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
+            .IsEqualTo(RuntimeFailureCode.ProviderRejected);
+        await Assert.That(health.IsReady(RuntimeProvider.Docker)).IsFalse();
     }
 
     [Test]
@@ -262,7 +312,8 @@ public sealed class ContainerRuntimeHandlerTests
         IContainerSandboxLifecycle sandbox,
         IRunnerCapacityGate capacity,
         IRuntimeNodeWorkReader reader,
-        IRuntimeManagedResourceReconciler? reconciler = null)
+        IRuntimeManagedResourceReconciler? reconciler = null,
+        RunnerProviderHealthState? providerHealth = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -276,7 +327,8 @@ public sealed class ContainerRuntimeHandlerTests
             [reconciler ?? new RecordingResourceReconciler()],
             configuration,
             capacity,
-            reader);
+            reader,
+            providerHealth: providerHealth);
     }
 
     private sealed class RecordingContainerLifecycle : IContainerLifecycle
