@@ -6,17 +6,6 @@ using NoCTF.GameModes.Scoring;
 
 namespace NoCTF.GameModes.Awdp.Configuration;
 
-public enum AwdpFlagInjectionKind
-{
-    EnvironmentVariable,
-    File
-}
-
-public sealed record AwdpFlagInjectionConfiguration(
-    AwdpFlagInjectionKind Kind,
-    string? EnvironmentVariableName = null,
-    string? FilePath = null);
-
 public sealed record AwdpConfiguration(
     int SchemaVersion,
     int RoundDurationSeconds,
@@ -52,8 +41,7 @@ public sealed record AwdpChallengeConfiguration(
     long? ServiceAbnormalPenalty = null,
     EvaluationDispatchMode? EvaluationDispatchMode = null,
     long? MaximumPatchUploadBytes = null,
-    PerTeamFlagTemplate? FlagTemplate = null,
-    AwdpFlagInjectionConfiguration? FlagInjection = null)
+    PerTeamFlagTemplate? FlagTemplate = null)
 {
     public const int CurrentSchemaVersion = 4;
 }
@@ -76,5 +64,4 @@ public sealed record AwdpEffectiveConfiguration(
     RunnerJobConfiguration? Checker,
     int ReadyTimeoutSeconds,
     long MaximumPatchUploadBytes,
-    PerTeamFlagTemplate FlagTemplate,
-    AwdpFlagInjectionConfiguration? FlagInjection);
+    PerTeamFlagTemplate FlagTemplate);

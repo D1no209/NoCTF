@@ -136,7 +136,6 @@ describe('AWDP patch upload limits', () => {
     expect(runtime.definition.kind).toBe('container')
     if (runtime.definition.kind !== 'container') throw new Error('Expected AWDP container')
     expect(runtime.definition.flagEnvironmentVariableName).toBe('FLAG')
-    expect(model.awdpFlagInjection).toBeNull()
     model.maximumPatchUploadBytes = 512 * 1024 * 1024
 
     const json = serializeDefinition('Awdp', model)
@@ -148,5 +147,15 @@ describe('AWDP patch upload limits', () => {
     expect(JSON.parse(json).flagInjection).toBeUndefined()
     expect(competitionConfigFields('Awdp').some(field => field.key === 'requireBreakBeforeFix')).toBeTrue()
     expect(challengeRuleFields('Awdp').some(field => field.key === 'requireBreakBeforeFix')).toBeTrue()
+  })
+
+  test('ignores legacy AWDP flag injection fields', () => {
+    const model = parseDefinition(JSON.stringify({
+      schemaVersion: 4,
+      flagInjection: { kind: 0, environmentVariableName: 'OLD_FLAG' },
+    }))
+
+    expect(model?.flagInjection).toBeNull()
+    expect(JSON.parse(serializeDefinition('Awdp', model!)).flagInjection).toBeUndefined()
   })
 })

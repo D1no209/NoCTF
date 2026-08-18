@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
@@ -62,14 +61,6 @@ public sealed class RuntimeProviderHandler(
                 definition,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
-            if (awdpPlan.FileInjection is { } fileInjection)
-            {
-                await InjectAwdpAttackFileAsync(
-                    definition.Provider,
-                    receipt,
-                    fileInjection,
-                    cancellationToken);
-            }
             ExpandedRuntimeUrls? expanded = null;
             try
             {
@@ -463,45 +454,6 @@ public sealed class RuntimeProviderHandler(
 
     private string ReadRunnerId() => configuration["Runner:Id"]
         ?? throw new InvalidOperationException("Runner:Id is required.");
-
-    private async Task InjectAwdpAttackFileAsync(
-        RuntimeProvider provider,
-        ContainerReceipt receipt,
-        AwdpAttackFileInjection injection,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            IReadOnlyList<string> command =
-            [
-                "/bin/sh",
-                "-c",
-                "set -eu; target=$1; parent=${target%/*}; "
-                    + "if [ -z \"$parent\" ]; then parent=/; fi; mkdir -p -- \"$parent\"; "
-                    + "umask 077; cat > \"$target\"",
-                "noctf-awdp-flag",
-                injection.Path
-            ];
-            var result = await providers.Sandbox(provider).ExecWithInputAsync(
-                receipt,
-                command,
-                Encoding.UTF8.GetBytes(injection.Flag),
-                TimeSpan.FromSeconds(15),
-                cancellationToken);
-            if (result.TimedOut || result.ExitCode != 0)
-                throw new RuntimeConfigurationException(
-                    "The AWDP attack Runtime flag file could not be injected.");
-        }
-        catch
-        {
-            await IsolatedContainerProvisioner.DestroyAsync(
-                providers.Containers(provider),
-                providers.Sandbox(provider),
-                receipt,
-                cancellationToken);
-            throw;
-        }
-    }
 
     private async Task<object> CompleteProvisionFailureAsync(
         IRuntimeProvisionMessage message,

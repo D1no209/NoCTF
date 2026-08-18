@@ -28,6 +28,95 @@ public sealed class AwdpAttackRuntimePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Attack_provisioning_accepts_worker_injected_flag_without_legacy_flag_injection(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awdp_attack_plan")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var flag = "flag{awdp-runtime-env}";
+            var message = await CreateAttackProvisioningMessageAsync(
+                options,
+                fixture,
+                flag,
+                storeFlag: true,
+                includeInjectedFlag: true,
+                cancellationToken);
+
+            await using var services = BuildPlanReaderServices(options);
+            var reader = new AwdpAttackProvisioningPlanReader(
+                services.GetRequiredService<IServiceScopeFactory>());
+            var plan = await reader.ReadAsync(message, cancellationToken);
+
+            await Assert.That(plan.State).IsEqualTo(AwdpAttackProvisioningPlanState.Ready);
+            await Assert.That(plan.Definition).IsNotNull();
+            await Assert.That(plan.Definition!.Environment["FLAG"]).IsEqualTo(flag);
+            await Assert.That(plan.Definition.Environment.ContainsKey("OLD_FLAG")).IsFalse();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Attack_provisioning_rejects_missing_runtime_flag_or_worker_injection(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awdp_attack_plan_invalid")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            await using var services = BuildPlanReaderServices(options);
+            var reader = new AwdpAttackProvisioningPlanReader(
+                services.GetRequiredService<IServiceScopeFactory>());
+
+            var missingFlagRow = await CreateAttackProvisioningMessageAsync(
+                options,
+                fixture,
+                "flag{missing-row}",
+                storeFlag: false,
+                includeInjectedFlag: true,
+                cancellationToken);
+            var missingFlagRowPlan = await reader.ReadAsync(
+                missingFlagRow,
+                cancellationToken);
+            await Assert.That(missingFlagRowPlan.State)
+                .IsEqualTo(AwdpAttackProvisioningPlanState.Invalid);
+
+            var missingInjection = await CreateAttackProvisioningMessageAsync(
+                options,
+                fixture,
+                "flag{missing-injection}",
+                storeFlag: true,
+                includeInjectedFlag: false,
+                cancellationToken);
+            var missingInjectionPlan = await reader.ReadAsync(
+                missingInjection,
+                cancellationToken);
+            await Assert.That(missingInjectionPlan.State)
+                .IsEqualTo(AwdpAttackProvisioningPlanState.Invalid);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Concurrent_start_is_stable_and_reset_rotates_generation_flag(
         CancellationToken cancellationToken)
     {
@@ -178,6 +267,93 @@ public sealed class AwdpAttackRuntimePersistenceTests
         new FixedRuntimePlacementPolicy(RuntimeProvider.Docker, "awdp-tests"),
         new PostgresPerTeamRuntimeFlagStore(db),
         new NoopOutbox());
+
+    private static ServiceProvider BuildPlanReaderServices(
+        DbContextOptions<NoCtfDbContext> options)
+    {
+        var services = new ServiceCollection();
+        services.AddScoped(_ => new NoCtfDbContext(options));
+        return services.BuildServiceProvider(validateScopes: true);
+    }
+
+    private static async Task<ProvisionContainerRuntime> CreateAttackProvisioningMessageAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        string flag,
+        bool storeFlag,
+        bool includeInjectedFlag,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var runtimeId = Guid.CreateVersion7(fixture.Now.AddSeconds(1));
+        var runtime = new RuntimeInstance
+        {
+            Id = runtimeId,
+            CompetitionId = fixture.CompetitionId,
+            CompetitionChallengeId = fixture.CompetitionChallengeId,
+            TeamId = fixture.TeamIds[0],
+            Purpose = RuntimePurpose.AwdpAttack,
+            SourceCompetitionConfigurationRevision = 1,
+            SourceCompetitionChallengeRevision = 1,
+            SourceChallengeDefinitionRevision = 1,
+            Generation = 1,
+            RuntimeKind = RuntimeKind.Container,
+            RuntimeProvider = RuntimeProvider.Docker,
+            RunnerId = "runner-1",
+            RunnerPool = "awdp-tests",
+            State = RuntimeState.Provisioning,
+            ProcessingVersion = 1,
+            CreatedAt = fixture.Now
+        };
+        db.RuntimeInstances.Add(runtime);
+        if (storeFlag)
+        {
+            db.ChallengeFlags.Add(new ChallengeFlag
+            {
+                Id = Guid.CreateVersion7(fixture.Now.AddSeconds(2)),
+                CompetitionChallengeId = fixture.CompetitionChallengeId,
+                TeamId = fixture.TeamIds[0],
+                SpecificationKind = SpecificationKind.RuntimeGeneration,
+                SpecificationId = runtimeId,
+                Flag = flag,
+                FlagSha256 = ManageChallengeFlags.Hash(flag),
+                MatchKind = ChallengeFlagMatchKind.Exact,
+                CreatedAt = fixture.Now
+            });
+        }
+        await db.SaveChangesAsync(cancellationToken);
+
+        var challengeDefinition = await db.CompetitionChallenges.AsNoTracking()
+            .Where(item => item.Id == fixture.CompetitionChallengeId)
+            .Join(
+                db.Challenges.AsNoTracking(),
+                item => item.ChallengeId,
+                challenge => challenge.Id,
+                (_, challenge) => challenge.DefinitionJson)
+            .SingleAsync(cancellationToken);
+        await Assert.That(challengeDefinition.Contains("flagInjection", StringComparison.Ordinal))
+            .IsFalse();
+
+        var template = new ChallengeRuntimeTemplateCatalog().Get(
+            GameMode.Awdp,
+            challengeDefinition)!;
+        var claim = (ClaimContainerRuntime)NoCTF.Worker.Runtime.RuntimeClaimFactory.Create(
+            runtime,
+            GameMode.Awdp,
+            template,
+            challengeDefinition,
+            flag);
+        var environment = includeInjectedFlag
+            ? claim.Definition.Environment
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+        return new(
+            claim.RuntimeInstanceId,
+            claim.ProcessingVersion,
+            claim.Generation,
+            claim.RunnerPool,
+            "runner-1",
+            claim.Definition with { Environment = environment });
+    }
 
     private static async Task AssertEnvironmentInjectionAsync(
         DbContextOptions<NoCtfDbContext> options,

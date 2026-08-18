@@ -90,7 +90,7 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task AwdpDefinition_validates_flag_injection()
+    public async Task AwdpDefinition_rejects_legacy_flag_injection_metadata()
     {
         var errors = new GameModeChallengeConfigurationCatalog().ValidateDefinition(
             GameMode.Awdp,
@@ -104,8 +104,9 @@ public class ChallengeConfigurationCatalogTests
             }
             """);
 
-        await Assert.That(errors)
-            .Contains("FlagInjection.EnvironmentVariableName is invalid.");
+        await Assert.That(errors.Any(error =>
+                error.Contains("'flagInjection'", StringComparison.Ordinal)))
+            .IsTrue();
     }
 
     [Test]
@@ -780,7 +781,7 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
-    public async Task AwdpDefinition_rejects_invalid_dedicated_flag_injection()
+    public async Task AwdpDefinition_rejects_legacy_dedicated_flag_injection_metadata()
     {
         var root = JsonNode.Parse(
             new GameModeChallengeConfigurationCatalog().GetDefaultJson(GameMode.Awdp))!
@@ -795,8 +796,9 @@ public class ChallengeConfigurationCatalogTests
             GameMode.Awdp,
             root.ToJsonString());
 
-        await Assert.That(errors)
-            .Contains("FlagInjection.EnvironmentVariableName is invalid.");
+        await Assert.That(errors.Any(error =>
+                error.Contains("'flagInjection'", StringComparison.Ordinal)))
+            .IsTrue();
     }
 
     [Test]
