@@ -74,13 +74,13 @@ public sealed class AdminRuntimeStore(
             query = query.Where(item =>
                 item.CreatedAt < createdAt ||
                 item.CreatedAt == createdAt && item.Id.CompareTo(id) < 0);
-        return await query
+        var items = await query
             .OrderByDescending(item => item.CreatedAt)
             .ThenByDescending(item => item.Id)
             .Take(limit)
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
-                item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
+                item.Purpose, item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
                 item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
                 item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
@@ -104,17 +104,19 @@ public sealed class AdminRuntimeStore(
                     .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
                     .FirstOrDefault()))
             .ToListAsync(ct);
+        return await AddTeamAttributionAsync(items, ct);
     }
 
-    public Task<RuntimeInstanceView?> FindAsync(
+    public async Task<RuntimeInstanceView?> FindAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
-        CancellationToken ct) =>
-        db.RuntimeInstances.AsNoTracking()
+        CancellationToken ct)
+    {
+        var item = await db.RuntimeInstances.AsNoTracking()
             .Where(item => item.Id == runtimeInstanceId && item.CompetitionId == competitionId)
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
-                item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
+                item.Purpose, item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
                 item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
                 item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
@@ -138,6 +140,10 @@ public sealed class AdminRuntimeStore(
                     .Select(eventItem => (DateTimeOffset?)eventItem.OccurredAt)
                     .FirstOrDefault()))
             .SingleOrDefaultAsync(ct);
+        if (item is null)
+            return null;
+        return (await AddTeamAttributionAsync([item], ct))[0];
+    }
 
     public async Task<RuntimeMutationResult> ForceTerminateAsync(
         Guid competitionId,
@@ -359,8 +365,24 @@ public sealed class AdminRuntimeStore(
             return new(null, RuntimeMutationFailure.NotFound);
         if ((teamId is null) != (scope.Competition.Mode == GameMode.Koh))
             return new(null, RuntimeMutationFailure.Unsupported);
-        if (teamId is not null && scope.Competition.Mode is not (GameMode.Ctf or GameMode.Awd))
+        if (teamId is not null && scope.Competition.Mode is not (GameMode.Ctf or GameMode.Awd or GameMode.Awdp))
             return new(null, RuntimeMutationFailure.Unsupported);
+        if (teamId is Guid requestedTeamId
+            && !await db.Teams.AsNoTracking().AnyAsync(team =>
+                team.Id == requestedTeamId
+                && team.CompetitionId == competitionId
+                && team.DeletedAt == null
+                && !team.IsBanned
+                && team.RegistrationStatus == NoCTF.Domain.Teams.TeamRegistrationStatus.Approved,
+                ct))
+        {
+            return new(null, RuntimeMutationFailure.NotFound);
+        }
+
+        var purpose = scope.Competition.Mode == GameMode.Awdp
+            ? RuntimePurpose.AwdpAttack
+            : RuntimePurpose.Player;
+        var includesLegacyAwdpPurpose = purpose == RuntimePurpose.AwdpAttack;
 
         await using var criticalSection = teamId is Guid lockedTeamId
             ? await runtimeQuota.AcquireLockAsync(
@@ -375,7 +397,10 @@ public sealed class AdminRuntimeStore(
         var current = await db.RuntimeInstances
             .Where(item =>
                 item.CompetitionChallengeId == competitionChallengeId &&
-                item.TeamId == teamId)
+                item.TeamId == teamId &&
+                (item.Purpose == purpose
+                    || includesLegacyAwdpPurpose
+                    && item.Purpose == RuntimePurpose.Player))
             .OrderByDescending(item => item.Generation)
             .FirstOrDefaultAsync(ct);
         RuntimeInstance entity;
@@ -388,7 +413,9 @@ public sealed class AdminRuntimeStore(
                     item.CompetitionId == competitionId &&
                     item.CompetitionChallengeId == competitionChallengeId &&
                     item.TeamId == teamId &&
-                    item.Purpose == RuntimePurpose.Player &&
+                    (item.Purpose == purpose
+                        || includesLegacyAwdpPurpose
+                        && item.Purpose == RuntimePurpose.Player) &&
                     item.State == RuntimeState.Stopping,
                     ct))
                 return new(null, RuntimeMutationFailure.InvalidState);
@@ -412,7 +439,9 @@ public sealed class AdminRuntimeStore(
                         item.CompetitionId == competitionId &&
                         item.CompetitionChallengeId == competitionChallengeId &&
                         item.TeamId == teamId &&
-                        item.Purpose == RuntimePurpose.Player &&
+                        (item.Purpose == purpose
+                            || includesLegacyAwdpPurpose
+                            && item.Purpose == RuntimePurpose.Player) &&
                         item.State == RuntimeState.Failed &&
                         item.RunnerId != null &&
                         (item.ProviderReceiptJson != null
@@ -421,6 +450,8 @@ public sealed class AdminRuntimeStore(
                     .FirstOrDefaultAsync(ct);
             if (cleanupTarget is not null)
             {
+                if (scope.Competition.Mode == GameMode.Awdp)
+                    await runtimeFlags.InvalidateGenerationAsync(cleanupTarget.Id, now, ct);
                 cleanupTarget.State = RuntimeState.Stopping;
                 cleanupTarget.FailureCode = null;
                 cleanupTarget.RunnerAssignmentReleaseToken = null;
@@ -464,12 +495,32 @@ public sealed class AdminRuntimeStore(
                 }
             }
             var placement = placementPolicy.Resolve(template.RuntimeKind);
+            var runtimeInstanceId = Guid.CreateVersion7(now);
+            if (scope.Competition.Mode == GameMode.Awdp
+                && teamId is Guid generationTeamId)
+            {
+                try
+                {
+                    _ = await runtimeFlags.EnsureGenerationAsync(
+                        competitionId,
+                        competitionChallengeId,
+                        generationTeamId,
+                        runtimeInstanceId,
+                        now,
+                        ct);
+                }
+                catch (InvalidOperationException)
+                {
+                    return new(null, RuntimeMutationFailure.ConfigurationInvalid);
+                }
+            }
             entity = new RuntimeInstance
             {
-                Id = Guid.CreateVersion7(now),
+                Id = runtimeInstanceId,
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
                 TeamId = teamId,
+                Purpose = purpose,
                 Generation = checked((current?.Generation ?? 0) + 1),
                 RuntimeKind = template.RuntimeKind,
                 RuntimeProvider = placement.Provider,
@@ -491,6 +542,8 @@ public sealed class AdminRuntimeStore(
                 return new(Map(current));
             current.ProcessingVersion = checked(current.ProcessingVersion + 1);
             entity = current;
+            if (scope.Competition.Mode == GameMode.Awdp)
+                await runtimeFlags.InvalidateGenerationAsync(current.Id, now, ct);
             if (current.State == RuntimeState.Queued)
             {
                 current.State = RuntimeState.Stopped;
@@ -571,7 +624,7 @@ public sealed class AdminRuntimeStore(
         DateTimeOffset? stateChangedAt = null) =>
         new(
             item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
-            item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
+            item.Purpose, item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
             item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
             item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
             item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
@@ -585,4 +638,51 @@ public sealed class AdminRuntimeStore(
                     port.AllocatedAt))
                 .ToArray(),
             stateChangedAt);
+
+    private async Task<IReadOnlyList<RuntimeInstanceView>> AddTeamAttributionAsync(
+        IReadOnlyList<RuntimeInstanceView> runtimes,
+        CancellationToken ct)
+    {
+        if (runtimes.Count == 0)
+            return runtimes;
+
+        var runtimeIds = runtimes.Select(runtime => runtime.Id).ToArray();
+        var sources = await db.RuntimeInstances.AsNoTracking()
+            .Where(runtime => runtimeIds.Contains(runtime.Id))
+            .Select(runtime => new
+            {
+                runtime.Id,
+                SourceTeamId = runtime.TeamId
+                    ?? db.GameplayFacts.AsNoTracking()
+                        .Where(fact => fact.Id == runtime.GameplayFactId)
+                        .Select(fact => fact.TeamId)
+                        .FirstOrDefault()
+                    ?? db.PatchUploads.AsNoTracking()
+                        .Where(upload => upload.RuntimeInstanceId == runtime.Id)
+                        .OrderBy(upload => upload.UploadedAt)
+                        .ThenBy(upload => upload.Id)
+                        .Select(upload => (Guid?)upload.TeamId)
+                        .FirstOrDefault()
+            })
+            .ToDictionaryAsync(item => item.Id, item => item.SourceTeamId, ct);
+        var sourceTeamIds = sources.Values
+            .OfType<Guid>()
+            .Distinct()
+            .ToArray();
+        var teamNames = await db.Teams.IgnoreQueryFilters().AsNoTracking()
+            .Where(team => sourceTeamIds.Contains(team.Id))
+            .ToDictionaryAsync(team => team.Id, team => team.Name, ct);
+
+        return runtimes.Select(runtime =>
+        {
+            var sourceTeamId = sources.GetValueOrDefault(runtime.Id);
+            return runtime with
+            {
+                SourceTeamId = sourceTeamId,
+                SourceTeamName = sourceTeamId is Guid id
+                    ? teamNames.GetValueOrDefault(id)
+                    : null
+            };
+        }).ToArray();
+    }
 }

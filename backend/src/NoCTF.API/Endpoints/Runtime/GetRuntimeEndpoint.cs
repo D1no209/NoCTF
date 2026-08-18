@@ -36,6 +36,15 @@ public enum RuntimeStateProtocol
     Failed
 }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimePurposeProtocol>))]
+public enum RuntimePurposeProtocol
+{
+    Player,
+    AwdpTarget,
+    Practice,
+    AwdpAttack
+}
+
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<RuntimeFailureCodeProtocol>))]
 public enum RuntimeFailureCodeProtocol
 {
@@ -60,6 +69,9 @@ public static partial class RuntimeProtocolMapper
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial RuntimeStateProtocol ToProtocol(RuntimeState value);
+
+    [MapEnum(EnumMappingStrategy.ByName)]
+    public static partial RuntimePurposeProtocol ToProtocol(RuntimePurpose value);
 
     [MapEnum(EnumMappingStrategy.ByName)]
     public static partial RuntimeFailureCodeProtocol ToProtocol(RuntimeFailureCode value);

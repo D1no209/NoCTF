@@ -16412,6 +16412,18 @@
             "format": "guid",
             "nullable": true
           },
+          "sourceTeamId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "sourceTeamName": {
+            "type": "string",
+            "nullable": true
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimePurposeProtocol"
+          },
           "generation": {
             "type": "integer",
             "format": "int32"
@@ -16492,6 +16504,22 @@
             "type": "boolean"
           }
         }
+      },
+      "NoCTFAPIEndpointsRuntimeRuntimePurposeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Player",
+          "AwdpTarget",
+          "Practice",
+          "AwdpAttack"
+        ],
+        "enum": [
+          "Player",
+          "AwdpTarget",
+          "Practice",
+          "AwdpAttack"
+        ]
       },
       "NoCTFApplicationRuntimeInstancesRuntimePublishedPortView": {
         "type": "object",

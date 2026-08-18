@@ -55,19 +55,19 @@ public sealed class RuntimeInstanceStore(
             return null;
         var purpose = PurposeFor(scope);
         var includesLegacyAwdpPurpose = scope.Mode == GameMode.Awdp
-            && purpose == RuntimePurpose.Player;
+            && purpose == RuntimePurpose.AwdpAttack;
         return await db.RuntimeInstances.AsNoTracking()
             .Where(instance =>
                 instance.CompetitionId == competitionId &&
                 instance.CompetitionChallengeId == competitionChallengeId &&
                 (instance.Purpose == purpose
                     || includesLegacyAwdpPurpose
-                    && instance.Purpose == RuntimePurpose.AwdpAttack) &&
+                    && instance.Purpose == RuntimePurpose.Player) &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .Select(instance => new RuntimeInstanceView(
                 instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId,
-                instance.Generation, instance.RuntimeKind, instance.RuntimeProvider, instance.RunnerPool,
+                instance.Purpose, instance.Generation, instance.RuntimeKind, instance.RuntimeProvider, instance.RunnerPool,
                 instance.State, instance.FailureCode, instance.ProcessingVersion, instance.Urls,
                 instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt))
             .FirstOrDefaultAsync(ct);
@@ -92,7 +92,7 @@ public sealed class RuntimeInstanceStore(
             return new(null, RuntimeMutationFailure.Unsupported);
         var purpose = PurposeFor(scope);
         var includesLegacyAwdpPurpose = scope.Mode == GameMode.Awdp
-            && purpose == RuntimePurpose.Player;
+            && purpose == RuntimePurpose.AwdpAttack;
 
         await using var quotaLease = await runtimeQuota.AcquireLockAsync(
             db,
@@ -104,14 +104,17 @@ public sealed class RuntimeInstanceStore(
                 instance.CompetitionChallengeId == command.CompetitionChallengeId &&
                 (instance.Purpose == purpose
                     || includesLegacyAwdpPurpose
-                    && instance.Purpose == RuntimePurpose.AwdpAttack) &&
+                    && instance.Purpose == RuntimePurpose.Player) &&
                 instance.TeamId == scope.TeamId)
             .OrderByDescending(instance => instance.Generation)
             .FirstOrDefaultAsync(ct);
         var latestGeneration = await db.RuntimeInstances.AsNoTracking()
             .Where(instance =>
                 instance.CompetitionChallengeId == command.CompetitionChallengeId
-                && instance.TeamId == scope.TeamId)
+                && instance.TeamId == scope.TeamId
+                && (instance.Purpose == purpose
+                    || includesLegacyAwdpPurpose
+                    && instance.Purpose == RuntimePurpose.Player))
             .MaxAsync(instance => (int?)instance.Generation, ct) ?? 0;
 
         RuntimeInstance entity;
@@ -127,7 +130,7 @@ public sealed class RuntimeInstanceStore(
                         instance.CompetitionChallengeId == command.CompetitionChallengeId &&
                         (instance.Purpose == purpose
                             || includesLegacyAwdpPurpose
-                            && instance.Purpose == RuntimePurpose.AwdpAttack) &&
+                            && instance.Purpose == RuntimePurpose.Player) &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Stopping,
                         ct))
@@ -146,7 +149,7 @@ public sealed class RuntimeInstanceStore(
                         instance.CompetitionChallengeId == command.CompetitionChallengeId &&
                         (instance.Purpose == purpose
                             || includesLegacyAwdpPurpose
-                            && instance.Purpose == RuntimePurpose.AwdpAttack) &&
+                            && instance.Purpose == RuntimePurpose.Player) &&
                         instance.TeamId == scope.TeamId &&
                         instance.State == RuntimeState.Failed &&
                         instance.RunnerId != null &&
@@ -410,7 +413,9 @@ public sealed class RuntimeInstanceStore(
     private static RuntimePurpose PurposeFor(RuntimeScope scope) =>
         scope.Status == CompetitionStatus.Finished
             ? RuntimePurpose.Practice
-            : RuntimePurpose.Player;
+            : scope.Mode == GameMode.Awdp
+                ? RuntimePurpose.AwdpAttack
+                : RuntimePurpose.Player;
 
     private static bool IsValidAwdpConfiguration(RuntimeScope scope)
     {
@@ -436,7 +441,7 @@ public sealed class RuntimeInstanceStore(
     private static RuntimeInstanceView Map(RuntimeInstance instance) =>
         new(
             instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId,
-            instance.Generation, instance.RuntimeKind, instance.RuntimeProvider, instance.RunnerPool,
+            instance.Purpose, instance.Generation, instance.RuntimeKind, instance.RuntimeProvider, instance.RunnerPool,
             instance.State, instance.FailureCode, instance.ProcessingVersion, instance.Urls,
             instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt);
 

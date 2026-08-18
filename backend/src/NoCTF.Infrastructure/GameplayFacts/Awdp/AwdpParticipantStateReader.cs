@@ -82,6 +82,7 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 runtime.CompetitionId,
                 runtime.CompetitionChallengeId,
                 runtime.TeamId,
+                runtime.Purpose,
                 runtime.Generation,
                 runtime.RuntimeKind,
                 runtime.RuntimeProvider,

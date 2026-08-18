@@ -952,6 +952,9 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     competitionId?: string;
     competitionChallengeId?: string;
     teamId?: string | null;
+    sourceTeamId?: string | null;
+    sourceTeamName?: string | null;
+    purpose?: NoCtfapiEndpointsRuntimeRuntimePurposeProtocol;
     generation?: number;
     runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol;
     provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol;
@@ -971,6 +974,8 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     forceTerminationAvailableAt?: string | null;
     canForceTerminate?: boolean;
 };
+
+export type NoCtfapiEndpointsRuntimeRuntimePurposeProtocol = 'Player' | 'AwdpTarget' | 'Practice' | 'AwdpAttack';
 
 export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
     serviceName?: string | null;

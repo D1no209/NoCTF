@@ -17,6 +17,7 @@ public sealed record RuntimeInstanceView(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid? TeamId,
+    RuntimePurpose Purpose,
     int Generation,
     RuntimeKind RuntimeKind,
     RuntimeProvider Provider,
@@ -33,7 +34,9 @@ public sealed record RuntimeInstanceView(
     string? ProviderReceiptJson = null,
     string? ControlCheckUrl = null,
     IReadOnlyList<RuntimePublishedPortView>? PublishedPorts = null,
-    DateTimeOffset? StateChangedAt = null);
+    DateTimeOffset? StateChangedAt = null,
+    Guid? SourceTeamId = null,
+    string? SourceTeamName = null);
 
 public sealed record RuntimePublishedPortView(
     string? ServiceName,
