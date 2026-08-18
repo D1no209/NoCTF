@@ -1,5 +1,29 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.54 AWDP Runtime 队伍归属与管理端展示
+
+- `f84a3386` 修正 AWDP 攻击 Runtime 的用途与队伍归属链路：参赛者或管理员启动的长期 Break 环境现在以
+  `RuntimePurpose.AwdpAttack` 持久化，并始终携带已通过审核的真实 `TeamId`；启动、停止、重置、代际
+  Flag 创建与失效均按攻击 Runtime purpose 收敛，不再与一次性 `AwdpTarget` 混用。
+- 管理端 Runtime 响应新增强类型 `Purpose`、`SourceTeamId` 与 `SourceTeamName`。直接绑定队伍的攻击环境
+  显示真实队伍名；一次性 Fix Target 显示“Fix 验证 Target”，并优先通过关联 `GameplayFact` / `PatchUpload`
+  投影来源队伍。只有没有队伍归属的普通共享 Runtime（当前为 KoH）仍显示“共享”。Fix Target 行不再提供
+  启动、重置或续期操作，避免这些队伍级操作误作用到长期攻击环境；精确终止和强制清理仍保留。
+- OpenAPI 两份制品与 TypeScript SDK 已由工具重新生成并连续生成两次验证幂等；没有手写 URL、DTO、枚举
+  或失败码。`a2b91eb2` 将版本从 `0.1.0-alpha.53` 递增到 `0.1.0-alpha.54`。
+- 本阶段没有新增业务表、字段或 EF migration；没有推送、部署或修改生产/测试业务数据。用户已有
+  `TODO.md` 修改、临时部署包和其他未跟踪目录均未纳入提交。
+- 验证结果：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error。
+  - 非 Integration TUnit：818/818 通过。
+  - AWDP Runtime 真实 PostgreSQL 定向测试：4/4 通过，覆盖选手启动与管理员启动的 TeamId、Purpose、
+    管理端真实队名投影及并发启动边界。
+  - 前端 `bun test`：221/221 通过；`bun run typecheck` 与 production `bun run build` 通过。构建仅保留
+    既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `dotnet format ... analyzers --verify-no-changes` 通过；EF
+    `migrations has-pending-model-changes --configuration Release --no-build` 返回无模型漂移；
+    `git diff --check` 通过。
+
 ## 2026-08-19 alpha.53 AWDP 一次性防御验证模型
 
 - `e49ef2d4` 将 AWDP 的两类 Runtime 明确分离：选手端“启动环境”只创建长期存在、可重置和续期的
