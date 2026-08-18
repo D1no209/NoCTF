@@ -131,21 +131,18 @@ async function uploadFix(): Promise<void> {
 <template>
   <Card>
     <CardHeader>
-      <CardTitle class="text-base">{{ $t('一次性防御验证') }}</CardTitle>
-      <CardDescription>
-        {{ $t('每次申请都会创建一个全新的干净 target；上传一次 Fix 后立即锁定，只执行一次 Checker，完成后自动回收全部资源。') }}
-      </CardDescription>
+      <CardTitle class="text-base">{{ $t('防御验证') }}</CardTitle>
     </CardHeader>
     <CardContent class="flex flex-col gap-4">
       <Alert v-if="targetCreating">
         <Spinner class="mr-2 inline size-3" />
-        <AlertDescription class="inline">{{ $t('正在创建一次性防御验证环境…') }}</AlertDescription>
+        <AlertDescription class="inline">{{ $t('正在准备防御验证…') }}</AlertDescription>
       </Alert>
 
       <form v-else-if="canUpload" class="flex flex-col gap-4" @submit.prevent="uploadFix">
         <Alert>
           <AlertDescription>
-            {{ $t('干净 target 已就绪。该环境只接受一个 Fix 归档，上传后不可替换或再次上传。') }}
+            {{ $t('验证环境已就绪，请上传本次 Fix 包。') }}
           </AlertDescription>
         </Alert>
         <FieldGroup>
@@ -174,26 +171,26 @@ async function uploadFix(): Promise<void> {
       <Alert v-else-if="validating">
         <Spinner class="mr-2 inline size-3" />
         <AlertDescription class="inline">
-          {{ $t('Fix 已锁定，正在应用补丁并执行一次性验证 Checker。') }}
+          {{ $t('正在验证本次 Fix…') }}
         </AlertDescription>
       </Alert>
 
       <Alert v-else-if="recycling">
         <Spinner class="mr-2 inline size-3" />
         <AlertDescription class="inline">
-          {{ $t('验证已经结束，正在回收 target、Checker、网络、端口和容量。') }}
+          {{ $t('本次验证已结束，正在完成收尾…') }}
         </AlertDescription>
       </Alert>
 
       <Alert v-else-if="completedAndRecycled">
         <AlertDescription>
-          {{ $t('本次 Fix 验证已完成，一次性防御验证环境已回收。再次尝试必须申请新的干净环境。') }}
+          {{ $t('本次 Fix 验证已完成。') }}
         </AlertDescription>
       </Alert>
 
       <Alert v-else-if="targetFailed" variant="destructive">
         <AlertDescription>
-          {{ $t('一次性防御验证环境创建失败或已失效，可以重新申请。') }}
+          {{ $t('防御验证环境创建失败或已失效，可以重新申请。') }}
         </AlertDescription>
       </Alert>
 

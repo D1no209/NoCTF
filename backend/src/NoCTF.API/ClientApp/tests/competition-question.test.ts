@@ -162,4 +162,15 @@ describe('competition question page wiring', () => {
     expect(page).toContain('@click="loadMoreQuestions"')
     expect(page).not.toContain('query: { limit: 100 }')
   })
+
+  test('keeps the thread list narrow and gives the conversation the remaining width', async () => {
+    const page = await Bun.file(
+      new URL('../app/pages/competitions/[id]/questions.vue', import.meta.url),
+    ).text()
+
+    expect(page).toContain("lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)]")
+    expect(page).toContain("xl:grid-cols-[22rem_minmax(0,1fr)]")
+    expect(page).toContain('min-h-[36rem]')
+    expect(page).toContain('rows="7"')
+  })
 })

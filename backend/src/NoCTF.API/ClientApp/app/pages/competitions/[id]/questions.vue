@@ -322,8 +322,8 @@ const participantLimitReached = computed(() =>
 </script>
 
 <template>
-  <div class="grid gap-6 lg:grid-cols-5">
-    <div class="flex flex-col gap-4 lg:col-span-2">
+  <div class="grid items-start gap-5 lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
+    <div class="flex min-w-0 flex-col gap-4">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">{{ $t('咨询问答') }}</h2>
         <Dialog :open="createOpen" @update:open="setCreateOpen">
@@ -446,14 +446,14 @@ const participantLimitReached = computed(() =>
       </div>
     </div>
 
-    <div class="lg:col-span-3">
+    <div class="min-w-0">
       <Empty v-if="!selectedId" class="border py-16">
         <EmptyHeader>
           <EmptyTitle>{{ $t('选择左侧的咨询查看对话') }}</EmptyTitle>
         </EmptyHeader>
       </Empty>
       <Skeleton v-else-if="detailLoading" class="h-64 w-full" />
-      <Card v-else-if="detail">
+      <Card v-else-if="detail" class="min-h-[36rem]">
         <CardHeader>
           <div class="flex items-center justify-between gap-2">
             <CardTitle class="text-base">{{ detail.title }}</CardTitle>
@@ -497,7 +497,7 @@ const participantLimitReached = computed(() =>
               <FieldGroup>
                 <Field>
                   <FieldLabel for="q-reply">{{ $t('追加消息') }}</FieldLabel>
-                  <Textarea id="q-reply" v-model="reply" rows="5" required @input="replyError = null" />
+                  <Textarea id="q-reply" v-model="reply" class="min-h-36" rows="7" required @input="replyError = null" />
                   <FieldDescription v-if="detail.access === 'Asker'">
                     {{ $t('本轮还可连续发送 {remaining} / {maximum} 条；工作人员回复后重置。', { remaining: detail.participantMessagesRemaining ?? 0, maximum: detail.maxParticipantMessagesBeforeHandlerReply ?? 3 }) }}
                     <span v-if="detail.status === 'Resolved'">{{ $t('继续追问会将咨询重新设为待处理。') }}</span>

@@ -13,6 +13,8 @@ export const competitionBroadcastKinds = [
   'HintPublished',
   'ChallengeDescriptionUpdated',
   'ChallengePublished',
+  'AwdpBreakAttempted',
+  'AwdpFixAttempted',
 ] satisfies NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol[]
 
 export function competitionBroadcastText(
@@ -30,6 +32,8 @@ export function competitionBroadcastText(
     HintPublished: translate('题目「{challenge}」发布了新的提示', { challenge }),
     ChallengeDescriptionUpdated: translate('题目「{challenge}」已更新描述', { challenge }),
     ChallengePublished: translate('题目「{challenge}」已开放', { challenge }),
+    AwdpBreakAttempted: translate('队伍「{team}」对题目「{challenge}」进行了一次攻击操作', { team, challenge }),
+    AwdpFixAttempted: translate('队伍「{team}」对题目「{challenge}」提交了一次防御操作', { team, challenge }),
   }
   return messages[event.kind] ?? translate('赛事状态已更新')
 }

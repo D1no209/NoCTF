@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Award, Medal, Target, Users } from '@lucide/vue'
+import { Award, Medal, ShieldCheck, Swords, Target, Users } from '@lucide/vue'
 import { getTeamEndpoint } from '~/api'
 import type { NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
 import type { echarts } from '~/utils/echarts'
@@ -8,7 +8,18 @@ import type { ChallengeInfo, TrendSeries } from './types'
 
 const props = defineProps<{
   competitionId: string
-  entry: { teamId?: string; teamName?: string; rank?: number; score?: number; solveCount?: number } | null
+  mode?: string | null
+  entry: {
+    teamId?: string
+    teamName?: string
+    rank?: number
+    score?: number
+    solveCount?: number
+    attackScore?: number
+    defenseScore?: number
+    penaltyScore?: number
+    cells?: Array<{ competitionChallengeId?: string; attackScore?: number; defenseScore?: number }>
+  } | null
   series?: TrendSeries | null
   challenges: ChallengeInfo[]
   rangeStart?: string | null
@@ -16,6 +27,7 @@ const props = defineProps<{
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
+const isAwdp = computed(() => props.mode === 'Awdp')
 
 // 队伍公开资料(头像/成员数)
 const team = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
@@ -132,7 +144,7 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3" :class="isAwdp ? 'lg:grid-cols-6' : 'lg:grid-cols-4'">
           <Card>
             <CardContent class="flex items-center gap-3 pt-6">
               <Medal class="size-8" :class="medalRankClass[entry.rank ?? 0] ?? 'text-primary'" />
@@ -142,12 +154,39 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card v-if="isAwdp">
+            <CardContent class="flex items-center gap-3 pt-6">
+              <Swords class="size-8 text-primary" />
+              <div>
+                <p class="text-xs text-muted-foreground">{{ $t('攻击分') }}</p>
+                <p class="font-mono text-xl font-semibold tabular-nums">{{ entry.attackScore ?? 0 }} pts</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card v-if="isAwdp">
+            <CardContent class="flex items-center gap-3 pt-6">
+              <ShieldCheck class="size-8 text-emerald-600" />
+              <div>
+                <p class="text-xs text-muted-foreground">{{ $t('防御分') }}</p>
+                <p class="font-mono text-xl font-semibold tabular-nums">{{ entry.defenseScore ?? 0 }} pts</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card v-if="!isAwdp">
             <CardContent class="flex items-center gap-3 pt-6">
               <Target class="size-8 text-primary" />
               <div>
                 <p class="text-xs text-muted-foreground">{{ $t('解题数') }}</p>
                 <p class="font-mono text-xl font-semibold tabular-nums">{{ entry.solveCount ?? 0 }}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card v-if="isAwdp">
+            <CardContent class="flex items-center gap-3 pt-6">
+              <Award class="size-8 text-destructive" />
+              <div>
+                <p class="text-xs text-muted-foreground">{{ $t('罚分') }}</p>
+                <p class="font-mono text-xl font-semibold tabular-nums">{{ entry.penaltyScore ?? 0 }} pts</p>
               </div>
             </CardContent>
           </Card>
@@ -171,7 +210,41 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
           </Card>
         </div>
 
-        <div class="grid gap-4 lg:grid-cols-2">
+        <Card v-if="isAwdp">
+          <CardHeader>
+            <CardTitle class="flex items-center gap-2 text-base">
+              <Swords class="size-4" /> {{ $t('题目攻击与防御得分') }}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{{ $t('题目') }}</TableHead>
+                  <TableHead class="text-right">{{ $t('攻击分') }}</TableHead>
+                  <TableHead class="text-right">{{ $t('防御分') }}</TableHead>
+                  <TableHead class="text-right">{{ $t('合计') }}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="challenge in challenges" :key="challenge.competitionChallengeId">
+                  <TableCell class="font-medium">{{ challenge.title }}</TableCell>
+                  <TableCell class="text-right font-mono tabular-nums">
+                    {{ entry.cells?.find(cell => normalizeChallengeKey(cell.competitionChallengeId) === normalizeChallengeKey(challenge.competitionChallengeId))?.attackScore ?? 0 }} pts
+                  </TableCell>
+                  <TableCell class="text-right font-mono tabular-nums">
+                    {{ entry.cells?.find(cell => normalizeChallengeKey(cell.competitionChallengeId) === normalizeChallengeKey(challenge.competitionChallengeId))?.defenseScore ?? 0 }} pts
+                  </TableCell>
+                  <TableCell class="text-right font-mono font-semibold tabular-nums">
+                    {{ (entry.cells?.find(cell => normalizeChallengeKey(cell.competitionChallengeId) === normalizeChallengeKey(challenge.competitionChallengeId))?.attackScore ?? 0) + (entry.cells?.find(cell => normalizeChallengeKey(cell.competitionChallengeId) === normalizeChallengeKey(challenge.competitionChallengeId))?.defenseScore ?? 0) }} pts
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        <div v-if="!isAwdp" class="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle class="flex items-center gap-2 text-base">
@@ -218,7 +291,7 @@ const hasCharts = computed(() => (props.series?.solves?.length ?? 0) > 0)
           </Card>
         </div>
 
-        <Card>
+        <Card v-if="!isAwdp">
           <CardHeader>
             <CardTitle class="text-base">{{ $t('详细记录') }}</CardTitle>
           </CardHeader>

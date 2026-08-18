@@ -31,6 +31,8 @@ export interface ChallengeInfo {
 export interface LeaderboardCell {
   competitionChallengeId?: string
   score?: number
+  attackScore?: number
+  defenseScore?: number
   solvedAt?: string | null
   solverName?: string | null
   bloodRank?: string | null
@@ -42,6 +44,9 @@ export interface MatrixEntry {
   teamName?: string
   trackKey?: string
   score?: number
+  attackScore?: number
+  defenseScore?: number
+  penaltyScore?: number
   solveCount?: number
   lastScoreAt?: string | null
   cells?: LeaderboardCell[]

@@ -7,7 +7,9 @@ describe('participant challenge progress', () => {
     ).text()
 
     expect(page).toContain('current.solveCount += 1')
-    expect(page).toContain('current.solvedByMyTeam = true')
+    expect(page).toContain('current.attackSucceeded && current.defenseSucceeded')
+    expect(page).toContain("if (progress.attackSucceeded) return translate('攻击成功')")
+    expect(page).toContain("if (progress.defenseSucceeded) return translate('防御成功')")
     expect(page).toContain('currentScoreFor(challenge)')
     expect(page).toContain('currentBreakScore')
     expect(page).toContain('currentFixScore')
