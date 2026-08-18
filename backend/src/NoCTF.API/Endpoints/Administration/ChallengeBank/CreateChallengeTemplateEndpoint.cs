@@ -39,7 +39,7 @@ public sealed class CreateChallengeTemplateRequest
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Direction { get; set; } = string.Empty;
-    public string DefinitionJson { get; set; } = """{"schemaVersion":1}""";
+    public string DefinitionJson { get; set; } = string.Empty;
 }
 
 public sealed record ChallengeTemplateResponse(
@@ -109,7 +109,6 @@ public sealed class CreateChallengeTemplateValidator : Validator<CreateChallenge
         RuleFor(request => request.Visibility).IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.Direction).NotEmpty().MaximumLength(96);
-        RuleFor(request => request.DefinitionJson).NotEmpty();
     }
 }
 

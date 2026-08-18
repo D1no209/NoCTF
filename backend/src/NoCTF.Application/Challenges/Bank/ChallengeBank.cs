@@ -173,11 +173,14 @@ public sealed class CreateChallengeTemplate(
         CreateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
+        var definitionJson = string.IsNullOrWhiteSpace(command.DefinitionJson)
+            ? configurations.GetDefaultDefinitionJson(command.Mode)
+            : command.DefinitionJson;
         var validation = ChallengeTemplateValidation.Validate(
             command.Mode,
             command.Title,
             command.Direction,
-            command.DefinitionJson);
+            definitionJson);
         if (!validation.Succeeded)
         {
             return new(
@@ -186,7 +189,7 @@ public sealed class CreateChallengeTemplate(
         }
         var definitionErrors = configurations.ValidateDefinition(
             command.Mode,
-            command.DefinitionJson);
+            definitionJson);
         if (definitionErrors.Count > 0)
         {
             return new(
@@ -197,7 +200,8 @@ public sealed class CreateChallengeTemplate(
         {
             Title = command.Title.Trim(),
             Description = command.Description?.Trim(),
-            Direction = command.Direction.Trim()
+            Direction = command.Direction.Trim(),
+            DefinitionJson = definitionJson
         }, ct);
     }
 }
@@ -231,11 +235,14 @@ public sealed class UpdateChallengeTemplate(
         UpdateChallengeTemplateCommand command,
         CancellationToken ct = default)
     {
+        var definitionJson = string.IsNullOrWhiteSpace(command.DefinitionJson)
+            ? configurations.GetDefaultDefinitionJson(command.Mode)
+            : command.DefinitionJson;
         var validation = ChallengeTemplateValidation.Validate(
             command.Mode,
             command.Title,
             command.Direction,
-            command.DefinitionJson,
+            definitionJson,
             command.ExpectedRevision);
         if (!validation.Succeeded)
         {
@@ -245,7 +252,7 @@ public sealed class UpdateChallengeTemplate(
         }
         var definitionErrors = configurations.ValidateDefinition(
             command.Mode,
-            command.DefinitionJson);
+            definitionJson);
         if (definitionErrors.Count > 0)
         {
             return new(
@@ -256,7 +263,8 @@ public sealed class UpdateChallengeTemplate(
         {
             Title = command.Title.Trim(),
             Description = command.Description?.Trim(),
-            Direction = command.Direction.Trim()
+            Direction = command.Direction.Trim(),
+            DefinitionJson = definitionJson
         }, ct);
     }
 }

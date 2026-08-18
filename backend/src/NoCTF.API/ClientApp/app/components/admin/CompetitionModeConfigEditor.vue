@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { RotateCcw } from '@lucide/vue'
 import type { ConfigValues, GameModeValue } from '~/utils/game-config'
-import { competitionConfigFields, parseConfigValues, serializeConfigValues } from '~/utils/game-config'
+import { competitionConfigFields, fieldDefaultValue, parseConfigValues, serializeConfigValues } from '~/utils/game-config'
 
 const props = withDefaults(defineProps<{
   mode: GameModeValue
@@ -43,6 +44,13 @@ watch(
 
 function updateField(key: string, value: unknown) {
   values.value = { ...values.value, [key]: value }
+}
+
+function resetToCurrentDefaults() {
+  values.value = Object.fromEntries(
+    fields.value.map(field => [field.key, fieldDefaultValue(field)]),
+  )
+  parseFailed.value = false
 }
 
 function canonicalize(value: unknown): unknown {
@@ -88,7 +96,12 @@ function save() {
     </div>
     <Skeleton v-if="loading" class="h-64 w-full" />
     <Alert v-else-if="parseFailed" variant="destructive">
-      <AlertDescription>{{ $t('配置 JSON 无法解析,请联系平台管理员修复') }}</AlertDescription>
+      <AlertDescription class="flex flex-col items-start gap-3">
+        <span>{{ $t('配置 JSON 无法解析,请联系平台管理员修复') }}</span>
+        <Button v-if="!readonly" type="button" variant="outline" size="sm" @click="resetToCurrentDefaults">
+          <RotateCcw data-icon="inline-start" /> {{ $t('重置为当前模式默认配置') }}
+        </Button>
+      </AlertDescription>
     </Alert>
     <template v-else>
       <FieldGroup>
@@ -103,9 +116,13 @@ function save() {
           <FieldDescription v-if="field.description">{{ field.description }}</FieldDescription>
         </Field>
       </FieldGroup>
-      <div v-if="!readonly">
+      <div v-if="!readonly" class="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" :disabled="saving" @click="resetToCurrentDefaults">
+          <RotateCcw data-icon="inline-start" /> {{ $t('重置为当前模式默认配置') }}
+        </Button>
         <Button :disabled="saving || !dirty" @click="save">
           <Spinner v-if="saving" data-icon="inline-start" /> {{ $t('保存配置') }} </Button>
+        <span class="text-xs text-muted-foreground">{{ $t('重置后仍需保存配置才会生效') }}</span>
       </div>
     </template>
   </div>

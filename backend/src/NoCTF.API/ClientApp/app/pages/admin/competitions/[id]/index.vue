@@ -21,6 +21,7 @@ import type {
   NoCtfapiEndpointsAdministrationCompetitionsStartGateErrorResponse,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
+import { startGateErrorMessage } from '~/lib/start-gate-error'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -378,7 +379,7 @@ async function submitDelete() {
           <Alert v-for="(ve, i) in validationErrors" :key="i" variant="destructive">
             <AlertDescription>
               <span class="font-mono text-xs">{{ ve.code }}</span>
-              · {{ ve.message }}
+              · {{ startGateErrorMessage(ve) }}
               <NuxtLink
                 v-if="ve.competitionChallengeId"
                 class="underline"

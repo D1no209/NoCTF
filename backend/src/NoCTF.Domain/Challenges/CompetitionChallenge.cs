@@ -14,7 +14,7 @@ public sealed class CompetitionChallenge
     public long BaseScore { get; set; }
     public int Order { get; set; }
     public bool IsPublished { get; set; }
-    public string RulesJson { get; set; } = """{"schemaVersion":1}""";
+    public string RulesJson { get; set; } = string.Empty;
     [ConcurrencyCheck]
     public int Revision { get; set; }
     public int LastScheduledAwdRound { get; set; }

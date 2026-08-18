@@ -18,7 +18,7 @@ public sealed class Competition
     [ConcurrencyCheck]
     public int PermissionRevision { get; set; }
     public GameMode Mode { get; set; }
-    public string ConfigurationJson { get; set; } = """{"schemaVersion":1}""";
+    public string ConfigurationJson { get; set; } = string.Empty;
     public string? TrackConfigurationJson { get; set; }
     [ConcurrencyCheck]
     public int TrackConfigurationRevision { get; set; }
