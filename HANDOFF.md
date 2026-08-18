@@ -19,9 +19,10 @@
   `65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147` 与仓库固定值一致，再用于构建当前
   Runner；没有引入未校验二进制。新镜像分别保留 `alpha55-6e7024a2` 标签，旧 Runner 保留
   `pre-alpha55-74023e94` 回滚标签。
-- 切换后 API、Worker、Runner 均为 healthy，宿主 Nginx 为 active。启动后日志未发现 Error、Critical、
-  Exception 或失败消息；仅保留 ASP.NET Core DataProtection 临时密钥和显式 `ASPNETCORE_URLS` 覆盖默认端口
-  的既有警告，不影响当前无服务端 refresh-session 的认证模型。
+- 切换后 API、Worker、Runner 均为 healthy，宿主 Nginx 为 active。滚动重建初期出现一次 Wolverine 对已退出
+  旧节点发送 `StopRemoteAgent` 等待确认超时；新节点完成选主后没有继续出现 Error、Critical、Exception 或失败
+  消息，最终连续 3 分钟日志检查为空。其余仅保留 ASP.NET Core DataProtection 临时密钥和显式
+  `ASPNETCORE_URLS` 覆盖默认端口的既有警告，不影响当前无服务端 refresh-session 的认证模型。
 - 新 Runner 已按 provider receipt 自动收敛此前残留资源：部署前约 29 个 AWDP target 容器及其网络均被精确
   清理，最终 `noctf.io/managed=true` 容器为 0、网络为 0；数据库 30 条相关 Runtime 全部收敛为 Stopped，
   未通过跳过保护直接删库。另精确删除一个 39 小时前遗留、无端口的 Compose one-off backend 容器。
@@ -2298,3 +2299,4 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 
 - `.webbridge-tmp/`、`PLAN.md`、`backend/src/NoCTF.API/storage/` 是本地/用户内容，不应加入提交。
 - 不恢复旧 migration、旧表或兼容层；migration 与 snapshot 只能通过 EF CLI 修改。
+
