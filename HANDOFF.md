@@ -1,5 +1,26 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.56 测试生产环境推送与部署
+
+- 功能、版本与阶段交接提交 `2f18f836`、`eff4901c`、`d7dbfa3a`、`f0420fd9` 已推送到远程
+  `main`；远程 `main` 与部署代码基线均为 `f0420fd9f436d8841455ef60bac9c4f6fd3ca55c`。部署机到
+  GitHub 的出站连接仍不可用，因此使用本地生成并通过 `git bundle verify` 的完整 Git bundle 同步源码；同步后
+  仅保留部署机原有的未跟踪生产 Compose overlay 及其回滚副本，没有覆盖 `.env` 或其他生产配置。
+- 部署前创建 PostgreSQL custom-format 备份
+  `/root/backups/noctf-pre-alpha56-f0420fd9.dump`，文件大小 204662 bytes，SHA-256 为
+  `e1398a7dd153de82506c7d062d4b8e0be2612d0cd14100a121a838fc27ca175c`。迁移容器检查结果为数据库已是
+  最新状态，本次没有应用 migration，也没有手工修改生产业务数据。
+- 在服务器从同一完整源码构建 API、Worker、Runner 与 migration 镜像，并分别保留
+  `deploy-backend:alpha56-f0420fd9`、`deploy-worker:alpha56-f0420fd9`、
+  `deploy-runner:alpha56-f0420fd9`、`deploy-migration:alpha56-f0420fd9` 回滚标签；对应镜像 ID 分别为
+  `5acd1c0e`、`0803f08a`、`a4fa98f7`、`6c107f25`。PostgreSQL 与 Redis 未重建，只强制重建 API、Worker、Runner。
+- 切换后 API、Worker、Runner、PostgreSQL、Redis 均为 healthy；外部
+  `https://101.43.46.244/`、`/health`、`/health/ready` 均返回 HTTP 200，容器内程序集版本确认
+  为 `0.1.0-alpha.56`。从切换时间起检查 API、Worker、Runner 日志，未发现 `Error`、`Critical`、
+  `Exception` 或未处理失败。
+- 部署完成后根卷仍有约 5.9 GB 可用。临时 Git bundle 与部署时间标记已精确删除，未执行全局 prune，未删除
+  生产 Runtime、卷、数据库备份或旧回滚镜像。部署后的源码工作树仅保留既有生产 overlay 未跟踪文件。
+
 ## 2026-08-19 alpha.56 AWDP 轮次结算、攻防分拆、操作播报与咨询布局
 
 - `2f18f836` 重构 AWDP 排行榜的结算时间语义：只累计已经结束的逻辑轮次，当前轮次不提前展示未结算分数；
