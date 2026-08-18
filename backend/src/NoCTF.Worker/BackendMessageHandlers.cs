@@ -600,7 +600,7 @@ public static class BackendMessageHandlers
         results.RecordAwdpAsync(message, cancellationToken);
 
     public static async Task Handle(
-        ReplayAwdpFixVerification message,
+        CompleteAwdpFixRecovery message,
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
         CancellationToken cancellationToken,
@@ -612,7 +612,7 @@ public static class BackendMessageHandlers
             .FromSqlInterpolated($"""
                 SELECT *
                 FROM runtime_instances
-                WHERE id = {message.PreviousRuntimeInstanceId}
+                WHERE id = {message.RuntimeInstanceId}
                 FOR UPDATE
                 """)
             .SingleOrDefaultAsync(cancellationToken);
@@ -623,7 +623,7 @@ public static class BackendMessageHandlers
             || fact is null
             || previous.Purpose != RuntimePurpose.AwdpTarget
             || previous.GameplayFactId != fact.Id
-            || previous.Generation != message.PreviousGeneration
+            || previous.Generation != message.Generation
             || previous.State != RuntimeState.Stopping
             || previous.ProcessingVersion != message.RecoveryProcessingVersion
             || !string.Equals(previous.RunnerPool, message.RunnerPool, StringComparison.Ordinal)

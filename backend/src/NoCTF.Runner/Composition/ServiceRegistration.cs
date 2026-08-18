@@ -42,6 +42,11 @@ public static class ServiceRegistration
         services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
         services.AddNoCtfLocalComputationCaching(configuration);
         services.AddHttpClient();
+        services.AddHttpClient(AwdpFixArchiveDownloader.ClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false
+            });
         var configuredProvider = configuration["Runner:Provider"];
         var provider = Enum.TryParse<RuntimeProvider>(
             configuredProvider,
