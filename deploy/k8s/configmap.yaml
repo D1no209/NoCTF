@@ -27,6 +27,7 @@ data:
   Runner__Capacity__PidsLimit: "2048"
   Runner__Heartbeat__IntervalSeconds: "5"
   Runner__Heartbeat__TtlSeconds: "15"
+  Runner__ProviderFailureHoldSeconds: "120"
   RunnerScoring__CallbackBaseUrl: "http://backend-service.noctf.svc.cluster.local:8080"
   Runtime__Kubernetes__Namespace: "runtime"
   Runtime__Kubernetes__PublicHost: "noctf.local"

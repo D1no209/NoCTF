@@ -19,7 +19,8 @@ public sealed class RuntimeProviderHandler(
     IConfiguration configuration,
     IRunnerCapacityGate capacity,
     IRuntimeNodeWorkReader workReader,
-    IAwdpAttackProvisioningPlanReader? awdpAttackPlans = null)
+    IAwdpAttackProvisioningPlanReader? awdpAttackPlans = null,
+    RunnerProviderHealthState? providerHealth = null)
 {
     public async Task<object> Handle(
         ProvisionContainerRuntime message,
@@ -61,6 +62,7 @@ public sealed class RuntimeProviderHandler(
                 definition,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
+            providerHealth?.ReportSuccess(definition.Provider);
             ExpandedRuntimeUrls? expanded = null;
             try
             {
@@ -104,10 +106,18 @@ public sealed class RuntimeProviderHandler(
         catch (TimeoutException)
         {
             failureCode = RuntimeFailureCode.ProvisionTimeout;
+            providerHealth?.ReportFailure(
+                message.Definition.Provider,
+                RunnerProviderFailureKind.ProvisionTimedOut,
+                message.RuntimeInstanceId);
         }
         catch (InvalidOperationException)
         {
             failureCode = RuntimeFailureCode.ProviderRejected;
+            providerHealth?.ReportFailure(
+                message.Definition.Provider,
+                RunnerProviderFailureKind.ProvisionRejected,
+                message.RuntimeInstanceId);
         }
         return await CompleteProvisionFailureAsync(
             message,
@@ -150,6 +160,13 @@ public sealed class RuntimeProviderHandler(
         }
         catch (InvalidOperationException)
         {
+            if (work is not null)
+            {
+                providerHealth?.ReportFailure(
+                    work.Provider,
+                    RunnerProviderFailureKind.CleanupFailed,
+                    message.RuntimeInstanceId);
+            }
             return StopFailed(message, work);
         }
     }
@@ -191,6 +208,10 @@ public sealed class RuntimeProviderHandler(
                 var remaining = await reconciler.ListManagedAsync(cancellationToken);
                 if (remaining.Contains(identity))
                 {
+                    providerHealth?.ReportFailure(
+                        message.Provider,
+                        RunnerProviderFailureKind.CleanupFailed,
+                        message.RuntimeInstanceId);
                     return ForceTerminationFailed(
                         message,
                         DateTimeOffset.UtcNow,
@@ -218,6 +239,10 @@ public sealed class RuntimeProviderHandler(
         }
         catch
         {
+            providerHealth?.ReportFailure(
+                message.Provider,
+                RunnerProviderFailureKind.CleanupFailed,
+                message.RuntimeInstanceId);
             return ForceTerminationFailed(
                 message,
                 DateTimeOffset.UtcNow,
@@ -256,9 +281,16 @@ public sealed class RuntimeProviderHandler(
             var receipt = await runtime.UpAsync(message.Definition, cancellationToken);
             var status = await runtime.GetStatusAsync(receipt, cancellationToken);
             if (status?.Status != RuntimeStatus.Running)
+            {
                 failureCode = RuntimeFailureCode.ProviderRejected;
+                providerHealth?.ReportFailure(
+                    message.Definition.Provider,
+                    RunnerProviderFailureKind.ProvisionRejected,
+                    message.RuntimeInstanceId);
+            }
             else
             {
+                providerHealth?.ReportSuccess(message.Definition.Provider);
                 ExpandedRuntimeUrls? expanded = null;
                 try
                 {
@@ -296,10 +328,18 @@ public sealed class RuntimeProviderHandler(
         catch (TimeoutException)
         {
             failureCode = RuntimeFailureCode.ProvisionTimeout;
+            providerHealth?.ReportFailure(
+                message.Definition.Provider,
+                RunnerProviderFailureKind.ProvisionTimedOut,
+                message.RuntimeInstanceId);
         }
         catch (InvalidOperationException)
         {
             failureCode = RuntimeFailureCode.ProviderRejected;
+            providerHealth?.ReportFailure(
+                message.Definition.Provider,
+                RunnerProviderFailureKind.ProvisionRejected,
+                message.RuntimeInstanceId);
         }
         return await CompleteProvisionFailureAsync(
             message,
@@ -342,6 +382,13 @@ public sealed class RuntimeProviderHandler(
         }
         catch (InvalidOperationException)
         {
+            if (work is not null)
+            {
+                providerHealth?.ReportFailure(
+                    work.Provider,
+                    RunnerProviderFailureKind.CleanupFailed,
+                    message.RuntimeInstanceId);
+            }
             return StopFailed(message, work);
         }
     }
@@ -378,6 +425,7 @@ public sealed class RuntimeProviderHandler(
         {
             var runtime = providers.Appliance(RuntimeProvider.Libvirt);
             var receipt = await runtime.ImportAsync(message.Definition, timeout.Token);
+            providerHealth?.ReportSuccess(RuntimeProvider.Libvirt);
             ExpandedRuntimeUrls? expanded = null;
             try
             {
@@ -408,14 +456,26 @@ public sealed class RuntimeProviderHandler(
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             failureCode = RuntimeFailureCode.ProvisionTimeout;
+            providerHealth?.ReportFailure(
+                RuntimeProvider.Libvirt,
+                RunnerProviderFailureKind.ProvisionTimedOut,
+                message.RuntimeInstanceId);
         }
         catch (TimeoutException)
         {
             failureCode = RuntimeFailureCode.ProvisionTimeout;
+            providerHealth?.ReportFailure(
+                RuntimeProvider.Libvirt,
+                RunnerProviderFailureKind.ProvisionTimedOut,
+                message.RuntimeInstanceId);
         }
         catch (InvalidOperationException)
         {
             failureCode = RuntimeFailureCode.ProviderRejected;
+            providerHealth?.ReportFailure(
+                RuntimeProvider.Libvirt,
+                RunnerProviderFailureKind.ProvisionRejected,
+                message.RuntimeInstanceId);
         }
         return await CompleteProvisionFailureAsync(
             message,
@@ -457,6 +517,13 @@ public sealed class RuntimeProviderHandler(
         }
         catch (InvalidOperationException)
         {
+            if (work is not null)
+            {
+                providerHealth?.ReportFailure(
+                    work.Provider,
+                    RunnerProviderFailureKind.CleanupFailed,
+                    message.RuntimeInstanceId);
+            }
             return StopFailed(message, work);
         }
     }

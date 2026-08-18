@@ -226,6 +226,7 @@ services:
       Runner__Capacity__PidsLimit: ${RUNNER_CAPACITY_PIDS_LIMIT:-2048}
       Runner__Heartbeat__IntervalSeconds: ${RUNNER_HEARTBEAT_INTERVAL_SECONDS:-5}
       Runner__Heartbeat__TtlSeconds: ${RUNNER_HEARTBEAT_TTL_SECONDS:-15}
+      Runner__ProviderFailureHoldSeconds: ${RUNNER_PROVIDER_FAILURE_HOLD_SECONDS:-120}
       ConnectionStrings__PostgreSql: >-
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379

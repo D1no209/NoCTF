@@ -69,6 +69,10 @@ public static class ServiceRegistration
                 options.HeartbeatTtlSeconds = ReadIntOrZero(
                     configuration,
                     "Runner:Heartbeat:TtlSeconds");
+                options.ProviderFailureHoldSeconds = ReadPositiveIntOrDefault(
+                    configuration,
+                    "Runner:ProviderFailureHoldSeconds",
+                    120);
             })
             .Validate(
                 options => !string.IsNullOrWhiteSpace(options.RunnerId)
@@ -90,6 +94,9 @@ public static class ServiceRegistration
                 options => options.HeartbeatIntervalSeconds > 0
                     && options.HeartbeatTtlSeconds > options.HeartbeatIntervalSeconds,
                 "Runner heartbeat TTL must be greater than its positive interval.")
+            .Validate(
+                options => options.ProviderFailureHoldSeconds > 0,
+                "Runner provider failure hold must be a positive number of seconds.")
             .ValidateOnStart();
         if (!development)
         {
@@ -218,6 +225,7 @@ public static class ServiceRegistration
                 provider.GetRequiredService<LibvirtRuntimeResourceReconciler>());
         }
         services.AddSingleton<RuntimeProviderCatalog>();
+        services.AddSingleton<RunnerProviderHealthState>();
         services.AddSingleton<IReadinessDependency, RunnerProviderReadinessDependency>();
         services.AddSingleton<IOneShotRuntimeProviderCatalog>(provider =>
             provider.GetRequiredService<RuntimeProviderCatalog>());

@@ -7,7 +7,8 @@ namespace NoCTF.Infrastructure.Runtime.Capacity;
 public enum RunnerAvailabilityRegistrationOutcome
 {
     Online,
-    OfflineCapacityUntrusted
+    OfflineCapacityUntrusted,
+    OfflineProviderUnavailable
 }
 
 public sealed record RunnerAvailabilityRegistration(
@@ -17,7 +18,8 @@ public sealed record RunnerAvailabilityRegistration(
     string Version,
     RuntimeResourceLimits Capacity,
     TimeSpan TimeToLive,
-    bool HasActiveAssignments);
+    bool HasActiveAssignments,
+    bool ProviderAvailable = true);
 
 public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis)
 {
@@ -25,6 +27,14 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
 
     private const string RegisterScript = """
         redis.call('SADD', KEYS[1], ARGV[1])
+
+        if ARGV[9] ~= '1' then
+            redis.call('DEL', KEYS[3])
+            if redis.call('EXISTS', KEYS[2]) == 1 then
+                redis.call('PEXPIRE', KEYS[2], ARGV[6])
+            end
+            return 2
+        end
 
         local trusted = redis.call('HGET', KEYS[2], 'registrationSchema') == ARGV[2]
             and redis.call('HGET', KEYS[2], 'totalMemoryBytes') == ARGV[3]
@@ -79,11 +89,15 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                 registration.Capacity.PidsLimit,
                 checked((long)registration.TimeToLive.TotalMilliseconds),
                 heartbeat,
-                registration.HasActiveAssignments ? 1 : 0
+                registration.HasActiveAssignments ? 1 : 0,
+                registration.ProviderAvailable ? 1 : 0
             ]);
 
-        return result == 1
-            ? RunnerAvailabilityRegistrationOutcome.Online
-            : RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted;
+        return result switch
+        {
+            1 => RunnerAvailabilityRegistrationOutcome.Online,
+            2 => RunnerAvailabilityRegistrationOutcome.OfflineProviderUnavailable,
+            _ => RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
+        };
     }
 }

@@ -13,7 +13,8 @@ public sealed class RunnerAvailabilityPublisher(
     IServiceScopeFactory scopeFactory,
     RedisRunnerAvailabilityRegistry registry,
     IOptions<RunnerAvailabilityOptions> configuredOptions,
-    ILogger<RunnerAvailabilityPublisher> logger) : BackgroundService
+    ILogger<RunnerAvailabilityPublisher> logger,
+    RunnerProviderHealthState? providerHealth = null) : BackgroundService
 {
     private static readonly string Version =
         typeof(RunnerProgramMarker).Assembly
@@ -41,10 +42,17 @@ public sealed class RunnerAvailabilityPublisher(
                             options.RunnerId,
                             options.RunnerPool);
                     }
-                    else
+                    else if (outcome == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted)
                     {
                         logger.LogWarning(
                             "Runner {RunnerId} in pool {RunnerPool} remains offline because its Redis capacity is untrusted while assignments may still be active.",
+                            options.RunnerId,
+                            options.RunnerPool);
+                    }
+                    else
+                    {
+                        logger.LogWarning(
+                            "Runner {RunnerId} in pool {RunnerPool} is not accepting work because its Runtime provider recently rejected a resource operation.",
                             options.RunnerId,
                             options.RunnerPool);
                     }
@@ -102,7 +110,8 @@ public sealed class RunnerAvailabilityPublisher(
                 Version,
                 options.Capacity,
                 options.HeartbeatTtl,
-                hasActiveAssignments),
+                hasActiveAssignments,
+                providerHealth?.IsReady(options.Provider.Value) ?? true),
             cancellationToken);
     }
 }

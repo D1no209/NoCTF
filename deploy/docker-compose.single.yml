@@ -94,6 +94,7 @@ services:
       Runner__Capacity__PidsLimit: ${RUNNER_CAPACITY_PIDS_LIMIT:-2048}
       Runner__Heartbeat__IntervalSeconds: ${RUNNER_HEARTBEAT_INTERVAL_SECONDS:-5}
       Runner__Heartbeat__TtlSeconds: ${RUNNER_HEARTBEAT_TTL_SECONDS:-15}
+      Runner__ProviderFailureHoldSeconds: ${RUNNER_PROVIDER_FAILURE_HOLD_SECONDS:-120}
       Runtime__Provider: ${RUNNER_PROVIDER:-Docker}
       Runtime__RunnerPool: ${RUNNER_POOL:-default}
       Runtime__Docker__Endpoint: ${DOCKER_HOST:-unix:///var/run/docker.sock}
