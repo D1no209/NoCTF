@@ -30,6 +30,9 @@ export function detectLocale(): AppLocale {
 // Resolve the persisted locale synchronously to keep the first rendered frame stable.
 // UI consumers translate during render/computed evaluation so this ref remains reactive.
 const activeLocale = shallowRef<AppLocale>(detectLocale())
+const englishMessageSources = new Map<string, string>(
+  Object.entries(englishMessages).map(([source, english]) => [english.trim(), source]),
+)
 
 export function initializeLocale(): AppLocale {
   const locale = detectLocale()
@@ -70,4 +73,8 @@ export function translate(
     : source
   return template.replace(/\{(\w+)\}/g, (match, key: string) =>
     values[key] === undefined ? match : String(values[key]))
+}
+
+export function localizeMessage(message: string): string {
+  return translate(englishMessageSources.get(message.trim()) ?? message)
 }

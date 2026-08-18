@@ -19,7 +19,7 @@ export function competitionEventHistoryRange(
     : Number.NaN
   const earliestRecentEvent = now - RECENT_EVENT_DAYS * DAY_IN_MILLISECONDS
   const from = Number.isFinite(competitionStart)
-    ? Math.max(competitionStart, earliestRecentEvent)
+    ? Math.min(now, Math.max(competitionStart, earliestRecentEvent))
     : earliestRecentEvent
 
   return {

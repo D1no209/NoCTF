@@ -1,4 +1,4 @@
-import { translate } from './i18n'
+import { localizeMessage, translate } from './i18n'
 
 /**
  * Normalized API error parsed from RFC 9457 problem+json responses.
@@ -34,7 +34,7 @@ export function parseApiError(error: unknown, fallback = translate("请求失败
     const problem = error as ProblemDetailsLike
     const firstFieldError = problem.errors ? Object.values(problem.errors).flat()[0] : undefined
     // 字段级校验错误(FluentValidation)优先于泛泛的 title("One or more validation errors occurred")。
-    const message = problem.detail ?? firstFieldError ?? problem.title ?? fallback
+    const message = localizeMessage(problem.detail ?? firstFieldError ?? problem.title ?? fallback)
     return new ApiError(message, {
       status: problem.status,
       code: problem.code,
