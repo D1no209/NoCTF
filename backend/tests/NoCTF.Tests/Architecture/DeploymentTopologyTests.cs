@@ -147,6 +147,48 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task Public_tls_terminates_at_nginx_while_internal_api_remains_http_only()
+    {
+        var compose = await ReadAsync("deploy", "docker-compose.yml");
+        var singleCompose = await ReadAsync("deploy", "docker-compose.single.yml");
+        var nginx = await ReadAsync("deploy", "nginx", "noctf.conf");
+        var kubernetesConfig = await ReadAsync("deploy", "k8s", "configmap.yaml");
+        var kubernetesIngress = await ReadAsync("deploy", "k8s", "ingress.yaml");
+        var serviceRegistration = await ReadAsync(
+            "backend", "src", "NoCTF.API", "Composition", "ServiceRegistration.cs");
+        var pipeline = await ReadAsync(
+            "backend", "src", "NoCTF.API", "Composition", "PipelineConfiguration.cs");
+
+        foreach (var manifest in new[] { compose, singleCompose })
+        {
+            await Assert.That(manifest).Contains("ASPNETCORE_URLS: http://+:8080");
+            await Assert.That(manifest).Contains(
+                "127.0.0.1:${NOCTF_BACKEND_PORT:-8080}:8080");
+            await Assert.That(manifest).DoesNotContain("\"80:8080\"");
+            await Assert.That(manifest).Contains("ForwardedHeaders__KnownNetworks__0:");
+            await Assert.That(manifest).Contains("ForwardedHeaders__AllowedHosts__0:");
+        }
+
+        await Assert.That(nginx).Contains("return 308 https://$host$request_uri;");
+        await Assert.That(nginx).Contains("proxy_pass http://127.0.0.1:8080;");
+        await Assert.That(nginx).Contains("Strict-Transport-Security");
+        await Assert.That(nginx).Contains("proxy_set_header X-Forwarded-Proto https;");
+        await Assert.That(nginx).Contains("proxy_set_header Upgrade $http_upgrade;");
+        await Assert.That(nginx).Contains("proxy_set_header Connection $connection_upgrade;");
+
+        await Assert.That(kubernetesConfig).Contains("ASPNETCORE_URLS: \"http://+:8080\"");
+        await Assert.That(kubernetesConfig).Contains("ForwardedHeaders__KnownNetworks__0:");
+        await Assert.That(kubernetesConfig).DoesNotContain("ForwardedHeaders__TrustAll");
+        await Assert.That(kubernetesIngress).Contains("ssl-redirect: \"true\"");
+        await Assert.That(kubernetesIngress).Contains("force-ssl-redirect: \"true\"");
+        await Assert.That(kubernetesIngress).Contains("proxy_set_header Upgrade $http_upgrade;");
+
+        await Assert.That(serviceRegistration).Contains("AddNoCtfForwardedHeaders(configuration)");
+        await Assert.That(pipeline).Contains("app.UseForwardedHeaders();");
+        await Assert.That(pipeline).DoesNotContain("UseHttpsRedirection");
+    }
+
+    [Test]
     public async Task Kubernetes_platform_egress_is_explicit_and_fail_closed()
     {
         var networkPolicies = await ReadAsync("deploy", "k8s", "networkpolicy.yaml");

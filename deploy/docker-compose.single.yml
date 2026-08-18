@@ -80,7 +80,8 @@ services:
       Authentication__SigningKey: ${JWT_SECRET:?set JWT_SECRET}
       Authentication__Issuer: ${JWT_ISSUER:-NoCTF}
       Authentication__Audience: ${JWT_AUDIENCE:-NoCTF.Api}
-      Authentication__RefreshCookieSecure: ${AUTH_REFRESH_COOKIE_SECURE:-false}
+      ForwardedHeaders__KnownNetworks__0: ${NOCTF_REVERSE_PROXY_NETWORK:-172.16.0.0/12}
+      ForwardedHeaders__AllowedHosts__0: ${NOCTF_PUBLIC_HOST:-noctf.local}
       RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET:?set JWT_SECRET}}
       RunnerScoring__Issuer: ${RUNNER_SCORING_ISSUER:-NoCTF.Runner}
       RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}
@@ -125,7 +126,7 @@ services:
       migration:
         condition: service_completed_successfully
     ports:
-      - "80:8080"
+      - "127.0.0.1:${NOCTF_BACKEND_PORT:-8080}:8080"
     healthcheck:
       test:
         - CMD

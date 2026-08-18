@@ -73,7 +73,8 @@ services:
       RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}
       Runtime__Provider: ${RUNNER_PROVIDER:-Docker}
       Runtime__RunnerPool: ${RUNNER_POOL:-default}
-      Authentication__RefreshCookieSecure: ${AUTH_REFRESH_COOKIE_SECURE:-false}
+      ForwardedHeaders__KnownNetworks__0: ${NOCTF_REVERSE_PROXY_NETWORK:-172.16.0.0/12}
+      ForwardedHeaders__AllowedHosts__0: ${NOCTF_PUBLIC_HOST:-noctf.local}
       Database__AutoMigrate: "false"
       SeedAdmin__Email: ${SEED_ADMIN_EMAIL:-admin@noctf.local}
       SeedAdmin__UserName: ${SEED_ADMIN_USERNAME:-admin}
@@ -101,7 +102,7 @@ services:
       migration:
         condition: service_completed_successfully
     ports:
-      - "80:8080"
+      - "127.0.0.1:${NOCTF_BACKEND_PORT:-8080}:8080"
     healthcheck:
       test:
         - CMD

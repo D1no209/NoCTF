@@ -54,6 +54,7 @@ public static class ServiceRegistration
             throw new InvalidOperationException(string.Join(" ", uploadLimitErrors));
         services.AddSingleton(uploadLimits);
         services.AddProblemDetails();
+        services.AddNoCtfForwardedHeaders(configuration);
         if (endpointAssemblies is null)
             services.AddFastEndpoints();
         else
