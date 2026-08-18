@@ -12,6 +12,10 @@ namespace NoCTF.API.Endpoints.GameplayFacts;
 public sealed class ListGameplayFactsRequest
 {
     [QueryParam]
+    public Guid? CompetitionChallengeId { get; set; }
+    [QueryParam]
+    public GameplayFactKindProtocol? Kind { get; set; }
+    [QueryParam]
     public string? Cursor { get; set; }
     [QueryParam]
     public int Limit { get; set; } = 50;
@@ -82,13 +86,21 @@ public sealed class ListGameplayFactsEndpoint(
         ListGameplayFactsRequest request,
         CancellationToken ct)
     {
-        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, string.Empty, out var position))
+        var competitionId = Route<Guid>("competitionId");
+        var cursorScope = string.Join(':',
+            competitionId.ToString("N"),
+            user.UserId.ToString("N"),
+            request.CompetitionChallengeId?.ToString("N") ?? "all",
+            request.Kind?.ToString() ?? "all");
+        if (!cursors.TryDecode(request.Cursor, CursorEndpoint, cursorScope, out var position))
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Invalid cursor.");
         var items = await list.PlayerAsync(
-            Route<Guid>("competitionId"),
+            competitionId,
             user.UserId,
+            request.CompetitionChallengeId,
+            request.Kind is null ? null : GameplayFactMapper.ToDomain(request.Kind.Value),
             position?.CreatedAt,
             position?.Id,
             request.Limit,
@@ -96,7 +108,7 @@ public sealed class ListGameplayFactsEndpoint(
         if (items is null)
             return TypedResults.NotFound();
         var next = items.Count == request.Limit
-            ? cursors.Encode(CursorEndpoint, string.Empty, new(items[^1].OccurredAt, items[^1].Id))
+            ? cursors.Encode(CursorEndpoint, cursorScope, new(items[^1].OccurredAt, items[^1].Id))
             : null;
         return TypedResults.Ok(new GameplayFactListResponse(
             items.Select(GameplayFactListMapping.ToPlayerResponse).ToArray(),

@@ -34,7 +34,11 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
                         item.Score,
                         item.SolvedAt,
                         item.SolverName,
-                        bloodRank);
+                        bloodRank)
+                    {
+                        AttackScore = item.AttackScore,
+                        DefenseScore = item.DefenseScore
+                    };
                 })
                 .OrderBy(item => item.CompetitionChallengeId)
                 .ToList();
@@ -50,7 +54,11 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
                 projection.CurrentBreakScores?.GetValueOrDefault(challenge.Id),
                 projection.CurrentFixScores?.GetValueOrDefault(challenge.Id)))
             .ToList();
-        return new(entriesWithCells, challenges);
+        return new(
+            entriesWithCells,
+            challenges,
+            projection.CurrentRound,
+            projection.SettledThroughRound);
     }
 
     private static IReadOnlyList<CtfSolveObservation> BuildCtfSolveObservations(

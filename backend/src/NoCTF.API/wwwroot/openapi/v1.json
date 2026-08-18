@@ -1893,6 +1893,27 @@
             }
           },
           {
+            "name": "competitionChallengeId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "guid",
+              "nullable": true
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "nullable": true,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactKindProtocol"
+                }
+              ]
+            }
+          },
+          {
             "name": "cursor",
             "in": "query",
             "schema": {
@@ -14461,6 +14482,16 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "currentRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "settledThroughRound": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },
@@ -14500,6 +14531,21 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardCellResponse"
             }
+          },
+          "attackScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "defenseScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "penaltyScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },
@@ -14531,6 +14577,16 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardBloodRankProtocol"
               }
             ]
+          },
+          "attackScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "defenseScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
           }
         }
       },
@@ -14798,7 +14854,9 @@
           "QuestionStatusChanged",
           "ChallengeDescriptionUpdated",
           "TrackConfigurationUpdated",
-          "TeamTrackChanged"
+          "TeamTrackChanged",
+          "AwdpBreakAttempted",
+          "AwdpFixAttempted"
         ],
         "enum": [
           "CompetitionCreated",
@@ -14853,7 +14911,9 @@
           "QuestionStatusChanged",
           "ChallengeDescriptionUpdated",
           "TrackConfigurationUpdated",
-          "TeamTrackChanged"
+          "TeamTrackChanged",
+          "AwdpBreakAttempted",
+          "AwdpFixAttempted"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsEventsCompetitionEventLevelProtocol": {

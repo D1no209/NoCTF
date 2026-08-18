@@ -10,6 +10,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
@@ -18,8 +19,11 @@ using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.GameplayFacts.Awdp;
+using NoCTF.Infrastructure.GameplayFacts.Intake;
 using NoCTF.Infrastructure.GameplayFacts.PatchUploads;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Storage;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -106,6 +110,15 @@ public sealed class AwdpDefenseTargetPersistenceTests
             await Assert.That(await verification.GameplayFacts.CountAsync(
                 fact => fact.Kind == GameplayFactKind.FixAttempt,
                 cancellationToken)).IsEqualTo(1);
+            var publicFixEvent = await verification.CompetitionEvents.AsNoTracking()
+                .SingleAsync(item => item.Kind == CompetitionEventKind.AwdpFixAttempted,
+                    cancellationToken);
+            await Assert.That(publicFixEvent.Visibility)
+                .IsEqualTo(CompetitionEventVisibility.Public);
+            await Assert.That(publicFixEvent.TeamId).IsEqualTo(fixture.TeamId);
+            await Assert.That(publicFixEvent.CompetitionChallengeId)
+                .IsEqualTo(fixture.CompetitionChallengeId);
+            await Assert.That(publicFixEvent.ActorUserId).IsNull();
             var target = await verification.RuntimeInstances.AsNoTracking()
                 .SingleAsync(item => item.Id == runtimeId, cancellationToken);
             await Assert.That(target.GameplayFactId).IsNotNull();
@@ -144,7 +157,10 @@ public sealed class AwdpDefenseTargetPersistenceTests
         var store = new PatchUploadStore(
             db,
             outbox,
-            NullLogger<PatchUploadStore>.Instance);
+            new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()),
+            new FileReferenceLock(),
+            NullLogger<PatchUploadStore>.Instance,
+            new CompetitionEventStore(db, outbox));
         var scope = await store.ResolveScopeAsync(
             fixture.CompetitionId,
             fixture.CompetitionChallengeId,
@@ -311,7 +327,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             ExpiresAt = now.AddMinutes(15)
         });
         await db.SaveChangesAsync(cancellationToken);
-        return new(now, competitionId, competitionChallengeId, userId);
+        return new(now, competitionId, competitionChallengeId, userId, teamId);
     }
 
     private static async Task<PostgreSqlContainer> StartPostgresAsync(
@@ -356,5 +372,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
         DateTimeOffset Now,
         Guid CompetitionId,
         Guid CompetitionChallengeId,
-        Guid UserId);
+        Guid UserId,
+        Guid TeamId);
 }

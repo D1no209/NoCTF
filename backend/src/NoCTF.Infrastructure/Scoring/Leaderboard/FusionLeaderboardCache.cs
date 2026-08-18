@@ -205,7 +205,8 @@ public sealed class FusionLeaderboardCache(
             competition.StartAt,
             lifecycle,
             awdRounds,
-            projectedAt));
+            projectedAt,
+            competition.Status));
         return new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
         {
             Challenges = projection.Challenges,
@@ -216,7 +217,9 @@ public sealed class FusionLeaderboardCache(
                 track.VisibleOnLeaderboard)).ToArray(),
             Visibility = CompetitionLeaderboardVisibility.Normal,
             DataScope = LeaderboardDataScope.Live,
-            DataAsOf = projectedAt
+            DataAsOf = projectedAt,
+            CurrentRound = projection.CurrentRound,
+            SettledThroughRound = projection.SettledThroughRound
         };
     }
 

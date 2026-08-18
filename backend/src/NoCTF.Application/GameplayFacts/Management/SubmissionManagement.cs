@@ -46,6 +46,8 @@ public interface IGameplayFactManagementStore
     Task<IReadOnlyList<GameplayFactListItem>?> ListPlayerAsync(
         Guid competitionId,
         Guid userId,
+        Guid? competitionChallengeId,
+        GameplayFactKind? kind,
         DateTimeOffset? beforeOccurredAt,
         Guid? beforeId,
         int limit,
@@ -72,11 +74,21 @@ public sealed class ListGameplayFacts(IGameplayFactManagementStore store)
     public Task<IReadOnlyList<GameplayFactListItem>?> PlayerAsync(
         Guid competitionId,
         Guid userId,
+        Guid? competitionChallengeId,
+        GameplayFactKind? kind,
         DateTimeOffset? beforeOccurredAt,
         Guid? beforeId,
         int limit,
         CancellationToken ct = default) =>
-        store.ListPlayerAsync(competitionId, userId, beforeOccurredAt, beforeId, limit, ct);
+        store.ListPlayerAsync(
+            competitionId,
+            userId,
+            competitionChallengeId,
+            kind,
+            beforeOccurredAt,
+            beforeId,
+            limit,
+            ct);
 }
 
 public sealed class QueueGameplayFactWork(IGameplayFactManagementStore store)

@@ -22,6 +22,8 @@ public sealed record LeaderboardResponse(Guid CompetitionId, DateTimeOffset Gene
     public CompetitionLeaderboardVisibility Visibility { get; init; }
     public LeaderboardDataScope DataScope { get; init; }
     public DateTimeOffset? DataAsOf { get; init; }
+    public int? CurrentRound { get; init; }
+    public int? SettledThroughRound { get; init; }
 }
 public enum LeaderboardProjectionState { Processing }
 public sealed record LeaderboardProcessingResponse(

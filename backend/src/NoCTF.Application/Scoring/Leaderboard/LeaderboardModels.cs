@@ -16,7 +16,11 @@ public sealed record LeaderboardCell(
     long Score,
     DateTimeOffset? SolvedAt,
     string? SolverName,
-    LeaderboardBloodRank? BloodRank);
+    LeaderboardBloodRank? BloodRank)
+{
+    public long? AttackScore { get; init; }
+    public long? DefenseScore { get; init; }
+}
 
 /// <summary>Projection-only cell before it is attached to a ranked team row.</summary>
 public sealed record LeaderboardCellFact(
@@ -24,7 +28,11 @@ public sealed record LeaderboardCellFact(
     Guid CompetitionChallengeId,
     long Score,
     DateTimeOffset? SolvedAt,
-    string? SolverName);
+    string? SolverName)
+{
+    public long? AttackScore { get; init; }
+    public long? DefenseScore { get; init; }
+}
 
 public sealed record LeaderboardChallengeInfo(
     Guid CompetitionChallengeId,
@@ -43,6 +51,10 @@ public sealed record LeaderboardEntry(
     DateTimeOffset? LastScoreAt,
     string TrackKey = "default")
 {
+    public long? AttackScore { get; init; }
+    public long? DefenseScore { get; init; }
+    public long? PenaltyScore { get; init; }
+
     /// <summary>Only solved/corrected cells are serialized; the matrix is sparse.</summary>
     public IReadOnlyList<LeaderboardCell> Cells { get; init; } = [];
 }
