@@ -183,10 +183,16 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         await E2ELifecycle.StartOrObserveRunningAsync(admin, competitionId, cancellationToken);
 
+        var blueDefenseTargetId = await RequestAndPollDefenseTargetAsync(
+            blueClient,
+            competitionId,
+            competitionChallengeId,
+            cancellationToken);
         await AssertPatchUploadRejectedAsync(
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             CreateEmptyArchive(),
             "empty.tar.gz",
             HttpStatusCode.UnprocessableEntity,
@@ -195,6 +201,7 @@ public sealed class AwdpFullBoundaryTests
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             CreateTarGzipArchive(("/fix.sh", "echo bad")),
             "absolute-path.tar.gz",
             HttpStatusCode.UnprocessableEntity,
@@ -203,6 +210,7 @@ public sealed class AwdpFullBoundaryTests
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             CreateTarGzipArchive(("../fix.sh", "echo bad")),
             "path-traversal.tar.gz",
             HttpStatusCode.UnprocessableEntity,
@@ -211,6 +219,7 @@ public sealed class AwdpFullBoundaryTests
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             CreateLinkArchive(TarEntryType.SymbolicLink),
             "symbolic-link.tar.gz",
             HttpStatusCode.UnprocessableEntity,
@@ -219,6 +228,7 @@ public sealed class AwdpFullBoundaryTests
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             CreateLinkArchive(TarEntryType.HardLink),
             "hard-link.tar.gz",
             HttpStatusCode.UnprocessableEntity,
@@ -227,6 +237,7 @@ public sealed class AwdpFullBoundaryTests
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             CreateTarGzipArchive(("fix.sh", "echo one"), ("fix.sh", "echo two")),
             "duplicate-path.tar.gz",
             HttpStatusCode.UnprocessableEntity,
@@ -235,6 +246,7 @@ public sealed class AwdpFullBoundaryTests
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             CreateRawTarArchive(("fix.sh", "echo ok")),
             "not-gzip.tar.gz",
             HttpStatusCode.UnprocessableEntity,
@@ -243,6 +255,7 @@ public sealed class AwdpFullBoundaryTests
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             CreateOversizedArchive(1_048_577),
             "oversized.tar.gz",
             HttpStatusCode.UnprocessableEntity,
@@ -260,8 +273,10 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         await Assert.That(redRuntime.GetProperty("id").GetGuid())
             .IsNotEqualTo(blueRuntime.GetProperty("id").GetGuid());
-        await Assert.That(redRuntime.GetProperty("generation").GetInt32()).IsEqualTo(1);
-        await Assert.That(blueRuntime.GetProperty("generation").GetInt32()).IsEqualTo(1);
+        await Assert.That(blueRuntime.GetProperty("id").GetGuid())
+            .IsNotEqualTo(blueDefenseTargetId);
+        await Assert.That(redRuntime.GetProperty("generation").GetInt32()).IsGreaterThanOrEqualTo(1);
+        await Assert.That(blueRuntime.GetProperty("generation").GetInt32()).IsGreaterThanOrEqualTo(1);
         var redUrl = redRuntime.GetProperty("urls")[0].GetString()
             ?? throw new InvalidOperationException("Red attack Runtime did not expose a URL.");
         var blueUrl = blueRuntime.GetProperty("urls")[0].GetString()
@@ -311,18 +326,13 @@ public sealed class AwdpFullBoundaryTests
             failureCode: null);
 
         var fixedArchive = CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/fixed\n");
-        var bluePatchId = await UploadPatchAsync(
+        var blueFixId = await UploadPatchAsync(
             blueClient,
             competitionId,
             competitionChallengeId,
+            blueDefenseTargetId,
             fixedArchive,
             "defense-succeeded.tar.gz",
-            cancellationToken);
-        var blueFixId = await SubmitFixAsync(
-            blueClient,
-            competitionId,
-            competitionChallengeId,
-            bluePatchId,
             cancellationToken);
         var blueFix = await PollCompletedSubmissionAsync(
             blueClient,
@@ -335,13 +345,14 @@ public sealed class AwdpFullBoundaryTests
             kind: "FixAttempt",
             result: "Correct",
             failureCode: null);
-        var blueState = await PollJsonAsync(
+        var blueState = await PollDefenseTargetRecycledAsync(
             blueClient,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
-            value => value.GetProperty("defense").GetProperty("stage").GetString() == "Completed"
-                && value.GetProperty("fixActivation").ValueKind == JsonValueKind.Object,
-            TimeSpan.FromSeconds(30),
+            competitionId,
+            competitionChallengeId,
+            blueDefenseTargetId,
             cancellationToken);
+        await Assert.That(blueState.GetProperty("fixActivation").ValueKind)
+            .IsEqualTo(JsonValueKind.Object);
         await Assert.That(blueState.GetProperty("breakActivation").ValueKind)
             .IsEqualTo(JsonValueKind.Null);
 
@@ -437,18 +448,18 @@ public sealed class AwdpFullBoundaryTests
             .GetProperty("effectiveRound").GetInt32();
 
         var failedArchive = CreatePatchArchive("#!/bin/sh\nexit 9\n");
-        var redFailedPatchId = await UploadPatchAsync(
+        var redDefenseTargetId = await RequestAndPollDefenseTargetAsync(
             redClient,
             competitionId,
             competitionChallengeId,
+            cancellationToken);
+        var redFailedFixId = await UploadPatchAsync(
+            redClient,
+            competitionId,
+            competitionChallengeId,
+            redDefenseTargetId,
             failedArchive,
             "failed.tar.gz",
-            cancellationToken);
-        var redFailedFixId = await SubmitFixAsync(
-            redClient,
-            competitionId,
-            competitionChallengeId,
-            redFailedPatchId,
             cancellationToken);
         var redFailedFix = await PollCompletedSubmissionAsync(
             redClient,
@@ -720,21 +731,31 @@ public sealed class AwdpFullBoundaryTests
         return accepted.GetProperty("gameplayFactId").GetGuid();
     }
 
-    private static async Task<Guid> SubmitFixAsync(
+    private static async Task<Guid> RequestAndPollDefenseTargetAsync(
         HttpClient client,
         Guid competitionId,
         Guid competitionChallengeId,
-        Guid patchUploadId,
         CancellationToken cancellationToken)
     {
-        var accepted = await SendJsonAsync(
+        var accepted = await SendWithoutBodyForJsonAsync(
             client,
             HttpMethod.Post,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/fix-submissions",
-            new { patchUploadId },
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets",
             HttpStatusCode.Accepted,
             cancellationToken);
-        return accepted.GetProperty("gameplayFactId").GetGuid();
+        var runtimeInstanceId = accepted.GetProperty("runtimeInstanceId").GetGuid();
+        _ = await PollJsonAsync(
+            client,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
+            value => value.GetProperty("defense").GetProperty("runtimeInstanceId").GetGuid()
+                    == runtimeInstanceId
+                && value.GetProperty("defense").GetProperty("runtimeState").GetString()
+                    == "Running"
+                && value.GetProperty("defense").GetProperty("stage").GetString()
+                    == "AwaitingPatch",
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
+        return runtimeInstanceId;
     }
 
     private static async Task SubmitFixAndAssertAsync(
@@ -749,18 +770,18 @@ public sealed class AwdpFullBoundaryTests
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        var patchId = await UploadPatchAsync(
+        var runtimeInstanceId = await RequestAndPollDefenseTargetAsync(
             client,
             competitionId,
             competitionChallengeId,
+            cancellationToken);
+        var factId = await UploadPatchAsync(
+            client,
+            competitionId,
+            competitionChallengeId,
+            runtimeInstanceId,
             archive,
             fileName,
-            cancellationToken);
-        var factId = await SubmitFixAsync(
-            client,
-            competitionId,
-            competitionChallengeId,
-            patchId,
             cancellationToken);
         var fact = await PollCompletedSubmissionAsync(
             client,
@@ -769,12 +790,39 @@ public sealed class AwdpFullBoundaryTests
             timeout,
             cancellationToken);
         await AssertSubmissionAsync(fact, kind, result, failureCode);
+        _ = await PollDefenseTargetRecycledAsync(
+            client,
+            competitionId,
+            competitionChallengeId,
+            runtimeInstanceId,
+            cancellationToken);
     }
+
+    private static Task<JsonElement> PollDefenseTargetRecycledAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid runtimeInstanceId,
+        CancellationToken cancellationToken) =>
+        PollJsonAsync(
+            client,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
+            value =>
+            {
+                var defense = value.GetProperty("defense");
+                return defense.GetProperty("runtimeInstanceId").GetGuid() == runtimeInstanceId
+                    && defense.GetProperty("runtimeState").GetString() == "Stopped"
+                    && defense.GetProperty("stage").GetString() == "Completed"
+                    && defense.GetProperty("targetStoppedAt").ValueKind == JsonValueKind.String;
+            },
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
 
     private static async Task<Guid> UploadPatchAsync(
         HttpClient client,
         Guid competitionId,
         Guid competitionChallengeId,
+        Guid runtimeInstanceId,
         byte[] archive,
         string fileName,
         CancellationToken cancellationToken)
@@ -784,17 +832,18 @@ public sealed class AwdpFullBoundaryTests
         content.Headers.ContentType = new MediaTypeHeaderValue("application/gzip");
         form.Add(content, "File", fileName);
         using var response = await client.PostAsync(
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload",
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix",
             form,
             cancellationToken);
-        var body = await ReadExpectedJsonAsync(response, HttpStatusCode.Created, cancellationToken);
-        return body.GetProperty("patchUploadId").GetGuid();
+        var body = await ReadExpectedJsonAsync(response, HttpStatusCode.Accepted, cancellationToken);
+        return body.GetProperty("gameplayFactId").GetGuid();
     }
 
     private static async Task AssertPatchUploadRejectedAsync(
         HttpClient client,
         Guid competitionId,
         Guid competitionChallengeId,
+        Guid runtimeInstanceId,
         byte[] archive,
         string fileName,
         HttpStatusCode expected,
@@ -805,7 +854,7 @@ public sealed class AwdpFullBoundaryTests
         content.Headers.ContentType = new MediaTypeHeaderValue("application/gzip");
         form.Add(content, "File", fileName);
         using var response = await client.PostAsync(
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload",
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix",
             form,
             cancellationToken);
         await Assert.That(response.StatusCode).IsEqualTo(expected);

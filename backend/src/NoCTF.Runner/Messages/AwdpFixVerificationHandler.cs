@@ -52,6 +52,7 @@ public sealed record AwdpFixRecoveryWork(
     int Generation,
     long RecoveryProcessingVersion,
     RuntimeProvider Provider,
+    string? ProviderReceiptJson,
     string RunnerPool,
     string RunnerId);
 
@@ -135,6 +136,7 @@ public sealed class AwdpFixWorkReader(
                     fenceResult.Generation,
                     fenceResult.RuntimeProcessingVersion,
                     fenceResult.Provider,
+                    fenceResult.ProviderReceiptJson,
                     fenceResult.RunnerPool,
                     fenceResult.RunnerId));
         }
@@ -406,10 +408,10 @@ public sealed class AwdpFixVerificationHandler(
         var tarPath = Path.Combine(operationDirectory, "fix.tar");
         try
         {
-            if (!await archives.DownloadAsync(
+            if (await archives.DownloadAsync(
                     work.Archive,
                     archivePath,
-                    cancellationToken))
+                    cancellationToken) != AwdpFixArchiveDownloadOutcome.Downloaded)
             {
                 outcome = AwdpFixOutcome.PlatformFailed;
             }
@@ -463,8 +465,7 @@ public sealed class AwdpFixVerificationHandler(
         }
         finally
         {
-            if (Directory.Exists(operationDirectory))
-                Directory.Delete(operationDirectory, recursive: true);
+            TryDeleteDirectory(operationDirectory);
         }
 
         if (outcome is not AwdpFixOutcome result)
@@ -490,13 +491,26 @@ public sealed class AwdpFixVerificationHandler(
         var identity = new RuntimeResourceIdentity(
             recovery.RuntimeInstanceId,
             recovery.Generation);
+        if (!string.IsNullOrWhiteSpace(recovery.ProviderReceiptJson))
+        {
+            var receipt = JsonSerializer.Deserialize<ContainerReceipt>(
+                recovery.ProviderReceiptJson)
+                ?? throw new InvalidOperationException("AWDP target provider receipt is invalid.");
+            if (receipt.Provider != recovery.Provider)
+                throw new InvalidOperationException("AWDP target provider receipt does not match its assignment.");
+            await IsolatedContainerProvisioner.DestroyAsync(
+                providers.Containers(recovery.Provider),
+                providers.Sandbox(recovery.Provider),
+                receipt,
+                cancellationToken);
+        }
         await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
         var remaining = await reconciler.ListManagedAsync(cancellationToken);
         if (remaining.Contains(identity))
             throw new InvalidOperationException(
                 "AWDP verification resources remain after identity-based cleanup.");
 
-        DeleteOperationDirectory(recovery.GameplayFactId, recovery.RuntimeInstanceId);
+        TryDeleteOperationDirectory(recovery.GameplayFactId, recovery.RuntimeInstanceId);
         var release = await capacity.ReleaseAsync(
             recovery.RuntimeInstanceId,
             recovery.RunnerId,
@@ -516,7 +530,7 @@ public sealed class AwdpFixVerificationHandler(
         await outbox.FlushOutgoingMessagesAsync();
     }
 
-    private static void DeleteOperationDirectory(
+    private static void TryDeleteOperationDirectory(
         Guid gameplayFactId,
         Guid runtimeInstanceId)
     {
@@ -524,7 +538,23 @@ public sealed class AwdpFixVerificationHandler(
             Path.GetTempPath(),
             "noctf-awdp",
             $"{gameplayFactId:N}-{runtimeInstanceId:N}");
-        if (Directory.Exists(path))
-            Directory.Delete(path, recursive: true);
+        TryDeleteDirectory(path);
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Local scratch cleanup must not prevent the durable result or resource cleanup.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Local scratch cleanup must not prevent the durable result or resource cleanup.
+        }
     }
 }

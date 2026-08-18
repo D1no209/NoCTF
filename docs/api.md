@@ -123,8 +123,8 @@ Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向�
 ```text
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload
-POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/fix-submissions
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix
 GET  /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
 GET  /api/v1/competitions/{competitionId}/gameplay-facts
 ```
@@ -140,7 +140,7 @@ AWD 可二选一使用 flag 或 flags；CTF/AWDP Break 必须只用 flag。AWD f
 `FlagInvalid`/400 且零写入。每项创建独立 GameplayFact；数据库不保存 batch。单 flag 的 202 body 返回
 GameplayFactId/state/statusUrl；flags 保持输入顺序，不返回 BatchId。
 
-Patch upload 是 multipart 单文件，成功返回 PatchUploadId；Fix trigger body 只含该 Id。上传不创建 GameplayFact，触发才做尝试预检、锁定与 Reference 关联。
+第一条 AWDP 防御路由申请一次性干净 Target，返回 RuntimeInstanceId 和状态地址。Target 进入 AwaitingPatch 后，第二条 multipart 单文件路由在事务中唯一绑定 PatchUpload/FixAttempt，并直接返回 PatchUploadId、GameplayFactId 与事实状态；没有独立的 Fix trigger。归档校验失败不消费 Target，成功绑定后同一 Target 不再接受第二次上传。
 
 ## Runtime
 
@@ -156,9 +156,9 @@ GET  /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/aw
 
 变更返回 202、RuntimeInstanceId 与 status URL。只有 Running 返回展开后的 `urls: string[]`。
 
-CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期控制且 Extend 不支持；KoH 不开放普通玩家 Runtime 动作。AWDP v2 的玩家 Runtime 是长期攻击环境，可通过统一 Runtime 路由启停、重置和续期；一次性 Fix 验证环境不通过这些玩家路由暴露。路由保留统一形状，但每个 Endpoint 的 Application policy 必须按 GameMode/RuntimePurpose 拒绝不支持动作。
+CTF 开放四个动作；AWD 玩家 GET/Reset，Start/Stop 由平台生命周期控制且 Extend 不支持；KoH 不开放普通玩家 Runtime 动作。AWDP schema v4 的玩家 `Player/AwdpAttack` Runtime 是长期攻击靶机，可通过统一 Runtime 路由启停、重置和续期；一次性 `AwdpTarget` 防御验证环境只通过申请与 Fix 上传路由管理，不通过普通玩家 Runtime 动作暴露。路由保留统一形状，但每个 Endpoint 的 Application policy 必须按 GameMode/RuntimePurpose 拒绝不支持动作。
 
-`awdp-state` 仅用于 AWDP v2 参赛队伍，返回本队攻击 Runtime、Break/Fix 生效轮次、当前逻辑轮次与最新 Fix 验证阶段；不返回动态 Flag 明文、Provider receipt、内部地址或其他队伍状态。
+`awdp-state` 仅用于 AWDP schema v4 参赛队伍，返回本队攻击 Runtime、Break/Fix 生效轮次、当前逻辑轮次与最近一次防御 Target 的 TargetProvisioning/AwaitingPatch/PatchApplying/CheckerRunning/Completed 阶段；不返回动态 Flag 明文、Provider receipt、内部地址或其他队伍状态。
 
 `targets` 只用于 AWD：加固期只返回本队 TeamId/Name/Running urls；加固期结束后返回所有 Approved、未 Ban、未删除队伍的 TeamId/Name 与其 Running `Exposure=Participants` urls，未 Running 的目标保留 Team 条目但 urls 为空。本队仍可从 Runtime GET 取得 OwnerOnly urls。排序 Team.RegisteredAt/TeamId。targets 永不返回 Flag、服务状态、Provider receipt 或内部地址；其他模式返回 404。
 

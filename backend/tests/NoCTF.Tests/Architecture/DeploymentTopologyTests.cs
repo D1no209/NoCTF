@@ -109,6 +109,12 @@ public sealed class DeploymentTopologyTests
             "k8s",
             "backend-deployment.yaml");
         var networkPolicies = await ReadAsync("deploy", "k8s", "networkpolicy.yaml");
+        var pipeline = await ReadAsync(
+            "backend",
+            "src",
+            "NoCTF.API",
+            "Composition",
+            "PipelineConfiguration.cs");
 
         await Assert.That(compose)
             .Contains("noctf.io/internal-role: scoring-callback-gateway");
@@ -137,6 +143,7 @@ public sealed class DeploymentTopologyTests
             .Contains("kubernetes.io/metadata.name: runtime");
         await Assert.That(networkPolicies).Contains("- awd-checker");
         await Assert.That(networkPolicies).Contains("- awdp-checker");
+        await Assert.That(pipeline).DoesNotContain("UseHttpsRedirection");
     }
 
     [Test]

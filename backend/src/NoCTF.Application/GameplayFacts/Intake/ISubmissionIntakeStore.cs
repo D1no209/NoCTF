@@ -22,12 +22,6 @@ public interface IGameplayFactIntakeStore
         int? maxAttempts,
         CancellationToken cancellationToken);
 
-    Task<GameplayFactAcceptanceResult> TryAcceptFixAsync(
-        FixGameplayFactReceived received,
-        GameplayFactAdmissionSnapshot snapshot,
-        int? maxAttempts,
-        CancellationToken cancellationToken);
-
     Task<GameplayFactAcceptanceResult> TryAcceptHintUnlockAsync(
         HintUnlockGameplayFactReceived received,
         CancellationToken cancellationToken) =>

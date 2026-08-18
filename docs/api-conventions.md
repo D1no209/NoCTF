@@ -52,7 +52,7 @@
 - Multipart Endpoint 用 DTO `IFormFile` 与 AllowFileUploads；不得直接读 HttpContext.Request.Body。
 - 上传按用途执行显式业务上限；超过上限返回带稳定失败码的 413，且不得进入对象存储或创建业务记录。Kestrel/multipart 的全局上限仍保持开放；各上传 Endpoint 同时设置“文件上限 + 64 KiB multipart 开销”的传输硬上限，防止在绑定前无限落盘。单项 Flag 字节数和 Runner 解包安全限制分别执行各自的强类型边界；AWD Flag 批次数量与总字节数不设上限。
 - 用户 FileName/MIME 不可信，ObjectKey 由服务端生成；流和 CancellationToken 正确传递。
-- Patch 上传与触发是两个 API；不是预签名上传会话。
+- AWDP 防御申请与 Patch 上传是两个 API；上传成功即原子绑定唯一 FixAttempt 并触发一次验证，不存在第三个 Fix trigger，也不是预签名上传会话。
 - 下载先授权；S3 返回 typed `RedirectHttpResult`（60 秒预签名 302），LocalFileSystem 返回 typed `FileStreamHttpResult`。二者必须出现在 Endpoint `Results<...>` 中，不以 SendStreamAsync/HttpResponse 手写。
 
 ## Revision 并发

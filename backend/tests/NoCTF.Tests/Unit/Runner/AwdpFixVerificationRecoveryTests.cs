@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using NSubstitute;
 using NoCTF.Application.GameplayFacts.Processing;
@@ -197,6 +198,29 @@ public sealed class AwdpFixVerificationRecoveryTests
     }
 
     [Test]
+    public async Task Recovery_destroys_the_receipted_target_before_identity_cleanup()
+    {
+        var context = CreateContext(resourcesRemain: false, withReceipt: true);
+
+        await context.Handler.Handle(context.Message, CancellationToken.None);
+
+        await context.Container.Received(1).DestroyAsync(
+            Arg.Is<ContainerReceipt>(receipt =>
+                receipt != null
+                && receipt.OperationId == context.Message.RuntimeInstanceId
+                && receipt.Generation == context.Message.Generation),
+            Arg.Any<CancellationToken>());
+        await context.Sandbox.Received(1).DeleteIsolatedNetworkAsync(
+            "target-network",
+            Arg.Any<CancellationToken>());
+        await context.Reconciler.Received(1).DestroyByIdentityAsync(
+            new RuntimeResourceIdentity(
+                context.Message.RuntimeInstanceId,
+                context.Message.Generation),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Test]
     public async Task Cleanup_that_leaves_resources_never_releases_capacity_or_requests_replay()
     {
         var context = CreateContext(resourcesRemain: true);
@@ -212,7 +236,7 @@ public sealed class AwdpFixVerificationRecoveryTests
         await Assert.That(context.Outbox.Messages).IsEmpty();
     }
 
-    private static TestContext CreateContext(bool resourcesRemain)
+    private static TestContext CreateContext(bool resourcesRemain, bool withReceipt = false)
     {
         var message = Message();
         var reader = Substitute.For<IAwdpFixWorkReader>();
@@ -224,6 +248,19 @@ public sealed class AwdpFixVerificationRecoveryTests
                 message.Generation,
                 12,
                 RuntimeProvider.Docker,
+                withReceipt
+                    ? JsonSerializer.Serialize(new ContainerReceipt(
+                        message.RuntimeInstanceId,
+                        RuntimeProvider.Docker,
+                        "target",
+                        RuntimeStatus.Running,
+                        new Dictionary<int, int>(),
+                        null,
+                        "target",
+                        "target-network",
+                        message.RuntimeInstanceId,
+                        message.Generation))
+                    : null,
                 message.RunnerPool,
                 message.RunnerId)));
         var identity = new RuntimeResourceIdentity(
@@ -243,18 +280,23 @@ public sealed class AwdpFixVerificationRecoveryTests
             .Returns(RunnerCapacityReleaseOutcome.Released);
         var outbox = new RecordingOutbox();
         var configuration = Configuration(message);
+        var container = Substitute.For<IContainerLifecycle>();
+        var sandbox = Substitute.For<IContainerSandboxLifecycle>();
+        var providers = Substitute.For<IRuntimeProviderCatalog>();
+        providers.Containers(RuntimeProvider.Docker).Returns(container);
+        providers.Sandbox(RuntimeProvider.Docker).Returns(sandbox);
         var handler = new AwdpFixVerificationHandler(
             reader,
             new AwdpFixArchiveDownloader(Substitute.For<IHttpClientFactory>()),
             new FixArchivePreparer(configuration),
-            Substitute.For<IRuntimeProviderCatalog>(),
+            providers,
             Substitute.For<IAwdpCheckerExecutor>(),
             Substitute.For<IAwdpFixExecutionFence>(),
             [reconciler],
             capacity,
             outbox,
             configuration);
-        return new(handler, message, reconciler, capacity, outbox);
+        return new(handler, message, reconciler, capacity, outbox, container, sandbox);
     }
 
     private static RunAwdpFixVerification Message() => new(
@@ -299,7 +341,9 @@ public sealed class AwdpFixVerificationRecoveryTests
         RunAwdpFixVerification Message,
         IRuntimeManagedResourceReconciler Reconciler,
         IRunnerCapacityGate Capacity,
-        RecordingOutbox Outbox);
+        RecordingOutbox Outbox,
+        IContainerLifecycle Container,
+        IContainerSandboxLifecycle Sandbox);
 
     private sealed class StaticHttpClientFactory(HttpClient client) : IHttpClientFactory
     {

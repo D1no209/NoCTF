@@ -26,7 +26,8 @@
 - [ ] Container、`PerTeam`，不是 Compose 或 OVA。
 - [ ] FlagSource 为 `PerTeam`，只填写注入环境变量名。
 - [ ] Player 使用 host port `0` 和 OwnerOnly URL。
-- [ ] Fix target 自动忽略公网端口和 URL，TeamId 为空。
+- [ ] Fix target 自动忽略公网端口和 URL，绑定申请队伍但不向选手暴露入口。
+- [ ] 每次 Fix 都先申请全新 target；该 target 只接受一次 PatchUpload，验证后立即回收。
 - [ ] `InternalPorts` 恰好一个，服务监听 `0.0.0.0`。
 - [ ] 全新容器稳定复现漏洞，Fix 目标路径可写。
 - [ ] 不依赖宿主路径、Docker Socket、其他队伍、平台网络或外网。

@@ -2,9 +2,12 @@ using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
+using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Storage;
@@ -18,8 +21,12 @@ public sealed class PatchUploadStore(
     ITransactionalMessageOutbox outbox,
     GameplayFactAttemptCriticalSection attemptCriticalSection,
     FileReferenceLock fileLock,
-    ILogger<PatchUploadStore> logger) : IPatchUploadStore
+    ILogger<PatchUploadStore> logger,
+    ICompetitionEventRecorder? eventRecorder = null) : IPatchUploadStore
 {
+    private readonly ICompetitionEventRecorder events =
+        eventRecorder ?? NullCompetitionEventRecorder.Instance;
+
     public PatchUploadStore(
         NoCtfDbContext db,
         ITransactionalMessageOutbox outbox,
@@ -29,11 +36,13 @@ public sealed class PatchUploadStore(
             outbox,
             new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()),
             new FileReferenceLock(),
-            logger) { }
+            logger,
+            null) { }
 
     public async Task<PatchUploadScope?> ResolveScopeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        Guid runtimeInstanceId,
         Guid userId,
         CancellationToken ct)
     {
@@ -76,18 +85,27 @@ public sealed class PatchUploadStore(
             available.ConfigurationJson,
             available.RulesJson,
             available.DefinitionJson);
-        return configuration.MaximumPatchUploadBytes > 0
+        var targetExists = await db.RuntimeInstances.AsNoTracking().AnyAsync(instance =>
+            instance.Id == runtimeInstanceId
+            && instance.CompetitionId == competitionId
+            && instance.CompetitionChallengeId == competitionChallengeId
+            && instance.TeamId == team.Id
+            && instance.Purpose == RuntimePurpose.AwdpTarget,
+            ct);
+        return configuration.MaximumPatchUploadBytes > 0 && targetExists
             ? new(
                 competitionId,
                 competitionChallengeId,
                 team.Id,
                 userId,
+                runtimeInstanceId,
                 configuration.MaximumPatchUploadBytes)
             : null;
     }
 
-    public async Task<bool> SaveAsync(
+    public async Task<PatchUploadSaveResult> SaveAsync(
         Guid patchUploadId,
+        Guid gameplayFactId,
         PatchUploadScope scope,
         Guid fileId,
         DateTimeOffset uploadedAt,
@@ -103,27 +121,64 @@ public sealed class PatchUploadStore(
             GameplayFactKind.FixAttempt,
             ct);
         if (!await fileLock.AcquireAsync(db, fileId, ct))
-            return false;
+            return new(PatchUploadSaveState.ConcurrencyConflict);
 
-        var previous = await db.PatchUploads.AsNoTracking()
-            .Where(upload => upload.TeamId == scope.TeamId
-                && upload.CompetitionChallengeId == scope.CompetitionChallengeId
-                && !db.GameplayFacts.Any(fact =>
-                    fact.ReferenceKind == Domain.Gameplay.GameplayFactReferenceKind.PatchUpload
-                    && fact.ReferenceId == upload.Id))
-            .Select(upload => new { upload.Id, upload.FileId })
-            .SingleOrDefaultAsync(ct);
-        if (previous is not null)
+        var target = await db.RuntimeInstances.SingleOrDefaultAsync(
+            instance => instance.Id == scope.RuntimeInstanceId,
+            ct);
+        if (target is null
+            || target.Purpose != RuntimePurpose.AwdpTarget
+            || target.CompetitionId != scope.CompetitionId
+            || target.CompetitionChallengeId != scope.CompetitionChallengeId
+            || target.TeamId != scope.TeamId)
         {
-            var deleted = await db.PatchUploads
-                .Where(upload => upload.Id == previous.Id
-                    && !db.GameplayFacts.Any(fact =>
-                        fact.ReferenceKind == Domain.Gameplay.GameplayFactReferenceKind.PatchUpload
-                        && fact.ReferenceId == upload.Id))
-                .ExecuteDeleteAsync(ct);
-            if (deleted != 1)
-                return false;
+            return new(PatchUploadSaveState.DefenseTargetNotReady);
         }
+        if (target.GameplayFactId is not null
+            || await db.PatchUploads.AnyAsync(
+                upload => upload.RuntimeInstanceId == target.Id,
+                ct))
+        {
+            return new(PatchUploadSaveState.DefenseTargetConsumed);
+        }
+        if (target.State != RuntimeState.Running
+            || target.AwdpFixStage != AwdpFixStage.AwaitingPatch
+            || target.RunnerId is null
+            || target.ExpiresAt is not { } expiresAt
+            || expiresAt <= uploadedAt)
+        {
+            return new(PatchUploadSaveState.DefenseTargetNotReady);
+        }
+
+        var admission = await GameplayFactAdmissionPersistence.LoadAsync(
+            db,
+            scope.CompetitionId,
+            scope.CompetitionChallengeId,
+            scope.UserId,
+            ct);
+        if (admission is null || admission.CompetitionStatus != CompetitionStatus.Running)
+            return new(PatchUploadSaveState.DefenseTargetNotReady);
+        var context = await db.CompetitionChallenges.AsNoTracking()
+            .Where(challenge => challenge.Id == scope.CompetitionChallengeId)
+            .Join(
+                db.Challenges.AsNoTracking(),
+                challenge => challenge.ChallengeId,
+                template => template.Id,
+                (challenge, template) => new { challenge.RulesJson, template.DefinitionJson })
+            .SingleAsync(ct);
+        var configuration = AwdpConfigurationResolver.Resolve(
+            admission.CompetitionConfigurationJson,
+            context.RulesJson,
+            context.DefinitionJson);
+        if (configuration.MaxFixSubmissions > 0
+            && admission.AcceptedFixAttempts >= configuration.MaxFixSubmissions)
+        {
+            return new(PatchUploadSaveState.AttemptsExhausted);
+        }
+        if (configuration.RequireBreakBeforeFix && !admission.HasCorrectBreak)
+            return new(PatchUploadSaveState.DefenseTargetNotReady);
+        if (configuration.Checker is null || configuration.Runtime is null)
+            return new(PatchUploadSaveState.DefenseTargetNotReady);
 
         db.PatchUploads.Add(new PatchUpload
         {
@@ -132,13 +187,69 @@ public sealed class PatchUploadStore(
             CompetitionChallengeId = scope.CompetitionChallengeId,
             TeamId = scope.TeamId,
             UploadedByUserId = scope.UserId,
+            RuntimeInstanceId = target.Id,
             FileId = fileId,
             UploadedAt = uploadedAt
         });
+        var fact = new GameplayFact
+        {
+            Id = gameplayFactId,
+            CompetitionId = scope.CompetitionId,
+            CompetitionChallengeId = scope.CompetitionChallengeId,
+            TeamId = scope.TeamId,
+            ActorUserId = scope.UserId,
+            Kind = GameplayFactKind.FixAttempt,
+            ReferenceKind = GameplayFactReferenceKind.PatchUpload,
+            ReferenceId = patchUploadId,
+            OccurredAt = uploadedAt,
+            State = GameplayFactState.Processing,
+            UpdatedAt = uploadedAt
+        };
+        db.GameplayFacts.Add(fact);
+        target.GameplayFactId = fact.Id;
+        target.AwdpFixStage = AwdpFixStage.PatchApplying;
+        var ttlSeconds = configuration.Runtime.TtlSeconds is > 0
+            ? configuration.Runtime.TtlSeconds.Value
+            : 900;
+        var deadline = uploadedAt.AddSeconds(ttlSeconds);
+        target.ExpiresAt = deadline;
+        await LeaderboardDirty.MarkAsync(db, scope.CompetitionId, ct);
+        await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
+        await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
+            fact.Id,
+            fact.CompetitionChallengeId,
+            patchUploadId,
+            target.Id,
+            target.Generation,
+            target.ProcessingVersion,
+            deadline,
+            target.RunnerPool,
+            target.RunnerId));
+        await outbox.ScheduleAsync(new ExpireAwdpFixVerification(
+            fact.Id,
+            target.Id,
+            target.Generation,
+            target.ProcessingVersion,
+            deadline,
+            target.RunnerPool,
+            target.RunnerId), deadline);
+        await events.RecordAsync(new(
+            fact.CompetitionId,
+            CompetitionEventKind.GameplayFactReceived,
+            CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            fact.OccurredAt,
+            ActorUserId: fact.ActorUserId,
+            TeamId: fact.TeamId,
+            CompetitionChallengeId: fact.CompetitionChallengeId,
+            RuntimeInstanceId: target.Id,
+            GameplayFactId: fact.Id,
+            GameplayFactKind: fact.Kind,
+            GameplayFactState: fact.State,
+            RuntimeState: target.State,
+            RuntimeGeneration: target.Generation), ct);
         try
         {
-            if (previous is not null)
-                await outbox.PublishAsync(new CleanupFile(previous.FileId));
             await db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
             try
@@ -152,11 +263,11 @@ public sealed class PatchUploadStore(
                     "Patch upload {PatchUploadId} committed, but its durable cleanup message was not flushed immediately.",
                     patchUploadId);
             }
-            return true;
+            return new(PatchUploadSaveState.Accepted, fact.Id);
         }
         catch (DbUpdateException)
         {
-            return false;
+            return new(PatchUploadSaveState.ConcurrencyConflict);
         }
     }
 }

@@ -26,15 +26,27 @@ public sealed class EndpointOutcomeOpenApiTests
                     ["429"] = ResponseBodyKind.Empty
                 }),
             new OutcomeContract(
-                $"{ChallengePrefix}/fix-submissions",
+                $"{ChallengePrefix}/awdp-defense-targets",
+                new Dictionary<string, ResponseBodyKind>
+                {
+                    ["202"] = ResponseBodyKind.Json,
+                    ["401"] = ResponseBodyKind.Empty,
+                    ["403"] = ResponseBodyKind.Empty,
+                    ["404"] = ResponseBodyKind.Empty,
+                    ["409"] = ResponseBodyKind.Json
+                }),
+            new OutcomeContract(
+                $"{ChallengePrefix}/awdp-defense-targets/{{runtimeInstanceId}}/fix",
                 new Dictionary<string, ResponseBodyKind>
                 {
                     ["202"] = ResponseBodyKind.Json,
                     ["400"] = ResponseBodyKind.Problem,
                     ["401"] = ResponseBodyKind.Empty,
-                    ["403"] = ResponseBodyKind.Problem,
-                    ["409"] = ResponseBodyKind.Problem,
-                    ["429"] = ResponseBodyKind.Empty
+                    ["403"] = ResponseBodyKind.Empty,
+                    ["404"] = ResponseBodyKind.Empty,
+                    ["409"] = ResponseBodyKind.Json,
+                    ["413"] = ResponseBodyKind.Problem,
+                    ["422"] = ResponseBodyKind.Json
                 }),
             RuntimeContract("start", includesValidationProblem: false),
             RuntimeContract("reset", includesValidationProblem: false),

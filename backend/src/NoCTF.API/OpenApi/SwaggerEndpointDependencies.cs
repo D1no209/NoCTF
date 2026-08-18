@@ -8,6 +8,8 @@ using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.GameplayFacts.PatchUploads;
+using NoCTF.Application.GameplayFacts.Awdp;
+using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Competitions;
 using NoCTF.Application.Storage;
 
@@ -33,10 +35,6 @@ internal sealed class SwaggerGameplayFactStore : IGameplayFactIntakeStore
         Task.FromResult<IReadOnlyList<GameplayFactAcceptanceResult>>(
             received.Select(_ => new GameplayFactAcceptanceResult(
                 GameplayFactAcceptanceState.SnapshotChanged)).ToArray());
-    public Task<GameplayFactAcceptanceResult> TryAcceptFixAsync(
-        FixGameplayFactReceived received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
     public Task<GameplayFactAcceptanceResult> TryAcceptHintUnlockAsync(
         HintUnlockGameplayFactReceived received,
         CancellationToken cancellationToken) =>
@@ -52,16 +50,33 @@ internal sealed class SwaggerPatchUploadStore : IPatchUploadStore
     public Task<PatchUploadScope?> ResolveScopeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
+        Guid runtimeInstanceId,
         Guid userId,
         CancellationToken cancellationToken) =>
         Task.FromResult<PatchUploadScope?>(null);
-    public Task<bool> SaveAsync(
+    public Task<PatchUploadSaveResult> SaveAsync(
         Guid patchUploadId,
+        Guid gameplayFactId,
         PatchUploadScope scope,
         Guid fileId,
         DateTimeOffset uploadedAt,
         CancellationToken cancellationToken) =>
-        Task.FromResult(false);
+        Task.FromResult(new PatchUploadSaveResult(
+            PatchUploadSaveState.ConcurrencyConflict));
+}
+
+internal sealed class SwaggerAwdpDefenseTargetStore : IAwdpDefenseTargetStore
+{
+    public Task<AwdpDefenseTargetRequestResult> TryCreateAsync(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new AwdpDefenseTargetRequestResult(
+            AwdpDefenseTargetRequestState.Created,
+            Guid.Empty,
+            RuntimeState.Queued));
 }
 
 internal sealed class SwaggerFixArchiveReader : IFixArchiveReader

@@ -331,6 +331,110 @@ public sealed class DockerContainerLifecycleTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Reconciler_tracks_and_removes_awdp_verification_resources(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var image = new ContainerBuilder("busybox:1.36.1")
+                .WithCommand("true")
+                .Build();
+            await image.StartAsync(cancellationToken);
+            var runtimeId = Guid.NewGuid();
+            const int generation = 1;
+            var networkName = $"noctf-awdp-reconcile-{runtimeId:N}";
+            var containerName = $"noctf-awdp-reconcile-target-{runtimeId:N}";
+            using var docker = new DockerClientBuilder()
+                .WithEndpoint(new Uri(DockerEndpoint()))
+                .Build();
+            var labels = new Dictionary<string, string>
+            {
+                ["noctf.io/managed"] = "true",
+                ["noctf.io/job-kind"] = "awdp-verification",
+                ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D"),
+                ["noctf.io/generation"] = generation.ToString()
+            };
+            var network = await docker.Networks.CreateNetworkAsync(
+                new NetworksCreateParameters
+                {
+                    Name = networkName,
+                    Labels = labels
+                },
+                cancellationToken);
+            var created = await docker.Containers.CreateContainerAsync(
+                new CreateContainerParameters
+                {
+                    Name = containerName,
+                    Image = "busybox:1.36.1",
+                    Cmd = ["/bin/sh", "-c", "sleep 300"],
+                    Labels = labels,
+                    HostConfig = new HostConfig { NetworkMode = networkName }
+                },
+                cancellationToken);
+            _ = await docker.Containers.StartContainerAsync(
+                created.ID,
+                new ContainerStartParameters(),
+                cancellationToken);
+            var options = new DockerRuntimeOptions(DockerEndpoint());
+            var composeWorkRoot = Path.Combine(
+                Path.GetTempPath(),
+                $"noctf-awdp-compose-reconcile-{runtimeId:N}");
+            using var reconciler = new DockerRuntimeResourceReconciler(
+                options,
+                new DockerComposeRuntime(options, workDirectory: composeWorkRoot));
+            try
+            {
+                var identity = new RuntimeResourceIdentity(runtimeId, generation);
+                await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
+                    .Contains(identity);
+
+                await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+
+                await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
+                    .DoesNotContain(identity);
+                Func<Task> inspectContainer = async () =>
+                    _ = await docker.Containers.InspectContainerAsync(
+                        created.ID,
+                        cancellationToken);
+                Func<Task> inspectNetwork = async () =>
+                    _ = await docker.Networks.InspectNetworkAsync(
+                        network.ID,
+                        cancellationToken);
+                await Assert.That(inspectContainer).ThrowsException();
+                await Assert.That(inspectNetwork).ThrowsException();
+            }
+            finally
+            {
+                try
+                {
+                    await docker.Containers.RemoveContainerAsync(
+                        created.ID,
+                        new ContainerRemoveParameters { Force = true },
+                        CancellationToken.None);
+                }
+                catch (DockerContainerNotFoundException)
+                {
+                    // The reconciler already removed the exact test resource.
+                }
+                try
+                {
+                    await docker.Networks.DeleteNetworkAsync(
+                        network.ID,
+                        CancellationToken.None);
+                }
+                catch (DockerApiException exception) when (
+                    exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // The reconciler already removed the exact test resource.
+                }
+                if (Directory.Exists(composeWorkRoot))
+                    Directory.Delete(composeWorkRoot, recursive: true);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Concurrent_persistent_runtimes_keep_their_allocated_ports(
         CancellationToken cancellationToken)
     {

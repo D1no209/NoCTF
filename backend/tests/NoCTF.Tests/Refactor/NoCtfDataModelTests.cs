@@ -77,7 +77,6 @@ public sealed class NoCtfDataModelTests
             Task.FromResult<GameplayFactAdmissionSnapshot?>(null);
         public Task<GameplayFactAcceptanceResult> TryAcceptFlagAsync(FlagGameplayFactReceived received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<IReadOnlyList<GameplayFactAcceptanceResult>> TryAcceptFlagsAsync(IReadOnlyList<FlagGameplayFactReceived> received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<GameplayFactAcceptanceResult> TryAcceptFixAsync(FixGameplayFactReceived received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<GameplayFactAcceptanceResult> TryAcceptHintUnlockAsync(HintUnlockGameplayFactReceived received, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<GameplayFactAcceptanceResult> TryAcceptManualAdjustmentAsync(ManualAdjustmentGameplayFactReceived received, CancellationToken cancellationToken)
         {

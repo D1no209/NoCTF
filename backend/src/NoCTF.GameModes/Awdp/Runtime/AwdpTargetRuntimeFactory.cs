@@ -6,7 +6,8 @@ namespace NoCTF.GameModes.Awdp.Runtime;
 public static class AwdpTargetRuntimeFactory
 {
     public static RuntimeInstance Create(
-        Guid gameplayFactId,
+        Guid teamId,
+        Guid? gameplayFactId,
         Guid competitionId,
         Guid competitionChallengeId,
         Guid runtimeInstanceId,
@@ -37,7 +38,7 @@ public static class AwdpTargetRuntimeFactory
             Id = runtimeInstanceId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
-            TeamId = null,
+            TeamId = teamId,
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = gameplayFactId,
             AwdpFixStage = AwdpFixStage.TargetProvisioning,

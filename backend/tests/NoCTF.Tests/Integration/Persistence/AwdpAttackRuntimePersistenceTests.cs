@@ -99,6 +99,10 @@ public sealed class AwdpAttackRuntimePersistenceTests
                 cancellationToken);
             await Assert.That(missingFlagRowPlan.State)
                 .IsEqualTo(AwdpAttackProvisioningPlanState.Invalid);
+            await MarkRuntimeFailedAsync(
+                options,
+                missingFlagRow.RuntimeInstanceId,
+                cancellationToken);
 
             var missingInjection = await CreateAttackProvisioningMessageAsync(
                 options,
@@ -113,6 +117,21 @@ public sealed class AwdpAttackRuntimePersistenceTests
             await Assert.That(missingInjectionPlan.State)
                 .IsEqualTo(AwdpAttackProvisioningPlanState.Invalid);
         });
+    }
+
+    private static async Task MarkRuntimeFailedAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Guid runtimeInstanceId,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var runtime = await db.RuntimeInstances.SingleAsync(
+            item => item.Id == runtimeInstanceId,
+            cancellationToken);
+        runtime.State = RuntimeState.Failed;
+        runtime.FailureCode = RuntimeFailureCode.InvalidConfiguration;
+        runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     [Test]
@@ -286,6 +305,11 @@ public sealed class AwdpAttackRuntimePersistenceTests
     {
         await using var db = new NoCtfDbContext(options);
         var runtimeId = Guid.CreateVersion7(fixture.Now.AddSeconds(1));
+        var generation = checked((await db.RuntimeInstances
+            .Where(item => item.CompetitionChallengeId == fixture.CompetitionChallengeId
+                && item.TeamId == fixture.TeamIds[0]
+                && item.Purpose == RuntimePurpose.AwdpAttack)
+            .MaxAsync(item => (int?)item.Generation, cancellationToken) ?? 0) + 1);
         var runtime = new RuntimeInstance
         {
             Id = runtimeId,
@@ -296,7 +320,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
             SourceCompetitionConfigurationRevision = 1,
             SourceCompetitionChallengeRevision = 1,
             SourceChallengeDefinitionRevision = 1,
-            Generation = 1,
+            Generation = generation,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerId = "runner-1",

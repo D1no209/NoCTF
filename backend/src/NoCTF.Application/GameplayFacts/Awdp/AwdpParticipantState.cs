@@ -10,12 +10,18 @@ public sealed record AwdpAchievementActivationView(
     DateTimeOffset EffectiveAt);
 
 public sealed record AwdpDefenseProgressView(
+    Guid? RuntimeInstanceId,
+    RuntimeState? RuntimeState,
+    RuntimeFailureCode? RuntimeFailureCode,
     Guid? GameplayFactId,
     Guid? PatchUploadId,
     NoCTF.Domain.Gameplay.GameplayFactState? State,
     NoCTF.Domain.Gameplay.GameplayFactResult? Result,
     NoCTF.Domain.Gameplay.GameplayFactFailureCode? FailureCode,
     AwdpFixStage? Stage,
+    DateTimeOffset? TargetCreatedAt,
+    DateTimeOffset? TargetExpiresAt,
+    DateTimeOffset? TargetStoppedAt,
     DateTimeOffset? UpdatedAt);
 
 public sealed record AwdpParticipantStateView(

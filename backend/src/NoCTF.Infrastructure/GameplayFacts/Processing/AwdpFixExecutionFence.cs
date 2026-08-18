@@ -148,6 +148,7 @@ public sealed class PostgresAwdpFixExecutionFence(
             runtime.Generation,
             runtime.ProcessingVersion,
             runtime.RuntimeProvider,
+            runtime.ProviderReceiptJson,
             runtime.RunnerPool,
             runtime.RunnerId!);
 }

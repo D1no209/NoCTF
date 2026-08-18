@@ -26,6 +26,7 @@ public sealed record AwdpFixExecutionFenceResult(
     int Generation,
     long RuntimeProcessingVersion,
     RuntimeProvider Provider,
+    string? ProviderReceiptJson,
     string RunnerPool,
     string RunnerId)
 {
@@ -37,6 +38,7 @@ public sealed record AwdpFixExecutionFenceResult(
             request.Generation,
             request.RuntimeProcessingVersion,
             default,
+            null,
             request.RunnerPool,
             request.RunnerId);
 }

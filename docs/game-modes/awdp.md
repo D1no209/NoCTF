@@ -6,7 +6,7 @@ AWDP 由攻击与防御两条独立事实流组成；是否允许未完成 Break
 由当前比赛题目的 `RequireBreakBeforeFix` 决定：
 
 - 攻击轨 `BreakAttempt`：队伍启动自己的长期攻击 Runtime，利用漏洞取得该 Runtime generation 的动态 Flag；每个逻辑轮内首次有效 Correct 参与该轮攻击分结算。
-- 防御轨 `FixAttempt`：队伍上传不可变 `tar.gz` Patch，平台在全新的临时 Fix Target 中应用 Patch，并只运行一次 Checker；每个逻辑轮内首次有效 Correct 参与该轮防御分结算。
+- 防御轨 `FixAttempt`：队伍先申请全新的临时 Fix Target，再向该 Target 唯一上传一次不可变 `tar.gz` Patch；平台应用 Patch 并只运行一次 Checker，每个逻辑轮内首次有效 Correct 参与该轮防御分结算。
 
 AWDP 不是 AWD，不使用 `FlagAttempt`、`AwdRound`、加固期、周期服务上下线检查、批量提交其他队伍轮次 Flag 或 AWD 目标列表。AWDP 的 Checker 只属于一次 Fix 验证，不会周期运行，也不会修改队伍的长期攻击 Runtime。
 
@@ -89,13 +89,16 @@ AWDP Break 不写 `GameplayFactReferenceKind.AwdRound`，也不创建 AWD 服务
 若 `RequireBreakBeforeFix=false`，Fix 可独立提交；开启后，后端必须在创建 FixAttempt
 前确认当前仍存在有效 Correct Break。标准流程是：
 
-1. 上传不可变 `tar.gz` PatchUpload；
-2. 创建独立 `FixAttempt`；
-3. 从题目干净镜像创建 `RuntimePurpose.AwdpTarget` 临时目标，TeamId 为空、无公开入口；
-4. 安全解包并按 argv 形式执行 Patch；
-5. Patch exit 0 后只启动一次 Checker；
-6. Checker 通过认证 callback 返回结论；
-7. 完成后停止 Checker、Target、隔离网络并释放容量。
+1. 队伍申请防御，平台先做 Break 前置条件、次数和配置检查；
+2. 从题目干净镜像创建绑定当前 Team、但没有公开入口的 `RuntimePurpose.AwdpTarget`；
+3. Target Running 后进入 `AwaitingPatch`，只允许绑定一次 PatchUpload 和一次 FixAttempt；
+4. 选手上传不可变 `tar.gz`，后端在同一 PostgreSQL 临界区原子锁定 Target、PatchUpload 与 FixAttempt；
+5. 安全解包并按 argv 形式执行 Patch；
+6. Patch exit 0 后只启动一次 Checker；
+7. Checker 通过认证 callback 返回结论；
+8. 成功、业务失败、平台失败或超时后都停止 Checker、Target、隔离网络并释放容量。
+
+同一个 Target 的并发上传只能有一个成功。归档格式或大小在建立业务绑定前被拒绝时，Target 仍可接受修正后的单次上传；一旦 PatchUpload/FixAttempt 已绑定便永久锁定，不允许替换、再次上传或再次运行 Checker。若需再次尝试，必须重新申请另一个干净 Target。
 
 Patch 默认入口为 `fix.sh`；不剥离顶层目录，入口必须在 archive 根下精确存在。`{entrypoint}` 只在独立 argv 中替换为 `/noctf/fix/<path>`，不得拼成 shell 文本。
 
@@ -114,15 +117,15 @@ outcome: ExploitSucceeded | DefenseSucceeded | ServiceAbnormal
 
 Checker 应先把 EXP 作为子进程执行并捕获失败/崩溃，再执行正常服务交互；服务异常优先级高于 EXP 结果。Checker exit 0 只表示进程正常结束；没有成功 callback 时绝不能推导为 DefenseSucceeded。Runner 级整体验证超时会判为 `ServiceAbnormal`；Checker 主进程异常退出且没有可信业务结果、Runner、Provider 或存储故障为 `PlatformFailed`/稳定平台失败，不得记为 Correct。管理员显式 Rejudge 才会重新创建一次干净验证环境。
 
-## Fix 重放与 revision fence
+## Fix 重投与 revision fence
 
 Provider Running 后，Runner 在执行 Patch 前用 PostgreSQL 事务把 disposable target 推进到 execution fence。结果不确定的 Wolverine 重投不得在同一 Target 上再次执行非幂等 Patch：
 
 1. 先推进 recovery fence，使旧 callback、超时和迟到结果失效；
 2. 按 RuntimeInstanceId+Generation 精确清理 Target、Checker、网络和工作目录；
 3. 确认 Provider 不存在该 identity，并完成 owner-checked capacity release；
-4. 旧 Runtime 标为 Stopped，创建新 RuntimeInstanceId/更高 Generation；
-5. 从原 GameplayFact 引用的同一不可变 PatchUpload 重放。
+4. 旧 Runtime 标为 Stopped；仍未得到可信结论的 FixAttempt 收敛为稳定平台失败；
+5. 不创建替代 Target、不自动重放 Patch，也不再次运行 Checker。队伍需要再次显式申请防御。
 
 创建 Target 时固化 Competition configuration revision、CompetitionChallenge revision 和 Challenge definition revision。结果落库前任一 revision 变化都使该次验证 PlatformFailed；不得隐式拿新定义解释旧请求。
 
@@ -147,9 +150,9 @@ round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 
 ## 玩家状态接口
 
-题目页面通过单一强类型状态接口恢复：当前逻辑轮、攻击 Runtime、最近 Break、Break 激活轮次、最近 Fix 的 Patch/GameplayFact、TargetProvisioning/PatchApplying/CheckerRunning/Completed 阶段，以及 Fix 激活轮次。响应应用现有玩家结果脱敏，不返回动态 Flag。
+题目页面通过单一强类型状态接口恢复：当前逻辑轮、攻击 Runtime、最近 Break、Break 激活轮次、最近一次性防御 Target、Patch/GameplayFact、TargetProvisioning/AwaitingPatch/PatchApplying/CheckerRunning/Completed 阶段，以及 Fix 激活轮次。响应应用现有玩家结果脱敏，不返回动态 Flag。
 
-前端固定展示“攻击”和“防御”两栏：攻击区管理 Runtime 并提交一个 Flag；防御区上传 Patch 和触发一次 Checker。页面不得展示 AWD 对手目标列表、批量 Flag、加固期或周期 Checker 文案。
+前端固定展示“攻击”和“防御”两栏：攻击区管理长期攻击靶机并提交一个 Flag；防御区先申请一次性干净 Target，等待就绪后唯一上传本次 Patch，随后展示验证中、结果与环境已回收状态。页面不得把 Target 描述为长期题目环境，也不得展示 AWD 对手目标列表、批量 Flag、加固期或周期 Checker 文案。
 
 ## 排名
 

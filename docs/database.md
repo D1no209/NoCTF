@@ -74,7 +74,7 @@ Flag 原文/Hash、Challenge 或 CompetitionChallenge 作用域、Specification�
 
 ### `patch_uploads`
 
-保留业务范围、上传者和 `file_id`。是否消费由 `gameplay_facts` 中 PatchUpload Reference 推导，不保存 ConsumedAt 或 GameplayFactId。
+保留业务范围、上传者、`file_id` 和唯一的一次性 `runtime_instance_id`。是否消费由 `gameplay_facts` 中 PatchUpload Reference 与 AwdpTarget.GameplayFactId 共同推导，不保存 ConsumedAt 或独立 GameplayFactId 列。
 
 ### `account_tokens`
 

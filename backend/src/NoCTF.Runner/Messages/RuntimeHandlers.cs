@@ -705,67 +705,9 @@ public static class RuntimeWriteBackHandler
         if (message.AwdCheckerTargetHost is not null)
             instance.NextCheckerDueAt = instance.RunningAt;
         if (instance.Purpose == RuntimePurpose.AwdpTarget
-            && instance.GameplayFactId is Guid gameplayFactId)
+            && instance.GameplayFactId is null)
         {
-            instance.AwdpFixStage = AwdpFixStage.PatchApplying;
-            var submission = await db.GameplayFacts
-                .SingleOrDefaultAsync(item => item.Id == gameplayFactId, cancellationToken);
-            if (submission is null
-                || submission.State != NoCTF.Domain.Gameplay.GameplayFactState.Processing)
-            {
-                if (submission is not null
-                    && submission.State == NoCTF.Domain.Gameplay.GameplayFactState.Processing)
-                {
-                    submission.State = NoCTF.Domain.Gameplay.GameplayFactState.PlatformFailed;
-                    submission.FailureCode = NoCTF.Domain.Gameplay.GameplayFactFailureCode.CheckerPlatformError;
-                    submission.UpdatedAt = DateTimeOffset.UtcNow;
-                }
-                instance.State = RuntimeState.Stopping;
-                instance.RunnerAssignmentReleaseToken = null;
-                instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
-                await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
-                    instance.Id,
-                    instance.ProcessingVersion,
-                    instance.Generation,
-                    instance.RunnerPool,
-                    message.RunnerId));
-                await RecordRuntimeStateAsync(
-                    events,
-                    instance,
-                    CompetitionEventLevel.Warning,
-                    DateTimeOffset.UtcNow,
-                    cancellationToken);
-                await db.SaveChangesAsync(cancellationToken);
-                await outbox.FlushOutgoingMessagesAsync();
-                return;
-            }
-            if (submission is
-                {
-                    ReferenceKind: NoCTF.Domain.Gameplay.GameplayFactReferenceKind.PatchUpload,
-                    ReferenceId: Guid patchUploadId
-                })
-            {
-                var deadline = instance.ExpiresAt
-                    ?? DateTimeOffset.UtcNow.AddMinutes(15);
-                await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
-                    submission.Id,
-                    submission.CompetitionChallengeId,
-                    patchUploadId,
-                    instance.Id,
-                    instance.Generation,
-                    instance.ProcessingVersion,
-                    deadline,
-                    instance.RunnerPool,
-                    message.RunnerId));
-                await outbox.ScheduleAsync(new ExpireAwdpFixVerification(
-                    submission.Id,
-                    instance.Id,
-                    instance.Generation,
-                    instance.ProcessingVersion,
-                    deadline,
-                    instance.RunnerPool,
-                    message.RunnerId), deadline);
-            }
+            instance.AwdpFixStage = AwdpFixStage.AwaitingPatch;
         }
         var now = DateTimeOffset.UtcNow;
         var currentAwdFlag = instance.TeamId is null

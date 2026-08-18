@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Application.Storage;
+using NoCTF.API.Serialization;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
 
@@ -12,62 +14,119 @@ public sealed class UploadPatchRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
+    public Guid RuntimeInstanceId { get; set; }
     public IFormFile File { get; set; } = null!;
 }
 
-public sealed record UploadPatchResponse(Guid PatchUploadId);
+public sealed record UploadPatchResponse(
+    Guid PatchUploadId,
+    Guid GameplayFactId,
+    GameplayFactStateProtocol State,
+    string StatusUrl);
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<UploadPatchFailureCodeProtocol>))]
+public enum UploadPatchFailureCodeProtocol
+{
+    ArchiveStreamNotSeekable,
+    ArchiveInvalid,
+    DefenseTargetNotReady,
+    FixAttemptsExhausted,
+    DefenseTargetConsumed
+}
+
+public sealed record UploadPatchFailureResponse(UploadPatchFailureCodeProtocol Code);
 
 public sealed class UploadPatchValidator : Validator<UploadPatchRequest>
 {
-    public UploadPatchValidator() =>
+    public UploadPatchValidator()
+    {
+        RuleFor(request => request.RuntimeInstanceId).NotEmpty();
         RuleFor(request => request.File).NotNull();
+    }
 }
 
 public sealed class UploadPatchEndpoint(
     CreatePatchUpload upload,
-    IUserContext user)
+    IUserContext user,
+    TimeProvider timeProvider)
     : Endpoint<UploadPatchRequest,
-        Results<Created<UploadPatchResponse>, NotFound, ProblemHttpResult>>
+        Results<Accepted<UploadPatchResponse>, NotFound,
+            Conflict<UploadPatchFailureResponse>,
+            UnprocessableEntity<UploadPatchFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
-        Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload");
+        Post("/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix");
         AuthSchemes("Bearer");
         AllowFileUploads();
         MaxRequestBodySize(FileUploadLimits.MaximumRequestBytes(
             PatchUploadRules.HardMaximumArchiveBytes));
         Description(builder => builder
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
-                StatusCodes.Status413PayloadTooLarge)
-            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
-                StatusCodes.Status422UnprocessableEntity));
+                StatusCodes.Status413PayloadTooLarge));
         Summary(summary =>
         {
-            summary.Summary = "Upload an AWDP patch archive";
-            summary.Description = "Validates and stores one gzip-compressed tar archive without creating a gameplay fact.";
+            summary.Summary = "Upload the only Fix archive accepted by an AWDP defense target.";
+            summary.Description =
+                "Atomically binds one archive and one Fix attempt to the clean disposable target, then starts one Checker verification.";
         });
     }
 
     public override async Task<
-        Results<Created<UploadPatchResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+        Results<Accepted<UploadPatchResponse>, NotFound,
+            Conflict<UploadPatchFailureResponse>,
+            UnprocessableEntity<UploadPatchFailureResponse>, ProblemHttpResult>> ExecuteAsync(
         UploadPatchRequest request,
         CancellationToken ct)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         request.CompetitionChallengeId = Route<Guid>("competitionChallengeId");
+        request.RuntimeInstanceId = Route<Guid>("runtimeInstanceId");
         await using var stream = request.File.OpenReadStream();
         var result = await upload.ExecuteAsync(
             request.CompetitionId,
             request.CompetitionChallengeId,
+            request.RuntimeInstanceId,
             user.UserId,
             request.File.FileName,
             request.File.ContentType,
             stream,
-            DateTimeOffset.UtcNow,
+            timeProvider.GetUtcNow(),
             ct);
         if (result.FailureCode == PatchUploadFailureCode.PatchUploadNotAvailable)
             return TypedResults.NotFound();
         if (!result.Succeeded)
+        {
+            if (result.FailureCode is PatchUploadFailureCode.DefenseTargetNotReady)
+            {
+                return TypedResults.Conflict(new UploadPatchFailureResponse(
+                    UploadPatchFailureCodeProtocol.DefenseTargetNotReady));
+            }
+            if (result.FailureCode is PatchUploadFailureCode.AttemptsExhausted)
+            {
+                return TypedResults.Conflict(new UploadPatchFailureResponse(
+                    UploadPatchFailureCodeProtocol.FixAttemptsExhausted));
+            }
+            if (result.FailureCode is PatchUploadFailureCode.PatchUploadConflict)
+            {
+                return TypedResults.Conflict(new UploadPatchFailureResponse(
+                    UploadPatchFailureCodeProtocol.DefenseTargetConsumed));
+            }
+            if (result.FailureCode is PatchUploadFailureCode.DefenseTargetConsumed)
+            {
+                return TypedResults.Conflict(new UploadPatchFailureResponse(
+                    UploadPatchFailureCodeProtocol.DefenseTargetConsumed));
+            }
+            if (result.FailureCode is PatchUploadFailureCode.ArchiveStreamNotSeekable)
+            {
+                return TypedResults.UnprocessableEntity(new UploadPatchFailureResponse(
+                    UploadPatchFailureCodeProtocol.ArchiveStreamNotSeekable));
+            }
+            if (result.FailureCode is PatchUploadFailureCode.ArchiveInvalid)
+            {
+                return TypedResults.UnprocessableEntity(new UploadPatchFailureResponse(
+                    UploadPatchFailureCodeProtocol.ArchiveInvalid));
+            }
             return TypedResults.Problem(
                 statusCode: result.FailureCode == PatchUploadFailureCode.ArchiveTooLarge
                     ? StatusCodes.Status413PayloadTooLarge
@@ -80,8 +139,15 @@ public sealed class UploadPatchEndpoint(
                 {
                     ["code"] = result.FailureCode?.ToString()
                 });
-        return TypedResults.Created(
-            $"/api/v1/competitions/{request.CompetitionId}/challenges/{request.CompetitionChallengeId}/patch-upload",
-            new UploadPatchResponse(result.Value!.PatchUploadId));
+        }
+        var statusUrl =
+            $"/api/v1/competitions/{request.CompetitionId}/gameplay-facts/{result.Value!.GameplayFactId}";
+        return TypedResults.Accepted(
+            statusUrl,
+            new UploadPatchResponse(
+                result.Value.PatchUploadId,
+                result.Value.GameplayFactId,
+                GameplayFactStateProtocol.Processing,
+                statusUrl));
     }
 }

@@ -27,7 +27,7 @@ public sealed class DockerRuntimeResourceReconciler(
         CancellationToken cancellationToken)
     {
         var identities = new HashSet<RuntimeResourceIdentity>();
-        var filters = PersistentRuntimeFilters();
+        var filters = ManagedRuntimeFilters();
         var containers = await client.Containers.ListContainersAsync(
             new ContainersListParameters { All = true, Filters = filters },
             cancellationToken);
@@ -131,13 +131,12 @@ public sealed class DockerRuntimeResourceReconciler(
 
     public void Dispose() => client.Dispose();
 
-    private static Dictionary<string, IDictionary<string, bool>> PersistentRuntimeFilters() =>
+    private static Dictionary<string, IDictionary<string, bool>> ManagedRuntimeFilters() =>
         new()
         {
             ["label"] = new Dictionary<string, bool>
             {
-                ["noctf.io/managed=true"] = true,
-                ["noctf.io/job-kind=persistent-runtime"] = true
+                ["noctf.io/managed=true"] = true
             }
         };
 
@@ -148,7 +147,6 @@ public sealed class DockerRuntimeResourceReconciler(
             ["label"] = new Dictionary<string, bool>
             {
                 ["noctf.io/managed=true"] = true,
-                ["noctf.io/job-kind=persistent-runtime"] = true,
                 [$"noctf.io/runtime-instance-id={identity.RuntimeInstanceId:D}"] = true,
                 [$"noctf.io/generation={identity.Generation.ToString(CultureInfo.InvariantCulture)}"] =
                     true
@@ -163,8 +161,6 @@ public sealed class DockerRuntimeResourceReconciler(
         if (labels is null
             || !labels.TryGetValue("noctf.io/managed", out var managed)
             || !string.Equals(managed, "true", StringComparison.Ordinal)
-            || !labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-            || !string.Equals(jobKind, "persistent-runtime", StringComparison.Ordinal)
             || !labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
             || !Guid.TryParse(runtimeText, out var runtimeId)
             || runtimeId == Guid.Empty

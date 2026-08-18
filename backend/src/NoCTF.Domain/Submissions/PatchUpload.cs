@@ -10,6 +10,7 @@ public sealed class PatchUpload
     public Guid CompetitionChallengeId { get; set; }
     public Guid TeamId { get; set; }
     public Guid UploadedByUserId { get; set; }
+    public Guid? RuntimeInstanceId { get; set; }
     public Guid FileId { get; set; }
     public NoCTF.Domain.Storage.StoredFile File { get; set; } = null!;
     [NotMapped] public string ObjectKey => File.ObjectKey;

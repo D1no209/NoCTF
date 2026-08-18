@@ -14,6 +14,7 @@ namespace NoCTF.API.Endpoints.GameplayFacts;
 public enum AwdpFixStageProtocol
 {
     TargetProvisioning,
+    AwaitingPatch,
     PatchApplying,
     CheckerRunning,
     Completed
@@ -25,12 +26,18 @@ public sealed record AwdpAchievementActivationResponse(
     DateTimeOffset EffectiveAt);
 
 public sealed record AwdpDefenseProgressResponse(
+    Guid? RuntimeInstanceId,
+    RuntimeStateProtocol? RuntimeState,
+    RuntimeFailureCodeProtocol? RuntimeFailureCode,
     Guid? GameplayFactId,
     Guid? PatchUploadId,
     GameplayFactStateProtocol? State,
     GameplayFactResultProtocol? Result,
     GameplayFactFailureCodeProtocol? FailureCode,
     AwdpFixStageProtocol? Stage,
+    DateTimeOffset? TargetCreatedAt,
+    DateTimeOffset? TargetExpiresAt,
+    DateTimeOffset? TargetStoppedAt,
     DateTimeOffset? UpdatedAt);
 
 public sealed record AwdpParticipantStateResponse(
@@ -56,6 +63,13 @@ internal static partial class AwdpParticipantStateMapping
                 : GameplayFactMapper.ToStatusResponse(view.LatestBreakAttempt),
             Activation(view.BreakActivation),
             new(
+                view.Defense.RuntimeInstanceId,
+                view.Defense.RuntimeState is null
+                    ? null
+                    : RuntimeProtocolMapper.ToProtocol(view.Defense.RuntimeState.Value),
+                view.Defense.RuntimeFailureCode is null
+                    ? null
+                    : RuntimeProtocolMapper.ToProtocol(view.Defense.RuntimeFailureCode.Value),
                 view.Defense.GameplayFactId,
                 view.Defense.PatchUploadId,
                 view.Defense.State is null
@@ -68,6 +82,9 @@ internal static partial class AwdpParticipantStateMapping
                     ? null
                     : GameplayFactMapper.ToProtocol(view.Defense.FailureCode.Value),
                 view.Defense.Stage is null ? null : ToProtocol(view.Defense.Stage.Value),
+                view.Defense.TargetCreatedAt,
+                view.Defense.TargetExpiresAt,
+                view.Defense.TargetStoppedAt,
                 view.Defense.UpdatedAt),
             Activation(view.FixActivation));
 

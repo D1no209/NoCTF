@@ -12,9 +12,16 @@ public sealed record AwdpFixArchive(
     long ByteLength,
     byte[] Sha256);
 
+public enum AwdpFixArchiveDownloadOutcome
+{
+    Downloaded,
+    Unavailable,
+    IntegrityMismatch
+}
+
 public sealed class AwdpFixArchiveDownloader(IHttpClientFactory httpClients)
 {
-    public async Task<bool> DownloadAsync(
+    public async Task<AwdpFixArchiveDownloadOutcome> DownloadAsync(
         AwdpFixArchive archive,
         string destinationPath,
         CancellationToken cancellationToken)
@@ -23,14 +30,57 @@ public sealed class AwdpFixArchiveDownloader(IHttpClientFactory httpClients)
         request.Headers.Authorization = new AuthenticationHeaderValue(
             "Bearer",
             archive.DownloadToken);
-        using var response = await httpClients.CreateClient().SendAsync(
-            request,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return false;
-        response.EnsureSuccessStatusCode();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClients.CreateClient().SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                timeout.Token);
+        }
+        catch (HttpRequestException)
+        {
+            return AwdpFixArchiveDownloadOutcome.Unavailable;
+        }
+        catch (OperationCanceledException) when (
+            !cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+        {
+            return AwdpFixArchiveDownloadOutcome.Unavailable;
+        }
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+                return AwdpFixArchiveDownloadOutcome.Unavailable;
+            try
+            {
+                return await CopyAndVerifyAsync(
+                    response,
+                    archive,
+                    destinationPath,
+                    timeout.Token);
+            }
+            catch (HttpRequestException)
+            {
+                DeletePartialFile(destinationPath);
+                return AwdpFixArchiveDownloadOutcome.Unavailable;
+            }
+            catch (OperationCanceledException) when (
+                !cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
+            {
+                DeletePartialFile(destinationPath);
+                return AwdpFixArchiveDownloadOutcome.Unavailable;
+            }
+        }
+    }
 
+    private static async Task<AwdpFixArchiveDownloadOutcome> CopyAndVerifyAsync(
+        HttpResponseMessage response,
+        AwdpFixArchive archive,
+        string destinationPath,
+        CancellationToken cancellationToken)
+    {
         var directory = Path.GetDirectoryName(destinationPath);
         if (!string.IsNullOrWhiteSpace(directory))
             Directory.CreateDirectory(directory);
@@ -74,8 +124,16 @@ public sealed class AwdpFixArchiveDownloader(IHttpClientFactory httpClients)
         {
             ArrayPool<byte>.Shared.Return(buffer);
         }
-        if (!accepted && File.Exists(destinationPath))
+        if (!accepted)
+            DeletePartialFile(destinationPath);
+        return accepted
+            ? AwdpFixArchiveDownloadOutcome.Downloaded
+            : AwdpFixArchiveDownloadOutcome.IntegrityMismatch;
+    }
+
+    private static void DeletePartialFile(string destinationPath)
+    {
+        if (File.Exists(destinationPath))
             File.Delete(destinationPath);
-        return accepted;
     }
 }

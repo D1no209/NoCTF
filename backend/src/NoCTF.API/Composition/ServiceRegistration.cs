@@ -13,6 +13,7 @@ using NoCTF.API.OpenApi;
 using NoCTF.Application.Authentication.RefreshSession;
 using NoCTF.Application.Authentication.PasswordReset;
 using NoCTF.Application.GameplayFacts.Status;
+using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Application.Storage;
 using NoCTF.Application.Notifications;
@@ -87,7 +88,6 @@ public static class ServiceRegistration
         {
             services.AddNoCtfInfrastructure(configuration, development);
             services.AddScoped<SubmitFlag>();
-            services.AddScoped<SubmitFix>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
             services.AddScoped<RegisterUser>();
@@ -106,13 +106,14 @@ public static class ServiceRegistration
             services.AddScoped<IGameplayFactIntakeStore, SwaggerGameplayFactStore>();
             services.AddScoped<IPatchUploadStore, SwaggerPatchUploadStore>();
             services.AddScoped<CreatePatchUpload>();
+            services.AddScoped<IAwdpDefenseTargetStore, SwaggerAwdpDefenseTargetStore>();
+            services.AddScoped<RequestAwdpDefenseTarget>();
             services.AddScoped<IFixArchiveReader, SwaggerFixArchiveReader>();
             services.AddScoped<IGameplayFactStatusReader, SwaggerStatusReader>();
             services.AddScoped<IUserAuthenticationStore, SwaggerAuthenticationStore>();
             services.AddScoped<IAccessTokenVersionReader, SwaggerAccessTokenVersionReader>();
             services.AddSingleton<IAccessTokenIssuer, SwaggerTokenIssuer>();
             services.AddScoped<SubmitFlag>();
-            services.AddScoped<SubmitFix>();
             services.AddSingleton<IGameplayFactAdmissionModePolicy, SwaggerGameplayFactAdmissionModePolicy>();
             services.AddScoped<LoginUser>();
             services.AddScoped<RefreshAccessToken>();
