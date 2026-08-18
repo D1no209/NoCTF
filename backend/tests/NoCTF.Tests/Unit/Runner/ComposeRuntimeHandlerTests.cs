@@ -230,7 +230,11 @@ public sealed class ComposeRuntimeHandlerTests
             capacity,
             new FixedWorkReader(
                 RuntimeProvisionWorkStatus.Current,
-                new(RuntimeProvider.Docker, System.Text.Json.JsonSerializer.Serialize(receipt))));
+                new(
+                    RuntimeProvider.Docker,
+                    System.Text.Json.JsonSerializer.Serialize(receipt),
+                    receipt.Generation,
+                    RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
             8,
@@ -258,7 +262,11 @@ public sealed class ComposeRuntimeHandlerTests
             capacity,
             new FixedWorkReader(
                 RuntimeProvisionWorkStatus.Current,
-                new(RuntimeProvider.Docker, System.Text.Json.JsonSerializer.Serialize(receipt))));
+                new(
+                    RuntimeProvider.Docker,
+                    System.Text.Json.JsonSerializer.Serialize(receipt),
+                    receipt.Generation,
+                    RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
             8,
@@ -352,18 +360,22 @@ public sealed class ComposeRuntimeHandlerTests
 
         public Task<ComposeStatus?> GetStatusAsync(
             ComposeReceipt receipt,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<ComposeStatus?>(new(
-                receipt.ProjectName,
-                RuntimeStatus.Running,
-                [
-                    new(
-                        "web",
-                        "container-web",
-                        RuntimeStatus.Running,
-                        new Dictionary<int, int> { [8080] = 32000 },
-                        "web")
-                ]));
+            CancellationToken cancellationToken) => DownCount > 0
+                ? Task.FromResult<ComposeStatus?>(new(
+                    receipt.ProjectName,
+                    RuntimeStatus.Stopped,
+                    []))
+                : Task.FromResult<ComposeStatus?>(new(
+                    receipt.ProjectName,
+                    RuntimeStatus.Running,
+                    [
+                        new(
+                            "web",
+                            "container-web",
+                            RuntimeStatus.Running,
+                            new Dictionary<int, int> { [8080] = 32000 },
+                            "web")
+                    ]));
 
         public Task<ContainerExecResult> ExecAsync(
             ComposeReceipt receipt,

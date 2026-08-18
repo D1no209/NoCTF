@@ -62,6 +62,7 @@ public sealed class ContainerRuntimeHandlerTests
         var sandbox = new RecordingSandboxLifecycle();
         var capacity = new RecordingCapacity(
             RunnerCapacityReleaseOutcome.OwnerMismatch);
+        var reconciler = new RecordingResourceReconciler();
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var receipt = new ContainerReceipt(
             runtimeInstanceId,
@@ -80,7 +81,9 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                System.Text.Json.JsonSerializer.Serialize(receipt))));
+                System.Text.Json.JsonSerializer.Serialize(receipt),
+                Generation: 3)),
+            reconciler);
         var message = new StopContainerRuntime(
             runtimeInstanceId,
             8,
@@ -98,8 +101,48 @@ public sealed class ContainerRuntimeHandlerTests
         await Assert.That(failure.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(lifecycle.Destroyed).IsEquivalentTo([receipt]);
         await Assert.That(sandbox.DeletedNetworks).IsEquivalentTo(["network-1"]);
+        await Assert.That(lifecycle.ReadResourceIds).IsEquivalentTo(["container-1"]);
+        await Assert.That(sandbox.CheckedNetworks).IsEquivalentTo(["network-1"]);
+        await Assert.That(reconciler.Destroyed).IsEmpty();
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
+    }
+
+    [Test]
+    public async Task Stop_rejects_a_receipt_for_another_generation_without_deleting_resources()
+    {
+        var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var receipt = new ContainerReceipt(
+            runtimeInstanceId,
+            RuntimeProvider.Docker,
+            "container-1",
+            RuntimeStatus.Running,
+            new Dictionary<int, int>(),
+            null,
+            "container-1",
+            "network-1",
+            runtimeInstanceId,
+            Generation: 2);
+        var lifecycle = new RecordingContainerLifecycle();
+        var sandbox = new RecordingSandboxLifecycle();
+        var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var handler = CreateHandler(
+            lifecycle,
+            sandbox,
+            capacity,
+            new FixedWorkReader(new(
+                RuntimeProvider.Docker,
+                System.Text.Json.JsonSerializer.Serialize(receipt),
+                Generation: 3)));
+
+        var result = await handler.Handle(
+            new StopContainerRuntime(runtimeInstanceId, 8, 3, "default", "runner-a"),
+            CancellationToken.None);
+
+        await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
+        await Assert.That(lifecycle.Destroyed).IsEmpty();
+        await Assert.That(sandbox.DeletedNetworks).IsEmpty();
+        await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
     }
 
     [Test]
@@ -142,14 +185,26 @@ public sealed class ContainerRuntimeHandlerTests
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var reconciler = new RecordingResourceReconciler();
         var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
+        var receipt = new ContainerReceipt(
+            runtimeInstanceId,
+            RuntimeProvider.Docker,
+            "container-1",
+            RuntimeStatus.Running,
+            new Dictionary<int, int>(),
+            null,
+            "container-1",
+            "network-1",
+            runtimeInstanceId,
+            Generation: 3);
         var handler = CreateHandler(
             new RecordingContainerLifecycle(),
             new RecordingSandboxLifecycle(),
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                ProviderReceiptJson: "{\"stale\":true}",
-                Generation: 3)),
+                System.Text.Json.JsonSerializer.Serialize(receipt),
+                Generation: 3,
+                RuntimeKind.Container)),
             reconciler);
         var message = new ForceTerminateRuntime(
             runtimeInstanceId,
@@ -167,8 +222,7 @@ public sealed class ContainerRuntimeHandlerTests
         await Assert.That(result).IsTypeOf<RuntimeForceTerminated>();
         await Assert.That(((RuntimeForceTerminated)result).CleanupResult)
             .IsEqualTo(RuntimeCleanupResult.ResourcesAbsent);
-        await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+        await Assert.That(reconciler.Destroyed).IsEmpty();
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
     }
 
@@ -228,6 +282,7 @@ public sealed class ContainerRuntimeHandlerTests
     private sealed class RecordingContainerLifecycle : IContainerLifecycle
     {
         public List<ContainerReceipt> Destroyed { get; } = [];
+        public List<string> ReadResourceIds { get; } = [];
         public Exception? ProvisionFailure { get; init; }
         public int EnsureRunningCalls { get; private set; }
 
@@ -257,13 +312,17 @@ public sealed class ContainerRuntimeHandlerTests
         public Task<ContainerReceipt?> GetAsync(
             RuntimeProvider provider,
             string resourceId,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            CancellationToken cancellationToken)
+        {
+            ReadResourceIds.Add(resourceId);
+            return Task.FromResult<ContainerReceipt?>(null);
+        }
     }
 
     private sealed class RecordingSandboxLifecycle : IContainerSandboxLifecycle
     {
         public List<string> DeletedNetworks { get; } = [];
+        public List<string> CheckedNetworks { get; } = [];
 
         public Task<string> CreateIsolatedNetworkAsync(
             ContainerNetworkPolicyRequest request,
@@ -276,6 +335,14 @@ public sealed class ContainerRuntimeHandlerTests
         {
             DeletedNetworks.Add(networkId);
             return Task.CompletedTask;
+        }
+
+        public Task<bool> IsolatedNetworkExistsAsync(
+            string networkId,
+            CancellationToken cancellationToken)
+        {
+            CheckedNetworks.Add(networkId);
+            return Task.FromResult(false);
         }
 
         public Task CopyArchiveAsync(

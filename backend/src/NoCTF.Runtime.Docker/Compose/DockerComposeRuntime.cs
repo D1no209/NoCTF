@@ -94,6 +94,8 @@ public sealed class DockerComposeRuntime(
     public async Task<ComposeStatus?> GetStatusAsync(ComposeReceipt receipt, CancellationToken cancellationToken)
     {
         var directory = ResolveOwnedDirectory(receipt.Namespace);
+        if (!Directory.Exists(directory))
+            return new(receipt.ProjectName, RuntimeStatus.Stopped, []);
         var result = await RunDockerAsync(
             directory,
             receipt.ProjectName,

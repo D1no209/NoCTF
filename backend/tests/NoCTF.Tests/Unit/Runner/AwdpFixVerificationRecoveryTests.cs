@@ -201,7 +201,7 @@ public sealed class AwdpFixVerificationRecoveryTests
     }
 
     [Test]
-    public async Task Recovery_destroys_the_receipted_target_before_identity_cleanup()
+    public async Task Recovery_uses_the_receipt_without_identity_discovery()
     {
         var context = CreateContext(resourcesRemain: false, withReceipt: true);
 
@@ -216,11 +216,9 @@ public sealed class AwdpFixVerificationRecoveryTests
         await context.Sandbox.Received(1).DeleteIsolatedNetworkAsync(
             "target-network",
             Arg.Any<CancellationToken>());
-        await context.Reconciler.Received(1).DestroyByIdentityAsync(
-            new RuntimeResourceIdentity(
-                context.Message.RuntimeInstanceId,
-                context.Message.Generation),
-            Arg.Any<CancellationToken>());
+        await context.Reconciler.DidNotReceiveWithAnyArgs().DestroyByIdentityAsync(
+            default,
+            default);
     }
 
     [Test]

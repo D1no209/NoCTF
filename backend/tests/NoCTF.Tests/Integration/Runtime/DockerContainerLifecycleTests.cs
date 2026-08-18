@@ -1,10 +1,12 @@
 using System.Text;
+using System.Text.Json;
 using System.Security.Cryptography;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using DotNet.Testcontainers.Builders;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
+using NoCTF.Runner.Composition;
 using NoCTF.Runner.Messages;
 using NoCTF.Runtime.Docker;
 using NoCTF.Runtime.Docker.Compose;
@@ -325,6 +327,81 @@ public sealed class DockerContainerLifecycleTests
                     CancellationToken.None);
                 if (Directory.Exists(composeWorkRoot))
                     Directory.Delete(composeWorkRoot, recursive: true);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Receipt_cleanup_removes_the_exact_container_and_network(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var dockerProbe = new ContainerBuilder("alpine:3.20")
+                .WithCommand("true")
+                .Build();
+            await dockerProbe.StartAsync(cancellationToken);
+            using var lifecycle = CreateLifecycle();
+            var runtimeId = Guid.NewGuid();
+            var identity = new RuntimeResourceIdentity(runtimeId, 1);
+            ContainerReceipt? receipt = null;
+
+            try
+            {
+                receipt = await IsolatedContainerProvisioner.ProvisionAsync(
+                    lifecycle,
+                    lifecycle,
+                    CheckerRequest(runtimeId, null) with
+                    {
+                        AllowInternalCallback = false,
+                        RuntimeInstanceId = runtimeId,
+                        NetworkIsolation = ContainerNetworkIsolation.Isolated,
+                        InternalPorts = [8080]
+                    },
+                    DateTimeOffset.UtcNow,
+                    cancellationToken);
+                await Assert.That(receipt.RuntimeInstanceId).IsEqualTo(runtimeId);
+                await Assert.That(receipt.Generation).IsEqualTo(1);
+                await Assert.That(receipt.NetworkId).IsNotNull();
+
+                await RuntimeReceiptCleanup.CleanupContainerAsync(
+                    new DockerOnlyProviderCatalog(lifecycle),
+                    identity,
+                    RuntimeProvider.Docker,
+                    JsonSerializer.Serialize(receipt),
+                    cancellationToken);
+
+                var remaining = await lifecycle.GetAsync(
+                    RuntimeProvider.Docker,
+                    receipt.ResourceId,
+                    cancellationToken);
+                await Assert.That(remaining).IsNull();
+                await Assert.That(await lifecycle.IsolatedNetworkExistsAsync(
+                    receipt.NetworkId!,
+                    cancellationToken)).IsFalse();
+            }
+            finally
+            {
+                if (receipt is not null)
+                {
+                    if (await lifecycle.GetAsync(
+                            RuntimeProvider.Docker,
+                            receipt.ResourceId,
+                            CancellationToken.None) is not null)
+                    {
+                        await lifecycle.DestroyAsync(receipt, CancellationToken.None);
+                    }
+                    if (receipt.NetworkId is { Length: > 0 } remainingNetworkId
+                        && await lifecycle.IsolatedNetworkExistsAsync(
+                            remainingNetworkId,
+                            CancellationToken.None))
+                    {
+                        await lifecycle.DeleteIsolatedNetworkAsync(
+                            remainingNetworkId,
+                            CancellationToken.None);
+                    }
+                }
             }
         });
     }
@@ -955,5 +1032,25 @@ public sealed class DockerContainerLifecycleTests
     private static ContainerReceipt Receipt(string resourceId) => new(
         Guid.NewGuid(), RuntimeProvider.Docker, resourceId, RuntimeStatus.Running,
         new Dictionary<int, int>(), "localhost", null);
+
+    private sealed class DockerOnlyProviderCatalog(DockerContainerLifecycle lifecycle)
+        : IRuntimeProviderCatalog
+    {
+        public IContainerLifecycle Containers(RuntimeProvider provider) =>
+            provider == RuntimeProvider.Docker
+                ? lifecycle
+                : throw new UnsupportedRuntimeProviderException(provider);
+
+        public IContainerSandboxLifecycle Sandbox(RuntimeProvider provider) =>
+            provider == RuntimeProvider.Docker
+                ? lifecycle
+                : throw new UnsupportedRuntimeProviderException(provider);
+
+        public IComposeRuntime Compose(RuntimeProvider provider) =>
+            throw new UnsupportedRuntimeProviderException(provider);
+
+        public IOvaRuntime Appliance(RuntimeProvider provider) =>
+            throw new UnsupportedRuntimeProviderException(provider);
+    }
 
 }

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Globalization;
+using System.Net;
 using System.Text;
 using Docker.DotNet;
 using Docker.DotNet.Models;
@@ -491,6 +492,21 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
 
     public Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken) =>
         client.Networks.DeleteNetworkAsync(networkId, cancellationToken);
+
+    public async Task<bool> IsolatedNetworkExistsAsync(
+        string networkId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _ = await client.Networks.InspectNetworkAsync(networkId, cancellationToken);
+            return true;
+        }
+        catch (DockerApiException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+    }
 
     public async Task<ContainerExecResult> ExecAsync(
         ContainerReceipt receipt,

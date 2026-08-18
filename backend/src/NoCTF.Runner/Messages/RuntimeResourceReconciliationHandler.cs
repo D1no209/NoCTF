@@ -15,7 +15,8 @@ public sealed class RuntimeResourceReconciliationHandler(
     NoCtfDbContext db,
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
     IConfiguration configuration,
-    IRunnerCapacityGate capacity)
+    IRunnerCapacityGate capacity,
+    IRuntimeProviderCatalog? providers = null)
 {
     public async Task Handle(
         ReconcileRuntimeResources message,
@@ -55,9 +56,28 @@ public sealed class RuntimeResourceReconciliationHandler(
             .ToHashSet();
         foreach (var instance in failedAssignments)
         {
-            await reconciler.DestroyByIdentityAsync(
-                new RuntimeResourceIdentity(instance.Id, instance.Generation),
-                cancellationToken);
+            var identity = new RuntimeResourceIdentity(instance.Id, instance.Generation);
+            if (instance.ProviderReceiptJson is { } providerReceiptJson)
+            {
+                var catalog = providers
+                    ?? throw new InvalidOperationException(
+                        "Runtime provider catalog is required for receipt-based cleanup.");
+                await RuntimeReceiptCleanup.CleanupAsync(
+                    catalog,
+                    instance.RuntimeKind,
+                    identity,
+                    instance.RuntimeProvider,
+                    providerReceiptJson,
+                    cancellationToken);
+            }
+            else
+            {
+                await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
+                var remaining = await reconciler.ListManagedAsync(cancellationToken);
+                if (remaining.Contains(identity))
+                    throw new InvalidOperationException(
+                        "Failed Runtime resources remain after orphan cleanup.");
+            }
             var release = await capacity.ReleaseAsync(
                 instance.Id,
                 message.RunnerId,

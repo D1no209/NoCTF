@@ -63,7 +63,8 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
             .Select(candidate => new RuntimeStopWork(
                 candidate.RuntimeProvider,
                 candidate.ProviderReceiptJson,
-                candidate.Generation))
+                candidate.Generation,
+                candidate.RuntimeKind))
             .SingleOrDefaultAsync(cancellationToken);
     }
 }
