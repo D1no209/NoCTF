@@ -1,5 +1,36 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.55 测试生产环境推送与部署
+
+- 将本阶段功能分支与最新 `origin/main` 合并，保留协作者的 `e8b71bee` SSH.NET 安全版本固定，合并提交为
+  `6e7024a2`；该提交已推送到远程 `main`。由于服务器到 GitHub 的出站连接连续失败，部署机使用本地生成并
+  校验过的 complete Git bundle 同步到同一提交，没有改写历史或使用不完整源码包。
+- 部署前已创建 PostgreSQL custom-format 备份
+  `/root/backups/noctf-pre-alpha55-6e7024a2.dump`，SHA-256 为
+  `843a088be21e3e984543b604fe79c92b8f66e1ea986e803ccb8eff0ba9806da3`。迁移容器成功应用 EF 工具生成的
+  `20260818170133_BindAwdpFixTarget`；没有手工修改 migration 或 snapshot。
+- 完成生产拓扑迁移：宿主 Nginx 终结 80/443 TLS，API 仅绑定 `127.0.0.1:8080` 的 HTTP，Worker、Runner
+  和内部 callback 继续使用容器网络 HTTP。既有证书复制到 root/nginx 受限目录，Nginx 配置检查通过并设置
+  HSTS；HTTP 返回 308，IP、域名、`/health`、`/health/ready` 与首页均返回预期 200。
+- 上线验收发现客户端可伪造的转发链会触发 ASP.NET Core 严格头对称校验；`e35108ef` 将唯一可信边缘 Nginx
+  的 `X-Forwarded-For` 改为覆盖写入 `$remote_addr`，并增加部署拓扑守卫测试。测试环境同时明确允许域名与
+  `101.43.46.244` 两个公开 Host；恶意多值转发头回归请求返回 200，后端不再产生 Forwarded Headers 警告。
+- 服务器不能访问 GitHub 下载构建依赖时，从部署前 Runner 镜像提取既有 Kompose 1.38.0，并核对其 SHA-256
+  `65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147` 与仓库固定值一致，再用于构建当前
+  Runner；没有引入未校验二进制。新镜像分别保留 `alpha55-6e7024a2` 标签，旧 Runner 保留
+  `pre-alpha55-74023e94` 回滚标签。
+- 切换后 API、Worker、Runner 均为 healthy，宿主 Nginx 为 active。启动后日志未发现 Error、Critical、
+  Exception 或失败消息；仅保留 ASP.NET Core DataProtection 临时密钥和显式 `ASPNETCORE_URLS` 覆盖默认端口
+  的既有警告，不影响当前无服务端 refresh-session 的认证模型。
+- 新 Runner 已按 provider receipt 自动收敛此前残留资源：部署前约 29 个 AWDP target 容器及其网络均被精确
+  清理，最终 `noctf.io/managed=true` 容器为 0、网络为 0；数据库 30 条相关 Runtime 全部收敛为 Stopped，
+  未通过跳过保护直接删库。另精确删除一个 39 小时前遗留、无端口的 Compose one-off backend 容器。
+- 远程构建前仅清理可重建的 BuildKit cache，回收约 7.9 GB；部署完根卷仍有约 7.1 GB 可用。临时 bundle、
+  Kompose 与构建目录均已精确移除，保留数据库备份、生产 overlay 及 overlay 回滚副本。除 EF migration 与
+  Runtime 自动恢复收敛外，没有手工修改生产业务数据。
+- 部署后附加验证：`DeploymentTopologyTests` 10/10 通过；Nginx `nginx -t` 通过；外部 HTTP 308、HTTPS
+  health/readiness/home 200，HSTS 响应头存在；运行程序集版本确认 `0.1.0-alpha.55`。
+
 ## 2026-08-19 alpha.55 AWDP Fix 失败收敛、资源回收与 Runner 就绪状态
 
 - `54a4f739` 修正内部 API 通信拓扑：API 不再对内部 HTTP 请求执行 HTTPS 重定向，反向代理边界显式处理
