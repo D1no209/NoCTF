@@ -173,6 +173,8 @@ public sealed class DeploymentTopologyTests
         await Assert.That(nginx).Contains("proxy_pass http://127.0.0.1:8080;");
         await Assert.That(nginx).Contains("Strict-Transport-Security");
         await Assert.That(nginx).Contains("proxy_set_header X-Forwarded-Proto https;");
+        await Assert.That(nginx).Contains("proxy_set_header X-Forwarded-For $remote_addr;");
+        await Assert.That(nginx).DoesNotContain("$proxy_add_x_forwarded_for");
         await Assert.That(nginx).Contains("proxy_set_header Upgrade $http_upgrade;");
         await Assert.That(nginx).Contains("proxy_set_header Connection $connection_upgrade;");
 
