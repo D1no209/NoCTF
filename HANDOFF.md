@@ -1,5 +1,19 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.48 分值曲线提示与中文错误提示修复
+
+- `4207856d` 修复管理端分值衰减曲线预览的鼠标提示行为：浮层现在跟随鼠标指针，并与指针保持固定偏移；曲线上高亮点仍按横轴换算为整数“解题队伍数”，显示该解题数对应的取整分值。
+- 同一提交修复未开赛比赛的选手端“动态”页：普通选手查询范围在比赛开始时间晚于当前时间时会夹到当前时刻的空范围，避免向后端发送 `from > to` 导致红色错误。
+- 同一提交新增 API problem detail 本地化兜底：已知后端英文 `detail/title/field error` 在中文界面会转换为中文提示，覆盖事件范围、作弊查询范围、平台日志范围、上传图片类型、运行环境操作、SMTP/平台配置等当前常见红色错误。
+- `c4399487` 将平台版本从 `0.1.0-alpha.47` 递增为 `0.1.0-alpha.48`。
+- 本阶段没有新增业务表、EF migration、OpenAPI 契约或 TypeScript SDK 变更；未推送、未部署。
+- 验证通过：
+  - `bun test tests/challenge-definition-defaults.test.ts tests/api-error-localization.test.ts tests/competition-event-history.test.ts tests/i18n.test.ts`：26/26 通过。
+  - `bun test`：208/208 通过。
+  - `bun run typecheck`：通过。
+  - `bun run build`：通过；仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `git diff --check`：通过。
+
 ## 2026-08-18 alpha.47 推送与生产测试环境部署
 
 - 已将 `main` 从 `0a3cd3f9` 快进推送到 `45d1e878`。生产测试环境
