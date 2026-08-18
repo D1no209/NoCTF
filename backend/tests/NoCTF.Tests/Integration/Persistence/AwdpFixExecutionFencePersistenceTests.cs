@@ -77,7 +77,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var replayOutbox = new RecordingOutbox();
             await using (var replayDb = new NoCtfDbContext(options))
             {
-                await BackendMessageHandlers.Handle(new ReplayAwdpFixVerification(
+                await BackendMessageHandlers.Handle(new CompleteAwdpFixRecovery(
                     fixture.GameplayFactId,
                     fixture.RuntimeInstanceId,
                     1,
@@ -113,7 +113,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
 
             await using (var duplicateDb = new NoCtfDbContext(options))
             {
-                await BackendMessageHandlers.Handle(new ReplayAwdpFixVerification(
+                await BackendMessageHandlers.Handle(new CompleteAwdpFixRecovery(
                     fixture.GameplayFactId,
                     fixture.RuntimeInstanceId,
                     1,
@@ -155,7 +155,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var outbox = new RecordingOutbox();
             await using (var replayDb = new NoCtfDbContext(options))
             {
-                await BackendMessageHandlers.Handle(new ReplayAwdpFixVerification(
+                await BackendMessageHandlers.Handle(new CompleteAwdpFixRecovery(
                     fixture.GameplayFactId,
                     fixture.RuntimeInstanceId,
                     1,

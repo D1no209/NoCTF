@@ -20,10 +20,10 @@ public sealed record CleanupAwdpTarget(
     string RunnerPool,
     string RunnerId) : IRunnerNodeMessage;
 
-public sealed record ReplayAwdpFixVerification(
+public sealed record CompleteAwdpFixRecovery(
     Guid GameplayFactId,
-    Guid PreviousRuntimeInstanceId,
-    int PreviousGeneration,
+    Guid RuntimeInstanceId,
+    int Generation,
     long RecoveryProcessingVersion,
     string RunnerPool,
     string RunnerId,

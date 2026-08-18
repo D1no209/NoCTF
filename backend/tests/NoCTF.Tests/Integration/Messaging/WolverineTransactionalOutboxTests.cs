@@ -123,7 +123,7 @@ public sealed class WolverineTransactionalOutboxTests
             await host.StartAsync(cancellationToken);
             try
             {
-                var message = new ReplayAwdpFixVerification(
+                var message = new CompleteAwdpFixRecovery(
                     Guid.NewGuid(),
                     Guid.NewGuid(),
                     3,
@@ -1034,7 +1034,7 @@ public sealed class WolverineTransactionalOutboxTests
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<GenerateAwdFlags>()
                 .ToPostgresqlQueue("outbox-probe");
-            options.PublishMessage<ReplayAwdpFixVerification>()
+            options.PublishMessage<CompleteAwdpFixRecovery>()
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<AwdpFixResult>()
                 .ToPostgresqlQueue("outbox-probe");
@@ -1418,7 +1418,7 @@ public sealed class ObserveOutboxBusinessProbeHandler
 
 public sealed class AwdpReplayProbeHandler
 {
-    public static void Handle(ReplayAwdpFixVerification message)
+    public static void Handle(CompleteAwdpFixRecovery message)
     {
         if (AwdpReplayProbeObservation.RecordAttempt(message.GameplayFactId) == 1)
             throw new AwdpReplayProbeException();
@@ -1480,12 +1480,12 @@ public static class AwdpReplayProbeObservation
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int>
         DeliveryAttempts = new();
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid,
-        TaskCompletionSource<ReplayAwdpFixVerification>> Observations = new();
+        TaskCompletionSource<CompleteAwdpFixRecovery>> Observations = new();
 
-    public static TaskCompletionSource<ReplayAwdpFixVerification> Expect(Guid id)
+    public static TaskCompletionSource<CompleteAwdpFixRecovery> Expect(Guid id)
     {
         DeliveryAttempts.TryRemove(id, out _);
-        var completion = new TaskCompletionSource<ReplayAwdpFixVerification>(
+        var completion = new TaskCompletionSource<CompleteAwdpFixRecovery>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         Observations[id] = completion;
         return completion;
@@ -1496,7 +1496,7 @@ public static class AwdpReplayProbeObservation
 
     public static int Attempts(Guid id) => DeliveryAttempts.GetValueOrDefault(id);
 
-    public static void Complete(Guid id, ReplayAwdpFixVerification message)
+    public static void Complete(Guid id, CompleteAwdpFixRecovery message)
     {
         if (Observations.TryRemove(id, out var completion))
             completion.TrySetResult(message);

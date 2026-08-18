@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Messaging;
@@ -75,7 +76,8 @@ public sealed class AwdpFixVerificationRecoveryTests
             [],
             Substitute.For<IRunnerCapacityGate>(),
             outbox,
-            configuration);
+            configuration,
+            NullLogger<AwdpFixVerificationHandler>.Instance);
 
         await handler.Handle(message, CancellationToken.None);
 
@@ -164,7 +166,8 @@ public sealed class AwdpFixVerificationRecoveryTests
             [],
             Substitute.For<IRunnerCapacityGate>(),
             outbox,
-            configuration);
+            configuration,
+            NullLogger<AwdpFixVerificationHandler>.Instance);
 
         await handler.Handle(message, CancellationToken.None);
 
@@ -175,7 +178,7 @@ public sealed class AwdpFixVerificationRecoveryTests
     }
 
     [Test]
-    public async Task Uncertain_execution_cleans_exact_identity_before_requesting_replay()
+    public async Task Uncertain_execution_cleans_resources_before_terminal_completion()
     {
         var context = CreateContext(resourcesRemain: false);
 
@@ -190,11 +193,11 @@ public sealed class AwdpFixVerificationRecoveryTests
             context.Message.RuntimeInstanceId,
             context.Message.RunnerId,
             Arg.Any<CancellationToken>());
-        var replay = context.Outbox.Messages.OfType<ReplayAwdpFixVerification>().Single();
-        await Assert.That(replay.GameplayFactId).IsEqualTo(context.Message.GameplayFactId);
-        await Assert.That(replay.PreviousRuntimeInstanceId)
+        var completion = context.Outbox.Messages.OfType<CompleteAwdpFixRecovery>().Single();
+        await Assert.That(completion.GameplayFactId).IsEqualTo(context.Message.GameplayFactId);
+        await Assert.That(completion.RuntimeInstanceId)
             .IsEqualTo(context.Message.RuntimeInstanceId);
-        await Assert.That(replay.RecoveryProcessingVersion).IsEqualTo(12);
+        await Assert.That(completion.RecoveryProcessingVersion).IsEqualTo(12);
     }
 
     [Test]
@@ -221,7 +224,7 @@ public sealed class AwdpFixVerificationRecoveryTests
     }
 
     [Test]
-    public async Task Cleanup_that_leaves_resources_never_releases_capacity_or_requests_replay()
+    public async Task Cleanup_that_leaves_resources_never_releases_capacity_or_completes_recovery()
     {
         var context = CreateContext(resourcesRemain: true);
         Func<Task> action = () => context.Handler.Handle(
@@ -295,7 +298,8 @@ public sealed class AwdpFixVerificationRecoveryTests
             [reconciler],
             capacity,
             outbox,
-            configuration);
+            configuration,
+            NullLogger<AwdpFixVerificationHandler>.Instance);
         return new(handler, message, reconciler, capacity, outbox, container, sandbox);
     }
 

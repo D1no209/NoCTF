@@ -373,7 +373,8 @@ public sealed class AwdpFixVerificationHandler(
     IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
     IRunnerCapacityGate capacity,
     ITransactionalMessageOutbox outbox,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    ILogger<AwdpFixVerificationHandler> logger)
 {
     public async Task Handle(
         RunAwdpFixVerification message,
@@ -408,11 +409,20 @@ public sealed class AwdpFixVerificationHandler(
         var tarPath = Path.Combine(operationDirectory, "fix.tar");
         try
         {
-            if (await archives.DownloadAsync(
-                    work.Archive,
-                    archivePath,
-                    cancellationToken) != AwdpFixArchiveDownloadOutcome.Downloaded)
+            var download = await archives.DownloadAsync(
+                work.Archive,
+                archivePath,
+                cancellationToken);
+            if (download != AwdpFixArchiveDownloadOutcome.Downloaded)
             {
+                logger.LogWarning(
+                    "AWDP Fix archive failed before patch execution. "
+                    + "FailureCode={FailureCode} GameplayFactId={GameplayFactId} "
+                    + "RuntimeInstanceId={RuntimeInstanceId} Generation={Generation}",
+                    download,
+                    message.GameplayFactId,
+                    message.RuntimeInstanceId,
+                    message.Generation);
                 outcome = AwdpFixOutcome.PlatformFailed;
             }
             else
@@ -519,7 +529,7 @@ public sealed class AwdpFixVerificationHandler(
             throw new InvalidOperationException(
                 "AWDP target capacity belongs to a different Runner assignment.");
 
-        await outbox.PublishAsync(new ReplayAwdpFixVerification(
+        await outbox.PublishAsync(new CompleteAwdpFixRecovery(
             recovery.GameplayFactId,
             recovery.RuntimeInstanceId,
             recovery.Generation,

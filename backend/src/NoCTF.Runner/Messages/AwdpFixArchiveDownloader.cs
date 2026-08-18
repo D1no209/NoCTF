@@ -15,12 +15,35 @@ public sealed record AwdpFixArchive(
 public enum AwdpFixArchiveDownloadOutcome
 {
     Downloaded,
-    Unavailable,
+    ConnectionFailed,
+    TimedOut,
+    HttpStatusRejected,
+    TransferInterrupted,
     IntegrityMismatch
 }
 
-public sealed class AwdpFixArchiveDownloader(IHttpClientFactory httpClients)
+public sealed class AwdpFixArchiveDownloader
 {
+    public const string ClientName = "awdp-fix-archive";
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+    private readonly IHttpClientFactory httpClients;
+    private readonly TimeSpan downloadTimeout;
+
+    public AwdpFixArchiveDownloader(IHttpClientFactory httpClients)
+        : this(httpClients, DefaultTimeout)
+    {
+    }
+
+    internal AwdpFixArchiveDownloader(
+        IHttpClientFactory httpClients,
+        TimeSpan downloadTimeout)
+    {
+        if (downloadTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(downloadTimeout));
+        this.httpClients = httpClients;
+        this.downloadTimeout = downloadTimeout;
+    }
+
     public async Task<AwdpFixArchiveDownloadOutcome> DownloadAsync(
         AwdpFixArchive archive,
         string destinationPath,
@@ -31,28 +54,28 @@ public sealed class AwdpFixArchiveDownloader(IHttpClientFactory httpClients)
             "Bearer",
             archive.DownloadToken);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        timeout.CancelAfter(downloadTimeout);
         HttpResponseMessage response;
         try
         {
-            response = await httpClients.CreateClient().SendAsync(
+            response = await httpClients.CreateClient(ClientName).SendAsync(
                 request,
                 HttpCompletionOption.ResponseHeadersRead,
                 timeout.Token);
         }
         catch (HttpRequestException)
         {
-            return AwdpFixArchiveDownloadOutcome.Unavailable;
+            return AwdpFixArchiveDownloadOutcome.ConnectionFailed;
         }
         catch (OperationCanceledException) when (
             !cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
         {
-            return AwdpFixArchiveDownloadOutcome.Unavailable;
+            return AwdpFixArchiveDownloadOutcome.TimedOut;
         }
         using (response)
         {
             if (!response.IsSuccessStatusCode)
-                return AwdpFixArchiveDownloadOutcome.Unavailable;
+                return AwdpFixArchiveDownloadOutcome.HttpStatusRejected;
             try
             {
                 return await CopyAndVerifyAsync(
@@ -64,13 +87,18 @@ public sealed class AwdpFixArchiveDownloader(IHttpClientFactory httpClients)
             catch (HttpRequestException)
             {
                 DeletePartialFile(destinationPath);
-                return AwdpFixArchiveDownloadOutcome.Unavailable;
+                return AwdpFixArchiveDownloadOutcome.TransferInterrupted;
+            }
+            catch (IOException)
+            {
+                DeletePartialFile(destinationPath);
+                return AwdpFixArchiveDownloadOutcome.TransferInterrupted;
             }
             catch (OperationCanceledException) when (
                 !cancellationToken.IsCancellationRequested && timeout.IsCancellationRequested)
             {
                 DeletePartialFile(destinationPath);
-                return AwdpFixArchiveDownloadOutcome.Unavailable;
+                return AwdpFixArchiveDownloadOutcome.TimedOut;
             }
         }
     }
