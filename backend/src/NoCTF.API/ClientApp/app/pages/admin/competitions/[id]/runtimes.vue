@@ -20,6 +20,7 @@ import type {
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 import { createLatestPageRefresh } from '~/lib/latest-page-refresh'
+import { adminRuntimeTeamLabel } from '~/utils/admin-runtime'
 import {
   createRuntimeOperationCoordinator,
   type RuntimeOperationKind,
@@ -34,7 +35,18 @@ const { isAdministrator } = useAuth()
 // ---- Reference data ----
 const challengeOptions = ref<{ id: string; title: string }[]>([])
 const teamOptions = ref<{ id: string; name: string }[]>([])
-const teamName = (id?: string | null) => (id ? (teamOptions.value.find(t => t.id === id)?.name ?? id) : translate("共享"))
+const runtimeTeamLabel = (
+  runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse | null | undefined,
+) => runtime
+  ? adminRuntimeTeamLabel(
+      runtime,
+      translate,
+      id => teamOptions.value.find(team => team.id === id)?.name,
+    )
+  : '-'
+const isPlayerManagedRuntime = (
+  runtime: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse,
+) => runtime.purpose !== 'AwdpTarget'
 const challengeTitle = (id?: string | null) => challengeOptions.value.find(c => c.id === id)?.title ?? id ?? '-'
 
 async function loadRefs() {
@@ -383,7 +395,7 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
         </TableHeader>
         <TableBody>
           <TableRow v-for="rt in items" :key="rt.id">
-            <TableCell class="font-medium">{{ teamName(rt.teamId) }}</TableCell>
+            <TableCell class="font-medium">{{ runtimeTeamLabel(rt) }}</TableCell>
             <TableCell>{{ challengeTitle(rt.competitionChallengeId) }}</TableCell>
             <TableCell class="font-mono tabular-nums">{{ rt.generation }}</TableCell>
             <TableCell>{{ enumLabel(RuntimeKindLabel, rt.runtimeKind) }}</TableCell>
@@ -398,7 +410,7 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
                 <Button variant="ghost" size="sm" @click="openDetail(rt.id)">{{ $t('详情') }}</Button>
                 <template v-if="canWrite">
                   <Button
-                    v-if="rt.state === 'Stopped' || rt.state === 'Failed'"
+                    v-if="isPlayerManagedRuntime(rt) && (rt.state === 'Stopped' || rt.state === 'Failed')"
                     variant="ghost" size="sm" :disabled="isRuntimePending(rt)"
                     @click="runRuntimeOp(rt, 'start')"
                   >
@@ -415,12 +427,13 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
                     @click="openForceTermination(rt)"
                   >{{ $t('强制终结') }}</Button>
                   <Button
+                    v-if="isPlayerManagedRuntime(rt)"
                     variant="ghost" size="sm" :disabled="isRuntimePending(rt)"
                     @click="runRuntimeOp(rt, 'reset')"
                   >
                     <Spinner v-if="isRuntimeOperationPending(rt, 'reset')" data-icon="inline-start" /> {{ $t('重置') }} </Button>
                   <Button
-                    v-if="rt.teamId && rt.state === 'Running'"
+                    v-if="isPlayerManagedRuntime(rt) && rt.teamId && rt.state === 'Running'"
                     variant="ghost" size="sm" :disabled="isRuntimePending(rt)"
                     @click="extendDialog = rt; extendSeconds = 1800"
                   >{{ $t('续期') }}</Button>
@@ -444,7 +457,7 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
         </SheetHeader>
         <Skeleton v-if="detailLoading" class="mx-4 h-48" />
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('队伍') }}</span><span>{{ teamName(detail.teamId) }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('队伍') }}</span><span>{{ runtimeTeamLabel(detail) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('题目') }}</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('代数') }}</span><span class="font-mono tabular-nums">{{ detail.generation }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(RuntimeKindLabel, detail.runtimeKind) }}</span></div>
@@ -481,7 +494,7 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{{ $t('延长运行时间') }}</DialogTitle>
-          <DialogDescription>{{ $t('为「{team}」的实例延长到期时间', { team: teamName(extendDialog?.teamId) }) }}</DialogDescription>
+          <DialogDescription>{{ $t('为「{team}」的实例延长到期时间', { team: runtimeTeamLabel(extendDialog) }) }}</DialogDescription>
         </DialogHeader>
         <FieldGroup>
           <Field>
@@ -503,7 +516,7 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
           <AlertDialogTitle>{{ $t('终止此运行时实例？') }}</AlertDialogTitle>
           <AlertDialogDescription>
             {{ $t('将立即停止并清理「{team}」在「{challenge}」的第 {generation} 代实例。该操作不会重建环境。', {
-              team: teamName(terminateDialog?.teamId),
+              team: runtimeTeamLabel(terminateDialog),
               challenge: challengeTitle(terminateDialog?.competitionChallengeId),
               generation: terminateDialog?.generation ?? 0,
             }) }}

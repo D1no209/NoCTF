@@ -16,6 +16,7 @@ using NoCTF.GameModes.Flags;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Challenges.Flags;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Runtime.Administration;
 using NoCTF.Infrastructure.Runtime.Instances;
 using NoCTF.Runner.Messages;
 using Testcontainers.PostgreSql;
@@ -172,10 +173,41 @@ public sealed class AwdpAttackRuntimePersistenceTests
             await using (var verify = new NoCtfDbContext(options))
             {
                 var runtimes = await verify.RuntimeInstances.AsNoTracking()
-                    .Where(runtime => runtime.Purpose == RuntimePurpose.Player)
+                    .Where(runtime => runtime.Purpose == RuntimePurpose.AwdpAttack)
                     .OrderBy(runtime => runtime.TeamId)
                     .ToArrayAsync(cancellationToken);
                 await Assert.That(runtimes.Length).IsEqualTo(2);
+                await Assert.That(runtimes.Select(runtime => runtime.TeamId).ToArray())
+                    .IsEquivalentTo(fixture.TeamIds.Cast<Guid?>().ToArray());
+                var adminRuntimes = await new AdminRuntimeStore(
+                        verify,
+                        new ChallengeRuntimeTemplateCatalog(),
+                        new FixedRuntimePlacementPolicy(RuntimeProvider.Docker, "awdp-tests"),
+                        new PostgresPerTeamRuntimeFlagStore(verify),
+                        new NoopOutbox())
+                    .ListAsync(new(
+                            fixture.CompetitionId,
+                            fixture.CompetitionChallengeId,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null),
+                        null,
+                        null,
+                        10,
+                        cancellationToken);
+                var attackRuntimes = adminRuntimes
+                    .Where(runtime => runtime.Purpose == RuntimePurpose.AwdpAttack)
+                    .ToArray();
+                await Assert.That(attackRuntimes.Length).IsEqualTo(2);
+                await Assert.That(attackRuntimes.Select(runtime => runtime.SourceTeamId).ToArray())
+                    .IsEquivalentTo(fixture.TeamIds.Cast<Guid?>().ToArray());
+                await Assert.That(attackRuntimes.Select(runtime => runtime.SourceTeamName).ToArray())
+                    .IsEquivalentTo(new string?[] { "Team 0", "Team 1" });
                 var flags = await verify.ChallengeFlags.AsNoTracking()
                     .Where(flag => flag.SpecificationKind == SpecificationKind.RuntimeGeneration)
                     .OrderBy(flag => flag.TeamId)
@@ -229,6 +261,65 @@ public sealed class AwdpAttackRuntimePersistenceTests
             var invalidated = await stoppedVerification.ChallengeFlags.AsNoTracking()
                 .SingleAsync(flag => flag.Id == secondGeneration.Id, cancellationToken);
             await Assert.That(invalidated.ValidUntil).IsNotNull();
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Admin_start_creates_a_team_bound_awdp_attack_runtime(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awdp_admin_attack_runtime")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+
+            await using var db = new NoCtfDbContext(options);
+            var store = new AdminRuntimeStore(
+                db,
+                new ChallengeRuntimeTemplateCatalog(),
+                new FixedRuntimePlacementPolicy(RuntimeProvider.Docker, "awdp-tests"),
+                new PostgresPerTeamRuntimeFlagStore(db),
+                new NoopOutbox());
+            var result = await store.MutateAsync(
+                fixture.CompetitionId,
+                fixture.CompetitionChallengeId,
+                fixture.TeamIds[0],
+                RuntimeAction.Start,
+                null,
+                fixture.Now,
+                cancellationToken);
+
+            await Assert.That(result.Failure).IsNull();
+            await Assert.That(result.Runtime).IsNotNull();
+            await Assert.That(result.Runtime!.Purpose).IsEqualTo(RuntimePurpose.AwdpAttack);
+            await Assert.That(result.Runtime.TeamId).IsEqualTo(fixture.TeamIds[0]);
+
+            var listed = await store.ListAsync(new(
+                    fixture.CompetitionId,
+                    fixture.CompetitionChallengeId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null),
+                null,
+                null,
+                10,
+                cancellationToken);
+            await Assert.That(listed.Single().SourceTeamName).IsEqualTo("Team 0");
         });
     }
 
@@ -407,7 +498,8 @@ public sealed class AwdpAttackRuntimePersistenceTests
             challengeDefinition,
             expectedFlag);
 
-        await Assert.That(entity.Purpose).IsEqualTo(RuntimePurpose.Player);
+        await Assert.That(entity.Purpose).IsEqualTo(RuntimePurpose.AwdpAttack);
+        await Assert.That(entity.TeamId).IsEqualTo(runtime.TeamId);
         await Assert.That(claim.Definition.Environment["FLAG"]).IsEqualTo(expectedFlag);
         await Assert.That(claim.Definition.PortMappings[31337]).IsEqualTo(0);
         await Assert.That(claim.Definition.UrlBindings!.Single().Exposure)

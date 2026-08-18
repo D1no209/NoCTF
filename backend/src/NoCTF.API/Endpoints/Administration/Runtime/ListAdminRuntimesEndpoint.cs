@@ -44,6 +44,9 @@ public sealed record AdminRuntimeResponse(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid? TeamId,
+    Guid? SourceTeamId,
+    string? SourceTeamName,
+    RuntimePurposeProtocol Purpose,
     int Generation,
     RuntimeKindProtocol RuntimeKind,
     RuntimeProviderProtocol Provider,
@@ -74,6 +77,8 @@ internal static class AdminRuntimeMapping
         var availableAt = RuntimeForceTerminationPolicy.AvailableAt(view);
         return new(
             view.Id, view.CompetitionId, view.CompetitionChallengeId, view.TeamId,
+            view.SourceTeamId, view.SourceTeamName,
+            RuntimeProtocolMapper.ToProtocol(view.Purpose),
             view.Generation,
             RuntimeProtocolMapper.ToProtocol(view.RuntimeKind),
             RuntimeProtocolMapper.ToProtocol(view.Provider),
