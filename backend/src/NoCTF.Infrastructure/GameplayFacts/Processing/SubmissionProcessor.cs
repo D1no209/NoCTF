@@ -3,7 +3,6 @@ using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
-using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.GameplayFacts.Processing;
@@ -12,8 +11,6 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awd.Scheduling;
-using NoCTF.GameModes.Awdp.Configuration;
-using NoCTF.GameModes.Awdp.Runtime;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Shared;
@@ -27,7 +24,6 @@ public sealed class GameplayFactProcessor(
     NoCtfDbContext db,
     IGameplayFactEvaluatorCatalog evaluatorCatalog,
     IGameplayFactAdmissionModePolicy admissionModePolicy,
-    IRuntimePlacementPolicy placementPolicy,
     ITransactionalMessageOutbox outbox,
     ILeaderboardSnapshotFactory leaderboardSnapshots,
     BloodRankCriticalSection bloodRankCriticalSection,
@@ -42,7 +38,6 @@ public sealed class GameplayFactProcessor(
         NoCtfDbContext db,
         IGameplayFactEvaluatorCatalog evaluatorCatalog,
         IGameplayFactAdmissionModePolicy admissionModePolicy,
-        IRuntimePlacementPolicy placementPolicy,
         ITransactionalMessageOutbox outbox,
         ILeaderboardSnapshotFactory leaderboardSnapshots,
         ICompetitionEventRecorder? eventRecorder = null,
@@ -51,7 +46,6 @@ public sealed class GameplayFactProcessor(
             db,
             evaluatorCatalog,
             admissionModePolicy,
-            placementPolicy,
             outbox,
             leaderboardSnapshots,
             new BloodRankCriticalSection(new LocalCriticalSectionRegistry()),
@@ -394,111 +388,6 @@ public sealed class GameplayFactProcessor(
 
         if (evaluation.Decision.Result is null)
         {
-            if (submission.Kind == GameplayFactKind.FixAttempt)
-            {
-                var configurationJson = await db.CompetitionChallenges.AsNoTracking()
-                    .Where(challenge => challenge.Id == submission.CompetitionChallengeId)
-                    .Join(
-                        db.Competitions.AsNoTracking(),
-                        challenge => challenge.CompetitionId,
-                        competition => competition.Id,
-                        (challenge, competition) => new
-                        {
-                            Competition = competition.ConfigurationJson,
-                            Challenge = challenge
-                        })
-                    .Join(
-                        db.Challenges.AsNoTracking(),
-                        scope => scope.Challenge.ChallengeId,
-                        template => template.Id,
-                        (scope, template) => new
-                        {
-                            scope.Competition,
-                            Rules = scope.Challenge.RulesJson,
-                            template.DefinitionJson
-                        })
-                    .SingleAsync(cancellationToken);
-                var definition = AwdpConfigurationParser.ParseChallenge(
-                    configurationJson.DefinitionJson);
-                var rules = AwdpConfigurationParser.ParseChallenge(configurationJson.Rules);
-                var combined = rules with
-                {
-                    Runtime = definition.Runtime,
-                    Checker = definition.Checker,
-                    PatchEntrypoint = definition.PatchEntrypoint,
-                    PatchCommand = definition.PatchCommand,
-                    PatchTimeoutSeconds = definition.PatchTimeoutSeconds,
-                    ReadyTimeoutSeconds = definition.ReadyTimeoutSeconds
-                };
-                var configuration = AwdpConfigurationResolver.Resolve(
-                    configurationJson.Competition,
-                    System.Text.Json.JsonSerializer.Serialize(
-                        combined,
-                        new System.Text.Json.JsonSerializerOptions(
-                            System.Text.Json.JsonSerializerDefaults.Web)));
-                if (configuration.Runtime is { } template
-                    && submission.ReferenceKind == GameplayFactReferenceKind.PatchUpload
-                    && submission.ReferenceId is not null)
-                {
-                    var targetId = Guid.CreateVersion7(now);
-                    var configurationIsValid = true;
-                    try
-                    {
-                        var placement = placementPolicy.Resolve(template.RuntimeKind);
-                        _ = AwdpTargetDefinitionFactory.Create(
-                            targetId,
-                            1,
-                            template,
-                            placement.Provider,
-                            now);
-                    }
-                    catch (InvalidOperationException)
-                    {
-                        configurationIsValid = false;
-                    }
-
-                    if (configurationIsValid)
-                    {
-                        var generation = checked((await db.RuntimeInstances
-                            .Where(instance => instance.GameplayFactId == submission.Id)
-                            .MaxAsync(instance => (int?)instance.Generation, cancellationToken) ?? 0) + 1);
-                        var target = AwdpTargetRuntimeFactory.Create(
-                            submission.Id,
-                            submission.CompetitionId,
-                            submission.CompetitionChallengeId,
-                            targetId,
-                            template,
-                            placementPolicy.Resolve(template.RuntimeKind),
-                            generation,
-                            evaluation.CompetitionRevision,
-                            evaluation.CompetitionChallengeRevision,
-                            evaluation.ChallengeDefinitionRevision,
-                            now);
-                        db.RuntimeInstances.Add(target);
-                        await outbox.PublishAsync(new DispatchRuntime(
-                            target.Id,
-                            target.ProcessingVersion));
-                        await events.RecordAsync(new(
-                            target.CompetitionId,
-                            CompetitionEventKind.RuntimeCreated,
-                            CompetitionEventLevel.Information,
-                            CompetitionEventVisibility.Team,
-                            now,
-                            TeamId: target.TeamId,
-                            CompetitionChallengeId: target.CompetitionChallengeId,
-                            RuntimeInstanceId: target.Id,
-                            GameplayFactId: submission.Id,
-                            RuntimeState: target.State,
-                            RuntimeGeneration: target.Generation), cancellationToken);
-                        submission.FailureCode = null;
-                        submission.UpdatedAt = now;
-                        await db.SaveChangesAsync(cancellationToken);
-                        await transaction.CommitAsync(cancellationToken);
-                        await outbox.FlushOutgoingMessagesAsync();
-                        return;
-                    }
-                }
-            }
             submission.State = GameplayFactState.PlatformFailed;
             submission.FailureCode =
                 evaluation.Decision.FailureCode ?? GameplayFactFailureCode.CheckerPlatformError;

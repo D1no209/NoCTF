@@ -24,6 +24,7 @@ public sealed class CreatePatchUploadTests
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
             "fix.tar.gz",
             "application/gzip",
             archive,
@@ -46,6 +47,7 @@ public sealed class CreatePatchUploadTests
         await using var archive = new MemoryStream(CreatePatchArchive());
 
         var result = await useCase.ExecuteAsync(
+            Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
@@ -75,12 +77,41 @@ public sealed class CreatePatchUploadTests
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
             "fix.tar.gz",
             "application/gzip",
             archive,
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.FailureCode).IsEqualTo(PatchUploadFailureCode.PatchUploadConflict);
+        await Assert.That(registry.AbandonedFileId)
+            .IsEqualTo(registry.RegisteredFileId);
+    }
+
+    [Test]
+    public async Task Consumed_target_returns_the_stable_failure_and_cleans_the_new_file()
+    {
+        var store = new RejectingPatchUploadStore(
+            saveState: PatchUploadSaveState.DefenseTargetConsumed);
+        var objects = new RecordingObjectStorage();
+        var registry = new RecordingUploadRegistry();
+        var useCase = new CreatePatchUpload(
+            store,
+            new ManagedFileUploads(registry, objects));
+        await using var archive = new MemoryStream(CreatePatchArchive());
+
+        var result = await useCase.ExecuteAsync(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            "fix.tar.gz",
+            "application/gzip",
+            archive,
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(PatchUploadFailureCode.DefenseTargetConsumed);
         await Assert.That(registry.AbandonedFileId)
             .IsEqualTo(registry.RegisteredFileId);
     }
@@ -107,11 +138,14 @@ public sealed class CreatePatchUploadTests
     }
 
     private sealed class RejectingPatchUploadStore(
-        long maximumArchiveBytes = PatchUploadRules.DefaultMaximumArchiveBytes) : IPatchUploadStore
+        long maximumArchiveBytes = PatchUploadRules.DefaultMaximumArchiveBytes,
+        PatchUploadSaveState saveState = PatchUploadSaveState.ConcurrencyConflict)
+        : IPatchUploadStore
     {
         public Task<PatchUploadScope?> ResolveScopeAsync(
             Guid competitionId,
             Guid competitionChallengeId,
+            Guid runtimeInstanceId,
             Guid userId,
             CancellationToken cancellationToken) =>
             Task.FromResult<PatchUploadScope?>(new(
@@ -119,15 +153,18 @@ public sealed class CreatePatchUploadTests
                 competitionChallengeId,
                 Guid.CreateVersion7(),
                 userId,
+                runtimeInstanceId,
                 maximumArchiveBytes));
 
-        public Task<bool> SaveAsync(
+        public Task<PatchUploadSaveResult> SaveAsync(
             Guid patchUploadId,
+            Guid gameplayFactId,
             PatchUploadScope scope,
             Guid fileId,
             DateTimeOffset uploadedAt,
             CancellationToken cancellationToken) =>
-            Task.FromResult(false);
+            Task.FromResult(new PatchUploadSaveResult(
+                saveState));
     }
 
     private sealed class RecordingObjectStorage : IObjectStorage

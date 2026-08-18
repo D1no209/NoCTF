@@ -100,7 +100,7 @@ Runtime Namespace 只放置 `rt-*` Runtime 资源；如确需平台资源，名�
 
 ## 网络
 
-外部 TLS 在可信代理终止或进程端到端 TLS。ForwardedHeaders 只信任明确代理。API CORS 精确 Origin+credentials；Refresh Cookie Secure/SameSite Strict。
+外部 TLS 在可信代理终止或进程端到端 TLS。API 不对内部 HTTP 请求执行 HTTPS 重定向；Runner 的归档读取与 Checker 回调必须能通过部署配置中的内部 HTTP(S) Service 地址直达 API。ForwardedHeaders 只信任明确代理。API CORS 精确 Origin+credentials；Refresh Cookie Secure/SameSite Strict。
 
 当前威胁模型信任办赛管理员、管理员维护的题目配置、Runner Pool 配置及平台托管镜像，
 不防御管理员内鬼。选手、题目业务容器及其网络输入仍是不可信边界。

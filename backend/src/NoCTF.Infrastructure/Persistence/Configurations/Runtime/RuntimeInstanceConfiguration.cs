@@ -21,10 +21,13 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
                 "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
             table.HasCheckConstraint(
                 "ck_runtime_instances_awdp_gameplay_fact",
-                "(purpose = 1) = (gameplay_fact_id IS NOT NULL)");
+                "gameplay_fact_id IS NULL OR purpose = 1");
+            table.HasCheckConstraint(
+                "ck_runtime_instances_awdp_bound_attempt",
+                "purpose <> 1 OR awdp_fix_stage IN (0, 1) OR gameplay_fact_id IS NOT NULL");
             table.HasCheckConstraint(
                 "ck_runtime_instances_awdp_fix_stage",
-                "awdp_fix_stage IS NULL OR purpose = 1");
+                "(awdp_fix_stage IS NOT NULL) = (purpose = 1)");
         });
         builder.HasKey(instance => instance.Id);
         builder.HasAlternateKey(instance => new { instance.Id, instance.CompetitionId });
@@ -43,6 +46,7 @@ internal sealed class RuntimeInstanceConfiguration : IEntityTypeConfiguration<Ru
         {
             instance.CompetitionChallengeId,
             instance.TeamId,
+            instance.Purpose,
             instance.Generation
         }).IsUnique();
         builder.HasIndex(instance => new

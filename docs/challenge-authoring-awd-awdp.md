@@ -248,8 +248,9 @@ Fix 不是 Flag，不能把修复包、修复状态或补丁 ID 塞进 Flag 接�
 
 - Player Runtime：`Purpose=Player`、有 TeamId，使用 `PerTeam` 动态精确 Flag、host port `0`
   和 OwnerOnly URL；选手 Start/Stop/Reset/Extend 并从自己的实例取得 Break Flag。
-- Fix Target：`Purpose=AwdpTarget`、TeamId 为空、绑定 Fix GameplayFact；复用干净镜像与唯一
-  内部端口，但忽略公开 PortMappings/URL，不向选手提供入口，验证结束后销毁。
+- Fix Target：`Purpose=AwdpTarget`、绑定申请它的 Team；申请时没有 Fix GameplayFact，Running 后
+  只接受一次 PatchUpload，并在同一事务绑定唯一 Fix GameplayFact；复用干净镜像与唯一内部端口，
+  但忽略公开 PortMappings/URL，不向选手提供入口，验证结束后销毁。
 
 共同约束：
 

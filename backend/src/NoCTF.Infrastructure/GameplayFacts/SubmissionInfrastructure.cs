@@ -33,6 +33,8 @@ internal static class GameplayFactInfrastructure
         services.AddScoped<JudgePracticeFlag>();
         services.AddScoped<IAwdpParticipantStateReader, AwdpParticipantStateReader>();
         services.AddScoped<GetAwdpParticipantState>();
+        services.AddScoped<IAwdpDefenseTargetStore, AwdpDefenseTargetStore>();
+        services.AddScoped<RequestAwdpDefenseTarget>();
         services.AddScoped<CreateManualAdjustment>();
         services.AddScoped<IPatchUploadStore, PatchUploadStore>();
         services.AddScoped<CreatePatchUpload>();

@@ -7,7 +7,6 @@ public static class PipelineConfiguration
         app.UseDefaultFiles();
         app.UseStaticFiles();
         app.UseExceptionHandler();
-        app.UseHttpsRedirection();
         app.UseAuthentication();
         app.UseRateLimiter();
         app.UseAuthorization();

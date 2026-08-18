@@ -19,9 +19,9 @@ ManualAdjustment 由管理员创建即为 Completed/Applied，Value 是非零 ca
 
 ## 接入与尝试
 
-Flag、Break、Fix、Hint 先创建事实并通过 Wolverine Outbox 发布 `EvaluateGameplayFact(GameplayFactId)`。消息和内部 JWT 不携带事实处理版本或 callback hash。批量领取按 `(TeamId, CompetitionChallengeId, Kind)` 和 `(OccurredAt, Id)`，使用短事务及 `FOR UPDATE SKIP LOCKED`；PlatformFailed 是否消耗尝试沿用各模式规则。
+Flag、Break、Hint 先创建事实并通过 Wolverine Outbox 发布 `EvaluateGameplayFact(GameplayFactId)`。AWDP Fix 在一次性 Target Running 后，由唯一一次 Patch 上传直接创建 Processing FixAttempt 并发布 `RunAwdpFixVerification`。消息和内部 JWT 不携带事实处理版本或 callback hash。批量领取按 `(TeamId, CompetitionChallengeId, Kind)` 和 `(OccurredAt, Id)`，使用短事务及 `FOR UPDATE SKIP LOCKED`；PlatformFailed 是否消耗尝试沿用各模式规则。
 
-Fix 事务先 `FOR UPDATE` 锁定 PatchUpload，验证 Competition、CompetitionChallenge、Team 与上传者，确认不存在 `ReferenceKind=PatchUpload/ReferenceId=upload.Id` 的事实，再创建 FixAttempt 和 Outbox。部分唯一索引保证并发时一个上传只能被一个事实引用；PatchUpload 不保存 ConsumedAt 或 GameplayFactId。
+Fix 事务在同一个按 Team/题/Kind 串行的临界区内验证 Competition、CompetitionChallenge、Team、一次性 AwdpTarget 与上传者，锁定 Target/File，并创建相互绑定的 PatchUpload、FixAttempt 和 Outbox。RuntimeInstance 与 PatchUpload 的部分唯一索引、Target 上的 GameplayFactId 共同保证一个 Target 只能消费一次；PatchUpload 不保存 ConsumedAt，消费事实由 GameplayFact Reference 与 Target 绑定共同确定。
 
 ## 重判与作弊事件
 

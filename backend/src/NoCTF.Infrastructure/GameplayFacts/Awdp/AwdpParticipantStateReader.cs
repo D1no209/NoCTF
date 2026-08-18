@@ -96,19 +96,33 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 runtime.StoppedAt))
             .FirstOrDefaultAsync(cancellationToken);
 
-        var latestFix = facts
-            .Where(fact => fact.Kind == GameplayFactKind.FixAttempt)
-            .OrderByDescending(fact => fact.OccurredAt)
-            .ThenByDescending(fact => fact.Id)
-            .FirstOrDefault();
-        var fixRuntime = latestFix is null
+        var fixRuntime = await db.RuntimeInstances.AsNoTracking()
+            .Where(runtime => runtime.CompetitionId == competitionId
+                && runtime.CompetitionChallengeId == competitionChallengeId
+                && runtime.TeamId == scope.TeamId
+                && runtime.Purpose == RuntimePurpose.AwdpTarget)
+            .OrderByDescending(runtime => runtime.Generation)
+            .Select(runtime => new
+            {
+                runtime.Id,
+                runtime.State,
+                runtime.FailureCode,
+                runtime.GameplayFactId,
+                runtime.AwdpFixStage,
+                runtime.CreatedAt,
+                runtime.ExpiresAt,
+                runtime.StoppedAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        var latestFix = fixRuntime?.GameplayFactId is Guid fixFactId
+            ? facts.SingleOrDefault(fact => fact.Id == fixFactId)
+            : null;
+        var patchUploadId = fixRuntime is null
             ? null
-            : await db.RuntimeInstances.AsNoTracking()
-                .Where(runtime => runtime.GameplayFactId == latestFix.Id
-                    && runtime.Purpose == RuntimePurpose.AwdpTarget)
-                .OrderByDescending(runtime => runtime.Generation)
-                .Select(runtime => new { runtime.AwdpFixStage })
-                .FirstOrDefaultAsync(cancellationToken);
+            : await db.PatchUploads.AsNoTracking()
+                .Where(upload => upload.RuntimeInstanceId == fixRuntime.Id)
+                .Select(upload => (Guid?)upload.Id)
+                .SingleOrDefaultAsync(cancellationToken);
 
         var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
             .Where(@event => @event.CompetitionId == competitionId
@@ -149,14 +163,18 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
             latestBreak is null ? null : ToStatus(latestBreak),
             Activation(firstBreak, lifecycle, configuration.RoundDurationSeconds),
             new(
+                fixRuntime?.Id,
+                fixRuntime?.State,
+                fixRuntime?.FailureCode,
                 latestFix?.Id,
-                latestFix is { ReferenceKind: GameplayFactReferenceKind.PatchUpload }
-                    ? latestFix.ReferenceId
-                    : null,
+                patchUploadId,
                 latestFix?.State,
                 GameplayFactResultDisclosure.PlayerResult(latestFix?.Result, latestFix?.FailureCode),
                 GameplayFactResultDisclosure.PlayerFailureCode(latestFix?.FailureCode),
                 fixRuntime?.AwdpFixStage,
+                fixRuntime?.CreatedAt,
+                fixRuntime?.ExpiresAt,
+                fixRuntime?.StoppedAt,
                 latestFix?.UpdatedAt),
             Activation(firstFix, lifecycle, configuration.RoundDurationSeconds));
     }

@@ -373,7 +373,6 @@ public sealed class GameplayFactOrderingPersistenceTests
             db,
             evaluatorCatalog ?? new GameModeGameplayFactEvaluatorCatalog(),
             new GameModeGameplayFactAdmissionPolicy(),
-            Substitute.For<IRuntimePlacementPolicy>(),
             outbox,
             Substitute.For<ILeaderboardSnapshotFactory>(),
             new CompetitionEventStore(db, outbox));

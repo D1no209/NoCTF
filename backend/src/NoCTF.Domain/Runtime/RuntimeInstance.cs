@@ -30,6 +30,7 @@ public enum RuntimePurpose : short
 public enum AwdpFixStage : short
 {
     TargetProvisioning,
+    AwaitingPatch,
     PatchApplying,
     CheckerRunning,
     Completed

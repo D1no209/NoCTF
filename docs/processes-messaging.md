@@ -38,7 +38,7 @@ Runner 直接在完成事务中更新 RuntimeInstance；AWDP callback 使用 cla
 - Leaderboard 完整投影/重建；
 - 比赛级批量 Flag 预生成。
 
-GameplayFact 尝试次数使用更细粒度 `(TeamId, CompetitionChallengeId, GameplayFactKind)` advisory lock，只串行同队同题同类型。Fix 还锁定 PatchUpload 并由部分唯一索引防并发消费。HTTP 限流和请求验证在事务前完成；事务只进行额度检查、Insert、引用验证和 Outbox，禁止在锁内上传文件或调用外部服务。
+GameplayFact 尝试次数使用更细粒度 `(TeamId, CompetitionChallengeId, GameplayFactKind)` advisory lock，只串行同队同题同类型。AWDP 防御申请在该临界区内创建唯一活动 Target；Patch 上传再锁定 Target/File，并由 Runtime/PatchUpload 唯一索引防并发消费。HTTP 限流和归档校验在事务前完成；事务只进行额度检查、Insert、引用验证和 Outbox，禁止在锁内调用外部服务。
 
 ## 重试
 

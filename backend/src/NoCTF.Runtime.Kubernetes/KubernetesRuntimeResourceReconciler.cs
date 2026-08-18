@@ -26,7 +26,7 @@ public sealed class KubernetesRuntimeResourceReconciler(
         CancellationToken cancellationToken)
     {
         var identities = new HashSet<RuntimeResourceIdentity>();
-        var selector = PersistentRuntimeSelector();
+        var selector = ManagedRuntimeSelector();
         var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(
             options.Namespace,
             labelSelector: selector,
@@ -199,11 +199,10 @@ public sealed class KubernetesRuntimeResourceReconciler(
         }
     }
 
-    private static string PersistentRuntimeSelector() =>
-        "noctf.io/managed=true,noctf.io/job-kind=persistent-runtime";
+    private static string ManagedRuntimeSelector() => "noctf.io/managed=true";
 
     private static string IdentitySelector(RuntimeResourceIdentity identity) =>
-        $"{PersistentRuntimeSelector()},"
+        $"{ManagedRuntimeSelector()},"
         + $"noctf.io/runtime-instance-id={identity.RuntimeInstanceId:D},"
         + $"noctf.io/generation={identity.Generation.ToString(CultureInfo.InvariantCulture)}";
 
@@ -220,8 +219,6 @@ public sealed class KubernetesRuntimeResourceReconciler(
         if (labels is null
             || !labels.TryGetValue("noctf.io/managed", out var managed)
             || !string.Equals(managed, "true", StringComparison.Ordinal)
-            || !labels.TryGetValue("noctf.io/job-kind", out var jobKind)
-            || !string.Equals(jobKind, "persistent-runtime", StringComparison.Ordinal)
             || !labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
             || !Guid.TryParse(runtimeText, out var runtimeId)
             || runtimeId == Guid.Empty

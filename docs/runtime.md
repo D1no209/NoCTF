@@ -324,10 +324,12 @@ CTF 比赛可配置赛后练习模式。比赛进入 Finished 后，原比赛中
 每队容量、TTL、Docker host port 0、Runner 调度与资源回收约束。关闭练习模式前必须确认该比赛不存在
 Queued、Provisioning、Running 或 Stopping 的练习实例。
 
-AWDP disposable target 额外使用两级 `ProcessingVersion` fence：Provider Running 后的首次 Fix
-消息先持久认领 execution fence，结果不确定的重投再持久认领 recovery fence。recovery fence
-必须先于 Provider cleanup，因此旧 checker callback 即使与清理并发也不能发布权威结果。
-Runner 只有在 exact RuntimeInstanceId+Generation 的 Provider 资源已确认不存在、对应容量已按
-Runner owner 释放后，才发布 replay-ready；Worker 再以新 RuntimeInstanceId/Generation 创建
-替代 target。该流程复用 RuntimeInstance、GameplayFact、Wolverine outbox 和 provider receipt，
-不建立 operation/result-history 表。
+AWDP disposable target 分成 `TargetProvisioning -> AwaitingPatch -> PatchApplying ->
+CheckerRunning -> Completed`。申请时只创建 Team 绑定的 `AwdpTarget`；Target Running 后最多绑定
+一个 PatchUpload/FixAttempt。绑定后 Runner 使用两级 `ProcessingVersion` fence：首次消息持久认领
+execution fence，结果不确定的重投再持久认领 recovery fence。recovery fence 必须先于 Provider
+cleanup，因此旧 checker callback 即使与清理并发也不能发布权威结果。Runner 只有在 exact
+RuntimeInstanceId+Generation 的 Provider 资源已确认不存在、对应容量已按 Runner owner 释放后，
+才允许 Worker 把 Runtime 收敛为 Stopped；没有可信结论的事实收敛为平台失败。平台不会自动创建
+替代 Target 或重跑非幂等 Patch。该流程复用 RuntimeInstance、GameplayFact、PatchUpload、Wolverine
+outbox 和 provider receipt，不建立 operation/result-history 表。

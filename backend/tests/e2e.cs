@@ -137,6 +137,7 @@ internal sealed class ModeEnvironment(
                     "tests",
                     "NoCTF.E2E",
                     "NoCTF.E2E.csproj"),
+                "--no-restore",
                 "--",
                 "--treenode-filter",
                 $"/*/*/*/*[Category={mode}E2E]",

@@ -28,7 +28,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Redelivery_fences_old_results_and_replays_on_a_fresh_generation(
+    public async Task Redelivery_cleans_the_consumed_target_without_rerunning_the_checker(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -86,7 +86,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                     fixture.RunnerId,
                     fixture.Now.AddSeconds(2)),
                     replayDb,
-                    new FixedRuntimePlacementPolicy(RuntimeProvider.Docker, fixture.RunnerPool),
                     replayOutbox,
                     cancellationToken);
             }
@@ -97,19 +96,16 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                     .Where(runtime => runtime.GameplayFactId == fixture.GameplayFactId)
                     .OrderBy(runtime => runtime.Generation)
                     .ToArrayAsync(cancellationToken);
-                await Assert.That(runtimes.Length).IsEqualTo(2);
+                await Assert.That(runtimes.Length).IsEqualTo(1);
                 await Assert.That(runtimes[0].State).IsEqualTo(RuntimeState.Stopped);
-                await Assert.That(runtimes[1].State).IsEqualTo(RuntimeState.Queued);
-                await Assert.That(runtimes[1].Generation).IsEqualTo(2);
-                await Assert.That(runtimes[1].Id).IsNotEqualTo(runtimes[0].Id);
-                await Assert.That(runtimes[1].ReplacesRuntimeInstanceId)
-                    .IsEqualTo(runtimes[0].Id);
                 var fact = await verification.GameplayFacts.AsNoTracking()
                     .SingleAsync(item => item.Id == fixture.GameplayFactId, cancellationToken);
-                await Assert.That(fact.State).IsEqualTo(GameplayFactState.Processing);
+                await Assert.That(fact.State).IsEqualTo(GameplayFactState.PlatformFailed);
+                await Assert.That(fact.FailureCode)
+                    .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
             }
             await Assert.That(replayOutbox.Messages.OfType<DispatchRuntime>().Count())
-                .IsEqualTo(1);
+                .IsEqualTo(0);
 
             var obsoleteMessage = await AcquireAsync(options, request, cancellationToken);
             await Assert.That(obsoleteMessage.Disposition)
@@ -126,12 +122,11 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                     fixture.RunnerId,
                     fixture.Now.AddSeconds(2)),
                     duplicateDb,
-                    new FixedRuntimePlacementPolicy(RuntimeProvider.Docker, fixture.RunnerPool),
                     replayOutbox,
                     cancellationToken);
             }
             await Assert.That(replayOutbox.Messages.OfType<DispatchRuntime>().Count())
-                .IsEqualTo(1);
+                .IsEqualTo(0);
         });
     }
 
@@ -169,7 +164,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                     fixture.RunnerId,
                     fixture.Now.AddSeconds(2)),
                     replayDb,
-                    new FixedRuntimePlacementPolicy(RuntimeProvider.Docker, fixture.RunnerPool),
                     outbox,
                     cancellationToken);
             }
@@ -390,6 +384,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
             UploadedByUserId = ownerId,
+            RuntimeInstanceId = runtimeId,
             FileId = fileId,
             File = file,
             UploadedAt = now
@@ -413,6 +408,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             Id = runtimeId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
+            TeamId = teamId,
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = factId,
             AwdpFixStage = AwdpFixStage.PatchApplying,

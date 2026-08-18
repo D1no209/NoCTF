@@ -49,7 +49,7 @@ function toggleCheckerJob(enabled: boolean): void {
   </FieldSet>
 
   <FieldSet v-else-if="mode === 'Awdp'" class="rounded-md border p-4">
-    <FieldLegend class="px-1 text-sm font-medium">{{ $t('Checker(服务健康检查)') }}</FieldLegend>
+    <FieldLegend class="px-1 text-sm font-medium">{{ $t('Fix 一次性验证 Checker') }}</FieldLegend>
     <Field orientation="horizontal">
       <Switch
         id="def-has-checker-job"
@@ -57,7 +57,7 @@ function toggleCheckerJob(enabled: boolean): void {
         :disabled="disabled"
         @update:model-value="toggleCheckerJob($event === true)"
       />
-      <FieldLabel for="def-has-checker-job" class="font-normal">{{ $t('启用周期性服务检查') }}</FieldLabel>
+      <FieldLabel for="def-has-checker-job" class="font-normal">{{ $t('启用 Fix 一次性验证 Checker') }}</FieldLabel>
     </Field>
     <RunnerJobEditor v-if="model.checkerJob" :job="model.checkerJob" :disabled="disabled" />
   </FieldSet>

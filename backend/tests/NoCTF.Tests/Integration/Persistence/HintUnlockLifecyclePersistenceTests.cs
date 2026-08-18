@@ -192,7 +192,6 @@ public sealed class HintUnlockLifecyclePersistenceTests
                     processingDb,
                     Substitute.For<IGameplayFactEvaluatorCatalog>(),
                     admissionPolicy,
-                    Substitute.For<IRuntimePlacementPolicy>(),
                     Substitute.For<ITransactionalMessageOutbox>(),
                     Substitute.For<ILeaderboardSnapshotFactory>());
 

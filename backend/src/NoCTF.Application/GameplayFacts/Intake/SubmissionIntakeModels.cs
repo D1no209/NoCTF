@@ -45,8 +45,7 @@ public enum GameplayFactAcceptanceState
 {
     Created,
     AttemptsExhausted,
-    SnapshotChanged,
-    PatchUploadUnavailable
+    SnapshotChanged
 }
 
 public sealed record GameplayFactAcceptanceResult(
@@ -61,11 +60,4 @@ public sealed record FlagGameplayFactCommand(
     Guid CompetitionChallengeId,
     Guid UserId,
     string Flag,
-    DateTimeOffset OccurredAt);
-
-public sealed record FixGameplayFactCommand(
-    Guid CompetitionId,
-    Guid CompetitionChallengeId,
-    Guid UserId,
-    Guid PatchUploadId,
     DateTimeOffset OccurredAt);

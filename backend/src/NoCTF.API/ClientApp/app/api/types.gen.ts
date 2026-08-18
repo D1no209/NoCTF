@@ -298,16 +298,22 @@ export type NoCtfapiEndpointsGameplayFactsAwdpAchievementActivationResponse = {
 };
 
 export type NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse = {
+    runtimeInstanceId?: string | null;
+    runtimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
+    runtimeFailureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
     gameplayFactId?: string | null;
     patchUploadId?: string | null;
     state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
     result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
     failureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
     stage?: NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol | null;
+    targetCreatedAt?: string | null;
+    targetExpiresAt?: string | null;
+    targetStoppedAt?: string | null;
     updatedAt?: string | null;
 };
 
-export type NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol = 'TargetProvisioning' | 'PatchApplying' | 'CheckerRunning' | 'Completed';
+export type NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol = 'TargetProvisioning' | 'AwaitingPatch' | 'PatchApplying' | 'CheckerRunning' | 'Completed';
 
 export type NoCtfapiEndpointsGameplayFactsGetGameplayFactStatusRequest = {
     [key: string]: never;
@@ -358,15 +364,17 @@ export type NoCtfapiEndpointsGameplayFactsListGameplayFactsRequest = {
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsGameplayFactsAcceptedGameplayFactResponse = {
-    gameplayFactId?: string;
-    state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol;
+export type NoCtfapiEndpointsGameplayFactsRequestAwdpDefenseTargetResponse = {
+    runtimeInstanceId?: string;
+    state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
     statusUrl?: string;
 };
 
-export type NoCtfapiEndpointsGameplayFactsSubmitFixRequest = {
-    patchUploadId: string;
+export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetConflictResponse = {
+    code?: NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol;
 };
+
+export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol = 'DefenseNotAvailable' | 'ActiveDefenseTargetExists' | 'BreakRequired' | 'FixAttemptsExhausted' | 'InvalidRuntimeConfiguration' | 'DefenseTargetConcurrency';
 
 export type NoCtfapiEndpointsGameplayFactsFlagGameplayFactAcceptedResponse = {
     gameplayFactId?: string | null;
@@ -388,7 +396,16 @@ export type NoCtfapiEndpointsGameplayFactsSubmitFlagRequest = {
 
 export type NoCtfapiEndpointsGameplayFactsUploadPatchResponse = {
     patchUploadId?: string;
+    gameplayFactId?: string;
+    state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol;
+    statusUrl?: string;
 };
+
+export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureResponse = {
+    code?: NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol;
+};
+
+export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol = 'ArchiveStreamNotSeekable' | 'ArchiveInvalid' | 'DefenseTargetNotReady' | 'FixAttemptsExhausted' | 'DefenseTargetConsumed';
 
 export type NoCtfapiEndpointsGameplayFactsUploadPatchRequest = {
     file: Blob | File;
@@ -641,6 +658,12 @@ export type NoCtfapiEndpointsChallengesChallengeListResponse = {
 
 export type NoCtfapiEndpointsChallengesListChallengesRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsGameplayFactsAcceptedGameplayFactResponse = {
+    gameplayFactId?: string;
+    state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol;
+    statusUrl?: string;
 };
 
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse = {
@@ -3027,21 +3050,17 @@ export type ListGameplayFactsEndpointResponses = {
 
 export type ListGameplayFactsEndpointResponse = ListGameplayFactsEndpointResponses[keyof ListGameplayFactsEndpointResponses];
 
-export type SubmitFixEndpointData = {
-    body: NoCtfapiEndpointsGameplayFactsSubmitFixRequest;
+export type RequestAwdpDefenseTargetEndpointData = {
+    body?: never;
     path: {
         competitionId: string;
         competitionChallengeId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/fix-submissions';
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets';
 };
 
-export type SubmitFixEndpointErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+export type RequestAwdpDefenseTargetEndpointErrors = {
     /**
      * Unauthorized
      */
@@ -3049,24 +3068,24 @@ export type SubmitFixEndpointErrors = {
     /**
      * Forbidden
      */
-    403: MicrosoftAspNetCoreMvcProblemDetails;
-    409: MicrosoftAspNetCoreMvcProblemDetails;
+    403: unknown;
     /**
-     * Too Many Requests
+     * Not Found
      */
-    429: unknown;
+    404: unknown;
+    409: NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetConflictResponse;
 };
 
-export type SubmitFixEndpointError = SubmitFixEndpointErrors[keyof SubmitFixEndpointErrors];
+export type RequestAwdpDefenseTargetEndpointError = RequestAwdpDefenseTargetEndpointErrors[keyof RequestAwdpDefenseTargetEndpointErrors];
 
-export type SubmitFixEndpointResponses = {
+export type RequestAwdpDefenseTargetEndpointResponses = {
     /**
      * Accepted
      */
-    202: NoCtfapiEndpointsGameplayFactsAcceptedGameplayFactResponse;
+    202: NoCtfapiEndpointsGameplayFactsRequestAwdpDefenseTargetResponse;
 };
 
-export type SubmitFixEndpointResponse = SubmitFixEndpointResponses[keyof SubmitFixEndpointResponses];
+export type RequestAwdpDefenseTargetEndpointResponse = RequestAwdpDefenseTargetEndpointResponses[keyof RequestAwdpDefenseTargetEndpointResponses];
 
 export type SubmitFlagEndpointData = {
     body: NoCtfapiEndpointsGameplayFactsSubmitFlagRequest;
@@ -3114,9 +3133,10 @@ export type UploadPatchEndpointData = {
     path: {
         competitionId: string;
         competitionChallengeId: string;
+        runtimeInstanceId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload';
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix';
 };
 
 export type UploadPatchEndpointErrors = {
@@ -3136,17 +3156,18 @@ export type UploadPatchEndpointErrors = {
      * Not Found
      */
     404: unknown;
+    409: NoCtfapiEndpointsGameplayFactsUploadPatchFailureResponse;
     413: MicrosoftAspNetCoreMvcProblemDetails;
-    422: MicrosoftAspNetCoreMvcProblemDetails;
+    422: NoCtfapiEndpointsGameplayFactsUploadPatchFailureResponse;
 };
 
 export type UploadPatchEndpointError = UploadPatchEndpointErrors[keyof UploadPatchEndpointErrors];
 
 export type UploadPatchEndpointResponses = {
     /**
-     * Created
+     * Accepted
      */
-    201: NoCtfapiEndpointsGameplayFactsUploadPatchResponse;
+    202: NoCtfapiEndpointsGameplayFactsUploadPatchResponse;
 };
 
 export type UploadPatchEndpointResponse = UploadPatchEndpointResponses[keyof UploadPatchEndpointResponses];

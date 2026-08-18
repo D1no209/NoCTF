@@ -34,7 +34,8 @@ public sealed class AwdpFixArchiveDownloaderTests
                 destination,
                 CancellationToken.None);
 
-            await Assert.That(downloaded).IsTrue();
+            await Assert.That(downloaded)
+                .IsEqualTo(AwdpFixArchiveDownloadOutcome.Downloaded);
             await Assert.That(await File.ReadAllBytesAsync(destination)).IsEquivalentTo(body);
             await Assert.That(handler.Method).IsEqualTo(HttpMethod.Get);
             await Assert.That(handler.RequestUri).IsEqualTo(archive.DownloadUrl);
@@ -75,7 +76,8 @@ public sealed class AwdpFixArchiveDownloaderTests
                 destination,
                 CancellationToken.None);
 
-            await Assert.That(downloaded).IsFalse();
+            await Assert.That(downloaded)
+                .IsEqualTo(AwdpFixArchiveDownloadOutcome.IntegrityMismatch);
         }
         finally
         {
@@ -105,7 +107,34 @@ public sealed class AwdpFixArchiveDownloaderTests
             destination,
             CancellationToken.None);
 
-        await Assert.That(downloaded).IsFalse();
+        await Assert.That(downloaded)
+            .IsEqualTo(AwdpFixArchiveDownloadOutcome.Unavailable);
+        await Assert.That(File.Exists(destination)).IsFalse();
+    }
+
+    [Test]
+    public async Task Download_treats_transport_failures_as_a_stable_unavailable_outcome()
+    {
+        var downloader = new AwdpFixArchiveDownloader(
+            new StubHttpClientFactory(new TransportFailureHandler()));
+        var destination = Path.Combine(
+            Path.GetTempPath(),
+            $"noctf-fix-archive-{Guid.NewGuid():N}.tar.gz");
+        var archive = new AwdpFixArchive(
+            new Uri("https://api.example/api/internal/v1/awdp/fix-archives/"
+                + "11111111-1111-1111-1111-111111111111"),
+            "claim-bound-token",
+            "fix.tar.gz",
+            1,
+            new byte[SHA256.HashSizeInBytes]);
+
+        var downloaded = await downloader.DownloadAsync(
+            archive,
+            destination,
+            CancellationToken.None);
+
+        await Assert.That(downloaded)
+            .IsEqualTo(AwdpFixArchiveDownloadOutcome.Unavailable);
         await Assert.That(File.Exists(destination)).IsFalse();
     }
 
@@ -131,5 +160,13 @@ public sealed class AwdpFixArchiveDownloaderTests
             AuthorizationParameter = request.Headers.Authorization?.Parameter;
             return Task.FromResult(response);
         }
+    }
+
+    private sealed class TransportFailureHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            throw new HttpRequestException("The internal archive endpoint is unavailable.");
     }
 }

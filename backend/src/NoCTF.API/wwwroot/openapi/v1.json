@@ -1948,22 +1948,21 @@
         ]
       }
     },
-    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/fix-submissions": {
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets": {
       "post": {
         "tags": [
           "Competitions"
         ],
-        "summary": "Consume a PatchUpload and create a Fix attempt.",
-        "description": "PatchUpload consumption and durable evaluation dispatch are atomic.",
-        "operationId": "SubmitFixEndpoint",
+        "summary": "Request a clean one-shot AWDP defense target.",
+        "description": "Creates an isolated disposable target that accepts exactly one Fix archive.",
+        "operationId": "RequestAwdpDefenseTargetEndpoint",
         "parameters": [
           {
             "name": "competitionId",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "guid"
+              "type": "string"
             }
           },
           {
@@ -1971,70 +1970,39 @@
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "guid"
+              "type": "string"
             }
           }
         ],
-        "requestBody": {
-          "x-name": "SubmitFixRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsSubmitFixRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
         "responses": {
           "202": {
             "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAcceptedGameplayFactResponse"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsRequestAwdpDefenseTargetResponse"
                 }
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
-                }
-              }
-            }
+          "404": {
+            "description": "Not Found"
           },
           "409": {
             "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpDefenseTargetConflictResponse"
                 }
               }
             }
-          },
-          "429": {
-            "description": "Too Many Requests"
           },
           "401": {
             "description": "Unauthorized"
           },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -2140,13 +2108,13 @@
         ]
       }
     },
-    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/patch-upload": {
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix": {
       "post": {
         "tags": [
           "Competitions"
         ],
-        "summary": "Upload an AWDP patch archive",
-        "description": "Validates and stores one gzip-compressed tar archive without creating a gameplay fact.",
+        "summary": "Upload the only Fix archive accepted by an AWDP defense target.",
+        "description": "Atomically binds one archive and one Fix attempt to the clean disposable target, then starts one Checker verification.",
         "operationId": "UploadPatchEndpoint",
         "parameters": [
           {
@@ -2160,6 +2128,15 @@
           },
           {
             "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "guid"
+            }
+          },
+          {
+            "name": "runtimeInstanceId",
             "in": "path",
             "required": true,
             "schema": {
@@ -2182,8 +2159,8 @@
           "x-position": 1
         },
         "responses": {
-          "201": {
-            "description": "Created",
+          "202": {
+            "description": "Accepted",
             "content": {
               "application/json": {
                 "schema": {
@@ -2195,17 +2172,27 @@
           "404": {
             "description": "Not Found"
           },
-          "413": {
+          "409": {
             "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsUploadPatchFailureResponse"
                 }
               }
             }
           },
           "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsUploadPatchFailureResponse"
+                }
+              }
+            }
+          },
+          "413": {
             "description": "",
             "content": {
               "application/problem+json": {
@@ -13834,6 +13821,27 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "runtimeInstanceId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
+          "runtimeState": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
+              }
+            ]
+          },
+          "runtimeFailureCode": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol"
+              }
+            ]
+          },
           "gameplayFactId": {
             "type": "string",
             "format": "guid",
@@ -13876,6 +13884,21 @@
               }
             ]
           },
+          "targetCreatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "targetExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "targetStoppedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
           "updatedAt": {
             "type": "string",
             "format": "date-time",
@@ -13888,12 +13911,14 @@
         "description": "",
         "x-enumNames": [
           "TargetProvisioning",
+          "AwaitingPatch",
           "PatchApplying",
           "CheckerRunning",
           "Completed"
         ],
         "enum": [
           "TargetProvisioning",
+          "AwaitingPatch",
           "PatchApplying",
           "CheckerRunning",
           "Completed"
@@ -14078,36 +14103,50 @@
         "type": "object",
         "additionalProperties": false
       },
-      "NoCTFAPIEndpointsGameplayFactsAcceptedGameplayFactResponse": {
+      "NoCTFAPIEndpointsGameplayFactsRequestAwdpDefenseTargetResponse": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "gameplayFactId": {
+          "runtimeInstanceId": {
             "type": "string",
             "format": "guid"
           },
           "state": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol"
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeStateProtocol"
           },
           "statusUrl": {
             "type": "string"
           }
         }
       },
-      "NoCTFAPIEndpointsGameplayFactsSubmitFixRequest": {
+      "NoCTFAPIEndpointsGameplayFactsAwdpDefenseTargetConflictResponse": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "patchUploadId"
-        ],
         "properties": {
-          "patchUploadId": {
-            "type": "string",
-            "format": "guid",
-            "minLength": 1,
-            "nullable": false
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol"
           }
         }
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "DefenseNotAvailable",
+          "ActiveDefenseTargetExists",
+          "BreakRequired",
+          "FixAttemptsExhausted",
+          "InvalidRuntimeConfiguration",
+          "DefenseTargetConcurrency"
+        ],
+        "enum": [
+          "DefenseNotAvailable",
+          "ActiveDefenseTargetExists",
+          "BreakRequired",
+          "FixAttemptsExhausted",
+          "InvalidRuntimeConfiguration",
+          "DefenseTargetConcurrency"
+        ]
       },
       "NoCTFAPIEndpointsGameplayFactsFlagGameplayFactAcceptedResponse": {
         "type": "object",
@@ -14179,8 +14218,45 @@
           "patchUploadId": {
             "type": "string",
             "format": "guid"
+          },
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol"
+          },
+          "statusUrl": {
+            "type": "string"
           }
         }
+      },
+      "NoCTFAPIEndpointsGameplayFactsUploadPatchFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsUploadPatchFailureCodeProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsUploadPatchFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ArchiveStreamNotSeekable",
+          "ArchiveInvalid",
+          "DefenseTargetNotReady",
+          "FixAttemptsExhausted",
+          "DefenseTargetConsumed"
+        ],
+        "enum": [
+          "ArchiveStreamNotSeekable",
+          "ArchiveInvalid",
+          "DefenseTargetNotReady",
+          "FixAttemptsExhausted",
+          "DefenseTargetConsumed"
+        ]
       },
       "NoCTFAPIEndpointsGameplayFactsUploadPatchRequest": {
         "type": "object",
@@ -15245,6 +15321,22 @@
       "NoCTFAPIEndpointsChallengesListChallengesRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsGameplayFactsAcceptedGameplayFactResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameplayFactId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactStateProtocol"
+          },
+          "statusUrl": {
+            "type": "string"
+          }
+        }
       },
       "NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionResponse": {
         "type": "object",

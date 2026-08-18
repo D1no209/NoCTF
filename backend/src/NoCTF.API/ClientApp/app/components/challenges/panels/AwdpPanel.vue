@@ -18,6 +18,7 @@ const loadError = ref<string | null>(null)
 
 const fixStages = [
   'TargetProvisioning',
+  'AwaitingPatch',
   'PatchApplying',
   'CheckerRunning',
   'Completed',
@@ -25,6 +26,7 @@ const fixStages = [
 
 const fixStageLabels: Record<NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol, string> = {
   TargetProvisioning: '创建干净验证环境',
+  AwaitingPatch: '等待上传本次 Fix',
   PatchApplying: '应用补丁',
   CheckerRunning: '执行一次 Checker',
   Completed: '验证完成',
@@ -35,9 +37,15 @@ const activeFixStageIndex = computed(() => {
   return stage ? fixStages.indexOf(stage) : -1
 })
 
-const fixInProgress = computed(() => {
+const defenseTransitionInProgress = computed(() => {
   const factState = state.value?.defense?.state
-  return factState === 'Pending' || factState === 'Queued' || factState === 'Processing'
+  const runtimeState = state.value?.defense?.runtimeState
+  return factState === 'Pending'
+    || factState === 'Queued'
+    || factState === 'Processing'
+    || runtimeState === 'Queued'
+    || runtimeState === 'Provisioning'
+    || runtimeState === 'Stopping'
 })
 
 async function refreshState(): Promise<boolean> {
@@ -54,7 +62,7 @@ async function refreshState(): Promise<boolean> {
   }
   state.value = data
   loadError.value = null
-  return !fixInProgress.value
+  return !defenseTransitionInProgress.value
 }
 
 const { start: startStatePolling, stop: stopStatePolling } = usePolling(
@@ -64,7 +72,7 @@ const { start: startStatePolling, stop: stopStatePolling } = usePolling(
 
 async function refreshAndPoll(): Promise<void> {
   await refreshState()
-  if (fixInProgress.value) startStatePolling()
+  if (defenseTransitionInProgress.value) startStatePolling()
 }
 
 let unwatch: (() => void) | undefined
@@ -104,7 +112,7 @@ onUnmounted(() => {
       <section class="flex min-w-0 flex-col gap-4" aria-labelledby="awdp-attack-title">
         <div>
           <div class="mb-1 flex flex-wrap items-center gap-2">
-            <h2 id="awdp-attack-title" class="text-lg font-semibold">{{ $t('攻击轨 · Break') }}</h2>
+            <h2 id="awdp-attack-title" class="text-lg font-semibold">{{ $t('攻击靶机 · Break 环境') }}</h2>
             <Badge v-if="state?.breakActivation" variant="default">
               {{ $t('已于第 {round} 轮生效', { round: state.breakActivation.effectiveRound ?? '-' }) }}
             </Badge>
@@ -180,8 +188,9 @@ onUnmounted(() => {
         <FixSubmit
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
+          :defense="state?.defense"
+          @changed="refreshAndPoll"
           @accepted="refreshAndPoll"
-          @evaluated="refreshAndPoll"
         />
       </section>
     </div>

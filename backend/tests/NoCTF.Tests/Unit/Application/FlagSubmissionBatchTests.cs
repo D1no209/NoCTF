@@ -152,12 +152,6 @@ public sealed class FlagSubmissionBatchTests
                     item.OccurredAt)).ToArray());
         }
 
-        public Task<GameplayFactAcceptanceResult> TryAcceptFixAsync(
-            FixGameplayFactReceived received,
-            GameplayFactAdmissionSnapshot snapshot,
-            int? maxAttempts,
-            CancellationToken cancellationToken) =>
-            throw new InvalidOperationException();
     }
 
     private sealed class Policy : IGameplayFactAdmissionModePolicy

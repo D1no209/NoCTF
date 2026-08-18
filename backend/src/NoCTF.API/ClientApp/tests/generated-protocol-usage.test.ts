@@ -58,7 +58,8 @@ describe('generated protocol usage', () => {
 
     expect(hub).toContain("competitionHubString(payload, 'competitionId')")
     expect(flagSubmit).toContain("competitionHubString(payload, 'gameplayFactId')")
-    expect(fixSubmit).toContain("competitionHubString(payload, 'gameplayFactId')")
+    expect(fixSubmit).toContain('NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol')
+    expect(fixSubmit).toContain('NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol')
     expect(`${hub}\n${flagSubmit}\n${fixSubmit}`).not.toContain('as { gameplayFactId?: unknown }')
   })
 })

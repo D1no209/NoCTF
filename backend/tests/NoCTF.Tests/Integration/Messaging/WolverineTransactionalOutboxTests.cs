@@ -852,6 +852,7 @@ public sealed class WolverineTransactionalOutboxTests
             Title = "AWDP result outbox",
             OwnerId = ownerId,
             Mode = GameMode.Awdp,
+            ConfigurationJson = "{}",
             ConfigurationRevision = 3,
             ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
@@ -868,6 +869,7 @@ public sealed class WolverineTransactionalOutboxTests
             Mode = GameMode.Awdp,
             Title = "AWDP result target",
             Visibility = ChallengeVisibility.Private,
+            DefinitionJson = "{}",
             Revision = 5,
             CreatedAt = now,
             UpdatedAt = now
@@ -879,6 +881,7 @@ public sealed class WolverineTransactionalOutboxTests
             ChallengeId = challengeId,
             BaseScore = 100,
             IsPublished = true,
+            RulesJson = "{}",
             Revision = 7,
             UpdatedAt = now
         });
@@ -916,6 +919,7 @@ public sealed class WolverineTransactionalOutboxTests
             TeamId = teamId,
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = fixture.GameplayFactId,
+            AwdpFixStage = AwdpFixStage.PatchApplying,
             SourceCompetitionConfigurationRevision = 3,
             SourceCompetitionChallengeRevision = 7,
             SourceChallengeDefinitionRevision = 5,

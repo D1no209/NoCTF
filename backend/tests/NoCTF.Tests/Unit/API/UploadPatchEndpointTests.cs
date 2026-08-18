@@ -23,6 +23,7 @@ public sealed class UploadPatchEndpointTests
     private static readonly Guid UserId = Guid.CreateVersion7();
     private static readonly Guid CompetitionId = Guid.CreateVersion7();
     private static readonly Guid CompetitionChallengeId = Guid.CreateVersion7();
+    private static readonly Guid RuntimeInstanceId = Guid.CreateVersion7();
 
     [Test]
     public async Task Configured_patch_limit_returns_typed_413_before_storage()
@@ -33,7 +34,7 @@ public sealed class UploadPatchEndpointTests
         form.Add(new ByteArrayContent([1, 2]), "file", "fix.tar.gz");
 
         using var response = await client.PostAsync(
-            $"/api/v1/competitions/{CompetitionId}/challenges/{CompetitionChallengeId}/patch-upload",
+            $"/api/v1/competitions/{CompetitionId}/challenges/{CompetitionChallengeId}/awdp-defense-targets/{RuntimeInstanceId}/fix",
             form);
         var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
 
@@ -84,6 +85,7 @@ public sealed class UploadPatchEndpointTests
         public Task<PatchUploadScope?> ResolveScopeAsync(
             Guid competitionId,
             Guid competitionChallengeId,
+            Guid runtimeInstanceId,
             Guid userId,
             CancellationToken cancellationToken) =>
             Task.FromResult<PatchUploadScope?>(new(
@@ -91,10 +93,12 @@ public sealed class UploadPatchEndpointTests
                 competitionChallengeId,
                 Guid.CreateVersion7(),
                 userId,
+                runtimeInstanceId,
                 MaximumArchiveBytes: 1));
 
-        public Task<bool> SaveAsync(
+        public Task<PatchUploadSaveResult> SaveAsync(
             Guid patchUploadId,
+            Guid gameplayFactId,
             PatchUploadScope scope,
             Guid fileId,
             DateTimeOffset uploadedAt,

@@ -17,15 +17,6 @@ public sealed record FlagGameplayFactReceived(
         $"{nameof(FlagGameplayFactReceived)} {{ GameplayFactId = {GameplayFactId}, Flag = [REDACTED] }}";
 }
 
-public sealed record FixGameplayFactReceived(
-    Guid GameplayFactId,
-    Guid CompetitionId,
-    Guid TeamId,
-    Guid CompetitionChallengeId,
-    Guid UserId,
-    Guid PatchUploadId,
-    DateTimeOffset OccurredAt);
-
 public sealed record HintUnlockGameplayFactReceived(
     Guid GameplayFactId,
     Guid CompetitionId,
