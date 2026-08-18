@@ -1,5 +1,19 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.52 竞赛概览倒计时实时刷新
+
+- `f9d0cefd` 修复选手端竞赛概览页的大号倒计时仅在刷新页面或等待 30 秒后才更新的问题。页面存活期间现在每秒刷新当前时间，因此“距开始 / 距结束”会连续更新，并在越过开始或结束时刻后立即切换对应文案；组件卸载时继续清理定时器。
+- 新增 `competition-countdown.test.ts`，锁定概览倒计时的一秒刷新频率和卸载清理，避免与已每秒更新的页头倒计时再次出现行为分叉。
+- `1762624f` 将平台版本从 `0.1.0-alpha.51` 递增为 `0.1.0-alpha.52`。
+- 本阶段没有新增业务表、字段、EF migration、OpenAPI 契约或 TypeScript SDK 变更；未推送、未部署，也未修改生产/测试业务数据。
+- 验证结果：
+  - `bun test tests/competition-countdown.test.ts`：1/1 通过。
+  - `bun test`：215/215 通过（1602 assertions）。
+  - `bun run typecheck`：通过。
+  - `bun run build`：通过；仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error。
+  - `git diff --check`：通过。
+
 ## 2026-08-18 alpha.51 推送与生产测试环境部署
 
 - 已将 `main` 从 `d1a9bf54` 快进推送到 `cbab9f4d`。生产测试环境
