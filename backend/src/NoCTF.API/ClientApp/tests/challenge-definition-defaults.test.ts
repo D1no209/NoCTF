@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import { challengeTemplateWriteErrorMessage } from '../app/lib/challenge-template-error'
-import { ctfPointsAtSolveCount, defaultDefinitionJson, normalizeDefinitionJson } from '../app/utils/game-config'
+import { startGateErrorMessage } from '../app/lib/start-gate-error'
+import {
+  competitionConfigFields,
+  ctfPointsAtSolveCount,
+  defaultDefinitionJson,
+  fieldDefaultValue,
+  normalizeDefinitionJson,
+  serializeConfigValues,
+} from '../app/utils/game-config'
 
 describe('challenge definition defaults', () => {
   test.each([
@@ -31,6 +39,13 @@ describe('challenge definition defaults', () => {
     expect(normalizeDefinitionJson('Ctf', '{')).toBeNull()
   })
 
+  test('serializes saved AWDP competition defaults with schema version 4', () => {
+    const fields = competitionConfigFields('Awdp')
+    const values = Object.fromEntries(fields.map(field => [field.key, fieldDefaultValue(field)]))
+
+    expect(JSON.parse(serializeConfigValues('Awdp', fields, values, { rules: false })).schemaVersion).toBe(4)
+  })
+
   test('localizes invalid definition failures without clearing the form', async () => {
     expect(challengeTemplateWriteErrorMessage({
       status: 400,
@@ -44,6 +59,45 @@ describe('challenge definition defaults', () => {
     expect(submit).toContain('challengeTemplateWriteErrorMessage(apiError)')
     expect(submit).not.toContain("title.value = ''")
     expect(submit).not.toContain("definitionJson.value = ''")
+  })
+
+  test('offers explicit current-mode repair actions without silently saving', async () => {
+    const competitionEditor = await Bun.file(
+      new URL('../app/components/admin/CompetitionModeConfigEditor.vue', import.meta.url),
+    ).text()
+    const templatePage = await Bun.file(
+      new URL('../app/pages/admin/challenges/[id].vue', import.meta.url),
+    ).text()
+
+    expect(competitionEditor).toContain('function resetToCurrentDefaults()')
+    expect(competitionEditor).toContain("$t('重置为当前模式默认配置')")
+    expect(competitionEditor).toContain("$t('重置后仍需保存配置才会生效')")
+    expect(templatePage).toContain('function resetDefinitionToCurrentMode(): void')
+    expect(templatePage).toContain('form.definitionJson = defaultDefinitionJson(form.mode)')
+    expect(templatePage).toContain("$t('重置为当前模式默认题目定义')")
+    expect(templatePage).toContain("$t('重置后请返回基本信息保存修改')")
+  })
+
+  test('localizes legacy start-gate schema failures and retains challenge navigation', async () => {
+    expect(startGateErrorMessage({
+      code: 'CompetitionConfigurationInvalid',
+      message: 'schemaVersion 1 is unsupported; supported versions are 4.',
+    })).toBe('比赛模式配置版本过旧，请重新保存比赛配置。')
+    expect(startGateErrorMessage({
+      code: 'RuntimeDefinitionInvalid',
+      message: 'schemaVersion 1 is unsupported; supported versions are 4.',
+    })).toBe('题目运行环境定义版本过旧，请进入题目模板重新保存题目定义。')
+    expect(startGateErrorMessage({
+      code: 'ChallengeRulesInvalid',
+      message: 'schemaVersion 1 is unsupported; supported versions are 4.',
+    })).toBe('题目规则版本过旧，请重新保存题目规则。')
+
+    const page = await Bun.file(
+      new URL('../app/pages/admin/competitions/[id]/index.vue', import.meta.url),
+    ).text()
+    expect(page).toContain('startGateErrorMessage(ve)')
+    expect(page).toContain('v-if="ve.competitionChallengeId"')
+    expect(page).toContain("$t('查看题目')")
   })
 })
 

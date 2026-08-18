@@ -153,6 +153,78 @@ public sealed class AwdpEffectiveConfigurationTests
             .Contains("Runtime is required before an AWDP competition can start.");
     }
 
+    [Test]
+    public async Task Start_gate_rejects_legacy_awdp_competition_configuration()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var currentChallenge = new GameModeChallengeConfigurationCatalog()
+            .GetDefaultJson(NoCTF.Domain.Competitions.GameMode.Awdp);
+        var gate = new CompetitionStartGate(
+            new StartGateStore(new(
+                competitionId,
+                NoCTF.Domain.Competitions.GameMode.Awdp,
+                NoCTF.Domain.Competitions.CompetitionStatus.Published,
+                """{"schemaVersion":1}""",
+                [new(
+                    challengeId,
+                    NoCTF.Domain.Competitions.GameMode.Awdp,
+                    currentChallenge,
+                    currentChallenge,
+                    true,
+                    100,
+                    [])],
+                1,
+                0)),
+            new GameModeCompetitionConfigurationValidator(),
+            new GameModeChallengeConfigurationCatalog());
+
+        var errors = await gate.ValidateAsync(competitionId);
+
+        await Assert.That(errors).IsNotNull();
+        await Assert.That(errors!.Any(error =>
+            error.Code == StartGateFailureCode.CompetitionConfigurationInvalid
+            && error.Message.Contains("schemaVersion 1 is unsupported", StringComparison.Ordinal)))
+            .IsTrue();
+    }
+
+    [Test]
+    public async Task Start_gate_rejects_legacy_awdp_template_definition()
+    {
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var currentRules = new GameModeChallengeConfigurationCatalog()
+            .GetDefaultJson(NoCTF.Domain.Competitions.GameMode.Awdp);
+        var gate = new CompetitionStartGate(
+            new StartGateStore(new(
+                competitionId,
+                NoCTF.Domain.Competitions.GameMode.Awdp,
+                NoCTF.Domain.Competitions.CompetitionStatus.Published,
+                GameModeDefaultConfiguration.GetCompetitionJson(
+                    NoCTF.Domain.Competitions.GameMode.Awdp),
+                [new(
+                    challengeId,
+                    NoCTF.Domain.Competitions.GameMode.Awdp,
+                    currentRules,
+                    """{"schemaVersion":1}""",
+                    true,
+                    100,
+                    [])],
+                1,
+                0)),
+            new GameModeCompetitionConfigurationValidator(),
+            new GameModeChallengeConfigurationCatalog());
+
+        var errors = await gate.ValidateAsync(competitionId);
+
+        await Assert.That(errors).IsNotNull();
+        await Assert.That(errors!.Any(error =>
+            error.Code == StartGateFailureCode.RuntimeDefinitionInvalid
+            && error.CompetitionChallengeId == challengeId
+            && error.Message.Contains("schemaVersion 1 is unsupported", StringComparison.Ordinal)))
+            .IsTrue();
+    }
+
     private sealed class StartGateStore(CompetitionStartGateSnapshot snapshot)
         : ICompetitionStartGateStore
     {

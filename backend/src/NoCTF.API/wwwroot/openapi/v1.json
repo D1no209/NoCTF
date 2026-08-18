@@ -19594,8 +19594,7 @@
         "additionalProperties": false,
         "required": [
           "title",
-          "direction",
-          "definitionJson"
+          "direction"
         ],
         "properties": {
           "id": {
@@ -19626,9 +19625,7 @@
             "nullable": false
           },
           "definitionJson": {
-            "type": "string",
-            "minLength": 1,
-            "nullable": false
+            "type": "string"
           }
         }
       },
@@ -19692,7 +19689,6 @@
           "visibility",
           "title",
           "direction",
-          "definitionJson",
           "expectedRevision"
         ],
         "properties": {
@@ -19729,9 +19725,7 @@
             "nullable": false
           },
           "definitionJson": {
-            "type": "string",
-            "minLength": 1,
-            "nullable": false
+            "type": "string"
           },
           "expectedRevision": {
             "type": "integer",

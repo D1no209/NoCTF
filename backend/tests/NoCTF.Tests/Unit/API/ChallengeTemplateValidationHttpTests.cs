@@ -45,7 +45,6 @@ public sealed class ChallengeTemplateValidationHttpTests
             nameof(UpdateChallengeTemplateRequest.Visibility),
             nameof(UpdateChallengeTemplateRequest.Title),
             nameof(UpdateChallengeTemplateRequest.Direction),
-            nameof(UpdateChallengeTemplateRequest.DefinitionJson),
             nameof(UpdateChallengeTemplateRequest.ExpectedRevision));
 
         using var applicationResponse = await client.PutAsJsonAsync(route, new

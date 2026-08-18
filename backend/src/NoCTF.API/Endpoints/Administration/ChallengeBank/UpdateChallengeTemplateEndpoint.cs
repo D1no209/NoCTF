@@ -31,7 +31,6 @@ public sealed class UpdateChallengeTemplateValidator : Validator<UpdateChallenge
         RuleFor(request => request.Visibility).NotNull().IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.Direction).NotEmpty().MaximumLength(96);
-        RuleFor(request => request.DefinitionJson).NotEmpty();
         RuleFor(request => request.ExpectedRevision).NotNull().GreaterThanOrEqualTo(0);
     }
 }

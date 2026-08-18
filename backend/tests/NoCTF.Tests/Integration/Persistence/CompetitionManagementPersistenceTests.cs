@@ -8,6 +8,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Application.Teams.Registration;
 using NoCTF.Domain.Teams;
+using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Teams.Registration;
 using Testcontainers.PostgreSql;
@@ -18,6 +19,72 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class CompetitionManagementPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Create_competition_persists_the_current_configuration_schema_for_every_mode(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_competition_defaults")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            var ownerId = Guid.CreateVersion7();
+
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+            db.Users.Add(new User
+            {
+                Id = ownerId,
+                UserName = "administrator",
+                NormalizedUserName = "ADMINISTRATOR",
+                Email = "administrator@example.test",
+                NormalizedEmail = "ADMINISTRATOR@EXAMPLE.TEST",
+                PasswordHash = "test",
+                Role = UserRole.Administrator,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+            await db.SaveChangesAsync(cancellationToken);
+
+            var store = new CompetitionManagementStore(db);
+            foreach (var descriptor in GameModeCatalog.All)
+            {
+                var result = await store.CreateAsync(new(
+                    $"{descriptor.Mode} defaults",
+                    null,
+                    descriptor.Mode,
+                    now.AddHours(1),
+                    now.AddHours(2),
+                    true,
+                    5,
+                    2,
+                    ownerId,
+                    now), cancellationToken);
+                var competitionId = result.Competition!.Id;
+                var persistedJson = await db.Competitions
+                    .AsNoTracking()
+                    .Where(competition => competition.Id == competitionId)
+                    .Select(competition => competition.ConfigurationJson)
+                    .SingleAsync(cancellationToken);
+                using var document = System.Text.Json.JsonDocument.Parse(persistedJson);
+
+                await Assert.That(document.RootElement
+                        .GetProperty("schemaVersion")
+                        .GetInt32())
+                    .IsEqualTo(descriptor.CurrentSchemaVersion);
+            }
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Find_filters_the_entity_before_projecting_the_competition_view(

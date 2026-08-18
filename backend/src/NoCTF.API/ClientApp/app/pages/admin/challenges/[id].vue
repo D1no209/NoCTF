@@ -91,6 +91,11 @@ function changeMode(value: unknown): void {
   form.mode = value
 }
 
+function resetDefinitionToCurrentMode(): void {
+  form.definitionJson = defaultDefinitionJson(form.mode)
+  toast.info(translate('已载入当前模式默认题目定义，请保存修改'))
+}
+
 function syncForm(value: Template): void {
   form.title = value.title ?? ''
   form.visibility = value.visibility ?? 'Private'
@@ -675,9 +680,20 @@ onMounted(() => {
             <Card>
               <CardContent class="pt-6">
                 <Alert v-if="definitionParseFailed" variant="destructive">
-                  <AlertDescription> {{ $t('现有定义 JSON 无法解析,可能是历史遗留数据。请先在数据库或 API 层面修复后再编辑。') }} </AlertDescription>
+                  <AlertDescription class="flex flex-col items-start gap-3">
+                    <span>{{ $t('现有定义 JSON 无法解析,可能是历史遗留数据。请重置为当前模式默认定义后补齐运行环境配置。') }}</span>
+                    <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
+                      <RotateCcw data-icon="inline-start" /> {{ $t('重置为当前模式默认题目定义') }}
+                    </Button>
+                  </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="definitionModel">
+                  <div v-if="!isDeleted" class="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
+                      <RotateCcw data-icon="inline-start" /> {{ $t('重置为当前模式默认题目定义') }}
+                    </Button>
+                    <span class="text-xs text-muted-foreground">{{ $t('重置后请返回基本信息保存修改') }}</span>
+                  </div>
                   <DefinitionRuntimeSection :model="definitionModel" :mode="form.mode" :disabled="isDeleted" />
                   <FieldDescription>{{ $t('Runtime 定义修改对未来启动的实例生效。') }}</FieldDescription>
                 </FieldGroup>
@@ -689,9 +705,20 @@ onMounted(() => {
             <Card>
               <CardContent class="pt-6">
                 <Alert v-if="definitionParseFailed" variant="destructive">
-                  <AlertDescription> {{ $t('现有定义 JSON 无法解析,可能是历史遗留数据。请先在数据库或 API 层面修复后再编辑。') }} </AlertDescription>
+                  <AlertDescription class="flex flex-col items-start gap-3">
+                    <span>{{ $t('现有定义 JSON 无法解析,可能是历史遗留数据。请重置为当前模式默认定义后补齐模式配置。') }}</span>
+                    <Button v-if="!isDeleted" type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
+                      <RotateCcw data-icon="inline-start" /> {{ $t('重置为当前模式默认题目定义') }}
+                    </Button>
+                  </AlertDescription>
                 </Alert>
                 <FieldGroup v-else-if="definitionModel">
+                  <div v-if="!isDeleted" class="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" @click="resetDefinitionToCurrentMode">
+                      <RotateCcw data-icon="inline-start" /> {{ $t('重置为当前模式默认题目定义') }}
+                    </Button>
+                    <span class="text-xs text-muted-foreground">{{ $t('重置后请返回基本信息保存修改') }}</span>
+                  </div>
                   <Alert v-if="hasModeDefinition && runtimeDisabled">
                     <AlertDescription>{{ $t('运行环境未启用时,以下配置不会生效。') }}</AlertDescription>
                   </Alert>

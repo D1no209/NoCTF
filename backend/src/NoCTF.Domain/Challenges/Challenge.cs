@@ -15,7 +15,7 @@ public sealed class Challenge
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Direction { get; set; } = "Uncategorized";
-    public string DefinitionJson { get; set; } = """{"schemaVersion":1}""";
+    public string DefinitionJson { get; set; } = string.Empty;
     [ConcurrencyCheck]
     public int Revision { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

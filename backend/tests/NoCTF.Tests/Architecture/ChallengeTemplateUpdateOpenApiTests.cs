@@ -78,7 +78,6 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
                 "visibility",
                 "title",
                 "direction",
-                "definitionJson",
                 "expectedRevision"
             ]);
         AssertNonNegativeInt32(

@@ -1785,7 +1785,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateR
     title: string;
     description?: string | null;
     direction: string;
-    definitionJson: string;
+    definitionJson?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankGetChallengeFlagRequest = {
@@ -1823,7 +1823,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeTemplateR
     title: string;
     description?: string | null;
     direction: string;
-    definitionJson: string;
+    definitionJson?: string;
     expectedRevision: number;
 };
 

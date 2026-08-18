@@ -59,7 +59,7 @@ public sealed class ChallengeTemplateProtocolTests
         await Assert.That(missingProperties.Contains(
             nameof(UpdateChallengeTemplateRequest.Direction))).IsTrue();
         await Assert.That(missingProperties.Contains(
-            nameof(UpdateChallengeTemplateRequest.DefinitionJson))).IsTrue();
+            nameof(UpdateChallengeTemplateRequest.DefinitionJson))).IsFalse();
         await Assert.That(missingProperties.Contains(
             nameof(UpdateChallengeTemplateRequest.ExpectedRevision))).IsTrue();
         await Assert.That(validator.Validate(new UpdateChallengeTemplateRequest
