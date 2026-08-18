@@ -1,5 +1,35 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.51 推送与生产测试环境部署
+
+- 已将 `main` 从 `d1a9bf54` 快进推送到 `cbab9f4d`。生产测试环境
+  `https://101.43.46.244/` 已同步到 `cbab9f4d` 并完成部署。
+- 本次发布内容：
+  - `e328dd5f` 移除 AWDP 攻击 Runtime 旧版专属 `flagInjection` gate；Runner 不再要求题库/比赛配置里存在旧注入对象，而是校验 Worker 已按当前 Runtime generation 生成 `ChallengeFlag` 并注入到 Claim 环境变量。
+  - `797a825a` 记录 AWDP 动态 Flag 注入模型收口。
+  - `cbab9f4d` 将平台版本从 `0.1.0-alpha.50` 递增为 `0.1.0-alpha.51`。
+- 远程部署过程：
+  - 远端 `/root/NoCTF` 保留 `.env` 与未跟踪的 `deploy/docker-compose.prod.yml`，执行
+    `git fetch origin main && git reset --hard origin/main`，最终 HEAD 为 `cbab9f4d`。
+  - 使用 `deploy/docker-compose.yml` + `deploy/docker-compose.prod.yml` 和 `.env` 在远端构建
+    `migration`、`backend`、`worker`、`runner` 镜像；构建成功。前端静态资源生成阶段仅出现既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `docker compose ... run --rm migration` 返回 “No migrations were applied. The database is already up to date.”。
+  - 已重建并启动 `backend`、`worker`、`runner`，PostgreSQL 与 Redis 继续复用现有健康实例。
+  - 新镜像已打标签：`deploy-backend:alpha51-cbab9f4d`、`deploy-worker:alpha51-cbab9f4d`、
+    `deploy-runner:alpha51-cbab9f4d`、`deploy-migration:alpha51-cbab9f4d`。
+- 部署后验证：
+  - `deploy-backend-1`、`deploy-worker-1`、`deploy-runner-1` 均为 `Up / healthy`。
+  - 外部 HTTPS 检查：`https://101.43.46.244/` 返回 HTTP 200；`https://101.43.46.244/health` 返回 HTTP 200。
+  - 启动后三分钟 backend、worker、runner 日志未发现新的 `fail` / `error` / `exception` / `critical` 关键字输出。
+- 本阶段没有新增业务表、字段、EF migration、OpenAPI 契约或 TypeScript SDK 变更；未修改生产业务数据。
+- 本地验证结果：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error。
+  - `dotnet test backend/tests/NoCTF.Tests/NoCTF.Tests.csproj -c Release --no-build`：989 total，0 failed，813 succeeded，176 skipped。本机 Docker provider 不可用，因此 Docker/Kubernetes/Libvirt 专用集成用例由测试框架跳过；远端本次部署未执行破坏性 E2E。
+  - `bun test`：214/214 通过。
+  - `bun run typecheck`：通过。
+  - `bun run build`：通过；仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `git diff --check`：通过。
+
 ## 2026-08-18 alpha.50 后续未发布 AWDP 攻击 Runtime 动态 Flag 模型收口
 
 - `e328dd5f` 移除 AWDP 旧版专属 `flagInjection` 配置模型与管理端组件。AWDP schema v4 不再读取、不升级也不兼容旧 `flagInjection` 字段；旧字段会按未知 JSON 字段在后端保存/校验边界被拒绝，符合当前 Alpha 阶段“不保留旧模型兼容”的决策。
