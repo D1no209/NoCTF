@@ -1,5 +1,40 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.55 AWDP Fix 失败收敛、资源回收与 Runner 就绪状态
+
+- `54a4f739` 修正内部 API 通信拓扑：API 不再对内部 HTTP 请求执行 HTTPS 重定向，反向代理边界显式处理
+  Forwarded Headers，Compose 后端端口仅绑定 loopback，Kubernetes、Nginx 示例与部署文档同步；外部认证刷新 Cookie
+  仍保持 `Secure`。这避免 AWDP Runner 下载 Fix archive 时被重定向到容器内不可达的 HTTPS 地址。
+- `d3a76c85` 将 AWDP Fix archive 下载、解压或准备阶段的失败改为终态收敛，而不是 Wolverine 重投后不断创建替代
+  target。下载结果使用强类型状态、30 秒边界且禁止重定向；失败日志只记录结构化标识和失败码，不记录 archive
+  内容、URL 查询参数或敏感信息。
+- `25bb9492` 让正常停止、强制停止和恢复流程优先使用经校验的 `ProviderReceiptJson` 精确删除 Container、Compose、
+  OVA 及隔离网络；只有没有 receipt 时才按精确 `RuntimeId + Generation` 发现资源。Docker Compose 工作目录已消失时
+  幂等视为已停止，避免因标签漂移遗留 `AwdpTarget`、checker、网络、端口或 Runner 容量。
+- `e09b6a05` 增加 Runner provider 故障就绪状态：创建拒绝、超时或清理失败会在 120 秒保持窗口内使 readiness 返回失败，
+  同时将 Redis Runner 可用性标为离线但保留容量事实；后续成功操作会清除故障。Docker 地址池耗尽等资源故障因此
+  不再被 `/health/ready` 误报为健康。
+- `6e7425dc` 修复 Integration fixture 中无效的空 `jsonb` 种子，并明确 practice 与 player Runtime 属于不同 purpose、
+  各自从 generation 1 开始。该提交只修测试数据和断言，没有放宽生产 JSON 校验。
+- `6cff06a0` 将平台版本从 `0.1.0-alpha.54` 递增到 `0.1.0-alpha.55`。本阶段没有新增业务表、字段或 EF migration，
+  没有改变 HTTP/OpenAPI 契约；两份 OpenAPI 与生成 TypeScript SDK 已连续复核且无漂移。未推送、未部署，也未修改
+  生产或测试业务数据。用户已有的 `TODO.md` 修改、临时部署包和未跟踪目录均原样保留且未纳入提交。
+- 验证结果：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore -m:1`：通过，0 warning / 0 error。
+  - 非 Integration TUnit：829/829 通过。
+  - 完整 Integration：183 total，181 通过、0 失败、2 个环境型跳过，耗时 5 分 35.359 秒；跳过项仅为本机未配置
+    的真实 Kubernetes 集群与 Libvirt 磁盘。真实 PostgreSQL、Redis、Wolverine 与 Docker 用例全部通过。
+  - AWDP Full E2E：1/1 通过，耗时 3 分 42.887 秒；API、Redis、PostgreSQL 重启韧性检查通过；测试前后平台管理的
+    Docker 容器与网络均为 0，测试资源已精确清理。
+  - 前端 `bun test`：221/221 通过（1622 assertions）；`bun run typecheck` 与 production `bun run build` 通过。
+    构建仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `dotnet format backend/NoCTF.slnx analyzers --verify-no-changes --no-restore` 通过；EF
+    `migrations has-pending-model-changes --configuration Release --no-build` 返回无模型漂移；`git diff --check` 通过。
+  - OpenAPI 工具导出和 TypeScript SDK 连续生成两次均无差异；两份 OpenAPI SHA-256 均为
+    `4151471B13D6CAFFECBA10F508ECA3E6E53A8D583EDE15FF37F6BC667641D271`。
+  - 两份 Docker Compose 配置通过解析；Kubernetes `kubeconform -strict -ignore-missing-schemas` 检查 49 个资源：
+    46 valid、0 invalid、0 error、3 个 Cilium CRD 因无内置 schema 按 CI 规则 skipped。
+
 ## 2026-08-19 alpha.54 AWDP Runtime 队伍归属与管理端展示
 
 - `f84a3386` 修正 AWDP 攻击 Runtime 的用途与队伍归属链路：参赛者或管理员启动的长期 Break 环境现在以
