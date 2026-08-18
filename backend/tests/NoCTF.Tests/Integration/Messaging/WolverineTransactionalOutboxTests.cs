@@ -504,6 +504,7 @@ public sealed class WolverineTransactionalOutboxTests
                     OwnerId = ownerId,
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Running,
+                    ConfigurationJson = "{}",
                     RunningSince = now.AddMinutes(-1),
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),

@@ -356,6 +356,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         Mode = GameMode.Ctf,
         Status = CompetitionStatus.Visible,
         LeaderboardDirty = leaderboardDirty,
+        ConfigurationJson = "{}",
         MaxTeamMembers = 5,
         FlagDerivationSecret = new byte[32],
         StartAt = now.AddHours(1),

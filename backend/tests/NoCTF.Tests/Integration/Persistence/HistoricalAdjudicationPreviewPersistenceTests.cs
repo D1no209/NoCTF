@@ -438,6 +438,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             Mode = GameMode.Awdp,
             Title = $"AWDP {fixtureName} challenge",
             Direction = "Pwn",
+            DefinitionJson = "{}",
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -448,6 +449,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             ChallengeId = challengeId,
             BaseScore = 100,
             IsPublished = true,
+            RulesJson = "{}",
             UpdatedAt = now
         });
         var facts = new[]
@@ -682,6 +684,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             ObserverIds = [observerId],
             Title = "Adjudication preview",
             Mode = GameMode.Ctf,
+            ConfigurationJson = "{}",
             ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
             StartAt = now,
@@ -709,6 +712,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             Mode = GameMode.Ctf,
             Title = "Preview challenge",
             Direction = "Web",
+            DefinitionJson = "{}",
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -719,6 +723,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             ChallengeId = challengeId,
             BaseScore = 100,
             IsPublished = true,
+            RulesJson = "{}",
             UpdatedAt = now
         });
         db.GameplayFacts.Add(new GameplayFact

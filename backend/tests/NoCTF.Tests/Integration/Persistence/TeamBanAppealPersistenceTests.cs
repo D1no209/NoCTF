@@ -158,6 +158,7 @@ public sealed class TeamBanAppealPersistenceTests
             OwnerId = ownerId,
             Mode = GameMode.Ctf,
             Status = CompetitionStatus.Finished,
+            ConfigurationJson = "{}",
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-2),
             EndAt = now.AddHours(-1),

@@ -453,6 +453,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             BaseScore = 500,
             Order = 1,
             IsPublished = true,
+            RulesJson = "{}",
             UpdatedAt = now
         });
 
@@ -476,6 +477,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             ChallengeId = deletedParentChallengeId,
             BaseScore = 500,
             Order = 1,
+            RulesJson = "{}",
             UpdatedAt = now
         });
 

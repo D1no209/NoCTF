@@ -66,6 +66,7 @@ public sealed class IdentityNormalizationPersistenceTests
                     Title = "Normalization",
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Draft,
+                    ConfigurationJson = "{}",
                     MaxTeamMembers = 5,
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(1),

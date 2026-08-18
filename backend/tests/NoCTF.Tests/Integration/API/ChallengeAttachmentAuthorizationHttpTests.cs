@@ -269,6 +269,7 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             Title = "Attachment authorization",
             Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
+            ConfigurationJson = "{}",
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
@@ -371,6 +372,7 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
         OwnerId = ownerId,
         Title = title,
         Mode = GameMode.Ctf,
+        DefinitionJson = "{}",
         CreatedAt = DateTimeOffset.UtcNow,
         UpdatedAt = DateTimeOffset.UtcNow
     };
