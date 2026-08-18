@@ -1,5 +1,43 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.56 AWDP 轮次结算、攻防分拆、操作播报与咨询布局
+
+- `2f18f836` 重构 AWDP 排行榜的结算时间语义：只累计已经结束的逻辑轮次，当前轮次不提前展示未结算分数；
+  比赛结束时结算不足一整轮的最后一轮，暂停时长不进入逻辑时钟，封禁或解禁后继续由全部权威事实重放历史轮次。
+  Break 与 Fix 各自使用独立动态曲线，并在排行榜响应中明确提供 `attackScore`、`defenseScore`、`penaltyScore`、
+  `currentRound` 和 `settledThroughRound`；总分为已结算攻击分、防御分、惩罚及人工调整之和。
+- 同一提交将 CTF 正确 Flag 与 AWDP 正确 Break 的长期选手攻击 Runtime 自动推进到停止流程。AWDP 只停止
+  `AwdpAttack`，不会误停一次性 `AwdpTarget`；重复 Worker 消息由既有结果转换栅栏保证不会重复发送停止操作。
+  Full E2E 已改为明确验证攻击环境停止，再从 Stopped 状态启动新 generation，而不是对已停止实例调用 reset。
+- AWDP 接受的 Break/Fix 操作会分别写入永久的 `AwdpBreakAttempted` / `AwdpFixAttempted` 公开比赛事件；事件只包含
+  比赛、题目、队伍和操作类型，不复制 Flag、Fix 内容或验证过程。参赛者 Fix 历史列表新增题目与 kind 强类型筛选，
+  signed cursor 同时绑定比赛、用户和筛选条件；没有新增手写 URL、DTO、枚举或失败码。
+- `eff4901c` 重做参赛者 AWDP 展示：题目卡分别显示“攻击成功”“防御成功”，只有两者都成功才显示“已解出”；
+  排行榜和队伍详情分别展示攻击、防御、惩罚与总分，并明确显示已结算轮次，避免把当前轮次的参考曲线误当成实得分。
+  题目详情移除冗长内部流程说明，Fix 结果只展示“防御成功”“防御异常：EXP 利用成功”或“防御异常：服务异常”。
+  新增选手可访问的单题 Fix 历史页，分页展示状态与脱敏最终结果，不返回 Flag 或 patch 内容。
+- 同一前端提交补齐 AWDP 攻击/Fix 操作的赛事播报。咨询页改为左侧紧凑列表、右侧会话区占满剩余宽度；详情卡
+  提供至少 36rem 的交流空间，回复输入区增至 7 行并保留窄屏单列布局。
+- OpenAPI 两份制品与 TypeScript SDK 均由工具重新生成，并连续导出/生成两次验证幂等。两份 OpenAPI SHA-256
+  均为 `2DB8498F88663E9EF5A82D282E651F01F95488CCF49DA84169243989A0D3B5E3`，生成 SDK SHA-256 为
+  `B4E4C563E66CE9E37CC9D47ACB4F0201C92747CD5875C6BED67E634AAF3DB0E2`。
+- `d7dbfa3a` 将平台版本从 `0.1.0-alpha.55` 递增到 `0.1.0-alpha.56`。本阶段没有新增业务表、字段或 EF migration，
+  没有推送、部署或修改生产业务数据；用户已有 `TODO.md` 修改、临时部署包及未跟踪目录均原样保留且未纳入提交。
+- 验证结果：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error；版本递增后已复跑。
+  - 非 Integration TUnit：829/829 通过。新增 AWDP 轮次、攻防分拆、封禁重盘和结束时不足整轮结算测试均通过；
+    CTF/AWDP 正确 Flag/Break 自动停止的真实 PostgreSQL 定向测试 2/2 通过。
+  - 完整 Integration：185 total，182 通过、1 个 Wolverine 双节点维护故障转移时序用例在全量并行中超出 30 秒、
+    2 个环境型跳过；该失败用例隔离复跑 1/1 通过。跳过项仅为本机未配置的真实 Kubernetes 集群与 Libvirt 磁盘，
+    PostgreSQL、Redis、Wolverine 和 Docker 的其余真实集成用例均通过。
+  - CTF Full E2E：1/1 通过，耗时 54.514 秒；AWDP Full E2E：1/1 通过，耗时 3 分 50.937 秒；两种模式的
+    API、Worker、Runner、PostgreSQL、Redis、MinIO、Docker 闭环及 API/Redis/PostgreSQL 重启韧性检查通过，
+    E2E 容器、镜像和网络均由编排器精确清理。
+  - 前端 `bun test`：224/224 通过；`bun run typecheck` 与 production `bun run build` 通过。构建仅保留既有
+    大 chunk、plugin timing 与第三方 package deprecation warning。
+  - `dotnet format backend/NoCTF.slnx analyzers --verify-no-changes --no-restore --severity warn` 通过；EF
+    `migrations has-pending-model-changes --configuration Release --no-build` 返回无模型漂移；`git diff --check` 通过。
+
 ## 2026-08-19 alpha.55 测试生产环境推送与部署
 
 - 将本阶段功能分支与最新 `origin/main` 合并，保留协作者的 `e8b71bee` SSH.NET 安全版本固定，合并提交为
