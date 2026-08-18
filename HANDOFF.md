@@ -1,5 +1,23 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-18 alpha.50 当前模式配置默认值与旧版修复入口
+
+- `7f54f1dc` 删除 Domain 与 Challenge API 中会静默写入 `schemaVersion: 1` 的危险默认值。题目模板创建或更新未提供定义时，由 Application 根据所选游戏模式写入当前默认定义；AWDP 当前写入 schema v4，调用方显式提交 v1 时仍按不支持版本拒绝，不做隐式迁移。
+- 新建比赛继续由 `GameModeDefaultConfiguration` 写入各模式当前配置版本；新增真实 PostgreSQL 覆盖用例，逐一锁定 CTF、AWD、AWDP、KoH 的持久化 `schemaVersion`。Domain 实体本身不再伪造任何旧版 JSON。
+- 管理端新增两类显式修复入口：比赛配置可重置为当前模式默认配置，题目模板可重置为当前模式默认定义。重置只修改当前表单，必须再次点击保存才会写入，历史配置不会被静默覆盖。
+- StartGate 中包含不支持 `schemaVersion` 的 `CompetitionConfigurationInvalid`、`RuntimeDefinitionInvalid`、`ChallengeRulesInvalid` 已按强类型 code 显示中文/英文可操作提示，并保留关联题目的“查看题目”入口。
+- OpenAPI 与 TypeScript SDK 已由工具重新生成：创建/更新题目模板的 `definitionJson` 变为可选；缺省语义由 Application 负责。二次导出和生成哈希一致，未手工修改生成文件。
+- `cc54f615` 将平台版本从 `0.1.0-alpha.49` 递增为 `0.1.0-alpha.50`。
+- 本阶段没有新增业务表、字段或 EF migration；未查询或修改生产数据，因请求未提供待检查的具体比赛 ID；未推送、未部署。
+- 验证结果：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error（版本递增后复跑）。
+  - 非 Integration TUnit：810/810 通过。
+  - 题目默认定义、协议、OpenAPI 与 AWDP StartGate 定向测试：全部通过。
+  - 新增 PostgreSQL 各模式默认版本用例已执行，但本机 Docker provider 不可用，结果为 1 skipped、0 executed；不得视为通过，需在有 Docker 的 CI/测试环境补跑。
+  - `bun test`：213/213 通过；`bun run typecheck`、`bun run build` 通过。前端构建仅保留既有大 chunk、plugin timing 与第三方 Node exports deprecation warning。
+  - `dotnet ef migrations has-pending-model-changes`：无模型漂移。
+  - OpenAPI/SDK 二次生成幂等、改动 C# whitespace 校验与 `git diff --check`：通过。
+
 ## 2026-08-18 alpha.49 管理端竞赛题目删除按钮修复
 
 - `ef04dd5e` 修复管理后台“竞赛管理 / 题目”列表中的删除题目按钮无效问题。
