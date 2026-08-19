@@ -1,5 +1,19 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.58 AWDP 跨轮累计计分与中控动态增强
+
+- `a67bc6ab` 修正 AWDP 计分激活语义。每支队伍、每道题、每条 Break/Fix 轨道只取首个有效 Correct 作为唯一激活点；从激活轮开始，每个已完成轮次都按该轮截至当时的累计激活队伍数计算独立动态分值并持续累加。后续轮次新增队伍只影响后续轮次，重复正确提交、重复 callback 与 Wolverine 重投不会建立第二次激活；当前进行中轮次仍不提前计分，Pause/Resume/Finish 与封禁/解禁的权威重盘语义保持不变。
+- 同一提交扩展公开排行榜契约，新增可空 `roundDurationSeconds` 与 `currentRoundRemainingSeconds`。AWDP 投影使用暂停感知的有效比赛时间生成权威当前轮和剩余秒数；前端以排行榜 `generatedAt` 为基准每秒推进 Running 比赛的本轮倒计时，Paused 时冻结，Finished 时归零。两份 OpenAPI 制品由工具导出，TypeScript SDK 由工具重新生成，没有手写协议。
+- AWDP 中控顶栏不再用累计攻击分/防御分冒充操作统计，改为攻击与防御各自的“成功数 / 总提交数”；Attempted 与 Resolved 通过 GameplayFactId 合并后只计一次，并通过签名游标读取当前比赛窗口内全部 AWDP 操作事件。事件播放会自动选中对应队伍并将对应题目置顶、持续聚焦；题目卡复用全站方向图标，WEB 显示网络/地球图标，PWN 显示 Bug 图标。新增红/青双轨能量场、雷达扫描、事件爆发高亮及 scanline，同时保留 `prefers-reduced-motion` 降级。
+- `9d9f94f0` 将版本从 `0.1.0-alpha.57` 递增到 `0.1.0-alpha.58`。本阶段没有新增业务表、字段或 EF migration；没有推送、部署或修改生产业务数据。用户已有 `TODO.md` 修改、临时部署包及未跟踪目录均原样保留且未纳入提交。
+- 验证结果：
+  - `dotnet build backend/NoCTF.slnx -c Release --no-restore`：通过，0 warning / 0 error。
+  - `AwdpGameplayFactEvaluatorTests`：9/9 通过；非 Integration TUnit：829/829 通过。覆盖首次 Break/Fix 后无需逐轮重复提交仍连续累加、动态人数变化不追溯旧轮、重复事实去重、封禁重盘、暂停感知和结束冻结。
+  - 前端 `bun test`：231/231 通过（1718 assertions）；`bun run typecheck` 与 production `bun run build` 通过。构建仅保留既有动画组件 CSS 表达式、chunk 大小、plugin timing 与第三方 Node exports deprecation 警告。
+  - OpenAPI 与 TypeScript SDK 连续第二轮导出/生成哈希一致；两份 OpenAPI SHA-256 均为 `CD34201C266ADBEDD8F8E652AE7F5A3E31C72DAB350FEF21379B4B87A33FCB76`，生成 `types.gen.ts` SHA-256 为 `52DBF7FD7C4E01C1462F3F8F8599E35CD7E403535DC6B0DEB9C454F4B64E052A`。
+  - 变更 C# 文件 `dotnet format ... analyzers --verify-no-changes` 与 `git diff --check` 通过。
+- 尚未执行生产环境浏览器验收：本阶段尚未推送或部署，因此没有在生产页面上伪报视觉通过。部署后应使用 Microsoft Edge 验收本轮倒计时跨轮归位、操作总数、WEB/PWN 图标、事件聚焦和 reduced-motion，并确认 Network/Console 无新增错误。
+
 ## 2026-08-19 alpha.57 测试生产环境推送与部署
 
 - alpha.57 功能、版本和阶段交接内容已经推送到远程 `main`。由于直接 Git HTTPS 推送间歇性被连接重置，使用 GitHub Git Data API 按本地已验证树重建提交，并以 `108b94742cb26769923b4c17b058749b511debbf` 完成快进；远程最终 tree `39fbf854acea6db2350d707e9d8564d8874d3df8` 与本地 alpha.57 tree 完全一致。部署机通过经过 `git bundle verify` 的增量 bundle 快进到同一提交，没有覆盖生产 `.env`、Compose overlay 或其他未跟踪配置。
