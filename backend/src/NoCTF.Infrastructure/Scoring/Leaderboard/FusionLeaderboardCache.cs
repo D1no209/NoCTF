@@ -29,8 +29,13 @@ public sealed class FusionLeaderboardCache(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
 
-    public Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct) =>
-        cache.GetOrDefaultAsync<LeaderboardResponse?>(SnapshotKey(competitionId), null, token: ct).AsTask();
+    public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct) =>
+        (await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
+            ProjectionKey(competitionId), null, token: ct))?.Legacy;
+
+    public async Task<ScoreboardProjection?> GetScoreboardAsync(Guid competitionId, CancellationToken ct) =>
+        (await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
+            ProjectionKey(competitionId), null, token: ct))?.Scoreboard;
 
     public async Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken ct)
     {
@@ -40,23 +45,46 @@ public sealed class FusionLeaderboardCache(
             .SingleOrDefaultAsync(ct);
         return string.IsNullOrWhiteSpace(payload)
             ? null
-            : JsonSerializer.Deserialize<LeaderboardResponse>(payload, JsonOptions);
+            : JsonSerializer.Deserialize<LeaderboardProjectionBundle>(payload, JsonOptions)?.Legacy;
+    }
+
+    public async Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken ct)
+    {
+        var payload = await db.Competitions.AsNoTracking()
+            .Where(competition => competition.Id == competitionId)
+            .Select(competition => competition.FrozenLeaderboardSnapshotJson)
+            .SingleOrDefaultAsync(ct);
+        return string.IsNullOrWhiteSpace(payload)
+            ? null
+            : JsonSerializer.Deserialize<LeaderboardProjectionBundle>(payload, JsonOptions)?.Scoreboard;
     }
 
     public async Task<LeaderboardResponse?> CreateAsync(
         Guid competitionId,
         DateTimeOffset projectedAt,
         CancellationToken ct) =>
-        await CreateCoreAsync(competitionId, null, projectedAt, ct);
+        (await ProjectBundleAsync(competitionId, null, projectedAt, ct))?.Legacy;
+
+    public Task<LeaderboardProjectionBundle?> CreateBundleAsync(
+        Guid competitionId,
+        DateTimeOffset projectedAt,
+        CancellationToken ct) =>
+        ProjectBundleAsync(competitionId, null, projectedAt, ct);
+
+    public async Task<ScoreboardProjection?> CreateScoreboardAsync(
+        Guid competitionId,
+        DateTimeOffset projectedAt,
+        CancellationToken ct) =>
+        (await ProjectBundleAsync(competitionId, null, projectedAt, ct))?.Scoreboard;
 
     public async Task<LeaderboardResponse?> CreateWithConfigurationAsync(
         Guid competitionId,
         string competitionConfigurationJson,
         DateTimeOffset projectedAt,
         CancellationToken ct) =>
-        await CreateCoreAsync(competitionId, competitionConfigurationJson, projectedAt, ct);
+        (await ProjectBundleAsync(competitionId, competitionConfigurationJson, projectedAt, ct))?.Legacy;
 
-    private async Task<LeaderboardResponse?> CreateCoreAsync(
+    private async Task<LeaderboardProjectionBundle?> ProjectBundleAsync(
         Guid competitionId,
         string? competitionConfigurationJson,
         DateTimeOffset projectedAt,
@@ -120,20 +148,65 @@ public sealed class FusionLeaderboardCache(
                 templates[instance.ChallengeId].Direction,
                 instance.CustomTitle ?? templates[instance.ChallengeId].Title,
                 false,
-                instance.RulesJson))
+                instance.RulesJson,
+                instance.Order,
+                instance.IsPublished,
+                instance.Revision))
             .ToList();
 
+        var relevantFacts = db.GameplayFacts.AsNoTracking()
+            .Where(fact => fact.CompetitionId == competitionId);
+        relevantFacts = competition.Mode switch
+        {
+            GameMode.Ctf => relevantFacts.Where(fact =>
+                fact.Kind == GameplayFactKind.FlagAttempt
+                || fact.Kind == GameplayFactKind.HintUnlock
+                || fact.Kind == GameplayFactKind.ManualAdjustment),
+            GameMode.Awd => relevantFacts.Where(fact =>
+                fact.Kind == GameplayFactKind.FlagAttempt
+                || fact.Kind == GameplayFactKind.AwdServiceTransition
+                || fact.Kind == GameplayFactKind.ManualAdjustment),
+            GameMode.Awdp => relevantFacts.Where(fact =>
+                fact.Kind == GameplayFactKind.BreakAttempt
+                || fact.Kind == GameplayFactKind.FixAttempt
+                || fact.Kind == GameplayFactKind.ManualAdjustment),
+            GameMode.Koh => relevantFacts.Where(fact =>
+                fact.Kind == GameplayFactKind.KohControlObservation
+                || fact.Kind == GameplayFactKind.ManualAdjustment),
+            _ => throw new ArgumentOutOfRangeException(nameof(competition.Mode), competition.Mode, null)
+        };
+        var rawFacts = await relevantFacts
+            .OrderBy(fact => fact.OccurredAt)
+            .ThenBy(fact => fact.Id)
+            .Select(fact => new
+            {
+                fact.Id,
+                fact.TeamId,
+                fact.CompetitionChallengeId,
+                fact.Kind,
+                fact.OccurredAt,
+                fact.State,
+                fact.Result,
+                fact.FailureCode,
+                fact.ReferenceKind,
+                fact.ReferenceId,
+                fact.VictimTeamId,
+                fact.ActorUserId,
+                fact.Value
+            })
+            .ToListAsync(ct);
+        var actorIds = rawFacts
+            .Where(fact => fact.ActorUserId is not null)
+            .Select(fact => fact.ActorUserId!.Value)
+            .Distinct()
+            .ToArray();
         var users = await db.Users.AsNoTracking()
+            .Where(user => actorIds.Contains(user.Id))
             .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
         var hintCosts = challengeEntities
             .SelectMany(challenge => challenge.Hints)
             .ToDictionary(hint => hint.Id, hint => hint.Cost);
-        var facts = (await db.GameplayFacts.AsNoTracking()
-                .Where(fact => fact.CompetitionId == competitionId)
-                .OrderBy(fact => fact.OccurredAt)
-                .ThenBy(fact => fact.Id)
-                .ToListAsync(ct))
-            .Select(fact => new LeaderboardGameplayFact(
+        var facts = rawFacts.Select(fact => new LeaderboardGameplayFact(
                 fact.Id,
                 fact.TeamId,
                 fact.CompetitionChallengeId,
@@ -149,7 +222,8 @@ public sealed class FusionLeaderboardCache(
                 fact.Value,
                 fact.ReferenceKind == GameplayFactReferenceKind.Hint && fact.ReferenceId is Guid hintId
                     ? hintCosts.GetValueOrDefault(hintId)
-                    : null))
+                    : null,
+                fact.ActorUserId))
             .ToList();
 
         var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
@@ -195,7 +269,7 @@ public sealed class FusionLeaderboardCache(
                 .ToListAsync(ct);
         }
 
-        var projection = projectionEngine.Project(new(
+        var projectionInput = new LeaderboardProjectionInput(
             competitionId,
             competition.Mode,
             teamFacts,
@@ -206,8 +280,9 @@ public sealed class FusionLeaderboardCache(
             lifecycle,
             awdRounds,
             projectedAt,
-            competition.Status));
-        return new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
+            competition.Status);
+        var projection = projectionEngine.Project(projectionInput);
+        var legacy = new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
         {
             Challenges = projection.Challenges,
             Tracks = trackConfiguration.Tracks.Select(track => new LeaderboardTrackInfo(
@@ -223,19 +298,35 @@ public sealed class FusionLeaderboardCache(
             RoundDurationSeconds = projection.RoundDurationSeconds,
             CurrentRoundRemainingSeconds = projection.CurrentRoundRemainingSeconds
         };
+        var scoreboard = projectionEngine.ProjectScoreboard(projectionInput);
+        scoreboard = scoreboard with
+        {
+            Snapshot = scoreboard.Snapshot with
+            {
+                Tracks = trackConfiguration.Tracks.Select(track => new ScoreboardTrack(
+                    track.Key,
+                    track.Name,
+                    track.IsInternal,
+                    track.VisibleOnLeaderboard)).ToArray(),
+                Visibility = CompetitionLeaderboardVisibility.Normal,
+                DataScope = LeaderboardDataScope.Live,
+                DataAsOf = projectedAt
+            }
+        };
+        return new(legacy, scoreboard);
     }
 
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
     {
         if (db.Database.IsInMemory())
         {
-            var developmentResponse = await CreateAsync(
-                competitionId, DateTimeOffset.UtcNow, ct);
+            var developmentResponse = await ProjectBundleAsync(
+                competitionId, null, DateTimeOffset.UtcNow, ct);
             if (developmentResponse is null)
                 return;
-            await cache.SetAsync(SnapshotKey(competitionId), developmentResponse, token: ct);
+            await cache.SetAsync(ProjectionKey(competitionId), developmentResponse, token: ct);
             await cache.RemoveAsync(FailureKey(competitionId), token: ct);
-            await publisher.PublishAsync(competitionId, developmentResponse.GeneratedAt, ct);
+            await publisher.PublishAsync(developmentResponse.Scoreboard, ct);
             return;
         }
         try
@@ -244,13 +335,13 @@ public sealed class FusionLeaderboardCache(
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT pg_advisory_xact_lock(hashtextextended({competitionId.ToString("N")}, 0))",
                 ct);
-            var response = await CreateAsync(competitionId, DateTimeOffset.UtcNow, ct);
+            var response = await ProjectBundleAsync(competitionId, null, DateTimeOffset.UtcNow, ct);
             if (response is null)
                 return;
-            await cache.SetAsync(SnapshotKey(competitionId), response, token: ct);
+            await cache.SetAsync(ProjectionKey(competitionId), response, token: ct);
             await cache.RemoveAsync(FailureKey(competitionId), token: ct);
             await transaction.CommitAsync(ct);
-            await publisher.PublishAsync(competitionId, response.GeneratedAt, ct);
+            await publisher.PublishAsync(response.Scoreboard, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -294,6 +385,6 @@ public sealed class FusionLeaderboardCache(
         return new(failure);
     }
 
-    private static string SnapshotKey(Guid competitionId) => $"leaderboard:{competitionId:N}";
+    private static string ProjectionKey(Guid competitionId) => $"projection:v2:{competitionId:N}";
     private static string FailureKey(Guid competitionId) => $"leaderboard:{competitionId:N}:last-failure";
 }

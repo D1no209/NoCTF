@@ -139,7 +139,7 @@ round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 
 - 每个 Team/CompetitionChallenge/Kind 只选 `(OccurredAt, GameplayFactId)` 最早的有效 Correct，所属逻辑轮成为该轨道的唯一激活轮；
 - 同一题目的 Break 与 Fix 分别取每队首个有效 Correct 作为激活点；后续重复正确提交、重复 callback 或 Wolverine 重投不建立第二个激活点；
-- 每个已完成轮次分别统计截至该轮已激活且 `AffectsDynamicChallengeScore=true` 的不同队伍数，把该累计人数代入 Break/Fix 曲线，得到该轮整数攻击分和防御分；该轮所有已激活、可计分队伍获得对应轨道的同一分值；
+- 每个已完成轮次分别统计截至该轮已激活且 `AffectsCompetitiveResults=true` 的不同队伍数，把该累计人数代入 Break/Fix 曲线，得到该轮整数攻击分和防御分；该轮所有已激活、可计分队伍获得对应轨道的同一分值；`AffectsDynamicChallengeScore` 只用于 CTF 动态题值，不参与 AWDP 结算；
 - 当前进行中的轮次不进入公开排行榜；轮次结束后才追加该轮得分。进入后续轮后，前一轮使用当时的最终激活人数固化结算，后续新增激活只影响后续轮次，不追溯改变它；已激活队伍无需每轮重复提交即可持续累加；
 - 两轨分数独立后相加。启用 `RequireBreakBeforeFix` 时，Fix 必须存在按权威顺序更早的 Correct Break；该 Break 被重判后会确定性重盘依赖结果；
 - Correct/Wrong 重判、队伍禁赛或解禁都会从原始事实全量重播所有轮次，不修改 GameplayFact 或永久事件；
