@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.SignalR.Hubs;
+using NoCTF.Application.Notifications;
 using NoCTF.Infrastructure.Notifications;
 using StackExchange.Redis;
 
@@ -20,12 +21,12 @@ public sealed class RedisLeaderboardRefreshRelay(
         {
             try
             {
-                var notification = JsonSerializer.Deserialize<LeaderboardRefreshNotification>(
+                var notification = JsonSerializer.Deserialize<ScoreboardUpdated>(
                     message.Message.ToString());
                 if (notification is null)
                     return;
                 await hub.Clients.Group($"competition:{notification.CompetitionId:N}").SendAsync(
-                    "leaderboardRefreshed",
+                    "scoreboardUpdated",
                     notification,
                     stoppingToken);
             }

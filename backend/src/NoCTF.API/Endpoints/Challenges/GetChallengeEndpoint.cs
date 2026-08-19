@@ -62,7 +62,7 @@ internal static class ChallengeMapper
             koh?.ControlFlag,
             koh?.Urls,
             CompetitionProtocolMapper.ToProtocol(visibility),
-            LeaderboardProtocolMapper.ToProtocol(dataScope));
+            ScoreboardProtocolMapper.ToProtocol(dataScope));
 
     public static ChallengeListResponse ToListResponse(
         IReadOnlyList<ChallengeView> views,
@@ -74,7 +74,7 @@ internal static class ChallengeMapper
                 visibility: visibility,
                 dataScope: dataScope)).ToArray(),
             CompetitionProtocolMapper.ToProtocol(visibility),
-            LeaderboardProtocolMapper.ToProtocol(dataScope));
+            ScoreboardProtocolMapper.ToProtocol(dataScope));
 }
 
 public sealed class GetChallengeRequest

@@ -79,18 +79,28 @@ public sealed class CompetitionVisibilityStore(
         string? frozenSnapshotJson = null;
         if (!scheduled && command.Visibility == CompetitionLeaderboardVisibility.Frozen)
         {
-            var snapshot = await snapshots.CreateAsync(
+            var snapshot = await snapshots.CreateBundleAsync(
                 competition.Id,
                 command.Now,
                 ct);
             if (snapshot is null)
                 return new(CompetitionVisibilityMutationState.NotFound);
-            frozenSnapshotJson = JsonSerializer.Serialize(snapshot with
-            {
-                Visibility = CompetitionLeaderboardVisibility.Frozen,
-                DataScope = LeaderboardDataScope.Frozen,
-                DataAsOf = command.Now
-            }, JsonOptions);
+            frozenSnapshotJson = JsonSerializer.Serialize(new LeaderboardProjectionBundle(
+                snapshot.Legacy with
+                {
+                    Visibility = CompetitionLeaderboardVisibility.Frozen,
+                    DataScope = LeaderboardDataScope.Frozen,
+                    DataAsOf = command.Now
+                },
+                snapshot.Scoreboard with
+                {
+                    Snapshot = snapshot.Scoreboard.Snapshot with
+                    {
+                        Visibility = CompetitionLeaderboardVisibility.Frozen,
+                        DataScope = LeaderboardDataScope.Frozen,
+                        DataAsOf = command.Now
+                    }
+                }), JsonOptions);
         }
 
         competition.LeaderboardVisibility = command.Visibility;
@@ -174,18 +184,28 @@ public sealed class CompetitionVisibilityStore(
 
         if (competition.LeaderboardVisibility == CompetitionLeaderboardVisibility.Frozen)
         {
-            var snapshot = await snapshots.CreateAsync(
+            var snapshot = await snapshots.CreateBundleAsync(
                 competition.Id,
                 now,
                 ct);
             if (snapshot is null)
                 return;
-            competition.FrozenLeaderboardSnapshotJson = JsonSerializer.Serialize(snapshot with
-            {
-                Visibility = CompetitionLeaderboardVisibility.Frozen,
-                DataScope = LeaderboardDataScope.Frozen,
-                DataAsOf = now
-            }, JsonOptions);
+            competition.FrozenLeaderboardSnapshotJson = JsonSerializer.Serialize(new LeaderboardProjectionBundle(
+                snapshot.Legacy with
+                {
+                    Visibility = CompetitionLeaderboardVisibility.Frozen,
+                    DataScope = LeaderboardDataScope.Frozen,
+                    DataAsOf = now
+                },
+                snapshot.Scoreboard with
+                {
+                    Snapshot = snapshot.Scoreboard.Snapshot with
+                    {
+                        Visibility = CompetitionLeaderboardVisibility.Frozen,
+                        DataScope = LeaderboardDataScope.Frozen,
+                        DataAsOf = now
+                    }
+                }), JsonOptions);
         }
 
         competition.LeaderboardVisibilityAppliedAt = now;

@@ -37,8 +37,7 @@ internal static class NotificationInfrastructure
 internal sealed class NullLeaderboardRefreshPublisher : ILeaderboardRefreshPublisher
 {
     public Task PublishAsync(
-        Guid competitionId,
-        DateTimeOffset generatedAt,
+        NoCTF.Application.Scoring.Leaderboard.ScoreboardProjection projection,
         CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
