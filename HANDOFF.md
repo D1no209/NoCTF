@@ -1,5 +1,19 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.60 统一排行榜矩阵协议
+
+- 基线为远程 `main` 的 `870b5201f0b80e25af4871a6f5a56166cf8cf090`，实现位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`、分支 `codex/leaderboard-matrix-20260819`；原工作区的用户/协作者修改未被切换、清理或覆盖。本阶段未推送、未部署、未操作生产数据。
+- `042ad90f` 引入统一规范化排行榜查询投影。四种模式共用 `ScoreboardSchema`、`ScoreboardSnapshot`、Actor 目录、稀疏 `ScoreSlot`、`ScoreBreakdown`、`ScoreEntry` 与全局调整协议；横轴按 `CompetitionChallengeId + RoundId` 建立稳定连续列，队伍每行只传非空 Slot。Challenge、轮次、队伍和提交者信息分别去重，不创建 `leaderboard_slots` 等业务表。FusionCache 在一次投影中原子替换旧排行榜和规范化 Schema/Snapshot，失败不会覆盖上一份成功快照。
+- 规范化投影的所有分数、衰减、奖励、扣分与总分均由后端生成，前端只做布局和简单算术诊断。CTF 使用 `Solve/BloodAward/Hint`，动态分为 `Provisional`；AWD 使用 `Attack/Defense/Availability`；AWDP 每题每轮分别映射 `Attack/Defense`，当前轮 Slot 为 `Pending` 且三项分数均为 `null`，只展示成功数/尝试数，结算轮次才写入固定整数分；KoH 使用 `Control`。AWDP 成功队伍数按 `AffectsCompetitiveResults` 计算，未再错误复用仅属于 CTF 动态题的 `AffectsDynamicChallengeScore`，也不再为对齐旧总分伪造 `BanRecalculation` 调整。
+- `4ae028e5` 将现有排行榜响应演进为规范化 Snapshot，并新增强类型 Challenge Catalog、Scoreboard Schema、Slot Detail 三个资源；Slot Detail 使用现有签名游标并绑定 endpoint、competition、调用者、team、column 与筛选状态。工作人员在题目取消发布后仍可取得最小历史目录信息，参赛者不会获得未发布题面或敏感资料。SignalR/Redis 只广播 `competitionId/version/schemaRevision/challengeCatalogRevision`，不广播完整排行榜 JSON。
+- 两份 OpenAPI 均由工具导出且 SHA-256 同为 `D4A4C316CB5186EABA8FDDBDBB83864763F665F5E7BE69851E589EF42E5D58D7`；TypeScript SDK 由 `bun run api:gen` 生成。连续两轮 OpenAPI 导出和 SDK 生成覆盖 18 个制品，SHA-256 全部保持一致；生成 SDK 未被手工修改。
+- `6e787802` 提供共享 `useScoreboardMatrix` 加载/刷新状态机和协议工具。Catalog、Schema、Snapshot 并行加载；按 `CompetitionChallengeId`、round id、column index、actor index 建立映射；旧 version/旧 schema 响应不能覆盖新状态；短时通知合并，刷新期间到达的新通知会执行 trailing refresh；失败保留上一份成功快照。排行榜、题目卡、CTF 中控、AWDP 中控和详情页均使用生成 SDK 与同一矩阵协议，前端没有计分公式。
+- `5e61f391` 补齐后端/API/前端/四模式 Full E2E 回归。100 支队伍 × 20 题 × 50 轮的理论 100,000 单元格场景只生成非空 Slot，主快照不嵌 Challenge；Slot 明细通过游标分页。AWDP Full E2E 覆盖两队、两题、至少三轮、当前轮 Pending、已结算 Attack/Fix、历史轮次不受后轮影响、封禁/解禁重盘、Redis/PostgreSQL/API 重启恢复与详情分页。
+- `4856d4f9` 将版本从 `0.1.0-alpha.59` 递增到 `0.1.0-alpha.60`。本阶段没有新增业务表、EF migration 或 snapshot 修改；`dotnet ef migrations has-pending-model-changes --configuration Release --no-build` 返回无模型漂移。
+- 最终验证：Release solution build 0 warning/0 error；完整非 Integration TUnit 838/838；前端 `bun test` 238/238（1755 assertions）、`bun run typecheck`、production `bun run build`；C# analyzer 与 `git diff --check` 通过。完整 Integration 在最终分支共 185 项：182 通过，2 项因未配置真实 Kubernetes 集群和 Libvirt disk path 按设计跳过，1 项 Wolverine 双节点维护代理故障转移出现 30 秒时序超时；该唯一失败用例随后独立重跑 1/1 通过。仓库不存在 lint script，未将 lint 报告为已执行。
+- 四模式 Full E2E 在最终 AWDP 结算修正后分别通过：CTF 1/1（约 1m03s）、AWD 1/1（约 1m33s）、AWDP 1/1（约 3m47s）、KoH 1/1（约 1m32s）；测试创建的 Compose、容器、网络和数据均由编排器按精确项目身份清理，没有执行全局 prune。
+- Microsoft Edge 当前仅打开已部署的生产 `alpha.59`，本分支未部署且本任务没有部署授权。因此无法对 alpha.60 做可信的 Edge Network/Console 验收；该项明确阻塞于合并/部署后的可访问环境，未用旧生产页面冒充通过。需要后续确认：题目目录仅在 catalog revision 变化时重取，ScoreboardUpdated 不包含完整快照，连续通知仅触发合并刷新，Console 无新增错误。
+
 ## 2026-08-19 alpha.59 AWDP 参与者页与中控布局修正
 
 - `63c79b79` 移除 AWDP 题目详情页中脱离具体操作语境的整页错误横幅；运行环境与一次性 Fix 操作仍保留各自的明确错误反馈。与此同时，将题目详情移动为 `challenges/[ccId]/index.vue`，使详情页与 `fix-history.vue` 成为同级 Nuxt 路由，修复“Fix 历史”按钮地址变化但页面无响应的问题。
