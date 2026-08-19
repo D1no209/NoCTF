@@ -21,10 +21,6 @@ internal static class AwdpDynamicLeaderboardProjection
         var scoringTeams = activeTeams.Values
             .Where(team => team.EarnsScore)
             .ToDictionary(team => team.Id);
-        var dynamicTeams = activeTeams.Values
-            .Where(team => team.AffectsDynamicChallengeScore)
-            .Select(team => team.Id)
-            .ToHashSet();
         var competitiveTeams = activeTeams.Values
             .Where(team => team.AffectsCompetitiveResults)
             .Select(team => team.Id)
@@ -113,7 +109,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 settings.Break,
                 activations,
                 scoringTeams.Keys,
-                dynamicTeams,
+                competitiveTeams,
                 currentRound,
                 settledThroughRound,
                 awards,
@@ -124,7 +120,7 @@ internal static class AwdpDynamicLeaderboardProjection
                 settings.Fix,
                 activations,
                 scoringTeams.Keys,
-                dynamicTeams,
+                competitiveTeams,
                 currentRound,
                 settledThroughRound,
                 awards,
@@ -256,7 +252,7 @@ internal static class AwdpDynamicLeaderboardProjection
         ScoreCurveConfiguration curve,
         IReadOnlyList<Activation> allActivations,
         IEnumerable<Guid> scoringTeamIds,
-        IReadOnlySet<Guid> dynamicTeamIds,
+        IReadOnlySet<Guid> competitiveTeamIds,
         int currentRound,
         int settledThroughRound,
         ICollection<Award> awards,
@@ -278,7 +274,7 @@ internal static class AwdpDynamicLeaderboardProjection
             _ => 0L);
         var changeRounds = activations
             .Where(item => item.Round <= settledThroughRound
-                && (dynamicTeamIds.Contains(item.Fact.TeamId!.Value)
+                && (competitiveTeamIds.Contains(item.Fact.TeamId!.Value)
                     || scoringTeams.Contains(item.Fact.TeamId!.Value)))
             .Select(item => item.Round)
             .Distinct()
@@ -291,10 +287,13 @@ internal static class AwdpDynamicLeaderboardProjection
                 ? changeRounds[index + 1] - 1
                 : settledThroughRound;
             var roundCount = checked(lastRound - firstRound + 1);
-            var dynamicCount = activations.Count(item =>
+            var successfulTeamCount = activations.Count(item =>
                 item.Round <= firstRound
-                && dynamicTeamIds.Contains(item.Fact.TeamId!.Value));
-            var points = ScoreCurve.Evaluate(curve, dynamicCount, dynamicTeamIds.Count);
+                && competitiveTeamIds.Contains(item.Fact.TeamId!.Value));
+            var points = ScoreCurve.Evaluate(
+                curve,
+                successfulTeamCount,
+                competitiveTeamIds.Count);
             var segmentPoints = checked(points * roundCount);
             foreach (var activation in scoringActivations.Where(item => item.Round <= firstRound))
                 cumulativePoints[activation.Fact.GameplayFactId] = checked(
@@ -305,12 +304,12 @@ internal static class AwdpDynamicLeaderboardProjection
                 activation.Fact,
                 cumulativePoints[activation.Fact.GameplayFactId],
                 activation.Round));
-        var currentDynamicCount = activations.Count(item =>
-            item.Round <= currentRound && dynamicTeamIds.Contains(item.Fact.TeamId!.Value));
+        var currentSuccessfulTeamCount = activations.Count(item =>
+            item.Round <= currentRound && competitiveTeamIds.Contains(item.Fact.TeamId!.Value));
         currentScores[challengeId] = ScoreCurve.Evaluate(
             curve,
-            currentDynamicCount,
-            dynamicTeamIds.Count);
+            currentSuccessfulTeamCount,
+            competitiveTeamIds.Count);
     }
 
     private static int Round(

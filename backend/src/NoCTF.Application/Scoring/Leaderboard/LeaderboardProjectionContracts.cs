@@ -33,7 +33,10 @@ public sealed record LeaderboardChallengeFact(
     string Direction,
     string Title,
     bool IsDeleted,
-    string? ConfigurationJson = null);
+    string? ConfigurationJson = null,
+    int Order = 0,
+    bool IsPublished = true,
+    int Revision = 0);
 
 public sealed record LeaderboardGameplayFact(
     Guid GameplayFactId,
@@ -49,7 +52,8 @@ public sealed record LeaderboardGameplayFact(
     Guid? VictimTeamId = null,
     string? SubmitterName = null,
     string? Value = null,
-    long? HintCost = null);
+    long? HintCost = null,
+    Guid? ActorUserId = null);
 
 public sealed record LeaderboardAwdRoundFact(
     Guid CompetitionChallengeId,
@@ -91,4 +95,6 @@ public sealed record LeaderboardProjectionResult(
 public interface ILeaderboardProjectionEngine
 {
     LeaderboardProjectionResult Project(LeaderboardProjectionInput input);
+
+    ScoreboardProjection ProjectScoreboard(LeaderboardProjectionInput input);
 }

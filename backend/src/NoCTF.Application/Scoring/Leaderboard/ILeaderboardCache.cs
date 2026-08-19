@@ -34,11 +34,23 @@ public sealed record LeaderboardProcessingResponse(
     string StatusUrl);
 public sealed record LeaderboardCacheStatus(DateTimeOffset? LastFailureAt);
 
+/// <summary>
+/// One atomic projection generation. The legacy projection remains an internal scoring
+/// dependency while the public protocol exposes only the normalized scoreboard.
+/// </summary>
+public sealed record LeaderboardProjectionBundle(
+    LeaderboardResponse Legacy,
+    ScoreboardProjection Scoreboard);
+
 public interface ILeaderboardCache
 {
     Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken cancellationToken) =>
         Task.FromResult<LeaderboardResponse?>(null);
+    Task<ScoreboardProjection?> GetScoreboardAsync(Guid competitionId, CancellationToken cancellationToken) =>
+        Task.FromResult<ScoreboardProjection?>(null);
+    Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken cancellationToken) =>
+        Task.FromResult<ScoreboardProjection?>(null);
     Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken);
     Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<LeaderboardCacheStatus> GetStatusAsync(
@@ -49,6 +61,11 @@ public interface ILeaderboardCache
 
 public interface ILeaderboardSnapshotFactory
 {
+    Task<LeaderboardProjectionBundle?> CreateBundleAsync(
+        Guid competitionId,
+        DateTimeOffset projectedAt,
+        CancellationToken cancellationToken);
+
     Task<LeaderboardResponse?> CreateAsync(
         Guid competitionId,
         DateTimeOffset projectedAt,
@@ -60,4 +77,10 @@ public interface ILeaderboardSnapshotFactory
         DateTimeOffset projectedAt,
         CancellationToken cancellationToken) =>
         CreateAsync(competitionId, projectedAt, cancellationToken);
+
+    Task<ScoreboardProjection?> CreateScoreboardAsync(
+        Guid competitionId,
+        DateTimeOffset projectedAt,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<ScoreboardProjection?>(null);
 }

@@ -7,6 +7,12 @@ namespace NoCTF.GameModes.Leaderboard;
 public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog projectors)
     : ILeaderboardProjectionEngine
 {
+    public ScoreboardProjection ProjectScoreboard(LeaderboardProjectionInput input)
+    {
+        var legacy = Project(input);
+        return NormalizedScoreboardProjection.Project(input, legacy);
+    }
+
     public LeaderboardProjectionResult Project(LeaderboardProjectionInput input)
     {
         var projection = projectors.Get(input.Mode).Project(input);
