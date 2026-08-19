@@ -5,7 +5,12 @@
 - `63c79b79` 移除 AWDP 题目详情页中脱离具体操作语境的整页错误横幅；运行环境与一次性 Fix 操作仍保留各自的明确错误反馈。与此同时，将题目详情移动为 `challenges/[ccId]/index.vue`，使详情页与 `fix-history.vue` 成为同级 Nuxt 路由，修复“Fix 历史”按钮地址变化但页面无响应的问题。
 - `8b60c20c` 修正 AWDP 中控“队伍题目动态”布局：翻页控制改为固定 30px 宽度，中间队伍列表连续占满剩余空间；单队时翻页键禁用，不再出现箭头轨道占据大块空白。题目状态卡固定为 150px，并同步收紧图标与内容间距，约为原拉伸高度的一半，攻防状态和结算分仍完整可见。
 - 前端定向回归 14/14 通过；完整 `bun test` 233/233 通过，`bun run typecheck`、production build 与 `git diff --check` 均通过。构建只保留既有 CSS 表达式、chunk 大小、plugin timing 与第三方 Node exports deprecation 警告。
-- 版本从 `0.1.0-alpha.58` 递增到 `0.1.0-alpha.59`。本阶段未改变 HTTP/OpenAPI/生成 SDK、后端业务逻辑、数据库模型或 migration；未推送、未部署，也未修改生产数据。原工作区已有 `TODO.md`、临时部署包及未跟踪目录继续原样保留。
+- 版本从 `0.1.0-alpha.58` 递增到 `0.1.0-alpha.59`。本阶段未改变 HTTP/OpenAPI/生成 SDK、后端业务逻辑、数据库模型或 migration；原工作区已有 `TODO.md`、临时部署包及未跟踪目录继续原样保留。
+- 功能、版本与本阶段交接提交已快进推送到远程 `main`，功能部署代码基线为 `70c2b54ddfbf8af4794cb47f65126692911b08a0`；部署机 `/root/NoCTF` 通过经过 `git bundle verify` 的增量 bundle 快进到同一提交，没有覆盖生产 `.env`、Compose overlay 或其他未跟踪配置。
+- 部署前创建 PostgreSQL custom-format 备份 `/root/backups/noctf-pre-alpha59-70c2b54d-20260819T025000Z.dump`，`pg_restore --list` 校验通过，SHA-256 为 `824e4ecdbf8a750ed6aa81c1e80d21f67a6dde45951fd97bb4d4330543893534`。migration 容器确认数据库已经是最新状态，本次没有应用 migration，也没有手工修改生产业务数据。
+- 服务器完整构建并固化 `deploy-backend:alpha59-70c2b54d`、`deploy-worker:alpha59-70c2b54d`、`deploy-runner:alpha59-70c2b54d`、`deploy-migration:alpha59-70c2b54d`，镜像 ID 分别为 `96b25d306efc`、`0e1f90a4f227`、`01aa686247f4`、`a99194edd228`。当前 alpha.58 API、Worker、Runner 镜像保留 `rollback-alpha58-57337799` 标签作为直接回滚基线。
+- 仅强制重建 API、Worker、Runner；PostgreSQL 与 Redis 自 `2026-08-08T10:50:03Z` 起持续运行，部署期间未重启且 RestartCount 为 0。三个 alpha.59 服务均为 `healthy`、RestartCount 为 0；外部 `https://101.43.46.244/`、`/health`、`/health/ready` 均返回 HTTP 200。从切换时间 `2026-08-19T02:55:49Z` 起扫描三项服务日志，Error、Critical、Fatal 与未处理异常匹配数均为 0。
+- 部署前清理服务器中过时且未运行的 NoCTF 平台构建镜像、一个已退出 migration 容器及无引用 BuildKit 缓存；没有删除题目镜像、生产卷、数据库备份或比赛 Runtime 资源，也没有执行全局 Docker prune。根卷可用空间由约 3.4 GB 提升到部署完成后的 9.1 GB；平台托管 Runtime 容器与网络在切换前后均为 0。
 
 ## 2026-08-19 alpha.58 测试生产环境推送与部署
 
