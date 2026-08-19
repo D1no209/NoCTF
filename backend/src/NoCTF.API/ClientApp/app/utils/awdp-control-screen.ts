@@ -1,8 +1,11 @@
 import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
-  NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse,
-  NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
+import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardSlot } from './scoreboard'
 
 export type AwdpControlAction = 'attack' | 'defense'
 export type AwdpControlOutcome = 'pending' | 'success' | 'failure'
@@ -49,8 +52,10 @@ export interface AwdpTeamChallengeState {
   defenseOutcome: AwdpControlOutcome | 'idle'
 }
 
-export interface AwdpRankedEntry extends NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse {
+export interface AwdpRankedEntry extends NoCtfapiEndpointsCompetitionsScoreboardTeamResponse {
   rank: number
+  attackScore: number
+  defenseScore: number
   trend: 'up' | 'down' | 'steady'
 }
 
@@ -139,58 +144,57 @@ export function awdpOperationMetrics(events: readonly AwdpControlEvent[]): AwdpO
 }
 
 export function awdpRoundClock(
-  leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
   now: number,
   advances: boolean,
 ): AwdpRoundClock {
-  const currentRound = Math.max(0, leaderboard?.currentRound ?? 0)
-  const duration = leaderboard?.roundDurationSeconds ?? 0
-  const baseRemaining = leaderboard?.currentRoundRemainingSeconds ?? 0
-  if (!currentRound || duration <= 0 || baseRemaining <= 0)
-    return { currentRound, remainingSeconds: Math.max(0, baseRemaining) }
-
-  const generatedAt = leaderboard?.generatedAt
-    ? new Date(leaderboard.generatedAt).getTime()
-    : now
-  const elapsed = advances && Number.isFinite(generatedAt)
-    ? Math.max(0, Math.floor((now - generatedAt) / 1000))
-    : 0
-  const elapsedInBaseRound = duration - Math.min(duration, baseRemaining)
-  const totalElapsed = elapsedInBaseRound + elapsed
+  const round = (schema?.rounds ?? []).find(item => item.id === snapshot?.currentRoundId)
+  const currentRound = Math.max(0, round?.number ?? 0)
+  const endAt = round?.endAt ? new Date(round.endAt).getTime() : Number.NaN
+  const startAt = round?.startAt ? new Date(round.startAt).getTime() : now
+  if (!currentRound || !Number.isFinite(endAt)) return { currentRound, remainingSeconds: 0 }
+  const reference = advances ? now : Math.min(now, endAt)
   return {
-    currentRound: currentRound + Math.floor(totalElapsed / duration),
-    remainingSeconds: duration - totalElapsed % duration,
+    currentRound,
+    remainingSeconds: Math.max(0, Math.floor((endAt - Math.max(reference, startAt)) / 1000)),
   }
 }
 
 export function awdpPublicEntries(
-  leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
-): NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse[] {
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+): NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[] {
   const publicTrackKeys = new Set(
-    (leaderboard?.tracks ?? [])
+    (snapshot?.tracks ?? [])
       .filter(track => track.isInternal !== true)
       .map(track => track.key)
       .filter((key): key is string => Boolean(key)),
   )
-  return (leaderboard?.entries ?? []).filter(entry =>
+  return (snapshot?.teams ?? []).filter(entry =>
     !entry.trackKey || publicTrackKeys.has(entry.trackKey))
 }
 
 export function awdpRankedEntries(
-  leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
   previousRanks: ReadonlyMap<string, number> = new Map(),
 ): AwdpRankedEntry[] {
-  return awdpPublicEntries(leaderboard)
-    .sort((left, right) =>
-      (left.rank ?? Number.MAX_SAFE_INTEGER) - (right.rank ?? Number.MAX_SAFE_INTEGER)
-      || (right.score ?? 0) - (left.score ?? 0)
-      || (left.teamName ?? '').localeCompare(right.teamName ?? ''))
+  return awdpPublicEntries(snapshot)
     .map((entry, index) => {
       const rank = entry.rank ?? index + 1
       const previous = entry.teamId ? previousRanks.get(entry.teamId) : undefined
+      const attackScore = (entry.slots ?? []).reduce((total, slot) =>
+        total + (slot.scoreState === 'Settled'
+          ? scoreboardBreakdown(slot, 'Attack')?.netPoints ?? 0
+          : 0), 0)
+      const defenseScore = (entry.slots ?? []).reduce((total, slot) =>
+        total + (slot.scoreState === 'Settled'
+          ? scoreboardBreakdown(slot, 'Defense')?.netPoints ?? 0
+          : 0), 0)
       return {
         ...entry,
         rank,
+        attackScore,
+        defenseScore,
         trend: previous === undefined || previous === rank
           ? 'steady'
           : rank < previous ? 'up' : 'down',
@@ -215,16 +219,23 @@ function latestOutcome(
 }
 
 export function awdpTeamChallengeStates(
-  leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
-  entry: NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse | null,
+  catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  entry: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null,
   events: readonly AwdpControlEvent[],
 ): AwdpTeamChallengeState[] {
   if (!entry?.teamId) return []
-  return (leaderboard?.challenges ?? []).map((challenge) => {
-    const challengeId = challenge.competitionChallengeId ?? ''
-    const cell = (entry.cells ?? []).find(item => item.competitionChallengeId === challengeId)
-    const attackScore = cell?.attackScore ?? 0
-    const defenseScore = cell?.defenseScore ?? 0
+  return (catalog?.items ?? []).filter(challenge => challenge.id && challenge.published).map((challenge) => {
+    const challengeId = challenge.id!
+    let attackScore = 0
+    let defenseScore = 0
+    for (const column of scoreboardColumnsForChallenge(schema, challengeId)) {
+      if (column.index === undefined) continue
+      const slot = scoreboardSlot(entry, column.index)
+      if (slot?.scoreState !== 'Settled') continue
+      attackScore += scoreboardBreakdown(slot, 'Attack')?.netPoints ?? 0
+      defenseScore += scoreboardBreakdown(slot, 'Defense')?.netPoints ?? 0
+    }
     const attackOutcome = latestOutcome(events, entry.teamId!, challengeId, 'attack')
     const defenseOutcome = latestOutcome(events, entry.teamId!, challengeId, 'defense')
     return {

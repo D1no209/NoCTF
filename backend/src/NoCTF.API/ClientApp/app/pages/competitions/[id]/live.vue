@@ -10,11 +10,9 @@ import {
   Users,
   X,
 } from '@lucide/vue'
-import { getCompetitionEndpoint, getLeaderboardEndpoint } from '~/api'
+import { getCompetitionEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
-  NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol,
-  NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
 } from '~/api'
 import {
   controlScreenChallenges,
@@ -22,10 +20,11 @@ import {
   controlScreenSolveFeed,
   reconcileControlScreenSolves,
 } from '~/utils/control-screen'
-import type { ControlScreenSolve } from '~/utils/control-screen'
+import type { ControlScreenBloodRank, ControlScreenSolve } from '~/utils/control-screen'
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 import { LiveCityScene } from '~/lib/live-city-3d'
 import type { LiveCityBlood, LiveCityChallengeState } from '~/lib/live-city-3d'
+import { scoreboardTeamSolveCount } from '~/utils/scoreboard'
 
 definePageMeta({ layout: false })
 
@@ -33,9 +32,9 @@ const route = useRoute()
 const competitionId = route.params.id as string
 const { configuration, ensureLoaded } = usePlatform()
 const { t } = useLocale()
+const board = useScoreboardMatrix(competitionId)
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
-const leaderboard = ref<NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null>(null)
 const loading = ref(true)
 const refreshing = ref(false)
 const projectionPending = ref(false)
@@ -53,16 +52,13 @@ let celebrationTimer: ReturnType<typeof setTimeout> | undefined
 let seenSolveKeys: Set<string> | null = null
 let unwatch: (() => void) | undefined
 
-const entries = computed(() => controlScreenPublicEntries(leaderboard.value))
-const rankedEntries = computed(() => [...entries.value]
-  .sort((left, right) =>
-    (right.score ?? 0) - (left.score ?? 0)
-    || (left.teamName ?? '').localeCompare(right.teamName ?? '')))
-const challenges = computed(() => controlScreenChallenges(leaderboard.value, entries.value))
-const solveFeed = computed(() => controlScreenSolveFeed(leaderboard.value, entries.value).slice(0, 10))
+const entries = computed(() => controlScreenPublicEntries(board.snapshot.value))
+const rankedEntries = computed(() => entries.value)
+const challenges = computed(() => controlScreenChallenges(board.catalog.value, board.schema.value, entries.value))
+const solveFeed = computed(() => controlScreenSolveFeed(board.catalog.value, board.schema.value, entries.value).slice(0, 10))
 const solvedChallengeCount = computed(() => challenges.value.filter(challenge => challenge.solveCount > 0).length)
 const totalSolveCount = computed(() => challenges.value.reduce((sum, challenge) => sum + challenge.solveCount, 0))
-const dataAsOf = computed(() => leaderboard.value?.dataAsOf ?? leaderboard.value?.generatedAt)
+const dataAsOf = computed(() => board.snapshot.value?.dataAsOf ?? board.snapshot.value?.generatedAt)
 const marqueeEnabled = computed(() => rankedEntries.value.length > 7)
 const marqueeDuration = computed(() => Math.max(14, rankedEntries.value.length * 2.2))
 const bloodToneOrder: Record<LiveCityBlood['tone'], number> = { first: 0, second: 1, third: 2 }
@@ -97,14 +93,14 @@ const elapsedText = computed(() => {
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
 })
 
-function bloodLabel(rank: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol | null): string {
+function bloodLabel(rank: ControlScreenBloodRank | null): string {
   if (rank === 'First') return t('一血')
   if (rank === 'Second') return t('二血')
   if (rank === 'Third') return t('三血')
   return t('攻克')
 }
 
-function bloodClass(rank: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol | null): string {
+function bloodClass(rank: ControlScreenBloodRank | null): string {
   if (rank === 'First') return 'live-blood-first'
   if (rank === 'Second') return 'live-blood-second'
   if (rank === 'Third') return 'live-blood-third'
@@ -124,18 +120,15 @@ function challengeKey(value?: string | null): string {
 
 const bloodsByChallenge = computed(() => {
   const map = new Map<string, LiveCityBlood[]>()
-  for (const entry of entries.value) {
-    if (!entry.teamName) continue
-    for (const cell of entry.cells ?? []) {
-      if (!cell.bloodRank || !cell.solvedAt) continue
-      const tone: LiveCityBlood['tone'] = cell.bloodRank === 'First'
+  for (const solve of solveFeed.value) {
+      if (!solve.bloodRank) continue
+      const tone: LiveCityBlood['tone'] = solve.bloodRank === 'First'
         ? 'first'
-        : cell.bloodRank === 'Second' ? 'second' : 'third'
-      const key = challengeKey(cell.competitionChallengeId)
+        : solve.bloodRank === 'Second' ? 'second' : 'third'
+      const key = challengeKey(solve.competitionChallengeId)
       const list = map.get(key) ?? []
-      list.push({ label: bloodLabel(cell.bloodRank), teamName: entry.teamName, tone })
+      list.push({ label: bloodLabel(solve.bloodRank), teamName: solve.teamName, tone })
       map.set(key, list)
-    }
   }
   for (const list of map.values()) list.sort((left, right) => bloodToneOrder[left.tone] - bloodToneOrder[right.tone])
   return map
@@ -201,11 +194,8 @@ function reconcileCelebrations(currentSolves: readonly ControlScreenSolve[]): vo
 }
 
 async function loadData(): Promise<void> {
-  refreshing.value = Boolean(competition.value || leaderboard.value)
-  const [competitionResult, leaderboardResult] = await Promise.all([
-    getCompetitionEndpoint({ path: { competitionId } }),
-    getLeaderboardEndpoint({ path: { competitionId } }),
-  ])
+  refreshing.value = Boolean(competition.value || board.snapshot.value)
+  const competitionResult = await getCompetitionEndpoint({ path: { competitionId } })
   loading.value = false
   refreshing.value = false
 
@@ -219,7 +209,8 @@ async function loadData(): Promise<void> {
     error.value = t('3D 大屏当前仅支持 CTF 比赛')
     return
   }
-  if (leaderboardResult.response?.status === 202) {
+  await board.refresh({ catalog: true, schema: true, snapshot: true })
+  if (board.processing.value) {
     error.value = null
     projectionPending.value = true
     if (!projectionTimer) {
@@ -230,16 +221,15 @@ async function loadData(): Promise<void> {
     }
     return
   }
-  if (leaderboardResult.error || !leaderboardResult.data) {
+  if (board.error.value || !board.snapshot.value) {
     projectionPending.value = false
-    error.value = parseApiError(leaderboardResult.error, t('加载记分板失败')).message
+    error.value = board.error.value ?? t('加载记分板失败')
     return
   }
   projectionPending.value = false
   error.value = null
-  leaderboard.value = leaderboardResult.data as NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse
   await nextTick()
-  reconcileCelebrations(controlScreenSolveFeed(leaderboard.value, entries.value))
+  reconcileCelebrations(controlScreenSolveFeed(board.catalog.value, board.schema.value, entries.value))
 }
 
 const refreshLatest = createTrailingRefresh(loadData)
@@ -267,7 +257,7 @@ onMounted(async () => {
   refreshTimer = setInterval(() => void refreshLatest(), 15_000)
   document.addEventListener('fullscreenchange', syncFullscreen)
   unwatch = watchCompetition(competitionId, {
-    leaderboardRefreshed: () => void refreshLatest(),
+    scoreboardUpdated: () => void refreshLatest(),
     competitionLifecycleChanged: () => void refreshLatest(),
     onReconnected: () => void refreshLatest(),
   })
@@ -364,12 +354,12 @@ onUnmounted(() => {
           </Button>
         </div>
 
-        <div v-else-if="projectionPending && !leaderboard" class="live-overlay">
+        <div v-else-if="projectionPending && !board.snapshot.value" class="live-overlay">
           <Radio class="live-overlay-icon size-9 animate-pulse" />
           <p class="font-mono text-sm uppercase tracking-[0.22em] text-slate-400">{{ t('记分板正在生成') }}</p>
         </div>
 
-        <div v-else-if="leaderboard?.dataScope === 'Hidden'" class="live-overlay">
+        <div v-else-if="board.snapshot.value?.dataScope === 'Hidden'" class="live-overlay">
           <ShieldCheck class="live-overlay-icon size-9" />
           <p class="text-xl font-semibold">{{ t('排行榜暂不公开') }}</p>
           <p class="text-sm text-slate-400">{{ t('主办方当前隐藏了排行榜数据') }}</p>
@@ -380,7 +370,7 @@ onUnmounted(() => {
             <span class="live-arena-pulse" />
             <span>{{ t('实时题目态势') }}</span>
           </div>
-          <div v-if="leaderboard?.dataScope === 'Frozen'" class="live-frozen">
+          <div v-if="board.snapshot.value?.dataScope === 'Frozen'" class="live-frozen">
             {{ t('冻结快照') }} · {{ formatDateTime(dataAsOf) }}
           </div>
           <div v-else class="font-mono text-[0.625rem] text-slate-500">{{ formatDateTime(dataAsOf) }}</div>
@@ -439,16 +429,16 @@ onUnmounted(() => {
                 <li v-for="(entry, index) in rankedEntries" :key="entry.teamId" :class="rankClass(index + 1)">
                   <span class="live-rank">{{ index + 1 }}</span>
                   <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}</span>
-                  <span class="font-mono text-[0.625rem] text-slate-500">{{ entry.solveCount ?? 0 }}</span>
-                  <strong class="font-mono tabular-nums">{{ entry.score ?? 0 }}</strong>
+                  <span class="font-mono text-[0.625rem] text-slate-500">{{ scoreboardTeamSolveCount(entry) }}</span>
+                  <strong class="font-mono tabular-nums">{{ entry.totalScore ?? 0 }}</strong>
                 </li>
               </ol>
               <ol v-if="marqueeEnabled" class="live-ranking" aria-hidden="true">
                 <li v-for="(entry, index) in rankedEntries" :key="`clone-${entry.teamId}`" :class="rankClass(index + 1)">
                   <span class="live-rank">{{ index + 1 }}</span>
                   <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}</span>
-                  <span class="font-mono text-[0.625rem] text-slate-500">{{ entry.solveCount ?? 0 }}</span>
-                  <strong class="font-mono tabular-nums">{{ entry.score ?? 0 }}</strong>
+                  <span class="font-mono text-[0.625rem] text-slate-500">{{ scoreboardTeamSolveCount(entry) }}</span>
+                  <strong class="font-mono tabular-nums">{{ entry.totalScore ?? 0 }}</strong>
                 </li>
               </ol>
             </div>

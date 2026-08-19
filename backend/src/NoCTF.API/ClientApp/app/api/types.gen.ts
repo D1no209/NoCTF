@@ -445,57 +445,97 @@ export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
+export type NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
     competitionId?: string;
+    version?: number;
+    schemaRevision?: number;
     generatedAt?: string;
-    entries?: Array<NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse>;
-    challenges?: Array<NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse>;
-    tracks?: Array<NoCtfapiEndpointsCompetitionsLeaderboardTrackInfoResponse>;
+    currentRoundId?: string | null;
+    actors?: Array<NoCtfapiEndpointsCompetitionsScoreboardActorResponse>;
+    teams?: Array<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse>;
+    tracks?: Array<NoCtfapiEndpointsCompetitionsScoreboardTrackResponse>;
     visibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     dataScope?: NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol;
     dataAsOf?: string | null;
-    currentRound?: number | null;
-    settledThroughRound?: number | null;
-    roundDurationSeconds?: number | null;
-    currentRoundRemainingSeconds?: number | null;
 };
 
-export type NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse = {
-    rank?: number;
+export type NoCtfapiEndpointsCompetitionsScoreboardActorResponse = {
+    index?: number;
+    userId?: string;
+    displayName?: string;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     teamId?: string;
     teamName?: string;
     trackKey?: string;
-    score?: number;
-    solveCount?: number;
-    lastScoreAt?: string | null;
-    cells?: Array<NoCtfapiEndpointsCompetitionsLeaderboardCellResponse>;
-    attackScore?: number | null;
-    defenseScore?: number | null;
-    penaltyScore?: number | null;
+    rank?: number | null;
+    rankingState?: NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol;
+    totalScore?: number;
+    globalAdjustments?: Array<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse>;
+    slots?: Array<NoCtfapiEndpointsCompetitionsScoreboardSlotResponse>;
 };
 
-export type NoCtfapiEndpointsCompetitionsLeaderboardCellResponse = {
-    competitionChallengeId?: string;
-    score?: number;
-    solvedAt?: string | null;
-    solverName?: string | null;
-    bloodRank?: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol | null;
-    attackScore?: number | null;
-    defenseScore?: number | null;
+export type NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol = 'Eligible' | 'Banned' | 'Disqualified';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse = {
+    id?: string;
+    kind?: NoCtfapiEndpointsCompetitionsScoreboardAdjustmentKindProtocol;
+    occurredAt?: string;
+    actorIndex?: number | null;
+    earnedPoints?: number;
+    deductedPoints?: number;
+    netPoints?: number;
 };
 
-export type NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol = 'First' | 'Second' | 'Third';
+export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentKindProtocol = 'ManualAdjustment' | 'CompetitionPenalty' | 'BanRecalculation';
 
-export type NoCtfapiEndpointsCompetitionsLeaderboardChallengeInfoResponse = {
-    competitionChallengeId?: string;
-    title?: string;
-    direction?: string;
-    currentScore?: number | null;
-    currentBreakScore?: number | null;
-    currentFixScore?: number | null;
+export type NoCtfapiEndpointsCompetitionsScoreboardSlotResponse = {
+    columnIndex?: number;
+    scoreState?: NoCtfapiEndpointsCompetitionsScoreboardScoreStateProtocol;
+    earnedPoints?: number | null;
+    deductedPoints?: number | null;
+    netPoints?: number | null;
+    entryCount?: number;
+    breakdown?: Array<NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse>;
+    entries?: Array<NoCtfapiEndpointsCompetitionsScoreboardEntryResponse>;
 };
 
-export type NoCtfapiEndpointsCompetitionsLeaderboardTrackInfoResponse = {
+export type NoCtfapiEndpointsCompetitionsScoreboardScoreStateProtocol = 'Pending' | 'Provisional' | 'Settled';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse = {
+    kind?: NoCtfapiEndpointsCompetitionsScoreboardBreakdownKindProtocol;
+    successfulCount?: number;
+    attemptCount?: number;
+    earnedPoints?: number;
+    deductedPoints?: number;
+    netPoints?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardBreakdownKindProtocol = 'Solve' | 'Attack' | 'Defense' | 'Availability' | 'Control' | 'Penalty' | 'BloodAward' | 'Hint' | 'ManualAdjustment';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardEntryResponse = {
+    id?: string;
+    kind?: NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol;
+    outcome?: NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol;
+    actorIndex?: number | null;
+    targetTeamId?: string | null;
+    occurredAt?: string;
+    settledAt?: string | null;
+    earnedPoints?: number | null;
+    deductedPoints?: number | null;
+    netPoints?: number | null;
+    award?: NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol | null;
+    awardPoints?: number;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol = 'Solve' | 'Attack' | 'Defense' | 'Availability' | 'Control' | 'Penalty' | 'BloodAward' | 'Hint' | 'ManualAdjustment';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol = 'Pending' | 'Succeeded' | 'Failed' | 'Rejected';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol = 'FirstBlood' | 'SecondBlood' | 'ThirdBlood';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardTrackResponse = {
     key?: string;
     name?: string;
     isInternal?: boolean;
@@ -513,6 +553,73 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse =
 export type NoCtfapiEndpointsCompetitionsLeaderboardProjectionStateProtocol = 'Processing';
 
 export type NoCtfapiEndpointsCompetitionsGetLeaderboardRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
+    competitionId?: string;
+    revision?: number;
+    items?: Array<NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse>;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse = {
+    id?: string;
+    title?: string;
+    direction?: string;
+    category?: string;
+    order?: number;
+    published?: boolean;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetScoreboardChallengeCatalogRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+    competitionId?: string;
+    mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
+    revision?: number;
+    challengeCatalogRevision?: number;
+    rounds?: Array<NoCtfapiEndpointsCompetitionsScoreboardRoundResponse>;
+    columns?: Array<NoCtfapiEndpointsCompetitionsScoreboardColumnResponse>;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardRoundResponse = {
+    id?: string;
+    number?: number;
+    startAt?: string;
+    endAt?: string;
+    settledAt?: string | null;
+    state?: NoCtfapiEndpointsCompetitionsScoreboardRoundStateProtocol;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardRoundStateProtocol = 'Pending' | 'Running' | 'Settling' | 'Settled';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardColumnResponse = {
+    index?: number;
+    competitionChallengeId?: string;
+    roundId?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetScoreboardSchemaRequest = {
+    [key: string]: never;
+};
+
+export type NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse = {
+    competitionId?: string;
+    teamId?: string;
+    columnIndex?: number;
+    scoreState?: NoCtfapiEndpointsCompetitionsScoreboardScoreStateProtocol;
+    earnedPoints?: number | null;
+    deductedPoints?: number | null;
+    netPoints?: number | null;
+    entryCount?: number;
+    breakdown?: Array<NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse>;
+    items?: Array<NoCtfapiEndpointsCompetitionsScoreboardEntryResponse>;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetScoreboardSlotDetailRequest = {
     [key: string]: never;
 };
 
@@ -3249,7 +3356,7 @@ export type GetLeaderboardEndpointResponses = {
     /**
      * Success
      */
-    200: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse;
+    200: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse;
     /**
      * Accepted
      */
@@ -3257,6 +3364,104 @@ export type GetLeaderboardEndpointResponses = {
 };
 
 export type GetLeaderboardEndpointResponse = GetLeaderboardEndpointResponses[keyof GetLeaderboardEndpointResponses];
+
+export type GetScoreboardChallengeCatalogEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/leaderboard/challenges';
+};
+
+export type GetScoreboardChallengeCatalogEndpointErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetScoreboardChallengeCatalogEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse;
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse;
+};
+
+export type GetScoreboardChallengeCatalogEndpointResponse = GetScoreboardChallengeCatalogEndpointResponses[keyof GetScoreboardChallengeCatalogEndpointResponses];
+
+export type GetScoreboardSchemaEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/leaderboard/schema';
+};
+
+export type GetScoreboardSchemaEndpointErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetScoreboardSchemaEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse;
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse;
+};
+
+export type GetScoreboardSchemaEndpointResponse = GetScoreboardSchemaEndpointResponses[keyof GetScoreboardSchemaEndpointResponses];
+
+export type GetScoreboardSlotDetailEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+        columnIndex: number;
+    };
+    query: {
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}';
+};
+
+export type GetScoreboardSlotDetailEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetScoreboardSlotDetailEndpointError = GetScoreboardSlotDetailEndpointErrors[keyof GetScoreboardSlotDetailEndpointErrors];
+
+export type GetScoreboardSlotDetailEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse;
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse;
+};
+
+export type GetScoreboardSlotDetailEndpointResponse = GetScoreboardSlotDetailEndpointResponses[keyof GetScoreboardSlotDetailEndpointResponses];
 
 export type ListCompetitionsEndpointData = {
     body?: never;

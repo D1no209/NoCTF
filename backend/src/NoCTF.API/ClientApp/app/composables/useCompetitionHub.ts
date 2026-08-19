@@ -10,7 +10,7 @@ import { startRealtimeWithRetry } from '~/lib/realtime-retry'
  * 最后一个订阅者离开时断连。未登录(无 access token)时不连接。
  */
 export interface CompetitionHubHandlers {
-  leaderboardRefreshed?: (payload: unknown) => void
+  scoreboardUpdated?: (payload: unknown) => void
   competitionLifecycleChanged?: (payload: unknown) => void
   competitionEventChanged?: (payload: unknown) => void
   /** 定向投递给提交者本人,载荷为该提交的状态视图。 */
@@ -25,7 +25,7 @@ interface Subscriber {
 }
 
 const GROUP_EVENTS = [
-  'leaderboardRefreshed',
+  'scoreboardUpdated',
   'competitionLifecycleChanged',
   'competitionEventChanged',
 ] as const
