@@ -61,7 +61,9 @@ public enum CompetitionEventKind : short
     TrackConfigurationUpdated,
     TeamTrackChanged,
     AwdpBreakAttempted,
-    AwdpFixAttempted
+    AwdpFixAttempted,
+    AwdpBreakResolved,
+    AwdpFixResolved
 }
 
 public enum CompetitionEventLevel : short

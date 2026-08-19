@@ -8,6 +8,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
@@ -15,6 +16,7 @@ using NoCTF.Domain.Storage;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Worker;
@@ -211,9 +213,11 @@ public sealed class AwdpFixExecutionFencePersistenceTests
 
             await using (var resultDb = new NoCtfDbContext(options))
             {
+                var resultOutbox = new RecordingOutbox();
                 var applied = await new InternalResultStore(
                     resultDb,
-                    new RecordingOutbox()).RecordAwdpAsync(AwdpFixResult.Create(
+                    resultOutbox,
+                    new CompetitionEventStore(resultDb, resultOutbox)).RecordAwdpAsync(AwdpFixResult.Create(
                         fixture.GameplayFactId,
                         fixture.RuntimeInstanceId,
                         1,
@@ -237,6 +241,17 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var runtime = await verification.RuntimeInstances.AsNoTracking()
                 .SingleAsync(item => item.Id == fixture.RuntimeInstanceId, cancellationToken);
             await Assert.That(runtime.AwdpFixStage).IsEqualTo(AwdpFixStage.Completed);
+            var resolution = await verification.CompetitionEvents.AsNoTracking()
+                .SingleAsync(item => item.Kind == CompetitionEventKind.AwdpFixResolved,
+                    cancellationToken);
+            await Assert.That(resolution.Visibility)
+                .IsEqualTo(CompetitionEventVisibility.Public);
+            await Assert.That(resolution.TeamId).IsEqualTo(fixture.TeamId);
+            await Assert.That(resolution.CompetitionChallengeId)
+                .IsEqualTo(fixture.CompetitionChallengeId);
+            await Assert.That(resolution.GameplayFactId).IsEqualTo(fixture.GameplayFactId);
+            await Assert.That(resolution.Reason).IsNull();
+            await Assert.That(resolution.PayloadJson).DoesNotContain("flag{");
         });
     }
 
@@ -429,6 +444,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
         await db.SaveChangesAsync(cancellationToken);
         return new(
             now,
+            teamId,
             competitionChallengeId,
             factId,
             patchUploadId,
@@ -502,6 +518,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
 
     private sealed record Fixture(
         DateTimeOffset Now,
+        Guid TeamId,
         Guid CompetitionChallengeId,
         Guid GameplayFactId,
         Guid PatchUploadId,
