@@ -14492,6 +14492,16 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          },
+          "roundDurationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "currentRoundRemainingSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
           }
         }
       },

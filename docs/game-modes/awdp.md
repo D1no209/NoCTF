@@ -5,8 +5,8 @@
 AWDP 由攻击与防御两条独立事实流组成；是否允许未完成 Break 就提交 Fix，
 由当前比赛题目的 `RequireBreakBeforeFix` 决定：
 
-- 攻击轨 `BreakAttempt`：队伍启动自己的长期攻击 Runtime，利用漏洞取得该 Runtime generation 的动态 Flag；每个逻辑轮内首次有效 Correct 参与该轮攻击分结算。
-- 防御轨 `FixAttempt`：队伍先申请全新的临时 Fix Target，再向该 Target 唯一上传一次不可变 `tar.gz` Patch；平台应用 Patch 并只运行一次 Checker，每个逻辑轮内首次有效 Correct 参与该轮防御分结算。
+- 攻击轨 `BreakAttempt`：队伍启动自己的长期攻击 Runtime，利用漏洞取得该 Runtime generation 的动态 Flag；首个有效 Correct 从所属逻辑轮开始建立持续攻击得分。
+- 防御轨 `FixAttempt`：队伍先申请全新的临时 Fix Target，再向该 Target 唯一上传一次不可变 `tar.gz` Patch；平台应用 Patch 并只运行一次 Checker，首个有效 Correct 从所属逻辑轮开始建立持续防御得分。
 
 AWDP 不是 AWD，不使用 `FlagAttempt`、`AwdRound`、加固期、周期服务上下线检查、批量提交其他队伍轮次 Flag 或 AWD 目标列表。AWDP 的 Checker 只属于一次 Fix 验证，不会周期运行，也不会修改队伍的长期攻击 Runtime。
 
@@ -137,10 +137,10 @@ Provider Running 后，Runner 在执行 Patch 前用 PostgreSQL 事务把 dispos
 round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 ```
 
-- 每个 Team/CompetitionChallenge/Kind/round 只选 `(OccurredAt, GameplayFactId)` 最早的有效 Correct；
-- 同一题目的 Break 与 Fix 分开统计该轮成功的、`AffectsDynamicChallengeScore=true` 的不同队伍数；
-- 分别把该计数代入 Break/Fix 曲线，得到该轮的整数攻击分和防御分；该轮每个可计分成功队伍获得对应轨道的同一分值；
-- 当前进行中的轮次不进入公开排行榜；轮次结束后才按该轮最终成功队伍数一次性结算，进入后续轮后，前一轮使用前一轮自己的最终人数，后续人数不追溯改变它；
+- 每个 Team/CompetitionChallenge/Kind 只选 `(OccurredAt, GameplayFactId)` 最早的有效 Correct，所属逻辑轮成为该轨道的唯一激活轮；
+- 同一题目的 Break 与 Fix 分别取每队首个有效 Correct 作为激活点；后续重复正确提交、重复 callback 或 Wolverine 重投不建立第二个激活点；
+- 每个已完成轮次分别统计截至该轮已激活且 `AffectsDynamicChallengeScore=true` 的不同队伍数，把该累计人数代入 Break/Fix 曲线，得到该轮整数攻击分和防御分；该轮所有已激活、可计分队伍获得对应轨道的同一分值；
+- 当前进行中的轮次不进入公开排行榜；轮次结束后才追加该轮得分。进入后续轮后，前一轮使用当时的最终激活人数固化结算，后续新增激活只影响后续轮次，不追溯改变它；已激活队伍无需每轮重复提交即可持续累加；
 - 两轨分数独立后相加。启用 `RequireBreakBeforeFix` 时，Fix 必须存在按权威顺序更早的 Correct Break；该 Break 被重判后会确定性重盘依赖结果；
 - Correct/Wrong 重判、队伍禁赛或解禁都会从原始事实全量重播所有轮次，不修改 GameplayFact 或永久事件；
 - Pause 不增加 EffectiveRunningTime，因此不推进收益；Resume 从原逻辑时间继续；Finish 使用结束时点冻结；

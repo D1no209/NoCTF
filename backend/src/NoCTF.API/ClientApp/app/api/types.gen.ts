@@ -456,6 +456,8 @@ export type NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
     dataAsOf?: string | null;
     currentRound?: number | null;
     settledThroughRound?: number | null;
+    roundDurationSeconds?: number | null;
+    currentRoundRemainingSeconds?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse = {

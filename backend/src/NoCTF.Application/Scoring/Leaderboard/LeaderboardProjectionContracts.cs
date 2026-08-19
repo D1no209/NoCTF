@@ -65,7 +65,9 @@ public sealed record GameModeLeaderboardProjection(
     IReadOnlyDictionary<Guid, long>? CurrentBreakScores = null,
     IReadOnlyDictionary<Guid, long>? CurrentFixScores = null,
     int? CurrentRound = null,
-    int? SettledThroughRound = null);
+    int? SettledThroughRound = null,
+    int? RoundDurationSeconds = null,
+    int? CurrentRoundRemainingSeconds = null);
 
 public interface IGameModeLeaderboardProjector
 {
@@ -82,7 +84,9 @@ public sealed record LeaderboardProjectionResult(
     IReadOnlyList<LeaderboardEntry> Entries,
     IReadOnlyList<LeaderboardChallengeInfo> Challenges,
     int? CurrentRound = null,
-    int? SettledThroughRound = null);
+    int? SettledThroughRound = null,
+    int? RoundDurationSeconds = null,
+    int? CurrentRoundRemainingSeconds = null);
 
 public interface ILeaderboardProjectionEngine
 {
