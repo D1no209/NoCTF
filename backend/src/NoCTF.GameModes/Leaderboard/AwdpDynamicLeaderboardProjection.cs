@@ -44,6 +44,11 @@ internal static class AwdpDynamicLeaderboardProjection
         var currentRound = input.CompetitionStatus == CompetitionStatus.Finished
             ? Math.Max(1, settledThroughRound)
             : Round(elapsed, competition.RoundDurationSeconds);
+        var elapsedSeconds = Math.Max(0L, (long)Math.Floor(elapsed.TotalSeconds));
+        var currentRoundRemainingSeconds = input.CompetitionStatus == CompetitionStatus.Finished
+            ? 0
+            : competition.RoundDurationSeconds
+                - (int)(elapsedSeconds % competition.RoundDurationSeconds);
         var correctFacts = input.GameplayFacts
             .Where(fact => fact.OccurredAt <= projectedAt
                 && fact.TeamId is Guid teamId
@@ -80,12 +85,7 @@ internal static class AwdpDynamicLeaderboardProjection
             {
                 TeamId = fact.TeamId!.Value,
                 ChallengeId = fact.CompetitionChallengeId!.Value,
-                fact.Kind,
-                Round = Round(
-                    fact.OccurredAt,
-                    input.LifecycleAudits,
-                    input.CompetitionStartTime,
-                    competition.RoundDurationSeconds)
+                fact.Kind
             })
             .Select(group => group.First())
             .Select(fact => new Activation(
@@ -245,7 +245,9 @@ internal static class AwdpDynamicLeaderboardProjection
             breakScores,
             fixScores,
             currentRound,
-            settledThroughRound);
+            settledThroughRound,
+            competition.RoundDurationSeconds,
+            currentRoundRemainingSeconds);
     }
 
     private static void ProjectTrack(
@@ -267,24 +269,44 @@ internal static class AwdpDynamicLeaderboardProjection
             .ThenBy(item => item.Fact.OccurredAt)
             .ThenBy(item => item.Fact.GameplayFactId)
             .ToList();
-        foreach (var round in activations
-                     .Where(item => item.Round <= settledThroughRound)
-                     .Select(item => item.Round)
-                     .Distinct()
-                     .Order())
+        var scoringActivations = activations
+            .Where(item => scoringTeams.Contains(item.Fact.TeamId!.Value)
+                && item.Round <= settledThroughRound)
+            .ToList();
+        var cumulativePoints = scoringActivations.ToDictionary(
+            item => item.Fact.GameplayFactId,
+            _ => 0L);
+        var changeRounds = activations
+            .Where(item => item.Round <= settledThroughRound
+                && (dynamicTeamIds.Contains(item.Fact.TeamId!.Value)
+                    || scoringTeams.Contains(item.Fact.TeamId!.Value)))
+            .Select(item => item.Round)
+            .Distinct()
+            .Order()
+            .ToArray();
+        for (var index = 0; index < changeRounds.Length; index++)
         {
-            var roundActivations = activations
-                .Where(item => item.Round == round)
-                .ToList();
-            var dynamicCount = roundActivations.Count(item =>
-                dynamicTeamIds.Contains(item.Fact.TeamId!.Value));
+            var firstRound = changeRounds[index];
+            var lastRound = index + 1 < changeRounds.Length
+                ? changeRounds[index + 1] - 1
+                : settledThroughRound;
+            var roundCount = checked(lastRound - firstRound + 1);
+            var dynamicCount = activations.Count(item =>
+                item.Round <= firstRound
+                && dynamicTeamIds.Contains(item.Fact.TeamId!.Value));
             var points = ScoreCurve.Evaluate(curve, dynamicCount, dynamicTeamIds.Count);
-            foreach (var activation in roundActivations.Where(item =>
-                         scoringTeams.Contains(item.Fact.TeamId!.Value)))
-                awards.Add(new(activation.Fact, points, round));
+            var segmentPoints = checked(points * roundCount);
+            foreach (var activation in scoringActivations.Where(item => item.Round <= firstRound))
+                cumulativePoints[activation.Fact.GameplayFactId] = checked(
+                    cumulativePoints[activation.Fact.GameplayFactId] + segmentPoints);
         }
+        foreach (var activation in scoringActivations)
+            awards.Add(new(
+                activation.Fact,
+                cumulativePoints[activation.Fact.GameplayFactId],
+                activation.Round));
         var currentDynamicCount = activations.Count(item =>
-            item.Round == currentRound && dynamicTeamIds.Contains(item.Fact.TeamId!.Value));
+            item.Round <= currentRound && dynamicTeamIds.Contains(item.Fact.TeamId!.Value));
         currentScores[challengeId] = ScoreCurve.Evaluate(
             curve,
             currentDynamicCount,

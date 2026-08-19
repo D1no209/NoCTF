@@ -219,7 +219,9 @@ public sealed class FusionLeaderboardCache(
             DataScope = LeaderboardDataScope.Live,
             DataAsOf = projectedAt,
             CurrentRound = projection.CurrentRound,
-            SettledThroughRound = projection.SettledThroughRound
+            SettledThroughRound = projection.SettledThroughRound,
+            RoundDurationSeconds = projection.RoundDurationSeconds,
+            CurrentRoundRemainingSeconds = projection.CurrentRoundRemainingSeconds
         };
     }
 

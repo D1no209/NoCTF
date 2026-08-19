@@ -5,9 +5,11 @@ import type {
 } from '../app/api'
 import {
   awdpControlEvents,
+  awdpOperationMetrics,
   awdpPlaybackEvents,
   awdpPublicEntries,
   awdpRankedEntries,
+  awdpRoundClock,
   awdpTeamChallengeStates,
   calculateAwdpCanvasScale,
   normalizeAwdpControlEvent,
@@ -144,6 +146,49 @@ describe('AWDP control screen data adapter', () => {
       })
   })
 
+  test('counts each attack or defense operation once while pairing attempted and resolved events', () => {
+    const attackFactId = crypto.randomUUID()
+    const defenseFactId = crypto.randomUUID()
+    const events = awdpControlEvents([
+      event('AwdpBreakAttempted', { gameplayFactId: attackFactId }),
+      event('AwdpBreakResolved', {
+        gameplayFactId: attackFactId,
+        occurredAt: '2026-08-19T12:00:01Z',
+        gameplayFactState: 'Completed',
+        gameplayFactResult: 'Correct',
+      }),
+      event('AwdpFixAttempted', { gameplayFactId: defenseFactId }),
+      event('AwdpFixResolved', {
+        gameplayFactId: defenseFactId,
+        occurredAt: '2026-08-19T12:00:02Z',
+        gameplayFactState: 'Completed',
+        gameplayFactResult: 'Wrong',
+      }),
+    ])
+
+    expect(awdpOperationMetrics(events)).toEqual({
+      attack: { success: 1, total: 1 },
+      defense: { success: 0, total: 1 },
+    })
+  })
+
+  test('advances the displayed round clock from the generated leaderboard snapshot', () => {
+    const timedLeaderboard = {
+      ...leaderboard,
+      generatedAt: '2026-08-19T12:00:00Z',
+      currentRound: 12,
+      roundDurationSeconds: 300,
+      currentRoundRemainingSeconds: 120,
+    }
+
+    expect(awdpRoundClock(timedLeaderboard, Date.parse('2026-08-19T12:00:30Z'), true))
+      .toEqual({ currentRound: 12, remainingSeconds: 90 })
+    expect(awdpRoundClock(timedLeaderboard, Date.parse('2026-08-19T12:02:30Z'), true))
+      .toEqual({ currentRound: 13, remainingSeconds: 270 })
+    expect(awdpRoundClock(timedLeaderboard, Date.parse('2026-08-19T12:02:30Z'), false))
+      .toEqual({ currentRound: 12, remainingSeconds: 120 })
+  })
+
   test('keeps a fixed 1920 by 1080 virtual canvas with uniform letterboxed scaling', () => {
     expect(calculateAwdpCanvasScale(1920, 1080)).toBe(1)
     expect(calculateAwdpCanvasScale(2560, 1440)).toBeCloseTo(4 / 3)
@@ -174,6 +219,12 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).toContain('playbackQueue')
     expect(page).toContain('PLAYBACK_DURATION_MS = 5_400')
     expect(page).toContain('carouselTimer = setInterval(selectNextTeam, 8_000)')
+    expect(page).toContain("directionIcon(challenge.direction)")
+    expect(page).toContain('operationMetrics.attack.success')
+    expect(page).toContain('operationMetrics.defense.success')
+    expect(page).toContain("isChallengeFocused(challenge.competitionChallengeId)")
+    expect(page).not.toContain('totalAttackScore')
+    expect(page).not.toContain('totalDefenseScore')
     expect(page).toContain('width:1920px')
     expect(page).toContain('height:1080px')
     expect(page).not.toContain('$fetch(')

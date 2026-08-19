@@ -58,7 +58,9 @@ public sealed class LeaderboardProjectionEngine(ILeaderboardProjectorCatalog pro
             entriesWithCells,
             challenges,
             projection.CurrentRound,
-            projection.SettledThroughRound);
+            projection.SettledThroughRound,
+            projection.RoundDurationSeconds,
+            projection.CurrentRoundRemainingSeconds);
     }
 
     private static IReadOnlyList<CtfSolveObservation> BuildCtfSolveObservations(

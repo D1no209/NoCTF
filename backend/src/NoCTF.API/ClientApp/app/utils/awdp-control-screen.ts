@@ -24,6 +24,21 @@ export interface AwdpControlEventReconciliation {
   newEvents: AwdpControlEvent[]
 }
 
+export interface AwdpOperationMetric {
+  success: number
+  total: number
+}
+
+export interface AwdpOperationMetrics {
+  attack: AwdpOperationMetric
+  defense: AwdpOperationMetric
+}
+
+export interface AwdpRoundClock {
+  currentRound: number
+  remainingSeconds: number
+}
+
 export interface AwdpTeamChallengeState {
   competitionChallengeId: string
   title: string
@@ -103,6 +118,49 @@ export function reconcileAwdpControlEvents(
 
 export function awdpPlaybackEvents(events: readonly AwdpControlEvent[]): AwdpControlEvent[] {
   return events.filter(event => event.outcome !== 'pending')
+}
+
+export function awdpOperationMetrics(events: readonly AwdpControlEvent[]): AwdpOperationMetrics {
+  const attempts = new Map<string, AwdpControlEvent>()
+  for (const event of events) {
+    const key = `${event.action}:${event.gameplayFactId ?? event.id}`
+    const previous = attempts.get(key)
+    if (!previous || previous.outcome === 'pending' || event.outcome !== 'pending')
+      attempts.set(key, event)
+  }
+  const metric = (action: AwdpControlAction): AwdpOperationMetric => {
+    const matching = [...attempts.values()].filter(event => event.action === action)
+    return {
+      success: matching.filter(event => event.outcome === 'success').length,
+      total: matching.length,
+    }
+  }
+  return { attack: metric('attack'), defense: metric('defense') }
+}
+
+export function awdpRoundClock(
+  leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
+  now: number,
+  advances: boolean,
+): AwdpRoundClock {
+  const currentRound = Math.max(0, leaderboard?.currentRound ?? 0)
+  const duration = leaderboard?.roundDurationSeconds ?? 0
+  const baseRemaining = leaderboard?.currentRoundRemainingSeconds ?? 0
+  if (!currentRound || duration <= 0 || baseRemaining <= 0)
+    return { currentRound, remainingSeconds: Math.max(0, baseRemaining) }
+
+  const generatedAt = leaderboard?.generatedAt
+    ? new Date(leaderboard.generatedAt).getTime()
+    : now
+  const elapsed = advances && Number.isFinite(generatedAt)
+    ? Math.max(0, Math.floor((now - generatedAt) / 1000))
+    : 0
+  const elapsedInBaseRound = duration - Math.min(duration, baseRemaining)
+  const totalElapsed = elapsedInBaseRound + elapsed
+  return {
+    currentRound: currentRound + Math.floor(totalElapsed / duration),
+    remainingSeconds: duration - totalElapsed % duration,
+  }
 }
 
 export function awdpPublicEntries(

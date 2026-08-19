@@ -268,9 +268,12 @@ public sealed class AwdpGameplayFactEvaluatorTests
             ProjectedAt: startedAt.AddSeconds(250)));
 
         var entry = projection.Entries.Single();
-        await Assert.That(entry.Score).IsEqualTo(102L);
-        await Assert.That(entry.SolveCount).IsEqualTo(3);
-        await Assert.That(projection.Cells.Single().Score).IsEqualTo(140L);
+        await Assert.That(entry.Score).IsEqualTo(202L);
+        await Assert.That(entry.SolveCount).IsEqualTo(2);
+        await Assert.That(projection.Cells.Single().Score).IsEqualTo(240L);
+        await Assert.That(projection.CurrentRound).IsEqualTo(5);
+        await Assert.That(projection.RoundDurationSeconds).IsEqualTo(60);
+        await Assert.That(projection.CurrentRoundRemainingSeconds).IsEqualTo(50);
 
         LeaderboardGameplayFact Fact(
             GameplayFactKind kind,
@@ -289,7 +292,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
     }
 
     [Test]
-    public async Task Projection_settles_independent_dynamic_break_and_fix_curves_per_round()
+    public async Task Projection_accumulates_first_break_and_fix_activations_across_settled_rounds()
     {
         var startedAt = DateTimeOffset.UtcNow.AddMinutes(-10);
         var competitionId = Guid.NewGuid();
@@ -307,9 +310,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
         {
             Fact(teamA, GameplayFactKind.BreakAttempt, 20),
             Fact(teamA, GameplayFactKind.FixAttempt, 30),
-            Fact(teamA, GameplayFactKind.BreakAttempt, 70),
-            Fact(teamB, GameplayFactKind.BreakAttempt, 75),
-            Fact(teamA, GameplayFactKind.FixAttempt, 80)
+            Fact(teamB, GameplayFactKind.BreakAttempt, 75)
         };
 
         LeaderboardProjectionInput Input(bool banTeamB, DateTimeOffset projectedAt) => new(
@@ -347,6 +348,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
         await Assert.That(afterRoundTwo.Entries.Single(entry => entry.TeamId == teamB).AttackScore).IsEqualTo(55L);
         await Assert.That(afterRoundTwo.Cells.Single(cell => cell.TeamId == teamA).AttackScore).IsEqualTo(155L);
         await Assert.That(afterRoundTwo.Cells.Single(cell => cell.TeamId == teamA).DefenseScore).IsEqualTo(160L);
+        await Assert.That(afterRoundTwo.Entries.Single(entry => entry.TeamId == teamA).SolveCount).IsEqualTo(2);
         await Assert.That(replayAfterBan.Entries.Single().Score).IsEqualTo(180L);
         await Assert.That(replayAfterBan.CurrentBreakScores![challengeId]).IsEqualTo(100L);
 
@@ -409,7 +411,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
 
         var projection = new AwdpLeaderboardProjector().Project(input);
 
-        await Assert.That(projection.Entries.Single().Score).IsEqualTo(25L);
+        await Assert.That(projection.Entries.Single().Score).IsEqualTo(50L);
         await Assert.That(projection.CurrentRound).IsEqualTo(2);
         await Assert.That(projection.SettledThroughRound).IsEqualTo(2);
 
@@ -480,11 +482,11 @@ public sealed class AwdpGameplayFactEvaluatorTests
         var restored = new AwdpLeaderboardProjector().Project(
             Input(GameplayFactResult.Correct));
 
-        await Assert.That(beforeCorrection.Entries.Single().Score).IsEqualTo(125L);
+        await Assert.That(beforeCorrection.Entries.Single().Score).IsEqualTo(250L);
         await Assert.That(beforeCorrection.Entries.Single().SolveCount).IsEqualTo(2);
         await Assert.That(afterCorrection.Entries.Single().Score).IsEqualTo(0L);
         await Assert.That(afterCorrection.Entries.Single().SolveCount).IsEqualTo(0);
-        await Assert.That(restored.Entries.Single().Score).IsEqualTo(125L);
+        await Assert.That(restored.Entries.Single().Score).IsEqualTo(250L);
     }
 
     [Test]
