@@ -20,6 +20,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             .Where(candidate => candidate.Id == competitionId)
             .Select(candidate => new
             {
+                candidate.Mode,
                 candidate.Status,
                 candidate.OwnerId,
                 candidate.ManagerIds,
@@ -55,6 +56,7 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             now);
         var scope = DataScope(identity?.Kind, isCollaborator, visibility);
         return new(
+            competition.Mode,
             competition.Status,
             visibility,
             scope,

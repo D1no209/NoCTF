@@ -43,6 +43,9 @@ GET  /api/v1/competitions
 GET  /api/v1/competitions/{competitionId}
 GET  /api/v1/competitions/{competitionId}/poster
 GET  /api/v1/competitions/{competitionId}/leaderboard
+GET  /api/v1/competitions/{competitionId}/leaderboard/challenges
+GET  /api/v1/competitions/{competitionId}/leaderboard/schema
+GET  /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}
 GET  /api/v1/competitions/{competitionId}/tracks
 
 POST /api/v1/competitions/{competitionId}/teams
@@ -67,10 +70,13 @@ Team Avatar 与 Competition Poster 都通过不可变 File 引用上传；上传
 
 Competition 列表只返回调用者可见状态：匿名可见 Visible/Published/Running/Paused/Finished，Draft 仅管理者。Team 私有字段（InvitationToken、Ban 原因）只按权限返回；公开 Team DTO 永不包含 InvitationToken。
 
-Leaderboard GET 的 statusUrl 指回自身：无快照时原子置 Dirty 并返回仅含 competitionId/state/statusUrl 的 202；Dirty 且有旧快照仍返回 200 完整旧快照；无快照且最后投影失败返回 503 ProblemDetails。响应不含 revision/stale/failure 时间，也不创建 ProjectionOperation。
-Leaderboard 使用 `challenges[]` 列与 ranked `entries[]` 行；每行的稀疏 `cells[]` 直接携带
-`competitionChallengeId`、score、solvedAt、solverName 和 nullable `bloodRank`。CTF 每题前三个
-不同队伍的单元分别为 First、Second、Third；不再返回重复的 subjects/slots、bloods 或 series。
+Leaderboard GET 的 statusUrl 指回自身：无快照时原子置 Dirty 并返回仅含 competitionId/state/statusUrl 的 202；Dirty 且有旧快照仍返回 200 完整旧快照；无快照且最后投影失败返回 503 ProblemDetails。响应不创建 ProjectionOperation。
+排行榜拆分为低频题目目录、低频列结构和高频稀疏快照。`leaderboard/challenges` 返回稳定题目标识；
+`leaderboard/schema` 返回模式、轮次和 `columnIndex` 定义；`leaderboard` 返回 actors、teams、tracks
+以及队伍的非空 `slots[]`。每个 slot 明确区分 `Pending`/`Settled`，并提供 earned、deducted、net、
+breakdown 与压缩后的权威事实。完整 slot 历史通过带签名游标的 team/column 明细路由读取。
+CTF 按题目列，AWD/AWDP 按题目×轮次列，KoH 按控制结算列；AWDP 当前未结算轮次只暴露操作
+状态，所有分数字段为 null，轮次结算后才进入累计分数。前端不得重算、预估或重新排序。
 排行榜响应同时返回 `visibility`、`dataScope` 与 nullable `dataAsOf`。Frozen 返回截止时刻的持久化
 快照；Blackout 对参赛者和 Bot 返回 `Hidden` 与空集合，但不关闭题目、Runtime、提交或本人
 提交结果。比赛结束时自动恢复最终实时榜单。人工 Administrator/Owner/Manager/Judge/Observer

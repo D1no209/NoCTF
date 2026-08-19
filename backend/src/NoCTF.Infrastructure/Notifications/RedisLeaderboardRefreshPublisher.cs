@@ -1,10 +1,9 @@
 using System.Text.Json;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Scoring.Leaderboard;
 using StackExchange.Redis;
 
 namespace NoCTF.Infrastructure.Notifications;
-
-public sealed record LeaderboardRefreshNotification(Guid CompetitionId, DateTimeOffset GeneratedAt);
 
 public sealed class RedisLeaderboardRefreshPublisher(IConnectionMultiplexer redis)
     : ILeaderboardRefreshPublisher
@@ -12,12 +11,13 @@ public sealed class RedisLeaderboardRefreshPublisher(IConnectionMultiplexer redi
     public const string Channel = "noctf:leaderboard-refreshes";
 
     public Task PublishAsync(
-        Guid competitionId,
-        DateTimeOffset generatedAt,
+        ScoreboardProjection projection,
         CancellationToken cancellationToken) =>
         redis.GetSubscriber().PublishAsync(
             RedisChannel.Literal(Channel),
-            JsonSerializer.Serialize(new LeaderboardRefreshNotification(
-                competitionId,
-                generatedAt)));
+            JsonSerializer.Serialize(new ScoreboardUpdated(
+                projection.Snapshot.CompetitionId,
+                projection.Snapshot.Version,
+                projection.Schema.Revision,
+                projection.ChallengeCatalog.Revision)));
 }

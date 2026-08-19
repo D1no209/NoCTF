@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Notifications;
 
 namespace NoCTF.API.SignalR.Publishing;
@@ -10,12 +11,15 @@ public sealed class LocalLeaderboardRefreshPublisher(
     IHubContext<CompetitionHub> hub) : ILeaderboardRefreshPublisher
 {
     public Task PublishAsync(
-        Guid competitionId,
-        DateTimeOffset generatedAt,
+        ScoreboardProjection projection,
         CancellationToken cancellationToken) =>
-        hub.Clients.Group($"competition:{competitionId:N}").SendAsync(
-            "leaderboardRefreshed",
-            new LeaderboardRefreshNotification(competitionId, generatedAt),
+        hub.Clients.Group($"competition:{projection.Snapshot.CompetitionId:N}").SendAsync(
+            "scoreboardUpdated",
+            new ScoreboardUpdated(
+                projection.Snapshot.CompetitionId,
+                projection.Snapshot.Version,
+                projection.Schema.Revision,
+                projection.ChallengeCatalog.Revision),
             cancellationToken);
 }
 
