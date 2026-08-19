@@ -48,6 +48,32 @@ describe('AWDP participant panel', () => {
     expect(source).not.toContain('AwdRotation')
   })
 
+  test('does not render a page-wide participant-state error banner', async () => {
+    const source = await Bun.file(
+      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    ).text()
+
+    expect(source).not.toContain('loadError')
+    expect(source).not.toContain('<Alert')
+    expect(source).not.toContain('加载 AWDP 状态失败')
+  })
+
+  test('keeps the challenge page and Fix history as sibling routes', async () => {
+    const challengePage = Bun.file(
+      new URL('../app/pages/competitions/[id]/challenges/[ccId]/index.vue', import.meta.url),
+    )
+    const historyPage = Bun.file(
+      new URL('../app/pages/competitions/[id]/challenges/[ccId]/fix-history.vue', import.meta.url),
+    )
+    const obsoleteNestedParent = Bun.file(
+      new URL('../app/pages/competitions/[id]/challenges/[ccId].vue', import.meta.url),
+    )
+
+    expect(await challengePage.exists()).toBe(true)
+    expect(await historyPage.exists()).toBe(true)
+    expect(await obsoleteNestedParent.exists()).toBe(false)
+  })
+
   test('labels the AWDP checker as a one-shot Fix verifier', async () => {
     const source = await Bun.file(
       new URL('../app/components/admin/DefinitionCheckerSection.vue', import.meta.url),

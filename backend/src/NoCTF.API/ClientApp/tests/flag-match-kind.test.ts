@@ -74,7 +74,7 @@ describe('attachment delivery editor', () => {
 
   test('renders one player download entry for random delivery and all entries otherwise', async () => {
     const page = await Bun.file(
-      new URL('../app/pages/competitions/[id]/challenges/[ccId].vue', import.meta.url),
+      new URL('../app/pages/competitions/[id]/challenges/[ccId]/index.vue', import.meta.url),
     ).text()
 
     expect(page).toContain("attachmentDeliveryPolicy === 'RandomOnePerTeam'")

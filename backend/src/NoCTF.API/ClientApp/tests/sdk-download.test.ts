@@ -4,7 +4,7 @@ const pagePaths = [
   '../app/pages/admin/platform/logs.vue',
   '../app/pages/admin/platform/audit.vue',
   '../app/pages/admin/competitions/[id]/exports.vue',
-  '../app/pages/competitions/[id]/challenges/[ccId].vue',
+  '../app/pages/competitions/[id]/challenges/[ccId]/index.vue',
 ]
 
 describe('generated SDK file downloads', () => {
