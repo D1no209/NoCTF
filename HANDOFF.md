@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.57 测试生产环境推送与部署
+
+- alpha.57 功能、版本和阶段交接内容已经推送到远程 `main`。由于直接 Git HTTPS 推送间歇性被连接重置，使用 GitHub Git Data API 按本地已验证树重建提交，并以 `108b94742cb26769923b4c17b058749b511debbf` 完成快进；远程最终 tree `39fbf854acea6db2350d707e9d8564d8874d3df8` 与本地 alpha.57 tree 完全一致。部署机通过经过 `git bundle verify` 的增量 bundle 快进到同一提交，没有覆盖生产 `.env`、Compose overlay 或其他未跟踪配置。
+- 部署前创建 PostgreSQL custom-format 备份 `/root/backups/noctf-pre-alpha57-108b9474.dump`，文件大小 204541 bytes，SHA-256 为 `9258b8b8a507a3e4dc6dff175ac5bc039e6248a7e13823fa98cd7408be54bbf2`。migration 容器确认数据库已经是最新状态，本次没有应用 migration，也没有手工修改生产业务数据。
+- 在服务器从完整源码构建并固化 `deploy-backend:alpha57-108b9474`、`deploy-worker:alpha57-108b9474`、`deploy-runner:alpha57-108b9474`、`deploy-migration:alpha57-108b9474`；对应镜像摘要分别为 `d975ca7234b6`、`cc138ead0877`、`2d2c9fa39517`、`070cc75a36ae`。旧 alpha.56 镜像同时保留 `pre-alpha57-108b9474` 和 `alpha56-f0420fd9` 回滚标签。
+- 仅滚动重建 API、Worker、Runner，PostgreSQL 与 Redis 始终未重启。切换后五个服务全部 `healthy`，API、Worker、Runner 的 RestartCount 均为 0；外部 `https://101.43.46.244/`、`/health`、`/health/ready` 均返回 HTTP 200，API 容器内确认程序集版本为 `0.1.0-alpha.57`。
+- 从切换时间 `2026-08-19T01:04:51Z` 起检查 API、Worker、Runner 日志，未发现 `Error`、`Critical`、`Exception`、未处理异常或失败记录。切换前后没有平台托管的 Runtime 容器或网络，部署未清理、修改或重建任何比赛 Runtime 资源。
+- 部署后根卷约有 4.7 GB 可用。没有执行全局 Docker prune，没有删除数据库备份、生产卷或回滚镜像；用户已有 `TODO.md` 修改、临时部署包及未跟踪目录均原样保留且未纳入提交。
+
 ## 2026-08-19 alpha.57 AWDP 赛事中控大屏
 
 - `3ffeb85e` 新增 AWDP 专用 `/competitions/{competitionId}/awdp-live` 中控大屏，并只在 AWDP 比赛侧栏显示入口；CTF 原有 3D 大屏保持不变。页面使用固定 `1920×1080` 虚拟画布和等比留黑缩放，包含顶栏轮次/倒计时、左侧实时操作流、中央 FIFO 动画区、已结算攻击/防御/总分 Top 8、队伍题目轮播及底部 JavaScript 连续速览。
