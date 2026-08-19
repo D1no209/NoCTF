@@ -1,5 +1,37 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-19 alpha.58 测试生产环境推送与部署
+
+- alpha.58 功能、版本、测试可见性补充与阶段交接已合并到最新远程 `main` 并推送，部署代码基线为
+  `57337799807bdf332b02ca123923fc6913d1f26b`。部署机通过已校验的增量 Git bundle 从
+  `279e3179` 快进到同一提交；生产工作树仅保留既有未跟踪 Compose overlay
+  `deploy/docker-compose.prod.yml` 及其 `pre-alpha55` 回滚副本，没有覆盖 `.env` 或其他生产配置。
+- 干净合并工作树复验时发现远程 `main` 已有 Runner timeout 测试使用 internal seam、但遗漏测试程序集可见性声明；
+  `57337799` 补入最小 `InternalsVisibleTo("NoCTF.Tests")`，没有改变产品运行时逻辑、HTTP 契约、数据模型或迁移。
+- 部署前创建 PostgreSQL custom-format 备份
+  `/root/backups/noctf-pre-alpha58-57337799-20260819T020041Z.dump`，文件大小 206324 bytes，SHA-256 为
+  `8a29b10543ce32d833e35e863a9f1a1bf2fbcd68ae20ded5d8f03bf86a5186e1`。migration 容器确认数据库已经是
+  最新状态，本次没有应用 migration，也没有手工修改生产业务数据。
+- 在服务器从部署基线完整构建并固化 `deploy-backend:alpha58-57337799`、
+  `deploy-worker:alpha58-57337799`、`deploy-runner:alpha58-57337799`、
+  `deploy-migration:alpha58-57337799`；对应镜像 ID 分别为 `aceeb61af31d`、`c2b436abd50e`、
+  `19c21c4273ea`、`3da097c20f6f`。部署前运行的 alpha.57 镜像保留
+  `rollback-alpha57-279e3179` 标签用于回滚。
+- 切换前后平台管理的 Runtime 容器和网络均为 0。仅滚动重建 API、Worker、Runner，PostgreSQL 与 Redis
+  始终未重启；三个新服务均为 `healthy` 且 RestartCount 为 0。外部
+  `https://101.43.46.244/`、`/health`、`/health/ready` 均返回 HTTP 200，API 容器内确认程序集版本为
+  `0.1.0-alpha.58`。
+- 从切换时间 `2026-08-19T02:06:56Z` 起检查 API、Worker、Runner 启动与运行日志，未发现 Error、Critical、
+  Fatal 或未处理异常。仅保留既有 DataProtection 临时密钥、显式 URL 端口覆盖及 Wolverine 动态代码生成提示。
+- 部署前在合并后的干净工作树执行完整门禁：Release solution build 0 warning / 0 error；后端完整 TUnit
+  1014 total、1012 passed、0 failed、2 个环境型 skipped（真实 Kubernetes/Libvirt 环境未配置）；前端
+  `bun test` 231/231（1718 assertions）、typecheck 与 production build 通过。前端构建仍只有既有 CSS
+  表达式、chunk 大小、plugin timing 与第三方 Node exports deprecation 警告。
+- 部署后根卷约有 3.4 GB 可用（92% 使用）。没有执行全局 Docker prune，没有删除数据库备份、生产卷、
+  回滚镜像或题目镜像；原工作区已有 `TODO.md` 修改、临时部署包及未跟踪目录均未纳入提交。
+- 本次未在 Microsoft Edge 中伪报视觉验收；用户可直接检查 AWDP 中控的跨轮累计分数、实时本轮倒计时、
+  攻防成功/总提交、事件聚焦以及 WEB/PWN 图标。HTTPS 与服务健康闭环已完成。
+
 ## 2026-08-19 alpha.58 AWDP 跨轮累计计分与中控动态增强
 
 - `a67bc6ab` 修正 AWDP 计分激活语义。每支队伍、每道题、每条 Break/Fix 轨道只取首个有效 Correct 作为唯一激活点；从激活轮开始，每个已完成轮次都按该轮截至当时的累计激活队伍数计算独立动态分值并持续累加。后续轮次新增队伍只影响后续轮次，重复正确提交、重复 callback 与 Wolverine 重投不会建立第二次激活；当前进行中轮次仍不提前计分，Pause/Resume/Finish 与封禁/解禁的权威重盘语义保持不变。
