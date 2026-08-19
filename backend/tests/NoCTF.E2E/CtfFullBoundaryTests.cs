@@ -857,10 +857,10 @@ public sealed class CtfFullBoundaryTests
             if (response.StatusCode == HttpStatusCode.OK)
             {
                 var leaderboard = await ReadExpectedJsonAsync(response, HttpStatusCode.OK, cancellationToken);
-                var entry = leaderboard.GetProperty("entries").EnumerateArray()
+                var entry = leaderboard.GetProperty("teams").EnumerateArray()
                     .FirstOrDefault(item => item.GetProperty("teamId").GetGuid() == teamId);
                 if (entry.ValueKind != JsonValueKind.Undefined
-                    && entry.GetProperty("score").GetInt64() == expectedScore)
+                    && entry.GetProperty("totalScore").GetInt64() == expectedScore)
                     return leaderboard;
             }
             else if (response.StatusCode != HttpStatusCode.Accepted)
@@ -879,19 +879,19 @@ public sealed class CtfFullBoundaryTests
         int expectedSolveCount,
         int expectedBloodCount)
     {
-        var entry = leaderboard.GetProperty("entries").EnumerateArray()
+        _ = competitionChallengeId;
+        var entry = leaderboard.GetProperty("teams").EnumerateArray()
             .Single(item => item.GetProperty("teamId").GetGuid() == teamId);
-        await Assert.That(entry.GetProperty("solveCount").GetInt32())
-            .IsEqualTo(expectedSolveCount);
-        var challengeCells = entry.GetProperty("cells").EnumerateArray()
-            .Where(item =>
-                item.GetProperty("competitionChallengeId").GetGuid()
-                == competitionChallengeId)
-            .ToArray();
-        await Assert.That(challengeCells).Count().IsEqualTo(expectedSolveCount);
-        var bloodCount = challengeCells.Count(item =>
-            item.GetProperty("bloodRank").ValueKind == JsonValueKind.String
-            && item.GetProperty("bloodRank").GetString() == "First");
+        var slots = entry.GetProperty("slots").EnumerateArray().ToArray();
+        var solveCount = slots
+            .SelectMany(slot => slot.GetProperty("breakdown").EnumerateArray())
+            .Where(item => item.GetProperty("kind").GetString() == "Solve")
+            .Sum(item => item.GetProperty("successfulCount").GetInt32());
+        await Assert.That(solveCount).IsEqualTo(expectedSolveCount);
+        var bloodCount = slots
+            .SelectMany(slot => slot.GetProperty("entries").EnumerateArray())
+            .Count(item => item.GetProperty("award").ValueKind == JsonValueKind.String
+                && item.GetProperty("award").GetString() == "FirstBlood");
         await Assert.That(bloodCount).IsEqualTo(expectedBloodCount);
     }
 

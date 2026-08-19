@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import type { NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse } from '../app/api'
+import type {
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+} from '../app/api'
 import {
   controlScreenChallenges,
   controlScreenPublicEntries,
@@ -7,30 +11,60 @@ import {
   reconcileControlScreenSolves,
 } from '../app/utils/control-screen'
 
-const leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
-  competitionId: 'competition-1',
-  challenges: [
-    { competitionChallengeId: '00000000-0000-0000-0000-000000000001', title: 'web-100', direction: 'WEB', currentScore: 500 },
-    { competitionChallengeId: '00000000-0000-0000-0000-000000000002', title: 'pwn-200', direction: 'PWN', currentScore: 1000 },
+const competitionId = '00000000-0000-0000-0000-000000000010'
+const webId = '00000000-0000-0000-0000-000000000001'
+const pwnId = '00000000-0000-0000-0000-000000000002'
+const catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
+  competitionId,
+  revision: 1,
+  items: [
+    { id: webId, title: 'web-100', direction: 'WEB', category: 'WEB', order: 1, published: true },
+    { id: pwnId, title: 'pwn-200', direction: 'PWN', category: 'PWN', order: 2, published: true },
   ],
+}
+const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+  competitionId,
+  mode: 'Ctf',
+  revision: 1,
+  challengeCatalogRevision: 1,
+  rounds: [],
+  columns: [
+    { index: 0, competitionChallengeId: webId, roundId: null },
+    { index: 1, competitionChallengeId: pwnId, roundId: null },
+  ],
+}
+const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
+  competitionId: 'competition-1',
+  version: 1,
+  schemaRevision: 1,
+  generatedAt: '2026-08-12T12:10:00Z',
+  currentRoundId: null,
   tracks: [
     { key: 'open', name: 'Open', visibleOnLeaderboard: true, isInternal: false },
     { key: 'junior', name: 'Junior', visibleOnLeaderboard: false, isInternal: false },
     { key: 'staff', name: 'Staff', visibleOnLeaderboard: true, isInternal: true },
   ],
-  entries: [
+  teams: [
     {
       rank: 1,
       teamId: 'team-open',
       teamName: 'Alpha',
       trackKey: 'open',
-      score: 500,
-      solveCount: 1,
-      cells: [{
-        competitionChallengeId: '00000000000000000000000000000001',
-        score: 500,
-        solvedAt: '2026-08-12T12:05:00Z',
-        bloodRank: 'First',
+      rankingState: 'Eligible',
+      totalScore: 500,
+      slots: [{
+        columnIndex: 0,
+        scoreState: 'Provisional',
+        earnedPoints: 500,
+        deductedPoints: 0,
+        netPoints: 500,
+        entryCount: 1,
+        breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1, earnedPoints: 500, deductedPoints: 0, netPoints: 500 }],
+        entries: [{
+          id: '00000000-0000-0000-0000-000000000101', kind: 'Solve', outcome: 'Succeeded',
+          actorIndex: 0, targetTeamId: null, occurredAt: '2026-08-12T12:05:00Z', settledAt: null,
+          earnedPoints: 500, deductedPoints: 0, netPoints: 500, award: 'FirstBlood', awardPoints: 50,
+        }],
       }],
     },
     {
@@ -38,13 +72,21 @@ const leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
       teamId: 'team-junior',
       teamName: 'Beta',
       trackKey: 'junior',
-      score: 1000,
-      solveCount: 1,
-      cells: [{
-        competitionChallengeId: '00000000-0000-0000-0000-000000000002',
-        score: 1000,
-        solvedAt: '2026-08-12T12:06:00Z',
-        bloodRank: 'Second',
+      rankingState: 'Eligible',
+      totalScore: 1000,
+      slots: [{
+        columnIndex: 1,
+        scoreState: 'Provisional',
+        earnedPoints: 1000,
+        deductedPoints: 0,
+        netPoints: 1000,
+        entryCount: 1,
+        breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1, earnedPoints: 1000, deductedPoints: 0, netPoints: 1000 }],
+        entries: [{
+          id: '00000000-0000-0000-0000-000000000102', kind: 'Solve', outcome: 'Succeeded',
+          actorIndex: 1, targetTeamId: null, occurredAt: '2026-08-12T12:06:00Z', settledAt: null,
+          earnedPoints: 1000, deductedPoints: 0, netPoints: 1000, award: 'SecondBlood', awardPoints: 25,
+        }],
       }],
     },
     {
@@ -52,36 +94,36 @@ const leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
       teamId: 'team-staff',
       teamName: 'Internal',
       trackKey: 'staff',
-      score: 1500,
-      solveCount: 2,
-      cells: [],
+      rankingState: 'Eligible',
+      totalScore: 1500,
+      slots: [],
     },
   ],
 }
 
 describe('CTF control screen projection', () => {
   test('aggregates every non-internal track and excludes internal data', () => {
-    const entries = controlScreenPublicEntries(leaderboard)
+    const entries = controlScreenPublicEntries(snapshot)
     expect(entries.map(entry => entry.teamName)).toEqual(['Alpha', 'Beta'])
 
-    const challenges = controlScreenChallenges(leaderboard, entries)
+    const challenges = controlScreenChallenges(catalog, schema, entries)
     expect(challenges.map(challenge => ({ title: challenge.title, solves: challenge.solveCount })))
       .toEqual([{ title: 'web-100', solves: 1 }, { title: 'pwn-200', solves: 1 }])
     expect(challenges[0]?.completionPercent).toBe(50)
 
-    const feed = controlScreenSolveFeed(leaderboard, entries)
+    const feed = controlScreenSolveFeed(catalog, schema, entries)
     expect(feed).toHaveLength(2)
     expect(feed.map(item => item.teamName)).not.toContain('Internal')
   })
 
   test('orders the live feed by solve time and normalizes challenge ids', () => {
-    const feed = controlScreenSolveFeed(leaderboard, controlScreenPublicEntries(leaderboard))
+    const feed = controlScreenSolveFeed(catalog, schema, controlScreenPublicEntries(snapshot))
     expect(feed.map(item => item.teamName)).toEqual(['Beta', 'Alpha'])
     expect(feed.map(item => item.challengeTitle)).toEqual(['pwn-200', 'web-100'])
   })
 
   test('baselines historical solves and queues every new solve in occurrence order', () => {
-    const initial = controlScreenSolveFeed(leaderboard, controlScreenPublicEntries(leaderboard))
+    const initial = controlScreenSolveFeed(catalog, schema, controlScreenPublicEntries(snapshot))
     const baseline = reconcileControlScreenSolves(null, initial)
     expect(baseline.newSolves).toEqual([])
 
@@ -110,8 +152,8 @@ describe('CTF control screen projection', () => {
     ).exists()
 
     expect(page).toContain('definePageMeta({ layout: false })')
-    expect(page).toContain('getLeaderboardEndpoint({ path: { competitionId } })')
-    expect(page).toContain('leaderboardRefreshed: () => void refreshLatest()')
+    expect(page).toContain('useScoreboardMatrix(competitionId)')
+    expect(page).toContain('scoreboardUpdated: () => void refreshLatest()')
     expect(page).toContain('refreshTimer = setInterval(() => void refreshLatest(), 15_000)')
     expect(page).toContain('reconcileControlScreenSolves')
     expect(page).toContain('celebrationQueue')

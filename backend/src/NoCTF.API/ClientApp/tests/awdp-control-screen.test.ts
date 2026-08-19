@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import type {
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
-  NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
 } from '../app/api'
 import {
   awdpControlEvents,
@@ -38,38 +40,65 @@ function event(
   }
 }
 
-const leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse = {
+const roundId = '00000000-0000-0000-0000-000000000005'
+const catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
   competitionId,
-  currentRound: 12,
-  settledThroughRound: 11,
+  revision: 1,
+  items: [{ id: challengeId, title: 'Pwn-02', direction: 'PWN', category: 'PWN', order: 1, published: true }],
+}
+const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+  competitionId,
+  mode: 'Awdp',
+  revision: 1,
+  challengeCatalogRevision: 1,
+  rounds: [{
+    id: roundId,
+    number: 12,
+    startAt: '2026-08-19T11:57:00Z',
+    endAt: '2026-08-19T12:02:00Z',
+    settledAt: '2026-08-19T12:02:00Z',
+    state: 'Settled',
+  }],
+  columns: [{ index: 0, competitionChallengeId: challengeId, roundId }],
+}
+const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
+  competitionId,
+  version: 1,
+  schemaRevision: 1,
+  generatedAt: '2026-08-19T12:02:00Z',
+  currentRoundId: roundId,
   tracks: [
     { key: 'open', name: 'Open', isInternal: false, visibleOnLeaderboard: true },
     { key: 'staff', name: 'Staff', isInternal: true, visibleOnLeaderboard: true },
   ],
-  challenges: [{
-    competitionChallengeId: challengeId,
-    title: 'Pwn-02',
-    direction: 'PWN',
-    currentBreakScore: 480,
-    currentFixScore: 420,
-  }],
-  entries: [
+  teams: [
     {
       rank: 2,
       teamId,
       teamName: 'BlueWhale',
       trackKey: 'open',
-      score: 900,
-      attackScore: 500,
-      defenseScore: 400,
-      cells: [{ competitionChallengeId: challengeId, attackScore: 500, defenseScore: 400 }],
+      rankingState: 'Eligible',
+      totalScore: 900,
+      slots: [{
+        columnIndex: 0,
+        scoreState: 'Settled',
+        earnedPoints: 900,
+        deductedPoints: 0,
+        netPoints: 900,
+        entryCount: 2,
+        breakdown: [
+          { kind: 'Attack', successfulCount: 1, attemptCount: 1, earnedPoints: 500, deductedPoints: 0, netPoints: 500 },
+          { kind: 'Defense', successfulCount: 1, attemptCount: 1, earnedPoints: 400, deductedPoints: 0, netPoints: 400 },
+        ],
+      }],
     },
     {
       rank: 1,
       teamId: '00000000-0000-0000-0000-000000000004',
       teamName: 'Internal',
       trackKey: 'staff',
-      score: 99_999,
+      rankingState: 'Eligible',
+      totalScore: 99_999,
     },
   ],
 }
@@ -128,15 +157,15 @@ describe('AWDP control screen data adapter', () => {
   })
 
   test('uses settled public scores and excludes internal tracks', () => {
-    expect(awdpPublicEntries(leaderboard).map(entry => entry.teamName)).toEqual(['BlueWhale'])
-    expect(awdpRankedEntries(leaderboard, new Map([[teamId, 3]]))[0])
+    expect(awdpPublicEntries(snapshot).map(entry => entry.teamName)).toEqual(['BlueWhale'])
+    expect(awdpRankedEntries(snapshot, new Map([[teamId, 3]]))[0])
       .toMatchObject({ rank: 2, attackScore: 500, defenseScore: 400, trend: 'up' })
 
     const events = awdpControlEvents([
       event('AwdpBreakResolved', { gameplayFactState: 'Completed', gameplayFactResult: 'Correct' }),
       event('AwdpFixResolved', { gameplayFactState: 'Completed', gameplayFactResult: 'Wrong' }),
     ])
-    expect(awdpTeamChallengeStates(leaderboard, awdpPublicEntries(leaderboard)[0]!, events)[0])
+    expect(awdpTeamChallengeStates(catalog, schema, awdpPublicEntries(snapshot)[0]!, events)[0])
       .toMatchObject({
         title: 'Pwn-02',
         attackScore: 500,
@@ -173,20 +202,25 @@ describe('AWDP control screen data adapter', () => {
   })
 
   test('advances the displayed round clock from the generated leaderboard snapshot', () => {
-    const timedLeaderboard = {
-      ...leaderboard,
-      generatedAt: '2026-08-19T12:00:00Z',
-      currentRound: 12,
-      roundDurationSeconds: 300,
-      currentRoundRemainingSeconds: 120,
+    const timedSchema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+      ...schema,
+      rounds: [{
+        id: roundId,
+        number: 12,
+        startAt: '2026-08-19T11:57:00Z',
+        endAt: '2026-08-19T12:02:00Z',
+        settledAt: null,
+        state: 'Running',
+      }],
     }
+    const timedSnapshot = { ...snapshot, generatedAt: '2026-08-19T12:00:00Z' }
 
-    expect(awdpRoundClock(timedLeaderboard, Date.parse('2026-08-19T12:00:30Z'), true))
+    expect(awdpRoundClock(timedSnapshot, timedSchema, Date.parse('2026-08-19T12:00:30Z'), true))
       .toEqual({ currentRound: 12, remainingSeconds: 90 })
-    expect(awdpRoundClock(timedLeaderboard, Date.parse('2026-08-19T12:02:30Z'), true))
-      .toEqual({ currentRound: 13, remainingSeconds: 270 })
-    expect(awdpRoundClock(timedLeaderboard, Date.parse('2026-08-19T12:02:30Z'), false))
-      .toEqual({ currentRound: 12, remainingSeconds: 120 })
+    expect(awdpRoundClock(timedSnapshot, timedSchema, Date.parse('2026-08-19T12:02:30Z'), true))
+      .toEqual({ currentRound: 12, remainingSeconds: 0 })
+    expect(awdpRoundClock(timedSnapshot, timedSchema, Date.parse('2026-08-19T12:02:30Z'), false))
+      .toEqual({ currentRound: 12, remainingSeconds: 0 })
   })
 
   test('keeps a fixed 1920 by 1080 virtual canvas with uniform letterboxed scaling', () => {
@@ -213,7 +247,8 @@ describe('AWDP control screen implementation contract', () => {
     ).text()
 
     expect(page).toContain('definePageMeta({ layout: false })')
-    expect(page).toContain('getLeaderboardEndpoint({ path: { competitionId } })')
+    expect(page).toContain('useScoreboardMatrix(competitionId)')
+    expect(page).toContain('board.refresh({ catalog: true, schema: true, snapshot: true })')
     expect(page).toContain('listCompetitionEvents({')
     expect(page).toContain('competitionEventChanged: () => void refreshLatest()')
     expect(page).toContain('playbackQueue')

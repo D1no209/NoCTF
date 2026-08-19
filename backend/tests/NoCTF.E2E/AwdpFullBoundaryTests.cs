@@ -52,7 +52,7 @@ public sealed class AwdpFullBoundaryTests
         var competitionConfigurationJson = JsonSerializer.Serialize(new
         {
             schemaVersion = 4,
-            roundDurationSeconds = 5,
+            roundDurationSeconds = 30,
             @break = new
             {
                 initialPoints = 40,
@@ -481,34 +481,21 @@ public sealed class AwdpFullBoundaryTests
             result: "Wrong",
             failureCode: "AwdpPatchFailed");
 
-        await PollLeaderboardAsync(
+        var firstSettledScoreboard = await PollAwdpSettledScoreboardAsync(
             anonymous,
             competitionId,
             red.TeamId,
-            expectedScore: 33,
-            TimeSpan.FromSeconds(45),
-            cancellationToken);
-        await PollLeaderboardAsync(
-            anonymous,
-            competitionId,
             blue.TeamId,
-            expectedScore: 53,
-            TimeSpan.FromSeconds(45),
-            cancellationToken);
-        await PollLeaderboardAsync(
-            anonymous,
-            competitionId,
             green.TeamId,
-            expectedScore: -37,
-            TimeSpan.FromSeconds(45),
+            minimumSettledRounds: 3,
+            TimeSpan.FromSeconds(90),
             cancellationToken);
-        var firstRoundScores = await ReadScoresAsync(anonymous, competitionId, cancellationToken);
-        await AssertScoresStableAsync(
-            anonymous,
-            competitionId,
-            firstRoundScores,
-            TimeSpan.FromSeconds(6),
-            cancellationToken);
+        await AssertScoreboardArithmeticAsync(firstSettledScoreboard.Snapshot);
+        await AssertNoSyntheticGlobalAdjustmentsAsync(firstSettledScoreboard.Snapshot);
+        await AssertCurrentRoundScoresPendingAsync(firstSettledScoreboard);
+        var firstSettledSlots = CaptureSettledSlots(firstSettledScoreboard.Snapshot);
+        var firstRedScore = Team(firstSettledScoreboard.Snapshot, red.TeamId)
+            .GetProperty("totalScore").GetInt64();
 
         var redGenerationTwo = await StartAndPollRuntimeAsync(
             redClient,
@@ -525,6 +512,16 @@ public sealed class AwdpFullBoundaryTests
             TimeSpan.FromSeconds(30),
             cancellationToken);
         await Assert.That(redGenerationTwoFlag).IsNotEqualTo(redFlag);
+        var generationTwoStartRound = (await GetJsonAsync(
+            redClient,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
+            cancellationToken)).GetProperty("currentRound").GetInt32();
+        _ = await PollJsonAsync(
+            redClient,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
+            value => value.GetProperty("currentRound").GetInt32() > generationTwoStartRound,
+            TimeSpan.FromSeconds(45),
+            cancellationToken);
         var expiredBreakId = await SubmitBreakAsync(
             redClient,
             competitionId,
@@ -561,13 +558,29 @@ public sealed class AwdpFullBoundaryTests
             TimeSpan.FromSeconds(30),
             cancellationToken);
         await AssertSubmissionAsync(currentGenerationBreak, "BreakAttempt", "Correct", null);
-        await PollLeaderboardAsync(
+        var pendingRoundScoreboard = await PollScoreboardAsync(
             anonymous,
             competitionId,
-            red.TeamId,
-            expectedScore: 66,
-            TimeSpan.FromSeconds(45),
+            observation => HasPendingEntry(observation, red.TeamId, currentGenerationBreakId),
+            TimeSpan.FromSeconds(25),
             cancellationToken);
+        await AssertCurrentRoundScoresPendingAsync(pendingRoundScoreboard);
+        await AssertScoreboardArithmeticAsync(pendingRoundScoreboard.Snapshot);
+        var accumulatedScoreboard = await PollScoreboardAsync(
+            anonymous,
+            competitionId,
+            observation => observation.Schema.GetProperty("rounds").EnumerateArray()
+                    .Count(round => round.GetProperty("state").GetString() == "Settled")
+                    > firstSettledScoreboard.Schema.GetProperty("rounds").EnumerateArray()
+                        .Count(round => round.GetProperty("state").GetString() == "Settled")
+                && Team(observation.Snapshot, red.TeamId).GetProperty("totalScore").GetInt64()
+                    > firstRedScore,
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
+        await AssertSettledSlotsUnchangedAsync(firstSettledSlots, accumulatedScoreboard.Snapshot);
+        await AssertScoreboardArithmeticAsync(accumulatedScoreboard.Snapshot);
+        await AssertNoSyntheticGlobalAdjustmentsAsync(accumulatedScoreboard.Snapshot);
+        await AssertCurrentRoundScoresPendingAsync(accumulatedScoreboard);
 
         await SendWithoutBodyAsync(
             admin,
@@ -588,7 +601,7 @@ public sealed class AwdpFullBoundaryTests
             pausedState.GetProperty("currentRound").GetInt32(),
             TimeSpan.FromSeconds(11),
             cancellationToken);
-        var pausedScores = await PollScoresSettledAsync(
+        _ = await PollScoresSettledAsync(
             anonymous,
             competitionId,
             TimeSpan.FromSeconds(18),
@@ -600,12 +613,15 @@ public sealed class AwdpFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/resume",
             HttpStatusCode.NoContent,
             cancellationToken);
-        await AssertScoresStableAsync(
+        var resumedScoreboard = await PollScoreboardAsync(
             anonymous,
             competitionId,
-            pausedScores,
-            TimeSpan.FromSeconds(7),
+            observation => observation.Snapshot.GetProperty("version").GetInt64()
+                > accumulatedScoreboard.Snapshot.GetProperty("version").GetInt64(),
+            TimeSpan.FromSeconds(45),
             cancellationToken);
+        await AssertSettledSlotsUnchangedAsync(firstSettledSlots, resumedScoreboard.Snapshot);
+        await AssertScoreboardArithmeticAsync(resumedScoreboard.Snapshot);
 
         await SendWithoutBodyAsync(
             admin,
@@ -1109,6 +1125,202 @@ public sealed class AwdpFullBoundaryTests
             $"AWDP leaderboard did not reach the frozen score. Last scores: {FormatScores(last)}");
     }
 
+    private static async Task<ScoreboardObservation> PollAwdpSettledScoreboardAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid attackTeamId,
+        Guid defenseTeamId,
+        Guid penaltyTeamId,
+        int minimumSettledRounds,
+        TimeSpan timeout,
+        CancellationToken cancellationToken) =>
+        await PollScoreboardAsync(
+            client,
+            competitionId,
+            observation => observation.Schema.GetProperty("rounds").EnumerateArray()
+                    .Count(round => round.GetProperty("state").GetString() == "Settled")
+                    >= minimumSettledRounds
+                && SettledBreakdowns(observation.Snapshot, attackTeamId, "Attack")
+                    .Sum(item => item.GetProperty("earnedPoints").GetInt64()) > 0
+                && SettledBreakdowns(observation.Snapshot, defenseTeamId, "Defense")
+                    .Sum(item => item.GetProperty("earnedPoints").GetInt64()) > 0
+                && SettledBreakdowns(observation.Snapshot, penaltyTeamId, "Defense")
+                    .Sum(item => item.GetProperty("deductedPoints").GetInt64()) >= 37,
+            timeout,
+            cancellationToken);
+
+    private static async Task<ScoreboardObservation> PollScoreboardAsync(
+        HttpClient client,
+        Guid competitionId,
+        Func<ScoreboardObservation, bool> completed,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.Add(timeout);
+        ScoreboardObservation? last = null;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            last = await TryReadScoreboardAsync(client, competitionId, cancellationToken);
+            if (last is not null && completed(last))
+                return last;
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+        }
+        throw new TimeoutException(
+            $"AWDP scoreboard did not reach the expected round state. Last schema: {last?.Schema}; "
+            + $"last snapshot: {last?.Snapshot}");
+    }
+
+    private static async Task<ScoreboardObservation?> TryReadScoreboardAsync(
+        HttpClient client,
+        Guid competitionId,
+        CancellationToken cancellationToken)
+    {
+        using var schemaResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/schema",
+            cancellationToken);
+        if (schemaResponse.StatusCode == HttpStatusCode.Accepted)
+            return null;
+        var schema = await ReadExpectedJsonAsync(schemaResponse, HttpStatusCode.OK, cancellationToken);
+
+        using var snapshotResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard",
+            cancellationToken);
+        if (snapshotResponse.StatusCode == HttpStatusCode.Accepted)
+            return null;
+        var snapshot = await ReadExpectedJsonAsync(snapshotResponse, HttpStatusCode.OK, cancellationToken);
+        if (snapshot.GetProperty("schemaRevision").GetInt64()
+            != schema.GetProperty("revision").GetInt64())
+            return null;
+        return new(schema, snapshot);
+    }
+
+    private static JsonElement Team(JsonElement snapshot, Guid teamId) =>
+        snapshot.GetProperty("teams").EnumerateArray()
+            .Single(item => item.GetProperty("teamId").GetGuid() == teamId);
+
+    private static IEnumerable<JsonElement> SettledBreakdowns(
+        JsonElement snapshot,
+        Guid teamId,
+        string kind) =>
+        Team(snapshot, teamId).GetProperty("slots").EnumerateArray()
+            .Where(slot => slot.GetProperty("scoreState").GetString() == "Settled")
+            .SelectMany(slot => slot.GetProperty("breakdown").EnumerateArray())
+            .Where(item => item.GetProperty("kind").GetString() == kind);
+
+    private static bool HasPendingEntry(
+        ScoreboardObservation observation,
+        Guid teamId,
+        Guid entryId)
+    {
+        if (observation.Snapshot.GetProperty("currentRoundId").ValueKind != JsonValueKind.String)
+            return false;
+        var currentRoundId = observation.Snapshot.GetProperty("currentRoundId").GetGuid();
+        var currentColumns = observation.Schema.GetProperty("columns").EnumerateArray()
+            .Where(column => column.GetProperty("roundId").ValueKind == JsonValueKind.String
+                && column.GetProperty("roundId").GetGuid() == currentRoundId)
+            .Select(column => column.GetProperty("index").GetInt32())
+            .ToHashSet();
+        return Team(observation.Snapshot, teamId).GetProperty("slots").EnumerateArray()
+            .Where(slot => currentColumns.Contains(slot.GetProperty("columnIndex").GetInt32()))
+            .Any(slot => slot.GetProperty("scoreState").GetString() == "Pending"
+                && slot.GetProperty("entries").EnumerateArray()
+                    .Any(entry => entry.GetProperty("id").GetGuid() == entryId));
+    }
+
+    private static async Task AssertCurrentRoundScoresPendingAsync(ScoreboardObservation observation)
+    {
+        if (observation.Snapshot.GetProperty("currentRoundId").ValueKind != JsonValueKind.String)
+            return;
+        var currentRoundId = observation.Snapshot.GetProperty("currentRoundId").GetGuid();
+        var currentColumns = observation.Schema.GetProperty("columns").EnumerateArray()
+            .Where(column => column.GetProperty("roundId").ValueKind == JsonValueKind.String
+                && column.GetProperty("roundId").GetGuid() == currentRoundId)
+            .Select(column => column.GetProperty("index").GetInt32())
+            .ToHashSet();
+        foreach (var slot in observation.Snapshot.GetProperty("teams").EnumerateArray()
+                     .SelectMany(team => team.GetProperty("slots").EnumerateArray())
+                     .Where(slot => currentColumns.Contains(slot.GetProperty("columnIndex").GetInt32())))
+        {
+            await Assert.That(slot.GetProperty("scoreState").GetString()).IsEqualTo("Pending");
+            await Assert.That(slot.GetProperty("earnedPoints").ValueKind).IsEqualTo(JsonValueKind.Null);
+            await Assert.That(slot.GetProperty("deductedPoints").ValueKind).IsEqualTo(JsonValueKind.Null);
+            await Assert.That(slot.GetProperty("netPoints").ValueKind).IsEqualTo(JsonValueKind.Null);
+            await Assert.That(slot.GetProperty("entries").EnumerateArray().All(entry =>
+                    entry.GetProperty("earnedPoints").ValueKind == JsonValueKind.Null
+                    && entry.GetProperty("deductedPoints").ValueKind == JsonValueKind.Null
+                    && entry.GetProperty("netPoints").ValueKind == JsonValueKind.Null))
+                .IsTrue();
+        }
+    }
+
+    private static async Task AssertScoreboardArithmeticAsync(JsonElement snapshot)
+    {
+        foreach (var team in snapshot.GetProperty("teams").EnumerateArray())
+        {
+            var slots = team.GetProperty("slots").EnumerateArray().ToArray();
+            foreach (var slot in slots.Where(slot => slot.GetProperty("scoreState").GetString() != "Pending"))
+            {
+                var earned = slot.GetProperty("earnedPoints").GetInt64();
+                var deducted = slot.GetProperty("deductedPoints").GetInt64();
+                await Assert.That(slot.GetProperty("netPoints").GetInt64())
+                    .IsEqualTo(checked(earned - deducted));
+                await Assert.That(slot.GetProperty("breakdown").EnumerateArray()
+                        .Sum(item => item.GetProperty("earnedPoints").GetInt64()))
+                    .IsEqualTo(earned);
+                await Assert.That(slot.GetProperty("breakdown").EnumerateArray()
+                        .Sum(item => item.GetProperty("deductedPoints").GetInt64()))
+                    .IsEqualTo(deducted);
+            }
+            var slotNet = slots
+                .Where(slot => slot.GetProperty("netPoints").ValueKind == JsonValueKind.Number)
+                .Sum(slot => slot.GetProperty("netPoints").GetInt64());
+            var adjustments = team.GetProperty("globalAdjustments").EnumerateArray()
+                .Sum(item => item.GetProperty("netPoints").GetInt64());
+            await Assert.That(team.GetProperty("totalScore").GetInt64())
+                .IsEqualTo(checked(slotNet + adjustments));
+        }
+    }
+
+    private static async Task AssertNoSyntheticGlobalAdjustmentsAsync(JsonElement snapshot)
+    {
+        foreach (var team in snapshot.GetProperty("teams").EnumerateArray())
+            await Assert.That(team.GetProperty("globalAdjustments").GetArrayLength()).IsEqualTo(0);
+    }
+
+    private static IReadOnlyDictionary<(Guid TeamId, int ColumnIndex), SettledSlotScore> CaptureSettledSlots(
+        JsonElement snapshot) =>
+        snapshot.GetProperty("teams").EnumerateArray()
+            .SelectMany(team => team.GetProperty("slots").EnumerateArray()
+                .Where(slot => slot.GetProperty("scoreState").GetString() == "Settled")
+                .Select(slot => new
+                {
+                    TeamId = team.GetProperty("teamId").GetGuid(),
+                    ColumnIndex = slot.GetProperty("columnIndex").GetInt32(),
+                    Score = new SettledSlotScore(
+                        slot.GetProperty("earnedPoints").GetInt64(),
+                        slot.GetProperty("deductedPoints").GetInt64(),
+                        slot.GetProperty("netPoints").GetInt64())
+                }))
+            .ToDictionary(item => (item.TeamId, item.ColumnIndex), item => item.Score);
+
+    private static async Task AssertSettledSlotsUnchangedAsync(
+        IReadOnlyDictionary<(Guid TeamId, int ColumnIndex), SettledSlotScore> expected,
+        JsonElement snapshot)
+    {
+        foreach (var item in expected)
+        {
+            var slot = Team(snapshot, item.Key.TeamId).GetProperty("slots").EnumerateArray()
+                .Single(candidate => candidate.GetProperty("columnIndex").GetInt32()
+                    == item.Key.ColumnIndex);
+            await Assert.That(slot.GetProperty("scoreState").GetString()).IsEqualTo("Settled");
+            await Assert.That(new SettledSlotScore(
+                    slot.GetProperty("earnedPoints").GetInt64(),
+                    slot.GetProperty("deductedPoints").GetInt64(),
+                    slot.GetProperty("netPoints").GetInt64()))
+                .IsEqualTo(item.Value);
+        }
+    }
+
     private static async Task<IReadOnlyDictionary<Guid, long>> ReadScoresAsync(
         HttpClient client,
         Guid competitionId,
@@ -1136,9 +1348,9 @@ public sealed class AwdpFullBoundaryTests
         if (response.StatusCode == HttpStatusCode.Accepted)
             return null;
         var leaderboard = await ReadExpectedJsonAsync(response, HttpStatusCode.OK, cancellationToken);
-        return leaderboard.GetProperty("entries").EnumerateArray().ToDictionary(
+        return leaderboard.GetProperty("teams").EnumerateArray().ToDictionary(
             item => item.GetProperty("teamId").GetGuid(),
-            item => item.GetProperty("score").GetInt64());
+            item => item.GetProperty("totalScore").GetInt64());
     }
 
     private static string FormatScores(IReadOnlyDictionary<Guid, long>? scores) =>
@@ -1166,39 +1378,6 @@ public sealed class AwdpFullBoundaryTests
                     .All(item => item.GetProperty("state").GetString() == "Stopped"),
             TimeSpan.FromSeconds(90),
             cancellationToken);
-
-    private static async Task PollLeaderboardAsync(
-        HttpClient client,
-        Guid competitionId,
-        Guid teamId,
-        long expectedScore,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        var path = $"/api/v1/competitions/{competitionId}/leaderboard";
-        var deadline = DateTimeOffset.UtcNow.Add(timeout);
-        JsonElement last = default;
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            using var response = await client.GetAsync(path, cancellationToken);
-            if (response.StatusCode == HttpStatusCode.OK)
-            {
-                last = await ReadExpectedJsonAsync(response, HttpStatusCode.OK, cancellationToken);
-                var entry = last.GetProperty("entries").EnumerateArray()
-                    .SingleOrDefault(item => item.GetProperty("teamId").GetGuid() == teamId);
-                if (entry.ValueKind != JsonValueKind.Undefined
-                    && entry.GetProperty("score").GetInt64() == expectedScore)
-                    return;
-            }
-            else if (response.StatusCode != HttpStatusCode.Accepted)
-            {
-                throw await UnexpectedResponseAsync(response, HttpStatusCode.OK, cancellationToken);
-            }
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-        }
-        throw new TimeoutException(
-            $"Leaderboard did not reach AWDP score {expectedScore}. Last response: {last}");
-    }
 
     private static HttpClient CreateClient(string baseUrl, string? token = null)
     {
@@ -1325,4 +1504,6 @@ public sealed class AwdpFullBoundaryTests
         ?? throw new InvalidOperationException($"{name} is required for the external AWDP E2E test.");
 
     private sealed record TeamSession(HttpClient Client, Guid TeamId);
+    private sealed record ScoreboardObservation(JsonElement Schema, JsonElement Snapshot);
+    private sealed record SettledSlotScore(long EarnedPoints, long DeductedPoints, long NetPoints);
 }

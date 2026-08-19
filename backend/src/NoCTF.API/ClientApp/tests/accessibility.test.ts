@@ -9,7 +9,6 @@ describe('keyboard and icon accessibility', () => {
     const pages = await Promise.all([
       '../app/pages/admin/platform/users.vue',
       '../app/pages/admin/platform/dead-letters.vue',
-      '../app/pages/competitions/[id]/leaderboard.vue',
     ].map(source))
 
     for (const page of pages) {
@@ -19,6 +18,12 @@ describe('keyboard and icon accessibility', () => {
       expect(page).toContain('@keydown.space.prevent="openDetail(')
       expect(page).toContain(':aria-label="$t(')
     }
+
+    const leaderboard = await source('../app/pages/competitions/[id]/leaderboard.vue')
+    expect(leaderboard).toContain('<button')
+    expect(leaderboard).toContain('type="button"')
+    expect(leaderboard).toContain('@click="openDetail(team, column)"')
+    expect(leaderboard).toContain('focus-visible:ring-2')
   })
 
   test('labels dialog and sheet close buttons', async () => {
