@@ -400,14 +400,26 @@ onUnmounted(() => {
             </header>
             <div v-if="selectedTeam" class="team-carousel">
               <nav class="team-tabs" :aria-label="$t('选择队伍')">
-                <button @click="selectPreviousTeam"><ChevronLeft /></button>
                 <button
-                  v-for="(entry, index) in rankedEntries.slice(0, 5)"
-                  :key="entry.teamId"
-                  :class="selectedTeam?.teamId === entry.teamId && 'active'"
-                  @click="selectedTeamIndex = index"
-                >{{ entry.teamName }}</button>
-                <button @click="selectNextTeam"><ChevronRight /></button>
+                  class="team-tab-control"
+                  :aria-label="$t('上一页')"
+                  :disabled="rankedEntries.length <= 1"
+                  @click="selectPreviousTeam"
+                ><ChevronLeft /></button>
+                <div class="team-tab-list">
+                  <button
+                    v-for="(entry, index) in rankedEntries.slice(0, 5)"
+                    :key="entry.teamId"
+                    :class="selectedTeam?.teamId === entry.teamId && 'active'"
+                    @click="selectedTeamIndex = index"
+                  >{{ entry.teamName }}</button>
+                </div>
+                <button
+                  class="team-tab-control"
+                  :aria-label="$t('下一页')"
+                  :disabled="rankedEntries.length <= 1"
+                  @click="selectNextTeam"
+                ><ChevronRight /></button>
               </nav>
               <div class="team-summary">
                 <strong>{{ selectedTeam.teamName }}</strong>
@@ -456,4 +468,19 @@ onUnmounted(() => {
 .awdp-control-shell::before{content:"";position:absolute;inset:-35%;pointer-events:none;background:conic-gradient(from 30deg at 50% 50%,transparent 0 18%,rgba(0,190,255,.09) 21%,transparent 25% 51%,rgba(255,42,34,.08) 54%,transparent 59% 100%);filter:blur(22px);animation:awdp-energy-orbit 22s linear infinite}.awdp-control-shell::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:20;opacity:.2;background:repeating-linear-gradient(180deg,transparent 0 3px,rgba(76,203,255,.035) 4px);mix-blend-mode:screen}.awdp-control-canvas::before{content:"";position:absolute;z-index:0;left:50%;top:48%;width:1120px;height:720px;translate:-50% -50%;border-radius:50%;pointer-events:none;background:radial-gradient(circle,transparent 0 27%,rgba(0,196,255,.055) 28% 28.4%,transparent 29% 43%,rgba(255,49,40,.035) 44% 44.4%,transparent 45%);filter:drop-shadow(0 0 34px rgba(0,190,255,.16));animation:awdp-core-breathe 4.8s ease-in-out infinite}.awdp-topbar,.awdp-main-grid,.awdp-control-canvas>AwdpEventTicker{position:relative;z-index:2}.top-stats .operation-stat{min-width:132px}.top-stats .operation-stat.attack svg,.top-stats .operation-stat.attack dd{color:#ff5148;text-shadow:0 0 12px rgba(255,42,33,.5)}.top-stats .operation-stat.defense svg,.top-stats .operation-stat.defense dd{color:#16e6ce;text-shadow:0 0 12px rgba(0,226,200,.45)}.top-stats .operation-stat dt{white-space:nowrap}.team-panel{box-shadow:inset 0 0 44px rgba(0,160,225,.06),0 0 28px rgba(0,169,235,.08)}.challenge-strip article{isolation:isolate;overflow:hidden;transition:border-color .25s ease,box-shadow .25s ease,filter .25s ease}.challenge-strip article::before{content:"";position:absolute;z-index:-1;inset:-45%;background:conic-gradient(from 0deg,transparent,rgba(0,202,255,.12),transparent 28%,transparent 63%,rgba(255,56,42,.09),transparent 78%);animation:awdp-card-radar 9s linear infinite}.challenge-strip article::after{content:"";position:absolute;left:-60%;right:-60%;top:-4px;height:2px;background:linear-gradient(90deg,transparent,#18d7ff,transparent);box-shadow:0 0 14px #16ccff;animation:awdp-card-scan 4.5s ease-in-out infinite}.challenge-identity{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;gap:8px}.challenge-identity>div{min-width:0}.challenge-identity>div>span{font:700 8px var(--awdp-mono);letter-spacing:.14em;color:#3aaad1}.challenge-identity strong{display:block;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:800 12px var(--awdp-display)}.challenge-icon{width:40px;height:40px;display:grid;place-items:center;border:1px solid rgba(0,190,246,.42);background:radial-gradient(circle,rgba(0,192,255,.2),rgba(0,41,61,.12) 68%);clip-path:polygon(20% 0,80% 0,100% 20%,100% 80%,80% 100%,20% 100%,0 80%,0 20%);color:#33d5ff;filter:drop-shadow(0 0 8px rgba(0,196,255,.35))}.challenge-icon svg{width:22px;height:22px;stroke-width:1.8}.challenge-strip article footer{display:flex;justify-content:space-between;text-align:left}.challenge-strip article footer span:first-child{color:#ff6258}.challenge-strip article footer span:last-child{color:#21dac9}.challenge-strip article.event-focus{border-color:#fff;box-shadow:inset 0 0 28px rgba(0,204,255,.18),0 0 10px #fff,0 0 34px rgba(0,191,255,.65);animation:awdp-event-focus 1.05s ease-in-out infinite alternate}.challenge-strip article.event-focus .challenge-icon{color:#fff;border-color:#fff;filter:drop-shadow(0 0 12px #fff) drop-shadow(0 0 22px #00c9ff)}.challenge-strip article.event-focus::after{height:4px;background:linear-gradient(90deg,transparent,#fff 45%,#ff493d 55%,transparent);box-shadow:0 0 20px #fff;animation-duration:.8s}.feed-list li.success{background:linear-gradient(90deg,color-mix(in srgb,var(--tone) 8%,transparent),transparent)}.feed-list li.failure{background:linear-gradient(90deg,rgba(255,47,35,.1),transparent)}
 @keyframes awdp-energy-orbit{to{rotate:360deg}}@keyframes awdp-core-breathe{50%{scale:1.08;opacity:.72}}@keyframes awdp-card-radar{to{rotate:360deg}}@keyframes awdp-card-scan{0%,12%{translate:0 0;opacity:0}22%{opacity:1}70%,100%{translate:0 220px;opacity:0}}@keyframes awdp-event-focus{from{filter:saturate(1.15) brightness(1)}to{filter:saturate(1.5) brightness(1.24)}}
 @media(prefers-reduced-motion:reduce){.awdp-control-shell::before,.awdp-control-canvas::before,.challenge-strip article::before,.challenge-strip article::after,.challenge-strip article.event-focus{animation:none!important}}
+</style>
+
+<style>
+.team-carousel{grid-template-rows:36px 45px 150px;align-content:start}
+.team-tabs{grid-template-columns:30px minmax(0,1fr) 30px;grid-auto-flow:row;grid-auto-columns:auto}
+.team-tab-list{display:flex;min-width:0;gap:4px;overflow:hidden}
+.team-tab-list button{flex:1 1 0;width:auto!important}
+.team-tab-control{width:30px;display:grid;place-items:center}
+.team-tab-control:disabled{cursor:default;opacity:.35}
+.challenge-strip{height:150px}
+.challenge-strip article{padding-top:8px}
+.challenge-strip dl{margin-top:7px;gap:3px}
+.challenge-identity{grid-template-columns:34px minmax(0,1fr);gap:7px}
+.challenge-icon{width:32px;height:32px}
+.challenge-icon svg{width:18px;height:18px}
 </style>
