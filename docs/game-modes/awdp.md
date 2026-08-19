@@ -140,7 +140,7 @@ round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 - 每个 Team/CompetitionChallenge/Kind/round 只选 `(OccurredAt, GameplayFactId)` 最早的有效 Correct；
 - 同一题目的 Break 与 Fix 分开统计该轮成功的、`AffectsDynamicChallengeScore=true` 的不同队伍数；
 - 分别把该计数代入 Break/Fix 曲线，得到该轮的整数攻击分和防御分；该轮每个可计分成功队伍获得对应轨道的同一分值；
-- 当前进行中的轮次为暂定结算，随着本轮成功队伍增加会重投影；进入后续轮后，前一轮使用前一轮自己的最终人数，后续人数不追溯改变它；
+- 当前进行中的轮次不进入公开排行榜；轮次结束后才按该轮最终成功队伍数一次性结算，进入后续轮后，前一轮使用前一轮自己的最终人数，后续人数不追溯改变它；
 - 两轨分数独立后相加。启用 `RequireBreakBeforeFix` 时，Fix 必须存在按权威顺序更早的 Correct Break；该 Break 被重判后会确定性重盘依赖结果；
 - Correct/Wrong 重判、队伍禁赛或解禁都会从原始事实全量重播所有轮次，不修改 GameplayFact 或永久事件；
 - Pause 不增加 EffectiveRunningTime，因此不推进收益；Resume 从原逻辑时间继续；Finish 使用结束时点冻结；
@@ -153,6 +153,20 @@ round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 题目页面通过单一强类型状态接口恢复：当前逻辑轮、攻击 Runtime、最近 Break、Break 激活轮次、最近一次性防御 Target、Patch/GameplayFact、TargetProvisioning/AwaitingPatch/PatchApplying/CheckerRunning/Completed 阶段，以及 Fix 激活轮次。响应应用现有玩家结果脱敏，不返回动态 Flag。
 
 前端固定展示“攻击”和“防御”两栏：攻击区管理长期攻击靶机并提交一个 Flag；防御区先申请一次性干净 Target，等待就绪后唯一上传本次 Patch，随后展示验证中、结果与环境已回收状态。页面不得把 Target 描述为长期题目环境，也不得展示 AWD 对手目标列表、批量 Flag、加固期或周期 Checker 文案。
+
+## 赛事中控大屏
+
+AWDP 比赛使用独立的 `/competitions/{competitionId}/awdp-live` 现场大屏。它不复用 CTF 的 3D 城市视图，也不改变普通选手页面。大屏采用固定 `1920×1080` 虚拟画布并按视口等比缩放；多余区域留黑，不进行破坏信息密度的响应式重排。
+
+- 顶栏展示当前逻辑轮、已结算轮、非内部赛道队伍数、题目数和实时倒计时；
+- 左栏展示公开的 `AwdpBreakAttempted`、`AwdpFixAttempted`、`AwdpBreakResolved`、`AwdpFixResolved`；
+- 中央区域只播放已裁决结果，并以 FIFO 队列完整播放攻击成功、攻击失败、防御成功、防御失败四套独立动画；历史事件首次载入只建立基线，不回放旧动画；
+- 右上排行榜只展示已完成轮次的攻击分、防御分和总分，不为当前进行中轮次预测积分；
+- 右下按队伍轮播各题最近的攻击/防御状态和已结算分；内部赛道不得出现在大屏；
+- 底栏通过 JavaScript 动画循环滚动最近公开操作，鼠标悬停或键盘聚焦时暂停；
+- SignalR 只作为失效通知，收到事件或排行榜更新后仍通过生成 SDK 重新读取权威数据；断线时使用定时刷新兜底。
+
+公开结果事件只携带 Team、CompetitionChallenge、GameplayFact 的状态与结果。它们不得复制 Flag、Patch 内容、Checker 输出、失败原因或受保护的作弊证据。AWDP 攻击的业务对象始终是“队伍对题目的攻击操作”，不得在文案或动画中虚构另一支队伍为攻击目标。成功事件的现场动画只能说明操作已通过；实际积分仍等待本轮结束后结算。
 
 ## 排名
 

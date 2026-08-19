@@ -203,6 +203,22 @@ public sealed class InternalResultStore(
             RuntimeState: runtime.State,
             RuntimeGeneration: runtime.Generation), ct);
         await events.RecordAsync(new(
+            fact.CompetitionId,
+            CompetitionEventKind.AwdpFixResolved,
+            fact.State == GameplayFactState.PlatformFailed
+                ? CompetitionEventLevel.Error
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Public,
+            result.OccurredAt,
+            TeamId: fact.TeamId,
+            CompetitionChallengeId: fact.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            GameplayFactId: fact.Id,
+            GameplayFactKind: fact.Kind,
+            GameplayFactState: fact.State,
+            GameplayFactResult: fact.Result,
+            RuntimeGeneration: runtime.Generation), ct);
+        await events.RecordAsync(new(
             runtime.CompetitionId,
             CompetitionEventKind.RuntimeStateChanged,
             CompetitionEventLevel.Information,

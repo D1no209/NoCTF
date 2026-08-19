@@ -406,6 +406,7 @@ public sealed class GameplayFactProcessor(
                 GameplayFactKind: submission.Kind,
                 GameplayFactState: submission.State,
                 GameplayFactResult: submission.Result), cancellationToken);
+            await RecordAwdpBreakResolutionAsync(submission, now, cancellationToken);
             await QueueNextGameplayFactAsync(processingScope, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -530,6 +531,7 @@ public sealed class GameplayFactProcessor(
             GameplayFactKind: submission.Kind,
             GameplayFactState: submission.State,
             GameplayFactResult: submission.Result), cancellationToken);
+        await RecordAwdpBreakResolutionAsync(submission, now, cancellationToken);
         if (bloodAward is not null)
         {
             var bloodKind = bloodAward.BloodRank switch
@@ -555,6 +557,37 @@ public sealed class GameplayFactProcessor(
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
+    }
+
+    private async Task RecordAwdpBreakResolutionAsync(
+        GameplayFact submission,
+        DateTimeOffset occurredAt,
+        CancellationToken ct)
+    {
+        if (submission.Kind != GameplayFactKind.BreakAttempt)
+            return;
+
+        var isAwdp = await db.Competitions
+            .Where(competition => competition.Id == submission.CompetitionId)
+            .Select(competition => competition.Mode == GameMode.Awdp)
+            .SingleAsync(ct);
+        if (!isAwdp)
+            return;
+
+        await events.RecordAsync(new(
+            submission.CompetitionId,
+            CompetitionEventKind.AwdpBreakResolved,
+            submission.State == GameplayFactState.PlatformFailed
+                ? CompetitionEventLevel.Error
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Public,
+            occurredAt,
+            TeamId: submission.TeamId,
+            CompetitionChallengeId: submission.CompetitionChallengeId,
+            GameplayFactId: submission.Id,
+            GameplayFactKind: submission.Kind,
+            GameplayFactState: submission.State,
+            GameplayFactResult: submission.Result), ct);
     }
 
     private async Task StopSolvedChallengeRuntimesAsync(

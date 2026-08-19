@@ -100,6 +100,23 @@ public sealed class GameplayFactOrderingPersistenceTests
             var stops = outbox.Messages.OfType<StopRuntime>().ToArray();
             await Assert.That(stops.Length).IsEqualTo(1);
             await Assert.That(stops[0].RuntimeInstanceId).IsEqualTo(attackRuntimeId);
+            var resolutionEvents = await verification.CompetitionEvents.AsNoTracking()
+                .Where(item => item.Kind == CompetitionEventKind.AwdpBreakResolved)
+                .ToArrayAsync(cancellationToken);
+            if (mode == GameMode.Awdp)
+            {
+                await Assert.That(resolutionEvents.Length).IsEqualTo(1);
+                await Assert.That(resolutionEvents[0].Visibility)
+                    .IsEqualTo(CompetitionEventVisibility.Public);
+                await Assert.That(resolutionEvents[0].TeamId).IsEqualTo(fixture.TeamIds[0]);
+                await Assert.That(resolutionEvents[0].CompetitionChallengeId)
+                    .IsEqualTo(fixture.CompetitionChallengeId);
+                await Assert.That(resolutionEvents[0].GameplayFactId).IsEqualTo(factId);
+                await Assert.That(resolutionEvents[0].Reason).IsNull();
+                await Assert.That(resolutionEvents[0].PayloadJson).DoesNotContain(fixture.Flag);
+            }
+            else
+                await Assert.That(resolutionEvents).IsEmpty();
         });
     }
 

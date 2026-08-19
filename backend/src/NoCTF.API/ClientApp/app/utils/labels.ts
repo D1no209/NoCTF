@@ -149,6 +149,18 @@ export function competitionEventText(
   const actor = event.actorDisplayName ?? translate('系统')
   const team = event.teamDisplayName ?? translate('某队伍')
   const challenge = event.challengeTitle ?? translate('某题目')
+  const resolvedSuccessfully = event.gameplayFactState === 'Completed'
+    && event.gameplayFactResult === 'Correct'
+  if (event.kind === 'AwdpBreakResolved') {
+    return resolvedSuccessfully
+      ? translate('队伍「{team}」对题目「{challenge}」的攻击验证成功', { team, challenge })
+      : translate('队伍「{team}」对题目「{challenge}」的攻击验证失败', { team, challenge })
+  }
+  if (event.kind === 'AwdpFixResolved') {
+    return resolvedSuccessfully
+      ? translate('队伍「{team}」对题目「{challenge}」的防御验证成功', { team, challenge })
+      : translate('队伍「{team}」对题目「{challenge}」的防御验证失败', { team, challenge })
+  }
   const templates: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol, string>> = {
     CompetitionCreated: translate('竞赛已创建'), CompetitionUpdated: translate('竞赛信息已更新'), CompetitionLifecycleChanged: translate('竞赛生命周期变更'),
     LeaderboardVisibilityChanged: translate('排行榜可见性已变更'), ChallengeCreated: translate('题目「{challenge}」已加入竞赛', { challenge }), ChallengeUpdated: translate('题目「{challenge}」已更新', { challenge }),

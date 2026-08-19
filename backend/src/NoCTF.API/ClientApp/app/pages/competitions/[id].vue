@@ -6,7 +6,10 @@ import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
 
 const route = useRoute()
 const competitionId = computed(() => route.params.id as string)
-const isControlScreen = computed(() => route.path === `/competitions/${competitionId.value}/live`)
+const isControlScreen = computed(() => [
+  `/competitions/${competitionId.value}/live`,
+  `/competitions/${competitionId.value}/awdp-live`,
+].includes(route.path))
 const isChallengeIndex = computed(() => route.path === `/competitions/${competitionId.value}/challenges`)
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
@@ -52,6 +55,7 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
         ...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : []),
         { to: `${base}/leaderboard`, label: translate("记分板"), icon: Trophy },
         ...(competition.value?.mode === 'Ctf' ? [{ to: `${base}/live`, label: translate("3D 大屏"), icon: Orbit }] : []),
+        ...(competition.value?.mode === 'Awdp' ? [{ to: `${base}/awdp-live`, label: translate("中控大屏"), icon: Orbit }] : []),
         { to: `${base}/teams`, label: translate("队伍"), icon: Users },
         { to: `${base}/events`, label: translate("动态"), icon: Activity },
       ],
