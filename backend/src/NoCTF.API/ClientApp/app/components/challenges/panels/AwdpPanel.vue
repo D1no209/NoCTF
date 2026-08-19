@@ -14,7 +14,6 @@ const props = defineProps<{
 
 const state = ref<NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
 const loading = ref(true)
-const loadError = ref<string | null>(null)
 
 const defenseTransitionInProgress = computed(() => {
   const factState = state.value?.defense?.state
@@ -45,12 +44,8 @@ async function refreshState(): Promise<boolean> {
     },
   })
   loading.value = false
-  if (error || !data) {
-    loadError.value = parseApiError(error, translate('加载 AWDP 状态失败')).message
-    return true
-  }
+  if (error || !data) return true
   state.value = data
-  loadError.value = null
   return !defenseTransitionInProgress.value
 }
 
@@ -79,13 +74,6 @@ onUnmounted(() => {
 
 <template>
   <div class="flex flex-col gap-6">
-    <Alert v-if="loadError" variant="destructive">
-      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-        <span>{{ loadError }}</span>
-        <Button size="sm" variant="outline" @click="refreshAndPoll">{{ $t('重试') }}</Button>
-      </AlertDescription>
-    </Alert>
-
     <div v-if="loading" class="grid gap-6 lg:grid-cols-2">
       <Skeleton class="h-80 w-full" />
       <Skeleton class="h-80 w-full" />
