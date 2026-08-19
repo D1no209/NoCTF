@@ -14,11 +14,10 @@ import {
   Users,
   X,
 } from '@lucide/vue'
-import { getCompetitionEndpoint, getLeaderboardEndpoint, listCompetitionEvents } from '~/api'
+import { getCompetitionEndpoint, listCompetitionEvents } from '~/api'
 import type {
   NoCtfapiEndpointsCompetitionsCompetitionResponse,
   NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
-  NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
 } from '~/api'
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 import {
@@ -41,9 +40,9 @@ const route = useRoute()
 const competitionId = route.params.id as string
 const { configuration, ensureLoaded } = usePlatform()
 const { t } = useLocale()
+const board = useScoreboardMatrix(competitionId)
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
-const leaderboard = ref<NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null>(null)
 const events = ref<AwdpControlEvent[]>([])
 const loading = ref(true)
 const refreshing = ref(false)
@@ -71,14 +70,14 @@ let unwatch: (() => void) | undefined
 const PLAYBACK_DURATION_MS = 5_400
 const PLAYBACK_GAP_MS = 320
 
-const rankedEntries = computed(() => awdpRankedEntries(leaderboard.value, previousRanks))
+const rankedEntries = computed(() => awdpRankedEntries(board.snapshot.value, previousRanks))
 const topEntries = computed(() => rankedEntries.value.slice(0, 8))
 const selectedTeam = computed<AwdpRankedEntry | null>(() => {
   if (!rankedEntries.value.length) return null
   return rankedEntries.value[selectedTeamIndex.value % rankedEntries.value.length] ?? null
 })
 const selectedChallengeStates = computed(() => {
-  const states = awdpTeamChallengeStates(leaderboard.value, selectedTeam.value, events.value)
+  const states = awdpTeamChallengeStates(board.catalog.value, board.schema.value, selectedTeam.value, events.value)
   const focusedChallengeId = activeEvent.value?.teamId === selectedTeam.value?.teamId
     ? activeEvent.value?.competitionChallengeId
     : null
@@ -95,12 +94,15 @@ const canvasStyle = computed(() => ({
   transform: `translate(-50%, -50%) scale(${canvasScale.value})`,
 }))
 const liveRoundClock = computed(() => awdpRoundClock(
-  leaderboard.value,
+  board.snapshot.value,
+  board.schema.value,
   clock.value,
   competition.value?.status === 'Running',
 ))
 const currentRound = computed(() => liveRoundClock.value.currentRound)
-const settledRound = computed(() => leaderboard.value?.settledThroughRound ?? 0)
+const settledRound = computed(() => Math.max(0, ...(board.schema.value?.rounds ?? [])
+  .filter(round => round.state === 'Settled')
+  .map(round => round.number ?? 0)))
 const operationMetrics = computed(() => awdpOperationMetrics(events.value))
 const selectedTeamMetrics = computed(() => awdpOperationMetrics(
   selectedTeam.value?.teamId
@@ -202,7 +204,7 @@ function enqueueResolvedEvents(newEvents: readonly AwdpControlEvent[]): void {
 }
 
 async function loadData(): Promise<void> {
-  refreshing.value = Boolean(competition.value || leaderboard.value)
+  refreshing.value = Boolean(competition.value || board.snapshot.value)
   const competitionResult = await getCompetitionEndpoint({ path: { competitionId } })
   if (competitionResult.error || !competitionResult.data) {
     loading.value = false
@@ -222,8 +224,8 @@ async function loadData(): Promise<void> {
   const knownStart = competition.value.startTime ? new Date(competition.value.startTime).getTime() : now
   const from = new Date(Math.max(knownStart, now - 31 * 24 * 60 * 60 * 1000)).toISOString()
   const to = new Date(now).toISOString()
-  const [leaderboardResult, eventResult] = await Promise.all([
-    getLeaderboardEndpoint({ path: { competitionId } }),
+  const [, eventResult] = await Promise.all([
+    board.refresh({ catalog: true, schema: true, snapshot: true }),
     loadAllAwdpEvents(from, to),
   ])
   loading.value = false
@@ -239,7 +241,7 @@ async function loadData(): Promise<void> {
   events.value = nextEvents
   enqueueResolvedEvents(reconciliation.newEvents)
 
-  if (leaderboardResult.response?.status === 202) {
+  if (board.processing.value) {
     projectionPending.value = true
     error.value = null
     if (!projectionTimer) {
@@ -250,15 +252,14 @@ async function loadData(): Promise<void> {
     }
     return
   }
-  if (leaderboardResult.error || !leaderboardResult.data) {
+  if (board.error.value || !board.snapshot.value) {
     projectionPending.value = false
-    error.value = parseApiError(leaderboardResult.error, t('加载记分板失败')).message
+    error.value = board.error.value ?? t('加载记分板失败')
     return
   }
   projectionPending.value = false
   error.value = null
-  leaderboard.value = leaderboardResult.data as NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse
-  for (const entry of awdpRankedEntries(leaderboard.value)) {
+  for (const entry of awdpRankedEntries(board.snapshot.value)) {
     if (entry.teamId) previousRanks.set(entry.teamId, entry.rank)
   }
   if (selectedTeamIndex.value >= rankedEntries.value.length) selectedTeamIndex.value = 0
@@ -298,7 +299,7 @@ onMounted(async () => {
   refreshTimer = setInterval(() => void refreshLatest(), 10_000)
   carouselTimer = setInterval(selectNextTeam, 8_000)
   unwatch = watchCompetition(competitionId, {
-    leaderboardRefreshed: () => void refreshLatest(),
+    scoreboardUpdated: () => void refreshLatest(),
     competitionEventChanged: () => void refreshLatest(),
     competitionLifecycleChanged: () => void refreshLatest(),
     onReconnected: () => void refreshLatest(),
@@ -334,7 +335,7 @@ onUnmounted(() => {
         </div>
         <dl class="top-stats">
           <div><Users /><dt>{{ $t('队伍') }}</dt><dd>{{ rankedEntries.length }}</dd></div>
-          <div><Activity /><dt>{{ $t('题目') }}</dt><dd>{{ leaderboard?.challenges?.length ?? 0 }}</dd></div>
+          <div><Activity /><dt>{{ $t('题目') }}</dt><dd>{{ board.catalog.value?.items?.length ?? 0 }}</dd></div>
           <div class="operation-stat attack"><Swords /><dt>{{ $t('攻击 成功/总提交') }}</dt><dd>{{ operationMetrics.attack.success }} / {{ operationMetrics.attack.total }}</dd></div>
           <div class="operation-stat defense"><ShieldCheck /><dt>{{ $t('防御 成功/总提交') }}</dt><dd>{{ operationMetrics.defense.success }} / {{ operationMetrics.defense.total }}</dd></div>
         </dl>
@@ -385,12 +386,12 @@ onUnmounted(() => {
               <li v-for="entry in topEntries" :key="entry.teamId" :class="rankTone(entry.rank)">
                 <span class="rank-number">{{ entry.rank }}</span>
                 <strong>{{ entry.teamName }}</strong>
-                <span>{{ entry.attackScore ?? 0 }}</span><span>{{ entry.defenseScore ?? 0 }}</span><b>{{ entry.score ?? 0 }}</b>
+                <span>{{ entry.attackScore }}</span><span>{{ entry.defenseScore }}</span><b>{{ entry.totalScore ?? 0 }}</b>
                 <i :class="entry.trend">{{ entry.trend === 'up' ? '↗' : entry.trend === 'down' ? '↘' : '→' }}</i>
               </li>
             </ol>
             <div v-else class="panel-empty">{{ projectionPending ? $t('记分板正在生成') : $t('还没有队伍得分') }}</div>
-            <footer>{{ $t('仅显示已完成轮次的结算分数') }} · {{ eventTime(leaderboard?.generatedAt) }}</footer>
+            <footer>{{ $t('仅显示已完成轮次的结算分数') }} · {{ eventTime(board.snapshot.value?.generatedAt) }}</footer>
           </section>
 
           <section class="team-panel hud-panel">

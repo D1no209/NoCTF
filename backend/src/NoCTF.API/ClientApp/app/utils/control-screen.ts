@@ -1,14 +1,12 @@
 import type {
-  NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol,
-  NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse,
-  NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
+import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardSlot } from './scoreboard'
 
-type LeaderboardEntry = NoCtfapiEndpointsCompetitionsLeaderboardEntryResponse
-
-function normalizeChallengeKey(value?: string | null): string {
-  return (value ?? '').replace(/[^0-9a-f]/gi, '').toLowerCase()
-}
+export type ControlScreenBloodRank = 'First' | 'Second' | 'Third'
 
 export interface ControlScreenChallenge {
   competitionChallengeId: string
@@ -28,7 +26,7 @@ export interface ControlScreenSolve {
   challengeTitle: string
   direction: string
   score: number
-  bloodRank: NoCtfapiEndpointsCompetitionsLeaderboardBloodRankProtocol | null
+  bloodRank: ControlScreenBloodRank | null
   solvedAt: string
 }
 
@@ -38,81 +36,83 @@ export interface ControlScreenSolveReconciliation {
 }
 
 export function controlScreenPublicEntries(
-  leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
-): LeaderboardEntry[] {
-  const publicTrackKeys = new Set(
-    (leaderboard?.tracks ?? [])
-      .filter(track => track.isInternal !== true)
-      .map(track => track.key)
-      .filter((key): key is string => Boolean(key)),
-  )
-
-  return (leaderboard?.entries ?? []).filter(entry =>
-    !entry.trackKey || publicTrackKeys.has(entry.trackKey))
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+): NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[] {
+  const publicTracks = new Set((snapshot?.tracks ?? [])
+    .filter(track => !track.isInternal && track.key)
+    .map(track => track.key!))
+  return (snapshot?.teams ?? []).filter(team => !team.trackKey || publicTracks.has(team.trackKey))
 }
 
 export function controlScreenChallenges(
-  leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
-  entries: readonly LeaderboardEntry[],
+  catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  entries: readonly NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[],
 ): ControlScreenChallenge[] {
-  const challenges = leaderboard?.challenges ?? []
-  const teamCount = entries.length
-  const maximumScore = Math.max(1, ...challenges.map(challenge => challenge.currentScore ?? 0))
-
-  return challenges.map((challenge) => {
-    const challengeId = challenge.competitionChallengeId ?? ''
-    const challengeKey = normalizeChallengeKey(challengeId)
-    const solveCount = entries.reduce((count, entry) => {
-      const solved = (entry.cells ?? []).some(cell =>
-        normalizeChallengeKey(cell.competitionChallengeId) === challengeKey
-        && Boolean(cell.solvedAt))
-      return count + (solved ? 1 : 0)
-    }, 0)
-    const score = challenge.currentScore ?? 0
+  const provisional = (catalog?.items ?? []).filter(challenge => challenge.id && challenge.published).map((challenge) => {
+    const columns = scoreboardColumnsForChallenge(schema, challenge.id!)
+    let solveCount = 0
+    let currentScore = 0
+    for (const team of entries) {
+      let solved = false
+      for (const column of columns) {
+        if (column.index === undefined) continue
+        const slot = scoreboardSlot(team, column.index)
+        solved ||= (scoreboardBreakdown(slot, 'Solve')?.successfulCount ?? 0) > 0
+        if (slot?.scoreState === 'Settled' || slot?.scoreState === 'Provisional')
+          currentScore = Math.max(currentScore, slot.netPoints ?? 0)
+      }
+      if (solved) solveCount += 1
+    }
     return {
-      competitionChallengeId: challengeId,
+      competitionChallengeId: challenge.id!,
       title: challenge.title ?? '',
       direction: challenge.direction ?? '',
-      currentScore: score,
+      currentScore,
       solveCount,
-      completionPercent: teamCount ? Math.round(solveCount / teamCount * 100) : 0,
-      towerHeightPercent: 30 + Math.round(score / maximumScore * 60),
+      completionPercent: entries.length ? Math.round(solveCount / entries.length * 100) : 0,
+      towerHeightPercent: 30,
     }
   })
+  const maximumScore = Math.max(1, ...provisional.map(challenge => challenge.currentScore))
+  return provisional.map(challenge => ({
+    ...challenge,
+    towerHeightPercent: 30 + Math.round(challenge.currentScore / maximumScore * 60),
+  }))
 }
 
 export function controlScreenSolveFeed(
-  leaderboard: NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null,
-  entries: readonly LeaderboardEntry[],
+  catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  entries: readonly NoCtfapiEndpointsCompetitionsScoreboardTeamResponse[],
 ): ControlScreenSolve[] {
-  const challenges = new Map(
-    (leaderboard?.challenges ?? []).map(challenge => [
-      normalizeChallengeKey(challenge.competitionChallengeId),
-      challenge,
-    ]),
-  )
+  const challengeMap = new Map((catalog?.items ?? []).filter(item => item.id).map(item => [item.id!, item]))
   const solves: ControlScreenSolve[] = []
-
-  for (const entry of entries) {
-    if (!entry.teamId || !entry.teamName) continue
-    for (const cell of entry.cells ?? []) {
-      if (!cell.competitionChallengeId || !cell.solvedAt) continue
-      const challenge = challenges.get(normalizeChallengeKey(cell.competitionChallengeId))
-      solves.push({
-        key: `${entry.teamId}:${normalizeChallengeKey(cell.competitionChallengeId)}:${cell.solvedAt}`,
-        teamId: entry.teamId,
-        teamName: entry.teamName,
-        competitionChallengeId: cell.competitionChallengeId,
-        challengeTitle: challenge?.title ?? '',
-        direction: challenge?.direction ?? '',
-        score: cell.score ?? 0,
-        bloodRank: cell.bloodRank ?? null,
-        solvedAt: cell.solvedAt,
-      })
+  for (const team of entries) {
+    if (!team.teamId || !team.teamName) continue
+    for (const column of schema?.columns ?? []) {
+      if (column.index === undefined || !column.competitionChallengeId) continue
+      const slot = scoreboardSlot(team, column.index)
+      const challenge = challengeMap.get(column.competitionChallengeId)
+      for (const entry of slot?.entries ?? []) {
+        if (entry.kind !== 'Solve' || entry.outcome !== 'Succeeded' || !entry.id || !entry.occurredAt) continue
+        const bloodRank: ControlScreenBloodRank | null = entry.award === 'FirstBlood'
+          ? 'First' : entry.award === 'SecondBlood' ? 'Second' : entry.award === 'ThirdBlood' ? 'Third' : null
+        solves.push({
+          key: entry.id,
+          teamId: team.teamId,
+          teamName: team.teamName,
+          competitionChallengeId: column.competitionChallengeId,
+          challengeTitle: challenge?.title ?? '',
+          direction: challenge?.direction ?? '',
+          score: entry.netPoints ?? 0,
+          bloodRank,
+          solvedAt: entry.occurredAt,
+        })
+      }
     }
   }
-
-  return solves.sort((left, right) => right.solvedAt.localeCompare(left.solvedAt))
+  return solves.sort((left, right) => right.solvedAt.localeCompare(left.solvedAt) || right.key.localeCompare(left.key))
 }
 
 export function reconcileControlScreenSolves(
@@ -121,11 +121,9 @@ export function reconcileControlScreenSolves(
 ): ControlScreenSolveReconciliation {
   const seenKeys = new Set(previousKeys ?? [])
   const newSolves = previousKeys
-    ? currentSolves
-        .filter(solve => !seenKeys.has(solve.key))
+    ? currentSolves.filter(solve => !seenKeys.has(solve.key))
         .sort((left, right) => left.solvedAt.localeCompare(right.solvedAt) || left.key.localeCompare(right.key))
     : []
-
   for (const solve of currentSolves) seenKeys.add(solve.key)
   return { seenKeys, newSolves }
 }

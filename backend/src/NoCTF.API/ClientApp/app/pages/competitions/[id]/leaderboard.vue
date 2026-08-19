@@ -1,432 +1,252 @@
 <script setup lang="ts">
-import {
-  Download,
-  Medal,
-  ShieldCheck,
-  Swords,
-  Trophy,
-} from '@lucide/vue'
-import { getLeaderboardEndpoint } from '~/api'
+import { Download, Medal, Trophy } from '@lucide/vue'
+import { getScoreboardSlotDetailEndpoint } from '~/api'
 import type {
-  NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardColumnResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardEntryResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardSlotResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
-import { cn } from '@/lib/utils'
-import { bloodRankLabel, medalBloodRankClass, medalRankClass, normalizeChallengeKey } from '~/components/leaderboard/types'
-import type { ChallengeInfo, LeaderboardCell, MatrixEntry, TrendSeries } from '~/components/leaderboard/types'
+import { medalRankClass } from '~/components/leaderboard/types'
+import { scoreboardBreakdown, scoreboardSlot } from '~/utils/scoreboard'
 
 const route = useRoute()
 const competitionId = route.params.id as string
 const ctx = inject(competitionContextKey)!
-const isAwdp = computed(() => ctx.competition.value?.mode === 'Awdp')
+const board = useScoreboardMatrix(competitionId)
 
-const leaderboard = ref<NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse | null>(null)
-const loading = ref(true)
-const error = ref<string | null>(null)
-
-/** 拉取一次;返回 true 表示拿到 200 数据(不再需要重试)。 */
-async function fetchOnce(): Promise<boolean> {
-  const { data, error: err, response } = await getLeaderboardEndpoint({ path: { competitionId } })
-  loading.value = false
-  if (err) {
-    error.value = parseApiError(err, translate("加载记分板失败")).message
-    return true
-  }
-  if (response?.status === 202) return false
-  error.value = null
-  leaderboard.value = data as NoCtfapiEndpointsCompetitionsLeaderboardProtocolResponse
-  return true
-}
-
-const { polling, start: startPolling } = usePolling(fetchOnce, { interval: 2000, timeout: 60_000 })
-
-onMounted(async () => {
-  const done = await fetchOnce()
-  if (!done) startPolling()
-})
-
-// 实时:排行榜投影刷新 → 重新拉取
-let unwatch: (() => void) | undefined
-onMounted(() => {
-  unwatch = watchCompetition(competitionId, {
-    leaderboardRefreshed: () => void fetchOnce(),
-  })
-})
-onUnmounted(() => unwatch?.())
-
-// ---- 题目矩阵列 ----
-const challenges = computed<ChallengeInfo[]>(
-  () => (leaderboard.value?.challenges ?? []) as ChallengeInfo[],
-)
-
-interface DirectionGroup {
-  direction: string
-  challenges: ChallengeInfo[]
-}
-
-const directionGroups = computed<DirectionGroup[]>(() => {
-  const groups: DirectionGroup[] = []
-  for (const challenge of challenges.value) {
-    const direction = challenge.direction || translate('未分类')
-    const last = groups[groups.length - 1]
-    if (last && last.direction === direction) last.challenges.push(challenge)
-    else groups.push({ direction, challenges: [challenge] })
-  }
-  return groups
-})
-
-const showGroupLabels = ref(true)
-
-// ---- 独立赛道 ----
 const selectedTrackKey = ref('')
-const availableTracks = computed(() => leaderboard.value?.tracks ?? [])
+const visibleTeamCount = ref(50)
+const availableTracks = computed(() => (board.snapshot.value?.tracks ?? [])
+  .filter(track => track.visibleOnLeaderboard && !track.isInternal))
 
-watch(availableTracks, (next) => {
-  if (!next.length) {
+watch(availableTracks, (tracks) => {
+  if (!tracks.length) {
     selectedTrackKey.value = ''
     return
   }
-  if (!next.some(track => track.key === selectedTrackKey.value)) {
-    selectedTrackKey.value = next[0]?.key ?? ''
-  }
+  if (!tracks.some(track => track.key === selectedTrackKey.value))
+    selectedTrackKey.value = tracks[0]?.key ?? ''
 }, { immediate: true })
 
-// ---- 队伍 × 题目稀疏矩阵 ----
-const slotsByTeam = computed(() => {
-  const map = new Map<string, Map<string, LeaderboardCell>>()
-  for (const entry of (leaderboard.value?.entries ?? []) as MatrixEntry[]) {
-    if (!entry.teamId) continue
-    const cells = new Map<string, LeaderboardCell>()
-    for (const cell of entry.cells ?? []) {
-      if (cell.competitionChallengeId) {
-        cells.set(normalizeChallengeKey(cell.competitionChallengeId), cell)
-      }
-    }
-    map.set(entry.teamId, cells)
-  }
-  return map
-})
-
-function slotFor(teamId?: string, challengeId?: string) {
-  if (!teamId || !challengeId) return null
-  return slotsByTeam.value.get(teamId)?.get(normalizeChallengeKey(challengeId)) ?? null
-}
-
-function cellText(slot: LeaderboardCell, title: string): string {
-  const parts = [title]
-  if (isAwdp.value) {
-    parts.push(translate('攻击 {score} 分', { score: slot.attackScore ?? 0 }))
-    parts.push(translate('防御 {score} 分', { score: slot.defenseScore ?? 0 }))
-    return parts.join(' · ')
-  }
-  if (slot.score !== undefined) parts.push(translate('{score} 分', { score: slot.score }))
-  if (slot.bloodRank) parts.push(bloodRankLabel(slot.bloodRank))
-  if (slot.solvedAt) parts.push(formatDateTime(slot.solvedAt))
-  if (slot.solverName) parts.push(slot.solverName)
-  return parts.filter(Boolean).join(' · ')
-}
-
-// ---- 分数趋势/详情均由矩阵单元在浏览器派生 ----
-function toSeries(entry: MatrixEntry): TrendSeries {
-  const solves = (entry.cells ?? [])
-    .filter(cell => cell.solvedAt)
-    .sort((a, b) => String(a.solvedAt).localeCompare(String(b.solvedAt)))
-    .map((cell) => ({
-      competitionChallengeId: cell.competitionChallengeId,
-      at: cell.solvedAt ?? undefined,
-      points: cell.score ?? 0,
-      solveOrdinal: cell.bloodRank ? ['First', 'Second', 'Third'].indexOf(String(cell.bloodRank)) + 1 : undefined,
-      submitterName: cell.solverName,
-    }))
-  let score = 0
-  const points = solves.map((solve) => ({ at: solve.at, score: score += solve.points ?? 0 }))
-  if (score !== (entry.score ?? 0)) {
-    points.push({ at: leaderboard.value?.generatedAt, score: entry.score ?? 0 })
-  }
-  return { teamId: entry.teamId, teamName: entry.teamName, points, solves }
-}
-
-const topSeries = computed<TrendSeries[]>(() => entries.value.slice(0, 10).map(toSeries))
-const hasAnySeries = computed(() => entries.value.some(entry =>
-  (entry.cells?.length ?? 0) > 0 || (entry.score ?? 0) !== 0,
-))
-
-// ---- 完整快照上的渐进渲染 ----
-const entryBatchSize = 50
-const entries = computed<MatrixEntry[]>(() => {
-  const all = (leaderboard.value?.entries ?? []) as MatrixEntry[]
+const teams = computed(() => {
+  const all = board.snapshot.value?.teams ?? []
   return selectedTrackKey.value
-    ? all.filter(entry => entry.trackKey === selectedTrackKey.value)
+    ? all.filter(team => team.trackKey === selectedTrackKey.value)
     : all
 })
-const visibleEntryCount = ref(entryBatchSize)
-const visibleEntries = computed(() =>
-  entries.value.slice(0, visibleEntryCount.value),
-)
-const hasMoreEntries = computed(() => visibleEntryCount.value < entries.value.length)
+const visibleTeams = computed(() => teams.value.slice(0, visibleTeamCount.value))
+watch(teams, () => { visibleTeamCount.value = 50 })
 
-watch(entries, () => { visibleEntryCount.value = entryBatchSize })
-
-function showMoreEntries() {
-  visibleEntryCount.value = Math.min(
-    visibleEntryCount.value + entryBatchSize,
-    entries.value.length,
-  )
+interface ChallengeColumnGroup {
+  challenge: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse
+  columns: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse[]
 }
 
-// ---- 队伍详情弹窗 ----
-const detailOpen = ref(false)
-const detailEntry = ref<(typeof entries.value)[number] | null>(null)
-
-const detailSeries = computed<TrendSeries | null>(() => {
-  return detailEntry.value ? toSeries(detailEntry.value) : null
+const columnGroups = computed<ChallengeColumnGroup[]>(() => {
+  const groups: ChallengeColumnGroup[] = []
+  for (const challenge of board.catalog.value?.items ?? []) {
+    if (!challenge.id || !challenge.published) continue
+    const columns = (board.schema.value?.columns ?? [])
+      .filter(column => column.competitionChallengeId === challenge.id)
+      .sort((left, right) => (left.index ?? 0) - (right.index ?? 0))
+    if (columns.length) groups.push({ challenge, columns })
+  }
+  return groups
 })
+const flatColumns = computed(() => columnGroups.value.flatMap(group => group.columns))
 
-function openDetail(entry: (typeof entries.value)[number]) {
-  detailEntry.value = entry
-  detailOpen.value = true
+function roundLabel(column: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse): string {
+  if (!column.roundId) return translate('总计')
+  const round = board.roundsById.value.get(column.roundId)
+  return round?.number ? translate('第 {round} 轮', { round: round.number }) : translate('轮次')
 }
 
-// ---- 下载为 Excel(CSV,Excel 可直接打开) ----
-function exportCsv() {
-  const board = leaderboard.value
-  if (!board) return
-  const scoreHeaders = isAwdp.value
-    ? [translate('攻击分'), translate('防御分'), translate('罚分'), translate('总分')]
-    : [translate('总分'), translate('解题数'), translate('最后得分')]
-  const header = [translate('名次'), translate('队伍'), ...scoreHeaders, ...challenges.value.map((c) => c.title ?? translate('题目'))]
-  const rows = entries.value.map((entry) => [
-    entry.rank ?? '',
-    entry.teamName ?? '',
-    ...(isAwdp.value
-      ? [entry.attackScore ?? 0, entry.defenseScore ?? 0, entry.penaltyScore ?? 0, entry.score ?? 0]
-      : [entry.score ?? 0, entry.solveCount ?? 0, entry.lastScoreAt ? formatDateTime(entry.lastScoreAt) : '']),
-    ...challenges.value.map((challenge) => {
-      const slot = slotFor(entry.teamId, challenge.competitionChallengeId)
-      if (!slot) return ''
-      return isAwdp.value
-        ? `${translate('攻击')} ${slot.attackScore ?? 0} / ${translate('防御')} ${slot.defenseScore ?? 0}`
-        : slot.score ?? 0
+function slotTitle(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse): string {
+  if (slot.scoreState === 'Pending') return translate('本轮待结算')
+  if (slot.scoreState === 'Provisional') return translate('结算中')
+  return translate('已结算')
+}
+
+function breakdownText(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse): string {
+  const attack = scoreboardBreakdown(slot, 'Attack')
+  const defense = scoreboardBreakdown(slot, 'Defense')
+  if (attack || defense) {
+    return [
+      translate('攻击 {success}/{attempt}', { success: attack?.successfulCount ?? 0, attempt: attack?.attemptCount ?? 0 }),
+      translate('防御 {success}/{attempt}', { success: defense?.successfulCount ?? 0, attempt: defense?.attemptCount ?? 0 }),
+    ].join(' · ')
+  }
+  const solve = scoreboardBreakdown(slot, 'Solve')
+  if (solve) return translate('{count} 次成功', { count: solve.successfulCount ?? 0 })
+  const availability = scoreboardBreakdown(slot, 'Availability')
+  if (availability) return translate('{success}/{attempt} 次可用', { success: availability.successfulCount ?? 0, attempt: availability.attemptCount ?? 0 })
+  const control = scoreboardBreakdown(slot, 'Control')
+  if (control) return translate('{count} 次控制', { count: control.successfulCount ?? 0 })
+  return translate('{count} 条记录', { count: slot.entryCount ?? 0 })
+}
+
+function exportCsv(): void {
+  const snapshot = board.snapshot.value
+  if (!snapshot) return
+  const header = [
+    translate('名次'), translate('队伍'), translate('总分'),
+    ...flatColumns.value.map((column) => {
+      const challenge = board.challengesById.value.get(column.competitionChallengeId ?? '')
+      return `${challenge?.title ?? translate('未知题目')} · ${roundLabel(column)}`
+    }),
+  ]
+  const rows = teams.value.map(team => [
+    team.rank ?? '', team.teamName ?? '', team.totalScore ?? 0,
+    ...flatColumns.value.map((column) => {
+      if (column.index === undefined) return ''
+      const slot = scoreboardSlot(team, column.index)
+      return slot?.scoreState === 'Settled' ? slot.netPoints ?? 0 : ''
     }),
   ])
   const escape = (value: unknown) => `"${String(value).replaceAll('"', '""')}"`
-  const csv = '﻿' + [header, ...rows].map((row) => row.map(escape).join(',')).join('\r\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${ctx.competition.value?.title ?? 'leaderboard'}-${translate('记分板')}.csv`
-  a.click()
+  const csv = '\uFEFF' + [header, ...rows].map(row => row.map(escape).join(',')).join('\r\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `${ctx.competition.value?.title ?? 'scoreboard'}-${translate('记分板')}.csv`
+  anchor.click()
   URL.revokeObjectURL(url)
 }
 
-// ---- 方向图标/配色走共享映射(utils/directions.ts),Medal 金银铜走 types.ts 共享常量 ----
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detailLoadingMore = ref(false)
+const detailError = ref<string | null>(null)
+const detail = ref<NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse | null>(null)
+const detailEntries = ref<NoCtfapiEndpointsCompetitionsScoreboardEntryResponse[]>([])
+const detailTeam = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+const detailColumn = ref<NoCtfapiEndpointsCompetitionsScoreboardColumnResponse | null>(null)
+let detailGeneration = 0
+
+async function loadDetailPage(cursor: string | null, append: boolean): Promise<void> {
+  const teamId = detailTeam.value?.teamId
+  const columnIndex = detailColumn.value?.index
+  if (!teamId || columnIndex === undefined) return
+  const requestGeneration = detailGeneration
+  if (append) detailLoadingMore.value = true
+  else detailLoading.value = true
+  const result = await getScoreboardSlotDetailEndpoint({
+    path: { competitionId, teamId, columnIndex },
+    query: { cursor, limit: 50 },
+  })
+  if (requestGeneration !== detailGeneration) return
+  detailLoading.value = false
+  detailLoadingMore.value = false
+  if (result.error) {
+    detailError.value = parseApiError(result.error, translate('加载记分板明细失败')).message
+    return
+  }
+  if (result.response?.status === 202) {
+    detailError.value = translate('记分板数据投影中,请稍候…')
+    return
+  }
+  if (!result.data) return
+  const page = result.data as NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse
+  detail.value = page
+  detailEntries.value = append ? [...detailEntries.value, ...(page.items ?? [])] : [...(page.items ?? [])]
+  detailError.value = null
+}
+
+function openDetail(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, column: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse): void {
+  detailGeneration += 1
+  detailTeam.value = team
+  detailColumn.value = column
+  detail.value = null
+  detailEntries.value = []
+  detailError.value = null
+  detailOpen.value = true
+  void loadDetailPage(null, false)
+}
+
+watch(detailOpen, (open) => { if (!open) detailGeneration += 1 })
+
+function entryActor(entry: NoCtfapiEndpointsCompetitionsScoreboardEntryResponse): string {
+  if (entry.actorIndex === null || entry.actorIndex === undefined) return translate('系统')
+  return board.actorsByIndex.value.get(entry.actorIndex)?.displayName ?? translate('未知用户')
+}
 </script>
 
 <template>
   <div class="flex flex-col gap-6">
-    <Alert v-if="error" variant="destructive">
-      <AlertDescription>{{ error }}</AlertDescription>
+    <Alert v-if="board.error.value" variant="destructive">
+      <AlertDescription class="flex items-center justify-between gap-3"><span>{{ board.error.value }}</span><Button variant="outline" size="sm" @click="board.refresh()">{{ $t('重试') }}</Button></AlertDescription>
     </Alert>
-
-    <div v-else-if="loading || polling" class="flex flex-col gap-4">
-      <Alert>
-        <AlertDescription class="flex items-center gap-2">
-          <Spinner class="size-3" /> {{ $t('记分板数据投影中,请稍候…') }} </AlertDescription>
-      </Alert>
+    <div v-if="board.loading.value && !board.snapshot.value" class="flex flex-col gap-4">
+      <Alert><AlertDescription class="flex items-center gap-2"><Spinner class="size-3" />{{ $t('记分板数据投影中,请稍候…') }}</AlertDescription></Alert>
       <Skeleton class="h-64 w-full" />
     </div>
-
-    <template v-else-if="leaderboard">
+    <template v-else-if="board.snapshot.value && board.schema.value && board.catalog.value">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 class="flex items-center gap-2 text-display text-xl">
-          <Trophy class="size-5 text-primary" /> {{ $t('排行榜') }} </h2>
-        <div class="flex items-center gap-4">
+        <h2 class="flex items-center gap-2 text-display text-xl"><Trophy class="size-5 text-primary" />{{ $t('排行榜') }}<Badge v-if="board.refreshing.value" variant="secondary">{{ $t('刷新中') }}</Badge></h2>
+        <div class="flex flex-wrap items-center gap-3">
           <Select v-if="availableTracks.length > 1" v-model="selectedTrackKey">
-            <SelectTrigger class="min-w-40" :aria-label="$t('选择排行榜赛道')">
-              <SelectValue :placeholder="$t('选择赛道')" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">
-                {{ track.name }}<template v-if="track.isInternal"> · {{ $t('内部') }}</template>
-              </SelectItem>
-            </SelectContent>
+            <SelectTrigger class="min-w-40" :aria-label="$t('选择排行榜赛道')"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">{{ track.name }}</SelectItem></SelectContent>
           </Select>
-          <label class="flex items-center gap-2 text-sm text-muted-foreground">
-            <Checkbox v-model="showGroupLabels" /> {{ $t('显示分组标签') }} </label>
-          <Button variant="outline" :disabled="!entries.length" @click="exportCsv">
-            <Download data-icon="inline-start" /> {{ $t('下载为Excel') }} </Button>
+          <Button variant="outline" :disabled="!teams.length" @click="exportCsv"><Download data-icon="inline-start" />{{ $t('下载为Excel') }}</Button>
         </div>
       </div>
-
-      <Alert v-if="leaderboard.dataScope === 'Frozen'">
-        <AlertDescription>
-          {{ $t('排行榜已冻结，以下为截至 {time} 的快照。', { time: formatDateTime(leaderboard.dataAsOf) }) }}
-        </AlertDescription>
-      </Alert>
-      <Alert v-if="isAwdp && leaderboard.dataScope !== 'Hidden'">
-        <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
-          <span>
-            {{ $t('当前第 {current} 轮，已结算至第 {settled} 轮。', {
-              current: leaderboard.currentRound ?? 1,
-              settled: leaderboard.settledThroughRound ?? 0,
-            }) }}
-          </span>
-          <span class="text-muted-foreground">{{ $t('本轮攻击与防御成绩将在轮次结束后统一结算。') }}</span>
-        </AlertDescription>
-      </Alert>
-      <Empty v-if="leaderboard.dataScope === 'Hidden'" class="border py-12">
-        <EmptyHeader>
-          <EmptyTitle>{{ $t('排行榜暂不公开') }}</EmptyTitle>
-          <EmptyDescription>{{ $t('主办方当前隐藏了排行榜数据') }}</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-
-      <template v-else>
-        <Card v-if="hasAnySeries && !isAwdp">
-          <CardContent class="pt-6">
-            <ScoreTrendChart
-              :title="`${ctx.competition.value?.title ?? ''} - TOP10`"
-              :series="topSeries"
-              :range-start="ctx.competition.value?.startTime"
-              :range-end="ctx.competition.value?.endTime"
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent class="flex flex-col gap-3 pt-6">
-            <Empty v-if="!entries.length" class="border py-8">
-              <EmptyHeader>
-                <EmptyTitle>{{ $t('还没有队伍得分') }}</EmptyTitle>
-              </EmptyHeader>
-            </Empty>
-
-            <template v-else>
-              <div class="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow v-if="showGroupLabels && directionGroups.length">
-                      <TableHead :colspan="isAwdp ? 6 : 3" />
-                      <TableHead
-                        v-for="group in directionGroups"
-                        :key="group.direction"
-                        :colspan="group.challenges.length"
-                        class="border-l text-center"
-                      >
-                        <span class="inline-flex items-center gap-1.5">
-                          <component
-                            :is="directionIcon(group.direction)"
-                            class="size-4"
-                            :class="directionTextClass(group.direction)"
-                          />
-                          {{ group.direction }}
-                        </span>
-                      </TableHead>
-                    </TableRow>
-                    <TableRow>
-                      <TableHead class="w-14">{{ $t('名次') }}</TableHead>
-                      <TableHead class="sticky left-0 z-10 min-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
-                      <template v-if="isAwdp">
-                        <TableHead class="w-24 text-right">{{ $t('攻击分') }}</TableHead>
-                        <TableHead class="w-24 text-right">{{ $t('防御分') }}</TableHead>
-                        <TableHead class="w-24 text-right">{{ $t('罚分') }}</TableHead>
-                      </template>
-                      <TableHead class="w-24 text-right">{{ $t('总分') }}</TableHead>
-                      <TableHead
-                        v-for="challenge in challenges"
-                        :key="challenge.competitionChallengeId"
-                        class="max-w-16 border-l text-center"
-                        :title="challenge.title"
-                      >
-                        <span class="block truncate px-1">{{ challenge.title }}</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow
-                      v-for="entry in visibleEntries"
-                      :key="entry.teamId"
-                      :class="cn('cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset', (entry.rank ?? 99) <= 3 && 'bg-primary/5 hover:bg-primary/10')"
-                      role="button"
-                      tabindex="0"
-                      :aria-label="$t('查看队伍 {team} 详情', { team: entry.teamName ?? '' })"
-                      @click="openDetail(entry)"
-                      @keydown.enter="openDetail(entry)"
-                      @keydown.space.prevent="openDetail(entry)"
-                    >
-                      <TableCell>
-                        <Medal v-if="(entry.rank ?? 99) <= 3" :class="medalRankClass[entry.rank ?? 0]" class="size-5" />
-                        <span v-else class="pl-1 font-mono text-sm tabular-nums">{{ entry.rank }}</span>
-                      </TableCell>
-                      <TableCell class="sticky left-0 z-10 border-r bg-card">
-                        <span class="flex items-center gap-2">
-                          <Avatar class="size-8">
-                            <AvatarFallback>{{ entry.teamName?.slice(0, 2) ?? '?' }}</AvatarFallback>
-                          </Avatar>
-                          <span class="font-medium">{{ entry.teamName }}</span>
-                          <Badge v-if="availableTracks.length > 1" variant="outline" class="text-[0.7rem]">
-                            {{ availableTracks.find(track => track.key === entry.trackKey)?.name ?? entry.trackKey }}
-                          </Badge>
-                        </span>
-                      </TableCell>
-                      <template v-if="isAwdp">
-                        <TableCell class="text-right font-mono tabular-nums">{{ entry.attackScore ?? 0 }} pts</TableCell>
-                        <TableCell class="text-right font-mono tabular-nums">{{ entry.defenseScore ?? 0 }} pts</TableCell>
-                        <TableCell class="text-right font-mono tabular-nums" :class="(entry.penaltyScore ?? 0) > 0 ? 'text-destructive' : 'text-muted-foreground'">
-                          {{ entry.penaltyScore ?? 0 }} pts
-                        </TableCell>
-                      </template>
-                      <TableCell class="text-right font-mono font-semibold tabular-nums">{{ entry.score }} pts</TableCell>
-                      <TableCell
-                        v-for="challenge in challenges"
-                        :key="challenge.competitionChallengeId"
-                        class="border-l text-center"
-                      >
-                        <template v-if="isAwdp && slotFor(entry.teamId, challenge.competitionChallengeId)">
-                          <div
-                            class="flex items-center justify-center gap-2 font-mono text-xs tabular-nums"
-                            :title="cellText(slotFor(entry.teamId, challenge.competitionChallengeId)!, challenge.title ?? '')"
-                          >
-                            <span class="inline-flex items-center gap-1"><Swords class="size-3.5 text-primary" />{{ slotFor(entry.teamId, challenge.competitionChallengeId)?.attackScore ?? 0 }}</span>
-                            <span class="inline-flex items-center gap-1"><ShieldCheck class="size-3.5 text-emerald-600" />{{ slotFor(entry.teamId, challenge.competitionChallengeId)?.defenseScore ?? 0 }}</span>
-                          </div>
-                        </template>
-                        <template v-else-if="slotFor(entry.teamId, challenge.competitionChallengeId)">
-                          <Medal
-                            class="mx-auto size-5"
-                            :class="medalBloodRankClass(slotFor(entry.teamId, challenge.competitionChallengeId)?.bloodRank) ?? 'text-muted-foreground/50'"
-                            :title="cellText(slotFor(entry.teamId, challenge.competitionChallengeId)!, challenge.title ?? '')"
-                          />
-                        </template>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
-                <span>
-                  {{ $t('已显示 {visible} / {count} 支队伍', { visible: visibleEntries.length, count: entries.length }) }}
-                </span>
-                <Button v-if="hasMoreEntries" variant="outline" @click="showMoreEntries">
-                  {{ $t('加载更多') }}
-                </Button>
-              </div>
-            </template>
-          </CardContent>
-        </Card>
-      </template>
-
-      <TeamDetailDialog
-        v-model:open="detailOpen"
-        :competition-id="competitionId"
-        :entry="detailEntry"
-        :mode="ctx.competition.value?.mode"
-        :series="detailSeries"
-        :challenges="challenges"
-        :range-start="ctx.competition.value?.startTime"
-        :range-end="ctx.competition.value?.endTime"
-      />
+      <Alert v-if="board.processing.value"><AlertDescription>{{ $t('记分板数据投影中,请稍候…') }}</AlertDescription></Alert>
+      <Alert v-if="board.snapshot.value.dataScope === 'Frozen'"><AlertDescription>{{ $t('排行榜已冻结，以下为截至 {time} 的快照。', { time: formatDateTime(board.snapshot.value.dataAsOf) }) }}</AlertDescription></Alert>
+      <Empty v-if="board.snapshot.value.dataScope === 'Hidden'" class="border py-12"><EmptyHeader><EmptyTitle>{{ $t('排行榜暂不公开') }}</EmptyTitle><EmptyDescription>{{ $t('主办方当前隐藏了排行榜数据') }}</EmptyDescription></EmptyHeader></Empty>
+      <Card v-else>
+        <CardContent class="pt-6">
+          <Empty v-if="!teams.length" class="border py-8"><EmptyHeader><EmptyTitle>{{ $t('还没有队伍得分') }}</EmptyTitle></EmptyHeader></Empty>
+          <div v-else class="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead rowspan="2" class="w-14">{{ $t('名次') }}</TableHead>
+                  <TableHead rowspan="2" class="sticky left-0 z-20 min-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
+                  <TableHead rowspan="2" class="w-24 text-right">{{ $t('总分') }}</TableHead>
+                  <TableHead v-for="group in columnGroups" :key="group.challenge.id" :colspan="group.columns.length" class="border-l text-center">
+                    <span class="inline-flex items-center gap-1.5"><component :is="directionIcon(group.challenge.direction)" class="size-4" :class="directionTextClass(group.challenge.direction)" />{{ group.challenge.title }}</span>
+                  </TableHead>
+                </TableRow>
+                <TableRow><template v-for="group in columnGroups" :key="`${group.challenge.id}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-32 border-l text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(team.rank ?? 99) <= 3 ? 'bg-primary/5' : ''">
+                  <TableCell><Medal v-if="(team.rank ?? 99) <= 3" class="size-5" :class="medalRankClass[team.rank ?? 0]" /><span v-else class="font-mono tabular-nums">{{ team.rank ?? '—' }}</span></TableCell>
+                  <TableCell class="sticky left-0 z-10 border-r bg-card"><span class="font-medium">{{ team.teamName }}</span><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="ml-2">{{ team.rankingState }}</Badge></TableCell>
+                  <TableCell class="text-right font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</TableCell>
+                  <template v-for="group in columnGroups" :key="`${team.teamId}-${group.challenge.id}`">
+                    <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center">
+                      <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="min-h-14 w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openDetail(team, column)">
+                        <template v-if="scoreboardSlot(team, column.index!)?.scoreState === 'Pending'"><span class="block text-xs font-medium text-amber-600">{{ $t('本轮待结算') }}</span><span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ breakdownText(scoreboardSlot(team, column.index!)!) }}</span></template>
+                        <template v-else><span class="block font-mono font-semibold tabular-nums">{{ scoreboardSlot(team, column.index!)?.netPoints ?? 0 }} pts</span><span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ slotTitle(scoreboardSlot(team, column.index!)!) }} · {{ breakdownText(scoreboardSlot(team, column.index!)!) }}</span></template>
+                      </button>
+                      <span v-else class="text-muted-foreground/40">—</span>
+                    </TableCell>
+                  </template>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+          <div v-if="visibleTeams.length < teams.length" class="mt-4 flex justify-center"><Button variant="outline" @click="visibleTeamCount += 50">{{ $t('加载更多') }}</Button></div>
+        </CardContent>
+      </Card>
     </template>
+
+    <Dialog v-model:open="detailOpen">
+      <DialogScrollContent class="max-h-[85vh] sm:max-w-2xl">
+        <DialogHeader><DialogTitle>{{ detailTeam?.teamName }} · {{ board.challengesById.value.get(detailColumn?.competitionChallengeId ?? '')?.title ?? $t('未知题目') }} · {{ detailColumn ? roundLabel(detailColumn) : '' }}</DialogTitle><DialogDescription>{{ $t('分值与状态均来自服务端权威结算结果。') }}</DialogDescription></DialogHeader>
+        <Alert v-if="detailError" variant="destructive"><AlertDescription>{{ detailError }}</AlertDescription></Alert>
+        <div v-if="detailLoading" class="flex items-center justify-center py-10"><Spinner /></div>
+        <template v-else-if="detail">
+          <div class="grid grid-cols-3 gap-3"><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('状态') }}</p><p class="mt-1 font-medium">{{ slotTitle(detail) }}</p></div><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('得分') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.earnedPoints ?? '—' }}</p></div><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('净分') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.netPoints ?? '—' }}</p></div></div>
+          <div class="flex flex-col gap-2"><div v-for="entry in detailEntries" :key="entry.id" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ entry.kind }} · {{ entry.outcome }}</p><p class="text-xs text-muted-foreground">{{ entryActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono tabular-nums">{{ entry.netPoints ?? '—' }}<template v-if="entry.netPoints !== null && entry.netPoints !== undefined"> pts</template></span></div><p v-if="!detailEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('暂无明细') }}</p></div>
+          <Button v-if="detail.nextCursor" variant="outline" :disabled="detailLoadingMore" @click="loadDetailPage(detail.nextCursor ?? null, true)"><Spinner v-if="detailLoadingMore" />{{ $t('加载更多') }}</Button>
+        </template>
+      </DialogScrollContent>
+    </Dialog>
   </div>
 </template>
