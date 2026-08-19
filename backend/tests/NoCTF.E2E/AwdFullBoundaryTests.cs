@@ -273,10 +273,10 @@ public sealed class AwdFullBoundaryTests
             "the first completed AWD round",
             TimeSpan.FromSeconds(45),
             cancellationToken);
-        var firstRoundScores = firstRoundLeaderboard.GetProperty("entries").EnumerateArray()
+        var firstRoundScores = firstRoundLeaderboard.GetProperty("teams").EnumerateArray()
             .ToDictionary(
                 item => item.GetProperty("teamId").GetGuid(),
-                item => item.GetProperty("score").GetInt64());
+                item => item.GetProperty("totalScore").GetInt64());
         var scoringBaseline = firstRoundScores;
         WriteRoundScores("first completed round", scoringBaseline, red.TeamId, blue.TeamId);
         var currentBlueFlag = blueRoundTwoFlag;
@@ -302,10 +302,10 @@ public sealed class AwdFullBoundaryTests
                     "the next completed AWD round",
                     TimeSpan.FromSeconds(45),
                     cancellationToken))
-                .GetProperty("entries").EnumerateArray()
+                .GetProperty("teams").EnumerateArray()
                 .ToDictionary(
                     item => item.GetProperty("teamId").GetGuid(),
-                    item => item.GetProperty("score").GetInt64());
+                    item => item.GetProperty("totalScore").GetInt64());
             WriteRoundScores(
                 $"down observation attempt {attempt + 1}",
                 scoringBaseline,
@@ -355,10 +355,10 @@ public sealed class AwdFullBoundaryTests
                 "the next completed AWD recovery round",
                 TimeSpan.FromSeconds(45),
                 cancellationToken);
-            var recovered = finalLeaderboard.GetProperty("entries").EnumerateArray()
+            var recovered = finalLeaderboard.GetProperty("teams").EnumerateArray()
                 .ToDictionary(
                     item => item.GetProperty("teamId").GetGuid(),
-                    item => item.GetProperty("score").GetInt64());
+                    item => item.GetProperty("totalScore").GetInt64());
             WriteRoundScores(
                 $"recovery observation attempt {attempt + 1}",
                 recovered,
@@ -370,10 +370,14 @@ public sealed class AwdFullBoundaryTests
             recoveryBaseline = recovered;
         }
         await Assert.That(recoveryObserved).IsTrue();
-        var redEntry = finalLeaderboard.GetProperty("entries").EnumerateArray()
+        var redEntry = finalLeaderboard.GetProperty("teams").EnumerateArray()
             .Single(item => item.GetProperty("teamId").GetGuid() == red.TeamId);
         await Assert.That(redEntry.GetProperty("rank").GetInt32()).IsEqualTo(1);
-        await Assert.That(redEntry.GetProperty("solveCount").GetInt32()).IsEqualTo(1);
+        var successfulAttacks = redEntry.GetProperty("slots").EnumerateArray()
+            .SelectMany(slot => slot.GetProperty("breakdown").EnumerateArray())
+            .Where(item => item.GetProperty("kind").GetString() == "Attack")
+            .Sum(item => item.GetProperty("successfulCount").GetInt32());
+        await Assert.That(successfulAttacks).IsEqualTo(1);
 
         await SendWithoutBodyAsync(
             admin,
@@ -593,10 +597,10 @@ public sealed class AwdFullBoundaryTests
             if (response.StatusCode == HttpStatusCode.OK)
             {
                 last = await ReadExpectedJsonAsync(response, HttpStatusCode.OK, cancellationToken);
-                var scores = last.GetProperty("entries").EnumerateArray()
+                var scores = last.GetProperty("teams").EnumerateArray()
                     .ToDictionary(
                         item => item.GetProperty("teamId").GetGuid(),
-                        item => item.GetProperty("score").GetInt64());
+                        item => item.GetProperty("totalScore").GetInt64());
                 if (expectedScores.All(expected =>
                         scores.GetValueOrDefault(expected.Key, long.MinValue) == expected.Value))
                     return last;
@@ -627,10 +631,10 @@ public sealed class AwdFullBoundaryTests
             if (response.StatusCode == HttpStatusCode.OK)
             {
                 last = await ReadExpectedJsonAsync(response, HttpStatusCode.OK, cancellationToken);
-                var scores = last.GetProperty("entries").EnumerateArray()
+                var scores = last.GetProperty("teams").EnumerateArray()
                     .ToDictionary(
                         item => item.GetProperty("teamId").GetGuid(),
-                        item => item.GetProperty("score").GetInt64());
+                        item => item.GetProperty("totalScore").GetInt64());
                 if (completed(scores))
                     return last;
             }

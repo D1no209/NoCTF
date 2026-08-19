@@ -28,49 +28,54 @@ public sealed class LeaderboardOpenApiTests
                 .GetProperty("schema"));
         var responseProperties = response.GetProperty("properties");
 
-        await Assert.That(responseProperties.TryGetProperty("subjects", out _)).IsFalse();
-        await Assert.That(responseProperties.TryGetProperty("bloods", out _)).IsFalse();
-        await Assert.That(responseProperties.TryGetProperty("series", out _)).IsFalse();
-        var entry = ResolveSchema(
+        await Assert.That(PropertyNames(response)).IsEquivalentTo([
+            "competitionId",
+            "version",
+            "schemaRevision",
+            "generatedAt",
+            "currentRoundId",
+            "actors",
+            "teams",
+            "tracks",
+            "visibility",
+            "dataScope",
+            "dataAsOf"
+        ]);
+        var team = ResolveSchema(
             root,
-            responseProperties.GetProperty("entries").GetProperty("items"));
-        await Assert.That(PropertyNames(entry)).IsEquivalentTo([
-            "rank",
+            responseProperties.GetProperty("teams").GetProperty("items"));
+        await Assert.That(PropertyNames(team)).IsEquivalentTo([
             "teamId",
             "teamName",
             "trackKey",
-            "score",
-            "attackScore",
-            "defenseScore",
-            "penaltyScore",
-            "solveCount",
-            "lastScoreAt",
-            "cells"
+            "rank",
+            "rankingState",
+            "totalScore",
+            "globalAdjustments",
+            "slots"
         ]);
-        var cell = ResolveSchema(
+        var slot = ResolveSchema(
             root,
-            entry.GetProperty("properties").GetProperty("cells").GetProperty("items"));
-        await Assert.That(PropertyNames(cell)).IsEquivalentTo([
-            "competitionChallengeId",
-            "score",
-            "attackScore",
-            "defenseScore",
-            "solvedAt",
-            "solverName",
-            "bloodRank"
+            team.GetProperty("properties").GetProperty("slots").GetProperty("items"));
+        await Assert.That(PropertyNames(slot)).IsEquivalentTo([
+            "columnIndex",
+            "scoreState",
+            "earnedPoints",
+            "deductedPoints",
+            "netPoints",
+            "entryCount",
+            "breakdown",
+            "entries"
         ]);
-        await Assert.That(responseProperties.TryGetProperty("currentRound", out _)).IsTrue();
-        await Assert.That(responseProperties.TryGetProperty("settledThroughRound", out _)).IsTrue();
-        var rankProperty = cell.GetProperty("properties").GetProperty("bloodRank");
-        await Assert.That(rankProperty.GetProperty("nullable").GetBoolean()).IsTrue();
-        var rank = ResolveSchema(root, rankProperty.GetProperty("oneOf")[0]);
-        await Assert.That(rank.GetProperty("type").GetString()).IsEqualTo("string");
-        await Assert.That(rank.GetProperty("enum").EnumerateArray()
+        var scoreState = ResolveSchema(
+            root,
+            slot.GetProperty("properties").GetProperty("scoreState"));
+        await Assert.That(scoreState.GetProperty("enum").EnumerateArray()
                 .Select(value => value.GetString()!))
-            .IsEquivalentTo(["First", "Second", "Third"]);
-        await Assert.That(rank.GetProperty("x-enumNames").EnumerateArray()
+            .IsEquivalentTo(["Pending", "Provisional", "Settled"]);
+        await Assert.That(scoreState.GetProperty("x-enumNames").EnumerateArray()
                 .Select(value => value.GetString()!))
-            .IsEquivalentTo(["First", "Second", "Third"]);
+            .IsEquivalentTo(["Pending", "Provisional", "Settled"]);
     }
 
     [Test]

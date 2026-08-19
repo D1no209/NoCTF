@@ -78,14 +78,16 @@ public sealed class CompetitionVisibilityPersistenceTests
             await using var verify = new NoCtfDbContext(fixture.Options);
             var competition = await verify.Competitions.AsNoTracking()
                 .SingleAsync(candidate => candidate.Id == fixture.CompetitionId, ct);
-            var snapshot = JsonSerializer.Deserialize<LeaderboardResponse>(
+            var snapshot = JsonSerializer.Deserialize<LeaderboardProjectionBundle>(
                 competition.FrozenLeaderboardSnapshotJson!,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
             await Assert.That(competition.LeaderboardVisibility)
                 .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
             await Assert.That(competition.LeaderboardVisibilityAppliedAt).IsNotNull();
-            await Assert.That(snapshot?.DataAsOf).IsEqualTo(startsAt.AddSeconds(1));
-            await Assert.That(snapshot?.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
+            await Assert.That(snapshot?.Legacy.DataAsOf).IsEqualTo(startsAt.AddSeconds(1));
+            await Assert.That(snapshot?.Legacy.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
+            await Assert.That(snapshot?.Scoreboard.Snapshot.DataAsOf).IsEqualTo(startsAt.AddSeconds(1));
+            await Assert.That(snapshot?.Scoreboard.Snapshot.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
             await Assert.That(snapshots.Requests).HasSingleItem();
             await Assert.That(snapshots.Requests[0].ProjectedAt).IsEqualTo(startsAt.AddSeconds(1));
             await Assert.That(await verify.CompetitionEvents.AsNoTracking()
@@ -238,15 +240,11 @@ public sealed class CompetitionVisibilityPersistenceTests
                 ? null
                 : now.AddMinutes(-1),
             FrozenLeaderboardSnapshotJson = visibility == CompetitionLeaderboardVisibility.Frozen
-                ? JsonSerializer.Serialize(new LeaderboardResponse(
+                ? JsonSerializer.Serialize(CreateProjectionBundle(
                     competitionId,
                     now.AddMinutes(-1),
-                    [])
-                {
-                    Visibility = CompetitionLeaderboardVisibility.Frozen,
-                    DataScope = LeaderboardDataScope.Frozen,
-                    DataAsOf = now.AddMinutes(-1)
-                }, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                    LeaderboardDataScope.Frozen),
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null,
             ConfigurationJson = "{}",
             FlagDerivationSecret = new byte[32],
@@ -310,6 +308,45 @@ public sealed class CompetitionVisibilityPersistenceTests
                 projectedAt,
                 []));
         }
+
+        public Task<LeaderboardProjectionBundle?> CreateBundleAsync(
+            Guid competitionId,
+            DateTimeOffset projectedAt,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add((competitionId, projectedAt, false));
+            return Task.FromResult<LeaderboardProjectionBundle?>(CreateProjectionBundle(
+                competitionId,
+                projectedAt,
+                LeaderboardDataScope.Live));
+        }
+    }
+
+    private static LeaderboardProjectionBundle CreateProjectionBundle(
+        Guid competitionId,
+        DateTimeOffset projectedAt,
+        LeaderboardDataScope dataScope)
+    {
+        var legacy = new LeaderboardResponse(competitionId, projectedAt, [])
+        {
+            Visibility = dataScope == LeaderboardDataScope.Frozen
+                ? CompetitionLeaderboardVisibility.Frozen
+                : CompetitionLeaderboardVisibility.Normal,
+            DataScope = dataScope,
+            DataAsOf = projectedAt
+        };
+        var catalog = new ScoreboardChallengeCatalog(competitionId, 1, []);
+        var schema = new ScoreboardSchema(competitionId, GameMode.Ctf, 1, 1, [], []);
+        var scoreboard = new ScoreboardProjection(
+            catalog,
+            schema,
+            new ScoreboardSnapshot(competitionId, 1, 1, projectedAt, null, [], [])
+            {
+                Visibility = legacy.Visibility,
+                DataScope = dataScope,
+                DataAsOf = projectedAt
+            });
+        return new(legacy, scoreboard);
     }
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox

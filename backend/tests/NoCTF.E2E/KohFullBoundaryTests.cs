@@ -363,9 +363,9 @@ public sealed class KohFullBoundaryTests
     }
 
     private static Dictionary<Guid, long> Scores(JsonElement leaderboard) =>
-        leaderboard.GetProperty("entries").EnumerateArray().ToDictionary(
+        leaderboard.GetProperty("teams").EnumerateArray().ToDictionary(
             item => item.GetProperty("teamId").GetGuid(),
-            item => item.GetProperty("score").GetInt64());
+            item => item.GetProperty("totalScore").GetInt64());
 
     private static async Task<Dictionary<Guid, long>> ReadScoresAsync(
         HttpClient client,
