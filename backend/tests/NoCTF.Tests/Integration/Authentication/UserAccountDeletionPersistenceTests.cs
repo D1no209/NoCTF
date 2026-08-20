@@ -1,10 +1,15 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Administration.UserAccounts;
+using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
 using NoCTF.Domain.Shared;
+using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Persistence;
@@ -60,6 +65,14 @@ public sealed class UserAccountDeletionPersistenceTests
                     RelatedId = auditedUserId,
                     SentAt = now
                 });
+                var challengeId = Guid.CreateVersion7(now.AddTicks(6));
+                var competitionChallengeId = Guid.CreateVersion7(now.AddTicks(7));
+                var frozenBundle = FrozenBundle(
+                    competitionId,
+                    competitionChallengeId,
+                    referencedUserId,
+                    "Player",
+                    now.AddHours(-1));
                 db.Competitions.Add(new Competition
                 {
                     Id = competitionId,
@@ -67,6 +80,9 @@ public sealed class UserAccountDeletionPersistenceTests
                     Title = "Historical competition",
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Finished,
+                    LeaderboardVisibility = CompetitionLeaderboardVisibility.Frozen,
+                    LeaderboardVisibilityStartsAt = now.AddHours(-1),
+                    LeaderboardVisibilityAppliedAt = now.AddHours(-1),
                     ConfigurationJson = "{}",
                     MaxTeamMembers = 5,
                     FlagDerivationSecret = new byte[32],
@@ -74,7 +90,60 @@ public sealed class UserAccountDeletionPersistenceTests
                     EndAt = now.AddHours(-1),
                     CreatedAt = now.AddHours(-3),
                     UpdatedAt = now,
-                    ConfigurationUpdatedAt = now
+                    ConfigurationUpdatedAt = now,
+                    FrozenLeaderboardSnapshotJson = JsonSerializer.Serialize(
+                        frozenBundle,
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                });
+                db.Challenges.Add(new Challenge
+                {
+                    Id = challengeId,
+                    OwnerId = referencedUserId,
+                    Mode = GameMode.Ctf,
+                    Title = "Historical challenge",
+                    Visibility = ChallengeVisibility.Private,
+                    DefinitionJson = "{\"schemaVersion\":1}",
+                    Revision = 1,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                db.CompetitionChallenges.Add(new CompetitionChallenge
+                {
+                    Id = competitionChallengeId,
+                    CompetitionId = competitionId,
+                    ChallengeId = challengeId,
+                    BaseScore = 100,
+                    IsPublished = true,
+                    RulesJson = "{}",
+                    Revision = 1,
+                    UpdatedAt = now
+                });
+                var teamId = Guid.CreateVersion7(now.AddTicks(8));
+                db.Teams.Add(new Team
+                {
+                    Id = teamId,
+                    CompetitionId = competitionId,
+                    Name = "Historical team",
+                    NormalizedName = "HISTORICAL TEAM",
+                    CaptainId = referencedUserId,
+                    MemberIds = [referencedUserId],
+                    InvitationToken = new string('a', 32),
+                    RegistrationStatus = TeamRegistrationStatus.Approved,
+                    RegisteredAt = now
+                });
+                db.GameplayFacts.Add(new GameplayFact
+                {
+                    Id = Guid.CreateVersion7(now.AddTicks(9)),
+                    CompetitionId = competitionId,
+                    CompetitionChallengeId = competitionChallengeId,
+                    TeamId = teamId,
+                    ActorUserId = referencedUserId,
+                    Kind = GameplayFactKind.ManualAdjustment,
+                    State = GameplayFactState.Completed,
+                    Result = GameplayFactResult.Applied,
+                    Value = "25",
+                    OccurredAt = now.AddHours(-1),
+                    UpdatedAt = now.AddHours(-1)
                 });
                 await db.SaveChangesAsync(cancellationToken);
             }
@@ -142,6 +211,20 @@ public sealed class UserAccountDeletionPersistenceTests
                     competition => competition.Id == competitionId
                         && competition.OwnerId == referencedUserId,
                     cancellationToken)).IsTrue();
+                var competition = await db.Competitions.IgnoreQueryFilters().SingleAsync(
+                    candidate => candidate.Id == competitionId,
+                    cancellationToken);
+                await Assert.That(competition.LeaderboardDirty).IsTrue();
+                var frozen = JsonSerializer.Deserialize<LeaderboardProjectionBundle>(
+                    competition.FrozenLeaderboardSnapshotJson!,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+                var anonymousName = $"anonymous-{referencedUserId:N}";
+                await Assert.That(frozen.Legacy.Entries.Single().Cells.Single().SolverName)
+                    .IsEqualTo(anonymousName);
+                await Assert.That(frozen.Scoreboard.Snapshot.Actors.Single().DisplayName)
+                    .IsEqualTo(anonymousName);
+                await Assert.That(frozen.Scoreboard.DetailActors.Single().DisplayName)
+                    .IsEqualTo(anonymousName);
                 await Assert.That(await db.Users.AnyAsync(
                     user => user.Id == unusedUserId,
                     cancellationToken)).IsFalse();
@@ -196,4 +279,35 @@ public sealed class UserAccountDeletionPersistenceTests
             CreatedAt = now,
             UpdatedAt = now
         };
+
+    private static LeaderboardProjectionBundle FrozenBundle(
+        Guid competitionId,
+        Guid competitionChallengeId,
+        Guid userId,
+        string userName,
+        DateTimeOffset generatedAt)
+    {
+        var teamId = Guid.CreateVersion7(generatedAt);
+        var legacy = new LeaderboardResponse(
+            competitionId,
+            generatedAt,
+            [new LeaderboardEntry(1, teamId, "Historical team", 25, 1, generatedAt)
+            {
+                Cells = [new(competitionChallengeId, 25, generatedAt, userName, null)]
+            }])
+        {
+            Visibility = CompetitionLeaderboardVisibility.Frozen,
+            DataScope = LeaderboardDataScope.Frozen,
+            DataAsOf = generatedAt
+        };
+        var actor = new ScoreboardActor(0, userId, userName);
+        var scoreboard = new ScoreboardProjection(
+            new ScoreboardChallengeCatalog(competitionId, 1, []),
+            new ScoreboardSchema(competitionId, GameMode.Ctf, 1, 1, [], []),
+            new ScoreboardSnapshot(competitionId, 1, 1, generatedAt, null, [actor], []))
+        {
+            DetailActors = [actor]
+        };
+        return new(legacy, scoreboard);
+    }
 }
