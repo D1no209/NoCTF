@@ -161,9 +161,9 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             fact.VictimTeamId,
             fact.OccurredAt,
             settled ? round?.SettledAt ?? projection.Snapshot.GeneratedAt : null,
-            null,
-            null,
-            null);
+            settled ? 0 : null,
+            settled ? 0 : null,
+            settled ? 0 : null);
     }
 
     private static ScoreboardEntryKind EntryKind(

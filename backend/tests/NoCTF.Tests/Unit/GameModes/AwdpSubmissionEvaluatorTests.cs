@@ -368,6 +368,35 @@ public sealed class AwdpGameplayFactEvaluatorTests
     }
 
     [Test]
+    public async Task Projection_falls_back_to_scheduled_start_when_lifecycle_history_is_empty()
+    {
+        var startedAt = DateTimeOffset.UtcNow.AddMinutes(-3);
+        var competitionId = Guid.NewGuid();
+        var challengeId = Guid.NewGuid();
+        var teamId = Guid.NewGuid();
+        var configuration = JsonSerializer.Serialize(
+            new AwdpConfiguration(
+                AwdpConfiguration.CurrentSchemaVersion,
+                60,
+                FixedCurve(10),
+                FixedCurve(20)),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var projection = new AwdpLeaderboardProjector().Project(new(
+            competitionId,
+            GameMode.Awdp,
+            [new LeaderboardTeamFact(teamId, "Team", false, false, startedAt)],
+            [],
+            [new LeaderboardChallengeFact(challengeId, "Pwn", "Challenge", false, "{\"schemaVersion\":4}")],
+            configuration,
+            startedAt,
+            LifecycleAudits: [],
+            ProjectedAt: startedAt.AddSeconds(130)));
+
+        await Assert.That(projection.CurrentRound).IsEqualTo(3);
+        await Assert.That(projection.SettledThroughRound).IsEqualTo(2);
+    }
+
+    [Test]
     public async Task Continuous_projection_uses_pause_aware_clock_and_freezes_after_finish()
     {
         var startedAt = DateTimeOffset.UtcNow.AddHours(-1);

@@ -111,6 +111,12 @@ public sealed class NormalizedScoreboardProjectionTests
         var settled = row.Slots.Where(slot => slot.ScoreState == ScoreboardScoreState.Settled).ToArray();
         var current = row.Slots.Single(slot => slot.ScoreState == ScoreboardScoreState.Pending);
         await Assert.That(settled.Sum(slot => slot.NetPoints!.Value)).IsEqualTo(280L);
+        await Assert.That(settled.All(slot => slot.EntryCount > 0)).IsTrue();
+        await Assert.That(settled.All(slot => slot.Entries.Any(entry =>
+            (entry.Kind is ScoreboardEntryKind.Attack or ScoreboardEntryKind.Defense)
+            && entry.NetPoints.GetValueOrDefault() > 0))).IsTrue();
+        await Assert.That(settled.SelectMany(slot => slot.Entries).Select(entry => entry.Id).Distinct().Count())
+            .IsEqualTo(settled.SelectMany(slot => slot.Entries).Count());
         await Assert.That(current.EarnedPoints).IsNull();
         await Assert.That(current.DeductedPoints).IsNull();
         await Assert.That(current.NetPoints).IsNull();
@@ -212,6 +218,38 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(projection.Snapshot.Teams.Sum(team => team.Slots.Count)).IsEqualTo(1);
         await Assert.That(projection.Snapshot.Teams.SelectMany(team => team.Slots)
             .All(slot => slot.Entries.Count <= 5)).IsTrue();
+    }
+
+    [Test]
+    public async Task Large_round_matrix_keeps_theoretical_cells_sparse()
+    {
+        var teams = Enumerable.Range(1, 100).Select(index => Team(index, $"Team {index}")).ToArray();
+        var challenges = Enumerable.Range(1, 20)
+            .Select(index => Challenge(index, "Pwn", "{\"schemaVersion\":4}"))
+            .ToArray();
+        var configuration = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            60,
+            FixedCurve(100),
+            FixedCurve(40),
+            RequireBreakBeforeFix: false), JsonOptions);
+        var projection = engine.ProjectScoreboard(new(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            teams,
+            [Fact(teams[0].Id, challenges[0].Id, GameplayFactKind.BreakAttempt, 1,
+                GameplayFactResult.Correct)],
+            challenges,
+            configuration,
+            Start,
+            ProjectedAt: Start.AddSeconds(49 * 60 + 1),
+            CompetitionStatus: CompetitionStatus.Running));
+
+        await Assert.That(projection.Schema.Rounds.Count).IsEqualTo(50);
+        await Assert.That(projection.Schema.Columns.Count).IsEqualTo(1_000);
+        await Assert.That(projection.Snapshot.Teams.Count).IsEqualTo(100);
+        await Assert.That(projection.Snapshot.Teams.Sum(team => team.Slots.Count)).IsEqualTo(49);
+        await Assert.That(projection.Snapshot.Teams.Count(team => team.Slots.Count > 0)).IsEqualTo(1);
     }
 
     [Test]

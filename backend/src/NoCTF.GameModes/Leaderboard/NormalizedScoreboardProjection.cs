@@ -159,25 +159,25 @@ internal static class NormalizedScoreboardProjection
         if (entries.Count <= CompactEntryLimit)
             return entries;
 
-        // Keep the earliest score-bearing entry so a compact snapshot still explains
-        // where a slot's points originated. Fill the remaining bounded budget with
-        // the newest operational evidence. The full history remains cursor-paged.
+        // Every score-bearing summary remains in the main snapshot. Fill the remaining
+        // display budget with recent zero-point operational evidence; the raw operation
+        // history remains cursor-paged.
         var scoreBearing = entries
             .Where(entry => entry.NetPoints.GetValueOrDefault() != 0
                 || entry.AwardPoints != 0
                 || entry.Award is not null)
             .OrderBy(entry => entry.OccurredAt)
             .ThenBy(entry => entry.Id)
-            .FirstOrDefault();
-        var recentBudget = scoreBearing is null ? CompactEntryLimit : CompactEntryLimit - 1;
+            .ToArray();
+        var scoreBearingIds = scoreBearing.Select(entry => entry.Id).ToHashSet();
+        var recentBudget = Math.Max(0, CompactEntryLimit - scoreBearing.Length);
         var selected = entries
             .OrderByDescending(entry => entry.OccurredAt)
             .ThenByDescending(entry => entry.Id)
-            .Where(entry => scoreBearing is null || entry.Id != scoreBearing.Id)
+            .Where(entry => !scoreBearingIds.Contains(entry.Id))
             .Take(recentBudget)
             .ToList();
-        if (scoreBearing is not null)
-            selected.Add(scoreBearing);
+        selected.AddRange(scoreBearing);
         return selected
             .OrderBy(entry => entry.OccurredAt)
             .ThenBy(entry => entry.Id)
@@ -289,7 +289,8 @@ internal static class NormalizedScoreboardProjection
             var manualTotal = group
                 .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment
                     && fact.Result == GameplayFactResult.Applied)
-                .Aggregate(0L, (total, fact) => checked(total + ProjectionPenalties.ParseDelta(fact.Value)));
+                .Aggregate(0L, (total, fact) => checked(total
+                    + ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity));
             var solvePoints = checked((legacyCell?.Score ?? 0) - manualTotal);
             var firstCorrect = group
                 .Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
@@ -305,7 +306,9 @@ internal static class NormalizedScoreboardProjection
                     case GameplayFactKind.FlagAttempt:
                     {
                         var isAwardedSolve = firstCorrect?.GameplayFactId == fact.GameplayFactId;
-                        var deduction = fact.Result == GameplayFactResult.Wrong ? wrongPenalty : 0L;
+                        var deduction = fact.Result == GameplayFactResult.Wrong
+                            ? checked(wrongPenalty * fact.Multiplicity)
+                            : 0L;
                         var earned = isAwardedSolve ? Math.Max(0, solvePoints) : 0L;
                         var award = isAwardedSolve ? AwardFrom(legacyCell?.BloodRank) : null;
                         var basePoints = legacy.Challenges
@@ -333,11 +336,13 @@ internal static class NormalizedScoreboardProjection
                             ScoreboardBreakdownKind.Hint,
                             actorIndexes,
                             0,
-                            fact.Result == GameplayFactResult.Unlocked ? fact.HintCost.GetValueOrDefault() : 0);
+                            fact.Result == GameplayFactResult.Unlocked
+                                ? checked(fact.HintCost.GetValueOrDefault() * fact.Multiplicity)
+                                : 0);
                         break;
                     case GameplayFactKind.ManualAdjustment when fact.Result == GameplayFactResult.Applied:
                     {
-                        var delta = ProjectionPenalties.ParseDelta(fact.Value);
+                        var delta = checked(ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
                         slot.AddFact(
                             fact,
                             ScoreboardEntryKind.ManualAdjustment,
@@ -581,12 +586,23 @@ internal static class NormalizedScoreboardProjection
                     foreach (var activation in trackActivations.Where(item => item.Round <= round.Number
                                  && scoringTeams.Contains(item.Fact.TeamId!.Value)))
                     {
-                        GetSlot(
+                        var slot = GetSlot(
                             slots,
                             activation.Fact.TeamId!.Value,
                             columns[(challenge.Id, round.Id)],
-                            round)
-                            .AddBreakdownScore(breakdownKind, points, 0);
+                            round);
+                        slot.AddSettlement(
+                            StableGuid(
+                                activation.Fact.GameplayFactId,
+                                $"awdp-settlement:{round.Id:N}:{kind}"),
+                            kind == GameplayFactKind.BreakAttempt
+                                ? ScoreboardEntryKind.Attack
+                                : ScoreboardEntryKind.Defense,
+                            breakdownKind,
+                            activation.Fact,
+                            actorIndexes,
+                            points,
+                            0);
                     }
                 }
             }
@@ -656,7 +672,7 @@ internal static class NormalizedScoreboardProjection
                 else if (fact.Kind == GameplayFactKind.ManualAdjustment
                          && fact.Result == GameplayFactResult.Applied)
                 {
-                    var delta = ProjectionPenalties.ParseDelta(fact.Value);
+                    var delta = checked(ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
                     manual = checked(manual + delta);
                     slot.AddFact(
                         fact,
@@ -716,7 +732,7 @@ internal static class NormalizedScoreboardProjection
                 && fact.Result == GameplayFactResult.Applied)
             .Select(fact =>
             {
-                var net = ProjectionPenalties.ParseDelta(fact.Value);
+                var net = checked(ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
                 return new ScoreboardAdjustment(
                     fact.GameplayFactId,
                     ScoreboardAdjustmentKind.ManualAdjustment,
@@ -856,14 +872,15 @@ internal static class NormalizedScoreboardProjection
         LeaderboardGameplayFact fact,
         AwdpEffectiveConfiguration configuration) => (fact.Kind, fact.Result, fact.FailureCode) switch
     {
-        (GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong, _) => configuration.FlagWrongPenalty,
+        (GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong, _)
+            => checked(configuration.FlagWrongPenalty * fact.Multiplicity),
         (GameplayFactKind.BreakAttempt, GameplayFactResult.Rejected,
             GameplayFactFailureCode.ForeignTeamFlagDetected or GameplayFactFailureCode.AmbiguousFlagMatch)
-            => configuration.FlagWrongPenalty,
+            => checked(configuration.FlagWrongPenalty * fact.Multiplicity),
         (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpExploitSucceeded)
-            => configuration.ExploitSucceededPenalty,
+            => checked(configuration.ExploitSucceededPenalty * fact.Multiplicity),
         (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceAbnormal)
-            => configuration.ServiceAbnormalPenalty,
+            => checked(configuration.ServiceAbnormalPenalty * fact.Multiplicity),
         _ => 0
     };
 
@@ -914,6 +931,8 @@ internal static class NormalizedScoreboardProjection
         private readonly Dictionary<ScoreboardBreakdownKind, BreakdownAccumulator> breakdowns = [];
         private readonly List<ScoreboardSlotEntry> entries = [];
 
+        private int entryCount;
+
         private readonly int columnIndex;
 
         public SlotAccumulator(int columnIndex, ScoreboardRound? round)
@@ -936,7 +955,8 @@ internal static class NormalizedScoreboardProjection
             long? breakdownEarned = null)
         {
             var outcome = EntryOutcome(fact);
-            AddAttempt(breakdownKind, outcome == ScoreboardEntryOutcome.Succeeded);
+            entryCount = checked(entryCount + fact.Multiplicity);
+            AddAttempt(breakdownKind, outcome == ScoreboardEntryOutcome.Succeeded, fact.Multiplicity);
             AddBreakdownScore(breakdownKind, breakdownEarned ?? earned, deducted);
             entries.Add(new(
                 fact.GameplayFactId,
@@ -964,7 +984,8 @@ internal static class NormalizedScoreboardProjection
             long earned,
             long deducted)
         {
-            AddAttempt(breakdownKind, outcome == ScoreboardEntryOutcome.Succeeded);
+            entryCount++;
+            AddAttempt(breakdownKind, outcome == ScoreboardEntryOutcome.Succeeded, 1);
             AddBreakdownScore(breakdownKind, earned, deducted);
             entries.Add(new(
                 id,
@@ -979,6 +1000,32 @@ internal static class NormalizedScoreboardProjection
                 checked(earned - deducted)));
         }
 
+        public void AddSettlement(
+            Guid id,
+            ScoreboardEntryKind entryKind,
+            ScoreboardBreakdownKind breakdownKind,
+            LeaderboardGameplayFact source,
+            IReadOnlyDictionary<Guid, int> actorIndexes,
+            long earned,
+            long deducted)
+        {
+            entryCount++;
+            AddBreakdownScore(breakdownKind, earned, deducted);
+            entries.Add(new(
+                id,
+                entryKind,
+                ScoreboardEntryOutcome.Succeeded,
+                source.ActorUserId is Guid actorId && actorIndexes.TryGetValue(actorId, out var actorIndex)
+                    ? actorIndex
+                    : null,
+                source.VictimTeamId,
+                source.OccurredAt,
+                Round?.SettledAt,
+                earned,
+                deducted,
+                checked(earned - deducted)));
+        }
+
         public void AddBreakdownScore(ScoreboardBreakdownKind kind, long earned, long deducted)
         {
             var breakdown = GetBreakdown(kind);
@@ -986,12 +1033,12 @@ internal static class NormalizedScoreboardProjection
             breakdown.Deducted = checked(breakdown.Deducted + deducted);
         }
 
-        private void AddAttempt(ScoreboardBreakdownKind kind, bool succeeded)
+        private void AddAttempt(ScoreboardBreakdownKind kind, bool succeeded, int count)
         {
             var breakdown = GetBreakdown(kind);
-            breakdown.AttemptCount++;
+            breakdown.AttemptCount = checked(breakdown.AttemptCount + count);
             if (succeeded)
-                breakdown.SuccessfulCount++;
+                breakdown.SuccessfulCount = checked(breakdown.SuccessfulCount + count);
         }
 
         private BreakdownAccumulator GetBreakdown(ScoreboardBreakdownKind kind)
@@ -1040,7 +1087,7 @@ internal static class NormalizedScoreboardProjection
                 earned,
                 deducted,
                 earned is null ? null : checked(earned.Value - deducted!.Value),
-                entries.Count,
+                entryCount,
                 projectedBreakdowns,
                 projectedEntries);
         }

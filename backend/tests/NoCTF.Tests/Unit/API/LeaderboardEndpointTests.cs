@@ -267,7 +267,9 @@ public sealed class LeaderboardEndpointTests
         await Assert.That(page.EarnedPoints).IsEqualTo(500);
         await Assert.That(page.DeductedPoints).IsEqualTo(100);
         await Assert.That(page.NetPoints).IsEqualTo(400);
-        await Assert.That(page.Items.All(item => item.EarnedPoints is null)).IsTrue();
+        await Assert.That(page.Items.All(item => item.EarnedPoints == 0)).IsTrue();
+        await Assert.That(page.Items.All(item => item.DeductedPoints == 0)).IsTrue();
+        await Assert.That(page.Items.All(item => item.NetPoints == 0)).IsTrue();
         await Assert.That(detailReader.Queries.Single().Limit).IsEqualTo(3);
 
         var cursor = Uri.EscapeDataString(page.NextCursor!);

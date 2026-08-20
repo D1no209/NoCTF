@@ -118,6 +118,7 @@ internal static class CtfLeaderboardProjection
                 (TeamId: fact.TeamId!.Value,
                 fact.OccurredAt,
                 fact.GameplayFactId,
+                fact.Multiplicity,
                 Penalty: (fact.CompetitionChallengeId is Guid challengeId
                         ? ParseChallenge(challenges.GetValueOrDefault(challengeId)?.ConfigurationJson)
                         : null)
@@ -127,7 +128,8 @@ internal static class CtfLeaderboardProjection
             .GroupBy(fact => fact.TeamId)
             .ToDictionary(
                 group => group.Key,
-                group => group.Aggregate(0L, (total, fact) => checked(total + fact.Penalty)));
+                group => group.Aggregate(0L, (total, fact) => checked(
+                    total + fact.Penalty * fact.Multiplicity)));
         var hintCosts = ProjectionPenalties.HintCosts(input, validTeams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, validTeams.Keys);
 
@@ -552,7 +554,10 @@ internal static class KohLeaderboardProjection
                 (total, fact) => checked(total + PointsForObservation(
                     configuration.ControlPointsPerInterval,
                     challengePoints,
-                    fact.CompetitionChallengeId!.Value)));
+                    fact.CompetitionChallengeId!.Value) * fact.Multiplicity));
+            var observationCount = own.Aggregate(
+                0,
+                (total, fact) => checked(total + fact.Multiplicity));
             return new KohRankedEntry(
                 new LeaderboardEntry(
                     0,
@@ -560,10 +565,10 @@ internal static class KohLeaderboardProjection
                     team.Name,
                     checked(observationPoints - hintCosts.GetValueOrDefault(team.Id)
                         + manualAdjustments.GetValueOrDefault(team.Id)),
-                    own.Count,
-                    last == default ? null : last,
+                    observationCount,
+                    last == default ? null : own.Max(fact => fact.LastOccurredAt ?? fact.OccurredAt),
                     team.TrackKey),
-                own.Count,
+                observationCount,
                 own.Select(fact => fact.CompetitionChallengeId!.Value).Distinct().Count(),
                 first == default ? null : first,
                 team.RegisteredAt);
@@ -592,7 +597,7 @@ internal static class KohLeaderboardProjection
                     group.Aggregate(0L, (total, fact) => checked(total + PointsForObservation(
                         configuration.ControlPointsPerInterval,
                         challengePoints,
-                        fact.CompetitionChallengeId!.Value))),
+                        fact.CompetitionChallengeId!.Value) * fact.Multiplicity)),
                     first.OccurredAt,
                     null);
             })
@@ -670,7 +675,7 @@ internal static class ProjectionPenalties
                 group => group.Key,
                 group => group.Aggregate(
                     0L,
-                    (total, fact) => checked(total + ParseDelta(fact.Value))));
+                    (total, fact) => checked(total + ParseDelta(fact.Value) * fact.Multiplicity)));
         var projectedKeys = projectedCells
             .Select(cell => (cell.TeamId, ChallengeId: cell.CompetitionChallengeId))
             .ToHashSet();
@@ -711,7 +716,8 @@ internal static class ProjectionPenalties
             .GroupBy(fact => fact.TeamId!.Value)
             .ToDictionary(
                 group => group.Key,
-                group => group.Aggregate(0L, (total, fact) => checked(total + (fact.HintCost ?? 0))));
+                group => group.Aggregate(0L, (total, fact) => checked(
+                    total + (fact.HintCost ?? 0) * fact.Multiplicity)));
         return submissionHints;
     }
 
@@ -730,7 +736,8 @@ internal static class ProjectionPenalties
             .GroupBy(fact => fact.TeamId!.Value)
             .ToDictionary(
                 group => group.Key,
-                group => group.Aggregate(0L, (total, fact) => checked(total + ParseDelta(fact.Value))));
+                group => group.Aggregate(0L, (total, fact) => checked(
+                    total + ParseDelta(fact.Value) * fact.Multiplicity)));
     }
 
     internal static long ParseDelta(string? value) =>

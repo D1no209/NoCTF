@@ -149,7 +149,8 @@ internal static class AwdpDynamicLeaderboardProjection
                     fact,
                     Effective(
                         competition,
-                        challenges.GetValueOrDefault(fact.CompetitionChallengeId!.Value)?.ConfigurationJson)))));
+                        challenges.GetValueOrDefault(fact.CompetitionChallengeId!.Value)?.ConfigurationJson))
+                    * fact.Multiplicity)));
         var hintCosts = ProjectionPenalties.HintCosts(input, scoringTeams.Keys);
         var manualAdjustments = ProjectionPenalties.ManualAdjustments(input, scoringTeams.Keys);
         var rows = scoringTeams.Values.Select(team =>
@@ -327,7 +328,7 @@ internal static class AwdpDynamicLeaderboardProjection
     private static TimeSpan EffectiveElapsed(
         DateTimeOffset occurredAt,
         IReadOnlyList<NoCTF.Domain.Competitions.CompetitionLifecycleTransition>? lifecycleAudits,
-        DateTimeOffset? start) => lifecycleAudits is not null
+        DateTimeOffset? start) => lifecycleAudits is { Count: > 0 }
         ? AwdEffectiveRunningClock.Calculate(lifecycleAudits, occurredAt)
         : start is { } startedAt
             ? occurredAt - startedAt
