@@ -40,6 +40,7 @@ public sealed record ScoreboardAdjustmentDetailResponse(
 
 public sealed class GetScoreboardAdjustmentDetailEndpoint(
     ILeaderboardCache leaderboard,
+    IScoreboardDetailReader details,
     ICompetitionVisibilityAccess access,
     GetCompetitionTracks getTracks,
     ICompetitionModerationAuthorizer authorizer,
@@ -104,20 +105,19 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
                 title: "Invalid cursor.");
         }
 
-        var allocations = projection.AdjustmentAllocations
-            .Where(item => item.TeamId == request.TeamId
-                && item.OccurredAt <= dataAsOf
-                && (position is null
-                    || item.OccurredAt < position.CreatedAt
-                    || item.OccurredAt == position.CreatedAt && item.Id.CompareTo(position.Id) < 0))
-            .OrderByDescending(item => item.OccurredAt)
-            .ThenByDescending(item => item.Id)
-            .Take(request.Limit + 1)
-            .ToArray();
-        var page = allocations.Take(request.Limit).ToArray();
+        var adjustments = await details.ReadAdjustmentsAsync(new(
+            request.CompetitionId,
+            request.TeamId,
+            dataAsOf,
+            position?.CreatedAt,
+            position?.Id,
+            request.Limit + 1), cancellationToken);
+        var actorIndexesByUserId = projection.DetailActors
+            .ToDictionary(actor => actor.UserId, actor => actor.Index);
+        var page = adjustments.Take(request.Limit).ToArray();
         var actorIndexes = page
-            .Where(item => item.ActorIndex is not null)
-            .Select(item => item.ActorIndex!.Value)
+            .Where(item => item.ActorUserId is Guid actorId && actorIndexesByUserId.ContainsKey(actorId))
+            .Select(item => actorIndexesByUserId[item.ActorUserId!.Value])
             .ToHashSet();
         var actors = projection.DetailActors
             .Where(actor => actorIndexes.Contains(actor.Index))
@@ -129,13 +129,15 @@ public sealed class GetScoreboardAdjustmentDetailEndpoint(
             .ToArray();
         var items = page.Select(item => ScoreboardProtocolMapper.ToResponse(new ScoreboardAdjustment(
             item.Id,
-            item.Kind,
+            ScoreboardAdjustmentKind.ManualAdjustment,
             item.OccurredAt,
-            item.ActorIndex,
-            item.EarnedPoints,
-            item.DeductedPoints,
-            item.NetPoints))).ToArray();
-        var nextCursor = allocations.Length > request.Limit
+            item.ActorUserId is Guid actorId && actorIndexesByUserId.TryGetValue(actorId, out var actorIndex)
+                ? actorIndex
+                : null,
+            Math.Max(0, item.Delta),
+            Math.Max(0, -item.Delta),
+            item.Delta))).ToArray();
+        var nextCursor = adjustments.Count > request.Limit
             ? cursors.Encode(CursorEndpoint, scope, new(page[^1].OccurredAt, page[^1].Id))
             : null;
         return TypedResults.Ok(new ScoreboardAdjustmentDetailResponse(

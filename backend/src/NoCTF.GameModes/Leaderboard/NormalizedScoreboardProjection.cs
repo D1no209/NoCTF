@@ -43,8 +43,7 @@ internal static class NormalizedScoreboardProjection
 
         var roundProjection = BuildRounds(input, legacy, projectedAt);
         var columns = BuildColumns(input.Mode, challenges, roundProjection.Rounds);
-        var schemaRevision = StableRevision(columns.Select(column =>
-            $"{column.Index}|{column.CompetitionChallengeId:N}|{column.RoundId?.ToString("N")}"));
+        var schemaRevision = ScoreboardRevision.ForSchema(roundProjection.Rounds, columns);
         var schema = new ScoreboardSchema(
             input.CompetitionId,
             input.Mode,
@@ -105,15 +104,19 @@ internal static class NormalizedScoreboardProjection
         var adjustmentAllocations = new List<ScoreboardAdjustmentAllocation>();
         foreach (var team in input.Teams)
         {
-            var slots = slotsByTeam.GetValueOrDefault(team.Id, [])
-                .Select(slot => slot.Build(ScoreState(input, slot.Round)))
-                .Where(slot => slot.EntryCount > 0 || slot.NetPoints.GetValueOrDefault() != 0)
+            var builtSlots = slotsByTeam.GetValueOrDefault(team.Id, [])
+                .Select(accumulator => new
+                {
+                    Accumulator = accumulator,
+                    Slot = accumulator.Build(ScoreState(input, accumulator.Round))
+                })
+                .Where(item => item.Slot.EntryCount > 0 || item.Slot.NetPoints.GetValueOrDefault() != 0)
                 .ToArray();
-            entryAllocations.AddRange(slots.SelectMany(slot => slot.Entries.Select(entry =>
-                new ScoreboardEntryAllocation(team.Id, slot.ColumnIndex, entry))));
-            var compactSlots = slots.Select(slot => slot with
+            entryAllocations.AddRange(builtSlots.SelectMany(item =>
+                item.Accumulator.Allocate(team.Id, item.Slot)));
+            var compactSlots = builtSlots.Select(item => item.Slot with
             {
-                Entries = CompactEntries(slot.Entries)
+                Entries = CompactEntries(item.Slot.Entries)
             }).ToArray();
             var slotNet = compactSlots.Aggregate(0L, (total, slot) =>
                 checked(total + slot.NetPoints.GetValueOrDefault()));
@@ -131,6 +134,11 @@ internal static class NormalizedScoreboardProjection
                     adjustment.NetPoints)));
             var totalScore = allGlobalAdjustments.Aggregate(slotNet, (total, adjustment) =>
                 checked(total + adjustment.NetPoints));
+            var globalAdjustmentCount = input.GameplayFacts
+                .Where(fact => fact.TeamId == team.Id
+                    && fact.Kind == GameplayFactKind.ManualAdjustment
+                    && fact.Result == GameplayFactResult.Applied)
+                .Aggregate(0, (total, fact) => checked(total + fact.Multiplicity));
             rows.Add(new ScoreboardTeam(
                 team.Id,
                 team.Name,
@@ -142,7 +150,7 @@ internal static class NormalizedScoreboardProjection
                         ? ScoreboardRankingState.Disqualified
                         : ScoreboardRankingState.Eligible,
                 totalScore,
-                allGlobalAdjustments.Count,
+                globalAdjustmentCount,
                 CompactAdjustments(allGlobalAdjustments),
                 compactSlots));
         }
@@ -392,7 +400,10 @@ internal static class NormalizedScoreboardProjection
                                 deduction,
                                 award,
                                 awardPoints,
-                                Math.Max(0, earned - awardPoints));
+                                Math.Max(0, earned - awardPoints),
+                                deductedPointsPerOccurrence: fact.Result == GameplayFactResult.Wrong
+                                    ? wrongPenalty
+                                    : 0);
                             if (awardPoints > 0)
                                 slot.AddBreakdownScore(ScoreboardBreakdownKind.BloodAward, awardPoints, 0);
                             break;
@@ -406,6 +417,9 @@ internal static class NormalizedScoreboardProjection
                             0,
                             fact.Result == GameplayFactResult.Unlocked
                                 ? checked(fact.HintCost.GetValueOrDefault() * fact.Multiplicity)
+                                : 0,
+                            deductedPointsPerOccurrence: fact.Result == GameplayFactResult.Unlocked
+                                ? fact.HintCost.GetValueOrDefault()
                                 : 0);
                         break;
                 }
@@ -691,7 +705,16 @@ internal static class NormalizedScoreboardProjection
                     fact.TeamId!.Value,
                     columns[(fact.CompetitionChallengeId.Value, round.Id)],
                     round)
-                .AddFact(fact, kind, breakdown, actorIndexes, 0, penalty);
+                .AddFact(
+                    fact,
+                    kind,
+                    breakdown,
+                    actorIndexes,
+                    0,
+                    penalty,
+                    deductedPointsPerOccurrence: fact.Multiplicity > 0
+                        ? penalty / fact.Multiplicity
+                        : 0);
         }
     }
 
@@ -976,6 +999,7 @@ internal static class NormalizedScoreboardProjection
     {
         private readonly Dictionary<ScoreboardBreakdownKind, BreakdownAccumulator> breakdowns = [];
         private readonly List<ScoreboardSlotEntry> entries = [];
+        private readonly Dictionary<Guid, ScoreboardEntrySource> sources = [];
 
         private int entryCount;
 
@@ -998,7 +1022,9 @@ internal static class NormalizedScoreboardProjection
             long deducted,
             ScoreboardAward? award = null,
             long awardPoints = 0,
-            long? breakdownEarned = null)
+            long? breakdownEarned = null,
+            long? earnedPointsPerOccurrence = null,
+            long? deductedPointsPerOccurrence = null)
         {
             var outcome = EntryOutcome(fact);
             entryCount = checked(entryCount + fact.Multiplicity);
@@ -1019,6 +1045,18 @@ internal static class NormalizedScoreboardProjection
                 checked(earned - deducted),
                 award,
                 awardPoints));
+            sources.Add(fact.GameplayFactId, new(
+                fact.Kind,
+                fact.State,
+                fact.Result,
+                fact.FailureCode,
+                fact.ReferenceKind,
+                fact.ReferenceId,
+                fact.VictimTeamId,
+                fact.ActorUserId,
+                fact.Multiplicity,
+                earnedPointsPerOccurrence,
+                deductedPointsPerOccurrence));
         }
 
         public void AddSystemAttempt(
@@ -1096,6 +1134,12 @@ internal static class NormalizedScoreboardProjection
             }
             return breakdown;
         }
+
+        public IReadOnlyList<ScoreboardEntryAllocation> Allocate(Guid teamId, ScoreboardSlot slot) =>
+            slot.Entries.Select(entry => new ScoreboardEntryAllocation(teamId, columnIndex, entry)
+            {
+                Source = sources.GetValueOrDefault(entry.Id)
+            }).ToArray();
 
         public ScoreboardSlot Build(ScoreboardScoreState state)
         {

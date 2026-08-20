@@ -239,8 +239,7 @@ internal static class ScoreboardAudienceProjection
         var catalogRevision = StableRevision(challenges.Select(challenge =>
             $"{challenge.CompetitionChallengeId:N}|{challenge.Revision}|{challenge.Order}"));
         var mappedColumns = columns.Select((column, index) => column with { Index = index }).ToArray();
-        var schemaRevision = StableRevision(mappedColumns.Select(column =>
-            $"{column.Index}|{column.CompetitionChallengeId:N}|{column.RoundId?.ToString("N")}"));
+        var schemaRevision = ScoreboardRevision.ForSchema(projection.Schema.Rounds, mappedColumns);
         var visibleTeams = projection.Snapshot.Teams.Select(team => team with
         {
             Slots = team.Slots

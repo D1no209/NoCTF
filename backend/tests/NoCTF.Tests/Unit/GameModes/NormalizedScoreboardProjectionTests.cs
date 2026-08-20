@@ -173,6 +173,62 @@ public sealed class NormalizedScoreboardProjectionTests
     }
 
     [Test]
+    public async Task Schema_revision_changes_when_round_metadata_changes_without_changing_columns()
+    {
+        var competitionId = Guid.NewGuid();
+        var challenge = Challenge(1, "Pwn", "{\"schemaVersion\":4}");
+        var team = Team(1, "Alpha");
+        var roundId = Guid.NewGuid();
+        var round = new LeaderboardAwdRoundFact(
+            challenge.Id,
+            team.Id,
+            roundId,
+            Start,
+            Start.AddSeconds(60));
+        var before = engine.ProjectScoreboard(new(
+            competitionId,
+            GameMode.Awd,
+            [team],
+            [],
+            [challenge],
+            JsonSerializer.Serialize(AwdConfiguration.Default, JsonOptions),
+            Start,
+            AwdRounds: [round],
+            ProjectedAt: Start.AddSeconds(59),
+            CompetitionStatus: CompetitionStatus.Running));
+        var after = engine.ProjectScoreboard(new(
+            competitionId,
+            GameMode.Awd,
+            [team],
+            [],
+            [challenge],
+            JsonSerializer.Serialize(AwdConfiguration.Default, JsonOptions),
+            Start,
+            AwdRounds: [round],
+            ProjectedAt: Start.AddSeconds(61),
+            CompetitionStatus: CompetitionStatus.Running));
+
+        await Assert.That(before.Schema.Columns).IsEquivalentTo(after.Schema.Columns);
+        await Assert.That(before.Schema.Rounds.Single().State)
+            .IsEqualTo(ScoreboardRoundState.Running);
+        await Assert.That(after.Schema.Rounds.Single().State)
+            .IsEqualTo(ScoreboardRoundState.Settled);
+        await Assert.That(before.Schema.Revision).IsNotEqualTo(after.Schema.Revision);
+        await Assert.That(engine.ProjectScoreboard(new(
+                competitionId,
+                GameMode.Awd,
+                [team],
+                [],
+                [challenge],
+                JsonSerializer.Serialize(AwdConfiguration.Default, JsonOptions),
+                Start,
+                AwdRounds: [round],
+                ProjectedAt: Start.AddSeconds(61),
+                CompetitionStatus: CompetitionStatus.Running)).Schema.Revision)
+            .IsEqualTo(after.Schema.Revision);
+    }
+
+    [Test]
     public async Task Koh_projects_control_without_round_axis()
     {
         var challenge = Challenge(1, "Misc", "{\"schemaVersion\":1}");
@@ -262,6 +318,55 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(projection.EntryAllocations.Count).IsEqualTo(12);
         await Assert.That(projection.EntryAllocations.All(entry => entry.Entry.NetPoints == -1)).IsTrue();
         await Assert.That(row.TotalScore).IsEqualTo(0L);
+    }
+
+    [Test]
+    public async Task Grouped_fact_multiplicity_is_preserved_in_counts_and_detail_sources()
+    {
+        var team = Team(1, "Alpha");
+        var challenge = Challenge(1, "Web");
+        var hint = Fact(
+            team.Id,
+            challenge.Id,
+            GameplayFactKind.HintUnlock,
+            1,
+            GameplayFactResult.Unlocked,
+            hintCost: 2) with
+        {
+            Multiplicity = 10,
+            LastOccurredAt = Start.AddSeconds(10)
+        };
+        var adjustment = Fact(
+            team.Id,
+            challenge.Id,
+            GameplayFactKind.ManualAdjustment,
+            20,
+            GameplayFactResult.Applied,
+            value: "3") with
+        {
+            Multiplicity = 7,
+            LastOccurredAt = Start.AddSeconds(26)
+        };
+
+        var projection = engine.ProjectScoreboard(new(
+            Guid.NewGuid(),
+            GameMode.Ctf,
+            [team],
+            [hint, adjustment],
+            [challenge],
+            ProjectedAt: Start.AddMinutes(1),
+            CompetitionStatus: CompetitionStatus.Running));
+        var row = projection.Snapshot.Teams.Single();
+        var slot = row.Slots.Single();
+        var source = projection.EntryAllocations.Single().Source;
+
+        await Assert.That(slot.EntryCount).IsEqualTo(10);
+        await Assert.That(slot.DeductedPoints).IsEqualTo(20);
+        await Assert.That(source).IsNotNull();
+        await Assert.That(source!.Multiplicity).IsEqualTo(10);
+        await Assert.That(source.DeductedPointsPerOccurrence).IsEqualTo(2);
+        await Assert.That(row.GlobalAdjustmentCount).IsEqualTo(7);
+        await Assert.That(row.TotalScore).IsEqualTo(1);
     }
 
     [Test]

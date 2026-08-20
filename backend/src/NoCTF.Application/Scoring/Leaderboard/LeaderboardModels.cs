@@ -1,4 +1,5 @@
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Scoring.Leaderboard;
 
@@ -196,7 +197,27 @@ public sealed record ScoreboardSlotEntry(
 public sealed record ScoreboardEntryAllocation(
     Guid TeamId,
     int ColumnIndex,
-    ScoreboardSlotEntry Entry);
+    ScoreboardSlotEntry Entry)
+{
+    /// <summary>
+    /// Identifies the bounded PostgreSQL fact group represented by this allocation.
+    /// A null source denotes a synthetic settlement/system entry.
+    /// </summary>
+    public ScoreboardEntrySource? Source { get; init; }
+}
+
+public sealed record ScoreboardEntrySource(
+    GameplayFactKind Kind,
+    GameplayFactState State,
+    GameplayFactResult? Result,
+    GameplayFactFailureCode? FailureCode,
+    GameplayFactReferenceKind? ReferenceKind,
+    Guid? ReferenceId,
+    Guid? VictimTeamId,
+    Guid? ActorUserId,
+    int Multiplicity,
+    long? EarnedPointsPerOccurrence,
+    long? DeductedPointsPerOccurrence);
 
 public sealed record ScoreboardAdjustment(
     Guid Id,
