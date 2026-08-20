@@ -1,5 +1,15 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-21 alpha.64 排行榜权威状态与暂停轮次修复
+
+- `3cbcdb8f` 修复公开 CTF/AWDP 中控对封禁、失格队伍伪造名次的问题。前端现在只展示后端投影返回的权威 `rank`；无名次队伍显示 `—` 和强类型排名状态，不再用数组位置生成排名或趋势。
+- 同一提交修复工作人员排行榜错误隐藏内部/隐藏赛道的问题。平台管理员以及比赛 Owner、Manager、Judge、Observer 可以切换后端已经授权返回的全部赛道；普通参赛者仍只看到本人赛道与公开非内部赛道，没有扩大 API 数据范围。
+- AWDP 在暂停期间不再继续推进当前轮倒计时。投影把暂停时冻结的剩余秒数映射为相对于快照生成时刻的未来结束边界；前端以 `GeneratedAt` 作为冻结参考点，避免结束时间早于开始时间或页面计时继续归零。
+- 文档已统一为 AWDP schema v4，并明确 15 秒维护任务以 500 场为单批、按 Competition UUID keyset 遍历全部 Running AWDP 比赛，不再表述为只检查前 500 场。
+- `53dda317` 将版本从 `0.1.0-alpha.63` 递增到 `0.1.0-alpha.64`。本阶段没有新增业务表、字段、EF migration、HTTP/OpenAPI 或 TypeScript SDK 变化。
+- 验证：Release solution build 0 warning/0 error；完整非 Integration TUnit 853/853；完整 Integration 188 项中 185 通过、2 项因未配置真实 Kubernetes/Libvirt 环境按设计跳过，唯一 Wolverine 双节点维护代理故障转移用例发生 30 秒时序超时，随后隔离复跑 1/1 通过；标准化投影定向 11/11；前端 `bun test` 242/242（1790 assertions）、typecheck、production build；变更 C# whitespace 与 `git diff --check` 均通过。仓库没有 lint script，未将 lint 误报为已执行。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`，未覆盖主工作区修改；未推送、未部署、未操作生产数据。
+
 ## 2026-08-21 alpha.63 排行榜批次遍历与隐藏赛道修复
 
 - `af42683a` 修复 AWDP 轮次维护只取固定前 500 场比赛的问题。Worker 现在按 Competition UUID 稳定排序并使用 keyset 游标逐批读取，每批最多 500 场但会持续遍历至结果集末尾；无效配置只会跳过当前比赛，不再使第 501 场及后续比赛永久无法触发结算重投影。真实 PostgreSQL 回归一次创建 501 场 Running AWDP 比赛，并确认 501 场全部派发 `ProjectLeaderboard`。
