@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-21 alpha.63 排行榜批次遍历与隐藏赛道修复
+
+- `af42683a` 修复 AWDP 轮次维护只取固定前 500 场比赛的问题。Worker 现在按 Competition UUID 稳定排序并使用 keyset 游标逐批读取，每批最多 500 场但会持续遍历至结果集末尾；无效配置只会跳过当前比赛，不再使第 501 场及后续比赛永久无法触发结算重投影。真实 PostgreSQL 回归一次创建 501 场 Running AWDP 比赛，并确认 501 场全部派发 `ProjectLeaderboard`。
+- 同一提交补齐参赛者隐藏/内部赛道的响应语义。后端只在当前调用者自己的赛道上返回强类型 `isViewerTrack`，仍裁剪其他隐藏赛道及队伍；前端将本人赛道纳入可选项并优先作为默认赛道，公开赛道行为不变。OpenAPI 由工具导出，TypeScript SDK 由 `bun run api:gen` 重新生成，未手写 URL、DTO、枚举或生成文件。
+- `6190abb3` 将版本从 `0.1.0-alpha.62` 递增到 `0.1.0-alpha.63`。没有新增业务表、字段、EF migration 或 snapshot；EF `migrations has-pending-model-changes` 确认无模型漂移。
+- OpenAPI 两份制品 SHA-256 均为 `E043CEA4BF617E61B7F69081B0AA4EF024B1805564D3B793DDFCFC16420D88C7`，`types.gen.ts` 为 `EA2FF56C811564CAC8260F407576188CA819BBEED6932EAEC5F72378FF0B4E13`；连续第二轮导出与生成哈希不变。
+- 验证：Release solution build 0 warning/0 error；完整非 Integration TUnit 852/852；完整 Integration 188 项中 186 通过、0 失败，2 项仅因未配置真实 Kubernetes/Libvirt 环境按设计跳过；真实 PostgreSQL 排行榜投影类 3/3；排行榜 Endpoint 16/16、标准化投影 10/10、OpenAPI 5/5；前端 `bun test` 241/241（1783 assertions）、typecheck、production build；变更 C# 文件格式、EF drift 与 `git diff --check` 均通过。全仓 whitespace 检查仍报告未触碰文件的既有格式偏差；仓库没有 lint script，均未误报为通过。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`，未覆盖主工作区修改；未推送、未部署、未操作生产数据。
+
 ## 2026-08-20 alpha.62 统一排行榜最终审计修复
 
 - `fe47240e` 修复排行榜缓存仍暗中保留无界明细历史的问题。`ScoreboardProjection` 现在只保留主快照已经压缩到每个 Slot 最多 5 条的内部 Entry allocation，并移除全部人工调分历史 allocation；完整 Slot 与人工调分历史只在签名游标详情请求时，从 PostgreSQL 按页读取。内部 Actor 目录也只保留主快照实际引用的 Actor，不再随整场提交者数量无界增长。
