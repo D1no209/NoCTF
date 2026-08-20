@@ -12,7 +12,13 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
 import { medalRankClass } from '~/components/leaderboard/types'
-import { scoreboardBreakdown, scoreboardSlot } from '~/utils/scoreboard'
+import {
+  scoreboardBreakdown,
+  scoreboardEntryKindLabel,
+  scoreboardEntryOutcomeLabel,
+  scoreboardRankingStateLabel,
+  scoreboardSlot,
+} from '~/utils/scoreboard'
 
 const route = useRoute()
 const competitionId = route.params.id as string
@@ -320,7 +326,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
               <TableBody>
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(team.rank ?? 99) <= 3 ? 'bg-primary/5' : ''">
                   <TableCell><Medal v-if="(team.rank ?? 99) <= 3" class="size-5" :class="medalRankClass[team.rank ?? 0]" /><span v-else class="font-mono tabular-nums">{{ team.rank ?? '—' }}</span></TableCell>
-                  <TableCell class="sticky left-0 z-10 border-r bg-card"><span class="font-medium">{{ team.teamName }}</span><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="ml-2">{{ team.rankingState }}</Badge></TableCell>
+                  <TableCell class="sticky left-0 z-10 border-r bg-card"><span class="font-medium">{{ team.teamName }}</span><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="ml-2">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></TableCell>
                   <TableCell class="text-right">
                     <button v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>
@@ -353,7 +359,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
         <div v-if="detailLoading" class="flex items-center justify-center py-10"><Spinner /></div>
         <template v-else-if="detail">
           <div class="grid grid-cols-3 gap-3"><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('状态') }}</p><p class="mt-1 font-medium">{{ slotTitle(detail) }}</p></div><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('得分') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.earnedPoints ?? '—' }}</p></div><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('净分') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.netPoints ?? '—' }}</p></div></div>
-          <div class="flex flex-col gap-2"><div v-for="entry in detailEntries" :key="entry.id" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ entry.kind }} · {{ entry.outcome }}</p><p class="text-xs text-muted-foreground">{{ entryActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono tabular-nums">{{ entry.netPoints ?? '—' }}<template v-if="entry.netPoints !== null && entry.netPoints !== undefined"> pts</template></span></div><p v-if="!detailEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('暂无明细') }}</p></div>
+          <div class="flex flex-col gap-2"><div v-for="entry in detailEntries" :key="entry.id" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ scoreboardEntryKindLabel(entry.kind) }} · {{ scoreboardEntryOutcomeLabel(entry.outcome) }}</p><p class="text-xs text-muted-foreground">{{ entryActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono tabular-nums">{{ entry.netPoints ?? '—' }}<template v-if="entry.netPoints !== null && entry.netPoints !== undefined"> pts</template></span></div><p v-if="!detailEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('暂无明细') }}</p></div>
           <Button v-if="detail.nextCursor" variant="outline" :disabled="detailLoadingMore" @click="loadDetailPage(detail.nextCursor ?? null, true)"><Spinner v-if="detailLoadingMore" />{{ $t('加载更多') }}</Button>
         </template>
       </DialogScrollContent>

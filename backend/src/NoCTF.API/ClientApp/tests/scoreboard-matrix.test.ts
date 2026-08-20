@@ -7,6 +7,9 @@ import {
   latestSettledScore,
   scoreboardBreakdown,
   scoreboardColumnsForChallenge,
+  scoreboardEntryKindLabel,
+  scoreboardEntryOutcomeLabel,
+  scoreboardRankingStateLabel,
   scoreboardSlot,
   scoreboardTeamSolveCount,
 } from '../app/utils/scoreboard'
@@ -145,5 +148,19 @@ describe('normalized scoreboard matrix', () => {
     expect(leaderboardPage).toContain('actorNames.set(entry.id, displayName)')
     expect(leaderboardPage).toContain('detailActorNames.value.get(entry.id)')
     expect(leaderboardPage).not.toContain('board.actorsByIndex.value.get(entry.actorIndex)')
+  })
+
+  test('renders generated scoreboard protocol values through localized labels', () => {
+    expect(scoreboardRankingStateLabel('Banned')).toBe('已封禁')
+    expect(scoreboardRankingStateLabel('Disqualified')).toBe('已取消资格')
+    expect(scoreboardEntryKindLabel('Attack')).toBe('攻击')
+    expect(scoreboardEntryKindLabel('ManualAdjustment')).toBe('人工调分')
+    expect(scoreboardEntryOutcomeLabel('Succeeded')).toBe('成功')
+    expect(scoreboardEntryOutcomeLabel('Rejected')).toBe('已拒绝')
+    expect(leaderboardPage).toContain('scoreboardRankingStateLabel(team.rankingState)')
+    expect(leaderboardPage).toContain('scoreboardEntryKindLabel(entry.kind)')
+    expect(leaderboardPage).toContain('scoreboardEntryOutcomeLabel(entry.outcome)')
+    expect(leaderboardPage).not.toContain('{{ team.rankingState }}')
+    expect(leaderboardPage).not.toContain('{{ entry.kind }} · {{ entry.outcome }}')
   })
 })
