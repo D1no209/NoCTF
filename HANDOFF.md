@@ -1,5 +1,16 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-21 alpha.66 记分板投影标识与历史窗口一致性修复
+
+- `436b0ad3` 修复记分板协议标识在 JavaScript 中丢失精度的问题。内部仍以 `long` 保存 Snapshot version、Schema revision 与题目目录 revision；HTTP、SignalR 和 Redis 外部边界统一输出不变区域十进制字符串，前端只做精确字符串比较，不再将 64 位值转换为 IEEE-754 `number`。OpenAPI 与 TypeScript SDK 均由工具重新生成，没有手改生成文件。
+- 同一提交修复 AWDP 历史轮次窗口跨多次查询可能读取到混合数据库状态的问题。历史窗口现在在 PostgreSQL `RepeatableRead` 快照中完成；生命周期事件严格裁剪到 `projectedAt`，因此截止时间之后的 Finished 等状态不会污染此前窗口，也不会把仍在进行的历史轮次提前标记为已结算。
+- 前端历史轮次选择现在区分真实请求失败、投影处理中、版本一致性重试和已被新请求取代四种结果。只有真实失败才回退到上一窗口；202 或目录/Schema/Snapshot 暂时不一致时保留用户选择并继续请求该窗口，不再静默跳回旧轮次。
+- `a50588dd` 将 Nuxt/PostCSS 的传递依赖 `nanoid` 从存在高危公告的 `3.3.17` 兼容锁定到修复版本 `3.3.18`；`bun audit` 返回 0 漏洞，没有升级 Nuxt/PostCSS 或改变产品运行时依赖边界。
+- `fe16b2a0` 将版本从 `0.1.0-alpha.65` 递增到 `0.1.0-alpha.66`。本阶段没有新增业务表、字段、EF migration 或 snapshot；EF `has-pending-model-changes` 确认无模型漂移。
+- 两份 OpenAPI 连续第二轮导出后 SHA-256 均保持 `3C5EA333AB2B4B1C1ECCB5C484D72EF39E3B5F524492F7691BCCE0639182CA80`；生成的 `types.gen.ts` SHA-256 保持 `F87A095B28D699E67676AD57669E00E314A1D5BCCD889B15630AA6EDED0DCCF2`，证明导出与 SDK 生成幂等。
+- 验证：Release solution build 0 warning/0 error；后端完整 TUnit 1046 项中 1044 通过、0 失败，2 项仅因未配置真实 Kubernetes/Libvirt 环境按设计跳过；排行榜 API 17/17、OpenAPI 5/5、真实 PostgreSQL 投影 4/4；前端 `bun test` 244/244（1806 assertions）、typecheck、production build、`bun audit`；C# analyzers、EF model drift 与 `git diff --check` 全部通过。前端构建只保留既有大 chunk、plugin timing 与第三方 Node exports deprecation 警告。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`。没有重新执行四模式 Full E2E，未将旧结果冒充为本轮验证；未推送、未部署、未操作生产数据，也没有切换或同步本地 `main`，等待用户下一步指令。
+
 ## 2026-08-21 alpha.65 AWDP 长赛轮次窗口与排行榜一致性修复
 
 - `f3a77951` 将 AWDP 主排行榜矩阵约束为最多 50 个连续轮次，并提供按 `endingRound` 向前、向后及返回最新轮次的历史窗口导航。全赛历史仍用于权威累计总分；历史窗口只读取自身 `[startAt, endAt)` 内的 Break/Fix 事实，后续轮次提交不会污染旧窗口，人工调分始终从全历史只计一次，不会因窗口查询重复累加。
