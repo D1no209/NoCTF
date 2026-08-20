@@ -34,6 +34,73 @@ public sealed class LeaderboardProjectionPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Awdp_round_refresh_traverses_every_running_competition(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awdp_round_refresh")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+            var owner = CreateUser(now);
+            var configuration = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp);
+            var competitions = Enumerable.Range(0, 501)
+                .Select(index => new Competition
+                {
+                    Id = Guid.CreateVersion7(now.AddTicks(index + 1)),
+                    Title = $"AWDP round refresh {index}",
+                    OwnerId = owner.Id,
+                    Mode = GameMode.Awdp,
+                    ConfigurationJson = configuration,
+                    ConfigurationRevision = 1,
+                    ConfigurationUpdatedAt = now,
+                    TrackConfigurationUpdatedAt = now,
+                    FlagDerivationSecret = new byte[32],
+                    StartAt = now.AddHours(-1),
+                    EndAt = now.AddHours(1),
+                    RunningSince = now.AddHours(-1),
+                    Status = CompetitionStatus.Running,
+                    LeaderboardDirty = false,
+                    MaxConcurrentRuntimeInstancesPerTeam = 1,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                })
+                .ToArray();
+            db.Users.Add(owner);
+            db.Competitions.AddRange(competitions);
+            await db.SaveChangesAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+
+            var outbox = new RecordingOutbox();
+            var cache = Substitute.For<ILeaderboardCache>();
+            cache.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+                .Returns(Task.FromResult<LeaderboardResponse?>(null));
+
+            await BackendMessageHandlers.Handle(
+                new RefreshDirtyLeaderboards(now),
+                db,
+                outbox,
+                cache,
+                cancellationToken);
+
+            await Assert.That(outbox.ProjectLeaderboardMessages.Select(message => message.CompetitionId))
+                .IsEquivalentTo(competitions.Select(competition => competition.Id));
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Awdp_ban_and_unban_reproject_the_authoritative_cache(
         CancellationToken cancellationToken)
     {

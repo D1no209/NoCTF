@@ -74,6 +74,7 @@ describe('competition track pages', () => {
     expect(overview).not.toContain('createTrackKey.value = selectableTracks.value.find')
     expect(leaderboard).toContain("all.filter(team => team.trackKey === selectedTrackKey.value)")
     expect(leaderboard).toContain('availableTracks.length > 1')
-    expect(leaderboard).toContain('track.isInternal')
+    expect(leaderboard).toContain('track.isViewerTrack || (track.visibleOnLeaderboard && !track.isInternal)')
+    expect(leaderboard).toContain('tracks.find(track => track.isViewerTrack)?.key')
   })
 })

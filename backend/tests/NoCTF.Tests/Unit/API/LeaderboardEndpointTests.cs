@@ -719,6 +719,56 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
+    public async Task Participant_snapshot_marks_and_includes_only_the_viewers_hidden_track()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var publicTeamId = Guid.CreateVersion7();
+        var viewerTeamId = Guid.CreateVersion7();
+        var otherHiddenTeamId = Guid.CreateVersion7();
+        var projection = CreateProjection(
+            competitionId,
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(0, challengeId, null)],
+            [
+                new(publicTeamId, "Public", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], []),
+                new(viewerTeamId, "Viewer", "hidden", null, ScoreboardRankingState.Disqualified, 1, 0, [], []),
+                new(otherHiddenTeamId, "Other hidden", "other", null, ScoreboardRankingState.Disqualified, 1, 0, [], [])
+            ]);
+        projection = projection with
+        {
+            Snapshot = projection.Snapshot with
+            {
+                Tracks =
+                [
+                    new("default", "Default", false, true),
+                    new("hidden", "Hidden", true, false),
+                    new("other", "Other", true, false)
+                ]
+            }
+        };
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(projection: projection),
+            new RecordingMessagePublisher(),
+            trackStore: new ViewerHiddenTrackStore(competitionId, viewerTeamId));
+
+        using var response = await app.GetTestClient().GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var snapshot = await response.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(snapshot!.Teams.Select(team => team.TeamId))
+            .IsEquivalentTo([publicTeamId, viewerTeamId]);
+        await Assert.That(snapshot.Tracks.Select(track => track.Key))
+            .IsEquivalentTo(["default", "hidden"]);
+        await Assert.That(snapshot.Tracks.Single(track => track.Key == "default").IsViewerTrack)
+            .IsFalse();
+        await Assert.That(snapshot.Tracks.Single(track => track.Key == "hidden").IsViewerTrack)
+            .IsTrue();
+    }
+
+    [Test]
     public async Task Slot_detail_cursor_is_invalidated_when_frozen_snapshot_identity_changes()
     {
         var competitionId = Guid.CreateVersion7();
@@ -1057,6 +1107,38 @@ public sealed class LeaderboardEndpointTests
                         new("default", "Default", true, true, false, true, true, true, true, true),
                         new("staff", "Staff", false, false, true, false, false, false, false, false)
                     ])
+                : null);
+
+        public Task<NoCTF.Application.Common.OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+            UpdateCompetitionTracksCommand command,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<NoCTF.Application.Common.OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode>> AssignAsync(
+            AssignTeamTrackCommand command,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
+    private sealed class ViewerHiddenTrackStore(Guid competitionId, Guid viewerTeamId)
+        : ICompetitionTrackStore
+    {
+        public Task<CompetitionTracksView?> GetAsync(
+            Guid requestedCompetitionId,
+            Guid? viewerUserId,
+            bool includeInternal,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<CompetitionTracksView?>(requestedCompetitionId == competitionId
+                ? new CompetitionTracksView(
+                    competitionId,
+                    GameMode.Ctf,
+                    CompetitionStatus.Running,
+                    1,
+                    false,
+                    [
+                        new("default", "Default", true, true, false, true, true, true, true, true),
+                        new("hidden", "Hidden", false, false, true, true, true, true, false, true, true),
+                        new("other", "Other", false, false, true, true, true, true, false, true)
+                    ],
+                    viewerTeamId)
                 : null);
 
         public Task<NoCTF.Application.Common.OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(

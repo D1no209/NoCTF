@@ -477,15 +477,41 @@ public static class BackendMessageHandlers
         ILeaderboardCache leaderboard,
         CancellationToken cancellationToken)
     {
-        var competitions = await db.Competitions
-            .Where(competition => competition.Mode == GameMode.Awdp
-                && competition.Status == CompetitionStatus.Running
-                && competition.DeletedAt == null)
-            .OrderBy(competition => competition.Id)
-            .Take(500)
-            .ToListAsync(cancellationToken);
-        if (competitions.Count == 0)
-            return;
+        Guid? afterCompetitionId = null;
+        while (true)
+        {
+            var competitions = await db.Competitions
+                .Where(competition => competition.Mode == GameMode.Awdp
+                    && competition.Status == CompetitionStatus.Running
+                    && competition.DeletedAt == null
+                    && (afterCompetitionId == null
+                        || competition.Id.CompareTo(afterCompetitionId.Value) > 0))
+                .OrderBy(competition => competition.Id)
+                .Take(500)
+                .ToListAsync(cancellationToken);
+            if (competitions.Count == 0)
+                return;
+            afterCompetitionId = competitions[^1].Id;
+            await MarkDueAwdpLeaderboardBatchAsync(
+                competitions,
+                now,
+                db,
+                leaderboard,
+                cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            db.ChangeTracker.Clear();
+            if (competitions.Count < 500)
+                return;
+        }
+    }
+
+    private static async Task MarkDueAwdpLeaderboardBatchAsync(
+        IReadOnlyList<Competition> competitions,
+        DateTimeOffset now,
+        NoCtfDbContext db,
+        ILeaderboardCache leaderboard,
+        CancellationToken cancellationToken)
+    {
         var continuous = competitions
             .Select(competition => new
             {
@@ -561,7 +587,6 @@ public static class BackendMessageHandlers
             if (currentRound > projectedRound)
                 item.Competition.LeaderboardDirty = true;
         }
-        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static int LogicalAwdpRound(

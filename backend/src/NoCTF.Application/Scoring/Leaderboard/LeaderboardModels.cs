@@ -253,7 +253,8 @@ public sealed record ScoreboardTrack(
     string Key,
     string Name,
     bool IsInternal,
-    bool VisibleOnLeaderboard);
+    bool VisibleOnLeaderboard,
+    bool IsViewerTrack = false);
 
 public sealed record ScoreboardSnapshot(
     Guid CompetitionId,
