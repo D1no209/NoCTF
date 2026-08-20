@@ -541,6 +541,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTrackResponse = {
     name?: string;
     isInternal?: boolean;
     visibleOnLeaderboard?: boolean;
+    isViewerTrack?: boolean;
 };
 
 export type NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol = 'Live' | 'Frozen' | 'Hidden';

@@ -28,7 +28,7 @@ const board = useScoreboardMatrix(competitionId)
 const selectedTrackKey = ref('')
 const visibleTeamCount = ref(50)
 const availableTracks = computed(() => (board.snapshot.value?.tracks ?? [])
-  .filter(track => track.visibleOnLeaderboard && !track.isInternal))
+  .filter(track => track.isViewerTrack || (track.visibleOnLeaderboard && !track.isInternal)))
 
 watch(availableTracks, (tracks) => {
   if (!tracks.length) {
@@ -36,7 +36,7 @@ watch(availableTracks, (tracks) => {
     return
   }
   if (!tracks.some(track => track.key === selectedTrackKey.value))
-    selectedTrackKey.value = tracks[0]?.key ?? ''
+    selectedTrackKey.value = tracks.find(track => track.isViewerTrack)?.key ?? tracks[0]?.key ?? ''
 }, { immediate: true })
 
 const teams = computed(() => {

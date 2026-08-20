@@ -109,7 +109,8 @@ public sealed record ScoreboardTrackResponse(
     string Key,
     string Name,
     bool IsInternal,
-    bool VisibleOnLeaderboard);
+    bool VisibleOnLeaderboard,
+    bool IsViewerTrack);
 
 public sealed record ScoreboardSnapshotResponse(
     Guid CompetitionId,
@@ -144,7 +145,8 @@ internal static class ScoreboardProtocolMapper
         value.Teams.Select(ToResponse).ToArray())
     {
         Tracks = value.Tracks.Select(track => new ScoreboardTrackResponse(
-            track.Key, track.Name, track.IsInternal, track.VisibleOnLeaderboard)).ToArray(),
+            track.Key, track.Name, track.IsInternal, track.VisibleOnLeaderboard,
+            track.IsViewerTrack)).ToArray(),
         Visibility = CompetitionProtocolMapper.ToProtocol(value.Visibility),
         DataScope = ToProtocol(value.DataScope),
         DataAsOf = value.DataAsOf
@@ -368,6 +370,10 @@ internal static class ScoreboardAudienceProjection
                 }).ToArray(),
                 Tracks = projection.Snapshot.Tracks
                     .Where(track => visibleKeys.Contains(track.Key) || viewerKeys.Contains(track.Key))
+                    .Select(track => track with
+                    {
+                        IsViewerTrack = viewerKeys.Contains(track.Key)
+                    })
                     .ToArray()
             },
             EntryAllocations = projection.EntryAllocations

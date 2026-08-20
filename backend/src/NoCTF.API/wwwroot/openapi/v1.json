@@ -15128,6 +15128,9 @@
           },
           "visibleOnLeaderboard": {
             "type": "boolean"
+          },
+          "isViewerTrack": {
+            "type": "boolean"
           }
         }
       },
