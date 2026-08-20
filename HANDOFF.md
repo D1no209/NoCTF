@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-20 alpha.62 统一排行榜分页明细完整性修复
+
+- `1a00d069` 修复数据库聚合投影与分页详情的数量边界。原投影会把同类 `GameplayFact` 折叠为一条并用 `Multiplicity` 计入 `EntryCount`，但 Slot 和全局人工调分详情仍只分页聚合后的代表记录，导致“完整数量为 N，详情只有 1 条”。现在主快照仍保持有界聚合，只有签名游标详情请求会按当前页有界读取 PostgreSQL 原始事实，从而让 `EntryCount`、breakdown 和可遍历详情一致，不向主响应塞入无界历史。
+- 详情分页严格绑定快照 `DataAsOf`、Schema revision 和 Snapshot version，并在 PostgreSQL `RepeatableRead` 快照中使用该时点前最后一条不可变 `GameplayFactAdjudicated` 事件还原状态/结果。后续重判不会改写已打开的分页链。对于旧事件未保留 failure/victim 等完整计分身份的歧义数据，后端不猜测单条得扣分，而是返回 `null`，并保留主 Slot 聚合分数为权威结果。
+- Schema revision 原先只哈希列坐标，轮次的开始、结束、结算时间或状态单独变化时不会变更。现在轮次 ID/序号/时间/状态与列目录共同生成稳定 revision；公开榜的过滤 Schema 使用同一规则，前端不会复用过期轮次元数据。
+- 新增和更新的设计约束已记录在 `docs/leaderboard-matrix-main-agent-prompt.md`。本次没有新增业务表、EF migration、snapshot 或 HTTP 响应契约；OpenAPI 工具导出和 `bun run api:gen` 均无实质差异。两份 OpenAPI SHA-256 均为 `DA38D2C5B1F65AF177B5AC141393752A636427417672C574BAF17B2B9DEF7A50`，`types.gen.ts` 为 `4A906B41FA880C835EE2D2125477628AD135AC75A30377F6BCF584A74003062B`；EF model drift 检查无变化。
+- 验证：Release solution build 0 warning/0 error；排行榜 Endpoint 15/15；真实 PostgreSQL 排行榜投影/历史分页 1/1；完整非 Integration TUnit 851/851；完整 Integration 186 项中 184 通过、0 失败、2 项因未配置真实 Kubernetes/Libvirt 环境按设计跳过；前端 `bun test` 240/240（1771 assertions）、typecheck 和 production build 通过；变更 C# 文件 whitespace、全仓 analyzers、EF drift 与 `git diff --check` 通过。仓库全量 whitespace 仍会报本次未触及文件的既有格式偏差，未越界格式化无关代码。
+- 版本仍为 `0.1.0-alpha.62`；这是同一发布候选的审计修复，未重复递增版本。本阶段未推送、未部署、未操作生产数据。
+
 ## 2026-08-20 alpha.62 统一排行榜精确明细审计与发布收口
 
 - `a633acd9` 修复排行榜明细与主快照之间的事实边界。旧实现会在打开 Slot 明细时重新读取当前 `GameplayFact`，冻结榜单可能因此混入冻结后的事实，并把主快照未携带的精确分值重建为 `0`。现在 Slot 明细和全局人工调分明细都从生成主榜时的同一份 `ScoreboardProjection` 读取；实时榜使用同一投影版本，冻结榜保持冻结时事实，后续数据不会改写已打开的分页链。
