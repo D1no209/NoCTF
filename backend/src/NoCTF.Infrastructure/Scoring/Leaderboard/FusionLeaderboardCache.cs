@@ -154,78 +154,9 @@ public sealed class FusionLeaderboardCache(
                 instance.Revision))
             .ToList();
 
-        var relevantFacts = db.GameplayFacts.AsNoTracking()
-            .Where(fact => fact.CompetitionId == competitionId);
-        relevantFacts = competition.Mode switch
-        {
-            GameMode.Ctf => relevantFacts.Where(fact =>
-                fact.Kind == GameplayFactKind.FlagAttempt
-                || fact.Kind == GameplayFactKind.HintUnlock
-                || fact.Kind == GameplayFactKind.ManualAdjustment),
-            GameMode.Awd => relevantFacts.Where(fact =>
-                fact.Kind == GameplayFactKind.FlagAttempt
-                || fact.Kind == GameplayFactKind.AwdServiceTransition
-                || fact.Kind == GameplayFactKind.ManualAdjustment),
-            GameMode.Awdp => relevantFacts.Where(fact =>
-                fact.Kind == GameplayFactKind.BreakAttempt
-                || fact.Kind == GameplayFactKind.FixAttempt
-                || fact.Kind == GameplayFactKind.ManualAdjustment),
-            GameMode.Koh => relevantFacts.Where(fact =>
-                fact.Kind == GameplayFactKind.KohControlObservation
-                || fact.Kind == GameplayFactKind.ManualAdjustment),
-            _ => throw new ArgumentOutOfRangeException(nameof(competition.Mode), competition.Mode, null)
-        };
-        var rawFacts = await relevantFacts
-            .OrderBy(fact => fact.OccurredAt)
-            .ThenBy(fact => fact.Id)
-            .Select(fact => new
-            {
-                fact.Id,
-                fact.TeamId,
-                fact.CompetitionChallengeId,
-                fact.Kind,
-                fact.OccurredAt,
-                fact.State,
-                fact.Result,
-                fact.FailureCode,
-                fact.ReferenceKind,
-                fact.ReferenceId,
-                fact.VictimTeamId,
-                fact.ActorUserId,
-                fact.Value
-            })
-            .ToListAsync(ct);
-        var actorIds = rawFacts
-            .Where(fact => fact.ActorUserId is not null)
-            .Select(fact => fact.ActorUserId!.Value)
-            .Distinct()
-            .ToArray();
-        var users = await db.Users.AsNoTracking()
-            .Where(user => actorIds.Contains(user.Id))
-            .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
         var hintCosts = challengeEntities
             .SelectMany(challenge => challenge.Hints)
             .ToDictionary(hint => hint.Id, hint => hint.Cost);
-        var facts = rawFacts.Select(fact => new LeaderboardGameplayFact(
-                fact.Id,
-                fact.TeamId,
-                fact.CompetitionChallengeId,
-                fact.Kind,
-                fact.OccurredAt,
-                fact.State,
-                fact.Result,
-                fact.FailureCode,
-                fact.ReferenceKind,
-                fact.ReferenceId,
-                fact.VictimTeamId,
-                fact.ActorUserId is Guid actorId ? users.GetValueOrDefault(actorId) : null,
-                fact.Value,
-                fact.ReferenceKind == GameplayFactReferenceKind.Hint && fact.ReferenceId is Guid hintId
-                    ? hintCosts.GetValueOrDefault(hintId)
-                    : null,
-                fact.ActorUserId))
-            .ToList();
-
         var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
             .Where(@event => @event.CompetitionId == competitionId
                 && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
@@ -247,6 +178,32 @@ public sealed class FusionLeaderboardCache(
                 OccurredAt = @event.OccurredAt
             };
         }).ToList();
+        var facts = await LeaderboardFactProjectionReader.ReadAsync(
+            db,
+            competitionId,
+            competition.Mode,
+            competitionConfigurationJson ?? competition.ConfigurationJson,
+            competition.StartAt,
+            lifecycle,
+            projectedAt,
+            hintCosts,
+            teamFacts,
+            ct);
+        var actorIds = facts
+            .Where(fact => fact.ActorUserId is not null)
+            .Select(fact => fact.ActorUserId!.Value)
+            .Distinct()
+            .ToArray();
+        var users = await db.Users.AsNoTracking()
+            .Where(user => actorIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, user => user.UserName, ct);
+        facts = facts.Select(fact => fact with
+            {
+                SubmitterName = fact.ActorUserId is Guid actorId
+                    ? users.GetValueOrDefault(actorId)
+                    : null
+            })
+            .ToArray();
 
         IReadOnlyList<LeaderboardAwdRoundFact> awdRounds = [];
         if (competition.Mode == GameMode.Awd)

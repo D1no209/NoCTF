@@ -53,7 +53,9 @@ public sealed record LeaderboardGameplayFact(
     string? SubmitterName = null,
     string? Value = null,
     long? HintCost = null,
-    Guid? ActorUserId = null);
+    Guid? ActorUserId = null,
+    int Multiplicity = 1,
+    DateTimeOffset? LastOccurredAt = null);
 
 public sealed record LeaderboardAwdRoundFact(
     Guid CompetitionChallengeId,
