@@ -357,21 +357,18 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
-    public async Task Frozen_adjustment_detail_pages_the_snapshot_without_reading_current_facts()
+    public async Task Frozen_adjustment_detail_pages_facts_at_the_frozen_cutoff()
     {
         var competitionId = Guid.CreateVersion7();
         var firstTeamId = Guid.CreateVersion7();
         var secondTeamId = Guid.CreateVersion7();
         var actorId = Guid.CreateVersion7();
         var occurredAt = DateTimeOffset.UtcNow;
-        ScoreboardAdjustmentAllocation[] adjustments =
+        ScoreboardAdjustmentDetailFact[] adjustments =
         [
-            new(firstTeamId, Guid.CreateVersion7(), ScoreboardAdjustmentKind.ManualAdjustment,
-                occurredAt, 0, 25, 0, 25),
-            new(firstTeamId, Guid.CreateVersion7(), ScoreboardAdjustmentKind.ManualAdjustment,
-                occurredAt.AddSeconds(-1), 0, 0, 10, -10),
-            new(firstTeamId, Guid.CreateVersion7(), ScoreboardAdjustmentKind.ManualAdjustment,
-                occurredAt.AddSeconds(-2), null, 5, 0, 5)
+            new(Guid.CreateVersion7(), actorId, "Operator", occurredAt, 25),
+            new(Guid.CreateVersion7(), actorId, "Operator", occurredAt.AddSeconds(-1), -10),
+            new(Guid.CreateVersion7(), null, null, occurredAt.AddSeconds(-2), 5)
         ];
         var projection = CreateProjection(
             competitionId,
@@ -385,8 +382,7 @@ public sealed class LeaderboardEndpointTests
             ]);
         projection = projection with
         {
-            DetailActors = [new(0, actorId, "Operator")],
-            AdjustmentAllocations = adjustments
+            DetailActors = [new(0, actorId, "Operator")]
         };
         await using var app = await CreateApplicationAsync(
             competitionId,
@@ -394,7 +390,7 @@ public sealed class LeaderboardEndpointTests
             new RecordingMessagePublisher(),
             CompetitionLeaderboardVisibility.Frozen,
             LeaderboardDataScope.Frozen,
-            detailReader: new StaticScoreboardDetailReader());
+            detailReader: new StaticScoreboardDetailReader(adjustments: adjustments));
         using var client = app.GetTestClient();
         var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{firstTeamId}/adjustments?limit=2";
 
@@ -439,6 +435,7 @@ public sealed class LeaderboardEndpointTests
                 null,
                 null,
                 actorId,
+                "Player",
                 null,
                 true,
                 occurredAt.AddSeconds(-index)))
@@ -537,6 +534,7 @@ public sealed class LeaderboardEndpointTests
             null,
             null,
             actorId,
+            "Player",
             null,
             false,
             occurredAt);
@@ -695,6 +693,7 @@ public sealed class LeaderboardEndpointTests
                     null,
                     null,
                     publicActorId,
+                    "Public player",
                     internalTeamId,
                     true,
                     slot.Entries[0].OccurredAt)

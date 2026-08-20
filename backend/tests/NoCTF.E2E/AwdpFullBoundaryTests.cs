@@ -582,6 +582,51 @@ public sealed class AwdpFullBoundaryTests
         await AssertNoSyntheticGlobalAdjustmentsAsync(accumulatedScoreboard.Snapshot);
         await AssertCurrentRoundScoresPendingAsync(accumulatedScoreboard);
 
+        var preBanRedScore = Team(accumulatedScoreboard.Snapshot, red.TeamId)
+            .GetProperty("totalScore").GetInt64();
+        var preBanSettledSlots = CaptureSettledSlots(accumulatedScoreboard.Snapshot)
+            .Where(item => item.Key.TeamId == red.TeamId)
+            .ToDictionary(item => item.Key, item => item.Value);
+        await SendJsonWithoutResponseAsync(
+            admin,
+            HttpMethod.Post,
+            $"/api/v1/admin/competitions/{competitionId}/teams/{red.TeamId}/ban",
+            new { reason = "AWDP E2E leaderboard replay", announcePublicly = false },
+            HttpStatusCode.NoContent,
+            cancellationToken);
+        _ = await PollScoreboardAsync(
+            anonymous,
+            competitionId,
+            observation =>
+            {
+                var team = Team(observation.Snapshot, red.TeamId);
+                return team.GetProperty("rankingState").GetString() == "Banned"
+                    && team.GetProperty("totalScore").GetInt64() == 0
+                    && team.GetProperty("slots").GetArrayLength() == 0;
+            },
+            TimeSpan.FromSeconds(45),
+            cancellationToken);
+        await SendJsonWithoutResponseAsync(
+            admin,
+            HttpMethod.Post,
+            $"/api/v1/admin/competitions/{competitionId}/teams/{red.TeamId}/unban",
+            new { },
+            HttpStatusCode.NoContent,
+            cancellationToken);
+        var unbannedScoreboard = await PollScoreboardAsync(
+            anonymous,
+            competitionId,
+            observation =>
+            {
+                var team = Team(observation.Snapshot, red.TeamId);
+                return team.GetProperty("rankingState").GetString() == "Eligible"
+                    && team.GetProperty("totalScore").GetInt64() >= preBanRedScore
+                    && ContainsSettledSlots(preBanSettledSlots, observation.Snapshot);
+            },
+            TimeSpan.FromSeconds(45),
+            cancellationToken);
+        await AssertScoreboardArithmeticAsync(unbannedScoreboard.Snapshot);
+
         await SendWithoutBodyAsync(
             admin,
             HttpMethod.Post,
@@ -1321,6 +1366,16 @@ public sealed class AwdpFullBoundaryTests
         }
     }
 
+    private static bool ContainsSettledSlots(
+        IReadOnlyDictionary<(Guid TeamId, int ColumnIndex), SettledSlotScore> expected,
+        JsonElement snapshot) =>
+        expected.All(item => Team(snapshot, item.Key.TeamId).GetProperty("slots").EnumerateArray()
+            .Any(slot => slot.GetProperty("columnIndex").GetInt32() == item.Key.ColumnIndex
+                && slot.GetProperty("scoreState").GetString() == "Settled"
+                && slot.GetProperty("earnedPoints").GetInt64() == item.Value.EarnedPoints
+                && slot.GetProperty("deductedPoints").GetInt64() == item.Value.DeductedPoints
+                && slot.GetProperty("netPoints").GetInt64() == item.Value.NetPoints));
+
     private static async Task<IReadOnlyDictionary<Guid, long>> ReadScoresAsync(
         HttpClient client,
         Guid competitionId,
@@ -1432,6 +1487,23 @@ public sealed class AwdpFullBoundaryTests
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        using var response = await client.SendAsync(request, cancellationToken);
+        if (response.StatusCode != expected)
+            throw await UnexpectedResponseAsync(response, expected, cancellationToken);
+    }
+
+    private static async Task SendJsonWithoutResponseAsync(
+        HttpClient client,
+        HttpMethod method,
+        string path,
+        object body,
+        HttpStatusCode expected,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, path)
+        {
+            Content = JsonContent.Create(body, options: JsonOptions)
+        };
         using var response = await client.SendAsync(request, cancellationToken);
         if (response.StatusCode != expected)
             throw await UnexpectedResponseAsync(response, expected, cancellationToken);

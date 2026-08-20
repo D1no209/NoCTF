@@ -101,7 +101,6 @@ internal static class NormalizedScoreboardProjection
                 group => group.OrderBy(pair => pair.Key.ColumnIndex).Select(pair => pair.Value).ToArray());
         var rows = new List<ScoreboardTeam>(input.Teams.Count);
         var entryAllocations = new List<ScoreboardEntryAllocation>();
-        var adjustmentAllocations = new List<ScoreboardAdjustmentAllocation>();
         foreach (var team in input.Teams)
         {
             var builtSlots = slotsByTeam.GetValueOrDefault(team.Id, [])
@@ -112,26 +111,16 @@ internal static class NormalizedScoreboardProjection
                 })
                 .Where(item => item.Slot.EntryCount > 0 || item.Slot.NetPoints.GetValueOrDefault() != 0)
                 .ToArray();
-            entryAllocations.AddRange(builtSlots.SelectMany(item =>
-                item.Accumulator.Allocate(team.Id, item.Slot)));
             var compactSlots = builtSlots.Select(item => item.Slot with
             {
                 Entries = CompactEntries(item.Slot.Entries)
             }).ToArray();
+            entryAllocations.AddRange(builtSlots.Zip(compactSlots).SelectMany(item =>
+                item.First.Accumulator.Allocate(team.Id, item.Second)));
             var slotNet = compactSlots.Aggregate(0L, (total, slot) =>
                 checked(total + slot.NetPoints.GetValueOrDefault()));
             legacyByTeam.TryGetValue(team.Id, out var legacyRow);
             var allGlobalAdjustments = BuildGlobalAdjustments(input, team.Id, actorIndexes);
-            adjustmentAllocations.AddRange(allGlobalAdjustments.Select(adjustment =>
-                new ScoreboardAdjustmentAllocation(
-                    team.Id,
-                    adjustment.Id,
-                    adjustment.Kind,
-                    adjustment.OccurredAt,
-                    adjustment.ActorIndex,
-                    adjustment.EarnedPoints,
-                    adjustment.DeductedPoints,
-                    adjustment.NetPoints)));
             var totalScore = allGlobalAdjustments.Aggregate(slotNet, (total, adjustment) =>
                 checked(total + adjustment.NetPoints));
             var globalAdjustmentCount = input.GameplayFacts
@@ -160,6 +149,10 @@ internal static class NormalizedScoreboardProjection
             .ThenBy(row => row.TeamId)
             .ToArray();
         var compacted = CompactActors(actors, orderedRows);
+        int? MapCompactedActor(int? actorIndex) => actorIndex is int value
+            && compacted.IndexMap.TryGetValue(value, out var mapped)
+                ? mapped
+                : null;
         var currentRoundId = roundProjection.CurrentRoundNumber is int currentRound
             ? roundProjection.Rounds.FirstOrDefault(round => round.Number == currentRound)?.Id
             : null;
@@ -177,17 +170,19 @@ internal static class NormalizedScoreboardProjection
         };
         return new(catalog, schema, snapshot)
         {
-            DetailActors = actors,
+            DetailActors = compacted.Actors,
             EntryAllocations = entryAllocations
                 .OrderBy(allocation => allocation.TeamId)
                 .ThenBy(allocation => allocation.ColumnIndex)
                 .ThenBy(allocation => allocation.Entry.OccurredAt)
                 .ThenBy(allocation => allocation.Entry.Id)
-                .ToArray(),
-            AdjustmentAllocations = adjustmentAllocations
-                .OrderBy(allocation => allocation.TeamId)
-                .ThenBy(allocation => allocation.OccurredAt)
-                .ThenBy(allocation => allocation.Id)
+                .Select(allocation => allocation with
+                {
+                    Entry = allocation.Entry with
+                    {
+                        ActorIndex = MapCompactedActor(allocation.Entry.ActorIndex)
+                    }
+                })
                 .ToArray()
         };
     }
@@ -257,7 +252,10 @@ internal static class NormalizedScoreboardProjection
                 }).ToArray()
             }).ToArray()
         }).ToArray();
-        return new(actorPairs.Select(pair => pair.Actor).ToArray(), compactTeams);
+        return new(
+            actorPairs.Select(pair => pair.Actor).ToArray(),
+            compactTeams,
+            indexMap);
     }
 
     private static IReadOnlyList<ScoreboardColumn> BuildColumns(
@@ -1197,7 +1195,8 @@ internal static class NormalizedScoreboardProjection
 
     private sealed record CompactedActors(
         IReadOnlyList<ScoreboardActor> Actors,
-        IReadOnlyList<ScoreboardTeam> Teams);
+        IReadOnlyList<ScoreboardTeam> Teams,
+        IReadOnlyDictionary<int, int> IndexMap);
 
     private sealed record AwdScoringSettings(
         AttackRewardMode AttackRewardMode,
