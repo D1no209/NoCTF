@@ -6,7 +6,7 @@
 
 - CTF：Correct FlagAttempt、Wrong 罚分、Unlocked Hint、Applied ManualAdjustment。
 - AWD：带 VictimTeam/AwdRound 的 Correct FlagAttempt，以及状态变化产生的 AwdServiceTransition。
-- AWDP schema v3：按 Team/CompetitionChallenge/Kind/round 选择最早 Correct，按该轮不同成功队伍数分别计算 Break/Fix 动态曲线；失败事实只应用一次罚分。
+- AWDP schema v4：按 Team/CompetitionChallenge/Kind/round 选择最早 Correct，按该轮不同成功队伍数分别计算 Break/Fix 动态曲线；失败事实只应用一次罚分。
 - KoH：每次完成轮询产生的 Controlled/Uncontrolled KohControlObservation；连续同队控制仍分别计分。
 
 配置修改立即影响下一次全量投影，不保存历史配置，也不支持按过去时点重建。冻结排行榜在冻结命令内同步使用当前事实和配置完整生成，并把完整 JSON 保存到 Competition；冻结失败不改变可见性。
@@ -19,7 +19,7 @@
 
 `ProjectLeaderboard` 获取 CompetitionId 对应的 PostgreSQL transaction advisory lock，从 PostgreSQL 全量加载并计算完整不可变 `LeaderboardResponse`，然后原子替换缓存并发布 `leaderboardRefreshed`。同一比赛的投影串行，旧任务不能在新任务之后覆盖快照。
 
-AWDP v3 的分数会在没有新 GameplayFact 的逻辑轮边界变化。singular maintenance 的 15 秒刷新消息每批最多检查 500 场 Running AWDP v3 比赛；它用生命周期事件分别计算缓存 `DataAsOf` 与当前时刻的 EffectiveRunningTime/轮次，只在跨轮或缓存缺失时设置 Dirty。Pause 不跨轮，Finished 不再进入扫描，最终生命周期投影冻结分数。该机制不新增计划表，也不保存派生攻击/防御状态。
+AWDP v4 的分数会在没有新 GameplayFact 的逻辑轮边界变化。singular maintenance 的 15 秒刷新消息以 500 场为一批，按比赛 UUID keyset 遍历全部 Running AWDP v4 比赛；它用生命周期事件分别计算缓存 `DataAsOf` 与当前时刻的 EffectiveRunningTime/轮次，只在跨轮或缓存缺失时设置 Dirty。Pause 不跨轮，Finished 不再进入扫描，最终生命周期投影冻结分数。该机制不新增计划表，也不保存派生攻击/防御状态。
 
 失败时保留旧快照、记录 `leaderboard:{competitionId:N}:last-failure`、重新置 Dirty 并让 Wolverine 重试。没有旧快照时 GET 返回 503 `LeaderboardProjectionFailed`；有旧快照时继续返回 200。
 

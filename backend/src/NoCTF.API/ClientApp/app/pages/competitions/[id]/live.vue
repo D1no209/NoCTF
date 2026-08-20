@@ -24,7 +24,7 @@ import type { ControlScreenBloodRank, ControlScreenSolve } from '~/utils/control
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 import { LiveCityScene } from '~/lib/live-city-3d'
 import type { LiveCityBlood, LiveCityChallengeState } from '~/lib/live-city-3d'
-import { scoreboardTeamSolveCount } from '~/utils/scoreboard'
+import { scoreboardRankingStateLabel, scoreboardTeamSolveCount } from '~/utils/scoreboard'
 
 definePageMeta({ layout: false })
 
@@ -426,17 +426,17 @@ onUnmounted(() => {
               :style="marqueeEnabled ? { animationDuration: `${marqueeDuration}s` } : undefined"
             >
               <ol class="live-ranking">
-                <li v-for="(entry, index) in rankedEntries" :key="entry.teamId" :class="rankClass(index + 1)">
-                  <span class="live-rank">{{ index + 1 }}</span>
-                  <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}</span>
+                <li v-for="entry in rankedEntries" :key="entry.teamId" :class="rankClass(entry.rank ?? undefined)">
+                  <span class="live-rank">{{ entry.rank ?? '—' }}</span>
+                  <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}<small v-if="entry.rankingState !== 'Eligible'"> · {{ scoreboardRankingStateLabel(entry.rankingState) }}</small></span>
                   <span class="font-mono text-[0.625rem] text-slate-500">{{ scoreboardTeamSolveCount(entry) }}</span>
                   <strong class="font-mono tabular-nums">{{ entry.totalScore ?? 0 }}</strong>
                 </li>
               </ol>
               <ol v-if="marqueeEnabled" class="live-ranking" aria-hidden="true">
-                <li v-for="(entry, index) in rankedEntries" :key="`clone-${entry.teamId}`" :class="rankClass(index + 1)">
-                  <span class="live-rank">{{ index + 1 }}</span>
-                  <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}</span>
+                <li v-for="entry in rankedEntries" :key="`clone-${entry.teamId}`" :class="rankClass(entry.rank ?? undefined)">
+                  <span class="live-rank">{{ entry.rank ?? '—' }}</span>
+                  <span class="min-w-0 flex-1 truncate font-semibold">{{ entry.teamName }}<small v-if="entry.rankingState !== 'Eligible'"> · {{ scoreboardRankingStateLabel(entry.rankingState) }}</small></span>
                   <span class="font-mono text-[0.625rem] text-slate-500">{{ scoreboardTeamSolveCount(entry) }}</span>
                   <strong class="font-mono tabular-nums">{{ entry.totalScore ?? 0 }}</strong>
                 </li>

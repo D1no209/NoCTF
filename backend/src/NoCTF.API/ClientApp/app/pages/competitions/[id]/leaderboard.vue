@@ -24,11 +24,16 @@ const route = useRoute()
 const competitionId = route.params.id as string
 const ctx = inject(competitionContextKey)!
 const board = useScoreboardMatrix(competitionId)
+const { isAdministrator } = useAuth()
 
 const selectedTrackKey = ref('')
 const visibleTeamCount = ref(50)
+const canObserveAllTracks = computed(() =>
+  isAdministrator.value || Boolean(ctx.competition.value?.administrationRole))
 const availableTracks = computed(() => (board.snapshot.value?.tracks ?? [])
-  .filter(track => track.isViewerTrack || (track.visibleOnLeaderboard && !track.isInternal)))
+  .filter(track => canObserveAllTracks.value
+    || track.isViewerTrack
+    || (track.visibleOnLeaderboard && !track.isInternal)))
 
 watch(availableTracks, (tracks) => {
   if (!tracks.length) {
