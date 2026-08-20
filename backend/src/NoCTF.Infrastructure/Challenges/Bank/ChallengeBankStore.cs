@@ -173,6 +173,8 @@ public sealed class ChallengeBankStore(
             entity.Description,
             command.Description,
             StringComparison.Ordinal);
+        var catalogChanged = !string.Equals(entity.Title, command.Title, StringComparison.Ordinal)
+            || !string.Equals(entity.Direction, command.Direction, StringComparison.Ordinal);
         var publishedReferences = descriptionChanged
             ? await db.CompetitionChallenges.AsNoTracking()
                 .Where(item =>
@@ -204,6 +206,16 @@ public sealed class ChallengeBankStore(
         try
         {
             await db.SaveChangesAsync(ct);
+            if (catalogChanged)
+            {
+                _ = await db.Competitions
+                    .Where(competition => db.CompetitionChallenges.IgnoreQueryFilters().Any(instance =>
+                        instance.CompetitionId == competition.Id
+                        && instance.ChallengeId == entity.Id
+                        && instance.DeletedAt == null))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(competition => competition.LeaderboardDirty, true), ct);
+            }
         }
         catch (DbUpdateConcurrencyException)
         {

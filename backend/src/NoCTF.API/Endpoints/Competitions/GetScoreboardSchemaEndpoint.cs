@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
 using NoCTF.API.Serialization;
@@ -31,15 +32,30 @@ public sealed record ScoreboardSchemaResponse(
     long Revision,
     long ChallengeCatalogRevision,
     IReadOnlyList<ScoreboardRoundResponse> Rounds,
-    IReadOnlyList<ScoreboardColumnResponse> Columns);
+    IReadOnlyList<ScoreboardColumnResponse> Columns)
+{
+    public int? RoundWindowStart { get; init; }
+    public int? RoundWindowEnd { get; init; }
+    public int? LatestRound { get; init; }
+}
 
 public sealed class GetScoreboardSchemaRequest
 {
     public Guid CompetitionId { get; set; }
+
+    [QueryParam]
+    public int? EndingRound { get; set; }
+}
+
+public sealed class GetScoreboardSchemaValidator : Validator<GetScoreboardSchemaRequest>
+{
+    public GetScoreboardSchemaValidator() =>
+        RuleFor(request => request.EndingRound).GreaterThan(0).When(request => request.EndingRound is not null);
 }
 
 public sealed class GetScoreboardSchemaEndpoint(
     ILeaderboardCache leaderboard,
+    ILeaderboardSnapshotFactory snapshots,
     ICompetitionVisibilityAccess access,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
@@ -74,6 +90,17 @@ public sealed class GetScoreboardSchemaEndpoint(
         var projection = visibility.DataScope == LeaderboardDataScope.Frozen
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
             : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
+        if (projection is not null
+            && visibility.DataScope != LeaderboardDataScope.Frozen
+            && request.EndingRound is int endingRound
+            && visibility.GameMode == NoCTF.Domain.Competitions.GameMode.Awdp)
+        {
+            projection = await snapshots.CreateScoreboardWindowAsync(
+                request.CompetitionId,
+                endingRound,
+                projection.Snapshot.DataAsOf ?? projection.Snapshot.GeneratedAt,
+                cancellationToken);
+        }
         if (projection is null)
             return Processing(request.CompetitionId);
         var canObserve = user.UserId != Guid.Empty
@@ -92,7 +119,12 @@ public sealed class GetScoreboardSchemaEndpoint(
                 round.SettledAt,
                 Enum.Parse<ScoreboardRoundStateProtocol>(round.State.ToString()))).ToArray(),
             schema.Columns.Select(column => new ScoreboardColumnResponse(
-                column.Index, column.CompetitionChallengeId, column.RoundId)).ToArray()));
+                column.Index, column.CompetitionChallengeId, column.RoundId)).ToArray())
+        {
+            RoundWindowStart = schema.RoundWindowStart,
+            RoundWindowEnd = schema.RoundWindowEnd,
+            LatestRound = schema.LatestRound
+        });
     }
 
     private Accepted<LeaderboardProcessingProtocolResponse> Processing(Guid competitionId)

@@ -22,12 +22,18 @@ public sealed class GetScoreboardSlotDetailRequest
 
     [QueryParam]
     public int Limit { get; set; } = 50;
+
+    [QueryParam]
+    public int? EndingRound { get; set; }
 }
 
 public sealed class GetScoreboardSlotDetailValidator : Validator<GetScoreboardSlotDetailRequest>
 {
-    public GetScoreboardSlotDetailValidator() =>
+    public GetScoreboardSlotDetailValidator()
+    {
         RuleFor(request => request.Limit).InclusiveBetween(1, 200);
+        RuleFor(request => request.EndingRound).GreaterThan(0).When(request => request.EndingRound is not null);
+    }
 }
 
 public sealed record ScoreboardSlotDetailResponse(
@@ -46,6 +52,7 @@ public sealed record ScoreboardSlotDetailResponse(
 
 public sealed class GetScoreboardSlotDetailEndpoint(
     ILeaderboardCache leaderboard,
+    ILeaderboardSnapshotFactory snapshots,
     IScoreboardDetailReader details,
     ICompetitionVisibilityAccess access,
     GetCompetitionTracks getTracks,
@@ -79,6 +86,17 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         var projection = visibility.DataScope == LeaderboardDataScope.Frozen
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
             : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
+        if (projection is not null
+            && visibility.DataScope != LeaderboardDataScope.Frozen
+            && request.EndingRound is int endingRound
+            && visibility.GameMode == NoCTF.Domain.Competitions.GameMode.Awdp)
+        {
+            projection = await snapshots.CreateScoreboardWindowAsync(
+                request.CompetitionId,
+                endingRound,
+                projection.Snapshot.DataAsOf ?? projection.Snapshot.GeneratedAt,
+                cancellationToken);
+        }
         if (projection is null)
             return Processing(request.CompetitionId);
 
@@ -107,6 +125,8 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             request.ColumnIndex,
             projection.Schema.Revision,
             projection.Snapshot.Version,
+            projection.Schema.RoundWindowStart,
+            projection.Schema.RoundWindowEnd,
             dataAsOf.UtcTicks);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, scope, out var position))
         {
@@ -311,7 +331,6 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         source.Kind == fact.Kind
         && source.State == fact.State
         && source.Result == fact.Result
-        && source.ActorUserId == fact.ActorUserId
         && (!fact.ScoringIdentityKnown
             || source.FailureCode == fact.FailureCode && source.VictimTeamId == fact.VictimTeamId)
         && (mode is NoCTF.Domain.Competitions.GameMode.Awdp or NoCTF.Domain.Competitions.GameMode.Koh

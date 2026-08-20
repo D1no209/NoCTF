@@ -138,6 +138,14 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 1,
                 changedAt,
                 cancellationToken);
+            await using (var dirtyDb = new NoCtfDbContext(options))
+            {
+                var leaderboardDirty = await dirtyDb.Competitions.AsNoTracking()
+                    .Where(item => item.Id == fixture.CompetitionId)
+                    .Select(item => item.LeaderboardDirty)
+                    .SingleAsync(cancellationToken);
+                await Assert.That(leaderboardDirty).IsTrue();
+            }
             await using (var eventDb = new NoCtfDbContext(options))
             {
                 var descriptionEvents = await eventDb.CompetitionEvents.AsNoTracking()

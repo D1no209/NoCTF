@@ -21,14 +21,25 @@ internal static class NormalizedScoreboardProjection
         LeaderboardProjectionResult legacy)
     {
         var projectedAt = input.ProjectedAt ?? DateTimeOffset.UtcNow;
+        var scoreboardInput = input.ScoreboardGameplayFacts is null
+            ? input
+            : input with { GameplayFacts = input.ScoreboardGameplayFacts };
         var challenges = (input.Challenges ?? [])
             .Where(challenge => !challenge.IsDeleted)
             .OrderBy(challenge => challenge.Order)
             .ThenBy(challenge => challenge.Id)
             .ToArray();
         var challengeById = challenges.ToDictionary(challenge => challenge.Id);
-        var catalogRevision = StableRevision(challenges.Select(challenge =>
-            $"{challenge.Id:N}|{challenge.Revision}|{challenge.Order}|{challenge.IsPublished}"));
+        var catalogRevision = StableRevision(challenges.Select(challenge => JsonSerializer.Serialize(new
+        {
+            challenge.Id,
+            challenge.Title,
+            challenge.Direction,
+            Category = challenge.Direction,
+            challenge.Order,
+            challenge.IsPublished,
+            challenge.Revision
+        })));
         var catalog = new ScoreboardChallengeCatalog(
             input.CompetitionId,
             catalogRevision,
@@ -41,7 +52,7 @@ internal static class NormalizedScoreboardProjection
                 challenge.IsPublished,
                 challenge.Revision)).ToArray());
 
-        var roundProjection = BuildRounds(input, legacy, projectedAt);
+        var roundProjection = BuildRounds(scoreboardInput, legacy, projectedAt);
         var columns = BuildColumns(input.Mode, challenges, roundProjection.Rounds);
         var schemaRevision = ScoreboardRevision.ForSchema(roundProjection.Rounds, columns);
         var schema = new ScoreboardSchema(
@@ -50,9 +61,14 @@ internal static class NormalizedScoreboardProjection
             schemaRevision,
             catalogRevision,
             roundProjection.Rounds,
-            columns);
+            columns)
+        {
+            RoundWindowStart = roundProjection.WindowStart,
+            RoundWindowEnd = roundProjection.WindowEnd,
+            LatestRound = roundProjection.LatestRound
+        };
 
-        var actors = input.GameplayFacts
+        var actors = scoreboardInput.GameplayFacts
             .Where(fact => fact.ActorUserId is not null)
             .GroupBy(fact => fact.ActorUserId!.Value)
             .OrderBy(group => group.Key)
@@ -72,14 +88,14 @@ internal static class NormalizedScoreboardProjection
         switch (input.Mode)
         {
             case GameMode.Ctf:
-                ProjectCtf(input, legacy, challengeById, columnsByKey, actorIndexes, accumulators);
+                ProjectCtf(scoreboardInput, legacy, challengeById, columnsByKey, actorIndexes, accumulators);
                 break;
             case GameMode.Awd:
-                ProjectAwd(input, challengeById, columnsByKey, roundById, actorIndexes, accumulators);
+                ProjectAwd(scoreboardInput, challengeById, columnsByKey, roundById, actorIndexes, accumulators);
                 break;
             case GameMode.Awdp:
                 ProjectAwdp(
-                    input,
+                    scoreboardInput,
                     challengeById,
                     columnsByKey,
                     roundProjection,
@@ -87,7 +103,7 @@ internal static class NormalizedScoreboardProjection
                     accumulators);
                 break;
             case GameMode.Koh:
-                ProjectKoh(input, legacy, columnsByKey, actorIndexes, accumulators);
+                ProjectKoh(scoreboardInput, legacy, columnsByKey, actorIndexes, accumulators);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(input), input.Mode, "Unsupported game mode.");
@@ -99,15 +115,15 @@ internal static class NormalizedScoreboardProjection
             .ToDictionary(
                 group => group.Key,
                 group => group.OrderBy(pair => pair.Key.ColumnIndex).Select(pair => pair.Value).ToArray());
-        var rows = new List<ScoreboardTeam>(input.Teams.Count);
+        var rows = new List<ScoreboardTeam>(scoreboardInput.Teams.Count);
         var entryAllocations = new List<ScoreboardEntryAllocation>();
-        foreach (var team in input.Teams)
+        foreach (var team in scoreboardInput.Teams)
         {
             var builtSlots = slotsByTeam.GetValueOrDefault(team.Id, [])
                 .Select(accumulator => new
                 {
                     Accumulator = accumulator,
-                    Slot = accumulator.Build(ScoreState(input, accumulator.Round))
+                    Slot = accumulator.Build(ScoreState(scoreboardInput, accumulator.Round))
                 })
                 .Where(item => item.Slot.EntryCount > 0 || item.Slot.NetPoints.GetValueOrDefault() != 0)
                 .ToArray();
@@ -115,15 +131,17 @@ internal static class NormalizedScoreboardProjection
             {
                 Entries = CompactEntries(item.Slot.Entries)
             }).ToArray();
-            entryAllocations.AddRange(builtSlots.Zip(compactSlots).SelectMany(item =>
-                item.First.Accumulator.Allocate(team.Id, item.Second)));
+            entryAllocations.AddRange(builtSlots.SelectMany(item =>
+                item.Accumulator.Allocate(team.Id, item.Slot)));
             var slotNet = compactSlots.Aggregate(0L, (total, slot) =>
                 checked(total + slot.NetPoints.GetValueOrDefault()));
             legacyByTeam.TryGetValue(team.Id, out var legacyRow);
-            var allGlobalAdjustments = BuildGlobalAdjustments(input, team.Id, actorIndexes);
-            var totalScore = allGlobalAdjustments.Aggregate(slotNet, (total, adjustment) =>
-                checked(total + adjustment.NetPoints));
-            var globalAdjustmentCount = input.GameplayFacts
+            var allGlobalAdjustments = BuildGlobalAdjustments(scoreboardInput, team.Id, actorIndexes);
+            var totalScore = scoreboardInput.Mode == GameMode.Awdp
+                ? legacyRow?.Score ?? 0
+                : allGlobalAdjustments.Aggregate(slotNet, (total, adjustment) =>
+                    checked(total + adjustment.NetPoints));
+            var globalAdjustmentCount = scoreboardInput.GameplayFacts
                 .Where(fact => fact.TeamId == team.Id
                     && fact.Kind == GameplayFactKind.ManualAdjustment
                     && fact.Result == GameplayFactResult.Applied)
@@ -283,7 +301,7 @@ internal static class NormalizedScoreboardProjection
         DateTimeOffset projectedAt)
     {
         if (input.Mode is GameMode.Ctf or GameMode.Koh)
-            return new([], null);
+            return new([], null, null, null, null);
         if (input.Mode == GameMode.Awd)
         {
             var facts = (input.AwdRounds ?? [])
@@ -306,15 +324,20 @@ internal static class NormalizedScoreboardProjection
                 .ToArray();
             return new(
                 rounds,
-                rounds.FirstOrDefault(round => round.State == ScoreboardRoundState.Running)?.Number);
+                rounds.FirstOrDefault(round => round.State == ScoreboardRoundState.Running)?.Number,
+                rounds.FirstOrDefault()?.Number,
+                rounds.LastOrDefault()?.Number,
+                rounds.LastOrDefault()?.Number);
         }
 
         var duration = legacy.RoundDurationSeconds.GetValueOrDefault(300);
         var currentRound = Math.Max(1, legacy.CurrentRound.GetValueOrDefault(1));
         var settledThrough = Math.Max(0, legacy.SettledThroughRound.GetValueOrDefault());
         var lastRound = Math.Max(currentRound, settledThrough);
-        var roundsResult = new List<ScoreboardRound>(lastRound);
-        for (var number = 1; number <= lastRound; number++)
+        var windowEnd = Math.Clamp(input.ScoreboardRoundWindowEnd ?? lastRound, 1, lastRound);
+        var windowStart = Math.Max(1, windowEnd - ScoreboardRoundWindow.DefaultSize + 1);
+        var roundsResult = new List<ScoreboardRound>(windowEnd - windowStart + 1);
+        for (var number = windowStart; number <= windowEnd; number++)
         {
             var start = EffectiveClockToWallTime(input, TimeSpan.FromSeconds((long)(number - 1) * duration));
             var end = number == currentRound && input.CompetitionStatus == CompetitionStatus.Paused
@@ -333,7 +356,12 @@ internal static class NormalizedScoreboardProjection
                         ? ScoreboardRoundState.Running
                         : ScoreboardRoundState.Pending));
         }
-        return new(roundsResult, currentRound);
+        return new(
+            roundsResult,
+            currentRound >= windowStart && currentRound <= windowEnd ? currentRound : null,
+            windowStart,
+            windowEnd,
+            lastRound);
     }
 
     private static void ProjectCtf(
@@ -1135,11 +1163,33 @@ internal static class NormalizedScoreboardProjection
             return breakdown;
         }
 
-        public IReadOnlyList<ScoreboardEntryAllocation> Allocate(Guid teamId, ScoreboardSlot slot) =>
-            slot.Entries.Select(entry => new ScoreboardEntryAllocation(teamId, columnIndex, entry)
+        public IReadOnlyList<ScoreboardEntryAllocation> Allocate(Guid teamId, ScoreboardSlot slot)
+        {
+            var allocations = slot.Entries.Select(entry => new ScoreboardEntryAllocation(
+                teamId,
+                columnIndex,
+                entry)
             {
                 Source = sources.GetValueOrDefault(entry.Id)
             }).ToArray();
+            var synthetic = allocations.Where(allocation => allocation.Source is null);
+            var factGroups = allocations
+                .Where(allocation => allocation.Source is not null)
+                .GroupBy(allocation => AllocationIdentity.From(allocation))
+                .Select(group => group
+                    .OrderBy(allocation => allocation.Entry.OccurredAt)
+                    .ThenBy(allocation => allocation.Entry.Id)
+                    .First())
+                .Select(allocation => allocation with
+                {
+                    Entry = allocation.Entry with { ActorIndex = null },
+                    Source = allocation.Source! with { ActorUserId = null }
+                });
+            return synthetic.Concat(factGroups)
+                .OrderBy(allocation => allocation.Entry.OccurredAt)
+                .ThenBy(allocation => allocation.Entry.Id)
+                .ToArray();
+        }
 
         public ScoreboardSlot Build(ScoreboardScoreState state)
         {
@@ -1193,12 +1243,50 @@ internal static class NormalizedScoreboardProjection
 
     private sealed record RoundProjection(
         IReadOnlyList<ScoreboardRound> Rounds,
-        int? CurrentRoundNumber);
+        int? CurrentRoundNumber,
+        int? WindowStart,
+        int? WindowEnd,
+        int? LatestRound);
 
     private sealed record CompactedActors(
         IReadOnlyList<ScoreboardActor> Actors,
         IReadOnlyList<ScoreboardTeam> Teams,
         IReadOnlyDictionary<int, int> IndexMap);
+
+    private sealed record AllocationIdentity(
+        ScoreboardEntryKind EntryKind,
+        ScoreboardEntryOutcome Outcome,
+        ScoreboardAward? Award,
+        long AwardPoints,
+        GameplayFactKind Kind,
+        GameplayFactState State,
+        GameplayFactResult? Result,
+        GameplayFactFailureCode? FailureCode,
+        GameplayFactReferenceKind? ReferenceKind,
+        Guid? ReferenceId,
+        Guid? VictimTeamId,
+        long? EarnedPointsPerOccurrence,
+        long? DeductedPointsPerOccurrence)
+    {
+        public static AllocationIdentity From(ScoreboardEntryAllocation allocation)
+        {
+            var source = allocation.Source!;
+            return new(
+                allocation.Entry.Kind,
+                allocation.Entry.Outcome,
+                allocation.Entry.Award,
+                allocation.Entry.AwardPoints,
+                source.Kind,
+                source.State,
+                source.Result,
+                source.FailureCode,
+                source.ReferenceKind,
+                source.ReferenceId,
+                source.VictimTeamId,
+                source.EarnedPointsPerOccurrence,
+                source.DeductedPointsPerOccurrence);
+        }
+    }
 
     private sealed record AwdScoringSettings(
         AttackRewardMode AttackRewardMode,

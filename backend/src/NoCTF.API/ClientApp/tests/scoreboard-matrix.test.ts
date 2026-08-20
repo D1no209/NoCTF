@@ -30,7 +30,8 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('getLeaderboardEndpoint')
     expect(composable).toContain('const requestGeneration = ++generation')
     expect(composable).toContain('requestGeneration !== generation')
-    expect(composable).toContain('(incoming.version ?? 0) >= (snapshot.value?.version ?? 0)')
+    expect(composable).toContain('candidateSnapshot = incoming')
+    expect(composable).not.toContain('(incoming.version ?? 0) >= (snapshot.value?.version ?? 0)')
   })
 
   test('uses compact realtime versions and a trailing refresh instead of applying hub arithmetic', () => {
@@ -47,6 +48,19 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('scheduleProcessingRetry()')
     expect(composable).toContain('if (snapshotResult?.data)')
     expect(composable).not.toContain('snapshot.value = null')
+  })
+
+  test('pages bounded AWDP round windows and keeps slot details on the selected window', () => {
+    expect(composable).toContain('const requestedEndingRound = ref<number | null>(null)')
+    expect(composable).toContain('query: { endingRound }')
+    expect(composable).toContain('await selectRoundWindow(windowStart - 1)')
+    expect(composable).toContain('const nextEnd = Math.min(latestRound, windowEnd + 50)')
+    expect(composable).toContain('await selectRoundWindow(nextEnd >= latestRound ? null : nextEnd)')
+    expect(composable).toContain('const detailEndingRound = computed')
+    expect(leaderboardPage).toContain('endingRound: board.detailEndingRound.value')
+    expect(leaderboardPage).toContain("$t('较早轮次')")
+    expect(leaderboardPage).toContain("$t('较新轮次')")
+    expect(leaderboardPage).toContain("$t('返回最新轮次')")
   })
 
   test('accepts only a revision-coherent catalog, schema and snapshot bundle', () => {

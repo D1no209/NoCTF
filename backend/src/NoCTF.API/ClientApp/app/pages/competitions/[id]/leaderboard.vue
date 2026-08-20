@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, Medal, Trophy } from '@lucide/vue'
+import { ChevronLeft, ChevronRight, Download, History, Medal, Trophy } from '@lucide/vue'
 import { getScoreboardAdjustmentDetailEndpoint, getScoreboardSlotDetailEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse,
@@ -70,6 +70,12 @@ const columnGroups = computed<ChallengeColumnGroup[]>(() => {
   return groups
 })
 const flatColumns = computed(() => columnGroups.value.flatMap(group => group.columns))
+const roundWindowLabel = computed(() => {
+  const start = board.schema.value?.roundWindowStart
+  const end = board.schema.value?.roundWindowEnd
+  if (!start || !end) return translate('暂无已结算轮次')
+  return translate('第 {start}–{end} 轮', { start, end })
+})
 
 function roundLabel(column: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse): string {
   if (!column.roundId) return translate('总计')
@@ -150,7 +156,7 @@ async function loadDetailPage(cursor: string | null, append: boolean): Promise<v
   try {
     const result = await getScoreboardSlotDetailEndpoint({
       path: { competitionId, teamId, columnIndex },
-      query: { cursor, limit: 50 },
+      query: { cursor, limit: 50, endingRound: board.detailEndingRound.value },
     })
     if (requestGeneration !== detailGeneration) return
     if (result.error) {
@@ -201,6 +207,24 @@ function openDetail(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, c
 }
 
 watch(detailOpen, (open) => { if (!open) detailGeneration += 1 })
+
+async function showOlderRoundWindow(): Promise<void> {
+  detailOpen.value = false
+  detailGeneration += 1
+  await board.showOlderRounds()
+}
+
+async function showNewerRoundWindow(): Promise<void> {
+  detailOpen.value = false
+  detailGeneration += 1
+  await board.showNewerRounds()
+}
+
+async function showLatestRoundWindow(): Promise<void> {
+  detailOpen.value = false
+  detailGeneration += 1
+  await board.showLatestRounds()
+}
 
 function entryActor(entry: NoCtfapiEndpointsCompetitionsScoreboardEntryResponse): string {
   if (entry.actorIndex === null || entry.actorIndex === undefined) return translate('系统')
@@ -302,6 +326,18 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="flex items-center gap-2 text-display text-xl"><Trophy class="size-5 text-primary" />{{ $t('排行榜') }}<Badge v-if="board.refreshing.value" variant="secondary">{{ $t('刷新中') }}</Badge></h2>
         <div class="flex flex-wrap items-center gap-3">
+          <div v-if="board.schema.value.mode === 'Awdp'" class="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" class="font-mono tabular-nums">{{ roundWindowLabel }}</Badge>
+            <Button variant="outline" size="sm" :disabled="board.refreshing.value || !board.canShowOlderRounds.value" @click="showOlderRoundWindow">
+              <ChevronLeft data-icon="inline-start" />{{ $t('较早轮次') }}
+            </Button>
+            <Button variant="outline" size="sm" :disabled="board.refreshing.value || !board.canShowNewerRounds.value" @click="showNewerRoundWindow">
+              {{ $t('较新轮次') }}<ChevronRight data-icon="inline-end" />
+            </Button>
+            <Button v-if="!board.viewingLatestRounds.value" variant="outline" size="sm" :disabled="board.refreshing.value" @click="showLatestRoundWindow">
+              <History data-icon="inline-start" />{{ $t('返回最新轮次') }}
+            </Button>
+          </div>
           <Select v-if="availableTracks.length > 1" v-model="selectedTrackKey">
             <SelectTrigger class="min-w-40" :aria-label="$t('选择排行榜赛道')"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem v-for="track in availableTracks" :key="track.key" :value="track.key!">{{ track.name }}</SelectItem></SelectContent>

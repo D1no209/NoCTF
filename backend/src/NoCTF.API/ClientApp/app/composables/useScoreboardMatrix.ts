@@ -45,6 +45,7 @@ export function useScoreboardMatrix(competitionId: string) {
   const refreshing = ref(false)
   const processing = ref(false)
   const error = ref<string | null>(null)
+  const requestedEndingRound = ref<number | null>(null)
   let generation = 0
   let stopped = false
   let retryTimer: ReturnType<typeof setTimeout> | null = null
@@ -76,8 +77,9 @@ export function useScoreboardMatrix(competitionId: string) {
     catalog?: boolean
     schema?: boolean
     snapshot?: boolean
-  } = { catalog: true, schema: true, snapshot: true }): Promise<void> {
+  } = { catalog: true, schema: true, snapshot: true }): Promise<boolean> {
     const requestGeneration = ++generation
+    const endingRound = requestedEndingRound.value
     refreshing.value = true
     const wantCatalog = options.catalog ?? false
     const wantSchema = options.schema ?? false
@@ -87,17 +89,24 @@ export function useScoreboardMatrix(competitionId: string) {
         ? getScoreboardChallengeCatalogEndpoint({ path: { competitionId } })
         : Promise.resolve(null),
       wantSchema
-        ? getScoreboardSchemaEndpoint({ path: { competitionId } })
+        ? getScoreboardSchemaEndpoint({
+            path: { competitionId },
+            query: { endingRound },
+          })
         : Promise.resolve(null),
       wantSnapshot
-        ? getLeaderboardEndpoint({ path: { competitionId } })
+        ? getLeaderboardEndpoint({
+            path: { competitionId },
+            query: { endingRound },
+          })
         : Promise.resolve(null),
     ])
-    if (stopped || requestGeneration !== generation) return
+    if (stopped || requestGeneration !== generation) return false
 
     const failures = [catalogResult, schemaResult, snapshotResult]
       .filter(result => result?.error)
       .map(result => parseApiError(result?.error, translate('加载记分板失败')).message)
+    let accepted = false
     if (failures.length) {
       error.value = failures[0] ?? translate('加载记分板失败')
     }
@@ -113,7 +122,7 @@ export function useScoreboardMatrix(competitionId: string) {
         let candidateSnapshot = snapshot.value
         if (snapshotResult?.data) {
           const incoming = snapshotResult.data as NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse
-          if ((incoming.version ?? 0) >= (snapshot.value?.version ?? 0)) candidateSnapshot = incoming
+          candidateSnapshot = incoming
         }
         if (isCoherentScoreboardBundle(candidateCatalog, candidateSchema, candidateSnapshot)) {
           catalog.value = candidateCatalog
@@ -121,6 +130,7 @@ export function useScoreboardMatrix(competitionId: string) {
           snapshot.value = candidateSnapshot
           coherenceRetryCount = 0
           error.value = null
+          accepted = true
         }
         else {
           scheduleCoherenceRetry()
@@ -130,9 +140,20 @@ export function useScoreboardMatrix(competitionId: string) {
     }
     loading.value = false
     refreshing.value = false
+    return accepted
   }
 
-  const trailingRefresh = createTrailingRefresh(async () => refresh({ snapshot: true }))
+  async function selectRoundWindow(endingRound: number | null): Promise<void> {
+    if (refreshing.value || requestedEndingRound.value === endingRound) return
+    const previousEndingRound = requestedEndingRound.value
+    requestedEndingRound.value = endingRound
+    if (!await refresh({ schema: true, snapshot: true }))
+      requestedEndingRound.value = previousEndingRound
+  }
+
+  const trailingRefresh = createTrailingRefresh(async () => {
+    await refresh({ schema: true, snapshot: true })
+  })
   let unwatch: (() => void) | null = null
 
   onMounted(() => {
@@ -144,7 +165,7 @@ export function useScoreboardMatrix(competitionId: string) {
           && notice.challengeCatalogRevision !== (catalog.value?.revision ?? null)
         const wantsSchema = notice.schemaRevision !== null
           && notice.schemaRevision !== (schema.value?.revision ?? null)
-        if ((notice.version ?? 0) <= (snapshot.value?.version ?? 0)
+        if ((notice.version ?? 0) === (snapshot.value?.version ?? 0)
           && !wantsCatalog && !wantsSchema) return
         if (wantsCatalog || wantsSchema) {
           void refresh({ catalog: wantsCatalog, schema: wantsSchema, snapshot: true })
@@ -187,6 +208,41 @@ export function useScoreboardMatrix(competitionId: string) {
       .filter(actor => actor.index !== undefined)
       .map(actor => [actor.index!, actor]),
   ))
+  const viewingLatestRounds = computed(() => {
+    if (schema.value?.mode !== 'Awdp') return true
+    const windowEnd = schema.value.roundWindowEnd
+    const latestRound = schema.value.latestRound
+    return windowEnd === null || windowEnd === undefined
+      || latestRound === null || latestRound === undefined
+      || windowEnd >= latestRound
+  })
+  const canShowOlderRounds = computed(() => snapshot.value?.dataScope !== 'Frozen'
+    && schema.value?.mode === 'Awdp'
+    && (schema.value.roundWindowStart ?? 1) > 1)
+  const canShowNewerRounds = computed(() => snapshot.value?.dataScope !== 'Frozen'
+    && schema.value?.mode === 'Awdp'
+    && !viewingLatestRounds.value)
+  const detailEndingRound = computed(() => viewingLatestRounds.value
+    ? null
+    : schema.value?.roundWindowEnd ?? null)
+
+  async function showOlderRounds(): Promise<void> {
+    const windowStart = schema.value?.roundWindowStart
+    if (!windowStart || windowStart <= 1) return
+    await selectRoundWindow(windowStart - 1)
+  }
+
+  async function showNewerRounds(): Promise<void> {
+    const windowEnd = schema.value?.roundWindowEnd
+    const latestRound = schema.value?.latestRound
+    if (!windowEnd || !latestRound || windowEnd >= latestRound) return
+    const nextEnd = Math.min(latestRound, windowEnd + 50)
+    await selectRoundWindow(nextEnd >= latestRound ? null : nextEnd)
+  }
+
+  async function showLatestRounds(): Promise<void> {
+    await selectRoundWindow(null)
+  }
 
   return {
     catalog,
@@ -196,7 +252,15 @@ export function useScoreboardMatrix(competitionId: string) {
     refreshing,
     processing,
     error,
+    requestedEndingRound,
     refresh,
+    showOlderRounds,
+    showNewerRounds,
+    showLatestRounds,
+    viewingLatestRounds,
+    canShowOlderRounds,
+    canShowNewerRounds,
+    detailEndingRound,
     challengesById,
     roundsById,
     columnsByIndex,

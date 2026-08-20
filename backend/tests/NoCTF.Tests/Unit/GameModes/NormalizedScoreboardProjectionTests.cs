@@ -281,6 +281,35 @@ public sealed class NormalizedScoreboardProjectionTests
     }
 
     [Test]
+    public async Task Challenge_catalog_revision_covers_effective_title_and_direction()
+    {
+        var competitionId = Guid.NewGuid();
+        var original = Challenge(1, "Web") with { Revision = 7 };
+        var renamed = original with { Title = "Renamed", Direction = "Pwn" };
+        var before = engine.ProjectScoreboard(new(
+            competitionId,
+            GameMode.Ctf,
+            [Team(1, "Alpha")],
+            [],
+            [original],
+            ProjectedAt: Start,
+            CompetitionStatus: CompetitionStatus.Running));
+        var after = engine.ProjectScoreboard(new(
+            competitionId,
+            GameMode.Ctf,
+            [Team(1, "Alpha")],
+            [],
+            [renamed],
+            ProjectedAt: Start,
+            CompetitionStatus: CompetitionStatus.Running));
+
+        await Assert.That(before.ChallengeCatalog.Revision)
+            .IsNotEqualTo(after.ChallengeCatalog.Revision);
+        await Assert.That(after.ChallengeCatalog.Challenges.Single().Title).IsEqualTo("Renamed");
+        await Assert.That(after.ChallengeCatalog.Challenges.Single().Direction).IsEqualTo("Pwn");
+    }
+
+    [Test]
     public async Task Koh_projects_control_without_round_axis()
     {
         var challenge = Challenge(1, "Misc", "{\"schemaVersion\":1}");
@@ -368,13 +397,10 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(row.GlobalAdjustments.Count).IsEqualTo(5);
         await Assert.That(projection.Snapshot.Actors.Count).IsEqualTo(10);
         await Assert.That(projection.DetailActors.Count).IsEqualTo(10);
-        await Assert.That(projection.EntryAllocations.Count).IsEqualTo(5);
-        await Assert.That(projection.EntryAllocations
-            .Where(entry => entry.Entry.ActorIndex is not null)
-            .All(entry => entry.Entry.ActorIndex < projection.DetailActors.Count)).IsTrue();
+        await Assert.That(projection.EntryAllocations).HasSingleItem();
+        await Assert.That(projection.EntryAllocations.Single().Entry.ActorIndex).IsNull();
+        await Assert.That(projection.EntryAllocations.Single().Source!.ActorUserId).IsNull();
         await Assert.That(projection.EntryAllocations.All(entry => entry.Entry.NetPoints == -1)).IsTrue();
-        await Assert.That(projection.EntryAllocations.Select(entry => entry.Entry.Id))
-            .IsEquivalentTo(slot.Entries.Select(entry => entry.Id));
         await Assert.That(row.TotalScore).IsEqualTo(0L);
     }
 
@@ -457,6 +483,73 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(projection.Snapshot.Teams.Count).IsEqualTo(100);
         await Assert.That(projection.Snapshot.Teams.Sum(team => team.Slots.Count)).IsEqualTo(49);
         await Assert.That(projection.Snapshot.Teams.Count(team => team.Slots.Count > 0)).IsEqualTo(1);
+    }
+
+    [Test]
+    public async Task Awdp_long_history_keeps_only_the_latest_bounded_round_window()
+    {
+        const int elapsedSeconds = 30 * 24 * 60 * 60;
+        var challenge = Challenge(1, "Pwn", "{\"schemaVersion\":4}");
+        var team = Team(1, "Alpha");
+        var configuration = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            1,
+            FixedCurve(100),
+            FixedCurve(40),
+            RequireBreakBeforeFix: false), JsonOptions);
+        var projection = engine.ProjectScoreboard(new(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            [team],
+            [Fact(team.Id, challenge.Id, GameplayFactKind.BreakAttempt, 1,
+                GameplayFactResult.Correct)],
+            [challenge],
+            configuration,
+            Start,
+            ProjectedAt: Start.AddSeconds(elapsedSeconds),
+            CompetitionStatus: CompetitionStatus.Running));
+
+        await Assert.That(projection.Schema.Rounds.Count).IsEqualTo(ScoreboardRoundWindow.DefaultSize);
+        await Assert.That(projection.Schema.RoundWindowStart).IsEqualTo(elapsedSeconds - 48);
+        await Assert.That(projection.Schema.RoundWindowEnd).IsEqualTo(elapsedSeconds + 1);
+        await Assert.That(projection.Schema.LatestRound).IsEqualTo(elapsedSeconds + 1);
+        await Assert.That(projection.Schema.Columns.Count).IsEqualTo(ScoreboardRoundWindow.DefaultSize);
+        await Assert.That(projection.Snapshot.Teams.Single().TotalScore)
+            .IsEqualTo(100L * (elapsedSeconds - 1));
+    }
+
+    [Test]
+    public async Task Awdp_explicit_window_keeps_authoritative_total_and_projects_requested_rounds()
+    {
+        const int elapsedSeconds = 1_000;
+        var challenge = Challenge(1, "Pwn", "{\"schemaVersion\":4}");
+        var team = Team(1, "Alpha");
+        var configuration = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            1,
+            FixedCurve(100),
+            FixedCurve(40),
+            RequireBreakBeforeFix: false), JsonOptions);
+        var projection = engine.ProjectScoreboard(new(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            [team],
+            [Fact(team.Id, challenge.Id, GameplayFactKind.BreakAttempt, 1,
+                GameplayFactResult.Correct)],
+            [challenge],
+            configuration,
+            Start,
+            ProjectedAt: Start.AddSeconds(elapsedSeconds),
+            CompetitionStatus: CompetitionStatus.Running,
+            ScoreboardRoundWindowEnd: 100));
+
+        await Assert.That(projection.Schema.Rounds.Select(round => round.Number))
+            .IsEquivalentTo(Enumerable.Range(51, 50));
+        await Assert.That(projection.Schema.RoundWindowStart).IsEqualTo(51);
+        await Assert.That(projection.Schema.RoundWindowEnd).IsEqualTo(100);
+        await Assert.That(projection.Schema.LatestRound).IsEqualTo(elapsedSeconds + 1);
+        await Assert.That(projection.Snapshot.Teams.Single().TotalScore)
+            .IsEqualTo(100L * (elapsedSeconds - 1));
     }
 
     [Test]
