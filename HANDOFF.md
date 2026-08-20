@@ -1,5 +1,16 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-21 alpha.65 AWDP 长赛轮次窗口与排行榜一致性修复
+
+- `f3a77951` 将 AWDP 主排行榜矩阵约束为最多 50 个连续轮次，并提供按 `endingRound` 向前、向后及返回最新轮次的历史窗口导航。全赛历史仍用于权威累计总分；历史窗口只读取自身 `[startAt, endAt)` 内的 Break/Fix 事实，后续轮次提交不会污染旧窗口，人工调分始终从全历史只计一次，不会因窗口查询重复累加。
+- Schema 明确返回 `roundWindowStart`、`roundWindowEnd` 与 `latestRound`；Leaderboard、Schema、Slot Detail 三个强类型接口使用同一窗口边界，Slot Detail 签名游标也绑定窗口范围。冻结榜忽略实时历史窗口参数，继续只读取冻结时的权威快照。
+- 主快照继续只保留每个 Slot 最多 5 条摘要，但内部明细 allocation 来自完整已构建 Slot，因此分页详情不会再丢失被压缩摘要之外的旧记录。历史窗口导航失败会保留上一份成功数据；实时刷新会同步 Schema 与 Snapshot，客户端不再把 wall-clock 版本号误当作跨重启绝对单调时钟，缓存端则在同一缓存历史中保证新版本高于旧版本。
+- Challenge 模板标题、方向、分类、顺序、发布状态与 revision 都进入目录 revision；标题或方向变更会将所有引用比赛标记为 `LeaderboardDirty`，避免排行榜长期显示旧题目元数据。
+- `8a68159c` 将版本从 `0.1.0-alpha.64` 递增到 `0.1.0-alpha.65`。本阶段没有新增业务表、字段、EF migration 或 snapshot；EF `has-pending-model-changes` 确认无模型漂移。
+- 两份 OpenAPI 由工具连续导出两轮且 SHA-256 均为 `84569D15E9DB5ECAED2259004674C9AFD25B78BE567AB3D4B6F9DE4F64219060`；TypeScript SDK 连续生成两轮，`types.gen.ts` SHA-256 均为 `EEFA2DB75F47DEAD473305A390132248144F39EB194A67A18BA794BB50BC04C0`，生成结果幂等且未手工修改 SDK。
+- 验证：Release solution build 0 warning/0 error；完整非 Integration TUnit 856/856；完整 Integration 189 项中 187 通过、0 失败，2 项仅因未配置真实 Kubernetes/Libvirt 环境按设计跳过；排行榜 Endpoint 16/16；真实 PostgreSQL 长历史窗口、未来事实隔离、人工调分去重、封禁/解封重投影与题目元数据失效测试均通过；前端 `bun test` 243/243、typecheck、production build；C# analyzers 与 `git diff --check` 通过。仓库没有 lint script，未将 lint 误报为已执行。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`；未推送、未部署、未操作生产数据。本轮没有重新执行四模式 Full E2E，未将既有结果冒充为本轮验证。
+
 ## 2026-08-21 alpha.64 排行榜权威状态与暂停轮次修复
 
 - `3cbcdb8f` 修复公开 CTF/AWDP 中控对封禁、失格队伍伪造名次的问题。前端现在只展示后端投影返回的权威 `rank`；无名次队伍显示 `—` 和强类型排名状态，不再用数组位置生成排名或趋势。
