@@ -12,6 +12,7 @@ public sealed record ScoreboardSlotDetailFact(
     GameplayFactReferenceKind? ReferenceKind,
     Guid? ReferenceId,
     Guid? ActorUserId,
+    string? ActorDisplayName,
     Guid? VictimTeamId,
     bool ScoringIdentityKnown,
     DateTimeOffset OccurredAt);
@@ -32,6 +33,7 @@ public sealed record ScoreboardSlotDetailQuery(
 public sealed record ScoreboardAdjustmentDetailFact(
     Guid Id,
     Guid? ActorUserId,
+    string? ActorDisplayName,
     DateTimeOffset OccurredAt,
     long Delta);
 

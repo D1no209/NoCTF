@@ -141,8 +141,44 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             position?.CreatedAt,
             position?.Id,
             request.Limit + 1), cancellationToken);
-        var actorIndexesByUserId = projection.DetailActors
+        var cachedActorsByIndex = projection.DetailActors.ToDictionary(actor => actor.Index);
+        var pageActors = facts
+            .Where(fact => fact.ActorUserId is not null)
+            .Select(fact => new
+            {
+                UserId = fact.ActorUserId!.Value,
+                DisplayName = string.IsNullOrWhiteSpace(fact.ActorDisplayName)
+                    ? "-"
+                    : fact.ActorDisplayName
+            })
+            .Concat(synthetic
+                .Where(allocation => allocation.Entry.ActorIndex is int index
+                    && cachedActorsByIndex.ContainsKey(index))
+                .Select(allocation =>
+                {
+                    var actor = cachedActorsByIndex[allocation.Entry.ActorIndex!.Value];
+                    return new { actor.UserId, actor.DisplayName };
+                }))
+            .GroupBy(actor => actor.UserId)
+            .OrderBy(group => group.Key)
+            .Select((group, index) => new ScoreboardActor(
+                index,
+                group.Key,
+                group.Select(actor => actor.DisplayName)
+                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "-"))
+            .ToArray();
+        var actorIndexesByUserId = pageActors
             .ToDictionary(actor => actor.UserId, actor => actor.Index);
+        var cachedActorUserIdsByIndex = projection.DetailActors
+            .ToDictionary(actor => actor.Index, actor => actor.UserId);
+        ScoreboardSlotEntry RemapSyntheticActor(ScoreboardSlotEntry entry) => entry with
+        {
+            ActorIndex = entry.ActorIndex is int actorIndex
+                && cachedActorUserIdsByIndex.TryGetValue(actorIndex, out var actorUserId)
+                && actorIndexesByUserId.TryGetValue(actorUserId, out var pageActorIndex)
+                    ? pageActorIndex
+                    : null
+        };
         var visibleTeamIds = projection.Snapshot.Teams
             .Select(item => item.TeamId)
             .ToHashSet();
@@ -155,7 +191,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
                 round?.SettledAt,
                 actorIndexesByUserId,
                 visibleTeamIds))
-            .Concat(synthetic.Select(allocation => allocation.Entry))
+            .Concat(synthetic.Select(allocation => RemapSyntheticActor(allocation.Entry)))
             .OrderByDescending(entry => entry.OccurredAt)
             .ThenByDescending(entry => entry.Id)
             .Take(request.Limit + 1)
@@ -165,13 +201,28 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             .Where(entry => entry.ActorIndex is not null)
             .Select(entry => entry.ActorIndex!.Value)
             .ToHashSet();
-        var actors = projection.DetailActors
+        var actorPairs = pageActors
             .Where(actor => actorIndexes.Contains(actor.Index))
             .OrderBy(actor => actor.Index)
-            .Select(actor => new ScoreboardActorResponse(
-                actor.Index,
-                actor.UserId,
-                actor.DisplayName))
+            .Select((actor, index) => new
+            {
+                OldIndex = actor.Index,
+                Actor = actor with { Index = index }
+            })
+            .ToArray();
+        var pageActorIndexMap = actorPairs.ToDictionary(pair => pair.OldIndex, pair => pair.Actor.Index);
+        page = page.Select(entry => entry with
+        {
+            ActorIndex = entry.ActorIndex is int actorIndex
+                && pageActorIndexMap.TryGetValue(actorIndex, out var mappedActorIndex)
+                    ? mappedActorIndex
+                    : null
+        }).ToArray();
+        var actors = actorPairs
+            .Select(pair => new ScoreboardActorResponse(
+                pair.Actor.Index,
+                pair.Actor.UserId,
+                pair.Actor.DisplayName))
             .ToArray();
         var mapped = page
             .Select(ScoreboardProtocolMapper.ToResponse)

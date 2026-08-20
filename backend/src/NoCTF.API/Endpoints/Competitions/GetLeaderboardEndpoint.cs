@@ -379,9 +379,6 @@ internal static class ScoreboardAudienceProjection
                         TargetTeamId = VisibleTarget(allocation.Entry.TargetTeamId)
                     }
                 })
-                .ToArray(),
-            AdjustmentAllocations = projection.AdjustmentAllocations
-                .Where(allocation => visibleTeamIds.Contains(allocation.TeamId))
                 .ToArray()
         };
     }

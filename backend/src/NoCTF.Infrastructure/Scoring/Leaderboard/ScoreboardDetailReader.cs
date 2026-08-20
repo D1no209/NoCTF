@@ -81,6 +81,14 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
         var adjudications = await db.CompetitionEvents.AsNoTracking()
             .Where(@event => latestEventIds.Contains(@event.Id))
             .ToDictionaryAsync(@event => @event.SubjectId, cancellationToken);
+        var actorIds = rows
+            .Where(row => row.ActorUserId is not null)
+            .Select(row => row.ActorUserId!.Value)
+            .Distinct()
+            .ToArray();
+        var actorNames = await db.Users.AsNoTracking()
+            .Where(user => actorIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, user => user.UserName, cancellationToken);
 
         var result = rows.Select(row =>
         {
@@ -100,6 +108,9 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
                 row.ReferenceKind,
                 row.ReferenceId,
                 row.ActorUserId,
+                row.ActorUserId is Guid actorUserId
+                    ? actorNames.GetValueOrDefault(actorUserId)
+                    : null,
                 useCurrent ? row.VictimTeamId : null,
                 useCurrent,
                 row.OccurredAt);
@@ -112,6 +123,9 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
         ScoreboardAdjustmentDetailQuery query,
         CancellationToken cancellationToken)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
         var facts = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == query.CompetitionId
                 && fact.TeamId == query.TeamId
@@ -130,11 +144,24 @@ public sealed class ScoreboardDetailReader(NoCtfDbContext db) : IScoreboardDetai
             .Select(fact => new { fact.Id, fact.ActorUserId, fact.OccurredAt, fact.Value })
             .Take(query.Limit)
             .ToArrayAsync(cancellationToken);
-        return rows.Select(row => new ScoreboardAdjustmentDetailFact(
+        var actorIds = rows
+            .Where(row => row.ActorUserId is not null)
+            .Select(row => row.ActorUserId!.Value)
+            .Distinct()
+            .ToArray();
+        var actorNames = await db.Users.AsNoTracking()
+            .Where(user => actorIds.Contains(user.Id))
+            .ToDictionaryAsync(user => user.Id, user => user.UserName, cancellationToken);
+        var result = rows.Select(row => new ScoreboardAdjustmentDetailFact(
             row.Id,
             row.ActorUserId,
+            row.ActorUserId is Guid actorUserId
+                ? actorNames.GetValueOrDefault(actorUserId)
+                : null,
             row.OccurredAt,
             long.Parse(row.Value!, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture)))
             .ToArray();
+        await transaction.CommitAsync(cancellationToken);
+        return result;
     }
 }

@@ -228,16 +228,6 @@ public sealed record ScoreboardAdjustment(
     long DeductedPoints,
     long NetPoints);
 
-public sealed record ScoreboardAdjustmentAllocation(
-    Guid TeamId,
-    Guid Id,
-    ScoreboardAdjustmentKind Kind,
-    DateTimeOffset OccurredAt,
-    int? ActorIndex,
-    long EarnedPoints,
-    long DeductedPoints,
-    long NetPoints);
-
 public sealed record ScoreboardSlot(
     int ColumnIndex,
     ScoreboardScoreState ScoreState,
@@ -285,9 +275,8 @@ public sealed record ScoreboardProjection(
     ScoreboardSchema Schema,
     ScoreboardSnapshot Snapshot)
 {
-    // Full per-entry allocations are an internal query projection. The public snapshot
-    // remains compact, while cursor-paged details can return the exact settled score.
+    // These allocations mirror only the compact snapshot entries. Complete history is
+    // read from PostgreSQL through signed cursor-paged detail endpoints.
     public IReadOnlyList<ScoreboardActor> DetailActors { get; init; } = [];
     public IReadOnlyList<ScoreboardEntryAllocation> EntryAllocations { get; init; } = [];
-    public IReadOnlyList<ScoreboardAdjustmentAllocation> AdjustmentAllocations { get; init; } = [];
 }

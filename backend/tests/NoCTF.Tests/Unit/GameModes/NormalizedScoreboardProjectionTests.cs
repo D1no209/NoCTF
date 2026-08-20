@@ -315,8 +315,14 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(row.GlobalAdjustmentCount).IsEqualTo(12);
         await Assert.That(row.GlobalAdjustments.Count).IsEqualTo(5);
         await Assert.That(projection.Snapshot.Actors.Count).IsEqualTo(10);
-        await Assert.That(projection.EntryAllocations.Count).IsEqualTo(12);
+        await Assert.That(projection.DetailActors.Count).IsEqualTo(10);
+        await Assert.That(projection.EntryAllocations.Count).IsEqualTo(5);
+        await Assert.That(projection.EntryAllocations
+            .Where(entry => entry.Entry.ActorIndex is not null)
+            .All(entry => entry.Entry.ActorIndex < projection.DetailActors.Count)).IsTrue();
         await Assert.That(projection.EntryAllocations.All(entry => entry.Entry.NetPoints == -1)).IsTrue();
+        await Assert.That(projection.EntryAllocations.Select(entry => entry.Entry.Id))
+            .IsEquivalentTo(slot.Entries.Select(entry => entry.Id));
         await Assert.That(row.TotalScore).IsEqualTo(0L);
     }
 
