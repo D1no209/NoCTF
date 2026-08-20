@@ -293,9 +293,9 @@ public sealed class FusionLeaderboardCache(
             CurrentRoundRemainingSeconds = projection.CurrentRoundRemainingSeconds
         };
         var scoreboard = projectionEngine.ProjectScoreboard(projectionInput);
-        scoreboard = scoreboard with
+        ScoreboardProjection AddResponseMetadata(ScoreboardProjection value) => value with
         {
-            Snapshot = scoreboard.Snapshot with
+            Snapshot = value.Snapshot with
             {
                 Tracks = trackConfiguration.Tracks.Select(track => new ScoreboardTrack(
                     track.Key,
@@ -306,6 +306,29 @@ public sealed class FusionLeaderboardCache(
                 DataScope = LeaderboardDataScope.Live,
                 DataAsOf = projectedAt
             }
+        };
+        scoreboard = AddResponseMetadata(scoreboard);
+        var publishedChallengeIds = challenges
+            .Where(challenge => challenge.IsPublished)
+            .Select(challenge => challenge.Id)
+            .ToHashSet();
+        bool IsParticipantVisible(LeaderboardGameplayFact fact) =>
+            fact.CompetitionChallengeId is not Guid challengeId
+            || publishedChallengeIds.Contains(challengeId);
+        var participantInput = projectionInput with
+        {
+            Challenges = challenges.Where(challenge => challenge.IsPublished).ToArray(),
+            GameplayFacts = legacyFacts.Where(IsParticipantVisible).ToArray(),
+            ScoreboardGameplayFacts = scoreboardFacts.Where(IsParticipantVisible).ToArray(),
+            AwdRounds = awdRounds
+                .Where(round => publishedChallengeIds.Contains(round.CompetitionChallengeId))
+                .ToArray()
+        };
+        var participantScoreboard = AddResponseMetadata(
+            projectionEngine.ProjectScoreboard(participantInput));
+        scoreboard = scoreboard with
+        {
+            ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
         };
         return new(legacy, scoreboard);
     }
@@ -424,7 +447,13 @@ public sealed class FusionLeaderboardCache(
         {
             Scoreboard = candidate.Scoreboard with
             {
-                Snapshot = candidate.Scoreboard.Snapshot with { Version = nextVersion }
+                Snapshot = candidate.Scoreboard.Snapshot with { Version = nextVersion },
+                ParticipantView = candidate.Scoreboard.ParticipantView is { } participant
+                    ? participant with
+                    {
+                        Snapshot = participant.Snapshot with { Version = nextVersion }
+                    }
+                    : null
             }
         };
     }

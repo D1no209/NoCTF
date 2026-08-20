@@ -293,4 +293,29 @@ public sealed record ScoreboardProjection(
     // without embedding raw history in the main snapshot.
     public IReadOnlyList<ScoreboardActor> DetailActors { get; init; } = [];
     public IReadOnlyList<ScoreboardEntryAllocation> EntryAllocations { get; init; } = [];
+    public ScoreboardAudienceView? ParticipantView { get; init; }
+}
+
+public sealed record ScoreboardAudienceView(
+    ScoreboardChallengeCatalog ChallengeCatalog,
+    ScoreboardSchema Schema,
+    ScoreboardSnapshot Snapshot)
+{
+    public IReadOnlyList<ScoreboardActor> DetailActors { get; init; } = [];
+    public IReadOnlyList<ScoreboardEntryAllocation> EntryAllocations { get; init; } = [];
+
+    public static ScoreboardAudienceView From(ScoreboardProjection projection) => new(
+        projection.ChallengeCatalog,
+        projection.Schema,
+        projection.Snapshot)
+    {
+        DetailActors = projection.DetailActors,
+        EntryAllocations = projection.EntryAllocations
+    };
+
+    public ScoreboardProjection ToProjection() => new(ChallengeCatalog, Schema, Snapshot)
+    {
+        DetailActors = DetailActors,
+        EntryAllocations = EntryAllocations
+    };
 }

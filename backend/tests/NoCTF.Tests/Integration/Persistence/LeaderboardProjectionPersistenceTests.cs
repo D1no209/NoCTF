@@ -104,6 +104,111 @@ public sealed class LeaderboardProjectionPersistenceTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Participant_projection_excludes_unpublished_challenge_scores(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_participant_scoreboard_visibility")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var projectedAt = DateTimeOffset.UtcNow;
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+            var owner = CreateUser(projectedAt);
+            var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, projectedAt);
+            var visibleFact = fixture.Facts[0];
+            visibleFact.Result = GameplayFactResult.Correct;
+            var hiddenTemplate = new Challenge
+            {
+                Id = Guid.CreateVersion7(projectedAt.AddMinutes(40)),
+                OwnerId = owner.Id,
+                Mode = GameMode.Ctf,
+                Visibility = ChallengeVisibility.Private,
+                Title = "Hidden challenge",
+                Direction = "Pwn",
+                DefinitionJson = fixture.Challenge.DefinitionJson,
+                Revision = 1,
+                CreatedAt = projectedAt.AddMinutes(-20),
+                UpdatedAt = projectedAt.AddMinutes(-20)
+            };
+            var hiddenChallenge = new CompetitionChallenge
+            {
+                Id = Guid.CreateVersion7(projectedAt.AddMinutes(41)),
+                CompetitionId = fixture.Competition.Id,
+                ChallengeId = hiddenTemplate.Id,
+                BaseScore = 500,
+                Order = 2,
+                IsPublished = false,
+                RulesJson = fixture.CompetitionChallenge.RulesJson,
+                Revision = 1,
+                UpdatedAt = projectedAt.AddMinutes(-20)
+            };
+            var hiddenFact = new GameplayFact
+            {
+                Id = Guid.CreateVersion7(projectedAt.AddMinutes(-10)),
+                CompetitionId = fixture.Competition.Id,
+                CompetitionChallengeId = hiddenChallenge.Id,
+                TeamId = fixture.Team.Id,
+                ActorUserId = owner.Id,
+                Kind = GameplayFactKind.FlagAttempt,
+                OccurredAt = projectedAt.AddMinutes(-10),
+                Value = "flag{hidden}",
+                ValueSha256 = new byte[32],
+                State = GameplayFactState.Completed,
+                Result = GameplayFactResult.Correct,
+                UpdatedAt = projectedAt.AddMinutes(-10)
+            };
+            db.Users.Add(owner);
+            db.Competitions.Add(fixture.Competition);
+            db.Challenges.AddRange(fixture.Challenge, hiddenTemplate);
+            db.CompetitionChallenges.AddRange(fixture.CompetitionChallenge, hiddenChallenge);
+            db.Teams.Add(fixture.Team);
+            db.GameplayFacts.AddRange(visibleFact, hiddenFact);
+            await db.SaveChangesAsync(cancellationToken);
+
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.Leaderboards)
+                .Services
+                .BuildServiceProvider();
+            var cache = new FusionLeaderboardCache(
+                db,
+                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                Substitute.For<ILeaderboardRefreshPublisher>(),
+                cacheServices.GetRequiredService<IFusionCacheProvider>());
+
+            var full = await cache.CreateScoreboardAsync(
+                fixture.Competition.Id,
+                projectedAt,
+                cancellationToken);
+
+            await Assert.That(full).IsNotNull();
+            await Assert.That(full!.ParticipantView).IsNotNull();
+            var participant = full.ParticipantView!.ToProjection();
+            await Assert.That(full.ChallengeCatalog.Challenges).Count().IsEqualTo(2);
+            await Assert.That(participant.ChallengeCatalog.Challenges).HasSingleItem();
+            await Assert.That(participant.ChallengeCatalog.Challenges[0].CompetitionChallengeId)
+                .IsEqualTo(fixture.CompetitionChallenge.Id);
+            var fullTeam = full.Snapshot.Teams.Single();
+            var participantTeam = participant.Snapshot.Teams.Single();
+            await Assert.That(participantTeam.TotalScore).IsLessThan(fullTeam.TotalScore);
+            await Assert.That(participantTeam.TotalScore).IsEqualTo(checked(
+                participantTeam.Slots.Sum(slot => slot.NetPoints.GetValueOrDefault())
+                + participantTeam.ScoreOutsideWindow
+                + participantTeam.GlobalAdjustments.Sum(adjustment => adjustment.NetPoints)));
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Awdp_long_history_uses_a_bounded_round_window_without_losing_total_score(
         CancellationToken cancellationToken)
     {
