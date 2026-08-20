@@ -223,15 +223,18 @@ public sealed class LeaderboardEndpointTests
         var challengeId = Guid.CreateVersion7();
         var firstTeamId = Guid.CreateVersion7();
         var secondTeamId = Guid.CreateVersion7();
+        var firstActorId = Guid.CreateVersion7();
+        var secondActorId = Guid.CreateVersion7();
+        var thirdActorId = Guid.CreateVersion7();
         var occurredAt = DateTimeOffset.UtcNow;
         var detailReader = new RecordingSlotDetailReader(
         [
             new(Guid.CreateVersion7(), GameplayFactKind.FlagAttempt, GameplayFactState.Completed,
-                GameplayFactResult.Correct, Guid.CreateVersion7(), null, occurredAt),
+                GameplayFactResult.Correct, firstActorId, "First player", null, occurredAt),
             new(Guid.CreateVersion7(), GameplayFactKind.FlagAttempt, GameplayFactState.Completed,
-                GameplayFactResult.Wrong, Guid.CreateVersion7(), null, occurredAt.AddSeconds(-1)),
+                GameplayFactResult.Wrong, secondActorId, "Second player", null, occurredAt.AddSeconds(-1)),
             new(Guid.CreateVersion7(), GameplayFactKind.FlagAttempt, GameplayFactState.Completed,
-                GameplayFactResult.Duplicate, Guid.CreateVersion7(), null, occurredAt.AddSeconds(-2))
+                GameplayFactResult.Duplicate, thirdActorId, "Third player", null, occurredAt.AddSeconds(-2))
         ]);
         var slot = new ScoreboardSlot(
             0,
@@ -247,8 +250,8 @@ public sealed class LeaderboardEndpointTests
             [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
             [new(0, challengeId, null)],
             [
-                new(firstTeamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, 400, [], [slot]),
-                new(secondTeamId, "Beta", "default", 2, ScoreboardRankingState.Eligible, 400, [], [slot])
+                new(firstTeamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, 400, 0, [], [slot]),
+                new(secondTeamId, "Beta", "default", 2, ScoreboardRankingState.Eligible, 400, 0, [], [slot])
             ]);
         await using var app = await CreateApplicationAsync(
             competitionId,
@@ -263,6 +266,10 @@ public sealed class LeaderboardEndpointTests
 
         await Assert.That(first.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(page!.Items).Count().IsEqualTo(2);
+        await Assert.That(page.Actors.Select(actor => actor.UserId))
+            .IsEquivalentTo([firstActorId, secondActorId]);
+        await Assert.That(page.Items.Select(item => item.ActorIndex))
+            .IsEquivalentTo(new int?[] { 0, 1 });
         await Assert.That(page.NextCursor).IsNotNull();
         await Assert.That(page.EarnedPoints).IsEqualTo(500);
         await Assert.That(page.DeductedPoints).IsEqualTo(100);
@@ -271,6 +278,8 @@ public sealed class LeaderboardEndpointTests
         await Assert.That(page.Items.All(item => item.DeductedPoints == 0)).IsTrue();
         await Assert.That(page.Items.All(item => item.NetPoints == 0)).IsTrue();
         await Assert.That(detailReader.Queries.Single().Limit).IsEqualTo(3);
+        await Assert.That(detailReader.Queries.Single().DataAsOf)
+            .IsEqualTo(projection.Snapshot.GeneratedAt);
 
         var cursor = Uri.EscapeDataString(page.NextCursor!);
         using var otherTeam = await client.GetAsync(
@@ -283,6 +292,114 @@ public sealed class LeaderboardEndpointTests
         await Assert.That(tamperedResponse.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
     }
 
+    [Test]
+    public async Task Public_snapshot_and_slot_detail_hide_internal_track_teams_and_actors()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var publicTeamId = Guid.CreateVersion7();
+        var internalTeamId = Guid.CreateVersion7();
+        var publicActorId = Guid.CreateVersion7();
+        var internalActorId = Guid.CreateVersion7();
+        var slot = new ScoreboardSlot(
+            0,
+            ScoreboardScoreState.Provisional,
+            1,
+            0,
+            1,
+            1,
+            [],
+            [new(Guid.CreateVersion7(), ScoreboardEntryKind.Solve, ScoreboardEntryOutcome.Succeeded,
+                0, null, DateTimeOffset.UtcNow, null, 1, 0, 1)]);
+        var internalSlot = slot with
+        {
+            Entries = [slot.Entries[0] with { Id = Guid.CreateVersion7(), ActorIndex = 1 }]
+        };
+        var projection = CreateProjection(
+            competitionId,
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(0, challengeId, null)],
+            [
+                new(publicTeamId, "Public", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], [slot]),
+                new(internalTeamId, "Internal", "staff", null, ScoreboardRankingState.Disqualified, 1, 0, [], [internalSlot])
+            ],
+            [
+                new(0, publicActorId, "Public player"),
+                new(1, internalActorId, "Internal player")
+            ]);
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(projection: projection),
+            new RecordingMessagePublisher(),
+            trackStore: new InternalTrackStore(competitionId));
+        using var client = app.GetTestClient();
+
+        using var leaderboardResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var leaderboard = await leaderboardResponse.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+        using var detailResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/columns/0");
+
+        await Assert.That(leaderboardResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(leaderboard!.Teams.Select(team => team.TeamId)).IsEquivalentTo([publicTeamId]);
+        await Assert.That(leaderboard.Actors.Select(actor => actor.UserId)).IsEquivalentTo([publicActorId]);
+        await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+    }
+
+    [Test]
+    public async Task Slot_detail_cursor_is_invalidated_when_frozen_snapshot_identity_changes()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var teamId = Guid.CreateVersion7();
+        var occurredAt = DateTimeOffset.UtcNow;
+        var facts = new RecordingSlotDetailReader([
+            new(Guid.CreateVersion7(), GameplayFactKind.FlagAttempt, GameplayFactState.Completed,
+                GameplayFactResult.Correct, null, null, null, occurredAt),
+            new(Guid.CreateVersion7(), GameplayFactKind.FlagAttempt, GameplayFactState.Completed,
+                GameplayFactResult.Wrong, null, null, null, occurredAt.AddSeconds(-1))
+        ]);
+        var slot = new ScoreboardSlot(
+            0, ScoreboardScoreState.Settled, 1, 0, 1, 2, [], []);
+        var first = CreateProjection(
+            competitionId,
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(0, challengeId, null)],
+            [new(teamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], [slot])]);
+        first = first with
+        {
+            Snapshot = first.Snapshot with { DataAsOf = occurredAt, Version = 17 }
+        };
+        var second = first with
+        {
+            Snapshot = first.Snapshot with
+            {
+                DataAsOf = occurredAt.AddSeconds(1),
+                Version = 18
+            }
+        };
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new SwitchingLeaderboard(first, second),
+            new RecordingMessagePublisher(),
+            CompetitionLeaderboardVisibility.Frozen,
+            LeaderboardDataScope.Frozen,
+            details: facts);
+        using var client = app.GetTestClient();
+        var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/0?limit=1";
+
+        using var firstResponse = await client.GetAsync(route);
+        var page = await firstResponse.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
+        using var secondResponse = await client.GetAsync(
+            $"{route}&cursor={Uri.EscapeDataString(page!.NextCursor!)}");
+
+        await Assert.That(firstResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(page.NextCursor).IsNotNull();
+        await Assert.That(secondResponse.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(facts.Queries).Count().IsEqualTo(1);
+        await Assert.That(facts.Queries[0].DataAsOf).IsEqualTo(occurredAt);
+    }
+
     private static async Task<WebApplication> CreateApplicationAsync(
         Guid competitionId,
         ILeaderboardCache leaderboard,
@@ -290,7 +407,8 @@ public sealed class LeaderboardEndpointTests
         CompetitionLeaderboardVisibility visibility = CompetitionLeaderboardVisibility.Normal,
         LeaderboardDataScope dataScope = LeaderboardDataScope.Live,
         GameMode gameMode = GameMode.Ctf,
-        IScoreboardSlotDetailReader? details = null)
+        IScoreboardSlotDetailReader? details = null,
+        ICompetitionTrackStore? trackStore = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -315,7 +433,8 @@ public sealed class LeaderboardEndpointTests
         builder.Services.AddSingleton<ICompetitionVisibilityAccess>(
             new PublicVisibilityAccess(competitionId, gameMode, visibility, dataScope));
         builder.Services.AddSingleton<GetCompetitionTracks>();
-        builder.Services.AddSingleton<ICompetitionTrackStore>(new DefaultTrackStore(competitionId));
+        builder.Services.AddSingleton<ICompetitionTrackStore>(
+            trackStore ?? new DefaultTrackStore(competitionId));
         builder.Services.AddSingleton<ICompetitionModerationAuthorizer>(new NoStaffAccess());
         builder.Services.AddSingleton<IUserContext>(new AnonymousUserContext());
         builder.Services.AddSingleton<NoCTF.API.Pagination.SignedKeysetCursor>();
@@ -485,6 +604,65 @@ public sealed class LeaderboardEndpointTests
         }
     }
 
+    private sealed class SwitchingLeaderboard(
+        ScoreboardProjection first,
+        ScoreboardProjection second) : ILeaderboardCache
+    {
+        private int reads;
+
+        public Task<ScoreboardProjection?> GetFrozenScoreboardAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<ScoreboardProjection?>(Interlocked.Increment(ref reads) == 1
+                ? first
+                : second);
+
+        public Task<LeaderboardResponse?> GetFrozenAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
+
+        public Task<ScoreboardProjection?> GetScoreboardAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult<ScoreboardProjection?>(null);
+
+        public Task<LeaderboardResponse?> GetAsync(
+            Guid competitionId,
+            CancellationToken cancellationToken) => Task.FromResult<LeaderboardResponse?>(null);
+
+        public Task RefreshAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task InvalidateAsync(Guid competitionId, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class InternalTrackStore(Guid competitionId) : ICompetitionTrackStore
+    {
+        public Task<CompetitionTracksView?> GetAsync(
+            Guid requestedCompetitionId,
+            Guid? viewerUserId,
+            bool includeInternal,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<CompetitionTracksView?>(requestedCompetitionId == competitionId
+                ? new CompetitionTracksView(
+                    competitionId,
+                    GameMode.Ctf,
+                    CompetitionStatus.Running,
+                    1,
+                    false,
+                    [
+                        new("default", "Default", true, true, false, true, true, true, true, true),
+                        new("staff", "Staff", false, false, true, false, false, false, false, false)
+                    ])
+                : null);
+
+        public Task<NoCTF.Application.Common.OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
+            UpdateCompetitionTracksCommand command,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task<NoCTF.Application.Common.OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode>> AssignAsync(
+            AssignTeamTrackCommand command,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
+
     private sealed class RecordingSlotDetailReader(
         IReadOnlyList<ScoreboardSlotDetailFact> facts) : IScoreboardSlotDetailReader
     {
@@ -503,10 +681,11 @@ public sealed class LeaderboardEndpointTests
         Guid competitionId,
         IReadOnlyList<ScoreboardChallengeCatalogItem> challenges,
         IReadOnlyList<ScoreboardColumn> columns,
-        IReadOnlyList<ScoreboardTeam> teams) => new(
+        IReadOnlyList<ScoreboardTeam> teams,
+        IReadOnlyList<ScoreboardActor>? actors = null) => new(
         new ScoreboardChallengeCatalog(competitionId, 9, challenges),
         new ScoreboardSchema(competitionId, GameMode.Ctf, 11, 9, [], columns),
-        new ScoreboardSnapshot(competitionId, 17, 11, DateTimeOffset.UtcNow, null, [], teams));
+        new ScoreboardSnapshot(competitionId, 17, 11, DateTimeOffset.UtcNow, null, actors ?? [], teams));
 
     private sealed class RecordingMessagePublisher : IBackendMessagePublisher
     {

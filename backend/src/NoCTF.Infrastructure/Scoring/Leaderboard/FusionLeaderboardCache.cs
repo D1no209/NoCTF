@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Notifications;
@@ -288,7 +289,9 @@ public sealed class FusionLeaderboardCache(
         }
         try
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(
+                IsolationLevel.RepeatableRead,
+                ct);
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT pg_advisory_xact_lock(hashtextextended({competitionId.ToString("N")}, 0))",
                 ct);

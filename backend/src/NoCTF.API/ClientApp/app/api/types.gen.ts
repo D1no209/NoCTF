@@ -472,6 +472,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     rank?: number | null;
     rankingState?: NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol;
     totalScore?: number;
+    globalAdjustmentCount?: number;
     globalAdjustments?: Array<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse>;
     slots?: Array<NoCtfapiEndpointsCompetitionsScoreboardSlotResponse>;
 };
@@ -615,6 +616,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse = {
     netPoints?: number | null;
     entryCount?: number;
     breakdown?: Array<NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse>;
+    actors?: Array<NoCtfapiEndpointsCompetitionsScoreboardActorResponse>;
     items?: Array<NoCtfapiEndpointsCompetitionsScoreboardEntryResponse>;
     nextCursor?: string | null;
 };

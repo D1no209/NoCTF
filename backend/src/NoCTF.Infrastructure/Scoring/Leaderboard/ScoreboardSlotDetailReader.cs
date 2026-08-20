@@ -15,7 +15,8 @@ public sealed class ScoreboardSlotDetailReader(NoCtfDbContext db) : IScoreboardS
         var facts = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == query.CompetitionId
                 && fact.TeamId == query.TeamId
-                && fact.CompetitionChallengeId == query.CompetitionChallengeId);
+                && fact.CompetitionChallengeId == query.CompetitionChallengeId
+                && fact.OccurredAt <= query.DataAsOf);
 
         if (query.Mode == GameMode.Awd && query.RoundId is Guid roundId)
         {
@@ -43,6 +44,12 @@ public sealed class ScoreboardSlotDetailReader(NoCtfDbContext db) : IScoreboardS
                 fact.State,
                 fact.Result,
                 fact.ActorUserId,
+                fact.ActorUserId == null
+                    ? null
+                    : db.Users
+                        .Where(user => user.Id == fact.ActorUserId.Value)
+                        .Select(user => user.UserName)
+                        .FirstOrDefault(),
                 fact.VictimTeamId,
                 fact.OccurredAt))
             .Take(query.Limit)

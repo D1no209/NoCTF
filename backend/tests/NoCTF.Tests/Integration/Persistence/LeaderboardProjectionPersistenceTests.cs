@@ -1,3 +1,4 @@
+using System.Data;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -38,10 +39,11 @@ public sealed class LeaderboardProjectionPersistenceTests
             await postgres.StartAsync(cancellationToken);
 
             var commands = new CommandCaptureInterceptor();
+            var transactions = new TransactionCaptureInterceptor();
             var options = new DbContextOptionsBuilder<NoCtfDbContext>()
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
-                .AddInterceptors(commands)
+                .AddInterceptors(commands, transactions)
                 .Options;
             var projectedAt = DateTimeOffset.UtcNow;
 
@@ -119,6 +121,49 @@ public sealed class LeaderboardProjectionPersistenceTests
                         command.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase)))
                     .IsTrue();
             }
+
+            var ctf = fixtures.Single(fixture => fixture.Competition.Mode == GameMode.Ctf);
+            var futureFact = new GameplayFact
+            {
+                Id = Guid.CreateVersion7(projectedAt.AddMinutes(1)),
+                CompetitionId = ctf.Competition.Id,
+                CompetitionChallengeId = ctf.CompetitionChallenge.Id,
+                TeamId = ctf.Team.Id,
+                ActorUserId = owner.Id,
+                Kind = GameplayFactKind.FlagAttempt,
+                OccurredAt = projectedAt.AddMinutes(1),
+                Value = "flag{future}",
+                ValueSha256 = new byte[32],
+                State = GameplayFactState.Completed,
+                Result = GameplayFactResult.Correct,
+                UpdatedAt = projectedAt.AddMinutes(1)
+            };
+            db.GameplayFacts.Add(futureFact);
+            await db.SaveChangesAsync(cancellationToken);
+            var detailReader = new ScoreboardSlotDetailReader(db);
+            var detail = await detailReader.ReadAsync(new(
+                ctf.Competition.Id,
+                ctf.Team.Id,
+                ctf.CompetitionChallenge.Id,
+                GameMode.Ctf,
+                null,
+                null,
+                null,
+                projectedAt,
+                null,
+                null,
+                500), cancellationToken);
+
+            await Assert.That(detail.Select(item => item.Id)).DoesNotContain(futureFact.Id);
+            await Assert.That(detail.Where(item => item.ActorUserId == owner.Id)
+                    .Select(item => item.ActorDisplayName)
+                    .OfType<string>()
+                    .Distinct())
+                .IsEquivalentTo([owner.UserName]);
+
+            await cache.RefreshAsync(ctf.Competition.Id, cancellationToken);
+            await Assert.That(transactions.IsolationLevels)
+                .Contains(IsolationLevel.RepeatableRead);
         });
     }
 
@@ -336,6 +381,32 @@ public sealed class LeaderboardProjectionPersistenceTests
             CancellationToken cancellationToken = default)
         {
             commands.Add(command.CommandText);
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class TransactionCaptureInterceptor : DbTransactionInterceptor
+    {
+        private readonly List<IsolationLevel> isolationLevels = [];
+
+        public IReadOnlyList<IsolationLevel> IsolationLevels => isolationLevels;
+
+        public override DbTransaction TransactionStarted(
+            DbConnection connection,
+            TransactionEndEventData eventData,
+            DbTransaction result)
+        {
+            isolationLevels.Add(result.IsolationLevel);
+            return result;
+        }
+
+        public override ValueTask<DbTransaction> TransactionStartedAsync(
+            DbConnection connection,
+            TransactionEndEventData eventData,
+            DbTransaction result,
+            CancellationToken cancellationToken = default)
+        {
+            isolationLevels.Add(result.IsolationLevel);
             return ValueTask.FromResult(result);
         }
     }

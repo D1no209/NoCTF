@@ -219,6 +219,7 @@ public sealed record ScoreboardTeam(
     int? Rank,
     ScoreboardRankingState RankingState,
     long TotalScore,
+    int GlobalAdjustmentCount,
     IReadOnlyList<ScoreboardAdjustment> GlobalAdjustments,
     IReadOnlyList<ScoreboardSlot> Slots);
 

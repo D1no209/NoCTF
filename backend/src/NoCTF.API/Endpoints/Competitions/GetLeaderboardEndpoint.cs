@@ -101,6 +101,7 @@ public sealed record ScoreboardTeamResponse(
     int? Rank,
     ScoreboardRankingStateProtocol RankingState,
     long TotalScore,
+    int GlobalAdjustmentCount,
     IReadOnlyList<ScoreboardAdjustmentResponse> GlobalAdjustments,
     IReadOnlyList<ScoreboardSlotResponse> Slots);
 
@@ -170,6 +171,7 @@ internal static class ScoreboardProtocolMapper
         value.Rank,
         ToProtocol(value.RankingState),
         value.TotalScore,
+        value.GlobalAdjustmentCount,
         value.GlobalAdjustments.Select(adjustment => new ScoreboardAdjustmentResponse(
             adjustment.Id,
             ToProtocol(adjustment.Kind),
@@ -298,6 +300,66 @@ internal static class ScoreboardAudienceProjection
         };
     }
 
+    public static ScoreboardProjection FilterTracks(
+        ScoreboardProjection projection,
+        CompetitionTracksView tracks,
+        bool canObserve)
+    {
+        if (canObserve)
+            return projection;
+        var visibleKeys = tracks.Tracks
+            .Where(track => !track.IsInternal && track.VisibleOnLeaderboard)
+            .Select(track => track.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var viewerKeys = tracks.Tracks
+            .Where(track => track.IsViewerTrack)
+            .Select(track => track.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var teams = projection.Snapshot.Teams
+            .Where(team => visibleKeys.Contains(team.TrackKey)
+                || viewerKeys.Contains(team.TrackKey) && team.TeamId == tracks.ViewerTeamId)
+            .ToArray();
+        var actorIndexes = teams
+            .SelectMany(team => team.GlobalAdjustments.Select(item => item.ActorIndex)
+                .Concat(team.Slots.SelectMany(slot => slot.Entries.Select(entry => entry.ActorIndex))))
+            .Where(index => index is not null)
+            .Select(index => index!.Value)
+            .ToHashSet();
+        var actorPairs = projection.Snapshot.Actors
+            .Where(actor => actorIndexes.Contains(actor.Index))
+            .OrderBy(actor => actor.Index)
+            .Select((actor, index) => new { OldIndex = actor.Index, Actor = actor with { Index = index } })
+            .ToArray();
+        var actorIndexMap = actorPairs.ToDictionary(pair => pair.OldIndex, pair => pair.Actor.Index);
+        int? MapActor(int? actorIndex) => actorIndex is int value
+            && actorIndexMap.TryGetValue(value, out var mapped)
+                ? mapped
+                : null;
+        return projection with
+        {
+            Snapshot = projection.Snapshot with
+            {
+                Actors = actorPairs.Select(pair => pair.Actor).ToArray(),
+                Teams = teams.Select(team => team with
+                {
+                    GlobalAdjustments = team.GlobalAdjustments
+                        .Select(item => item with { ActorIndex = MapActor(item.ActorIndex) })
+                        .ToArray(),
+                    Slots = team.Slots.Select(slot => slot with
+                    {
+                        Entries = slot.Entries.Select(entry => entry with
+                        {
+                            ActorIndex = MapActor(entry.ActorIndex)
+                        }).ToArray()
+                    }).ToArray()
+                }).ToArray(),
+                Tracks = projection.Snapshot.Tracks
+                    .Where(track => visibleKeys.Contains(track.Key) || viewerKeys.Contains(track.Key))
+                    .ToArray()
+            }
+        };
+    }
+
     private static long StableRevision(IEnumerable<string> values)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', values)));
@@ -360,7 +422,8 @@ public sealed class GetLeaderboardEndpoint(
             if (tracks is null)
                 return TypedResults.NotFound();
             projection = ScoreboardAudienceProjection.Filter(projection, canObserve);
-            var snapshot = FilterSnapshot(projection.Snapshot, tracks, canObserve) with
+            projection = ScoreboardAudienceProjection.FilterTracks(projection, tracks, canObserve);
+            var snapshot = projection.Snapshot with
             {
                 Visibility = visibility.Visibility,
                 DataScope = visibility.DataScope,
@@ -390,30 +453,6 @@ public sealed class GetLeaderboardEndpoint(
         }
         await leaderboard.InvalidateAsync(request.CompetitionId, cancellationToken);
         return Processing(request.CompetitionId);
-    }
-
-    private static ScoreboardSnapshot FilterSnapshot(
-        ScoreboardSnapshot snapshot,
-        CompetitionTracksView tracks,
-        bool canObserve)
-    {
-        if (canObserve)
-            return snapshot;
-        var visibleKeys = tracks.Tracks
-            .Where(track => !track.IsInternal && track.VisibleOnLeaderboard)
-            .Select(track => track.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var viewerKeys = tracks.Tracks
-            .Where(track => track.IsViewerTrack)
-            .Select(track => track.Key)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return snapshot with
-        {
-            Teams = snapshot.Teams.Where(team => visibleKeys.Contains(team.TrackKey)
-                || viewerKeys.Contains(team.TrackKey) && team.TeamId == tracks.ViewerTeamId).ToArray(),
-            Tracks = snapshot.Tracks.Where(track => visibleKeys.Contains(track.Key)
-                || viewerKeys.Contains(track.Key)).ToArray()
-        };
     }
 
     private Accepted<LeaderboardProcessingProtocolResponse> Processing(Guid competitionId)

@@ -9,6 +9,7 @@ public sealed record ScoreboardSlotDetailFact(
     GameplayFactState State,
     GameplayFactResult? Result,
     Guid? ActorUserId,
+    string? ActorDisplayName,
     Guid? VictimTeamId,
     DateTimeOffset OccurredAt);
 
@@ -20,6 +21,7 @@ public sealed record ScoreboardSlotDetailQuery(
     Guid? RoundId,
     DateTimeOffset? RoundStartAt,
     DateTimeOffset? RoundEndAt,
+    DateTimeOffset DataAsOf,
     DateTimeOffset? BeforeOccurredAt,
     Guid? BeforeId,
     int Limit);

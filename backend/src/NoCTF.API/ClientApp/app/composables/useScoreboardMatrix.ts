@@ -9,6 +9,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
 } from '~/api'
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
+import { isCoherentScoreboardBundle } from '~/utils/scoreboard-coherence'
 
 interface ScoreboardUpdatedPayload {
   competitionId: string | null
@@ -47,13 +48,28 @@ export function useScoreboardMatrix(competitionId: string) {
   let generation = 0
   let stopped = false
   let retryTimer: ReturnType<typeof setTimeout> | null = null
+  let coherenceRetryTimer: ReturnType<typeof setTimeout> | null = null
+  let coherenceRetryCount = 0
 
   function scheduleProcessingRetry(): void {
     if (retryTimer || stopped) return
     retryTimer = setTimeout(() => {
       retryTimer = null
-      void refresh({ snapshot: true })
+      void refresh({ catalog: true, schema: true, snapshot: true })
     }, 2000)
+  }
+
+  function scheduleCoherenceRetry(): void {
+    if (coherenceRetryTimer || stopped) return
+    if (coherenceRetryCount >= 3) {
+      error.value = translate('记分板数据版本尚未同步，请稍后重试')
+      return
+    }
+    coherenceRetryCount += 1
+    coherenceRetryTimer = setTimeout(() => {
+      coherenceRetryTimer = null
+      void refresh({ catalog: true, schema: true, snapshot: true })
+    }, 250)
   }
 
   async function refresh(options: {
@@ -86,18 +102,31 @@ export function useScoreboardMatrix(competitionId: string) {
       error.value = failures[0] ?? translate('加载记分板失败')
     }
     else {
-      if (catalogResult?.data) catalog.value = catalogResult.data
-      if (schemaResult?.data) schema.value = schemaResult.data
       if (snapshotResult?.response?.status === 202) {
         processing.value = true
+        error.value = null
         scheduleProcessingRetry()
       }
-      else if (snapshotResult?.data) {
-        const incoming = snapshotResult.data as NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse
-        if ((incoming.version ?? 0) >= (snapshot.value?.version ?? 0)) snapshot.value = incoming
+      else {
+        const candidateCatalog = catalogResult?.data ?? catalog.value
+        const candidateSchema = schemaResult?.data ?? schema.value
+        let candidateSnapshot = snapshot.value
+        if (snapshotResult?.data) {
+          const incoming = snapshotResult.data as NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse
+          if ((incoming.version ?? 0) >= (snapshot.value?.version ?? 0)) candidateSnapshot = incoming
+        }
+        if (isCoherentScoreboardBundle(candidateCatalog, candidateSchema, candidateSnapshot)) {
+          catalog.value = candidateCatalog
+          schema.value = candidateSchema
+          snapshot.value = candidateSnapshot
+          coherenceRetryCount = 0
+          error.value = null
+        }
+        else {
+          scheduleCoherenceRetry()
+        }
         processing.value = false
       }
-      error.value = null
     }
     loading.value = false
     refreshing.value = false
@@ -132,6 +161,8 @@ export function useScoreboardMatrix(competitionId: string) {
     generation += 1
     if (retryTimer) clearTimeout(retryTimer)
     retryTimer = null
+    if (coherenceRetryTimer) clearTimeout(coherenceRetryTimer)
+    coherenceRetryTimer = null
     unwatch?.()
     unwatch = null
   })
