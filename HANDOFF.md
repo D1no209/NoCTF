@@ -1,5 +1,17 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-20 alpha.62 统一排行榜精确明细审计与发布收口
+
+- `a633acd9` 修复排行榜明细与主快照之间的事实边界。旧实现会在打开 Slot 明细时重新读取当前 `GameplayFact`，冻结榜单可能因此混入冻结后的事实，并把主快照未携带的精确分值重建为 `0`。现在 Slot 明细和全局人工调分明细都从生成主榜时的同一份 `ScoreboardProjection` 读取；实时榜使用同一投影版本，冻结榜保持冻结时事实，后续数据不会改写已打开的分页链。
+- 主榜响应继续保持有界，每个 Slot 最多携带 5 条摘要；精确明细通过强类型签名游标分页。内部 `DetailActors` 去重保存投影 Actor，Entry 只保存 `actorIndex`；每一页只返回该页使用的 Actor 目录。游标签名绑定 endpoint、比赛、调用者、队伍、列、Schema revision、Snapshot version 与 `DataAsOf`，不能跨比赛、跨用户、跨列或跨版本重放。
+- 新增强类型 `GET /competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments`，总分入口可分页查看全部全局人工调分；前端仅调用重新生成的 SDK。Slot 与调分弹窗均使用请求代次栅栏，旧响应不会覆盖新选择；失败会保留已加载内容并显示可理解错误。
+- 最终复核发现公开榜隐藏未发布题目后会重排列索引，但内部明细 allocation 仍引用旧索引；同时赛道过滤没有同步裁剪内部 allocation。现已按公开列映射重排 `EntryAllocations`，并按可见队伍过滤 Entry/Adjustment allocations，避免详情为空、串列或跨赛道残留。新增公开列重排回归后，排行榜 Endpoint 定向测试为 13/13。
+- `ee042c79` 将版本从 `0.1.0-alpha.61` 递增到 `0.1.0-alpha.62`。本阶段没有新增业务表、EF migration 或 snapshot 变更；未恢复旧的 raw-fact 明细读取器，也没有在前端重算分数。
+- OpenAPI 两份制品均由工具导出且 SHA-256 同为 `DA38D2C5B1F65AF177B5AC141393752A636427417672C574BAF17B2B9DEF7A50`；TypeScript SDK 由 `bun run api:gen` 生成，`types.gen.ts` SHA-256 为 `4A906B41FA880C835EE2D2125477628AD135AC75A30377F6BCF584A74003062B`。连续第二轮导出和生成无差异，生成 SDK 未被手工修改。EF model drift、C# format/analyzers 与 `git diff --check` 均通过。
+- 最终验证：Release solution build 0 warning/0 error；完整非 Integration TUnit 847/847；真实 PostgreSQL `LeaderboardProjectionPersistenceTests` 1/1；排行榜 Endpoint 13/13；前端 `bun test` 240/240（1771 expectations）、typecheck 与 production build 通过。仓库没有 lint script，未将 lint 误报为已执行。
+- 完整 Integration 共 186 项：183 通过，2 项因未配置真实 Kubernetes/Libvirt 环境按设计跳过；唯一失败为 Docker Hub 匿名拉取 `busybox:1.37.0-glibc` 返回 `EOF`。该用例独立复跑仍失败，直接执行 `docker pull busybox:1.37.0-glibc` 也得到相同 `EOF`，因此记录为外部镜像仓库/网络阻塞，不冒充通过，也没有通过修改产品或测试绕过。
+- 四模式 Full E2E 已在本分支的统一排行榜实现上顺序通过并记录于下方 alpha.61 交接；本次精确明细修复未改变计分、生命周期或 Runtime。该轮未重新操作生产比赛数据，也未部署；按用户授权，本记录提交后仅将审计通过的提交快进推送到远程 `main`。
+
 ## 2026-08-20 alpha.61 统一排行榜一致性与详情边界修复
 
 - `97cc8fa5` 修复统一排行榜矩阵审计发现的问题。主快照仍保持有界：每个 Slot 最多携带 5 条摘要记录、每队最多携带 5 条全局调整，同时新增 `GlobalAdjustmentCount` 保留完整计数；完整历史继续通过签名游标详情读取，没有新增业务表、EF migration 或 snapshot 变更。
