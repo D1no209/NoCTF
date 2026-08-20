@@ -314,8 +314,19 @@ describe('AWDP control screen data adapter', () => {
       }),
     ])
 
-    expect(awdpCurrentRoundEvents(current, snapshot, schema).map(item => item.action))
-      .toEqual(['defense'])
+    const currentRoundEvents = awdpCurrentRoundEvents(current, snapshot, schema)
+    expect(currentRoundEvents.map(item => item.action)).toEqual(['defense'])
+    expect(awdpTeamChallengeStates(
+      catalog,
+      schema,
+      awdpPublicEntries(snapshot)[0]!,
+      currentRoundEvents,
+    )[0]).toMatchObject({
+      attackScore: 3_300,
+      defenseScore: 2_200,
+      attackOutcome: 'idle',
+      defenseOutcome: 'failure',
+    })
   })
 
   test('advances the displayed round clock from the generated leaderboard snapshot', () => {

@@ -277,8 +277,8 @@ export function awdpTeamChallengeStates(
       direction: challenge.direction ?? 'MISC',
       attackScore,
       defenseScore,
-      attackOutcome: attackOutcome === 'idle' && attackScore > 0 ? 'success' : attackOutcome,
-      defenseOutcome: defenseOutcome === 'idle' && defenseScore > 0 ? 'success' : defenseOutcome,
+      attackOutcome,
+      defenseOutcome,
     }
   })
 }
