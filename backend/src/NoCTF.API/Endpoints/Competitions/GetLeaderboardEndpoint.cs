@@ -328,6 +328,9 @@ internal static class ScoreboardAudienceProjection
                 || viewerKeys.Contains(team.TrackKey) && team.TeamId == tracks.ViewerTeamId)
             .ToArray();
         var visibleTeamIds = teams.Select(team => team.TeamId).ToHashSet();
+        Guid? VisibleTarget(Guid? teamId) => teamId is Guid value && visibleTeamIds.Contains(value)
+            ? value
+            : null;
         var actorIndexes = teams
             .SelectMany(team => team.GlobalAdjustments.Select(item => item.ActorIndex)
                 .Concat(team.Slots.SelectMany(slot => slot.Entries.Select(entry => entry.ActorIndex))))
@@ -358,7 +361,8 @@ internal static class ScoreboardAudienceProjection
                     {
                         Entries = slot.Entries.Select(entry => entry with
                         {
-                            ActorIndex = MapActor(entry.ActorIndex)
+                            ActorIndex = MapActor(entry.ActorIndex),
+                            TargetTeamId = VisibleTarget(entry.TargetTeamId)
                         }).ToArray()
                     }).ToArray()
                 }).ToArray(),
@@ -368,6 +372,13 @@ internal static class ScoreboardAudienceProjection
             },
             EntryAllocations = projection.EntryAllocations
                 .Where(allocation => visibleTeamIds.Contains(allocation.TeamId))
+                .Select(allocation => allocation with
+                {
+                    Entry = allocation.Entry with
+                    {
+                        TargetTeamId = VisibleTarget(allocation.Entry.TargetTeamId)
+                    }
+                })
                 .ToArray(),
             AdjustmentAllocations = projection.AdjustmentAllocations
                 .Where(allocation => visibleTeamIds.Contains(allocation.TeamId))

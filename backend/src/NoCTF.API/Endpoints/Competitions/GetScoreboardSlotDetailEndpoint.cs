@@ -143,6 +143,9 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             request.Limit + 1), cancellationToken);
         var actorIndexesByUserId = projection.DetailActors
             .ToDictionary(actor => actor.UserId, actor => actor.Index);
+        var visibleTeamIds = projection.Snapshot.Teams
+            .Select(item => item.TeamId)
+            .ToHashSet();
         var entries = facts
             .Select(fact => MapFact(
                 fact,
@@ -150,7 +153,8 @@ public sealed class GetScoreboardSlotDetailEndpoint(
                 projection.Schema.Mode,
                 slot.ScoreState,
                 round?.SettledAt,
-                actorIndexesByUserId))
+                actorIndexesByUserId,
+                visibleTeamIds))
             .Concat(synthetic.Select(allocation => allocation.Entry))
             .OrderByDescending(entry => entry.OccurredAt)
             .ThenByDescending(entry => entry.Id)
@@ -202,7 +206,8 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         NoCTF.Domain.Competitions.GameMode mode,
         ScoreboardScoreState scoreState,
         DateTimeOffset? settledAt,
-        IReadOnlyDictionary<Guid, int> actorIndexes)
+        IReadOnlyDictionary<Guid, int> actorIndexes,
+        IReadOnlySet<Guid> visibleTeamIds)
     {
         var candidates = allocations
             .Where(candidate => candidate.Source is { } source && Matches(source, fact, mode))
@@ -228,7 +233,10 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             fact.ActorUserId is Guid actorId && actorIndexes.TryGetValue(actorId, out var actorIndex)
                 ? actorIndex
                 : null,
-            allocation?.Source?.VictimTeamId,
+            allocation?.Source?.VictimTeamId is Guid targetTeamId
+                && visibleTeamIds.Contains(targetTeamId)
+                    ? targetTeamId
+                    : null,
             fact.OccurredAt,
             pending ? null : settledAt,
             earned,

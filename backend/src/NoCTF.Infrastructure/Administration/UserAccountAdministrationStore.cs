@@ -2,6 +2,7 @@ using System.Data;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Administration.UserAccounts;
+using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Notifications;
@@ -101,6 +102,11 @@ public sealed class UserAccountAdministrationStore(
         user.AvatarFile = null;
         user.IsEmailPublic = false;
         user.UpdatedAt = now;
+        await AnonymizeLeaderboardProjectionsAsync(
+            userId,
+            originalUserName,
+            user.UserName,
+            ct);
         RecordLifecycleFact(
             user,
             actorUserId,
@@ -248,6 +254,72 @@ public sealed class UserAccountAdministrationStore(
             .ToListAsync(ct);
         foreach (var challenge in challenges)
             challenge.ManagerIds = challenge.ManagerIds.Where(id => id != userId).ToArray();
+    }
+
+    private async Task AnonymizeLeaderboardProjectionsAsync(
+        Guid userId,
+        string originalUserName,
+        string anonymousUserName,
+        CancellationToken ct)
+    {
+        var affectedCompetitionIds = await db.GameplayFacts.AsNoTracking()
+            .Where(fact => fact.ActorUserId == userId)
+            .Select(fact => fact.CompetitionId)
+            .Distinct()
+            .ToArrayAsync(ct);
+        // Frozen projections are immutable score snapshots, but identity erasure must
+        // still replace the presentation name without reprojecting any score facts.
+        var competitions = await db.Competitions.IgnoreQueryFilters()
+            .Where(competition => affectedCompetitionIds.Contains(competition.Id)
+                || competition.FrozenLeaderboardSnapshotJson != null)
+            .ToListAsync(ct);
+        var affectedIds = affectedCompetitionIds.ToHashSet();
+        foreach (var competition in competitions)
+        {
+            if (affectedIds.Contains(competition.Id))
+                competition.LeaderboardDirty = true;
+            if (string.IsNullOrWhiteSpace(competition.FrozenLeaderboardSnapshotJson))
+                continue;
+            var bundle = JsonSerializer.Deserialize<LeaderboardProjectionBundle>(
+                competition.FrozenLeaderboardSnapshotJson,
+                JsonOptions);
+            if (bundle is null)
+                continue;
+            var containsUser = bundle.Scoreboard.DetailActors.Any(actor => actor.UserId == userId)
+                || bundle.Scoreboard.Snapshot.Actors.Any(actor => actor.UserId == userId)
+                || bundle.Legacy.Entries.SelectMany(entry => entry.Cells)
+                    .Any(cell => cell.SolverName == originalUserName);
+            if (!containsUser)
+                continue;
+            var legacy = bundle.Legacy with
+            {
+                Entries = bundle.Legacy.Entries.Select(entry => entry with
+                {
+                    Cells = entry.Cells.Select(cell => cell.SolverName == originalUserName
+                        ? cell with { SolverName = anonymousUserName }
+                        : cell).ToArray()
+                }).ToArray()
+            };
+            var scoreboard = bundle.Scoreboard with
+            {
+                DetailActors = bundle.Scoreboard.DetailActors
+                    .Select(actor => actor.UserId == userId
+                        ? actor with { DisplayName = anonymousUserName }
+                        : actor)
+                    .ToArray(),
+                Snapshot = bundle.Scoreboard.Snapshot with
+                {
+                    Actors = bundle.Scoreboard.Snapshot.Actors
+                        .Select(actor => actor.UserId == userId
+                            ? actor with { DisplayName = anonymousUserName }
+                            : actor)
+                        .ToArray()
+                }
+            };
+            competition.FrozenLeaderboardSnapshotJson = JsonSerializer.Serialize(
+                new LeaderboardProjectionBundle(legacy, scoreboard),
+                JsonOptions);
+        }
     }
 
 }

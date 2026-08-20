@@ -357,7 +357,7 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
-    public async Task Adjustment_detail_pages_all_records_with_team_scoped_cursor()
+    public async Task Frozen_adjustment_detail_pages_the_snapshot_without_reading_current_facts()
     {
         var competitionId = Guid.CreateVersion7();
         var firstTeamId = Guid.CreateVersion7();
@@ -390,14 +390,11 @@ public sealed class LeaderboardEndpointTests
         };
         await using var app = await CreateApplicationAsync(
             competitionId,
-            new CachedLeaderboard(projection: projection),
+            new CachedLeaderboard(frozen: true, projection: projection),
             new RecordingMessagePublisher(),
-            detailReader: new StaticScoreboardDetailReader(adjustments:
-            [
-                new(adjustments[0].Id, actorId, adjustments[0].OccurredAt, 25),
-                new(adjustments[1].Id, actorId, adjustments[1].OccurredAt, -10),
-                new(adjustments[2].Id, null, adjustments[2].OccurredAt, 5)
-            ]));
+            CompetitionLeaderboardVisibility.Frozen,
+            LeaderboardDataScope.Frozen,
+            detailReader: new StaticScoreboardDetailReader());
         using var client = app.GetTestClient();
         var route = $"/api/v1/competitions/{competitionId}/leaderboard/teams/{firstTeamId}/adjustments?limit=2";
 
@@ -633,6 +630,7 @@ public sealed class LeaderboardEndpointTests
         var internalTeamId = Guid.CreateVersion7();
         var publicActorId = Guid.CreateVersion7();
         var internalActorId = Guid.CreateVersion7();
+        var publicEntryId = Guid.CreateVersion7();
         var slot = new ScoreboardSlot(
             0,
             ScoreboardScoreState.Provisional,
@@ -641,8 +639,8 @@ public sealed class LeaderboardEndpointTests
             1,
             1,
             [],
-            [new(Guid.CreateVersion7(), ScoreboardEntryKind.Solve, ScoreboardEntryOutcome.Succeeded,
-                0, null, DateTimeOffset.UtcNow, null, 1, 0, 1)]);
+            [new(publicEntryId, ScoreboardEntryKind.Attack, ScoreboardEntryOutcome.Succeeded,
+                0, internalTeamId, DateTimeOffset.UtcNow, null, 1, 0, 1)]);
         var internalSlot = slot with
         {
             Entries = [slot.Entries[0] with { Id = Guid.CreateVersion7(), ActorIndex = 1 }]
@@ -659,23 +657,66 @@ public sealed class LeaderboardEndpointTests
                 new(0, publicActorId, "Public player"),
                 new(1, internalActorId, "Internal player")
             ]);
+        projection = projection with
+        {
+            DetailActors = projection.Snapshot.Actors,
+            EntryAllocations =
+            [
+                new ScoreboardEntryAllocation(publicTeamId, 0, slot.Entries[0])
+                {
+                    Source = new(
+                        GameplayFactKind.FlagAttempt,
+                        GameplayFactState.Completed,
+                        GameplayFactResult.Correct,
+                        null,
+                        null,
+                        null,
+                        internalTeamId,
+                        publicActorId,
+                        1,
+                        1,
+                        0)
+                }
+            ]
+        };
         await using var app = await CreateApplicationAsync(
             competitionId,
             new CachedLeaderboard(projection: projection),
             new RecordingMessagePublisher(),
-            trackStore: new InternalTrackStore(competitionId));
+            trackStore: new InternalTrackStore(competitionId),
+            detailReader: new StaticScoreboardDetailReader(slotFacts:
+            [
+                new(
+                    publicEntryId,
+                    GameplayFactKind.FlagAttempt,
+                    GameplayFactState.Completed,
+                    GameplayFactResult.Correct,
+                    null,
+                    null,
+                    null,
+                    publicActorId,
+                    internalTeamId,
+                    true,
+                    slot.Entries[0].OccurredAt)
+            ]));
         using var client = app.GetTestClient();
 
         using var leaderboardResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard");
         var leaderboard = await leaderboardResponse.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
         using var detailResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{publicTeamId}/columns/0");
+        var detail = await detailResponse.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
+        using var internalDetailResponse = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard/teams/{internalTeamId}/columns/0");
 
         await Assert.That(leaderboardResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(leaderboard!.Teams.Select(team => team.TeamId)).IsEquivalentTo([publicTeamId]);
         await Assert.That(leaderboard.Actors.Select(actor => actor.UserId)).IsEquivalentTo([publicActorId]);
-        await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(leaderboard.Teams.Single().Slots.Single().Entries.Single().TargetTeamId).IsNull();
+        await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(detail!.Items.Single().TargetTeamId).IsNull();
+        await Assert.That(internalDetailResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
     }
 
     [Test]
