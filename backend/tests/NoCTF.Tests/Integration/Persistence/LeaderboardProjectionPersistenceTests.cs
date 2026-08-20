@@ -36,6 +36,74 @@ public sealed class LeaderboardProjectionPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Failed_projection_commit_preserves_the_last_successful_cache(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_projection_commit_failure")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+
+            var commitFailure = new FailingCommitInterceptor();
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .AddInterceptors(commitFailure)
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+            var owner = CreateUser(now);
+            var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
+            var fact = fixture.Facts[0];
+            db.Users.Add(owner);
+            db.Competitions.Add(fixture.Competition);
+            db.Challenges.Add(fixture.Challenge);
+            db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
+            db.Teams.Add(fixture.Team);
+            db.GameplayFacts.Add(fact);
+            await db.SaveChangesAsync(cancellationToken);
+
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.Leaderboards)
+                .Services
+                .BuildServiceProvider();
+            var cache = new FusionLeaderboardCache(
+                db,
+                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                Substitute.For<ILeaderboardRefreshPublisher>(),
+                cacheServices.GetRequiredService<IFusionCacheProvider>());
+            await cache.RefreshAsync(fixture.Competition.Id, cancellationToken);
+            var successful = await cache.GetScoreboardAsync(
+                fixture.Competition.Id,
+                cancellationToken);
+
+            fact.Result = GameplayFactResult.Correct;
+            fact.UpdatedAt = now.AddMinutes(1);
+            await db.SaveChangesAsync(cancellationToken);
+            commitFailure.FailNextCommit();
+
+            await Assert.That(async () =>
+                    await cache.RefreshAsync(fixture.Competition.Id, cancellationToken))
+                .Throws<InvalidOperationException>();
+            var retained = await cache.GetScoreboardAsync(
+                fixture.Competition.Id,
+                cancellationToken);
+
+            await Assert.That(successful).IsNotNull();
+            await Assert.That(retained).IsNotNull();
+            await Assert.That(retained!.Snapshot.Version).IsEqualTo(successful!.Snapshot.Version);
+            await Assert.That(retained.Snapshot.Teams.Single().TotalScore)
+                .IsEqualTo(successful.Snapshot.Teams.Single().TotalScore);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Awdp_long_history_uses_a_bounded_round_window_without_losing_total_score(
         CancellationToken cancellationToken)
     {
@@ -127,6 +195,8 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .IsEqualTo(elapsedSeconds + 1);
             await Assert.That(latest.Scoreboard.Snapshot.Teams.Single().TotalScore)
                 .IsEqualTo(100L * (elapsedSeconds - 1) + 14);
+            await Assert.That(latest.Scoreboard.Snapshot.Teams.Single().ScoreOutsideWindow)
+                .IsGreaterThan(0);
 
             fixture.Competition.Status = CompetitionStatus.Finished;
             fixture.Competition.UpdatedAt = projectedAt.AddMinutes(1);
@@ -162,6 +232,11 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .IsEquivalentTo(Enumerable.Range(51, ScoreboardRoundWindow.DefaultSize));
             await Assert.That(historical.Snapshot.Teams.Single().TotalScore)
                 .IsEqualTo(latest.Scoreboard.Snapshot.Teams.Single().TotalScore);
+            await Assert.That(historical.Snapshot.Teams.Single().TotalScore)
+                .IsEqualTo(checked(
+                    historical.Snapshot.Teams.Single().ScoreOutsideWindow
+                    + historical.Snapshot.Teams.Single().Slots.Sum(slot => slot.NetPoints ?? 0)
+                    + historical.Snapshot.Teams.Single().GlobalAdjustments.Sum(item => item.NetPoints)));
             await Assert.That(historical.Snapshot.Teams.Single().GlobalAdjustmentCount).IsEqualTo(2);
             await Assert.That(historical.Snapshot.Teams.Single().GlobalAdjustments.Single().NetPoints)
                 .IsEqualTo(14);
@@ -905,6 +980,25 @@ public sealed class LeaderboardProjectionPersistenceTests
         {
             isolationLevels.Add(result.IsolationLevel);
             return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class FailingCommitInterceptor : DbTransactionInterceptor
+    {
+        private bool failNextCommit;
+
+        public void FailNextCommit() => failNextCommit = true;
+
+        public override ValueTask<InterceptionResult> TransactionCommittingAsync(
+            DbTransaction transaction,
+            TransactionEventData eventData,
+            InterceptionResult result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!failNextCommit)
+                return ValueTask.FromResult(result);
+            failNextCommit = false;
+            throw new InvalidOperationException("Injected leaderboard projection commit failure.");
         }
     }
 }

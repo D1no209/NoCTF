@@ -22,6 +22,12 @@ interface ScoreboardUpdatedPayload {
   challengeCatalogRevision: string | null
 }
 
+interface ScoreboardRefreshOptions {
+  catalog?: boolean
+  schema?: boolean
+  snapshot?: boolean
+}
+
 function stringField(payload: unknown, key: string): string | null {
   if (!payload || typeof payload !== 'object') return null
   const value = Reflect.get(payload, key)
@@ -77,11 +83,9 @@ export function useScoreboardMatrix(competitionId: string) {
     }, 250)
   }
 
-  async function refresh(options: {
-    catalog?: boolean
-    schema?: boolean
-    snapshot?: boolean
-  } = { catalog: true, schema: true, snapshot: true }): Promise<ScoreboardRefreshOutcome> {
+  async function refresh(
+    options: ScoreboardRefreshOptions = { catalog: true, schema: true, snapshot: true },
+  ): Promise<ScoreboardRefreshOutcome> {
     const requestGeneration = ++generation
     const endingRound = requestedEndingRound.value
     refreshing.value = true
@@ -158,9 +162,24 @@ export function useScoreboardMatrix(competitionId: string) {
       requestedEndingRound.value = previousEndingRound
   }
 
+  let pendingRefresh: Required<ScoreboardRefreshOptions> = {
+    catalog: false,
+    schema: false,
+    snapshot: false,
+  }
   const trailingRefresh = createTrailingRefresh(async () => {
-    await refresh({ schema: true, snapshot: true })
+    const requested = pendingRefresh
+    pendingRefresh = { catalog: false, schema: false, snapshot: false }
+    await refresh(requested)
   })
+  function queueRefresh(options: ScoreboardRefreshOptions): Promise<void> {
+    pendingRefresh = {
+      catalog: pendingRefresh.catalog || (options.catalog ?? false),
+      schema: pendingRefresh.schema || (options.schema ?? false),
+      snapshot: pendingRefresh.snapshot || (options.snapshot ?? true),
+    }
+    return trailingRefresh()
+  }
   let unwatch: (() => void) | null = null
 
   onMounted(() => {
@@ -174,13 +193,13 @@ export function useScoreboardMatrix(competitionId: string) {
           && notice.schemaRevision !== (schema.value?.revision ?? null)
         if (notice.version !== null && notice.version === (snapshot.value?.version ?? null)
           && !wantsCatalog && !wantsSchema) return
-        if (wantsCatalog || wantsSchema) {
-          void refresh({ catalog: wantsCatalog, schema: wantsSchema, snapshot: true })
-          return
-        }
-        void trailingRefresh()
+        void queueRefresh({
+          catalog: wantsCatalog,
+          schema: wantsSchema,
+          snapshot: true,
+        })
       },
-      onReconnected: () => void refresh({ catalog: true, schema: true, snapshot: true }),
+      onReconnected: () => void queueRefresh({ catalog: true, schema: true, snapshot: true }),
     })
   })
 

@@ -103,6 +103,7 @@ public sealed record ScoreboardTeamResponse(
     int? Rank,
     ScoreboardRankingStateProtocol RankingState,
     long TotalScore,
+    long ScoreOutsideWindow,
     int GlobalAdjustmentCount,
     IReadOnlyList<ScoreboardAdjustmentResponse> GlobalAdjustments,
     IReadOnlyList<ScoreboardSlotResponse> Slots);
@@ -184,6 +185,7 @@ internal static class ScoreboardProtocolMapper
         value.Rank,
         ToProtocol(value.RankingState),
         value.TotalScore,
+        value.ScoreOutsideWindow,
         value.GlobalAdjustmentCount,
         value.GlobalAdjustments.Select(ToResponse).ToArray(),
         value.Slots.Select(slot => new ScoreboardSlotResponse(

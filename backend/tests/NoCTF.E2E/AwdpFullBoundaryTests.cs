@@ -1,4 +1,5 @@
 using System.Formats.Tar;
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
@@ -494,6 +495,8 @@ public sealed class AwdpFullBoundaryTests
         await AssertNoSyntheticGlobalAdjustmentsAsync(firstSettledScoreboard.Snapshot);
         await AssertCurrentRoundScoresPendingAsync(firstSettledScoreboard);
         var firstSettledSlots = CaptureSettledSlots(firstSettledScoreboard.Snapshot);
+        var firstSettledWindowEnd = firstSettledScoreboard.Schema
+            .GetProperty("roundWindowEnd").GetInt32();
         var firstRedScore = Team(firstSettledScoreboard.Snapshot, red.TeamId)
             .GetProperty("totalScore").GetInt64();
 
@@ -661,12 +664,20 @@ public sealed class AwdpFullBoundaryTests
         var resumedScoreboard = await PollScoreboardAsync(
             anonymous,
             competitionId,
-            observation => observation.Snapshot.GetProperty("version").GetInt64()
-                > accumulatedScoreboard.Snapshot.GetProperty("version").GetInt64(),
+            observation => ReadProtocolInt64(observation.Snapshot, "version")
+                > ReadProtocolInt64(accumulatedScoreboard.Snapshot, "version"),
             TimeSpan.FromSeconds(45),
             cancellationToken);
-        await AssertSettledSlotsUnchangedAsync(firstSettledSlots, resumedScoreboard.Snapshot);
         await AssertScoreboardArithmeticAsync(resumedScoreboard.Snapshot);
+        var resumedHistoricalWindow = await PollScoreboardAsync(
+            anonymous,
+            competitionId,
+            observation => ContainsSettledSlots(firstSettledSlots, observation.Snapshot),
+            TimeSpan.FromSeconds(45),
+            cancellationToken,
+            firstSettledWindowEnd);
+        await AssertSettledSlotsUnchangedAsync(firstSettledSlots, resumedHistoricalWindow.Snapshot);
+        await AssertScoreboardArithmeticAsync(resumedHistoricalWindow.Snapshot);
 
         await SendWithoutBodyAsync(
             admin,
@@ -1199,13 +1210,14 @@ public sealed class AwdpFullBoundaryTests
         Guid competitionId,
         Func<ScoreboardObservation, bool> completed,
         TimeSpan timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? endingRound = null)
     {
         var deadline = DateTimeOffset.UtcNow.Add(timeout);
         ScoreboardObservation? last = null;
         while (DateTimeOffset.UtcNow < deadline)
         {
-            last = await TryReadScoreboardAsync(client, competitionId, cancellationToken);
+            last = await TryReadScoreboardAsync(client, competitionId, cancellationToken, endingRound);
             if (last is not null && completed(last))
                 return last;
             await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
@@ -1218,25 +1230,38 @@ public sealed class AwdpFullBoundaryTests
     private static async Task<ScoreboardObservation?> TryReadScoreboardAsync(
         HttpClient client,
         Guid competitionId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? endingRound = null)
     {
+        var query = endingRound is int round ? $"?endingRound={round}" : string.Empty;
         using var schemaResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard/schema",
+            $"/api/v1/competitions/{competitionId}/leaderboard/schema{query}",
             cancellationToken);
         if (schemaResponse.StatusCode == HttpStatusCode.Accepted)
             return null;
         var schema = await ReadExpectedJsonAsync(schemaResponse, HttpStatusCode.OK, cancellationToken);
 
         using var snapshotResponse = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard",
+            $"/api/v1/competitions/{competitionId}/leaderboard{query}",
             cancellationToken);
         if (snapshotResponse.StatusCode == HttpStatusCode.Accepted)
             return null;
         var snapshot = await ReadExpectedJsonAsync(snapshotResponse, HttpStatusCode.OK, cancellationToken);
-        if (snapshot.GetProperty("schemaRevision").GetInt64()
-            != schema.GetProperty("revision").GetInt64())
+        if (!StringComparer.Ordinal.Equals(
+                snapshot.GetProperty("schemaRevision").GetString(),
+                schema.GetProperty("revision").GetString()))
             return null;
         return new(schema, snapshot);
+    }
+
+    private static long ReadProtocolInt64(JsonElement parent, string propertyName)
+    {
+        var value = parent.GetProperty(propertyName);
+        if (value.ValueKind != JsonValueKind.String
+            || !long.TryParse(value.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsed))
+            throw new InvalidOperationException(
+                $"Protocol property '{propertyName}' must be a canonical Int64 decimal string.");
+        return parsed;
     }
 
     private static JsonElement Team(JsonElement snapshot, Guid teamId) =>
@@ -1322,7 +1347,10 @@ public sealed class AwdpFullBoundaryTests
             var adjustments = team.GetProperty("globalAdjustments").EnumerateArray()
                 .Sum(item => item.GetProperty("netPoints").GetInt64());
             await Assert.That(team.GetProperty("totalScore").GetInt64())
-                .IsEqualTo(checked(slotNet + adjustments));
+                .IsEqualTo(checked(
+                    slotNet
+                    + adjustments
+                    + team.GetProperty("scoreOutsideWindow").GetInt64()));
         }
     }
 

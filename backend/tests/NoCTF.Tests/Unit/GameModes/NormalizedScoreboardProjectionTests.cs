@@ -516,6 +516,8 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(projection.Schema.Columns.Count).IsEqualTo(ScoreboardRoundWindow.DefaultSize);
         await Assert.That(projection.Snapshot.Teams.Single().TotalScore)
             .IsEqualTo(100L * (elapsedSeconds - 1));
+        await Assert.That(projection.Snapshot.Teams.Single().ScoreOutsideWindow).IsGreaterThan(0);
+        await AssertArithmetic(projection.Snapshot.Teams.Single());
     }
 
     [Test]
@@ -550,6 +552,9 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(projection.Schema.LatestRound).IsEqualTo(elapsedSeconds + 1);
         await Assert.That(projection.Snapshot.Teams.Single().TotalScore)
             .IsEqualTo(100L * (elapsedSeconds - 1));
+        await Assert.That(projection.Snapshot.Teams.Single().ScoreOutsideWindow)
+            .IsEqualTo(100L * (elapsedSeconds - 1 - ScoreboardRoundWindow.DefaultSize));
+        await AssertArithmetic(projection.Snapshot.Teams.Single());
     }
 
     [Test]
@@ -575,7 +580,8 @@ public sealed class NormalizedScoreboardProjectionTests
             checked(total + slot.NetPoints.GetValueOrDefault()));
         var adjustments = team.GlobalAdjustments.Aggregate(0L, (total, item) =>
             checked(total + item.NetPoints));
-        await Assert.That(team.TotalScore).IsEqualTo(checked(slotNet + adjustments));
+        await Assert.That(team.TotalScore)
+            .IsEqualTo(checked(slotNet + adjustments + team.ScoreOutsideWindow));
     }
 
     private static LeaderboardTeamFact Team(int index, string name) => new(

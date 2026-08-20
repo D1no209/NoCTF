@@ -472,6 +472,7 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     rank?: number | null;
     rankingState?: NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol;
     totalScore?: number;
+    scoreOutsideWindow?: number;
     globalAdjustmentCount?: number;
     globalAdjustments?: Array<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse>;
     slots?: Array<NoCtfapiEndpointsCompetitionsScoreboardSlotResponse>;

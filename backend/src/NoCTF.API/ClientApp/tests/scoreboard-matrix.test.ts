@@ -42,7 +42,10 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('schemaRevision')
     expect(composable).toContain('scoreboardUpdated: (raw) =>')
     expect(composable).toContain('createTrailingRefresh')
-    expect(composable).toContain('void trailingRefresh()')
+    expect(composable).toContain('void queueRefresh({')
+    expect(composable).toContain('catalog: wantsCatalog')
+    expect(composable).toContain('schema: wantsSchema')
+    expect(composable).not.toContain('void refresh({ catalog: wantsCatalog')
     expect(composable).not.toContain('totalScore.value +=')
   })
 

@@ -257,7 +257,10 @@ public sealed record ScoreboardTeam(
     long TotalScore,
     int GlobalAdjustmentCount,
     IReadOnlyList<ScoreboardAdjustment> GlobalAdjustments,
-    IReadOnlyList<ScoreboardSlot> Slots);
+    IReadOnlyList<ScoreboardSlot> Slots)
+{
+    public long ScoreOutsideWindow { get; init; }
+}
 
 public sealed record ScoreboardTrack(
     string Key,

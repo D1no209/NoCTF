@@ -61,6 +61,7 @@ public sealed class LeaderboardOpenApiTests
             "rank",
             "rankingState",
             "totalScore",
+            "scoreOutsideWindow",
             "globalAdjustments",
             "globalAdjustmentCount",
             "slots"
