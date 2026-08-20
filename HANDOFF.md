@@ -1,5 +1,15 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-21 alpha.67 记分板总分守恒与投影提交原子性修复
+
+- `150d5426` 修复 AWDP 长赛和历史轮次窗口的总分表达缺口。主矩阵仍只返回最多 50 个连续轮次，但每支队伍新增后端权威 `scoreOutsideWindow`；现在稳定满足 `totalScore = 当前可见 Slot 净分 + scoreOutsideWindow + 全局人工调分`。历史窗口中的窗口外分同时包含所选窗口之前和之后已经结算的轮次，前端不得自行累计或推测整场分数；CTF、AWD、KoH 的该字段固定为 0。
+- 同一提交修复排行榜投影事务与 FusionCache 更新顺序。投影现在在 PostgreSQL `RepeatableRead` 事务成功提交后才替换缓存和发布通知；提交失败会保留最后一份成功缓存。跨进程刷新使用 PostgreSQL session advisory lock 覆盖事务提交、缓存替换和通知发布，避免较旧投影在并发刷新中反向覆盖新结果。
+- 前端 `useScoreboardMatrix` 将目录、Schema 和 Snapshot 的 Hub 通知全部纳入同一个 trailing refresh 合并队列；刷新进行中收到的新通知不会被丢弃，重连也会请求完整三件套。AWDP Full E2E 同步使用 canonical Int64 十进制字符串协议，并分别验证当前窗口算术与已结算历史窗口不可变性。
+- `f8e34dea` 将版本从 `0.1.0-alpha.66` 递增到 `0.1.0-alpha.67`。本阶段没有新增业务表、字段、EF migration 或 snapshot；EF `has-pending-model-changes` 确认无模型漂移。
+- 两份 OpenAPI 连续第二轮导出后 SHA-256 均为 `28DF1207F59F96C4BF587982490207A21145D5D2E94891A6DBE87261A43287A0`；生成的 `types.gen.ts` SHA-256 为 `B4684E87C0528149783861788F4E2325D43890BACF4BD1939C51797B9224A662`，第二轮生成无差异，未手工修改生成 SDK。
+- 验证：Release solution build 0 warning/0 error；后端完整 TUnit 1047 项中 1045 通过、0 失败，2 项仅因未配置真实 Kubernetes/Libvirt 环境按设计跳过；真实 PostgreSQL 提交失败缓存保留、AWDP 长历史窗口和历史窗口守恒测试通过；CTF、AWD、AWDP、KoH 四种 Full E2E 均 1/1 通过，并完成 PostgreSQL/Redis/API 韧性与测试资源清理；前端 `bun test` 244/244（1809 assertions）、typecheck、production build、`bun audit`；C# analyzers、EF model drift、OpenAPI/SDK 双次幂等和 `git diff --check` 全部通过。前端构建只保留既有大 chunk、plugin timing 与第三方 Node exports deprecation 警告。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`。按用户指令，发现问题并完成修复后只创建本地提交；未推送、未部署、未操作生产数据，也未切换或同步本地 `main`，等待下一步指令。
+
 ## 2026-08-21 alpha.66 记分板投影标识与历史窗口一致性修复
 
 - `436b0ad3` 修复记分板协议标识在 JavaScript 中丢失精度的问题。内部仍以 `long` 保存 Snapshot version、Schema revision 与题目目录 revision；HTTP、SignalR 和 Redis 外部边界统一输出不变区域十进制字符串，前端只做精确字符串比较，不再将 64 位值转换为 IEEE-754 `number`。OpenAPI 与 TypeScript SDK 均由工具重新生成，没有手改生成文件。
