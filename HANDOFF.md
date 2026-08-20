@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-21 alpha.68 AWDP 权威攻防分拆与当前轮操作统计修复
+
+- `d6534a8d` 修复 AWDP 长赛累计攻防分被前端按当前最多 50 轮窗口重新计算的问题。规范化排行榜现在直接返回后端完整历史投影的 `attackScore`、`defenseScore`，并按 `CompetitionChallengeId` 返回权威 `challengeScores`；主榜窗口仍保持有界，前端不再从可见 Slot 推测整场或单题累计分。人工调分继续只进入总分，不被错误归类为攻击分或防御分。
+- 同一提交修复 AWDP 中控“当前轮”操作统计跨轮泄漏。顶栏及当前队伍的攻击/防御成功数与总提交数改为读取当前轮矩阵 Slot 的权威 breakdown；题目最新攻防状态只接受当前轮 `[startAt, endAt)` 内事件。左侧动态、中央播报及历史回放仍保留完整事件窗口，不因当前轮过滤丢失历史展示。
+- HTTP 响应、两份 OpenAPI 与 TypeScript SDK 均通过工具更新；没有手写 URL、DTO、枚举或生成文件。两份 OpenAPI SHA-256 均为 `CEE1FDDBCF585AC562C7A743D59B8F9823189C4EC26E0B6B473997BF2BF7E703`，`index.ts` 为 `3450501619DC098C61604A6709DCFFB0B5FB3BE88B147FA1637868816A86D822`，`types.gen.ts` 为 `5DCC8F2D92B8C4A377C9A88625E2A777CED1FA73E977A1BB01A9867C10112FCF`；连续第二轮导出与生成没有差异。
+- `6e922296` 将版本从 `0.1.0-alpha.67` 递增到 `0.1.0-alpha.68`。本阶段没有新增业务表、字段、EF migration 或 snapshot；EF `has-pending-model-changes` 确认无模型漂移。
+- 验证：Release solution build 0 warning/0 error；后端完整 TUnit 1048 项中 1046 通过、0 失败，2 项仅因未配置真实 Kubernetes/Libvirt 环境按设计跳过；权威分拆投影 14/14、OpenAPI 5/5；AWDP Full E2E 1/1（5m01.638s），随后 API、Redis、PostgreSQL 韧性检查通过，测试 Compose、镜像、容器和网络已按项目身份清理；前端 `bun test` 246/246（1813 assertions）、typecheck、production build、`bun audit` 0 漏洞；C# analyzers、OpenAPI/SDK 双次幂等、EF model drift 和 `git diff --check` 均通过。仓库没有 lint script，未将 lint 误报为已执行。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`、分支 `codex/fix-scoreboard-audit-20260820`，基线为 `3d69fbeeba8d9f2ded01b7c70a5dd36c3441bb7d`。按用户指令，发现问题并完成修复后只创建本地提交；未推送、未部署、未操作生产数据，也未切换或同步本地 `main`，等待下一步指令。
+
 ## 2026-08-21 alpha.67 记分板总分守恒与投影提交原子性修复
 
 - `150d5426` 修复 AWDP 长赛和历史轮次窗口的总分表达缺口。主矩阵仍只返回最多 50 个连续轮次，但每支队伍新增后端权威 `scoreOutsideWindow`；现在稳定满足 `totalScore = 当前可见 Slot 净分 + scoreOutsideWindow + 全局人工调分`。历史窗口中的窗口外分同时包含所选窗口之前和之后已经结算的轮次，前端不得自行累计或推测整场分数；CTF、AWD、KoH 的该字段固定为 0。
