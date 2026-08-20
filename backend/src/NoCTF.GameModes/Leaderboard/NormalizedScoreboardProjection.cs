@@ -317,7 +317,9 @@ internal static class NormalizedScoreboardProjection
         for (var number = 1; number <= lastRound; number++)
         {
             var start = EffectiveClockToWallTime(input, TimeSpan.FromSeconds((long)(number - 1) * duration));
-            var end = EffectiveClockToWallTime(input, TimeSpan.FromSeconds((long)number * duration));
+            var end = number == currentRound && input.CompetitionStatus == CompetitionStatus.Paused
+                ? projectedAt.AddSeconds(Math.Max(0, legacy.CurrentRoundRemainingSeconds.GetValueOrDefault()))
+                : EffectiveClockToWallTime(input, TimeSpan.FromSeconds((long)number * duration));
             var settled = number <= settledThrough;
             roundsResult.Add(new(
                 StableGuid(input.CompetitionId, $"round:{number}"),

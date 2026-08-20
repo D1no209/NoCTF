@@ -33,6 +33,7 @@ import {
 } from '~/utils/awdp-control-screen'
 import type { AwdpControlEvent, AwdpRankedEntry } from '~/utils/awdp-control-screen'
 import { directionIcon } from '~/utils/directions'
+import { scoreboardRankingStateLabel } from '~/utils/scoreboard'
 
 definePageMeta({ layout: false })
 
@@ -125,7 +126,7 @@ function resizeCanvas(): void {
   viewportHeight.value = window.innerHeight
 }
 
-function rankTone(rank: number): string {
+function rankTone(rank: number | null | undefined): string {
   if (rank === 1) return 'gold'
   if (rank === 2) return 'silver'
   if (rank === 3) return 'bronze'
@@ -260,7 +261,7 @@ async function loadData(): Promise<void> {
   projectionPending.value = false
   error.value = null
   for (const entry of awdpRankedEntries(board.snapshot.value)) {
-    if (entry.teamId) previousRanks.set(entry.teamId, entry.rank)
+    if (entry.teamId && entry.rank !== null) previousRanks.set(entry.teamId, entry.rank)
   }
   if (selectedTeamIndex.value >= rankedEntries.value.length) selectedTeamIndex.value = 0
 }
@@ -384,8 +385,8 @@ onUnmounted(() => {
             <div class="rank-head"><span>{{ $t('排名') }}</span><span>{{ $t('队伍') }}</span><span>{{ $t('攻击分') }}</span><span>{{ $t('防御分') }}</span><span>{{ $t('总分') }}</span></div>
             <ol v-if="topEntries.length" class="rank-list">
               <li v-for="entry in topEntries" :key="entry.teamId" :class="rankTone(entry.rank)">
-                <span class="rank-number">{{ entry.rank }}</span>
-                <strong>{{ entry.teamName }}</strong>
+                <span class="rank-number">{{ entry.rank ?? '—' }}</span>
+                <strong>{{ entry.teamName }}<small v-if="entry.rankingState !== 'Eligible'"> · {{ scoreboardRankingStateLabel(entry.rankingState) }}</small></strong>
                 <span>{{ entry.attackScore }}</span><span>{{ entry.defenseScore }}</span><b>{{ entry.totalScore ?? 0 }}</b>
                 <i :class="entry.trend">{{ entry.trend === 'up' ? '↗' : entry.trend === 'down' ? '↘' : '→' }}</i>
               </li>

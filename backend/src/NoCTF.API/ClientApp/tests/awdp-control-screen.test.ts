@@ -175,6 +175,28 @@ describe('AWDP control screen data adapter', () => {
       })
   })
 
+  test('preserves null ranks for banned or disqualified teams instead of inventing public places', () => {
+    const ineligibleTeamId = '00000000-0000-0000-0000-000000000006'
+    const ineligibleSnapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
+      ...snapshot,
+      teams: [
+        ...(snapshot.teams ?? []),
+        {
+          rank: null,
+          teamId: ineligibleTeamId,
+          teamName: 'Banned team',
+          trackKey: 'open',
+          rankingState: 'Banned',
+          totalScore: 0,
+          slots: [],
+        },
+      ],
+    }
+
+    expect(awdpRankedEntries(ineligibleSnapshot, new Map([[ineligibleTeamId, 1]])).at(-1))
+      .toMatchObject({ rank: null, rankingState: 'Banned', trend: 'steady' })
+  })
+
   test('counts each attack or defense operation once while pairing attempted and resolved events', () => {
     const attackFactId = crypto.randomUUID()
     const defenseFactId = crypto.randomUUID()
@@ -220,7 +242,7 @@ describe('AWDP control screen data adapter', () => {
     expect(awdpRoundClock(timedSnapshot, timedSchema, Date.parse('2026-08-19T12:02:30Z'), true))
       .toEqual({ currentRound: 12, remainingSeconds: 0 })
     expect(awdpRoundClock(timedSnapshot, timedSchema, Date.parse('2026-08-19T12:02:30Z'), false))
-      .toEqual({ currentRound: 12, remainingSeconds: 0 })
+      .toEqual({ currentRound: 12, remainingSeconds: 120 })
   })
 
   test('keeps a fixed 1920 by 1080 virtual canvas with uniform letterboxed scaling', () => {

@@ -146,7 +146,7 @@ round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
 - Pause 不增加 EffectiveRunningTime，因此不推进收益；Resume 从原逻辑时间继续；Finish 使用结束时点冻结；
 - 三类单次罚分按每条唯一事实最多应用一次：Flag 错误使用 `FlagWrongPenalty`，Fix 验证得到 `ExploitSucceeded` 使用 `ExploitSucceededPenalty`，Fix 验证得到 `ServiceAbnormal` 使用 `ServiceAbnormalPenalty`；Patch 解包错误、Patch 命令非零/超时、Runner/Provider/存储平台失败不套用这三类选手业务罚分。Hint、ManualAdjustment、赛道过滤和 checked Int64 聚合保持原规则。
 
-即使没有新 GameplayFact，轮次边界也会冻结上一轮并开始显示新一轮的初始曲线值。singular maintenance 每 15 秒最多检查 500 场 Running AWDP schema v4 比赛，比较缓存快照 `DataAsOf` 对应轮次与当前逻辑轮；只有跨轮或缺失快照时设置 `LeaderboardDirty`。随后复用现有 `RefreshDirtyLeaderboards -> ProjectLeaderboard`、PostgreSQL 行锁、Wolverine Outbox 和原子缓存替换。没有新增 schedule 或积分状态表，也不会每秒写库。
+即使没有新 GameplayFact，轮次边界也会冻结上一轮并开始显示新一轮的初始曲线值。singular maintenance 每 15 秒以 500 场为一批，按比赛 UUID keyset 遍历全部 Running AWDP schema v4 比赛，比较缓存快照 `DataAsOf` 对应轮次与当前逻辑轮；只有跨轮或缺失快照时设置 `LeaderboardDirty`。随后复用现有 `RefreshDirtyLeaderboards -> ProjectLeaderboard`、PostgreSQL 行锁、Wolverine Outbox 和原子缓存替换。没有新增 schedule 或积分状态表，也不会每秒写库。
 
 ## 玩家状态接口
 

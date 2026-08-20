@@ -53,7 +53,7 @@ export interface AwdpTeamChallengeState {
 }
 
 export interface AwdpRankedEntry extends NoCtfapiEndpointsCompetitionsScoreboardTeamResponse {
-  rank: number
+  rank: number | null
   attackScore: number
   defenseScore: number
   trend: 'up' | 'down' | 'steady'
@@ -154,7 +154,10 @@ export function awdpRoundClock(
   const endAt = round?.endAt ? new Date(round.endAt).getTime() : Number.NaN
   const startAt = round?.startAt ? new Date(round.startAt).getTime() : now
   if (!currentRound || !Number.isFinite(endAt)) return { currentRound, remainingSeconds: 0 }
-  const reference = advances ? now : Math.min(now, endAt)
+  const generatedAt = snapshot?.generatedAt ? new Date(snapshot.generatedAt).getTime() : Number.NaN
+  const reference = advances
+    ? now
+    : Number.isFinite(generatedAt) ? generatedAt : Math.min(now, endAt)
   return {
     currentRound,
     remainingSeconds: Math.max(0, Math.floor((endAt - Math.max(reference, startAt)) / 1000)),
@@ -179,8 +182,8 @@ export function awdpRankedEntries(
   previousRanks: ReadonlyMap<string, number> = new Map(),
 ): AwdpRankedEntry[] {
   return awdpPublicEntries(snapshot)
-    .map((entry, index) => {
-      const rank = entry.rank ?? index + 1
+    .map((entry) => {
+      const rank = entry.rank ?? null
       const previous = entry.teamId ? previousRanks.get(entry.teamId) : undefined
       const attackScore = (entry.slots ?? []).reduce((total, slot) =>
         total + (slot.scoreState === 'Settled'
@@ -195,7 +198,7 @@ export function awdpRankedEntries(
         rank,
         attackScore,
         defenseScore,
-        trend: previous === undefined || previous === rank
+        trend: rank === null || previous === undefined || previous === rank
           ? 'steady'
           : rank < previous ? 'up' : 'down',
       }

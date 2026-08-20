@@ -128,6 +128,58 @@ public sealed class NormalizedScoreboardProjectionTests
     }
 
     [Test]
+    public async Task Awdp_paused_round_keeps_a_future_end_boundary_for_the_frozen_remaining_time()
+    {
+        var competitionId = Guid.NewGuid();
+        var challenge = Challenge(1, "Pwn", "{\"schemaVersion\":4}");
+        var configuration = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            60,
+            FixedCurve(100),
+            FixedCurve(40),
+            RequireBreakBeforeFix: false), JsonOptions);
+        var pausedAt = Start.AddSeconds(90);
+        var projectedAt = Start.AddSeconds(120);
+        var projection = engine.ProjectScoreboard(new(
+            competitionId,
+            GameMode.Awdp,
+            [Team(1, "Alpha")],
+            [],
+            [challenge],
+            configuration,
+            Start,
+            LifecycleAudits:
+            [
+                new()
+                {
+                    Id = Guid.CreateVersion7(Start),
+                    CompetitionId = competitionId,
+                    From = CompetitionStatus.Published,
+                    To = CompetitionStatus.Running,
+                    OccurredAt = Start
+                },
+                new()
+                {
+                    Id = Guid.CreateVersion7(pausedAt),
+                    CompetitionId = competitionId,
+                    From = CompetitionStatus.Running,
+                    To = CompetitionStatus.Paused,
+                    OccurredAt = pausedAt
+                }
+            ],
+            ProjectedAt: projectedAt,
+            CompetitionStatus: CompetitionStatus.Paused));
+
+        var rounds = projection.Schema.Rounds.OrderBy(round => round.Number).ToArray();
+        await Assert.That(rounds.Length).IsEqualTo(2);
+        await Assert.That(rounds[0].State).IsEqualTo(ScoreboardRoundState.Settled);
+        await Assert.That(rounds[1].State).IsEqualTo(ScoreboardRoundState.Running);
+        await Assert.That(rounds[1].StartAt).IsEqualTo(Start.AddSeconds(60));
+        await Assert.That(rounds[1].EndAt).IsEqualTo(projectedAt.AddSeconds(30));
+        await Assert.That(rounds[1].EndAt > rounds[1].StartAt).IsTrue();
+    }
+
+    [Test]
     public async Task Awd_projects_attack_and_availability_into_round_columns()
     {
         var challenge = Challenge(1, "Pwn", "{\"schemaVersion\":4}");
