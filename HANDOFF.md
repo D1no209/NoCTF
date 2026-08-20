@@ -1,5 +1,16 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-20 alpha.61 统一排行榜矩阵有界投影修复
+
+- `c73240cc` 修正 alpha.60 统一排行榜矩阵的生产投影边界。`FusionLeaderboardCache` 不再把整场 `GameplayFact` 历史全部载入内存，而是通过 `LeaderboardFactProjectionReader` 在 PostgreSQL 中按 CTF、AWD、AWDP、KoH 各自的权威语义做集合式聚合；完整不可变事实仍由已有强类型签名游标详情接口分页读取。没有新增业务表、EF migration 或 snapshot 变更。
+- 聚合事实新增 `Multiplicity` 与最后发生时间，所有尝试数、成功数、错误提交扣分、Hint 扣分、人工调分、KoH 控制观察和旧投影总分均按聚合数量计算。主快照只生成非空 Slot，保留完整 `EntryCount`、breakdown、得分摘要及受控数量的最近零分操作，避免历史事实数量线性放大维护投影内存。
+- AWDP 已结算轮次现在为每条攻击/防御轨道生成稳定、确定性的结算得分记录；原始 Break/Fix 操作在 Slot 详情中只作为操作事实显示为 `0/0/0`，不会重复承载该轮结算分。当前轮仍为 `Pending` 且分数为 `null`，后续轮次不会改写历史结算。空生命周期事件列表会正确回退到比赛开始时间，不再把有效运行时长误算为零。
+- 真实 PostgreSQL 对照测试为四种模式各写入 250 条事实，比较数据库聚合投影与原始事实权威投影的总分、稀疏 Slot、分数状态、攻防 breakdown 和完整记录数；每场投影访问 `gameplay_facts` 的查询保持在 1–2 次。100 队伍 × 20 题 × 50 轮的理论 100,000 单元格压力测试只生成 49 个有事实的 Slot，未生成空矩阵。
+- `8bc6669b` 将版本从 `0.1.0-alpha.60` 递增到 `0.1.0-alpha.61`。本阶段未手改 OpenAPI、生成 SDK、migration 或 snapshot；也未操作生产数据、推送或部署。
+- 验证结果：Release solution build 0 warning/0 error；C# analyzers 与 EF model drift 通过；非 Integration TUnit 840/840；真实 PostgreSQL 排行榜投影对照 1/1；前端 `bun test` 238/238（1755 assertions）、typecheck、production build 通过，仓库没有 lint script。完整 Integration 共 186 项：183 通过、2 个环境型跳过（真实 Kubernetes/Libvirt 未配置），唯一失败发生在 Testcontainers Ryuk 创建测试资源前；同一 `BotAuthenticationTests` 独立复跑 1/1 通过，确认不是产品逻辑失败。
+- 四模式 Full E2E 顺序执行并全部通过：CTF 1/1（58.673s）、AWD 1/1（1m30.573s）、AWDP 1/1（4m24.848s）、KoH 1/1（1m11.909s）；每套均包含 API/Redis/PostgreSQL 重启韧性检查，Compose、容器、网络与临时镜像由编排器按精确项目身份清理。
+- OpenAPI 导出与 TypeScript SDK 生成连续执行两轮，OpenAPI SHA-256 始终为 `D4A4C316CB5186EABA8FDDBDBB83864763F665F5E7BE69851E589EF42E5D58D7`，`types.gen.ts` 为 `9240DE2D0550DC78A8FEB6911795C47D888A72E6D9BD9BFD61E3BF482E8E5597`，全部生成制品哈希保持一致。两份 Compose 配置通过；Kubernetes 49 个资源中 46 个有效、3 个 Cilium CRD 因无外部 schema 按门禁策略跳过、0 个错误。
+
 ## 2026-08-19 alpha.60 统一排行榜矩阵协议
 
 - 基线为远程 `main` 的 `870b5201f0b80e25af4871a6f5a56166cf8cf090`，实现位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`、分支 `codex/leaderboard-matrix-20260819`；原工作区的用户/协作者修改未被切换、清理或覆盖。本阶段未推送、未部署、未操作生产数据。
