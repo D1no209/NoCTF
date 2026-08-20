@@ -248,6 +248,11 @@ public sealed record ScoreboardSlot(
     IReadOnlyList<ScoreboardBreakdown> Breakdowns,
     IReadOnlyList<ScoreboardSlotEntry> Entries);
 
+public sealed record ScoreboardChallengeScore(
+    Guid CompetitionChallengeId,
+    long AttackScore,
+    long DefenseScore);
+
 public sealed record ScoreboardTeam(
     Guid TeamId,
     string TeamName,
@@ -260,6 +265,9 @@ public sealed record ScoreboardTeam(
     IReadOnlyList<ScoreboardSlot> Slots)
 {
     public long ScoreOutsideWindow { get; init; }
+    public long? AttackScore { get; init; }
+    public long? DefenseScore { get; init; }
+    public IReadOnlyList<ScoreboardChallengeScore> ChallengeScores { get; init; } = [];
 }
 
 public sealed record ScoreboardTrack(

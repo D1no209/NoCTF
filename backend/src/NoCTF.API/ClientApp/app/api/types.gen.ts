@@ -473,12 +473,21 @@ export type NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
     rankingState?: NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol;
     totalScore?: number;
     scoreOutsideWindow?: number;
+    attackScore?: number | null;
+    defenseScore?: number | null;
+    challengeScores?: Array<NoCtfapiEndpointsCompetitionsScoreboardChallengeScoreResponse>;
     globalAdjustmentCount?: number;
     globalAdjustments?: Array<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse>;
     slots?: Array<NoCtfapiEndpointsCompetitionsScoreboardSlotResponse>;
 };
 
 export type NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol = 'Eligible' | 'Banned' | 'Disqualified';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardChallengeScoreResponse = {
+    competitionChallengeId?: string;
+    attackScore?: number;
+    defenseScore?: number;
+};
 
 export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse = {
     id?: string;

@@ -79,6 +79,8 @@ breakdown 与压缩后的权威事实。完整 slot 历史通过带签名游标�
 超出主快照上限的全局调分历史通过 team/adjustments 签名游标路由读取。
 CTF 按题目列，AWD/AWDP 按题目×轮次列，KoH 按控制结算列；AWDP 当前未结算轮次只暴露操作
 状态，所有分数字段为 null，轮次结算后才进入累计分数。前端不得重算、预估或重新排序。
+AWDP 队伍行额外返回完整已结算历史的 `attackScore`、`defenseScore` 和按题目的
+`challengeScores`；这些累计字段不受主快照有界轮次窗口影响，前端不得从可见 Slot 重新求和。
 排行榜响应同时返回 `visibility`、`dataScope` 与 nullable `dataAsOf`。Frozen 返回截止时刻的持久化
 快照；Blackout 对参赛者和 Bot 返回 `Hidden` 与空集合，但不关闭题目、Runtime、提交或本人
 提交结果。比赛结束时自动恢复最终实时榜单。人工 Administrator/Owner/Manager/Judge/Observer

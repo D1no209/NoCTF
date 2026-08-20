@@ -5,7 +5,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
-import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardSlot } from './scoreboard'
+import { scoreboardBreakdown } from './scoreboard'
 
 export type AwdpControlAction = 'attack' | 'defense'
 export type AwdpControlOutcome = 'pending' | 'success' | 'failure'
@@ -143,6 +143,49 @@ export function awdpOperationMetrics(events: readonly AwdpControlEvent[]): AwdpO
   return { attack: metric('attack'), defense: metric('defense') }
 }
 
+export function awdpCurrentRoundEvents(
+  events: readonly AwdpControlEvent[],
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+): AwdpControlEvent[] {
+  const round = (schema?.rounds ?? []).find(item => item.id === snapshot?.currentRoundId)
+  const startAt = round?.startAt ? new Date(round.startAt).getTime() : Number.NaN
+  const endAt = round?.endAt ? new Date(round.endAt).getTime() : Number.NaN
+  if (!Number.isFinite(startAt) || !Number.isFinite(endAt)) return []
+  return events.filter((event) => {
+    const occurredAt = new Date(event.occurredAt).getTime()
+    return Number.isFinite(occurredAt) && occurredAt >= startAt && occurredAt < endAt
+  })
+}
+
+export function awdpCurrentRoundOperationMetrics(
+  snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
+  teamId?: string,
+): AwdpOperationMetrics {
+  const columnIndexes = new Set((schema?.columns ?? [])
+    .filter(column => column.roundId === snapshot?.currentRoundId && column.index !== undefined)
+    .map(column => column.index!))
+  const metrics: AwdpOperationMetrics = {
+    attack: { success: 0, total: 0 },
+    defense: { success: 0, total: 0 },
+  }
+  if (!columnIndexes.size) return metrics
+  const teams = awdpPublicEntries(snapshot).filter(entry => !teamId || entry.teamId === teamId)
+  for (const entry of teams) {
+    for (const slot of entry.slots ?? []) {
+      if (slot.columnIndex === undefined || !columnIndexes.has(slot.columnIndex)) continue
+      const attack = scoreboardBreakdown(slot, 'Attack')
+      const defense = scoreboardBreakdown(slot, 'Defense')
+      metrics.attack.success += attack?.successfulCount ?? 0
+      metrics.attack.total += attack?.attemptCount ?? 0
+      metrics.defense.success += defense?.successfulCount ?? 0
+      metrics.defense.total += defense?.attemptCount ?? 0
+    }
+  }
+  return metrics
+}
+
 export function awdpRoundClock(
   snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse | null,
   schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null,
@@ -185,19 +228,11 @@ export function awdpRankedEntries(
     .map((entry) => {
       const rank = entry.rank ?? null
       const previous = entry.teamId ? previousRanks.get(entry.teamId) : undefined
-      const attackScore = (entry.slots ?? []).reduce((total, slot) =>
-        total + (slot.scoreState === 'Settled'
-          ? scoreboardBreakdown(slot, 'Attack')?.netPoints ?? 0
-          : 0), 0)
-      const defenseScore = (entry.slots ?? []).reduce((total, slot) =>
-        total + (slot.scoreState === 'Settled'
-          ? scoreboardBreakdown(slot, 'Defense')?.netPoints ?? 0
-          : 0), 0)
       return {
         ...entry,
         rank,
-        attackScore,
-        defenseScore,
+        attackScore: entry.attackScore ?? 0,
+        defenseScore: entry.defenseScore ?? 0,
         trend: rank === null || previous === undefined || previous === rank
           ? 'steady'
           : rank < previous ? 'up' : 'down',
@@ -230,15 +265,10 @@ export function awdpTeamChallengeStates(
   if (!entry?.teamId) return []
   return (catalog?.items ?? []).filter(challenge => challenge.id && challenge.published).map((challenge) => {
     const challengeId = challenge.id!
-    let attackScore = 0
-    let defenseScore = 0
-    for (const column of scoreboardColumnsForChallenge(schema, challengeId)) {
-      if (column.index === undefined) continue
-      const slot = scoreboardSlot(entry, column.index)
-      if (slot?.scoreState !== 'Settled') continue
-      attackScore += scoreboardBreakdown(slot, 'Attack')?.netPoints ?? 0
-      defenseScore += scoreboardBreakdown(slot, 'Defense')?.netPoints ?? 0
-    }
+    const challengeScore = (entry.challengeScores ?? [])
+      .find(score => score.competitionChallengeId === challengeId)
+    const attackScore = challengeScore?.attackScore ?? 0
+    const defenseScore = challengeScore?.defenseScore ?? 0
     const attackOutcome = latestOutcome(events, entry.teamId!, challengeId, 'attack')
     const defenseOutcome = latestOutcome(events, entry.teamId!, challengeId, 'defense')
     return {

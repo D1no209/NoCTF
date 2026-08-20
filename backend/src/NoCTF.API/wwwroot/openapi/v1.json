@@ -14851,6 +14851,22 @@
             "type": "integer",
             "format": "int64"
           },
+          "attackScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "defenseScore": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "challengeScores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardChallengeScoreResponse"
+            }
+          },
           "globalAdjustmentCount": {
             "type": "integer",
             "format": "int32"
@@ -14882,6 +14898,24 @@
           "Banned",
           "Disqualified"
         ]
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardChallengeScoreResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "competitionChallengeId": {
+            "type": "string",
+            "format": "guid"
+          },
+          "attackScore": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "defenseScore": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "NoCTFAPIEndpointsCompetitionsScoreboardAdjustmentResponse": {
         "type": "object",

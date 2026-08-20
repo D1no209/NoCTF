@@ -62,9 +62,20 @@ public sealed class LeaderboardOpenApiTests
             "rankingState",
             "totalScore",
             "scoreOutsideWindow",
+            "attackScore",
+            "defenseScore",
+            "challengeScores",
             "globalAdjustments",
             "globalAdjustmentCount",
             "slots"
+        ]);
+        var challengeScore = ResolveSchema(
+            root,
+            team.GetProperty("properties").GetProperty("challengeScores").GetProperty("items"));
+        await Assert.That(PropertyNames(challengeScore)).IsEquivalentTo([
+            "competitionChallengeId",
+            "attackScore",
+            "defenseScore"
         ]);
         var slot = ResolveSchema(
             root,
