@@ -14,7 +14,6 @@ internal static class ScoringInfrastructure
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
         services.AddScoped<ILeaderboardCache, FusionLeaderboardCache>();
         services.AddScoped<ILeaderboardSnapshotFactory, FusionLeaderboardCache>();
-        services.AddScoped<IScoreboardSlotDetailReader, ScoreboardSlotDetailReader>();
         return services;
     }
 }

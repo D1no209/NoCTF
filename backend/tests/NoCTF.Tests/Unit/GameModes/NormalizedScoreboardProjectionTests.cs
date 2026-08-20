@@ -236,7 +236,7 @@ public sealed class NormalizedScoreboardProjectionTests
                 hintCost: 1))
             .Concat(Enumerable.Range(20, 12).Select(index => Fact(
                 team.Id,
-                null,
+                challenge.Id,
                 GameplayFactKind.ManualAdjustment,
                 index,
                 GameplayFactResult.Applied,
@@ -259,6 +259,8 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(row.GlobalAdjustmentCount).IsEqualTo(12);
         await Assert.That(row.GlobalAdjustments.Count).IsEqualTo(5);
         await Assert.That(projection.Snapshot.Actors.Count).IsEqualTo(10);
+        await Assert.That(projection.EntryAllocations.Count).IsEqualTo(12);
+        await Assert.That(projection.EntryAllocations.All(entry => entry.Entry.NetPoints == -1)).IsTrue();
         await Assert.That(row.TotalScore).IsEqualTo(0L);
     }
 

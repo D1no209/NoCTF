@@ -46,6 +46,7 @@ GET  /api/v1/competitions/{competitionId}/leaderboard
 GET  /api/v1/competitions/{competitionId}/leaderboard/challenges
 GET  /api/v1/competitions/{competitionId}/leaderboard/schema
 GET  /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}
+GET  /api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments
 GET  /api/v1/competitions/{competitionId}/tracks
 
 POST /api/v1/competitions/{competitionId}/teams
@@ -74,7 +75,8 @@ Leaderboard GET 的 statusUrl 指回自身：无快照时原子置 Dirty 并返�
 排行榜拆分为低频题目目录、低频列结构和高频稀疏快照。`leaderboard/challenges` 返回稳定题目标识；
 `leaderboard/schema` 返回模式、轮次和 `columnIndex` 定义；`leaderboard` 返回 actors、teams、tracks
 以及队伍的非空 `slots[]`。每个 slot 明确区分 `Pending`/`Settled`，并提供 earned、deducted、net、
-breakdown 与压缩后的权威事实。完整 slot 历史通过带签名游标的 team/column 明细路由读取。
+breakdown 与压缩后的权威事实。完整 slot 历史通过带签名游标的 team/column 明细路由读取；
+超出主快照上限的全局调分历史通过 team/adjustments 签名游标路由读取。
 CTF 按题目列，AWD/AWDP 按题目×轮次列，KoH 按控制结算列；AWDP 当前未结算轮次只暴露操作
 状态，所有分数字段为 null，轮次结算后才进入累计分数。前端不得重算、预估或重新排序。
 排行榜响应同时返回 `visibility`、`dataScope` 与 nullable `dataAsOf`。Frozen 返回截止时刻的持久化

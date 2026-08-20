@@ -193,7 +193,22 @@ public sealed record ScoreboardSlotEntry(
     ScoreboardAward? Award = null,
     long AwardPoints = 0);
 
+public sealed record ScoreboardEntryAllocation(
+    Guid TeamId,
+    int ColumnIndex,
+    ScoreboardSlotEntry Entry);
+
 public sealed record ScoreboardAdjustment(
+    Guid Id,
+    ScoreboardAdjustmentKind Kind,
+    DateTimeOffset OccurredAt,
+    int? ActorIndex,
+    long EarnedPoints,
+    long DeductedPoints,
+    long NetPoints);
+
+public sealed record ScoreboardAdjustmentAllocation(
+    Guid TeamId,
     Guid Id,
     ScoreboardAdjustmentKind Kind,
     DateTimeOffset OccurredAt,
@@ -247,4 +262,11 @@ public sealed record ScoreboardSnapshot(
 public sealed record ScoreboardProjection(
     ScoreboardChallengeCatalog ChallengeCatalog,
     ScoreboardSchema Schema,
-    ScoreboardSnapshot Snapshot);
+    ScoreboardSnapshot Snapshot)
+{
+    // Full per-entry allocations are an internal query projection. The public snapshot
+    // remains compact, while cursor-paged details can return the exact settled score.
+    public IReadOnlyList<ScoreboardActor> DetailActors { get; init; } = [];
+    public IReadOnlyList<ScoreboardEntryAllocation> EntryAllocations { get; init; } = [];
+    public IReadOnlyList<ScoreboardAdjustmentAllocation> AdjustmentAllocations { get; init; } = [];
+}
