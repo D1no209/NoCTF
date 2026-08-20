@@ -1,5 +1,15 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-20 alpha.62 统一排行榜最终审计修复
+
+- `fe47240e` 修复排行榜缓存仍暗中保留无界明细历史的问题。`ScoreboardProjection` 现在只保留主快照已经压缩到每个 Slot 最多 5 条的内部 Entry allocation，并移除全部人工调分历史 allocation；完整 Slot 与人工调分历史只在签名游标详情请求时，从 PostgreSQL 按页读取。内部 Actor 目录也只保留主快照实际引用的 Actor，不再随整场提交者数量无界增长。
+- PostgreSQL 明细读取继续受 `DataAsOf`、Schema revision、Snapshot version 与调用者签名游标约束。每页在同一个 `RepeatableRead` 快照中查询事实及当前脱敏后的用户显示名；API 为当前页重新建立稠密 Actor 索引，不把缓存中的内部索引直接暴露，也不会因用户匿名化继续显示旧用户名。
+- `8c04d9ab` 让前端不再直接显示生成协议中的 `Banned`、`Disqualified`、`Attack`、`Defense`、`Succeeded`、`Rejected` 等原始值。排名状态、明细类型与结果均通过生成 SDK 类型约束的穷尽映射实时翻译；中英文切换无需刷新页面。
+- 补齐真实封禁/解封重盘验证。真实 PostgreSQL + `TeamModerationStore` + Worker maintenance + FusionCache 集成测试证明：队伍初始具有已结算分数；封禁后排名状态为 Banned、总分归零且 Slot 清空；解封后按不可变 GameplayFact 历史重新投影，原分数和已结算 Slot 恢复。AWDP Full E2E 也通过管理员强类型 HTTP 封禁/解封接口验证了同一闭环。此前 `5e61f391` 的交接条目提前声称 Full E2E 已覆盖封禁/解封重盘，实际当时没有对应操作；本阶段已补成真实用例并纠正该记录。
+- 没有新增业务表、字段、EF migration、HTTP 响应契约或 OpenAPI/TypeScript SDK 变化；版本仍为 `0.1.0-alpha.62`，属于同一发布候选的审计修复。
+- 验证：Release solution build 0 warning/0 error；后端完整 TUnit 1038 项中 1036 通过、0 失败、2 项仅因未配置真实 Kubernetes/Libvirt 环境按设计跳过；排行榜定向单元 15/15、真实 PostgreSQL 定向集成 2/2；AWDP Full E2E 1/1（约 4m23s，包含 Redis/PostgreSQL/API 韧性检查及封禁/解封重盘）；前端 `bun test` 241/241（1782 assertions）、typecheck、production build；C# analyzers、EF model drift 与 `git diff --check` 均通过。仓库没有 lint script，未将 lint 误报为已执行。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`，未覆盖主工作区的用户/协作者修改；未推送、未部署、未操作生产数据。
+
 ## 2026-08-20 alpha.62 统一排行榜分页明细完整性修复
 
 - `1a00d069` 修复数据库聚合投影与分页详情的数量边界。原投影会把同类 `GameplayFact` 折叠为一条并用 `Multiplicity` 计入 `EntryCount`，但 Slot 和全局人工调分详情仍只分页聚合后的代表记录，导致“完整数量为 N，详情只有 1 条”。现在主快照仍保持有界聚合，只有签名游标详情请求会按当前页有界读取 PostgreSQL 原始事实，从而让 `EntryCount`、breakdown 和可遍历详情一致，不向主响应塞入无界历史。
