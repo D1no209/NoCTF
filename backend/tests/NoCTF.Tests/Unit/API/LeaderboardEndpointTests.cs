@@ -228,6 +228,15 @@ public sealed class LeaderboardEndpointTests
             ],
             [new(4, publishedId, null), new(9, unpublishedId, null)],
             []);
+        var participantProjection = CreateProjection(
+            competitionId,
+            [new(publishedId, "Published", "PWN", "PWN", 1, true, 2)],
+            [new(0, publishedId, null)],
+            []);
+        projection = projection with
+        {
+            ParticipantView = ScoreboardAudienceView.From(participantProjection)
+        };
         await using var app = await CreateApplicationAsync(
             competitionId,
             new CachedLeaderboard(projection: projection),
@@ -271,7 +280,7 @@ public sealed class LeaderboardEndpointTests
             ],
             [new(4, publishedId, null), new(9, unpublishedId, null)],
             [
-                new(teamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, 10, 0, [],
+                new(teamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, 30, 0, [],
                 [
                     new(4, ScoreboardScoreState.Provisional, 10, 0, 10, 1, [], []),
                     new(9, ScoreboardScoreState.Provisional, 20, 0, 20, 1, [], [])
@@ -289,6 +298,27 @@ public sealed class LeaderboardEndpointTests
                         null, null, occurredAt, null, 20, 0, 20))
             ]
         };
+        var participantProjection = CreateProjection(
+            competitionId,
+            [new(publishedId, "Published", "PWN", "PWN", 1, true, 2)],
+            [new(0, publishedId, null)],
+            [
+                new(teamId, "Alpha", "default", 2, ScoreboardRankingState.Eligible, 10, 0, [],
+                [new(0, ScoreboardScoreState.Provisional, 10, 0, 10, 1, [], [])])
+            ]);
+        participantProjection = participantProjection with
+        {
+            EntryAllocations =
+            [
+                new(teamId, 0,
+                    new(publishedEntryId, ScoreboardEntryKind.Solve, ScoreboardEntryOutcome.Succeeded,
+                        null, null, occurredAt, null, 10, 0, 10))
+            ]
+        };
+        projection = projection with
+        {
+            ParticipantView = ScoreboardAudienceView.From(participantProjection)
+        };
         await using var app = await CreateApplicationAsync(
             competitionId,
             new CachedLeaderboard(projection: projection),
@@ -297,12 +327,20 @@ public sealed class LeaderboardEndpointTests
 
         using var response = await client.GetAsync(
             $"/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/0");
+        using var leaderboardResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
         var detail = await response.Content.ReadFromJsonAsync<ScoreboardSlotDetailResponse>();
+        var leaderboard = await leaderboardResponse.Content
+            .ReadFromJsonAsync<ScoreboardSnapshotResponse>();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(leaderboardResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(detail!.ColumnIndex).IsEqualTo(0);
         await Assert.That(detail.Items.Select(item => item.Id)).IsEquivalentTo([publishedEntryId]);
         await Assert.That(detail.Items.Select(item => item.Id)).DoesNotContain(unpublishedEntryId);
+        await Assert.That(leaderboard!.Teams).HasSingleItem();
+        await Assert.That(leaderboard.Teams[0].TotalScore).IsEqualTo(10);
+        await Assert.That(leaderboard.Teams[0].Rank).IsEqualTo(2);
     }
 
     [Test]
@@ -1049,13 +1087,13 @@ public sealed class LeaderboardEndpointTests
             CancellationToken cancellationToken) =>
             Task.FromResult<ScoreboardProjection?>(missing
                 ? null
-                : projection ?? CreateScoreboard(competitionId, frozen: false));
+                : EnsureParticipantView(projection ?? CreateScoreboard(competitionId, frozen: false)));
 
         public Task<ScoreboardProjection?> GetFrozenScoreboardAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
             Task.FromResult<ScoreboardProjection?>(frozen
-                ? projection ?? CreateScoreboard(competitionId, frozen: true)
+                ? EnsureParticipantView(projection ?? CreateScoreboard(competitionId, frozen: true))
                 : null);
 
         public Task<LeaderboardCacheStatus> GetStatusAsync(
@@ -1132,9 +1170,10 @@ public sealed class LeaderboardEndpointTests
         public Task<ScoreboardProjection?> GetFrozenScoreboardAsync(
             Guid competitionId,
             CancellationToken cancellationToken) =>
-            Task.FromResult<ScoreboardProjection?>(Interlocked.Increment(ref reads) == 1
+            Task.FromResult<ScoreboardProjection?>(EnsureParticipantView(
+                Interlocked.Increment(ref reads) == 1
                 ? first
-                : second);
+                : second));
 
         public Task<LeaderboardResponse?> GetFrozenAsync(
             Guid competitionId,
@@ -1223,6 +1262,14 @@ public sealed class LeaderboardEndpointTests
         new ScoreboardChallengeCatalog(competitionId, 9, challenges),
         new ScoreboardSchema(competitionId, GameMode.Ctf, 11, 9, [], columns),
         new ScoreboardSnapshot(competitionId, 17, 11, DateTimeOffset.UtcNow, null, actors ?? [], teams));
+
+    private static ScoreboardProjection EnsureParticipantView(ScoreboardProjection projection) =>
+        projection.ParticipantView is not null
+            ? projection
+            : projection with
+            {
+                ParticipantView = ScoreboardAudienceView.From(projection)
+            };
 
     private sealed class RecordingMessagePublisher : IBackendMessagePublisher
     {

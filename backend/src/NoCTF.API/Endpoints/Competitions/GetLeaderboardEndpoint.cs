@@ -230,87 +230,34 @@ internal static class ScoreboardAudienceProjection
     {
         if (canObserve)
             return projection;
-        var challenges = projection.ChallengeCatalog.Challenges
-            .Where(challenge => challenge.IsPublished)
-            .ToArray();
-        var challengeIds = challenges
-            .Select(challenge => challenge.CompetitionChallengeId)
-            .ToHashSet();
-        var columns = projection.Schema.Columns
-            .Where(column => challengeIds.Contains(column.CompetitionChallengeId))
-            .OrderBy(column => column.Index)
-            .ToArray();
-        var indexMap = columns.Select((column, index) => (column.Index, NewIndex: index))
-            .ToDictionary(item => item.Index, item => item.NewIndex);
-        var catalogRevision = StableRevision(challenges.Select(challenge =>
-            $"{challenge.CompetitionChallengeId:N}|{challenge.Revision}|{challenge.Order}"));
-        var mappedColumns = columns.Select((column, index) => column with { Index = index }).ToArray();
-        var schemaRevision = ScoreboardRevision.ForSchema(projection.Schema.Rounds, mappedColumns);
-        var visibleTeams = projection.Snapshot.Teams.Select(team => team with
-        {
-            Slots = team.Slots
-                .Where(slot => indexMap.ContainsKey(slot.ColumnIndex))
-                .Select(slot => slot with { ColumnIndex = indexMap[slot.ColumnIndex] })
-                .ToArray()
-        }).ToArray();
-        var actorIndexes = visibleTeams
-            .SelectMany(team => team.GlobalAdjustments.Select(item => item.ActorIndex)
-                .Concat(team.Slots.SelectMany(slot => slot.Entries.Select(entry => entry.ActorIndex))))
-            .Where(index => index is not null)
-            .Select(index => index!.Value)
-            .ToHashSet();
-        var actorPairs = projection.Snapshot.Actors
-            .Where(actor => actorIndexes.Contains(actor.Index))
-            .OrderBy(actor => actor.Index)
-            .Select((actor, index) => new { OldIndex = actor.Index, Actor = actor with { Index = index } })
-            .ToArray();
-        var actors = actorPairs.Select(pair => pair.Actor).ToArray();
-        var actorIndexMap = actorPairs.ToDictionary(pair => pair.OldIndex, pair => pair.Actor.Index);
-        int? MapActor(int? actorIndex) => actorIndex is int value
-            && actorIndexMap.TryGetValue(value, out var mapped)
-                ? mapped
-                : null;
-        var teams = visibleTeams.Select(team => team with
-        {
-            GlobalAdjustments = team.GlobalAdjustments
-                .Select(item => item with { ActorIndex = MapActor(item.ActorIndex) })
-                .ToArray(),
-            Slots = team.Slots
-                .Select(slot => slot with
-                {
-                    Entries = slot.Entries.Select(entry => entry with
-                    {
-                        ActorIndex = MapActor(entry.ActorIndex)
-                    }).ToArray()
-                })
-                .ToArray()
-        }).ToArray();
+        if (projection.ParticipantView is { } participantView)
+            return participantView.ToProjection();
+
+        // Older frozen snapshots do not contain an authoritative participant projection.
+        // Fail closed instead of leaking totals or ranks derived from unpublished challenges.
+        var catalogRevision = StableRevision([]);
+        var schemaRevision = ScoreboardRevision.ForSchema(projection.Schema.Rounds, []);
         return projection with
         {
             ChallengeCatalog = projection.ChallengeCatalog with
             {
                 Revision = catalogRevision,
-                Challenges = challenges
+                Challenges = []
             },
             Schema = projection.Schema with
             {
                 Revision = schemaRevision,
                 ChallengeCatalogRevision = catalogRevision,
-                Columns = mappedColumns
+                Columns = []
             },
             Snapshot = projection.Snapshot with
             {
                 SchemaRevision = schemaRevision,
-                Actors = actors,
-                Teams = teams
+                Actors = [],
+                Teams = []
             },
-            EntryAllocations = projection.EntryAllocations
-                .Where(allocation => indexMap.ContainsKey(allocation.ColumnIndex))
-                .Select(allocation => allocation with
-                {
-                    ColumnIndex = indexMap[allocation.ColumnIndex]
-                })
-                .ToArray()
+            DetailActors = [],
+            EntryAllocations = []
         };
     }
 
