@@ -1965,4 +1965,9 @@ export const englishMessages: Record<string, string> = {
   "完整调分记录均来自服务端权威事实。": "The complete adjustment history comes from authoritative server facts.",
   "比赛处罚": "Competition penalty",
   "禁赛重算": "Ban recalculation",
+  "暂无已结算轮次": "No settled rounds yet",
+  "第 {start}–{end} 轮": "Rounds {start}–{end}",
+  "较早轮次": "Earlier rounds",
+  "较新轮次": "Later rounds",
+  "返回最新轮次": "Back to latest rounds",
 }

@@ -14,7 +14,9 @@ public sealed record LeaderboardProjectionInput(
     IReadOnlyList<CompetitionLifecycleTransition>? LifecycleAudits = null,
     IReadOnlyList<LeaderboardAwdRoundFact>? AwdRounds = null,
     DateTimeOffset? ProjectedAt = null,
-    CompetitionStatus? CompetitionStatus = null);
+    CompetitionStatus? CompetitionStatus = null,
+    IReadOnlyList<LeaderboardGameplayFact>? ScoreboardGameplayFacts = null,
+    int? ScoreboardRoundWindowEnd = null);
 
 public sealed record LeaderboardTeamFact(
     Guid Id,

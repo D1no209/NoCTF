@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using System.Security.Cryptography;
 using System.Text;
 using FastEndpoints;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
@@ -399,10 +400,20 @@ internal static class ScoreboardAudienceProjection
 public sealed class GetLeaderboardRequest
 {
     public Guid CompetitionId { get; set; }
+
+    [QueryParam]
+    public int? EndingRound { get; set; }
+}
+
+public sealed class GetLeaderboardValidator : Validator<GetLeaderboardRequest>
+{
+    public GetLeaderboardValidator() =>
+        RuleFor(request => request.EndingRound).GreaterThan(0).When(request => request.EndingRound is not null);
 }
 
 public sealed class GetLeaderboardEndpoint(
     ILeaderboardCache leaderboard,
+    ILeaderboardSnapshotFactory snapshots,
     IBackendMessagePublisher messages,
     ICompetitionVisibilityAccess access,
     GetCompetitionTracks getTracks,
@@ -439,6 +450,17 @@ public sealed class GetLeaderboardEndpoint(
         var projection = visibility.DataScope == LeaderboardDataScope.Frozen
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
             : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
+        if (projection is not null
+            && visibility.DataScope != LeaderboardDataScope.Frozen
+            && request.EndingRound is int endingRound
+            && visibility.GameMode == NoCTF.Domain.Competitions.GameMode.Awdp)
+        {
+            projection = await snapshots.CreateScoreboardWindowAsync(
+                request.CompetitionId,
+                endingRound,
+                projection.Snapshot.DataAsOf ?? projection.Snapshot.GeneratedAt,
+                cancellationToken);
+        }
         if (projection is not null)
         {
             var canObserve = user.UserId != Guid.Empty

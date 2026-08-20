@@ -17,6 +17,7 @@ using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.API.Security;
+using NSubstitute;
 
 namespace NoCTF.Tests.Unit.API;
 
@@ -134,16 +135,19 @@ public sealed class LeaderboardEndpointTests
     {
         var competitionId = Guid.CreateVersion7();
         var messages = new RecordingMessagePublisher();
+        var snapshots = Substitute.For<ILeaderboardSnapshotFactory>();
         await using var app = await CreateApplicationAsync(
             competitionId,
             new CachedLeaderboard(frozen: true),
             messages,
             CompetitionLeaderboardVisibility.Frozen,
-            LeaderboardDataScope.Frozen);
+            LeaderboardDataScope.Frozen,
+            gameMode: GameMode.Awdp,
+            snapshotFactory: snapshots);
         using var client = app.GetTestClient();
 
         using var response = await client.GetAsync(
-            $"/api/v1/competitions/{competitionId}/leaderboard");
+            $"/api/v1/competitions/{competitionId}/leaderboard?endingRound=1");
         var body = await response.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
@@ -152,6 +156,11 @@ public sealed class LeaderboardEndpointTests
             .IsEqualTo(LeaderboardVisibilityProtocol.Frozen);
         await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScopeProtocol.Frozen);
         await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
+        _ = snapshots.DidNotReceive().CreateScoreboardWindowAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<int>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Test]
@@ -832,7 +841,8 @@ public sealed class LeaderboardEndpointTests
         LeaderboardDataScope dataScope = LeaderboardDataScope.Live,
         GameMode gameMode = GameMode.Ctf,
         ICompetitionTrackStore? trackStore = null,
-        IScoreboardDetailReader? detailReader = null)
+        IScoreboardDetailReader? detailReader = null,
+        ILeaderboardSnapshotFactory? snapshotFactory = null)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
@@ -848,6 +858,8 @@ public sealed class LeaderboardEndpointTests
             options.Filter = type => type == typeof(GetLeaderboardEndpoint)
                 || type == typeof(GetScoreboardChallengeCatalogEndpoint)
                 || type == typeof(GetScoreboardSchemaEndpoint)
+                || type == typeof(GetLeaderboardValidator)
+                || type == typeof(GetScoreboardSchemaValidator)
                 || type == typeof(GetScoreboardSlotDetailEndpoint)
                 || type == typeof(GetScoreboardSlotDetailValidator)
                 || type == typeof(GetScoreboardAdjustmentDetailEndpoint)
@@ -855,6 +867,7 @@ public sealed class LeaderboardEndpointTests
         });
         builder.Services.SwaggerDocument();
         builder.Services.AddSingleton(leaderboard);
+        builder.Services.AddSingleton(snapshotFactory ?? Substitute.For<ILeaderboardSnapshotFactory>());
         builder.Services.AddSingleton(messages);
         builder.Services.AddSingleton<ICompetitionVisibilityAccess>(
             new PublicVisibilityAccess(competitionId, gameMode, visibility, dataScope));

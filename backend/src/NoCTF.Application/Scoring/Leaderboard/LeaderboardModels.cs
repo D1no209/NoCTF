@@ -3,6 +3,11 @@ using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Application.Scoring.Leaderboard;
 
+public static class ScoreboardRoundWindow
+{
+    public const int DefaultSize = 50;
+}
+
 public enum LeaderboardBloodRank
 {
     First = 1,
@@ -165,7 +170,12 @@ public sealed record ScoreboardSchema(
     long Revision,
     long ChallengeCatalogRevision,
     IReadOnlyList<ScoreboardRound> Rounds,
-    IReadOnlyList<ScoreboardColumn> Columns);
+    IReadOnlyList<ScoreboardColumn> Columns)
+{
+    public int? RoundWindowStart { get; init; }
+    public int? RoundWindowEnd { get; init; }
+    public int? LatestRound { get; init; }
+}
 
 public sealed record ScoreboardActor(
     int Index,
@@ -276,8 +286,8 @@ public sealed record ScoreboardProjection(
     ScoreboardSchema Schema,
     ScoreboardSnapshot Snapshot)
 {
-    // These allocations mirror only the compact snapshot entries. Complete history is
-    // read from PostgreSQL through signed cursor-paged detail endpoints.
+    // These bounded scoring identities let the PostgreSQL detail reader attribute points
+    // without embedding raw history in the main snapshot.
     public IReadOnlyList<ScoreboardActor> DetailActors { get; init; } = [];
     public IReadOnlyList<ScoreboardEntryAllocation> EntryAllocations { get; init; } = [];
 }

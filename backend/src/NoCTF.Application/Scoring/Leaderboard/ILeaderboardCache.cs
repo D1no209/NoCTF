@@ -83,4 +83,11 @@ public interface ILeaderboardSnapshotFactory
         DateTimeOffset projectedAt,
         CancellationToken cancellationToken) =>
         Task.FromResult<ScoreboardProjection?>(null);
+
+    Task<ScoreboardProjection?> CreateScoreboardWindowAsync(
+        Guid competitionId,
+        int endingRound,
+        DateTimeOffset projectedAt,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<ScoreboardProjection?>(null);
 }

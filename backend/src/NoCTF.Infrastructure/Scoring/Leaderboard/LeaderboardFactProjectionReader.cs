@@ -16,7 +16,7 @@ namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 /// </summary>
 internal static class LeaderboardFactProjectionReader
 {
-    public static async Task<IReadOnlyList<LeaderboardGameplayFact>> ReadAsync(
+    public static async Task<LeaderboardFactProjectionRows> ReadAsync(
         NoCtfDbContext db,
         Guid competitionId,
         GameMode mode,
@@ -26,26 +26,49 @@ internal static class LeaderboardFactProjectionReader
         DateTimeOffset projectedAt,
         IReadOnlyDictionary<Guid, long> hintCosts,
         IReadOnlyList<LeaderboardTeamFact> teams,
+        int? endingRound,
         CancellationToken ct)
     {
         var query = db.GameplayFacts.AsNoTracking()
             .Where(fact => fact.CompetitionId == competitionId && fact.OccurredAt <= projectedAt);
+        if (mode == GameMode.Awdp)
+        {
+            var window = BuildAwdpWindow(
+                competitionConfigurationJson,
+                competitionStart,
+                lifecycle,
+                projectedAt,
+                endingRound);
+            var legacyRows = await ReadAwdpLegacyAsync(query, ct);
+            var windowRows = await ReadAwdpWindowAsync(
+                query.Where(fact => fact.OccurredAt >= window.StartAt
+                    && fact.OccurredAt < window.EndAt),
+                BuildRoundSelector(competitionStart, lifecycle, window),
+                ct);
+            var carryRows = legacyRows.Where(row =>
+                row.Kind == GameplayFactKind.ManualAdjustment
+                || row.Result == GameplayFactResult.Correct && row.OccurredAt < window.StartAt);
+            return new(
+                Map(legacyRows, hintCosts),
+                Map(windowRows.Concat(carryRows)
+                    .GroupBy(row => row.Id)
+                    .Select(group => group.First()), hintCosts));
+        }
+
         var rows = mode switch
         {
             GameMode.Ctf => await ReadCtfAsync(query, ct),
             GameMode.Awd => await ReadAwdAsync(db, competitionId, query, ct),
-            GameMode.Awdp => await ReadAwdpAsync(
-                query,
-                BuildRoundSelector(
-                    competitionConfigurationJson,
-                    competitionStart,
-                    lifecycle,
-                    projectedAt),
-                ct),
             GameMode.Koh => await ReadKohAsync(query, teams, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
-        return rows.Select(row => new LeaderboardGameplayFact(
+        var mapped = Map(rows, hintCosts);
+        return new(mapped, mapped);
+    }
+
+    private static IReadOnlyList<LeaderboardGameplayFact> Map(
+        IEnumerable<FactSummary> rows,
+        IReadOnlyDictionary<Guid, long> hintCosts) => rows.Select(row => new LeaderboardGameplayFact(
                 row.Id,
                 row.TeamId,
                 row.CompetitionChallengeId,
@@ -68,7 +91,6 @@ internal static class LeaderboardFactProjectionReader
             .OrderBy(fact => fact.OccurredAt)
             .ThenBy(fact => fact.GameplayFactId)
             .ToArray();
-    }
 
     private static Task<List<FactSummary>> ReadCtfAsync(
         IQueryable<GameplayFact> query,
@@ -190,14 +212,49 @@ internal static class LeaderboardFactProjectionReader
         return rows;
     }
 
-    private static Task<List<FactSummary>> ReadAwdpAsync(
+    private static Task<List<FactSummary>> ReadAwdpWindowAsync(
         IQueryable<GameplayFact> query,
         Expression<Func<GameplayFact, AwdpGroupingKey>> keySelector,
         CancellationToken ct) => query
         .Where(fact => fact.Kind == GameplayFactKind.BreakAttempt
+            || fact.Kind == GameplayFactKind.FixAttempt)
+        .GroupBy(keySelector)
+        .Select(group => new FactSummary(
+            group.OrderBy(fact => fact.OccurredAt).ThenBy(fact => fact.Id).Select(fact => fact.Id).First(),
+            group.Key.TeamId,
+            group.Key.CompetitionChallengeId,
+            group.Key.Kind,
+            group.Min(fact => fact.OccurredAt),
+            group.Key.State,
+            group.Key.Result,
+            group.Key.FailureCode,
+            null,
+            null,
+            group.Key.VictimTeamId,
+            group.Key.ActorUserId,
+            group.Key.Value,
+            group.Count(),
+            group.Max(fact => fact.OccurredAt)))
+        .ToListAsync(ct);
+
+    private static Task<List<FactSummary>> ReadAwdpLegacyAsync(
+        IQueryable<GameplayFact> query,
+        CancellationToken ct) => query
+        .Where(fact => fact.Kind == GameplayFactKind.BreakAttempt
             || fact.Kind == GameplayFactKind.FixAttempt
             || fact.Kind == GameplayFactKind.ManualAdjustment)
-        .GroupBy(keySelector)
+        .GroupBy(fact => new
+        {
+            fact.TeamId,
+            fact.CompetitionChallengeId,
+            fact.Kind,
+            fact.State,
+            fact.Result,
+            fact.FailureCode,
+            fact.VictimTeamId,
+            fact.ActorUserId,
+            Value = fact.Kind == GameplayFactKind.ManualAdjustment ? fact.Value : null
+        })
         .Select(group => new FactSummary(
             group.OrderBy(fact => fact.OccurredAt).ThenBy(fact => fact.Id).Select(fact => fact.Id).First(),
             group.Key.TeamId,
@@ -331,24 +388,20 @@ internal static class LeaderboardFactProjectionReader
     }
 
     private static Expression<Func<GameplayFact, AwdpGroupingKey>> BuildRoundSelector(
-        string? configurationJson,
         DateTimeOffset? competitionStart,
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
-        DateTimeOffset projectedAt)
+        AwdpProjectionWindow window)
     {
-        var duration = ReadRoundDuration(configurationJson);
-        var elapsed = EffectiveElapsed(lifecycle, competitionStart, projectedAt);
-        var roundCount = Math.Max(1, checked((int)(Math.Max(0, elapsed.TotalSeconds) / duration) + 1));
-        var boundaries = Enumerable.Range(1, roundCount)
+        var boundaries = Enumerable.Range(window.StartRound, window.EndRound - window.StartRound + 1)
             .Select(number => (Number: number, End: EffectiveClockToWallTime(
                 lifecycle,
                 competitionStart,
-                TimeSpan.FromSeconds((long)number * duration))))
+                TimeSpan.FromSeconds((long)number * window.DurationSeconds))))
             .ToArray();
 
         var fact = Expression.Parameter(typeof(GameplayFact), "fact");
         var occurredAt = Expression.Property(fact, nameof(GameplayFact.OccurredAt));
-        Expression round = Expression.Constant(roundCount);
+        Expression round = Expression.Constant(window.EndRound);
         foreach (var boundary in boundaries.Reverse())
         {
             round = Expression.Condition(
@@ -376,6 +429,32 @@ internal static class LeaderboardFactProjectionReader
                 Expression.Constant(null, typeof(string))),
             round);
         return Expression.Lambda<Func<GameplayFact, AwdpGroupingKey>>(body, fact);
+    }
+
+    private static AwdpProjectionWindow BuildAwdpWindow(
+        string? configurationJson,
+        DateTimeOffset? competitionStart,
+        IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
+        DateTimeOffset projectedAt,
+        int? endingRound)
+    {
+        var duration = ReadRoundDuration(configurationJson);
+        var elapsed = EffectiveElapsed(lifecycle, competitionStart, projectedAt);
+        var latestRound = Math.Max(1, checked((int)(Math.Max(0, elapsed.TotalSeconds) / duration) + 1));
+        var endRound = Math.Clamp(endingRound ?? latestRound, 1, latestRound);
+        var startRound = Math.Max(1, endRound - ScoreboardRoundWindow.DefaultSize + 1);
+        return new(
+            startRound,
+            endRound,
+            duration,
+            EffectiveClockToWallTime(
+                lifecycle,
+                competitionStart,
+                TimeSpan.FromSeconds((long)(startRound - 1) * duration)),
+            EffectiveClockToWallTime(
+                lifecycle,
+                competitionStart,
+                TimeSpan.FromSeconds((long)endRound * duration)));
     }
 
     private static int ReadRoundDuration(string? json)
@@ -466,6 +545,13 @@ internal static class LeaderboardFactProjectionReader
         string? Value,
         int Round);
 
+    private sealed record AwdpProjectionWindow(
+        int StartRound,
+        int EndRound,
+        int DurationSeconds,
+        DateTimeOffset StartAt,
+        DateTimeOffset EndAt);
+
     private sealed record FactSummary(
         Guid Id,
         Guid? TeamId,
@@ -483,3 +569,7 @@ internal static class LeaderboardFactProjectionReader
         int Multiplicity,
         DateTimeOffset LastOccurredAt);
 }
+
+internal sealed record LeaderboardFactProjectionRows(
+    IReadOnlyList<LeaderboardGameplayFact> Legacy,
+    IReadOnlyList<LeaderboardGameplayFact> Scoreboard);

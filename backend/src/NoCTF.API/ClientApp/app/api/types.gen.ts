@@ -597,6 +597,9 @@ export type NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
     challengeCatalogRevision?: number;
     rounds?: Array<NoCtfapiEndpointsCompetitionsScoreboardRoundResponse>;
     columns?: Array<NoCtfapiEndpointsCompetitionsScoreboardColumnResponse>;
+    roundWindowStart?: number | null;
+    roundWindowEnd?: number | null;
+    latestRound?: number | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsScoreboardRoundResponse = {
@@ -3357,16 +3360,24 @@ export type GetLeaderboardEndpointData = {
     path: {
         competitionId: string;
     };
-    query?: never;
+    query?: {
+        endingRound?: number | null;
+    };
     url: '/api/v1/competitions/{competitionId}/leaderboard';
 };
 
 export type GetLeaderboardEndpointErrors = {
     /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
      * Not Found
      */
     404: unknown;
 };
+
+export type GetLeaderboardEndpointError = GetLeaderboardEndpointErrors[keyof GetLeaderboardEndpointErrors];
 
 export type GetLeaderboardEndpointResponses = {
     /**
@@ -3454,16 +3465,24 @@ export type GetScoreboardSchemaEndpointData = {
     path: {
         competitionId: string;
     };
-    query?: never;
+    query?: {
+        endingRound?: number | null;
+    };
     url: '/api/v1/competitions/{competitionId}/leaderboard/schema';
 };
 
 export type GetScoreboardSchemaEndpointErrors = {
     /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
      * Not Found
      */
     404: unknown;
 };
+
+export type GetScoreboardSchemaEndpointError = GetScoreboardSchemaEndpointErrors[keyof GetScoreboardSchemaEndpointErrors];
 
 export type GetScoreboardSchemaEndpointResponses = {
     /**
@@ -3488,6 +3507,7 @@ export type GetScoreboardSlotDetailEndpointData = {
     query: {
         cursor?: string | null;
         limit: number;
+        endingRound?: number | null;
     };
     url: '/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}';
 };
