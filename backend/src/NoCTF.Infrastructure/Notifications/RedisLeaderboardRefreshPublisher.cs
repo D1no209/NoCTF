@@ -15,9 +15,5 @@ public sealed class RedisLeaderboardRefreshPublisher(IConnectionMultiplexer redi
         CancellationToken cancellationToken) =>
         redis.GetSubscriber().PublishAsync(
             RedisChannel.Literal(Channel),
-            JsonSerializer.Serialize(new ScoreboardUpdated(
-                projection.Snapshot.CompetitionId,
-                projection.Snapshot.Version,
-                projection.Schema.Revision,
-                projection.ChallengeCatalog.Revision)));
+            JsonSerializer.Serialize(ScoreboardUpdated.From(projection)));
 }

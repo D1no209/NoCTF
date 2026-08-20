@@ -447,8 +447,8 @@ export type NoCtfapiEndpointsCompetitionsGetCompetitionRequest = {
 
 export type NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
     competitionId?: string;
-    version?: number;
-    schemaRevision?: number;
+    version?: string;
+    schemaRevision?: string;
     generatedAt?: string;
     currentRoundId?: string | null;
     actors?: Array<NoCtfapiEndpointsCompetitionsScoreboardActorResponse>;
@@ -573,7 +573,7 @@ export type NoCtfapiEndpointsCompetitionsGetScoreboardAdjustmentDetailRequest = 
 
 export type NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
     competitionId?: string;
-    revision?: number;
+    revision?: string;
     items?: Array<NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse>;
 };
 
@@ -593,8 +593,8 @@ export type NoCtfapiEndpointsCompetitionsGetScoreboardChallengeCatalogRequest = 
 export type NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
     competitionId?: string;
     mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
-    revision?: number;
-    challengeCatalogRevision?: number;
+    revision?: string;
+    challengeCatalogRevision?: string;
     rounds?: Array<NoCtfapiEndpointsCompetitionsScoreboardRoundResponse>;
     columns?: Array<NoCtfapiEndpointsCompetitionsScoreboardColumnResponse>;
     roundWindowStart?: number | null;

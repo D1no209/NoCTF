@@ -13,7 +13,10 @@ import {
   scoreboardSlot,
   scoreboardTeamSolveCount,
 } from '../app/utils/scoreboard'
-import { isCoherentScoreboardBundle } from '../app/utils/scoreboard-coherence'
+import {
+  isCoherentScoreboardBundle,
+  shouldRestoreRequestedRoundWindow,
+} from '../app/utils/scoreboard-coherence'
 
 const composable = await Bun.file(
   new URL('../app/composables/useScoreboardMatrix.ts', import.meta.url),
@@ -65,31 +68,39 @@ describe('normalized scoreboard matrix', () => {
 
   test('accepts only a revision-coherent catalog, schema and snapshot bundle', () => {
     const competitionId = crypto.randomUUID()
-    const catalog = { competitionId, revision: 7, items: [] }
+    const catalog = { competitionId, revision: '9007199254740993', items: [] }
     const schema = {
       competitionId,
       mode: 'Ctf' as const,
-      revision: 11,
-      challengeCatalogRevision: 7,
+      revision: '9007199254740995',
+      challengeCatalogRevision: '9007199254740993',
       rounds: [],
       columns: [],
     }
     const snapshot = {
       competitionId,
-      version: 13,
-      schemaRevision: 11,
+      version: '638914000000000001',
+      schemaRevision: '9007199254740995',
       generatedAt: new Date().toISOString(),
       actors: [],
       teams: [],
     }
 
     expect(isCoherentScoreboardBundle(catalog, schema, snapshot)).toBeTrue()
-    expect(isCoherentScoreboardBundle({ ...catalog, revision: 8 }, schema, snapshot)).toBeFalse()
-    expect(isCoherentScoreboardBundle(catalog, { ...schema, revision: 12 }, snapshot)).toBeFalse()
+    expect(isCoherentScoreboardBundle({ ...catalog, revision: '9007199254740994' }, schema, snapshot)).toBeFalse()
+    expect(isCoherentScoreboardBundle(catalog, { ...schema, revision: '9007199254740996' }, snapshot)).toBeFalse()
     expect(composable).toContain('scheduleCoherenceRetry()')
     expect(composable).toContain('catalog.value = candidateCatalog')
     expect(composable).toContain('schema.value = candidateSchema')
     expect(composable).toContain('snapshot.value = candidateSnapshot')
+  })
+
+  test('keeps a selected round window while an incoherent bundle is retried', () => {
+    expect(shouldRestoreRequestedRoundWindow('accepted')).toBeFalse()
+    expect(shouldRestoreRequestedRoundWindow('retrying')).toBeFalse()
+    expect(shouldRestoreRequestedRoundWindow('superseded')).toBeFalse()
+    expect(shouldRestoreRequestedRoundWindow('failed')).toBeTrue()
+    expect(composable).toContain("shouldRestoreRequestedRoundWindow(outcome)")
   })
 
   test('reads sparse slots and never predicts a pending round score', () => {
@@ -144,8 +155,8 @@ describe('normalized scoreboard matrix', () => {
     const schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
       competitionId: crypto.randomUUID(),
       mode: 'Awdp',
-      revision: 1,
-      challengeCatalogRevision: 1,
+      revision: '1',
+      challengeCatalogRevision: '1',
       columns: [
         { index: 0, competitionChallengeId: challengeA },
         { index: 1, competitionChallengeId: challengeA },

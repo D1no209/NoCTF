@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 using System.Security.Cryptography;
 using System.Text;
@@ -115,8 +116,8 @@ public sealed record ScoreboardTrackResponse(
 
 public sealed record ScoreboardSnapshotResponse(
     Guid CompetitionId,
-    long Version,
-    long SchemaRevision,
+    string Version,
+    string SchemaRevision,
     DateTimeOffset GeneratedAt,
     Guid? CurrentRoundId,
     IReadOnlyList<ScoreboardActorResponse> Actors,
@@ -137,8 +138,8 @@ internal static class ScoreboardProtocolMapper
 {
     public static ScoreboardSnapshotResponse ToResponse(ScoreboardSnapshot value) => new(
         value.CompetitionId,
-        value.Version,
-        value.SchemaRevision,
+        value.Version.ToString(CultureInfo.InvariantCulture),
+        value.SchemaRevision.ToString(CultureInfo.InvariantCulture),
         value.GeneratedAt,
         value.CurrentRoundId,
         value.Actors.Select(actor => new ScoreboardActorResponse(

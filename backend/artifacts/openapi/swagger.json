@@ -14759,12 +14759,10 @@
             "format": "guid"
           },
           "version": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string"
           },
           "schemaRevision": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string"
           },
           "generatedAt": {
             "type": "string",
@@ -15272,8 +15270,7 @@
             "format": "guid"
           },
           "revision": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string"
           },
           "items": {
             "type": "array",
@@ -15325,12 +15322,10 @@
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
           "revision": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string"
           },
           "challengeCatalogRevision": {
-            "type": "integer",
-            "format": "int64"
+            "type": "string"
           },
           "rounds": {
             "type": "array",
