@@ -15,11 +15,7 @@ public sealed class LocalLeaderboardRefreshPublisher(
         CancellationToken cancellationToken) =>
         hub.Clients.Group($"competition:{projection.Snapshot.CompetitionId:N}").SendAsync(
             "scoreboardUpdated",
-            new ScoreboardUpdated(
-                projection.Snapshot.CompetitionId,
-                projection.Snapshot.Version,
-                projection.Schema.Revision,
-                projection.ChallengeCatalog.Revision),
+            ScoreboardUpdated.From(projection),
             cancellationToken);
 }
 

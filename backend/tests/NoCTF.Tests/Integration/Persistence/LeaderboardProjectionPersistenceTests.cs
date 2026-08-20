@@ -128,6 +128,30 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(latest.Scoreboard.Snapshot.Teams.Single().TotalScore)
                 .IsEqualTo(100L * (elapsedSeconds - 1) + 14);
 
+            fixture.Competition.Status = CompetitionStatus.Finished;
+            fixture.Competition.UpdatedAt = projectedAt.AddMinutes(1);
+            db.CompetitionEvents.AddRange(
+                LifecycleEvent(
+                    fixture.Competition.Id,
+                    CompetitionStatus.Published,
+                    CompetitionStatus.Running,
+                    startedAt),
+                LifecycleEvent(
+                    fixture.Competition.Id,
+                    CompetitionStatus.Running,
+                    CompetitionStatus.Finished,
+                    projectedAt.AddMinutes(1)));
+            await db.SaveChangesAsync(cancellationToken);
+
+            var asOfLatest = await cache.CreateScoreboardWindowAsync(
+                fixture.Competition.Id,
+                elapsedSeconds + 1,
+                projectedAt,
+                cancellationToken);
+            await Assert.That(asOfLatest!.Schema.RoundWindowEnd).IsEqualTo(elapsedSeconds + 1);
+            await Assert.That(asOfLatest.Schema.Rounds[^1].State)
+                .IsEqualTo(ScoreboardRoundState.Running);
+
             var historical = await cache.CreateScoreboardWindowAsync(
                 fixture.Competition.Id,
                 100,
@@ -143,6 +167,29 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .IsEqualTo(14);
             await Assert.That(historical.Snapshot.Teams.Single().Slots.Sum(slot => slot.EntryCount))
                 .IsEqualTo(ScoreboardRoundWindow.DefaultSize);
+
+            static CompetitionEvent LifecycleEvent(
+                Guid competitionId,
+                CompetitionStatus from,
+                CompetitionStatus to,
+                DateTimeOffset occurredAt) => new()
+            {
+                Id = Guid.CreateVersion7(occurredAt),
+                CompetitionId = competitionId,
+                Kind = CompetitionEventKind.CompetitionLifecycleChanged,
+                Level = CompetitionEventLevel.Information,
+                Visibility = CompetitionEventVisibility.Public,
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    competitionStatus = to,
+                    from,
+                    to,
+                    automatic = true,
+                    reason = "test"
+                }),
+                OccurredAt = occurredAt
+            };
         });
     }
 
@@ -369,6 +416,16 @@ public sealed class LeaderboardProjectionPersistenceTests
                 new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
                 Substitute.For<ILeaderboardRefreshPublisher>(),
                 cacheServices.GetRequiredService<IFusionCacheProvider>());
+
+            transactions.Clear();
+            var awdp = fixtures.Single(fixture => fixture.Competition.Mode == GameMode.Awdp);
+            _ = await cache.CreateScoreboardWindowAsync(
+                awdp.Competition.Id,
+                1,
+                projectedAt,
+                cancellationToken);
+            await Assert.That(transactions.IsolationLevels)
+                .IsEquivalentTo([IsolationLevel.RepeatableRead]);
 
             foreach (var fixture in fixtures)
             {
@@ -828,6 +885,8 @@ public sealed class LeaderboardProjectionPersistenceTests
         private readonly List<IsolationLevel> isolationLevels = [];
 
         public IReadOnlyList<IsolationLevel> IsolationLevels => isolationLevels;
+
+        public void Clear() => isolationLevels.Clear();
 
         public override DbTransaction TransactionStarted(
             DbConnection connection,

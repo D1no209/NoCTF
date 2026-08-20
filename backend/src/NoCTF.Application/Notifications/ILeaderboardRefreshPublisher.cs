@@ -1,12 +1,20 @@
+using System.Globalization;
 using NoCTF.Application.Scoring.Leaderboard;
 
 namespace NoCTF.Application.Notifications;
 
 public sealed record ScoreboardUpdated(
     Guid CompetitionId,
-    long Version,
-    long SchemaRevision,
-    long ChallengeCatalogRevision);
+    string Version,
+    string SchemaRevision,
+    string ChallengeCatalogRevision)
+{
+    public static ScoreboardUpdated From(ScoreboardProjection projection) => new(
+        projection.Snapshot.CompetitionId,
+        projection.Snapshot.Version.ToString(CultureInfo.InvariantCulture),
+        projection.Schema.Revision.ToString(CultureInfo.InvariantCulture),
+        projection.ChallengeCatalog.Revision.ToString(CultureInfo.InvariantCulture));
+}
 
 public interface ILeaderboardRefreshPublisher
 {

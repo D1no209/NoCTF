@@ -1,3 +1,4 @@
+using System.Globalization;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
@@ -17,7 +18,7 @@ public sealed record ScoreboardChallengeCatalogItemResponse(
 
 public sealed record ScoreboardChallengeCatalogResponse(
     Guid CompetitionId,
-    long Revision,
+    string Revision,
     IReadOnlyList<ScoreboardChallengeCatalogItemResponse> Items);
 
 public sealed class GetScoreboardChallengeCatalogRequest
@@ -49,7 +50,7 @@ public sealed class GetScoreboardChallengeCatalogEndpoint(
         if (visibility is null)
             return TypedResults.NotFound();
         if (visibility.DataScope == LeaderboardDataScope.Hidden)
-            return TypedResults.Ok(new ScoreboardChallengeCatalogResponse(request.CompetitionId, 0, []));
+            return TypedResults.Ok(new ScoreboardChallengeCatalogResponse(request.CompetitionId, "0", []));
         var projection = visibility.DataScope == LeaderboardDataScope.Frozen
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
             : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
@@ -60,7 +61,7 @@ public sealed class GetScoreboardChallengeCatalogEndpoint(
         var catalog = ScoreboardAudienceProjection.Filter(projection, canObserve).ChallengeCatalog;
         return TypedResults.Ok(new ScoreboardChallengeCatalogResponse(
             catalog.CompetitionId,
-            catalog.Revision,
+            catalog.Revision.ToString(CultureInfo.InvariantCulture),
             catalog.Challenges.Select(item => new ScoreboardChallengeCatalogItemResponse(
                 item.CompetitionChallengeId,
                 item.Title,

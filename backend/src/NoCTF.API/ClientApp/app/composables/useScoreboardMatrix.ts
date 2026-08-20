@@ -9,27 +9,31 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
 } from '~/api'
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
-import { isCoherentScoreboardBundle } from '~/utils/scoreboard-coherence'
+import {
+  isCoherentScoreboardBundle,
+  shouldRestoreRequestedRoundWindow,
+} from '~/utils/scoreboard-coherence'
+import type { ScoreboardRefreshOutcome } from '~/utils/scoreboard-coherence'
 
 interface ScoreboardUpdatedPayload {
   competitionId: string | null
-  version: number | null
-  schemaRevision: number | null
-  challengeCatalogRevision: number | null
+  version: string | null
+  schemaRevision: string | null
+  challengeCatalogRevision: string | null
 }
 
-function numberField(payload: unknown, key: string): number | null {
+function stringField(payload: unknown, key: string): string | null {
   if (!payload || typeof payload !== 'object') return null
   const value = Reflect.get(payload, key)
-  return typeof value === 'number' && Number.isFinite(value) ? value : null
+  return typeof value === 'string' && value.length > 0 ? value : null
 }
 
 function scoreboardUpdatedPayload(payload: unknown): ScoreboardUpdatedPayload {
   return {
     competitionId: competitionHubString(payload, 'competitionId'),
-    version: numberField(payload, 'version'),
-    schemaRevision: numberField(payload, 'schemaRevision'),
-    challengeCatalogRevision: numberField(payload, 'challengeCatalogRevision'),
+    version: stringField(payload, 'version'),
+    schemaRevision: stringField(payload, 'schemaRevision'),
+    challengeCatalogRevision: stringField(payload, 'challengeCatalogRevision'),
   }
 }
 
@@ -77,7 +81,7 @@ export function useScoreboardMatrix(competitionId: string) {
     catalog?: boolean
     schema?: boolean
     snapshot?: boolean
-  } = { catalog: true, schema: true, snapshot: true }): Promise<boolean> {
+  } = { catalog: true, schema: true, snapshot: true }): Promise<ScoreboardRefreshOutcome> {
     const requestGeneration = ++generation
     const endingRound = requestedEndingRound.value
     refreshing.value = true
@@ -101,12 +105,12 @@ export function useScoreboardMatrix(competitionId: string) {
           })
         : Promise.resolve(null),
     ])
-    if (stopped || requestGeneration !== generation) return false
+    if (stopped || requestGeneration !== generation) return 'superseded'
 
     const failures = [catalogResult, schemaResult, snapshotResult]
       .filter(result => result?.error)
       .map(result => parseApiError(result?.error, translate('加载记分板失败')).message)
-    let accepted = false
+    let outcome: ScoreboardRefreshOutcome = 'failed'
     if (failures.length) {
       error.value = failures[0] ?? translate('加载记分板失败')
     }
@@ -115,6 +119,7 @@ export function useScoreboardMatrix(competitionId: string) {
         processing.value = true
         error.value = null
         scheduleProcessingRetry()
+        outcome = 'retrying'
       }
       else {
         const candidateCatalog = catalogResult?.data ?? catalog.value
@@ -130,24 +135,26 @@ export function useScoreboardMatrix(competitionId: string) {
           snapshot.value = candidateSnapshot
           coherenceRetryCount = 0
           error.value = null
-          accepted = true
+          outcome = 'accepted'
         }
         else {
           scheduleCoherenceRetry()
+          outcome = 'retrying'
         }
         processing.value = false
       }
     }
     loading.value = false
     refreshing.value = false
-    return accepted
+    return outcome
   }
 
   async function selectRoundWindow(endingRound: number | null): Promise<void> {
     if (refreshing.value || requestedEndingRound.value === endingRound) return
     const previousEndingRound = requestedEndingRound.value
     requestedEndingRound.value = endingRound
-    if (!await refresh({ schema: true, snapshot: true }))
+    const outcome = await refresh({ schema: true, snapshot: true })
+    if (shouldRestoreRequestedRoundWindow(outcome))
       requestedEndingRound.value = previousEndingRound
   }
 
@@ -165,7 +172,7 @@ export function useScoreboardMatrix(competitionId: string) {
           && notice.challengeCatalogRevision !== (catalog.value?.revision ?? null)
         const wantsSchema = notice.schemaRevision !== null
           && notice.schemaRevision !== (schema.value?.revision ?? null)
-        if ((notice.version ?? 0) === (snapshot.value?.version ?? 0)
+        if (notice.version !== null && notice.version === (snapshot.value?.version ?? null)
           && !wantsCatalog && !wantsSchema) return
         if (wantsCatalog || wantsSchema) {
           void refresh({ catalog: wantsCatalog, schema: wantsSchema, snapshot: true })

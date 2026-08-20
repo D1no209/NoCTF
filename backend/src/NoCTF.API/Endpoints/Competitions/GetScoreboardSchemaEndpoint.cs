@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
@@ -29,8 +30,8 @@ public sealed record ScoreboardColumnResponse(
 public sealed record ScoreboardSchemaResponse(
     Guid CompetitionId,
     GameModeProtocol Mode,
-    long Revision,
-    long ChallengeCatalogRevision,
+    string Revision,
+    string ChallengeCatalogRevision,
     IReadOnlyList<ScoreboardRoundResponse> Rounds,
     IReadOnlyList<ScoreboardColumnResponse> Columns)
 {
@@ -82,8 +83,8 @@ public sealed class GetScoreboardSchemaEndpoint(
             return TypedResults.Ok(new ScoreboardSchemaResponse(
                 request.CompetitionId,
                 Enum.Parse<GameModeProtocol>(visibility.GameMode.ToString()),
-                0,
-                0,
+                "0",
+                "0",
                 [],
                 []));
         }
@@ -109,8 +110,8 @@ public sealed class GetScoreboardSchemaEndpoint(
         return TypedResults.Ok(new ScoreboardSchemaResponse(
             schema.CompetitionId,
             Enum.Parse<GameModeProtocol>(schema.Mode.ToString()),
-            schema.Revision,
-            schema.ChallengeCatalogRevision,
+            schema.Revision.ToString(CultureInfo.InvariantCulture),
+            schema.ChallengeCatalogRevision.ToString(CultureInfo.InvariantCulture),
             schema.Rounds.Select(round => new ScoreboardRoundResponse(
                 round.Id,
                 round.Number,

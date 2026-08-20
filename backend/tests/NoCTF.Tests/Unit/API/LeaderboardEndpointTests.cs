@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.Builder;
@@ -12,6 +13,7 @@ using NoCTF.API.Endpoints.Competitions;
 using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Competitions.Tracks;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Notifications;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
@@ -23,6 +25,55 @@ namespace NoCTF.Tests.Unit.API;
 
 public sealed class LeaderboardEndpointTests
 {
+    [Test]
+    public async Task Scoreboard_identity_values_are_exact_decimal_strings()
+    {
+        var competitionId = Guid.CreateVersion7();
+        const long catalogRevision = 9_007_199_254_740_993;
+        const long schemaRevision = 9_007_199_254_740_995;
+        const long version = 638_914_000_000_000_001;
+        var projection = CreateProjection(competitionId, [], [], []) with
+        {
+            ChallengeCatalog = new(competitionId, catalogRevision, []),
+            Schema = new(competitionId, GameMode.Ctf, schemaRevision, catalogRevision, [], []),
+            Snapshot = new(competitionId, version, schemaRevision, DateTimeOffset.UtcNow, null, [], [])
+        };
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(projection: projection),
+            new RecordingMessagePublisher());
+        using var client = app.GetTestClient();
+
+        using var catalogResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/challenges");
+        using var schemaResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/schema");
+        using var snapshotResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        using var catalog = JsonDocument.Parse(await catalogResponse.Content.ReadAsStringAsync());
+        using var schema = JsonDocument.Parse(await schemaResponse.Content.ReadAsStringAsync());
+        using var snapshot = JsonDocument.Parse(await snapshotResponse.Content.ReadAsStringAsync());
+
+        await Assert.That(catalog.RootElement.GetProperty("revision").ValueKind)
+            .IsEqualTo(JsonValueKind.String);
+        await Assert.That(schema.RootElement.GetProperty("revision").ValueKind)
+            .IsEqualTo(JsonValueKind.String);
+        await Assert.That(schema.RootElement.GetProperty("challengeCatalogRevision").ValueKind)
+            .IsEqualTo(JsonValueKind.String);
+        await Assert.That(snapshot.RootElement.GetProperty("version").GetString())
+            .IsEqualTo(version.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await Assert.That(snapshot.RootElement.GetProperty("schemaRevision").ValueKind)
+            .IsEqualTo(JsonValueKind.String);
+
+        var realtime = ScoreboardUpdated.From(projection);
+        await Assert.That(realtime.Version)
+            .IsEqualTo(version.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await Assert.That(realtime.SchemaRevision)
+            .IsEqualTo(schemaRevision.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await Assert.That(realtime.ChallengeCatalogRevision)
+            .IsEqualTo(catalogRevision.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
     [Test]
     public async Task Cached_snapshot_is_returned_without_requesting_projection()
     {

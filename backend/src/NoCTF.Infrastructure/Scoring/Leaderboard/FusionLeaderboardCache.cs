@@ -82,8 +82,20 @@ public sealed class FusionLeaderboardCache(
         Guid competitionId,
         int endingRound,
         DateTimeOffset projectedAt,
-        CancellationToken ct) =>
-        (await ProjectBundleAsync(competitionId, null, projectedAt, endingRound, ct))?.Scoreboard;
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            ct);
+        var scoreboard = (await ProjectBundleAsync(
+            competitionId,
+            null,
+            projectedAt,
+            endingRound,
+            ct))?.Scoreboard;
+        await transaction.CommitAsync(ct);
+        return scoreboard;
+    }
 
     public async Task<LeaderboardResponse?> CreateWithConfigurationAsync(
         Guid competitionId,
@@ -173,7 +185,8 @@ public sealed class FusionLeaderboardCache(
             .ToDictionary(hint => hint.Id, hint => hint.Cost);
         var lifecycleEvents = await db.CompetitionEvents.AsNoTracking()
             .Where(@event => @event.CompetitionId == competitionId
-                && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged)
+                && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged
+                && @event.OccurredAt <= projectedAt)
             .OrderBy(@event => @event.OccurredAt)
             .ThenBy(@event => @event.Id)
             .ToListAsync(ct);
@@ -192,6 +205,9 @@ public sealed class FusionLeaderboardCache(
                 OccurredAt = @event.OccurredAt
             };
         }).ToList();
+        var competitionStatusAtProjection = lifecycle.Count > 0
+            ? lifecycle[^1].To
+            : competition.Status;
         var factRows = await LeaderboardFactProjectionReader.ReadAsync(
             db,
             competitionId,
@@ -256,7 +272,7 @@ public sealed class FusionLeaderboardCache(
             lifecycle,
             awdRounds,
             projectedAt,
-            competition.Status,
+            competitionStatusAtProjection,
             scoreboardFacts,
             scoreboardRoundWindowEnd);
         var projection = projectionEngine.Project(projectionInput);

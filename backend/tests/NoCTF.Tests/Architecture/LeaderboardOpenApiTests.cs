@@ -45,6 +45,12 @@ public sealed class LeaderboardOpenApiTests
             "dataScope",
             "dataAsOf"
         ]);
+        await Assert.That(ResolveSchema(root, responseProperties.GetProperty("version"))
+                .GetProperty("type").GetString())
+            .IsEqualTo("string");
+        await Assert.That(ResolveSchema(root, responseProperties.GetProperty("schemaRevision"))
+                .GetProperty("type").GetString())
+            .IsEqualTo("string");
         var team = ResolveSchema(
             root,
             responseProperties.GetProperty("teams").GetProperty("items"));
