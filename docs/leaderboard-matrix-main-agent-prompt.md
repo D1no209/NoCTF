@@ -183,6 +183,8 @@ type ScoreboardTeamRow = {
   rank: number
   rankingState: "Eligible" | "Banned" | "Disqualified"
   totalScore: number
+  /** 当前轮次窗口之外、已计入 totalScore 的权威净分。 */
+  scoreOutsideWindow: number
   globalAdjustments: ScoreboardAdjustment[]
   slots: ScoreSlot[]
 }
@@ -202,6 +204,8 @@ type ScoreboardAdjustment = {
 
 - 每支队伍在快照中最多出现一次；
 - `rank` 和 `totalScore` 由后端权威投影生成；
+- `scoreOutsideWindow` 由后端权威投影生成；非轮次模式固定为 0，轮次窗口覆盖整场时也为 0；
+- 历史轮次窗口中的 `scoreOutsideWindow` 同时包含窗口之前和之后、已计入当前总分的 Slot 净分，不允许前端自行累计；
 - 前端不得自行重新排名；
 - 被封禁或取消资格的队伍必须使用明确状态表达；
 - 不属于具体题目和轮次的人工调分、比赛级处罚放入 `globalAdjustments`；
@@ -383,6 +387,7 @@ ScoreSlot.deductedPoints
 
 Team.totalScore
 = 所有可计分 Slot.netPoints
++ ScoreboardTeam.scoreOutsideWindow
 + 所有 globalAdjustments.netPoints
 ```
 

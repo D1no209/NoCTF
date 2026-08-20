@@ -326,13 +326,18 @@ public sealed class FusionLeaderboardCache(
             await publisher.PublishAsync(developmentResponse.Scoreboard, ct);
             return;
         }
+        var closeConnection = db.Database.GetDbConnection().State != ConnectionState.Open;
+        var projectionLockAcquired = false;
         try
         {
+            if (closeConnection)
+                await db.Database.OpenConnectionAsync(ct);
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_lock(hashtextextended({competitionId.ToString("N")}, 0))",
+                ct);
+            projectionLockAcquired = true;
             await using var transaction = await db.Database.BeginTransactionAsync(
                 IsolationLevel.RepeatableRead,
-                ct);
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({competitionId.ToString("N")}, 0))",
                 ct);
             var response = await ProjectBundleAsync(
                 competitionId,
@@ -345,10 +350,10 @@ public sealed class FusionLeaderboardCache(
             var previous = await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
                 ProjectionKey(competitionId), null, token: ct);
             response = AdvanceScoreboardVersion(response, previous);
-            await cache.SetAsync(ProjectionKey(competitionId), response, token: ct);
-            await cache.RemoveAsync(FailureKey(competitionId), token: ct);
             await transaction.CommitAsync(ct);
+            await cache.SetAsync(ProjectionKey(competitionId), response, token: ct);
             await publisher.PublishAsync(response.Scoreboard, ct);
+            await cache.RemoveAsync(FailureKey(competitionId), token: ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -363,6 +368,17 @@ public sealed class FusionLeaderboardCache(
                     .SetProperty(competition => competition.LeaderboardDirty, true), CancellationToken.None);
             await cache.SetAsync(FailureKey(competitionId), DateTimeOffset.UtcNow, token: CancellationToken.None);
             throw;
+        }
+        finally
+        {
+            if (projectionLockAcquired)
+            {
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_unlock(hashtextextended({competitionId.ToString("N")}, 0))",
+                    CancellationToken.None);
+            }
+            if (closeConnection)
+                await db.Database.CloseConnectionAsync();
         }
     }
 

@@ -137,10 +137,14 @@ internal static class NormalizedScoreboardProjection
                 checked(total + slot.NetPoints.GetValueOrDefault()));
             legacyByTeam.TryGetValue(team.Id, out var legacyRow);
             var allGlobalAdjustments = BuildGlobalAdjustments(scoreboardInput, team.Id, actorIndexes);
+            var globalAdjustmentNet = allGlobalAdjustments.Aggregate(0L, (total, adjustment) =>
+                checked(total + adjustment.NetPoints));
             var totalScore = scoreboardInput.Mode == GameMode.Awdp
                 ? legacyRow?.Score ?? 0
-                : allGlobalAdjustments.Aggregate(slotNet, (total, adjustment) =>
-                    checked(total + adjustment.NetPoints));
+                : checked(slotNet + globalAdjustmentNet);
+            var scoreOutsideWindow = scoreboardInput.Mode == GameMode.Awdp
+                ? checked(totalScore - slotNet - globalAdjustmentNet)
+                : 0;
             var globalAdjustmentCount = scoreboardInput.GameplayFacts
                 .Where(fact => fact.TeamId == team.Id
                     && fact.Kind == GameplayFactKind.ManualAdjustment
@@ -159,7 +163,10 @@ internal static class NormalizedScoreboardProjection
                 totalScore,
                 globalAdjustmentCount,
                 CompactAdjustments(allGlobalAdjustments),
-                compactSlots));
+                compactSlots)
+            {
+                ScoreOutsideWindow = scoreOutsideWindow
+            });
         }
 
         var orderedRows = rows
