@@ -1,5 +1,6 @@
 using System.Data;
 using System.Data.Common;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,8 +8,10 @@ using NoCTF.Application.Notifications;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Registration;
@@ -123,6 +126,34 @@ public sealed class LeaderboardProjectionPersistenceTests
             }
 
             var ctf = fixtures.Single(fixture => fixture.Competition.Mode == GameMode.Ctf);
+            var detailReader = new ScoreboardDetailReader(db);
+            var detailIds = new List<Guid>();
+            DateTimeOffset? beforeOccurredAt = null;
+            Guid? beforeId = null;
+            while (true)
+            {
+                var page = await detailReader.ReadSlotAsync(new(
+                    ctf.Competition.Id,
+                    ctf.Team.Id,
+                    ctf.CompetitionChallenge.Id,
+                    GameMode.Ctf,
+                    null,
+                    null,
+                    null,
+                    projectedAt,
+                    beforeOccurredAt,
+                    beforeId,
+                    73), cancellationToken);
+                detailIds.AddRange(page.Select(fact => fact.Id));
+                if (page.Count < 73)
+                    break;
+                beforeOccurredAt = page[^1].OccurredAt;
+                beforeId = page[^1].Id;
+            }
+            await Assert.That(detailIds).Count().IsEqualTo(ctf.Facts.Count);
+            await Assert.That(detailIds.Distinct()).Count().IsEqualTo(ctf.Facts.Count);
+            await Assert.That(detailIds).IsEquivalentTo(ctf.Facts.Select(fact => fact.Id));
+
             var futureFact = new GameplayFact
             {
                 Id = Guid.CreateVersion7(projectedAt.AddMinutes(1)),
@@ -153,6 +184,57 @@ public sealed class LeaderboardProjectionPersistenceTests
                     .Select(item => item.DisplayName)
                     .Distinct())
                 .IsEquivalentTo([owner.UserName]);
+
+            var rejudgedFact = ctf.Facts.First(fact => fact.Result is not null);
+            var originalState = rejudgedFact.State;
+            var originalResult = rejudgedFact.Result;
+            var originalFailureCode = rejudgedFact.FailureCode;
+            var originalUpdatedAt = rejudgedFact.UpdatedAt;
+            rejudgedFact.State = GameplayFactState.PlatformFailed;
+            rejudgedFact.Result = null;
+            rejudgedFact.FailureCode = GameplayFactFailureCode.CheckerPlatformError;
+            rejudgedFact.UpdatedAt = projectedAt.AddMinutes(2);
+            db.CompetitionEvents.Add(new CompetitionEvent
+            {
+                Id = Guid.CreateVersion7(projectedAt.AddTicks(-1)),
+                CompetitionId = ctf.Competition.Id,
+                Kind = CompetitionEventKind.GameplayFactAdjudicated,
+                Level = CompetitionEventLevel.Information,
+                Visibility = CompetitionEventVisibility.Team,
+                SubjectType = EntityReferenceKind.GameplayFact,
+                SubjectId = rejudgedFact.Id,
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    schemaVersion = 1,
+                    gameplayFactState = originalState.ToString(),
+                    gameplayFactResult = originalResult!.Value.ToString()
+                }),
+                OccurredAt = projectedAt.AddTicks(-1)
+            });
+            await db.SaveChangesAsync(cancellationToken);
+
+            var restoredPage = await detailReader.ReadSlotAsync(new(
+                ctf.Competition.Id,
+                ctf.Team.Id,
+                ctf.CompetitionChallenge.Id,
+                GameMode.Ctf,
+                null,
+                null,
+                null,
+                projectedAt,
+                null,
+                null,
+                500), cancellationToken);
+            var restoredFact = restoredPage.Single(fact => fact.Id == rejudgedFact.Id);
+            await Assert.That(restoredFact.State).IsEqualTo(originalState);
+            await Assert.That(restoredFact.Result).IsEqualTo(originalResult);
+            await Assert.That(restoredFact.ScoringIdentityKnown).IsFalse();
+
+            rejudgedFact.State = originalState;
+            rejudgedFact.Result = originalResult;
+            rejudgedFact.FailureCode = originalFailureCode;
+            rejudgedFact.UpdatedAt = originalUpdatedAt;
+            await db.SaveChangesAsync(cancellationToken);
 
             await cache.RefreshAsync(ctf.Competition.Id, cancellationToken);
             await Assert.That(transactions.IsolationLevels)
