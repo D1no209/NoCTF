@@ -96,6 +96,11 @@ public sealed record ScoreboardSlotResponse(
     IReadOnlyList<ScoreboardBreakdownResponse> Breakdown,
     IReadOnlyList<ScoreboardEntryResponse> Entries);
 
+public sealed record ScoreboardChallengeScoreResponse(
+    Guid CompetitionChallengeId,
+    long AttackScore,
+    long DefenseScore);
+
 public sealed record ScoreboardTeamResponse(
     Guid TeamId,
     string TeamName,
@@ -104,6 +109,9 @@ public sealed record ScoreboardTeamResponse(
     ScoreboardRankingStateProtocol RankingState,
     long TotalScore,
     long ScoreOutsideWindow,
+    long? AttackScore,
+    long? DefenseScore,
+    IReadOnlyList<ScoreboardChallengeScoreResponse> ChallengeScores,
     int GlobalAdjustmentCount,
     IReadOnlyList<ScoreboardAdjustmentResponse> GlobalAdjustments,
     IReadOnlyList<ScoreboardSlotResponse> Slots);
@@ -186,6 +194,12 @@ internal static class ScoreboardProtocolMapper
         ToProtocol(value.RankingState),
         value.TotalScore,
         value.ScoreOutsideWindow,
+        value.AttackScore,
+        value.DefenseScore,
+        value.ChallengeScores.Select(item => new ScoreboardChallengeScoreResponse(
+            item.CompetitionChallengeId,
+            item.AttackScore,
+            item.DefenseScore)).ToArray(),
         value.GlobalAdjustmentCount,
         value.GlobalAdjustments.Select(ToResponse).ToArray(),
         value.Slots.Select(slot => new ScoreboardSlotResponse(

@@ -145,6 +145,21 @@ internal static class NormalizedScoreboardProjection
             var scoreOutsideWindow = scoreboardInput.Mode == GameMode.Awdp
                 ? checked(totalScore - slotNet - globalAdjustmentNet)
                 : 0;
+            var attackScore = scoreboardInput.Mode == GameMode.Awdp
+                ? legacyRow?.AttackScore ?? 0
+                : (long?)null;
+            var defenseScore = scoreboardInput.Mode == GameMode.Awdp
+                ? legacyRow?.DefenseScore ?? 0
+                : (long?)null;
+            var challengeScores = scoreboardInput.Mode == GameMode.Awdp && legacyRow is not null
+                ? legacyRow.Cells
+                    .OrderBy(cell => cell.CompetitionChallengeId)
+                    .Select(cell => new ScoreboardChallengeScore(
+                        cell.CompetitionChallengeId,
+                        cell.AttackScore ?? 0,
+                        cell.DefenseScore ?? 0))
+                    .ToArray()
+                : [];
             var globalAdjustmentCount = scoreboardInput.GameplayFacts
                 .Where(fact => fact.TeamId == team.Id
                     && fact.Kind == GameplayFactKind.ManualAdjustment
@@ -165,7 +180,10 @@ internal static class NormalizedScoreboardProjection
                 CompactAdjustments(allGlobalAdjustments),
                 compactSlots)
             {
-                ScoreOutsideWindow = scoreOutsideWindow
+                ScoreOutsideWindow = scoreOutsideWindow,
+                AttackScore = attackScore,
+                DefenseScore = defenseScore,
+                ChallengeScores = challengeScores
             });
         }
 

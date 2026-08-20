@@ -501,8 +501,12 @@ public sealed class NormalizedScoreboardProjectionTests
             Guid.NewGuid(),
             GameMode.Awdp,
             [team],
-            [Fact(team.Id, challenge.Id, GameplayFactKind.BreakAttempt, 1,
-                GameplayFactResult.Correct)],
+            [
+                Fact(team.Id, challenge.Id, GameplayFactKind.BreakAttempt, 1,
+                    GameplayFactResult.Correct),
+                Fact(team.Id, challenge.Id, GameplayFactKind.FixAttempt, 2,
+                    GameplayFactResult.Correct)
+            ],
             [challenge],
             configuration,
             Start,
@@ -514,10 +518,17 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(projection.Schema.RoundWindowEnd).IsEqualTo(elapsedSeconds + 1);
         await Assert.That(projection.Schema.LatestRound).IsEqualTo(elapsedSeconds + 1);
         await Assert.That(projection.Schema.Columns.Count).IsEqualTo(ScoreboardRoundWindow.DefaultSize);
-        await Assert.That(projection.Snapshot.Teams.Single().TotalScore)
-            .IsEqualTo(100L * (elapsedSeconds - 1));
-        await Assert.That(projection.Snapshot.Teams.Single().ScoreOutsideWindow).IsGreaterThan(0);
-        await AssertArithmetic(projection.Snapshot.Teams.Single());
+        var row = projection.Snapshot.Teams.Single();
+        await Assert.That(row.TotalScore)
+            .IsEqualTo(100L * (elapsedSeconds - 1) + 40L * (elapsedSeconds - 2));
+        await Assert.That(row.AttackScore).IsEqualTo(100L * (elapsedSeconds - 1));
+        await Assert.That(row.DefenseScore).IsEqualTo(40L * (elapsedSeconds - 2));
+        await Assert.That(row.ChallengeScores.Single()).IsEqualTo(new ScoreboardChallengeScore(
+            challenge.Id,
+            100L * (elapsedSeconds - 1),
+            40L * (elapsedSeconds - 2)));
+        await Assert.That(row.ScoreOutsideWindow).IsGreaterThan(0);
+        await AssertArithmetic(row);
     }
 
     [Test]

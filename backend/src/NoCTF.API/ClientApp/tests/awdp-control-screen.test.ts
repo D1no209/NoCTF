@@ -7,6 +7,8 @@ import type {
 } from '../app/api'
 import {
   awdpControlEvents,
+  awdpCurrentRoundEvents,
+  awdpCurrentRoundOperationMetrics,
   awdpOperationMetrics,
   awdpPlaybackEvents,
   awdpPublicEntries,
@@ -79,6 +81,9 @@ const snapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
       trackKey: 'open',
       rankingState: 'Eligible',
       totalScore: 900,
+      attackScore: 5_500,
+      defenseScore: 4_400,
+      challengeScores: [{ competitionChallengeId: challengeId, attackScore: 3_300, defenseScore: 2_200 }],
       slots: [{
         columnIndex: 0,
         scoreState: 'Settled',
@@ -159,7 +164,7 @@ describe('AWDP control screen data adapter', () => {
   test('uses settled public scores and excludes internal tracks', () => {
     expect(awdpPublicEntries(snapshot).map(entry => entry.teamName)).toEqual(['BlueWhale'])
     expect(awdpRankedEntries(snapshot, new Map([[teamId, 3]]))[0])
-      .toMatchObject({ rank: 2, attackScore: 500, defenseScore: 400, trend: 'up' })
+      .toMatchObject({ rank: 2, attackScore: 5_500, defenseScore: 4_400, trend: 'up' })
 
     const events = awdpControlEvents([
       event('AwdpBreakResolved', { gameplayFactState: 'Completed', gameplayFactResult: 'Correct' }),
@@ -168,8 +173,8 @@ describe('AWDP control screen data adapter', () => {
     expect(awdpTeamChallengeStates(catalog, schema, awdpPublicEntries(snapshot)[0]!, events)[0])
       .toMatchObject({
         title: 'Pwn-02',
-        attackScore: 500,
-        defenseScore: 400,
+        attackScore: 3_300,
+        defenseScore: 2_200,
         attackOutcome: 'success',
         defenseOutcome: 'failure',
       })
@@ -221,6 +226,96 @@ describe('AWDP control screen data adapter', () => {
       attack: { success: 1, total: 1 },
       defense: { success: 0, total: 1 },
     })
+  })
+
+  test('reads current-round operation metrics from the authoritative matrix', () => {
+    const previousRoundId = '00000000-0000-0000-0000-000000000006'
+    const twoRoundSchema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse = {
+      ...schema,
+      rounds: [
+        {
+          id: previousRoundId,
+          number: 11,
+          startAt: '2026-08-19T11:52:00Z',
+          endAt: '2026-08-19T11:57:00Z',
+          settledAt: '2026-08-19T11:57:00Z',
+          state: 'Settled',
+        },
+        ...schema.rounds!,
+      ],
+      columns: [
+        { index: 1, competitionChallengeId: challengeId, roundId: previousRoundId },
+        ...schema.columns!,
+      ],
+    }
+    const currentSnapshot: NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse = {
+      ...snapshot,
+      teams: [{
+        ...snapshot.teams![0]!,
+        slots: [
+          {
+            columnIndex: 1,
+            scoreState: 'Settled',
+            earnedPoints: 10_000,
+            deductedPoints: 0,
+            netPoints: 10_000,
+            entryCount: 40,
+            breakdown: [
+              { kind: 'Attack', successfulCount: 10, attemptCount: 20, earnedPoints: 5_000, deductedPoints: 0, netPoints: 5_000 },
+              { kind: 'Defense', successfulCount: 10, attemptCount: 20, earnedPoints: 5_000, deductedPoints: 0, netPoints: 5_000 },
+            ],
+          },
+          {
+            columnIndex: 0,
+            scoreState: 'Pending',
+            earnedPoints: null,
+            deductedPoints: null,
+            netPoints: null,
+            entryCount: 3,
+            breakdown: [
+              { kind: 'Attack', successfulCount: 1, attemptCount: 2, earnedPoints: 0, deductedPoints: 0, netPoints: 0 },
+              { kind: 'Defense', successfulCount: 0, attemptCount: 1, earnedPoints: 0, deductedPoints: 0, netPoints: 0 },
+            ],
+          },
+        ],
+      }],
+    }
+
+    expect(awdpCurrentRoundOperationMetrics(currentSnapshot, twoRoundSchema)).toEqual({
+      attack: { success: 1, total: 2 },
+      defense: { success: 0, total: 1 },
+    })
+    expect(awdpCurrentRoundOperationMetrics(currentSnapshot, twoRoundSchema, teamId)).toEqual({
+      attack: { success: 1, total: 2 },
+      defense: { success: 0, total: 1 },
+    })
+    expect(awdpCurrentRoundOperationMetrics(currentSnapshot, twoRoundSchema, crypto.randomUUID())).toEqual({
+      attack: { success: 0, total: 0 },
+      defense: { success: 0, total: 0 },
+    })
+  })
+
+  test('keeps current challenge status isolated from earlier rounds', () => {
+    const current = awdpControlEvents([
+      event('AwdpBreakResolved', {
+        occurredAt: '2026-08-19T11:56:59Z',
+        gameplayFactState: 'Completed',
+        gameplayFactResult: 'Correct',
+      }),
+      event('AwdpFixResolved', {
+        occurredAt: '2026-08-19T12:01:59Z',
+        gameplayFactState: 'Completed',
+        gameplayFactResult: 'Wrong',
+      }),
+      event('AwdpBreakResolved', {
+        occurredAt: '2026-08-19T12:02:00Z',
+        gameplayFactState: 'Completed',
+        gameplayFactResult: 'Correct',
+      }),
+    ])
+
+    expect(awdpCurrentRoundEvents(current, snapshot, schema).map(item => item.action))
+      .toEqual(['defense'])
   })
 
   test('advances the displayed round clock from the generated leaderboard snapshot', () => {

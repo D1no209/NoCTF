@@ -23,7 +23,8 @@ import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 import {
   awdpControlEventKinds,
   awdpControlEvents,
-  awdpOperationMetrics,
+  awdpCurrentRoundEvents,
+  awdpCurrentRoundOperationMetrics,
   awdpPlaybackEvents,
   awdpRankedEntries,
   awdpRoundClock,
@@ -77,8 +78,18 @@ const selectedTeam = computed<AwdpRankedEntry | null>(() => {
   if (!rankedEntries.value.length) return null
   return rankedEntries.value[selectedTeamIndex.value % rankedEntries.value.length] ?? null
 })
+const currentRoundEvents = computed(() => awdpCurrentRoundEvents(
+  events.value,
+  board.snapshot.value,
+  board.schema.value,
+))
 const selectedChallengeStates = computed(() => {
-  const states = awdpTeamChallengeStates(board.catalog.value, board.schema.value, selectedTeam.value, events.value)
+  const states = awdpTeamChallengeStates(
+    board.catalog.value,
+    board.schema.value,
+    selectedTeam.value,
+    currentRoundEvents.value,
+  )
   const focusedChallengeId = activeEvent.value?.teamId === selectedTeam.value?.teamId
     ? activeEvent.value?.competitionChallengeId
     : null
@@ -104,11 +115,14 @@ const currentRound = computed(() => liveRoundClock.value.currentRound)
 const settledRound = computed(() => Math.max(0, ...(board.schema.value?.rounds ?? [])
   .filter(round => round.state === 'Settled')
   .map(round => round.number ?? 0)))
-const operationMetrics = computed(() => awdpOperationMetrics(events.value))
-const selectedTeamMetrics = computed(() => awdpOperationMetrics(
-  selectedTeam.value?.teamId
-    ? events.value.filter(event => event.teamId === selectedTeam.value?.teamId)
-    : [],
+const operationMetrics = computed(() => awdpCurrentRoundOperationMetrics(
+  board.snapshot.value,
+  board.schema.value,
+))
+const selectedTeamMetrics = computed(() => awdpCurrentRoundOperationMetrics(
+  board.snapshot.value,
+  board.schema.value,
+  selectedTeam.value?.teamId,
 ))
 
 const remainingText = computed(() => {

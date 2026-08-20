@@ -185,6 +185,16 @@ type ScoreboardTeamRow = {
   totalScore: number
   /** 当前轮次窗口之外、已计入 totalScore 的权威净分。 */
   scoreOutsideWindow: number
+  /** 仅 AWDP 返回：整场已结算攻击轨的权威累计分。 */
+  attackScore: number | null
+  /** 仅 AWDP 返回：整场已结算防御轨的权威累计分。 */
+  defenseScore: number | null
+  /** 仅 AWDP 返回：按题目拆分的整场权威累计攻防分。 */
+  challengeScores: Array<{
+    competitionChallengeId: string
+    attackScore: number
+    defenseScore: number
+  }>
   globalAdjustments: ScoreboardAdjustment[]
   slots: ScoreSlot[]
 }
@@ -206,6 +216,7 @@ type ScoreboardAdjustment = {
 - `rank` 和 `totalScore` 由后端权威投影生成；
 - `scoreOutsideWindow` 由后端权威投影生成；非轮次模式固定为 0，轮次窗口覆盖整场时也为 0；
 - 历史轮次窗口中的 `scoreOutsideWindow` 同时包含窗口之前和之后、已计入当前总分的 Slot 净分，不允许前端自行累计；
+- AWDP 的 `attackScore`、`defenseScore` 与 `challengeScores` 必须由完整已结算历史投影生成，不得从有界 `slots` 窗口反推；其他模式返回 null/空集合；
 - 前端不得自行重新排名；
 - 被封禁或取消资格的队伍必须使用明确状态表达；
 - 不属于具体题目和轮次的人工调分、比赛级处罚放入 `globalAdjustments`；
