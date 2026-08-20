@@ -1,5 +1,16 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-20 alpha.61 统一排行榜一致性与详情边界修复
+
+- `97cc8fa5` 修复统一排行榜矩阵审计发现的问题。主快照仍保持有界：每个 Slot 最多携带 5 条摘要记录、每队最多携带 5 条全局调整，同时新增 `GlobalAdjustmentCount` 保留完整计数；完整历史继续通过签名游标详情读取，没有新增业务表、EF migration 或 snapshot 变更。
+- 排行榜详情请求现在绑定主快照的 `DataAsOf`，数据库只读取该时间点以前的事实；签名游标同时绑定比赛、调用者、队伍、列、Schema revision、Snapshot version 与时间截止点，后续事实不会混入已打开的分页链。`FusionLeaderboardCache` 使用 PostgreSQL `RepeatableRead` 生成同一快照中的目录、Schema 与分数投影，避免跨查询撕裂。
+- 公开排行榜会在后端过滤无权查看的内部赛道、内部队伍及 Actor；当前队伍仍可看到自己的内部赛道。详情页每一页都返回页内 Actor 目录，前端按记录 ID 保存显示名，翻页后不会因页内 ActorIndex 复用而显示错误提交者。
+- 前端 `useScoreboardMatrix` 只接受 catalog revision、schema revision、snapshot schema revision/version 相互一致的三件套；发现并发刷新产生的混合版本时最多重试 3 次，失败保留上一份成功数据并显示明确错误。AWDP 防御成功动画同时移除了无效 CSS 百分比计算，production build 不再产生该动画的 CSS 解析警告。
+- OpenAPI 两份制品均由工具导出，SHA-256 同为 `C75CEE69F5B93966CE36C0CF868F9FF303F69000E0915A2562C2307FDAB5F80C`；TypeScript SDK 由工具生成，`types.gen.ts` SHA-256 为 `FD974665BE841A8DBE0C73000BFBC2D1B84B82B6237CD5E5E91B20BEA`。连续第二轮导出与生成哈希一致，未手改生成 SDK。
+- 验证结果：Release solution build 0 warning/0 error；完整非 Integration TUnit 844/844；排行榜 Endpoint 定向 3/3、OpenAPI Actor 契约 1/1、真实 PostgreSQL 投影/详情 1/1；前端 `bun test` 240/240（1768 assertions）、typecheck 与 production build 通过；C# analyzers、EF model drift 和 `git diff --check` 通过，仓库没有 lint script。
+- 完整 Integration 共 1029 项：1026 通过、2 项因未配置真实 Kubernetes/Libvirt 环境按设计跳过；唯一失败是 Redis Runner capacity TTL 的瞬时时序断言，同一 `RedisRunnerCapacityGateTests` 测试类立即独立复跑 9/9 通过。最终 Actor 详情变更后另行执行的真实 PostgreSQL 定向测试 1/1 通过。该抖动未被误报为全量通过，也未通过延长产品超时掩盖。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`，未推送、未部署、未操作生产数据；版本仍为 `0.1.0-alpha.61`，本修复没有额外递增发布版本。
+
 ## 2026-08-20 alpha.61 统一排行榜矩阵有界投影修复
 
 - `c73240cc` 修正 alpha.60 统一排行榜矩阵的生产投影边界。`FusionLeaderboardCache` 不再把整场 `GameplayFact` 历史全部载入内存，而是通过 `LeaderboardFactProjectionReader` 在 PostgreSQL 中按 CTF、AWD、AWDP、KoH 各自的权威语义做集合式聚合；完整不可变事实仍由已有强类型签名游标详情接口分页读取。没有新增业务表、EF migration 或 snapshot 变更。
