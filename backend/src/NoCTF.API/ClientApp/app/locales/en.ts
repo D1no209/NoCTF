@@ -423,6 +423,7 @@ export const englishMessages: Record<string, string> = {
   "加载更多": "load more",
   "加载攻击目标失败": "Failed to load attack target",
   "加载记分板失败": "Failed to load scoreboard",
+  "记分板数据版本尚未同步，请稍后重试": "Scoreboard data revisions are not synchronized yet. Please try again shortly.",
   "加载竞赛列表失败": "Failed to load contest list",
   "加载竞赛失败": "Loading competition failed",
   "加载赛事播报失败": "Failed to load event report",

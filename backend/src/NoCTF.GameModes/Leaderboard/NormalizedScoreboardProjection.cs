@@ -14,6 +14,7 @@ namespace NoCTF.GameModes.Leaderboard;
 internal static class NormalizedScoreboardProjection
 {
     private const int CompactEntryLimit = 5;
+    private const int CompactAdjustmentLimit = 5;
 
     public static ScoreboardProjection Project(
         LeaderboardProjectionInput input,
@@ -113,8 +114,8 @@ internal static class NormalizedScoreboardProjection
             var slotNet = compactSlots.Aggregate(0L, (total, slot) =>
                 checked(total + slot.NetPoints.GetValueOrDefault()));
             legacyByTeam.TryGetValue(team.Id, out var legacyRow);
-            var globalAdjustments = BuildGlobalAdjustments(input, team.Id, actorIndexes);
-            var totalScore = globalAdjustments.Aggregate(slotNet, (total, adjustment) =>
+            var allGlobalAdjustments = BuildGlobalAdjustments(input, team.Id, actorIndexes);
+            var totalScore = allGlobalAdjustments.Aggregate(slotNet, (total, adjustment) =>
                 checked(total + adjustment.NetPoints));
             rows.Add(new ScoreboardTeam(
                 team.Id,
@@ -127,7 +128,8 @@ internal static class NormalizedScoreboardProjection
                         ? ScoreboardRankingState.Disqualified
                         : ScoreboardRankingState.Eligible,
                 totalScore,
-                globalAdjustments,
+                allGlobalAdjustments.Count,
+                CompactAdjustments(allGlobalAdjustments),
                 compactSlots));
         }
 
@@ -135,6 +137,7 @@ internal static class NormalizedScoreboardProjection
             .OrderBy(row => row.Rank ?? int.MaxValue)
             .ThenBy(row => row.TeamId)
             .ToArray();
+        var compacted = CompactActors(actors, orderedRows);
         var currentRoundId = roundProjection.CurrentRoundNumber is int currentRound
             ? roundProjection.Rounds.FirstOrDefault(round => round.Number == currentRound)?.Id
             : null;
@@ -144,8 +147,8 @@ internal static class NormalizedScoreboardProjection
             schemaRevision,
             projectedAt,
             currentRoundId,
-            actors,
-            orderedRows)
+            compacted.Actors,
+            compacted.Teams)
         {
             DataScope = LeaderboardDataScope.Live,
             DataAsOf = projectedAt
@@ -159,29 +162,66 @@ internal static class NormalizedScoreboardProjection
         if (entries.Count <= CompactEntryLimit)
             return entries;
 
-        // Every score-bearing summary remains in the main snapshot. Fill the remaining
-        // display budget with recent zero-point operational evidence; the raw operation
-        // history remains cursor-paged.
-        var scoreBearing = entries
-            .Where(entry => entry.NetPoints.GetValueOrDefault() != 0
-                || entry.AwardPoints != 0
-                || entry.Award is not null)
-            .OrderBy(entry => entry.OccurredAt)
-            .ThenBy(entry => entry.Id)
-            .ToArray();
-        var scoreBearingIds = scoreBearing.Select(entry => entry.Id).ToHashSet();
-        var recentBudget = Math.Max(0, CompactEntryLimit - scoreBearing.Length);
-        var selected = entries
-            .OrderByDescending(entry => entry.OccurredAt)
+        // Totals and EntryCount remain authoritative. The main snapshot contains only
+        // a small, deterministic recent summary; complete raw history is cursor-paged.
+        return entries
+            .OrderByDescending(entry => IsScoreBearing(entry))
+            .ThenByDescending(entry => entry.OccurredAt)
             .ThenByDescending(entry => entry.Id)
-            .Where(entry => !scoreBearingIds.Contains(entry.Id))
-            .Take(recentBudget)
-            .ToList();
-        selected.AddRange(scoreBearing);
-        return selected
+            .Take(CompactEntryLimit)
             .OrderBy(entry => entry.OccurredAt)
             .ThenBy(entry => entry.Id)
             .ToArray();
+    }
+
+    private static bool IsScoreBearing(ScoreboardSlotEntry entry) =>
+        entry.NetPoints.GetValueOrDefault() != 0
+        || entry.AwardPoints != 0
+        || entry.Award is not null;
+
+    private static IReadOnlyList<ScoreboardAdjustment> CompactAdjustments(
+        IReadOnlyList<ScoreboardAdjustment> adjustments) => adjustments
+        .OrderByDescending(adjustment => adjustment.OccurredAt)
+        .ThenByDescending(adjustment => adjustment.Id)
+        .Take(CompactAdjustmentLimit)
+        .OrderBy(adjustment => adjustment.OccurredAt)
+        .ThenBy(adjustment => adjustment.Id)
+        .ToArray();
+
+    private static CompactedActors CompactActors(
+        IReadOnlyList<ScoreboardActor> actors,
+        IReadOnlyList<ScoreboardTeam> teams)
+    {
+        var referencedIndexes = teams
+            .SelectMany(team => team.GlobalAdjustments.Select(adjustment => adjustment.ActorIndex)
+                .Concat(team.Slots.SelectMany(slot => slot.Entries.Select(entry => entry.ActorIndex))))
+            .Where(index => index is not null)
+            .Select(index => index!.Value)
+            .ToHashSet();
+        var actorPairs = actors
+            .Where(actor => referencedIndexes.Contains(actor.Index))
+            .OrderBy(actor => actor.Index)
+            .Select((actor, index) => new { OldIndex = actor.Index, Actor = actor with { Index = index } })
+            .ToArray();
+        var indexMap = actorPairs.ToDictionary(pair => pair.OldIndex, pair => pair.Actor.Index);
+        int? MapActor(int? actorIndex) => actorIndex is int value
+            && indexMap.TryGetValue(value, out var mapped)
+                ? mapped
+                : null;
+        var compactTeams = teams.Select(team => team with
+        {
+            GlobalAdjustments = team.GlobalAdjustments
+                .Select(adjustment => adjustment with { ActorIndex = MapActor(adjustment.ActorIndex) })
+                .ToArray(),
+            Slots = team.Slots.Select(slot => slot with
+            {
+                Entries = slot.Entries.Select(entry => entry with
+                {
+                    ActorIndex = MapActor(entry.ActorIndex)
+                }).ToArray()
+            }).ToArray()
+        }).ToArray();
+        return new(actorPairs.Select(pair => pair.Actor).ToArray(), compactTeams);
     }
 
     private static IReadOnlyList<ScoreboardColumn> BuildColumns(
@@ -1104,6 +1144,10 @@ internal static class NormalizedScoreboardProjection
     private sealed record RoundProjection(
         IReadOnlyList<ScoreboardRound> Rounds,
         int? CurrentRoundNumber);
+
+    private sealed record CompactedActors(
+        IReadOnlyList<ScoreboardActor> Actors,
+        IReadOnlyList<ScoreboardTeam> Teams);
 
     private sealed record AwdScoringSettings(
         AttackRewardMode AttackRewardMode,

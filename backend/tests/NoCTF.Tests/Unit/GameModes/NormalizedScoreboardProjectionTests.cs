@@ -221,6 +221,48 @@ public sealed class NormalizedScoreboardProjectionTests
     }
 
     [Test]
+    public async Task Main_snapshot_hard_caps_slot_entries_and_global_adjustments()
+    {
+        var team = Team(1, "Alpha");
+        var challenge = Challenge(1, "Web");
+        var facts = Enumerable.Range(1, 12)
+            .Select(index => Fact(
+                team.Id,
+                challenge.Id,
+                GameplayFactKind.HintUnlock,
+                index,
+                GameplayFactResult.Unlocked,
+                actorId: Guid.CreateVersion7(Start.AddSeconds(index)),
+                hintCost: 1))
+            .Concat(Enumerable.Range(20, 12).Select(index => Fact(
+                team.Id,
+                null,
+                GameplayFactKind.ManualAdjustment,
+                index,
+                GameplayFactResult.Applied,
+                actorId: Guid.CreateVersion7(Start.AddSeconds(index)),
+                value: "1")))
+            .ToArray();
+        var projection = engine.ProjectScoreboard(new(
+            Guid.NewGuid(),
+            GameMode.Ctf,
+            [team],
+            facts,
+            [challenge],
+            ProjectedAt: Start.AddMinutes(1),
+            CompetitionStatus: CompetitionStatus.Running));
+
+        var row = projection.Snapshot.Teams.Single();
+        var slot = row.Slots.Single();
+        await Assert.That(slot.EntryCount).IsEqualTo(12);
+        await Assert.That(slot.Entries.Count).IsEqualTo(5);
+        await Assert.That(row.GlobalAdjustmentCount).IsEqualTo(12);
+        await Assert.That(row.GlobalAdjustments.Count).IsEqualTo(5);
+        await Assert.That(projection.Snapshot.Actors.Count).IsEqualTo(10);
+        await Assert.That(row.TotalScore).IsEqualTo(0L);
+    }
+
+    [Test]
     public async Task Large_round_matrix_keeps_theoretical_cells_sparse()
     {
         var teams = Enumerable.Range(1, 100).Select(index => Team(index, $"Team {index}")).ToArray();
@@ -298,7 +340,7 @@ public sealed class NormalizedScoreboardProjectionTests
 
     private static LeaderboardGameplayFact Fact(
         Guid teamId,
-        Guid challengeId,
+        Guid? challengeId,
         GameplayFactKind kind,
         int seconds,
         GameplayFactResult result,
@@ -307,7 +349,8 @@ public sealed class NormalizedScoreboardProjectionTests
         long? hintCost = null,
         GameplayFactReferenceKind? referenceKind = null,
         Guid? referenceId = null,
-        Guid? victimTeamId = null) => new(
+        Guid? victimTeamId = null,
+        string? value = null) => new(
             Guid.CreateVersion7(Start.AddSeconds(seconds)),
             teamId,
             challengeId,
@@ -320,6 +363,7 @@ public sealed class NormalizedScoreboardProjectionTests
             referenceId,
             victimTeamId,
             submitter,
+            value,
             HintCost: hintCost,
             ActorUserId: actorId);
 

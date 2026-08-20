@@ -10,9 +10,13 @@ import {
   scoreboardSlot,
   scoreboardTeamSolveCount,
 } from '../app/utils/scoreboard'
+import { isCoherentScoreboardBundle } from '../app/utils/scoreboard-coherence'
 
 const composable = await Bun.file(
   new URL('../app/composables/useScoreboardMatrix.ts', import.meta.url),
+).text()
+const leaderboardPage = await Bun.file(
+  new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url),
 ).text()
 
 describe('normalized scoreboard matrix', () => {
@@ -40,6 +44,35 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('scheduleProcessingRetry()')
     expect(composable).toContain('if (snapshotResult?.data)')
     expect(composable).not.toContain('snapshot.value = null')
+  })
+
+  test('accepts only a revision-coherent catalog, schema and snapshot bundle', () => {
+    const competitionId = crypto.randomUUID()
+    const catalog = { competitionId, revision: 7, items: [] }
+    const schema = {
+      competitionId,
+      mode: 'Ctf' as const,
+      revision: 11,
+      challengeCatalogRevision: 7,
+      rounds: [],
+      columns: [],
+    }
+    const snapshot = {
+      competitionId,
+      version: 13,
+      schemaRevision: 11,
+      generatedAt: new Date().toISOString(),
+      actors: [],
+      teams: [],
+    }
+
+    expect(isCoherentScoreboardBundle(catalog, schema, snapshot)).toBeTrue()
+    expect(isCoherentScoreboardBundle({ ...catalog, revision: 8 }, schema, snapshot)).toBeFalse()
+    expect(isCoherentScoreboardBundle(catalog, { ...schema, revision: 12 }, snapshot)).toBeFalse()
+    expect(composable).toContain('scheduleCoherenceRetry()')
+    expect(composable).toContain('catalog.value = candidateCatalog')
+    expect(composable).toContain('schema.value = candidateSchema')
+    expect(composable).toContain('snapshot.value = candidateSnapshot')
   })
 
   test('reads sparse slots and never predicts a pending round score', () => {
@@ -105,5 +138,12 @@ describe('normalized scoreboard matrix', () => {
 
     expect(scoreboardColumnsForChallenge(schema, challengeA).map(column => column.index))
       .toEqual([0, 1])
+  })
+
+  test('keeps page-local detail actors stable while appending cursor pages', () => {
+    expect(leaderboardPage).toContain('const pageActors = new Map((page.actors ?? [])')
+    expect(leaderboardPage).toContain('actorNames.set(entry.id, displayName)')
+    expect(leaderboardPage).toContain('detailActorNames.value.get(entry.id)')
+    expect(leaderboardPage).not.toContain('board.actorsByIndex.value.get(entry.actorIndex)')
   })
 })

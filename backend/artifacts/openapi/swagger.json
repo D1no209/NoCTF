@@ -14721,6 +14721,10 @@
             "type": "integer",
             "format": "int64"
           },
+          "globalAdjustmentCount": {
+            "type": "integer",
+            "format": "int32"
+          },
           "globalAdjustments": {
             "type": "array",
             "items": {
@@ -15284,6 +15288,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardBreakdownResponse"
+            }
+          },
+          "actors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardActorResponse"
             }
           },
           "items": {

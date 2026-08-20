@@ -122,6 +122,7 @@ const detailLoadingMore = ref(false)
 const detailError = ref<string | null>(null)
 const detail = ref<NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse | null>(null)
 const detailEntries = ref<NoCtfapiEndpointsCompetitionsScoreboardEntryResponse[]>([])
+const detailActorNames = ref(new Map<string, string>())
 const detailTeam = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
 const detailColumn = ref<NoCtfapiEndpointsCompetitionsScoreboardColumnResponse | null>(null)
 let detailGeneration = 0
@@ -150,8 +151,17 @@ async function loadDetailPage(cursor: string | null, append: boolean): Promise<v
   }
   if (!result.data) return
   const page = result.data as NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse
+  const pageActors = new Map((page.actors ?? []).map(actor => [actor.index, actor.displayName]))
+  const actorNames = append ? new Map(detailActorNames.value) : new Map<string, string>()
+  for (const entry of page.items ?? []) {
+    if (entry.actorIndex !== null && entry.actorIndex !== undefined) {
+      const displayName = pageActors.get(entry.actorIndex)
+      if (displayName && entry.id) actorNames.set(entry.id, displayName)
+    }
+  }
   detail.value = page
   detailEntries.value = append ? [...detailEntries.value, ...(page.items ?? [])] : [...(page.items ?? [])]
+  detailActorNames.value = actorNames
   detailError.value = null
 }
 
@@ -161,6 +171,7 @@ function openDetail(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, c
   detailColumn.value = column
   detail.value = null
   detailEntries.value = []
+  detailActorNames.value = new Map()
   detailError.value = null
   detailOpen.value = true
   void loadDetailPage(null, false)
@@ -170,7 +181,7 @@ watch(detailOpen, (open) => { if (!open) detailGeneration += 1 })
 
 function entryActor(entry: NoCtfapiEndpointsCompetitionsScoreboardEntryResponse): string {
   if (entry.actorIndex === null || entry.actorIndex === undefined) return translate('系统')
-  return board.actorsByIndex.value.get(entry.actorIndex)?.displayName ?? translate('未知用户')
+  return (entry.id ? detailActorNames.value.get(entry.id) : null) ?? translate('未知用户')
 }
 </script>
 

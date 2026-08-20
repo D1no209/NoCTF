@@ -10,6 +10,8 @@ public sealed class LeaderboardOpenApiTests
         "/api/v1/admin/competitions/{competitionId}/leaderboard-visibility";
     private const string ChallengeListPath =
         "/api/v1/competitions/{competitionId}/challenges";
+    private const string ScoreboardSlotDetailPath =
+        "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}";
 
     [Test]
     public async Task Response_exposes_a_sparse_team_by_challenge_matrix()
@@ -52,6 +54,7 @@ public sealed class LeaderboardOpenApiTests
             "rankingState",
             "totalScore",
             "globalAdjustments",
+            "globalAdjustmentCount",
             "slots"
         ]);
         var slot = ResolveSchema(
@@ -129,6 +132,38 @@ public sealed class LeaderboardOpenApiTests
         await Assert.That(adminPath.GetProperty("put").GetProperty("responses")
                 .EnumerateObject().Select(response => response.Name))
             .IsEquivalentTo(["200", "400", "409", "404", "401", "403"]);
+    }
+
+    [Test]
+    public async Task Slot_detail_exposes_a_page_local_actor_catalog()
+    {
+        using var swagger = await ReadSwaggerAsync();
+        var root = swagger.RootElement;
+        var response = ResolveSchema(
+            root,
+            root.GetProperty("paths")
+                .GetProperty(ScoreboardSlotDetailPath)
+                .GetProperty("get")
+                .GetProperty("responses")
+                .GetProperty("200")
+                .GetProperty("content")
+                .GetProperty("application/json")
+                .GetProperty("schema"));
+
+        await Assert.That(PropertyNames(response)).IsEquivalentTo([
+            "competitionId",
+            "teamId",
+            "columnIndex",
+            "scoreState",
+            "earnedPoints",
+            "deductedPoints",
+            "netPoints",
+            "entryCount",
+            "breakdown",
+            "actors",
+            "items",
+            "nextCursor"
+        ]);
     }
 
     [Test]
