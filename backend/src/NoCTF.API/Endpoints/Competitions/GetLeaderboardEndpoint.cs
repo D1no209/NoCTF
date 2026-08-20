@@ -164,6 +164,15 @@ internal static class ScoreboardProtocolMapper
         value.Award is null ? null : ToProtocol(value.Award.Value),
         value.AwardPoints);
 
+    public static ScoreboardAdjustmentResponse ToResponse(ScoreboardAdjustment value) => new(
+        value.Id,
+        ToProtocol(value.Kind),
+        value.OccurredAt,
+        value.ActorIndex,
+        value.EarnedPoints,
+        value.DeductedPoints,
+        value.NetPoints);
+
     private static ScoreboardTeamResponse ToResponse(ScoreboardTeam value) => new(
         value.TeamId,
         value.TeamName,
@@ -172,14 +181,7 @@ internal static class ScoreboardProtocolMapper
         ToProtocol(value.RankingState),
         value.TotalScore,
         value.GlobalAdjustmentCount,
-        value.GlobalAdjustments.Select(adjustment => new ScoreboardAdjustmentResponse(
-            adjustment.Id,
-            ToProtocol(adjustment.Kind),
-            adjustment.OccurredAt,
-            adjustment.ActorIndex,
-            adjustment.EarnedPoints,
-            adjustment.DeductedPoints,
-            adjustment.NetPoints)).ToArray(),
+        value.GlobalAdjustments.Select(ToResponse).ToArray(),
         value.Slots.Select(slot => new ScoreboardSlotResponse(
             slot.ColumnIndex,
             ToProtocol(slot.ScoreState),
@@ -296,7 +298,14 @@ internal static class ScoreboardAudienceProjection
                 SchemaRevision = schemaRevision,
                 Actors = actors,
                 Teams = teams
-            }
+            },
+            EntryAllocations = projection.EntryAllocations
+                .Where(allocation => indexMap.ContainsKey(allocation.ColumnIndex))
+                .Select(allocation => allocation with
+                {
+                    ColumnIndex = indexMap[allocation.ColumnIndex]
+                })
+                .ToArray()
         };
     }
 
@@ -319,6 +328,7 @@ internal static class ScoreboardAudienceProjection
             .Where(team => visibleKeys.Contains(team.TrackKey)
                 || viewerKeys.Contains(team.TrackKey) && team.TeamId == tracks.ViewerTeamId)
             .ToArray();
+        var visibleTeamIds = teams.Select(team => team.TeamId).ToHashSet();
         var actorIndexes = teams
             .SelectMany(team => team.GlobalAdjustments.Select(item => item.ActorIndex)
                 .Concat(team.Slots.SelectMany(slot => slot.Entries.Select(entry => entry.ActorIndex))))
@@ -356,7 +366,13 @@ internal static class ScoreboardAudienceProjection
                 Tracks = projection.Snapshot.Tracks
                     .Where(track => visibleKeys.Contains(track.Key) || viewerKeys.Contains(track.Key))
                     .ToArray()
-            }
+            },
+            EntryAllocations = projection.EntryAllocations
+                .Where(allocation => visibleTeamIds.Contains(allocation.TeamId))
+                .ToArray(),
+            AdjustmentAllocations = projection.AdjustmentAllocations
+                .Where(allocation => visibleTeamIds.Contains(allocation.TeamId))
+                .ToArray()
         };
     }
 

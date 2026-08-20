@@ -140,24 +140,17 @@ public sealed class LeaderboardProjectionPersistenceTests
             };
             db.GameplayFacts.Add(futureFact);
             await db.SaveChangesAsync(cancellationToken);
-            var detailReader = new ScoreboardSlotDetailReader(db);
-            var detail = await detailReader.ReadAsync(new(
+            var historical = await cache.CreateBundleAsync(
                 ctf.Competition.Id,
-                ctf.Team.Id,
-                ctf.CompetitionChallenge.Id,
-                GameMode.Ctf,
-                null,
-                null,
-                null,
                 projectedAt,
-                null,
-                null,
-                500), cancellationToken);
+                cancellationToken);
 
-            await Assert.That(detail.Select(item => item.Id)).DoesNotContain(futureFact.Id);
-            await Assert.That(detail.Where(item => item.ActorUserId == owner.Id)
-                    .Select(item => item.ActorDisplayName)
-                    .OfType<string>()
+            await Assert.That(historical!.Scoreboard.EntryAllocations
+                    .Select(item => item.Entry.Id))
+                .DoesNotContain(futureFact.Id);
+            await Assert.That(historical.Scoreboard.DetailActors
+                    .Where(item => item.UserId == owner.Id)
+                    .Select(item => item.DisplayName)
                     .Distinct())
                 .IsEquivalentTo([owner.UserName]);
 

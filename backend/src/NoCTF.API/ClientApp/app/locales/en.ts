@@ -1953,4 +1953,10 @@ export const englishMessages: Record<string, string> = {
   "得分": "Earned",
   "净分": "Net score",
   "暂无明细": "No details",
+  "全局调分": "Global adjustments",
+  "全局调分 {count} 条": "{count} global adjustments",
+  "加载全局调分明细失败": "Failed to load global adjustment details",
+  "完整调分记录均来自服务端权威事实。": "The complete adjustment history comes from authoritative server facts.",
+  "比赛处罚": "Competition penalty",
+  "禁赛重算": "Ban recalculation",
 }

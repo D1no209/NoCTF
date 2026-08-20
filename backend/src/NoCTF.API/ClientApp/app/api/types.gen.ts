@@ -557,6 +557,19 @@ export type NoCtfapiEndpointsCompetitionsGetLeaderboardRequest = {
     [key: string]: never;
 };
 
+export type NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse = {
+    competitionId?: string;
+    teamId?: string;
+    entryCount?: number;
+    actors?: Array<NoCtfapiEndpointsCompetitionsScoreboardActorResponse>;
+    items?: Array<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse>;
+    nextCursor?: string | null;
+};
+
+export type NoCtfapiEndpointsCompetitionsGetScoreboardAdjustmentDetailRequest = {
+    [key: string]: never;
+};
+
 export type NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse = {
     competitionId?: string;
     revision?: number;
@@ -3366,6 +3379,45 @@ export type GetLeaderboardEndpointResponses = {
 };
 
 export type GetLeaderboardEndpointResponse = GetLeaderboardEndpointResponses[keyof GetLeaderboardEndpointResponses];
+
+export type GetScoreboardAdjustmentDetailEndpointData = {
+    body?: never;
+    path: {
+        competitionId: string;
+        teamId: string;
+    };
+    query: {
+        cursor?: string | null;
+        limit: number;
+    };
+    url: '/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments';
+};
+
+export type GetScoreboardAdjustmentDetailEndpointErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetScoreboardAdjustmentDetailEndpointError = GetScoreboardAdjustmentDetailEndpointErrors[keyof GetScoreboardAdjustmentDetailEndpointErrors];
+
+export type GetScoreboardAdjustmentDetailEndpointResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse;
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsCompetitionsLeaderboardProcessingProtocolResponse;
+};
+
+export type GetScoreboardAdjustmentDetailEndpointResponse = GetScoreboardAdjustmentDetailEndpointResponses[keyof GetScoreboardAdjustmentDetailEndpointResponses];
 
 export type GetScoreboardChallengeCatalogEndpointData = {
     body?: never;

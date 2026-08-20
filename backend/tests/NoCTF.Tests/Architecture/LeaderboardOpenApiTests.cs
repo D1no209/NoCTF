@@ -12,6 +12,8 @@ public sealed class LeaderboardOpenApiTests
         "/api/v1/competitions/{competitionId}/challenges";
     private const string ScoreboardSlotDetailPath =
         "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}";
+    private const string ScoreboardAdjustmentDetailPath =
+        "/api/v1/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments";
 
     [Test]
     public async Task Response_exposes_a_sparse_team_by_challenge_matrix()
@@ -160,6 +162,32 @@ public sealed class LeaderboardOpenApiTests
             "netPoints",
             "entryCount",
             "breakdown",
+            "actors",
+            "items",
+            "nextCursor"
+        ]);
+    }
+
+    [Test]
+    public async Task Adjustment_detail_exposes_complete_cursor_paged_history()
+    {
+        using var swagger = await ReadSwaggerAsync();
+        var root = swagger.RootElement;
+        var response = ResolveSchema(
+            root,
+            root.GetProperty("paths")
+                .GetProperty(ScoreboardAdjustmentDetailPath)
+                .GetProperty("get")
+                .GetProperty("responses")
+                .GetProperty("200")
+                .GetProperty("content")
+                .GetProperty("application/json")
+                .GetProperty("schema"));
+
+        await Assert.That(PropertyNames(response)).IsEquivalentTo([
+            "competitionId",
+            "teamId",
+            "entryCount",
             "actors",
             "items",
             "nextCursor"

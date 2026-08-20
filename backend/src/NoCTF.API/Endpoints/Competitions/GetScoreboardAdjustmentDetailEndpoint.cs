@@ -11,11 +11,10 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Competitions;
 
-public sealed class GetScoreboardSlotDetailRequest
+public sealed class GetScoreboardAdjustmentDetailRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid TeamId { get; set; }
-    public int ColumnIndex { get; set; }
 
     [QueryParam]
     public string? Cursor { get; set; }
@@ -24,52 +23,46 @@ public sealed class GetScoreboardSlotDetailRequest
     public int Limit { get; set; } = 50;
 }
 
-public sealed class GetScoreboardSlotDetailValidator : Validator<GetScoreboardSlotDetailRequest>
+public sealed class GetScoreboardAdjustmentDetailValidator
+    : Validator<GetScoreboardAdjustmentDetailRequest>
 {
-    public GetScoreboardSlotDetailValidator() =>
+    public GetScoreboardAdjustmentDetailValidator() =>
         RuleFor(request => request.Limit).InclusiveBetween(1, 200);
 }
 
-public sealed record ScoreboardSlotDetailResponse(
+public sealed record ScoreboardAdjustmentDetailResponse(
     Guid CompetitionId,
     Guid TeamId,
-    int ColumnIndex,
-    ScoreboardScoreStateProtocol ScoreState,
-    long? EarnedPoints,
-    long? DeductedPoints,
-    long? NetPoints,
     int EntryCount,
-    IReadOnlyList<ScoreboardBreakdownResponse> Breakdown,
     IReadOnlyList<ScoreboardActorResponse> Actors,
-    IReadOnlyList<ScoreboardEntryResponse> Items,
+    IReadOnlyList<ScoreboardAdjustmentResponse> Items,
     string? NextCursor);
 
-public sealed class GetScoreboardSlotDetailEndpoint(
+public sealed class GetScoreboardAdjustmentDetailEndpoint(
     ILeaderboardCache leaderboard,
     ICompetitionVisibilityAccess access,
     GetCompetitionTracks getTracks,
     ICompetitionModerationAuthorizer authorizer,
     SignedKeysetCursor cursors,
     IUserContext user)
-    : Endpoint<GetScoreboardSlotDetailRequest,
-        Results<Ok<ScoreboardSlotDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
+    : Endpoint<GetScoreboardAdjustmentDetailRequest,
+        Results<Ok<ScoreboardAdjustmentDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>>
 {
-    private const string CursorEndpoint = "scoreboard.slot.detail";
+    private const string CursorEndpoint = "scoreboard.adjustment.detail";
 
     public override void Configure()
     {
-        Get("/competitions/{competitionId}/leaderboard/teams/{teamId}/columns/{columnIndex}");
+        Get("/competitions/{competitionId}/leaderboard/teams/{teamId}/adjustments");
         AllowAnonymous();
-        Summary(summary => summary.Summary = "Get one sparse scoreboard slot with signed cursor pagination.");
+        Summary(summary => summary.Summary = "Get global scoreboard adjustments with signed cursor pagination.");
     }
 
-    public override async Task<Results<Ok<ScoreboardSlotDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
-        GetScoreboardSlotDetailRequest request,
+    public override async Task<Results<Ok<ScoreboardAdjustmentDetailResponse>, Accepted<LeaderboardProcessingProtocolResponse>, NotFound, ProblemHttpResult>> ExecuteAsync(
+        GetScoreboardAdjustmentDetailRequest request,
         CancellationToken cancellationToken)
     {
         request.CompetitionId = Route<Guid>("competitionId");
         request.TeamId = Route<Guid>("teamId");
-        request.ColumnIndex = Route<int>("columnIndex");
         var visibility = await access.ResolveAsync(
             user.UserId, request.CompetitionId, DateTimeOffset.UtcNow, cancellationToken);
         if (visibility is null || visibility.DataScope == LeaderboardDataScope.Hidden)
@@ -92,10 +85,8 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             return TypedResults.NotFound();
         projection = ScoreboardAudienceProjection.Filter(projection, canObserve);
         projection = ScoreboardAudienceProjection.FilterTracks(projection, tracks, canObserve);
-        var column = projection.Schema.Columns.SingleOrDefault(item => item.Index == request.ColumnIndex);
         var team = projection.Snapshot.Teams.SingleOrDefault(item => item.TeamId == request.TeamId);
-        var slot = team?.Slots.SingleOrDefault(item => item.ColumnIndex == request.ColumnIndex);
-        if (column is null || team is null || slot is null)
+        if (team is null)
             return TypedResults.NotFound();
 
         var dataAsOf = projection.Snapshot.DataAsOf ?? projection.Snapshot.GeneratedAt;
@@ -103,7 +94,6 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             request.CompetitionId.ToString("N"),
             user.UserId.ToString("N"),
             request.TeamId.ToString("N"),
-            request.ColumnIndex,
             projection.Schema.Revision,
             projection.Snapshot.Version,
             dataAsOf.UtcTicks);
@@ -114,21 +104,20 @@ public sealed class GetScoreboardSlotDetailEndpoint(
                 title: "Invalid cursor.");
         }
 
-        var allocations = projection.EntryAllocations
-            .Where(allocation => allocation.TeamId == request.TeamId
-                && allocation.ColumnIndex == request.ColumnIndex
+        var allocations = projection.AdjustmentAllocations
+            .Where(item => item.TeamId == request.TeamId
+                && item.OccurredAt <= dataAsOf
                 && (position is null
-                    || allocation.Entry.OccurredAt < position.CreatedAt
-                    || allocation.Entry.OccurredAt == position.CreatedAt
-                    && allocation.Entry.Id.CompareTo(position.Id) < 0))
-            .OrderByDescending(allocation => allocation.Entry.OccurredAt)
-            .ThenByDescending(allocation => allocation.Entry.Id)
+                    || item.OccurredAt < position.CreatedAt
+                    || item.OccurredAt == position.CreatedAt && item.Id.CompareTo(position.Id) < 0))
+            .OrderByDescending(item => item.OccurredAt)
+            .ThenByDescending(item => item.Id)
             .Take(request.Limit + 1)
             .ToArray();
         var page = allocations.Take(request.Limit).ToArray();
         var actorIndexes = page
-            .Where(allocation => allocation.Entry.ActorIndex is not null)
-            .Select(allocation => allocation.Entry.ActorIndex!.Value)
+            .Where(item => item.ActorIndex is not null)
+            .Select(item => item.ActorIndex!.Value)
             .ToHashSet();
         var actors = projection.DetailActors
             .Where(actor => actorIndexes.Contains(actor.Index))
@@ -138,30 +127,23 @@ public sealed class GetScoreboardSlotDetailEndpoint(
                 actor.UserId,
                 actor.DisplayName))
             .ToArray();
-        var mapped = page
-            .Select(allocation => ScoreboardProtocolMapper.ToResponse(allocation.Entry))
-            .ToArray();
+        var items = page.Select(item => ScoreboardProtocolMapper.ToResponse(new ScoreboardAdjustment(
+            item.Id,
+            item.Kind,
+            item.OccurredAt,
+            item.ActorIndex,
+            item.EarnedPoints,
+            item.DeductedPoints,
+            item.NetPoints))).ToArray();
         var nextCursor = allocations.Length > request.Limit
-            ? cursors.Encode(CursorEndpoint, scope, new(page[^1].Entry.OccurredAt, page[^1].Entry.Id))
+            ? cursors.Encode(CursorEndpoint, scope, new(page[^1].OccurredAt, page[^1].Id))
             : null;
-        return TypedResults.Ok(new ScoreboardSlotDetailResponse(
+        return TypedResults.Ok(new ScoreboardAdjustmentDetailResponse(
             request.CompetitionId,
             request.TeamId,
-            request.ColumnIndex,
-            Enum.Parse<ScoreboardScoreStateProtocol>(slot.ScoreState.ToString()),
-            slot.EarnedPoints,
-            slot.DeductedPoints,
-            slot.NetPoints,
-            slot.EntryCount,
-            slot.Breakdowns.Select(item => new ScoreboardBreakdownResponse(
-                Enum.Parse<ScoreboardBreakdownKindProtocol>(item.Kind.ToString()),
-                item.SuccessfulCount,
-                item.AttemptCount,
-                item.EarnedPoints,
-                item.DeductedPoints,
-                item.NetPoints)).ToArray(),
+            team.GlobalAdjustmentCount,
             actors,
-            mapped,
+            items,
             nextCursor));
     }
 
@@ -170,6 +152,8 @@ public sealed class GetScoreboardSlotDetailEndpoint(
         HttpContext.Response.Headers.RetryAfter = "2";
         var statusUrl = $"/api/v1/competitions/{competitionId}/leaderboard";
         return TypedResults.Accepted(statusUrl, new LeaderboardProcessingProtocolResponse(
-            competitionId, LeaderboardProjectionStateProtocol.Processing, statusUrl));
+            competitionId,
+            LeaderboardProjectionStateProtocol.Processing,
+            statusUrl));
     }
 }

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Download, Medal, Trophy } from '@lucide/vue'
-import { getScoreboardSlotDetailEndpoint } from '~/api'
+import { getScoreboardAdjustmentDetailEndpoint, getScoreboardSlotDetailEndpoint } from '~/api'
 import type {
+  NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse,
   NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse,
   NoCtfapiEndpointsCompetitionsScoreboardColumnResponse,
   NoCtfapiEndpointsCompetitionsScoreboardEntryResponse,
@@ -134,35 +136,45 @@ async function loadDetailPage(cursor: string | null, append: boolean): Promise<v
   const requestGeneration = detailGeneration
   if (append) detailLoadingMore.value = true
   else detailLoading.value = true
-  const result = await getScoreboardSlotDetailEndpoint({
-    path: { competitionId, teamId, columnIndex },
-    query: { cursor, limit: 50 },
-  })
-  if (requestGeneration !== detailGeneration) return
-  detailLoading.value = false
-  detailLoadingMore.value = false
-  if (result.error) {
-    detailError.value = parseApiError(result.error, translate('加载记分板明细失败')).message
-    return
+  try {
+    const result = await getScoreboardSlotDetailEndpoint({
+      path: { competitionId, teamId, columnIndex },
+      query: { cursor, limit: 50 },
+    })
+    if (requestGeneration !== detailGeneration) return
+    if (result.error) {
+      detailError.value = parseApiError(result.error, translate('加载记分板明细失败')).message
+      return
+    }
+    if (result.response?.status === 202) {
+      detailError.value = translate('记分板数据投影中,请稍候…')
+      return
+    }
+    if (!result.data) return
+    const page = result.data as NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse
+    const pageActors = new Map((page.actors ?? []).map(actor => [actor.index, actor.displayName]))
+    const actorNames = append ? new Map(detailActorNames.value) : new Map<string, string>()
+    for (const entry of page.items ?? []) {
+      if (entry.actorIndex !== null && entry.actorIndex !== undefined) {
+        const displayName = pageActors.get(entry.actorIndex)
+        if (displayName && entry.id) actorNames.set(entry.id, displayName)
+      }
+    }
+    detail.value = page
+    detailEntries.value = append ? [...detailEntries.value, ...(page.items ?? [])] : [...(page.items ?? [])]
+    detailActorNames.value = actorNames
+    detailError.value = null
   }
-  if (result.response?.status === 202) {
-    detailError.value = translate('记分板数据投影中,请稍候…')
-    return
+  catch (error) {
+    if (requestGeneration === detailGeneration)
+      detailError.value = parseApiError(error, translate('加载记分板明细失败')).message
   }
-  if (!result.data) return
-  const page = result.data as NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse
-  const pageActors = new Map((page.actors ?? []).map(actor => [actor.index, actor.displayName]))
-  const actorNames = append ? new Map(detailActorNames.value) : new Map<string, string>()
-  for (const entry of page.items ?? []) {
-    if (entry.actorIndex !== null && entry.actorIndex !== undefined) {
-      const displayName = pageActors.get(entry.actorIndex)
-      if (displayName && entry.id) actorNames.set(entry.id, displayName)
+  finally {
+    if (requestGeneration === detailGeneration) {
+      detailLoading.value = false
+      detailLoadingMore.value = false
     }
   }
-  detail.value = page
-  detailEntries.value = append ? [...detailEntries.value, ...(page.items ?? [])] : [...(page.items ?? [])]
-  detailActorNames.value = actorNames
-  detailError.value = null
 }
 
 function openDetail(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, column: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse): void {
@@ -182,6 +194,87 @@ watch(detailOpen, (open) => { if (!open) detailGeneration += 1 })
 function entryActor(entry: NoCtfapiEndpointsCompetitionsScoreboardEntryResponse): string {
   if (entry.actorIndex === null || entry.actorIndex === undefined) return translate('系统')
   return (entry.id ? detailActorNames.value.get(entry.id) : null) ?? translate('未知用户')
+}
+
+const adjustmentOpen = ref(false)
+const adjustmentLoading = ref(false)
+const adjustmentLoadingMore = ref(false)
+const adjustmentError = ref<string | null>(null)
+const adjustmentDetail = ref<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse | null>(null)
+const adjustmentEntries = ref<NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse[]>([])
+const adjustmentActorNames = ref(new Map<string, string>())
+const adjustmentTeam = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
+let adjustmentGeneration = 0
+
+async function loadAdjustmentPage(cursor: string | null, append: boolean): Promise<void> {
+  const teamId = adjustmentTeam.value?.teamId
+  if (!teamId) return
+  const requestGeneration = adjustmentGeneration
+  if (append) adjustmentLoadingMore.value = true
+  else adjustmentLoading.value = true
+  try {
+    const result = await getScoreboardAdjustmentDetailEndpoint({
+      path: { competitionId, teamId },
+      query: { cursor, limit: 50 },
+    })
+    if (requestGeneration !== adjustmentGeneration) return
+    if (result.error) {
+      adjustmentError.value = parseApiError(result.error, translate('加载全局调分明细失败')).message
+      return
+    }
+    if (result.response?.status === 202) {
+      adjustmentError.value = translate('记分板数据投影中,请稍候…')
+      return
+    }
+    if (!result.data) return
+    const page = result.data as NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse
+    const pageActors = new Map((page.actors ?? []).map(actor => [actor.index, actor.displayName]))
+    const actorNames = append ? new Map(adjustmentActorNames.value) : new Map<string, string>()
+    for (const entry of page.items ?? []) {
+      if (entry.actorIndex !== null && entry.actorIndex !== undefined) {
+        const displayName = pageActors.get(entry.actorIndex)
+        if (displayName && entry.id) actorNames.set(entry.id, displayName)
+      }
+    }
+    adjustmentDetail.value = page
+    adjustmentEntries.value = append ? [...adjustmentEntries.value, ...(page.items ?? [])] : [...(page.items ?? [])]
+    adjustmentActorNames.value = actorNames
+    adjustmentError.value = null
+  }
+  catch (error) {
+    if (requestGeneration === adjustmentGeneration)
+      adjustmentError.value = parseApiError(error, translate('加载全局调分明细失败')).message
+  }
+  finally {
+    if (requestGeneration === adjustmentGeneration) {
+      adjustmentLoading.value = false
+      adjustmentLoadingMore.value = false
+    }
+  }
+}
+
+function openAdjustments(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse): void {
+  adjustmentGeneration += 1
+  adjustmentTeam.value = team
+  adjustmentDetail.value = null
+  adjustmentEntries.value = []
+  adjustmentActorNames.value = new Map()
+  adjustmentError.value = null
+  adjustmentOpen.value = true
+  void loadAdjustmentPage(null, false)
+}
+
+watch(adjustmentOpen, (open) => { if (!open) adjustmentGeneration += 1 })
+
+function adjustmentActor(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse): string {
+  if (entry.actorIndex === null || entry.actorIndex === undefined) return translate('系统')
+  return (entry.id ? adjustmentActorNames.value.get(entry.id) : null) ?? translate('未知用户')
+}
+
+function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse): string {
+  if (entry.kind === 'CompetitionPenalty') return translate('比赛处罚')
+  if (entry.kind === 'BanRecalculation') return translate('禁赛重算')
+  return translate('人工调分')
 }
 </script>
 
@@ -228,7 +321,13 @@ function entryActor(entry: NoCtfapiEndpointsCompetitionsScoreboardEntryResponse)
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(team.rank ?? 99) <= 3 ? 'bg-primary/5' : ''">
                   <TableCell><Medal v-if="(team.rank ?? 99) <= 3" class="size-5" :class="medalRankClass[team.rank ?? 0]" /><span v-else class="font-mono tabular-nums">{{ team.rank ?? '—' }}</span></TableCell>
                   <TableCell class="sticky left-0 z-10 border-r bg-card"><span class="font-medium">{{ team.teamName }}</span><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="ml-2">{{ team.rankingState }}</Badge></TableCell>
-                  <TableCell class="text-right font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</TableCell>
+                  <TableCell class="text-right">
+                    <button v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
+                      <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>
+                      <span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ $t('全局调分 {count} 条', { count: team.globalAdjustmentCount ?? 0 }) }}</span>
+                    </button>
+                    <span v-else class="font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>
+                  </TableCell>
                   <template v-for="group in columnGroups" :key="`${team.teamId}-${group.challenge.id}`">
                     <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center">
                       <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="min-h-14 w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openDetail(team, column)">
@@ -256,6 +355,18 @@ function entryActor(entry: NoCtfapiEndpointsCompetitionsScoreboardEntryResponse)
           <div class="grid grid-cols-3 gap-3"><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('状态') }}</p><p class="mt-1 font-medium">{{ slotTitle(detail) }}</p></div><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('得分') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.earnedPoints ?? '—' }}</p></div><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('净分') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.netPoints ?? '—' }}</p></div></div>
           <div class="flex flex-col gap-2"><div v-for="entry in detailEntries" :key="entry.id" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ entry.kind }} · {{ entry.outcome }}</p><p class="text-xs text-muted-foreground">{{ entryActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono tabular-nums">{{ entry.netPoints ?? '—' }}<template v-if="entry.netPoints !== null && entry.netPoints !== undefined"> pts</template></span></div><p v-if="!detailEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('暂无明细') }}</p></div>
           <Button v-if="detail.nextCursor" variant="outline" :disabled="detailLoadingMore" @click="loadDetailPage(detail.nextCursor ?? null, true)"><Spinner v-if="detailLoadingMore" />{{ $t('加载更多') }}</Button>
+        </template>
+      </DialogScrollContent>
+    </Dialog>
+
+    <Dialog v-model:open="adjustmentOpen">
+      <DialogScrollContent class="max-h-[85vh] sm:max-w-xl">
+        <DialogHeader><DialogTitle>{{ adjustmentTeam?.teamName }} · {{ $t('全局调分') }}</DialogTitle><DialogDescription>{{ $t('完整调分记录均来自服务端权威事实。') }}</DialogDescription></DialogHeader>
+        <Alert v-if="adjustmentError" variant="destructive"><AlertDescription>{{ adjustmentError }}</AlertDescription></Alert>
+        <div v-if="adjustmentLoading" class="flex items-center justify-center py-10"><Spinner /></div>
+        <template v-else-if="adjustmentDetail">
+          <div class="flex flex-col gap-2"><div v-for="entry in adjustmentEntries" :key="entry.id" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ adjustmentKind(entry) }}</p><p class="text-xs text-muted-foreground">{{ adjustmentActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono font-semibold tabular-nums" :class="(entry.netPoints ?? 0) < 0 ? 'text-destructive' : 'text-emerald-600'">{{ (entry.netPoints ?? 0) > 0 ? '+' : '' }}{{ entry.netPoints ?? 0 }} pts</span></div><p v-if="!adjustmentEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('暂无明细') }}</p></div>
+          <Button v-if="adjustmentDetail.nextCursor" variant="outline" :disabled="adjustmentLoadingMore" @click="loadAdjustmentPage(adjustmentDetail.nextCursor ?? null, true)"><Spinner v-if="adjustmentLoadingMore" />{{ $t('加载更多') }}</Button>
         </template>
       </DialogScrollContent>
     </Dialog>

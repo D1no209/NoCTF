@@ -101,12 +101,16 @@ internal static class NormalizedScoreboardProjection
                 group => group.Key,
                 group => group.OrderBy(pair => pair.Key.ColumnIndex).Select(pair => pair.Value).ToArray());
         var rows = new List<ScoreboardTeam>(input.Teams.Count);
+        var entryAllocations = new List<ScoreboardEntryAllocation>();
+        var adjustmentAllocations = new List<ScoreboardAdjustmentAllocation>();
         foreach (var team in input.Teams)
         {
             var slots = slotsByTeam.GetValueOrDefault(team.Id, [])
                 .Select(slot => slot.Build(ScoreState(input, slot.Round)))
                 .Where(slot => slot.EntryCount > 0 || slot.NetPoints.GetValueOrDefault() != 0)
                 .ToArray();
+            entryAllocations.AddRange(slots.SelectMany(slot => slot.Entries.Select(entry =>
+                new ScoreboardEntryAllocation(team.Id, slot.ColumnIndex, entry))));
             var compactSlots = slots.Select(slot => slot with
             {
                 Entries = CompactEntries(slot.Entries)
@@ -115,6 +119,16 @@ internal static class NormalizedScoreboardProjection
                 checked(total + slot.NetPoints.GetValueOrDefault()));
             legacyByTeam.TryGetValue(team.Id, out var legacyRow);
             var allGlobalAdjustments = BuildGlobalAdjustments(input, team.Id, actorIndexes);
+            adjustmentAllocations.AddRange(allGlobalAdjustments.Select(adjustment =>
+                new ScoreboardAdjustmentAllocation(
+                    team.Id,
+                    adjustment.Id,
+                    adjustment.Kind,
+                    adjustment.OccurredAt,
+                    adjustment.ActorIndex,
+                    adjustment.EarnedPoints,
+                    adjustment.DeductedPoints,
+                    adjustment.NetPoints)));
             var totalScore = allGlobalAdjustments.Aggregate(slotNet, (total, adjustment) =>
                 checked(total + adjustment.NetPoints));
             rows.Add(new ScoreboardTeam(
@@ -153,7 +167,21 @@ internal static class NormalizedScoreboardProjection
             DataScope = LeaderboardDataScope.Live,
             DataAsOf = projectedAt
         };
-        return new(catalog, schema, snapshot);
+        return new(catalog, schema, snapshot)
+        {
+            DetailActors = actors,
+            EntryAllocations = entryAllocations
+                .OrderBy(allocation => allocation.TeamId)
+                .ThenBy(allocation => allocation.ColumnIndex)
+                .ThenBy(allocation => allocation.Entry.OccurredAt)
+                .ThenBy(allocation => allocation.Entry.Id)
+                .ToArray(),
+            AdjustmentAllocations = adjustmentAllocations
+                .OrderBy(allocation => allocation.TeamId)
+                .ThenBy(allocation => allocation.OccurredAt)
+                .ThenBy(allocation => allocation.Id)
+                .ToArray()
+        };
     }
 
     private static IReadOnlyList<ScoreboardSlotEntry> CompactEntries(
@@ -344,31 +372,31 @@ internal static class NormalizedScoreboardProjection
                 switch (fact.Kind)
                 {
                     case GameplayFactKind.FlagAttempt:
-                    {
-                        var isAwardedSolve = firstCorrect?.GameplayFactId == fact.GameplayFactId;
-                        var deduction = fact.Result == GameplayFactResult.Wrong
-                            ? checked(wrongPenalty * fact.Multiplicity)
-                            : 0L;
-                        var earned = isAwardedSolve ? Math.Max(0, solvePoints) : 0L;
-                        var award = isAwardedSolve ? AwardFrom(legacyCell?.BloodRank) : null;
-                        var basePoints = legacy.Challenges
-                            .FirstOrDefault(item => item.CompetitionChallengeId == group.Key.Item2)
-                            ?.CurrentScore ?? earned;
-                        var awardPoints = award is null ? 0L : Math.Max(0, earned - basePoints);
-                        slot.AddFact(
-                            fact,
-                            ScoreboardEntryKind.Solve,
-                            ScoreboardBreakdownKind.Solve,
-                            actorIndexes,
-                            earned,
-                            deduction,
-                            award,
-                            awardPoints,
-                            Math.Max(0, earned - awardPoints));
-                        if (awardPoints > 0)
-                            slot.AddBreakdownScore(ScoreboardBreakdownKind.BloodAward, awardPoints, 0);
-                        break;
-                    }
+                        {
+                            var isAwardedSolve = firstCorrect?.GameplayFactId == fact.GameplayFactId;
+                            var deduction = fact.Result == GameplayFactResult.Wrong
+                                ? checked(wrongPenalty * fact.Multiplicity)
+                                : 0L;
+                            var earned = isAwardedSolve ? Math.Max(0, solvePoints) : 0L;
+                            var award = isAwardedSolve ? AwardFrom(legacyCell?.BloodRank) : null;
+                            var basePoints = legacy.Challenges
+                                .FirstOrDefault(item => item.CompetitionChallengeId == group.Key.Item2)
+                                ?.CurrentScore ?? earned;
+                            var awardPoints = award is null ? 0L : Math.Max(0, earned - basePoints);
+                            slot.AddFact(
+                                fact,
+                                ScoreboardEntryKind.Solve,
+                                ScoreboardBreakdownKind.Solve,
+                                actorIndexes,
+                                earned,
+                                deduction,
+                                award,
+                                awardPoints,
+                                Math.Max(0, earned - awardPoints));
+                            if (awardPoints > 0)
+                                slot.AddBreakdownScore(ScoreboardBreakdownKind.BloodAward, awardPoints, 0);
+                            break;
+                        }
                     case GameplayFactKind.HintUnlock:
                         slot.AddFact(
                             fact,
@@ -380,18 +408,6 @@ internal static class NormalizedScoreboardProjection
                                 ? checked(fact.HintCost.GetValueOrDefault() * fact.Multiplicity)
                                 : 0);
                         break;
-                    case GameplayFactKind.ManualAdjustment when fact.Result == GameplayFactResult.Applied:
-                    {
-                        var delta = checked(ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
-                        slot.AddFact(
-                            fact,
-                            ScoreboardEntryKind.ManualAdjustment,
-                            ScoreboardBreakdownKind.ManualAdjustment,
-                            actorIndexes,
-                            Math.Max(0, delta),
-                            Math.Max(0, -delta));
-                        break;
-                    }
                 }
             }
         }
@@ -440,11 +456,11 @@ internal static class NormalizedScoreboardProjection
             .ToArray();
 
         foreach (var victimPool in attackFacts.GroupBy(fact => new
-                 {
-                     ChallengeId = fact.CompetitionChallengeId!.Value,
-                     RoundId = fact.ReferenceId!.Value,
-                     VictimId = fact.VictimTeamId!.Value
-                 }))
+        {
+            ChallengeId = fact.CompetitionChallengeId!.Value,
+            RoundId = fact.ReferenceId!.Value,
+            VictimId = fact.VictimTeamId!.Value
+        }))
         {
             var settings = EffectiveAwd(
                 competition,
@@ -711,17 +727,8 @@ internal static class NormalizedScoreboardProjection
                 }
                 else if (fact.Kind == GameplayFactKind.ManualAdjustment
                          && fact.Result == GameplayFactResult.Applied)
-                {
-                    var delta = checked(ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
-                    manual = checked(manual + delta);
-                    slot.AddFact(
-                        fact,
-                        ScoreboardEntryKind.ManualAdjustment,
-                        ScoreboardBreakdownKind.ManualAdjustment,
-                        actorIndexes,
-                        Math.Max(0, delta),
-                        Math.Max(0, -delta));
-                }
+                    manual = checked(manual
+                        + ProjectionPenalties.ParseDelta(fact.Value) * fact.Multiplicity);
             }
             var control = checked((legacyCells.GetValueOrDefault(group.Key)?.Score ?? 0L) - manual);
             slot.AddBreakdownScore(
@@ -767,7 +774,6 @@ internal static class NormalizedScoreboardProjection
     {
         var adjustments = input.GameplayFacts
             .Where(fact => fact.TeamId == teamId
-                && fact.CompetitionChallengeId is null
                 && fact.Kind == GameplayFactKind.ManualAdjustment
                 && fact.Result == GameplayFactResult.Applied)
             .Select(fact =>
@@ -911,18 +917,18 @@ internal static class NormalizedScoreboardProjection
     private static long AwdpPenalty(
         LeaderboardGameplayFact fact,
         AwdpEffectiveConfiguration configuration) => (fact.Kind, fact.Result, fact.FailureCode) switch
-    {
-        (GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong, _)
-            => checked(configuration.FlagWrongPenalty * fact.Multiplicity),
-        (GameplayFactKind.BreakAttempt, GameplayFactResult.Rejected,
-            GameplayFactFailureCode.ForeignTeamFlagDetected or GameplayFactFailureCode.AmbiguousFlagMatch)
-            => checked(configuration.FlagWrongPenalty * fact.Multiplicity),
-        (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpExploitSucceeded)
-            => checked(configuration.ExploitSucceededPenalty * fact.Multiplicity),
-        (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceAbnormal)
-            => checked(configuration.ServiceAbnormalPenalty * fact.Multiplicity),
-        _ => 0
-    };
+        {
+            (GameplayFactKind.BreakAttempt, GameplayFactResult.Wrong, _)
+                => checked(configuration.FlagWrongPenalty * fact.Multiplicity),
+            (GameplayFactKind.BreakAttempt, GameplayFactResult.Rejected,
+                GameplayFactFailureCode.ForeignTeamFlagDetected or GameplayFactFailureCode.AmbiguousFlagMatch)
+                => checked(configuration.FlagWrongPenalty * fact.Multiplicity),
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpExploitSucceeded)
+                => checked(configuration.ExploitSucceededPenalty * fact.Multiplicity),
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceAbnormal)
+                => checked(configuration.ServiceAbnormalPenalty * fact.Multiplicity),
+            _ => 0
+        };
 
     private static T? TryParse<T>(string? json) where T : class
     {
