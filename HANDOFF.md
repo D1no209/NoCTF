@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-21 alpha.69 冻结榜不可变性与 KoH 首次投影时序修复
+
+- `55f28f1d` 修复冻结排行榜仍接受 `endingRound`、并可能从当前数据库与当前比赛配置重建历史窗口的问题。`Frozen` 状态的排行榜、Schema 与 Slot Detail 现在始终只返回已经持久化的冻结快照并忽略轮次窗口参数；只有实时榜可以浏览历史轮次。前端在冻结榜隐藏轮次导航，不能再用后续重判、题目配置或队伍状态改变冻结结果。
+- `46d4f97b` 修复 KoH 刚启动时偶发长时间没有首个稳定排行榜投影的问题。根因是 Worker 的 Wolverine singular maintenance agent 在节点启动后可能较晚完成健康检查与领导权分配，虽然 KoH GameplayFact 已按约每 2 秒落库且 `LeaderboardDirty=true`，15 秒维护循环却尚未接管，客户端在 45 秒内持续读到初始零分缓存。Worker 现在把首次健康检查与 agent assignment 检查都明确设为启动后 1 秒；排行榜仍由既有 15 秒维护任务合并刷新，没有把每次 KoH 观测改成昂贵的全量投影。
+- `c20eb264` 将版本从 `0.1.0-alpha.68` 递增到 `0.1.0-alpha.69`。本阶段没有新增业务表、字段、EF migration、HTTP/OpenAPI 或 TypeScript SDK 变化，也没有改变 KoH 轮询周期和记分规则。
+- 验证：Release solution build 0 warning/0 error；最终完整非 Integration TUnit 859/859；完整 Integration 192 项中 190 通过、0 失败，2 项仅因未配置真实 Kubernetes/Libvirt 环境按设计跳过；前端 `bun test` 247/247（1819 assertions）、typecheck 与 production build 通过；CTF、AWD、AWDP Full E2E 分别 1/1 通过。KoH Full E2E 在审计中先复现过首次排行榜投影超时；修复后连续独立执行 3 次均 1/1 通过，每次都完成 API、Redis、PostgreSQL 韧性重启检查并按精确 Compose 项目身份清理容器、网络和测试镜像。完整测试套件曾有一次 Wolverine 双节点 maintenance failover 30 秒时序超时，随后该用例隔离复跑 1/1、完整类 10/10 通过，没有将偶发超时伪报为未发生。
+- C# analyzers、EF `has-pending-model-changes`、前端 production build 与 `git diff --check` 均通过。仓库没有 lint script，未将 lint 误报为已执行；Microsoft Edge 未连接到本地 alpha.69 环境，因此没有把旧部署页面冒充为本轮浏览器验收。
+- 本阶段位于独立工作树 `E:\SourceCode\NoCTF-leaderboard-matrix-20260819`、分支 `codex/fix-scoreboard-audit-20260820`。按用户指令，发现问题并完成修复后只创建本地提交；未推送、未部署、未操作生产数据，也未切换或同步本地 `main`，等待下一步指令。
+
 ## 2026-08-21 alpha.68 AWDP 权威攻防分拆与当前轮操作统计修复
 
 - `d6534a8d` 修复 AWDP 长赛累计攻防分被前端按当前最多 50 轮窗口重新计算的问题。规范化排行榜现在直接返回后端完整历史投影的 `attackScore`、`defenseScore`，并按 `CompetitionChallengeId` 返回权威 `challengeScores`；主榜窗口仍保持有界，前端不再从可见 Slot 推测整场或单题累计分。人工调分继续只进入总分，不被错误归类为攻击分或防御分。
