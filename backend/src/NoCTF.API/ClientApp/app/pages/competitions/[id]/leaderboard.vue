@@ -4,7 +4,6 @@ import { getScoreboardAdjustmentDetailEndpoint, getScoreboardSlotDetailEndpoint 
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse,
   NoCtfapiEndpointsCompetitionsScoreboardAdjustmentResponse,
-  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse,
   NoCtfapiEndpointsCompetitionsScoreboardColumnResponse,
   NoCtfapiEndpointsCompetitionsScoreboardEntryResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSlotDetailResponse,
@@ -14,6 +13,7 @@ import type {
 import { medalRankClass } from '~/components/leaderboard/types'
 import {
   scoreboardBreakdown,
+  scoreboardChallengeColumnGroups,
   scoreboardEntryKindLabel,
   scoreboardEntryOutcomeLabel,
   scoreboardRankingStateLabel,
@@ -53,22 +53,23 @@ const teams = computed(() => {
 const visibleTeams = computed(() => teams.value.slice(0, visibleTeamCount.value))
 watch(teams, () => { visibleTeamCount.value = 50 })
 
-interface ChallengeColumnGroup {
-  challenge: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse
-  columns: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse[]
-}
-
-const columnGroups = computed<ChallengeColumnGroup[]>(() => {
-  const groups: ChallengeColumnGroup[] = []
-  for (const challenge of board.catalog.value?.items ?? []) {
-    if (!challenge.id) continue
-    const columns = (board.schema.value?.columns ?? [])
-      .filter(column => column.competitionChallengeId === challenge.id)
-      .sort((left, right) => (left.index ?? 0) - (right.index ?? 0))
-    if (columns.length) groups.push({ challenge, columns })
-  }
-  return groups
-})
+const columnGroups = computed(() => scoreboardChallengeColumnGroups(
+  board.schema.value,
+  board.catalog.value?.items,
+))
+const missingChallengeIds = computed(() => columnGroups.value
+  .filter(group => !group.challenge)
+  .map(group => group.competitionChallengeId))
+let missingCatalogRefreshRevision: string | null = null
+watch(
+  [() => board.schema.value?.challengeCatalogRevision ?? null, missingChallengeIds],
+  ([revision, challengeIds]) => {
+    if (!revision || challengeIds.length === 0 || missingCatalogRefreshRevision === revision) return
+    missingCatalogRefreshRevision = revision
+    void board.refresh({ catalog: true, schema: false, snapshot: false })
+  },
+  { flush: 'post' },
+)
 const flatColumns = computed(() => columnGroups.value.flatMap(group => group.columns))
 const roundWindowLabel = computed(() => {
   const start = board.schema.value?.roundWindowStart
@@ -358,11 +359,11 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                   <TableHead rowspan="2" class="w-14">{{ $t('名次') }}</TableHead>
                   <TableHead rowspan="2" class="sticky left-0 z-20 min-w-44 border-r bg-card">{{ $t('参赛队伍') }}</TableHead>
                   <TableHead rowspan="2" class="w-24 text-right">{{ $t('总分') }}</TableHead>
-                  <TableHead v-for="group in columnGroups" :key="group.challenge.id" :colspan="group.columns.length" class="border-l text-center">
-                    <span class="inline-flex items-center gap-1.5"><component :is="directionIcon(group.challenge.direction)" class="size-4" :class="directionTextClass(group.challenge.direction)" />{{ group.challenge.title }}</span>
+                  <TableHead v-for="group in columnGroups" :key="group.competitionChallengeId" :colspan="group.columns.length" class="border-l text-center">
+                    <span class="inline-flex items-center gap-1.5"><component :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('未知题目') }}</span>
                   </TableHead>
                 </TableRow>
-                <TableRow><template v-for="group in columnGroups" :key="`${group.challenge.id}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-32 border-l text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
+                <TableRow><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-32 border-l text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(team.rank ?? 99) <= 3 ? 'bg-primary/5' : ''">
@@ -375,7 +376,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                     </button>
                     <span v-else class="font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>
                   </TableCell>
-                  <template v-for="group in columnGroups" :key="`${team.teamId}-${group.challenge.id}`">
+                  <template v-for="group in columnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
                     <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center">
                       <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="min-h-14 w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openDetail(team, column)">
                         <template v-if="scoreboardSlot(team, column.index!)?.scoreState === 'Pending'"><span class="block text-xs font-medium text-amber-600">{{ $t('本轮待结算') }}</span><span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ breakdownText(scoreboardSlot(team, column.index!)!) }}</span></template>

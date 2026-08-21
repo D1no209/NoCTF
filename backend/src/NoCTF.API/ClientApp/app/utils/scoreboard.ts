@@ -1,6 +1,7 @@
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardBreakdownKindProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse,
+  NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse,
   NoCtfapiEndpointsCompetitionsScoreboardColumnResponse,
   NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol,
@@ -10,6 +11,12 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
 import { translate } from './i18n'
+
+export interface ScoreboardChallengeColumnGroup {
+  competitionChallengeId: string
+  challenge: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse | null
+  columns: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse[]
+}
 
 const rankingStateLabels = {
   Eligible: '符合排名资格',
@@ -78,6 +85,34 @@ export function scoreboardColumnsForChallenge(
   return (schema?.columns ?? []).filter(column =>
     column.competitionChallengeId === competitionChallengeId,
   )
+}
+
+export function scoreboardChallengeColumnGroups(
+  schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null | undefined,
+  catalog: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse[] | null | undefined,
+): ScoreboardChallengeColumnGroup[] {
+  const catalogById = new Map<string, NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse>()
+  for (const challenge of catalog ?? []) {
+    if (challenge.id) catalogById.set(challenge.id, challenge)
+  }
+
+  const groups = new Map<string, ScoreboardChallengeColumnGroup>()
+  for (const column of schema?.columns ?? []) {
+    const competitionChallengeId = column.competitionChallengeId
+    if (!competitionChallengeId) continue
+    const existing = groups.get(competitionChallengeId)
+    if (existing) {
+      existing.columns.push(column)
+      continue
+    }
+    groups.set(competitionChallengeId, {
+      competitionChallengeId,
+      challenge: catalogById.get(competitionChallengeId) ?? null,
+      columns: [column],
+    })
+  }
+
+  return [...groups.values()]
 }
 
 export function latestSettledScore(
