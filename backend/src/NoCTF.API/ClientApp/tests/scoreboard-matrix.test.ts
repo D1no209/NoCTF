@@ -8,6 +8,7 @@ import {
   scoreboardBreakdown,
   scoreboardChallengeColumnGroups,
   scoreboardColumnsForChallenge,
+  scoreboardDirectionGroups,
   scoreboardEntryKindLabel,
   scoreboardEntryOutcomeLabel,
   scoreboardRankingStateLabel,
@@ -15,6 +16,7 @@ import {
   scoreboardSlotSignals,
   scoreboardTeamChallengeScore,
   scoreboardTeamChallengeSignals,
+  scoreboardTeamDirectionScore,
   scoreboardTeamSolveCount,
 } from '../app/utils/scoreboard'
 import {
@@ -279,10 +281,22 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardTeamChallengeScore(team, aggregateGroup)).toBe(400)
     expect(scoreboardTeamChallengeScore(team, settledGroup)).toBe(300)
     expect(scoreboardTeamChallengeSignals(team, settledGroup, 'Ctf').flagSucceeded).toBeTrue()
+    const directions = scoreboardDirectionGroups([
+      { ...aggregateGroup, challenge: { direction: 'PWN' } },
+      { ...settledGroup, challenge: { direction: 'pwn' } },
+    ])
+    expect(directions).toHaveLength(1)
+    expect(scoreboardTeamDirectionScore(team, directions[0]!, 'Ctf').total).toBe(700)
+    expect(scoreboardTeamDirectionScore(team, directions[0]!, 'Awdp')).toEqual({
+      attack: 240,
+      defense: 160,
+      total: 400,
+    })
     expect(leaderboardPage).toContain('@click="openTeamDetail(team)"')
     expect(leaderboardPage).toContain('<ScoreboardTeamDetailDialog')
     expect(scoreboardTeamDetailDialog).toContain("type: 'radar'")
-    expect(scoreboardTeamDetailDialog).toContain('scoreboardTeamChallengeScore')
+    expect(scoreboardTeamDetailDialog).toContain('scoreboardDirectionGroups')
+    expect(scoreboardTeamDetailDialog).toContain('scoreboardTeamDirectionScore')
   })
 
   test('keeps page-local detail actors stable while appending cursor pages', () => {

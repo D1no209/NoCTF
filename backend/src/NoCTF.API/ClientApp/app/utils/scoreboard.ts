@@ -19,6 +19,18 @@ export interface ScoreboardChallengeColumnGroup {
   columns: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse[]
 }
 
+export interface ScoreboardDirectionGroup {
+  key: string
+  name: string
+  groups: ScoreboardChallengeColumnGroup[]
+}
+
+export interface ScoreboardDirectionScore {
+  attack: number
+  defense: number
+  total: number
+}
+
 export interface ScoreboardSlotSignals {
   showFlag: boolean
   flagAttempted: boolean
@@ -173,6 +185,43 @@ export function scoreboardTeamChallengeScore(
     const slot = scoreboardSlot(team, column.index)
     return slot?.scoreState === 'Settled' ? total + (slot.netPoints ?? 0) : total
   }, 0)
+}
+
+export function scoreboardDirectionGroups(
+  columnGroups: ScoreboardChallengeColumnGroup[],
+): ScoreboardDirectionGroup[] {
+  const directions = new Map<string, ScoreboardDirectionGroup>()
+  for (const group of columnGroups) {
+    const name = group.challenge?.direction?.trim() || translate('未分类')
+    const key = name.toLocaleLowerCase()
+    const existing = directions.get(key)
+    if (existing) existing.groups.push(group)
+    else directions.set(key, { key, name, groups: [group] })
+  }
+  return [...directions.values()]
+}
+
+export function scoreboardTeamDirectionScore(
+  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  direction: ScoreboardDirectionGroup,
+  mode: NoCtfapiEndpointsCompetitionsGameModeProtocol | null | undefined,
+): ScoreboardDirectionScore {
+  let attack = 0
+  let defense = 0
+  let total = 0
+  for (const group of direction.groups) {
+    if (mode === 'Awdp') {
+      const aggregate = (team.challengeScores ?? []).find(
+        item => item.competitionChallengeId === group.competitionChallengeId,
+      )
+      attack += Math.max(0, aggregate?.attackScore ?? 0)
+      defense += Math.max(0, aggregate?.defenseScore ?? 0)
+    }
+    else {
+      total += Math.max(0, scoreboardTeamChallengeScore(team, group))
+    }
+  }
+  return { attack, defense, total: mode === 'Awdp' ? attack + defense : total }
 }
 
 export function scoreboardTeamChallengeSignals(
