@@ -3,6 +3,12 @@ import { describe, expect, test } from 'bun:test'
 const page = await Bun.file(
   new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url),
 ).text()
+const scoreboard = await Bun.file(
+  new URL('../app/utils/scoreboard.ts', import.meta.url),
+).text()
+const slotStatus = await Bun.file(
+  new URL('../app/components/leaderboard/ScoreboardSlotStatus.vue', import.meta.url),
+).text()
 
 describe('leaderboard progressive display', () => {
   test('keeps the full snapshot and progressively reveals stable entries', () => {
@@ -20,10 +26,12 @@ describe('leaderboard progressive display', () => {
     expect(page).not.toContain('@click="page++"')
   })
 
-  test('renders AWDP as settled attack and defense scores', async () => {
-    expect(page).toContain("scoreboardBreakdown(slot, 'Attack')")
-    expect(page).toContain("scoreboardBreakdown(slot, 'Defense')")
-    expect(page).toContain("slot.scoreState === 'Pending'")
+  test('keeps AWDP scores in authoritative detail while matrix cells show status icons', async () => {
+    expect(scoreboard).toContain("scoreboardActivity(slot, ['Attack'])")
+    expect(scoreboard).toContain("scoreboardActivity(slot, ['Defense'])")
+    expect(slotStatus).toContain('<Flag')
+    expect(slotStatus).toContain('<ShieldCheck')
+    expect(page).toContain('<ScoreboardSlotStatus')
     expect(page).toContain("slot?.scoreState === 'Settled'")
     expect(page).toContain("slot?.scoreState === 'Settled' ? slot.netPoints ?? 0 : ''")
     expect(page).toContain('getScoreboardSlotDetailEndpoint')

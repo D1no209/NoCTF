@@ -12,7 +12,6 @@ import type {
 } from '~/api'
 import { medalRankClass } from '~/components/leaderboard/types'
 import {
-  scoreboardBreakdown,
   scoreboardChallengeColumnGroups,
   scoreboardEntryKindLabel,
   scoreboardEntryOutcomeLabel,
@@ -90,24 +89,6 @@ function slotTitle(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | N
   return translate('已结算')
 }
 
-function breakdownText(slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse): string {
-  const attack = scoreboardBreakdown(slot, 'Attack')
-  const defense = scoreboardBreakdown(slot, 'Defense')
-  if (attack || defense) {
-    return [
-      translate('攻击 {success}/{attempt}', { success: attack?.successfulCount ?? 0, attempt: attack?.attemptCount ?? 0 }),
-      translate('防御 {success}/{attempt}', { success: defense?.successfulCount ?? 0, attempt: defense?.attemptCount ?? 0 }),
-    ].join(' · ')
-  }
-  const solve = scoreboardBreakdown(slot, 'Solve')
-  if (solve) return translate('{count} 次成功', { count: solve.successfulCount ?? 0 })
-  const availability = scoreboardBreakdown(slot, 'Availability')
-  if (availability) return translate('{success}/{attempt} 次可用', { success: availability.successfulCount ?? 0, attempt: availability.attemptCount ?? 0 })
-  const control = scoreboardBreakdown(slot, 'Control')
-  if (control) return translate('{count} 次控制', { count: control.successfulCount ?? 0 })
-  return translate('{count} 条记录', { count: slot.entryCount ?? 0 })
-}
-
 function exportCsv(): void {
   const snapshot = board.snapshot.value
   if (!snapshot) return
@@ -137,6 +118,8 @@ function exportCsv(): void {
 }
 
 const detailOpen = ref(false)
+const teamDetailOpen = ref(false)
+const teamDetailTeam = ref<NoCtfapiEndpointsCompetitionsScoreboardTeamResponse | null>(null)
 const detailLoading = ref(false)
 const detailLoadingMore = ref(false)
 const detailError = ref<string | null>(null)
@@ -205,6 +188,11 @@ function openDetail(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse, c
   detailError.value = null
   detailOpen.value = true
   void loadDetailPage(null, false)
+}
+
+function openTeamDetail(team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse): void {
+  teamDetailTeam.value = team
+  teamDetailOpen.value = true
 }
 
 watch(detailOpen, (open) => { if (!open) detailGeneration += 1 })
@@ -363,12 +351,12 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                     <span class="inline-flex items-center gap-1.5"><component :is="directionIcon(group.challenge?.direction)" class="size-4" :class="directionTextClass(group.challenge?.direction)" />{{ group.challenge?.title ?? $t('未知题目') }}</span>
                   </TableHead>
                 </TableRow>
-                <TableRow><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-32 border-l text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
+                <TableRow><template v-for="group in columnGroups" :key="`${group.competitionChallengeId}-rounds`"><TableHead v-for="column in group.columns" :key="column.index" class="min-w-20 border-l text-center">{{ roundLabel(column) }}</TableHead></template></TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(team.rank ?? 99) <= 3 ? 'bg-primary/5' : ''">
                   <TableCell><Medal v-if="(team.rank ?? 99) <= 3" class="size-5" :class="medalRankClass[team.rank ?? 0]" /><span v-else class="font-mono tabular-nums">{{ team.rank ?? '—' }}</span></TableCell>
-                  <TableCell class="sticky left-0 z-10 border-r bg-card"><span class="font-medium">{{ team.teamName }}</span><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="ml-2">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></TableCell>
+                  <TableCell class="sticky left-0 z-10 border-r bg-card"><button type="button" class="rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看队伍 {team} 详情', { team: team.teamName ?? '' })" @click="openTeamDetail(team)">{{ team.teamName }}</button><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="ml-2">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></TableCell>
                   <TableCell class="text-right">
                     <button v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>
@@ -378,9 +366,8 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                   </TableCell>
                   <template v-for="group in columnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
                     <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center">
-                      <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="min-h-14 w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openDetail(team, column)">
-                        <template v-if="scoreboardSlot(team, column.index!)?.scoreState === 'Pending'"><span class="block text-xs font-medium text-amber-600">{{ $t('本轮待结算') }}</span><span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ breakdownText(scoreboardSlot(team, column.index!)!) }}</span></template>
-                        <template v-else><span class="block font-mono font-semibold tabular-nums">{{ scoreboardSlot(team, column.index!)?.netPoints ?? 0 }} pts</span><span class="mt-1 block text-[0.7rem] text-muted-foreground">{{ slotTitle(scoreboardSlot(team, column.index!)!) }} · {{ breakdownText(scoreboardSlot(team, column.index!)!) }}</span></template>
+                      <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看 {team} 在 {challenge} {round} 的详情', { team: team.teamName ?? '', challenge: group.challenge?.title ?? $t('未知题目'), round: roundLabel(column) })" @click="openDetail(team, column)">
+                        <ScoreboardSlotStatus :mode="board.schema.value.mode" :slot="scoreboardSlot(team, column.index!)!" />
                       </button>
                       <span v-else class="text-muted-foreground/40">—</span>
                     </TableCell>
@@ -394,6 +381,8 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
       </Card>
     </template>
 
+    <ScoreboardTeamDetailDialog v-model:open="teamDetailOpen" :mode="board.schema.value?.mode" :team="teamDetailTeam" :teams="teams" :column-groups="columnGroups" />
+
     <Dialog v-model:open="detailOpen">
       <DialogScrollContent class="max-h-[85vh] sm:max-w-2xl">
         <DialogHeader><DialogTitle>{{ detailTeam?.teamName }} · {{ board.challengesById.value.get(detailColumn?.competitionChallengeId ?? '')?.title ?? $t('未知题目') }} · {{ detailColumn ? roundLabel(detailColumn) : '' }}</DialogTitle><DialogDescription>{{ $t('分值与状态均来自服务端权威结算结果。') }}</DialogDescription></DialogHeader>
@@ -401,6 +390,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
         <div v-if="detailLoading" class="flex items-center justify-center py-10"><Spinner /></div>
         <template v-else-if="detail">
           <div class="grid grid-cols-3 gap-3"><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('状态') }}</p><p class="mt-1 font-medium">{{ slotTitle(detail) }}</p></div><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('得分') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.earnedPoints ?? '—' }}</p></div><div class="rounded-lg border p-3"><p class="text-xs text-muted-foreground">{{ $t('净分') }}</p><p class="mt-1 font-mono font-semibold">{{ detail.netPoints ?? '—' }}</p></div></div>
+          <div v-if="detail.breakdown?.length" class="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2"><div v-for="item in detail.breakdown" :key="item.kind" class="flex items-center justify-between gap-4 bg-background p-3 text-sm"><div><p class="font-medium">{{ scoreboardEntryKindLabel(item.kind) }}</p><p class="text-xs text-muted-foreground">{{ $t('成功 {success} / 提交 {attempt}', { success: item.successfulCount ?? 0, attempt: item.attemptCount ?? 0 }) }}</p></div><span class="font-mono font-semibold tabular-nums">{{ item.netPoints ?? 0 }} pts</span></div></div>
           <div class="flex flex-col gap-2"><div v-for="entry in detailEntries" :key="entry.id" class="flex items-start justify-between gap-4 rounded-lg border p-3 text-sm"><div><p class="font-medium">{{ scoreboardEntryKindLabel(entry.kind) }} · {{ scoreboardEntryOutcomeLabel(entry.outcome) }}</p><p class="text-xs text-muted-foreground">{{ entryActor(entry) }} · {{ formatDateTime(entry.occurredAt) }}</p></div><span class="font-mono tabular-nums">{{ entry.netPoints ?? '—' }}<template v-if="entry.netPoints !== null && entry.netPoints !== undefined"> pts</template></span></div><p v-if="!detailEntries.length" class="py-6 text-center text-sm text-muted-foreground">{{ $t('暂无明细') }}</p></div>
           <Button v-if="detail.nextCursor" variant="outline" :disabled="detailLoadingMore" @click="loadDetailPage(detail.nextCursor ?? null, true)"><Spinner v-if="detailLoadingMore" />{{ $t('加载更多') }}</Button>
         </template>
