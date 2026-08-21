@@ -71,27 +71,29 @@ const radarOption = computed<echarts.EChartsCoreOption>(() => {
         {
           name: translate('攻击分'),
           value: selectedScores.map(score => score.attack),
-          lineStyle: { width: 2 },
-          areaStyle: { opacity: 0.28 },
+          lineStyle: { width: 3, color: '#ef4444' },
+          itemStyle: { color: '#ef4444' },
+          areaStyle: { color: '#ef4444', opacity: 0.2 },
           symbol: 'circle',
-          symbolSize: 5,
+          symbolSize: 6,
         },
         {
           name: translate('防御分'),
           value: selectedScores.map(score => score.defense),
-          lineStyle: { width: 2 },
-          areaStyle: { opacity: 0.28 },
+          lineStyle: { width: 3, color: '#0ea5e9' },
+          itemStyle: { color: '#0ea5e9' },
+          areaStyle: { color: '#0ea5e9', opacity: 0.2 },
           symbol: 'circle',
-          symbolSize: 5,
+          symbolSize: 6,
         },
       ]
     : [{
         name: translate('已结算得分'),
         value: selectedScores.map(score => score.total),
-        lineStyle: { width: 2 },
-        areaStyle: { opacity: 0.32 },
+        lineStyle: { width: 3 },
+        areaStyle: { opacity: 0.35 },
         symbol: 'circle',
-        symbolSize: 5,
+        symbolSize: 6,
       }]
 
   return {
@@ -100,12 +102,12 @@ const radarOption = computed<echarts.EChartsCoreOption>(() => {
     radar: {
       indicator: indicators,
       center: ['50%', '48%'],
-      radius: '66%',
-      splitNumber: 5,
+      radius: '62%',
+      splitNumber: 3,
       axisName: { fontSize: 12 },
-      splitArea: { areaStyle: { color: ['rgba(148,163,184,0.03)', 'rgba(148,163,184,0.08)'] } },
-      splitLine: { lineStyle: { color: 'rgba(148,163,184,0.24)' } },
-      axisLine: { lineStyle: { color: 'rgba(148,163,184,0.32)' } },
+      splitArea: { areaStyle: { color: 'transparent' } },
+      splitLine: { lineStyle: { color: 'rgba(148,163,184,0.28)' } },
+      axisLine: { lineStyle: { color: 'rgba(148,163,184,0.34)' } },
     },
     series: [{ type: 'radar', data }],
   }

@@ -321,6 +321,12 @@ describe('normalized scoreboard matrix', () => {
     expect(scoreboardTeamDetailDialog).toContain("type: 'radar'")
     expect(scoreboardTeamDetailDialog).toContain('scoreboardDirectionGroups')
     expect(scoreboardTeamDetailDialog).toContain('scoreboardTeamDirectionScore')
+    expect(scoreboardTeamDetailDialog).toContain("radius: '62%'")
+    expect(scoreboardTeamDetailDialog).toContain('splitNumber: 3')
+    expect(scoreboardTeamDetailDialog).toContain("name: translate('攻击分')")
+    expect(scoreboardTeamDetailDialog).toContain("name: translate('防御分')")
+    expect(scoreboardTeamDetailDialog).toContain("areaStyle: { color: '#ef4444', opacity: 0.2 }")
+    expect(scoreboardTeamDetailDialog).toContain("areaStyle: { color: '#0ea5e9', opacity: 0.2 }")
   })
 
   test('keeps page-local detail actors stable while appending cursor pages', () => {
