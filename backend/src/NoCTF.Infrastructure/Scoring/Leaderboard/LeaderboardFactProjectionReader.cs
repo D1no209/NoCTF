@@ -23,6 +23,7 @@ internal static class LeaderboardFactProjectionReader
         NoCtfDbContext db,
         Guid competitionId,
         GameMode mode,
+        CompetitionStatus competitionStatus,
         string? competitionConfigurationJson,
         DateTimeOffset? competitionStart,
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
@@ -43,8 +44,13 @@ internal static class LeaderboardFactProjectionReader
                 competitionStart,
                 lifecycle,
                 projectedAt,
+                competitionStatus,
                 endingRound);
-            var legacyRows = await ReadAwdpLegacyAsync(query, ct);
+            var legacyRows = await ReadAwdpLegacyAsync(
+                query,
+                window.SettledPenaltyCutoff,
+                window.IncludePenaltyCutoff,
+                ct);
             var windowRows = await ReadAwdpWindowAsync(
                 query.Where(fact => fact.OccurredAt >= window.StartAt
                     && fact.OccurredAt < window.EndAt),
@@ -512,10 +518,16 @@ internal static class LeaderboardFactProjectionReader
 
     private static Task<List<FactSummary>> ReadAwdpLegacyAsync(
         IQueryable<GameplayFact> query,
+        DateTimeOffset settledPenaltyCutoff,
+        bool includePenaltyCutoff,
         CancellationToken ct) => query
-        .Where(fact => fact.Kind == GameplayFactKind.BreakAttempt
-            || fact.Kind == GameplayFactKind.FixAttempt
-            || fact.Kind == GameplayFactKind.ManualAdjustment)
+        .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment
+            || ((fact.Kind == GameplayFactKind.BreakAttempt
+                    || fact.Kind == GameplayFactKind.FixAttempt)
+                && (fact.Result == GameplayFactResult.Correct
+                    || (includePenaltyCutoff
+                        ? fact.OccurredAt <= settledPenaltyCutoff
+                        : fact.OccurredAt < settledPenaltyCutoff))))
         .GroupBy(fact => new
         {
             fact.TeamId,
@@ -709,13 +721,24 @@ internal static class LeaderboardFactProjectionReader
         DateTimeOffset? competitionStart,
         IReadOnlyList<CompetitionLifecycleTransition> lifecycle,
         DateTimeOffset projectedAt,
+        CompetitionStatus competitionStatus,
         int? endingRound)
     {
         var duration = ReadRoundDuration(configurationJson);
         var elapsed = EffectiveElapsed(lifecycle, competitionStart, projectedAt);
-        var latestRound = Math.Max(1, checked((int)(Math.Max(0, elapsed.TotalSeconds) / duration) + 1));
+        var elapsedSeconds = Math.Max(0, elapsed.TotalSeconds);
+        var completedRounds = checked((int)(elapsedSeconds / duration));
+        var latestRound = Math.Max(1, checked(completedRounds + 1));
         var endRound = Math.Clamp(endingRound ?? latestRound, 1, latestRound);
         var startRound = Math.Max(1, endRound - ScoreboardRoundWindow.DefaultSize + 1);
+        var competitionFinished = competitionStatus == CompetitionStatus.Finished;
+        var settledPenaltyCutoff = competitionFinished
+            ? lifecycle.LastOrDefault(item => item.To == CompetitionStatus.Finished)?.OccurredAt
+                ?? projectedAt
+            : EffectiveClockToWallTime(
+                lifecycle,
+                competitionStart,
+                TimeSpan.FromSeconds((long)completedRounds * duration));
         return new(
             startRound,
             endRound,
@@ -727,7 +750,9 @@ internal static class LeaderboardFactProjectionReader
             EffectiveClockToWallTime(
                 lifecycle,
                 competitionStart,
-                TimeSpan.FromSeconds((long)endRound * duration)));
+                TimeSpan.FromSeconds((long)endRound * duration)),
+            settledPenaltyCutoff,
+            IncludePenaltyCutoff: competitionFinished);
     }
 
     private static int ReadRoundDuration(string? json)
@@ -823,7 +848,9 @@ internal static class LeaderboardFactProjectionReader
         int EndRound,
         int DurationSeconds,
         DateTimeOffset StartAt,
-        DateTimeOffset EndAt);
+        DateTimeOffset EndAt,
+        DateTimeOffset SettledPenaltyCutoff,
+        bool IncludePenaltyCutoff);
 
     private sealed record AwdAttackTuple(
         Guid CompetitionChallengeId,
