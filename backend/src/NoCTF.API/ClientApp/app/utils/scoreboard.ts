@@ -7,6 +7,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol,
+  NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSlotResponse,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
@@ -33,9 +34,11 @@ export interface ScoreboardDirectionScore {
 
 export interface ScoreboardSlotSignals {
   showFlag: boolean
+  flagState: NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol
   flagAttempted: boolean
   flagSucceeded: boolean
   showShield: boolean
+  shieldState: NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol
   shieldAttempted: boolean
   shieldSucceeded: boolean
 }
@@ -123,14 +126,22 @@ export function scoreboardSlotSignals(
   const shield = mode === 'Awd'
     ? scoreboardActivity(slot, ['Defense', 'Availability'])
     : scoreboardActivity(slot, ['Defense'])
+  const flagState = slot?.offenseState ?? (flag.succeeded
+    ? 'Succeeded'
+    : flag.attempted ? 'Failed' : 'None')
+  const shieldState = slot?.defenseState ?? (shield.succeeded
+    ? 'Succeeded'
+    : shield.attempted ? 'Failed' : 'None')
 
   return {
     showFlag: mode !== undefined && mode !== null,
+    flagState,
     flagAttempted: flag.attempted,
-    flagSucceeded: flag.succeeded,
+    flagSucceeded: flagState === 'Succeeded',
     showShield: mode === 'Awd' || mode === 'Awdp',
+    shieldState,
     shieldAttempted: shield.attempted,
-    shieldSucceeded: shield.succeeded,
+    shieldSucceeded: shieldState === 'Succeeded',
   }
 }
 
@@ -234,9 +245,15 @@ export function scoreboardTeamChallengeSignals(
     .map(column => scoreboardSlotSignals(scoreboardSlot(team, column.index!), mode))
   return {
     showFlag: signals.some(signal => signal.showFlag),
+    flagState: signals.some(signal => signal.flagState === 'Succeeded')
+      ? 'Succeeded'
+      : signals.some(signal => signal.flagState === 'Failed') ? 'Failed' : 'None',
     flagAttempted: signals.some(signal => signal.flagAttempted),
     flagSucceeded: signals.some(signal => signal.flagSucceeded),
     showShield: signals.some(signal => signal.showShield),
+    shieldState: signals.some(signal => signal.shieldState === 'Succeeded')
+      ? 'Succeeded'
+      : signals.some(signal => signal.shieldState === 'Failed') ? 'Failed' : 'None',
     shieldAttempted: signals.some(signal => signal.shieldAttempted),
     shieldSucceeded: signals.some(signal => signal.shieldSucceeded),
   }

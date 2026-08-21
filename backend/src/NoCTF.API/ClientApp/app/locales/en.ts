@@ -1982,4 +1982,12 @@ export const englishMessages: Record<string, string> = {
   "较早轮次": "Earlier rounds",
   "较新轮次": "Later rounds",
   "返回最新轮次": "Back to latest rounds",
+  "攻击失败": "Attack failed",
+  "防御异常": "Defense failed",
+  "攻击与防御均成功": "Attack and defense succeeded",
+  "攻击失败且防御异常": "Attack failed and defense was abnormal",
+  "本轮无攻击操作": "No attack this round",
+  "本轮无防御操作": "No defense this round",
+  "本轮无控制操作": "No control action this round",
+  "本轮无解题操作": "No solve attempt this round",
 }

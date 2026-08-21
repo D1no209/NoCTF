@@ -369,7 +369,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                       <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看 {team} 在 {challenge} {round} 的详情', { team: team.teamName ?? '', challenge: group.challenge?.title ?? $t('未知题目'), round: roundLabel(column) })" @click="openDetail(team, column)">
                         <ScoreboardSlotStatus :mode="board.schema.value.mode" :slot="scoreboardSlot(team, column.index!)!" />
                       </button>
-                      <span v-else class="text-muted-foreground/40">—</span>
+                      <span v-else class="font-mono text-sm text-muted-foreground/60">-</span>
                     </TableCell>
                   </template>
                 </TableRow>

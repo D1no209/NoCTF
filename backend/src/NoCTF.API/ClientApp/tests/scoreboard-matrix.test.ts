@@ -35,6 +35,9 @@ const leaderboardPage = await Bun.file(
 const scoreboardTeamDetailDialog = await Bun.file(
   new URL('../app/components/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url),
 ).text()
+const scoreboardSlotStatus = await Bun.file(
+  new URL('../app/components/leaderboard/ScoreboardSlotStatus.vue', import.meta.url),
+).text()
 
 describe('normalized scoreboard matrix', () => {
   test('loads catalog, schema and snapshot concurrently with stale-response fencing', () => {
@@ -238,9 +241,11 @@ describe('normalized scoreboard matrix', () => {
     }, 'Ctf')
     expect(ctfSignals).toEqual({
       showFlag: true,
+      flagState: 'Succeeded',
       flagAttempted: true,
       flagSucceeded: true,
       showShield: false,
+      shieldState: 'None',
       shieldAttempted: false,
       shieldSucceeded: false,
     })
@@ -256,6 +261,25 @@ describe('normalized scoreboard matrix', () => {
     expect(awdpSignals.showShield).toBeTrue()
     expect(awdpSignals.shieldAttempted).toBeTrue()
     expect(awdpSignals.shieldSucceeded).toBeFalse()
+
+    const carriedSignals = scoreboardSlotSignals({
+      offenseState: 'Succeeded',
+      defenseState: 'Succeeded',
+      breakdown: [],
+    }, 'Awdp')
+    expect(carriedSignals.flagAttempted).toBeFalse()
+    expect(carriedSignals.flagSucceeded).toBeTrue()
+    expect(carriedSignals.shieldAttempted).toBeFalse()
+    expect(carriedSignals.shieldSucceeded).toBeTrue()
+
+    expect(scoreboardSlotStatus).toContain('<ShieldCheck v-if="combinedSuccess"')
+    expect(scoreboardSlotStatus).toContain('<ShieldX v-else-if="combinedFailure"')
+    expect(scoreboardSlotStatus).toContain('<span v-else-if="noOperation"')
+    expect(scoreboardSlotStatus).toContain("signals.flagState === 'Failed'")
+    expect(scoreboardSlotStatus).toContain("signals.shieldState === 'Failed'")
+    expect(scoreboardSlotStatus).toContain('<Shield v-if="signals.shieldState === \'Succeeded\'"')
+    expect(scoreboardSlotStatus).toContain('aria-hidden="true">-</span>')
+    expect(scoreboardSlotStatus).not.toContain('rounded-md border')
 
     expect(leaderboardPage).toContain('<ScoreboardSlotStatus')
     expect(leaderboardPage).toContain('@click="openDetail(team, column)"')

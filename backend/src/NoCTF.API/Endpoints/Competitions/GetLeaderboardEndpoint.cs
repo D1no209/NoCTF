@@ -32,6 +32,9 @@ public enum ScoreboardRankingStateProtocol { Eligible, Banned, Disqualified }
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoreboardScoreStateProtocol>))]
 public enum ScoreboardScoreStateProtocol { Pending, Provisional, Settled }
 
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoreboardOperationStateProtocol>))]
+public enum ScoreboardOperationStateProtocol { None, Failed, Succeeded }
+
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<ScoreboardBreakdownKindProtocol>))]
 public enum ScoreboardBreakdownKindProtocol
 {
@@ -94,7 +97,9 @@ public sealed record ScoreboardSlotResponse(
     long? NetPoints,
     int EntryCount,
     IReadOnlyList<ScoreboardBreakdownResponse> Breakdown,
-    IReadOnlyList<ScoreboardEntryResponse> Entries);
+    IReadOnlyList<ScoreboardEntryResponse> Entries,
+    ScoreboardOperationStateProtocol OffenseState,
+    ScoreboardOperationStateProtocol DefenseState);
 
 public sealed record ScoreboardChallengeScoreResponse(
     Guid CompetitionChallengeId,
@@ -212,7 +217,9 @@ internal static class ScoreboardProtocolMapper
             slot.Breakdowns.Select(item => new ScoreboardBreakdownResponse(
                 ToProtocol(item.Kind), item.SuccessfulCount, item.AttemptCount,
                 item.EarnedPoints, item.DeductedPoints, item.NetPoints)).ToArray(),
-            slot.Entries.Select(ToResponse).ToArray())).ToArray());
+            slot.Entries.Select(ToResponse).ToArray(),
+            ToProtocol(slot.OffenseState),
+            ToProtocol(slot.DefenseState))).ToArray());
 
     public static LeaderboardDataScopeProtocol ToProtocol(LeaderboardDataScope value) => value switch
     {
@@ -226,6 +233,8 @@ internal static class ScoreboardProtocolMapper
         Enum.Parse<ScoreboardRankingStateProtocol>(value.ToString());
     private static ScoreboardScoreStateProtocol ToProtocol(ScoreboardScoreState value) =>
         Enum.Parse<ScoreboardScoreStateProtocol>(value.ToString());
+    private static ScoreboardOperationStateProtocol ToProtocol(ScoreboardOperationState value) =>
+        Enum.Parse<ScoreboardOperationStateProtocol>(value.ToString());
     private static ScoreboardBreakdownKindProtocol ToProtocol(ScoreboardBreakdownKind value) =>
         Enum.Parse<ScoreboardBreakdownKindProtocol>(value.ToString());
     private static ScoreboardEntryKindProtocol ToProtocol(ScoreboardEntryKind value) =>

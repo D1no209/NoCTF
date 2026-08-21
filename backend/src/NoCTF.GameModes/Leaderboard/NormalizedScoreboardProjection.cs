@@ -125,7 +125,10 @@ internal static class NormalizedScoreboardProjection
                     Accumulator = accumulator,
                     Slot = accumulator.Build(ScoreState(scoreboardInput, accumulator.Round))
                 })
-                .Where(item => item.Slot.EntryCount > 0 || item.Slot.NetPoints.GetValueOrDefault() != 0)
+                .Where(item => item.Slot.EntryCount > 0
+                    || item.Slot.NetPoints.GetValueOrDefault() != 0
+                    || item.Slot.OffenseState != ScoreboardOperationState.None
+                    || item.Slot.DefenseState != ScoreboardOperationState.None)
                 .ToArray();
             var compactSlots = builtSlots.Select(item => item.Slot with
             {
@@ -691,6 +694,22 @@ internal static class NormalizedScoreboardProjection
             .ToArray();
         var curveEvaluator = new Scoring.ScoreCurveEvaluator();
 
+        foreach (var activation in activations)
+        {
+            foreach (var round in roundProjection.Rounds.Where(round => round.Number >= activation.Round))
+            {
+                var slot = GetSlot(
+                    slots,
+                    activation.Fact.TeamId!.Value,
+                    columns[(activation.Fact.CompetitionChallengeId!.Value, round.Id)],
+                    round);
+                if (activation.Fact.Kind == GameplayFactKind.BreakAttempt)
+                    slot.MarkOffenseSucceeded();
+                else
+                    slot.MarkDefenseSucceeded();
+            }
+        }
+
         foreach (var challenge in challenges.Values)
         {
             var effective = EffectiveAwdp(competition, challenge.ConfigurationJson);
@@ -1062,6 +1081,8 @@ internal static class NormalizedScoreboardProjection
         private readonly Dictionary<Guid, ScoreboardEntrySource> sources = [];
 
         private int entryCount;
+        private ScoreboardOperationState offenseState;
+        private ScoreboardOperationState defenseState;
 
         private readonly int columnIndex;
 
@@ -1183,7 +1204,25 @@ internal static class NormalizedScoreboardProjection
             breakdown.AttemptCount = checked(breakdown.AttemptCount + count);
             if (succeeded)
                 breakdown.SuccessfulCount = checked(breakdown.SuccessfulCount + count);
+            var state = succeeded ? ScoreboardOperationState.Succeeded : ScoreboardOperationState.Failed;
+            if (kind is ScoreboardBreakdownKind.Solve
+                or ScoreboardBreakdownKind.Attack
+                or ScoreboardBreakdownKind.Control)
+                offenseState = MergeOperationState(offenseState, state);
+            else if (kind is ScoreboardBreakdownKind.Defense or ScoreboardBreakdownKind.Availability)
+                defenseState = MergeOperationState(defenseState, state);
         }
+
+        public void MarkOffenseSucceeded() => offenseState = ScoreboardOperationState.Succeeded;
+
+        public void MarkDefenseSucceeded() => defenseState = ScoreboardOperationState.Succeeded;
+
+        private static ScoreboardOperationState MergeOperationState(
+            ScoreboardOperationState current,
+            ScoreboardOperationState candidate) =>
+            current == ScoreboardOperationState.Succeeded || candidate == ScoreboardOperationState.Succeeded
+                ? ScoreboardOperationState.Succeeded
+                : candidate;
 
         private BreakdownAccumulator GetBreakdown(ScoreboardBreakdownKind kind)
         {
@@ -1261,7 +1300,11 @@ internal static class NormalizedScoreboardProjection
                 earned is null ? null : checked(earned.Value - deducted!.Value),
                 entryCount,
                 projectedBreakdowns,
-                projectedEntries);
+                projectedEntries)
+            {
+                OffenseState = offenseState,
+                DefenseState = defenseState
+            };
         }
     }
 

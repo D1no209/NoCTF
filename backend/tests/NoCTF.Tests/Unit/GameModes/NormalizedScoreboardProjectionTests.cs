@@ -111,6 +111,7 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(row.Slots.Count).IsEqualTo(3);
         var settled = row.Slots.Where(slot => slot.ScoreState == ScoreboardScoreState.Settled).ToArray();
         var current = row.Slots.Single(slot => slot.ScoreState == ScoreboardScoreState.Pending);
+        var orderedSlots = row.Slots.OrderBy(slot => slot.ColumnIndex).ToArray();
         await Assert.That(settled.Sum(slot => slot.NetPoints!.Value)).IsEqualTo(280L);
         await Assert.That(settled.All(slot => slot.EntryCount > 0)).IsTrue();
         await Assert.That(settled.All(slot => slot.Entries.Any(entry =>
@@ -123,9 +124,45 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(current.NetPoints).IsNull();
         await Assert.That(current.Breakdowns.Single().AttemptCount).IsEqualTo(1);
         await Assert.That(current.Entries.Single().EarnedPoints).IsNull();
+        await Assert.That(orderedSlots.All(slot =>
+            slot.OffenseState == ScoreboardOperationState.Succeeded)).IsTrue();
+        await Assert.That(orderedSlots.All(slot =>
+            slot.DefenseState == ScoreboardOperationState.Succeeded)).IsTrue();
+        await Assert.That(current.Breakdowns.Single().SuccessfulCount).IsEqualTo(0);
         await Assert.That(row.TotalScore).IsEqualTo(280L);
         await Assert.That(row.GlobalAdjustments).IsEmpty();
         await AssertArithmetic(row);
+    }
+
+    [Test]
+    public async Task Awdp_success_state_carries_into_a_later_round_without_new_operations()
+    {
+        var challenge = Challenge(1, "Pwn", "{\"schemaVersion\":4}");
+        var team = Team(1, "Alpha");
+        var configuration = JsonSerializer.Serialize(new AwdpConfiguration(
+            AwdpConfiguration.CurrentSchemaVersion,
+            60,
+            FixedCurve(100),
+            FixedCurve(40),
+            RequireBreakBeforeFix: false), JsonOptions);
+        var projection = engine.ProjectScoreboard(new(
+            Guid.NewGuid(),
+            GameMode.Awdp,
+            [team],
+            [Fact(team.Id, challenge.Id, GameplayFactKind.BreakAttempt, 10,
+                GameplayFactResult.Correct)],
+            [challenge],
+            configuration,
+            Start,
+            ProjectedAt: Start.AddSeconds(130),
+            CompetitionStatus: CompetitionStatus.Running));
+
+        var current = projection.Snapshot.Teams.Single().Slots
+            .Single(slot => slot.ScoreState == ScoreboardScoreState.Pending);
+        await Assert.That(current.EntryCount).IsEqualTo(0);
+        await Assert.That(current.Breakdowns).IsEmpty();
+        await Assert.That(current.OffenseState).IsEqualTo(ScoreboardOperationState.Succeeded);
+        await Assert.That(current.DefenseState).IsEqualTo(ScoreboardOperationState.None);
     }
 
     [Test]
@@ -529,7 +566,7 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(projection.Schema.Rounds.Count).IsEqualTo(50);
         await Assert.That(projection.Schema.Columns.Count).IsEqualTo(1_000);
         await Assert.That(projection.Snapshot.Teams.Count).IsEqualTo(100);
-        await Assert.That(projection.Snapshot.Teams.Sum(team => team.Slots.Count)).IsEqualTo(49);
+        await Assert.That(projection.Snapshot.Teams.Sum(team => team.Slots.Count)).IsEqualTo(50);
         await Assert.That(projection.Snapshot.Teams.Count(team => team.Slots.Count > 0)).IsEqualTo(1);
     }
 

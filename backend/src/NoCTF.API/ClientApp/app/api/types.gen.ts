@@ -510,6 +510,8 @@ export type NoCtfapiEndpointsCompetitionsScoreboardSlotResponse = {
     entryCount?: number;
     breakdown?: Array<NoCtfapiEndpointsCompetitionsScoreboardBreakdownResponse>;
     entries?: Array<NoCtfapiEndpointsCompetitionsScoreboardEntryResponse>;
+    offenseState?: NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol;
+    defenseState?: NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol;
 };
 
 export type NoCtfapiEndpointsCompetitionsScoreboardScoreStateProtocol = 'Pending' | 'Provisional' | 'Settled';
@@ -545,6 +547,8 @@ export type NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol = 'Solve' |
 export type NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol = 'Pending' | 'Succeeded' | 'Failed' | 'Rejected';
 
 export type NoCtfapiEndpointsCompetitionsScoreboardAwardProtocol = 'FirstBlood' | 'SecondBlood' | 'ThirdBlood';
+
+export type NoCtfapiEndpointsCompetitionsScoreboardOperationStateProtocol = 'None' | 'Failed' | 'Succeeded';
 
 export type NoCtfapiEndpointsCompetitionsScoreboardTrackResponse = {
     key?: string;
