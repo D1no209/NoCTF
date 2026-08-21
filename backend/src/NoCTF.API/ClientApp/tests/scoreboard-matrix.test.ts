@@ -12,6 +12,9 @@ import {
   scoreboardEntryOutcomeLabel,
   scoreboardRankingStateLabel,
   scoreboardSlot,
+  scoreboardSlotSignals,
+  scoreboardTeamChallengeScore,
+  scoreboardTeamChallengeSignals,
   scoreboardTeamSolveCount,
 } from '../app/utils/scoreboard'
 import {
@@ -26,6 +29,9 @@ const composable = await Bun.file(
 ).text()
 const leaderboardPage = await Bun.file(
   new URL('../app/pages/competitions/[id]/leaderboard.vue', import.meta.url),
+).text()
+const scoreboardTeamDetailDialog = await Bun.file(
+  new URL('../app/components/leaderboard/ScoreboardTeamDetailDialog.vue', import.meta.url),
 ).text()
 
 describe('normalized scoreboard matrix', () => {
@@ -222,6 +228,61 @@ describe('normalized scoreboard matrix', () => {
 
     expect(scoreboardColumnsForChallenge(schema, challengeA).map(column => column.index))
       .toEqual([0, 1])
+  })
+
+  test('renders only protocol-aware flag and shield signals in matrix cells', () => {
+    const ctfSignals = scoreboardSlotSignals({
+      breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 2 }],
+    }, 'Ctf')
+    expect(ctfSignals).toEqual({
+      showFlag: true,
+      flagAttempted: true,
+      flagSucceeded: true,
+      showShield: false,
+      shieldAttempted: false,
+      shieldSucceeded: false,
+    })
+
+    const awdpSignals = scoreboardSlotSignals({
+      breakdown: [
+        { kind: 'Attack', successfulCount: 1, attemptCount: 3 },
+        { kind: 'Defense', successfulCount: 0, attemptCount: 2 },
+      ],
+    }, 'Awdp')
+    expect(awdpSignals.showFlag).toBeTrue()
+    expect(awdpSignals.flagSucceeded).toBeTrue()
+    expect(awdpSignals.showShield).toBeTrue()
+    expect(awdpSignals.shieldAttempted).toBeTrue()
+    expect(awdpSignals.shieldSucceeded).toBeFalse()
+
+    expect(leaderboardPage).toContain('<ScoreboardSlotStatus')
+    expect(leaderboardPage).toContain('@click="openDetail(team, column)"')
+    expect(leaderboardPage).not.toContain('scoreboardSlot(team, column.index!)?.netPoints ?? 0 }} pts')
+    expect(leaderboardPage).not.toContain('breakdownText(scoreboardSlot(team, column.index!)!)')
+  })
+
+  test('builds each team radar from authoritative settled challenge scores', () => {
+    const challengeA = crypto.randomUUID()
+    const challengeB = crypto.randomUUID()
+    const team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse = {
+      teamId: crypto.randomUUID(),
+      teamName: 'Radar team',
+      challengeScores: [{ competitionChallengeId: challengeA, attackScore: 240, defenseScore: 160 }],
+      slots: [
+        { columnIndex: 0, scoreState: 'Settled', netPoints: 300, breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1 }] },
+        { columnIndex: 1, scoreState: 'Pending', netPoints: 999, breakdown: [{ kind: 'Solve', successfulCount: 1, attemptCount: 1 }] },
+      ],
+    }
+    const aggregateGroup = { competitionChallengeId: challengeA, challenge: null, columns: [] }
+    const settledGroup = { competitionChallengeId: challengeB, challenge: null, columns: [{ index: 0 }, { index: 1 }] }
+
+    expect(scoreboardTeamChallengeScore(team, aggregateGroup)).toBe(400)
+    expect(scoreboardTeamChallengeScore(team, settledGroup)).toBe(300)
+    expect(scoreboardTeamChallengeSignals(team, settledGroup, 'Ctf').flagSucceeded).toBeTrue()
+    expect(leaderboardPage).toContain('@click="openTeamDetail(team)"')
+    expect(leaderboardPage).toContain('<ScoreboardTeamDetailDialog')
+    expect(scoreboardTeamDetailDialog).toContain("type: 'radar'")
+    expect(scoreboardTeamDetailDialog).toContain('scoreboardTeamChallengeScore')
   })
 
   test('keeps page-local detail actors stable while appending cursor pages', () => {

@@ -5,6 +5,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardColumnResponse,
   NoCtfapiEndpointsCompetitionsScoreboardEntryKindProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardEntryOutcomeProtocol,
+  NoCtfapiEndpointsCompetitionsGameModeProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardRankingStateProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSlotResponse,
@@ -16,6 +17,15 @@ export interface ScoreboardChallengeColumnGroup {
   competitionChallengeId: string
   challenge: NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogItemResponse | null
   columns: NoCtfapiEndpointsCompetitionsScoreboardColumnResponse[]
+}
+
+export interface ScoreboardSlotSignals {
+  showFlag: boolean
+  flagAttempted: boolean
+  flagSucceeded: boolean
+  showShield: boolean
+  shieldAttempted: boolean
+  shieldSucceeded: boolean
 }
 
 const rankingStateLabels = {
@@ -78,6 +88,40 @@ export function scoreboardBreakdown(
   return (slot?.breakdown ?? []).find(item => item.kind === kind) ?? null
 }
 
+function scoreboardActivity(
+  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null | undefined,
+  kinds: NoCtfapiEndpointsCompetitionsScoreboardBreakdownKindProtocol[],
+): { attempted: boolean; succeeded: boolean } {
+  const items = slot?.breakdown?.filter(item => item.kind && kinds.includes(item.kind)) ?? []
+  return {
+    attempted: items.some(item => (item.attemptCount ?? 0) > 0),
+    succeeded: items.some(item => (item.successfulCount ?? 0) > 0),
+  }
+}
+
+export function scoreboardSlotSignals(
+  slot: NoCtfapiEndpointsCompetitionsScoreboardSlotResponse | null | undefined,
+  mode: NoCtfapiEndpointsCompetitionsGameModeProtocol | null | undefined,
+): ScoreboardSlotSignals {
+  const flag = mode === 'Ctf'
+    ? scoreboardActivity(slot, ['Solve'])
+    : mode === 'Koh'
+      ? scoreboardActivity(slot, ['Control'])
+      : scoreboardActivity(slot, ['Attack'])
+  const shield = mode === 'Awd'
+    ? scoreboardActivity(slot, ['Defense', 'Availability'])
+    : scoreboardActivity(slot, ['Defense'])
+
+  return {
+    showFlag: mode !== undefined && mode !== null,
+    flagAttempted: flag.attempted,
+    flagSucceeded: flag.succeeded,
+    showShield: mode === 'Awd' || mode === 'Awdp',
+    shieldAttempted: shield.attempted,
+    shieldSucceeded: shield.succeeded,
+  }
+}
+
 export function scoreboardColumnsForChallenge(
   schema: NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse | null | undefined,
   competitionChallengeId: string,
@@ -113,6 +157,40 @@ export function scoreboardChallengeColumnGroups(
   }
 
   return [...groups.values()]
+}
+
+export function scoreboardTeamChallengeScore(
+  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  group: ScoreboardChallengeColumnGroup,
+): number {
+  const aggregate = (team.challengeScores ?? []).find(
+    item => item.competitionChallengeId === group.competitionChallengeId,
+  )
+  if (aggregate) return (aggregate.attackScore ?? 0) + (aggregate.defenseScore ?? 0)
+
+  return group.columns.reduce((total, column) => {
+    if (column.index === undefined) return total
+    const slot = scoreboardSlot(team, column.index)
+    return slot?.scoreState === 'Settled' ? total + (slot.netPoints ?? 0) : total
+  }, 0)
+}
+
+export function scoreboardTeamChallengeSignals(
+  team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
+  group: ScoreboardChallengeColumnGroup,
+  mode: NoCtfapiEndpointsCompetitionsGameModeProtocol | null | undefined,
+): ScoreboardSlotSignals {
+  const signals = group.columns
+    .filter(column => column.index !== undefined)
+    .map(column => scoreboardSlotSignals(scoreboardSlot(team, column.index!), mode))
+  return {
+    showFlag: signals.some(signal => signal.showFlag),
+    flagAttempted: signals.some(signal => signal.flagAttempted),
+    flagSucceeded: signals.some(signal => signal.flagSucceeded),
+    showShield: signals.some(signal => signal.showShield),
+    shieldAttempted: signals.some(signal => signal.shieldAttempted),
+    shieldSucceeded: signals.some(signal => signal.shieldSucceeded),
+  }
 }
 
 export function latestSettledScore(
