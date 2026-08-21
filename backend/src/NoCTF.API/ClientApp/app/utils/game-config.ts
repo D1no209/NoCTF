@@ -12,7 +12,7 @@ import { translate } from './i18n'
 export type GameModeValue = NoCtfapiEndpointsCompetitionsGameModeProtocol
 
 /** 各 JSON 区域当前的 schemaVersion(更高的版本或无 upgrader 的旧版本会被后端拒绝)。 */
-export const DEFINITION_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 1, Awd: 4, Awdp: 4, Koh: 1 }
+export const DEFINITION_SCHEMA_VERSION = { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 } as const
 export const COMPETITION_CONFIG_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 2, Awdp: 4, Koh: 1 }
 export const CHALLENGE_RULES_SCHEMA_VERSION: Record<GameModeValue, number> = { Ctf: 2, Awd: 4, Awdp: 4, Koh: 1 }
 

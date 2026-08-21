@@ -38,6 +38,27 @@ public class ChallengeConfigurationCatalogTests
     }
 
     [Test]
+    public async Task Ctf_minimal_v2_definition_is_valid()
+    {
+        var errors = new GameModeChallengeConfigurationCatalog().ValidateDefinition(
+            GameMode.Ctf,
+            """{"schemaVersion":2}""");
+
+        await Assert.That(errors).IsEmpty();
+    }
+
+    [Test]
+    public async Task Ctf_v1_definition_is_rejected_without_a_noop_upgrader()
+    {
+        var errors = new GameModeChallengeConfigurationCatalog().ValidateDefinition(
+            GameMode.Ctf,
+            """{"schemaVersion":1}""");
+
+        await Assert.That(errors)
+            .Contains("CTF schemaVersion 1 has no registered upgrader.");
+    }
+
+    [Test]
     public async Task Awdp_defaults_make_fix_independent_from_break()
     {
         using var competition = JsonDocument.Parse(
