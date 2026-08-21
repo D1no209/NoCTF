@@ -9,7 +9,7 @@
 - AWDP schema v4：按 Team/CompetitionChallenge/Kind/round 选择最早 Correct，按该轮不同成功队伍数分别计算 Break/Fix 动态曲线；失败事实只应用一次罚分。
 - KoH：每次完成轮询产生的 Controlled/Uncontrolled KohControlObservation；连续同队控制仍分别计分。
 
-配置修改立即影响下一次全量投影，不保存历史配置，也不支持按过去时点重建。冻结排行榜在冻结命令内同步使用当前事实和配置完整生成，并把完整 JSON 保存到 Competition；冻结失败不改变可见性。
+配置修改立即影响下一次全量投影，不保存历史配置，也不支持按过去时点重建。冻结排行榜在冻结命令内同步使用当前事实和配置完整生成，并把完整 JSON 保存到 Competition；冻结失败不改变可见性。冻结后只读取这份持久化快照，不接受历史轮次窗口重建；否则后续重判、封禁或配置编辑会用新事实污染旧冻结结果。Normal 排行榜仍可按有界轮次窗口浏览完整历史。
 
 ## Dirty 与 15 秒全量刷新
 

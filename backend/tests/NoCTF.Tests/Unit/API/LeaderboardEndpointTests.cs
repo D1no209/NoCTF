@@ -182,18 +182,11 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
-    public async Task Frozen_projection_reconstructs_historical_rounds_at_the_frozen_cutoff()
+    public async Task Frozen_projection_ignores_historical_round_requests_and_keeps_the_persisted_snapshot()
     {
         var competitionId = Guid.CreateVersion7();
         var messages = new RecordingMessagePublisher();
         var snapshots = Substitute.For<ILeaderboardSnapshotFactory>();
-        var historicalWindow = CreateProjection(competitionId, [], [], []);
-        snapshots.CreateScoreboardWindowAsync(
-                competitionId,
-                1,
-                Arg.Any<DateTimeOffset>(),
-                Arg.Any<CancellationToken>())
-            .Returns(historicalWindow);
         await using var app = await CreateApplicationAsync(
             competitionId,
             new CachedLeaderboard(frozen: true),
@@ -214,9 +207,18 @@ public sealed class LeaderboardEndpointTests
             .IsEqualTo(LeaderboardVisibilityProtocol.Frozen);
         await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScopeProtocol.Frozen);
         await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
-        _ = snapshots.Received(1).CreateScoreboardWindowAsync(
-            competitionId,
-            1,
+
+        using var schemaResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/schema?endingRound=1");
+        await Assert.That(schemaResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+
+        using var slotResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{Guid.CreateVersion7()}/columns/0?endingRound=1");
+        await Assert.That(slotResponse.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+
+        _ = snapshots.DidNotReceive().CreateScoreboardWindowAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<int>(),
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
     }

@@ -435,7 +435,7 @@ netPoints = null
 17. 使用集合式查询和有界投影。
 18. 禁止产生 Team × Challenge × Round 的全量空对象矩阵。
 19. 只生成非空 Slot。
-20. 长比赛历史必须支持按轮次窗口或游标读取旧 Slot 详情。
+20. Normal 排行榜的长比赛历史必须支持按轮次窗口或游标读取旧 Slot 详情；Frozen 排行榜只读取冻结命令持久化的有界快照，不得使用之后变化的配置、队伍状态或裁决结果重建历史窗口。
 21. 不得加载整场全部 GameplayFact 后在内存逐项筛选。
 22. 所有 bounded concept 使用 enum 或值对象，禁止字符串穿透 Domain/Application。
 

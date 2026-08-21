@@ -56,11 +56,11 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).not.toContain('snapshot.value = null')
   })
 
-  test('pages bounded AWD and AWDP round windows, including frozen history', () => {
+  test('pages bounded live AWD and AWDP round windows without rebuilding frozen history', () => {
     expect(composable).toContain('const requestedEndingRound = ref<number | null>(null)')
     expect(composable).toContain("schema.value?.mode !== 'Awdp' && schema.value?.mode !== 'Awd'")
     expect(composable).toContain("schema.value?.mode === 'Awdp' || schema.value?.mode === 'Awd'")
-    expect(composable).not.toContain("snapshot.value?.dataScope !== 'Frozen'")
+    expect(composable).toContain("snapshot.value?.dataScope !== 'Frozen'")
     expect(composable).toContain('query: { endingRound }')
     expect(composable).toContain('await selectRoundWindow(windowStart - 1)')
     expect(composable).toContain('const nextEnd = Math.min(latestRound, windowEnd + 50)')

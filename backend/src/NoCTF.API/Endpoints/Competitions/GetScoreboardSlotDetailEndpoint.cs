@@ -87,6 +87,7 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
             : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
         if (projection is not null
+            && visibility.DataScope != LeaderboardDataScope.Frozen
             && request.EndingRound is int endingRound
             && visibility.GameMode is NoCTF.Domain.Competitions.GameMode.Awdp
                 or NoCTF.Domain.Competitions.GameMode.Awd)
