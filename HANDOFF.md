@@ -1,5 +1,15 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-21 alpha.70 仓库清理与生产部署
+
+- `fe422201` 将本地部署传输产物 `.tmp-noctf-*.bundle` 纳入根 `.gitignore`，防止临时 Git bundle 污染状态；没有删除业务代码、测试、部署清单或用户文件。`af907ecb` 将版本从 `0.1.0-alpha.69` 递增到 `0.1.0-alpha.70`。本阶段没有新增业务表、字段、EF migration、HTTP/OpenAPI 或 TypeScript SDK 变化。
+- 代码已快进推送至远程 `main`，生产部署的代码基线为 `af907ecbed83d6b643044656db8b0156e159e2f5`。服务器 `/root/NoCTF` 通过已验证的增量 Git bundle 从 `870b5201` 快进到该提交；生产专用且未跟踪的 `deploy/docker-compose.prod.yml` 与 `deploy/docker-compose.prod.yml.pre-alpha55` 均原样保留。
+- 部署前数据库备份为 `/root/backups/noctf-pre-alpha70-af907ecb-20260821T082100Z.dump`，SHA-256 为 `b2abaa00dcf78f46140ffd49f3558a842482c90ea7e5cfe8355646eb14a7763c`，并已用当前 PostgreSQL 容器中的 `pg_restore --list` 验证可读。迁移容器返回数据库已是最新状态，没有应用 migration。
+- 新镜像及回滚标签分别为 backend `4af2fbe1f87c`、worker `b812ecb06b1e`、runner `81b44af71fe2`、migration `affd76a0f502`，统一保留 `alpha70-af907ecb` 标签；上一版 `alpha59-70c2b54d` 四个镜像标签继续保留。Runner 构建时 GitHub Release 下载节点不稳定，改为从当前线上 Runner 提取相同 Kompose 1.38.0 二进制，并以仓库锁定的 SHA-256 `65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147` 验证后作为临时构建输入；临时 Dockerfile、二进制和传输 bundle 均已删除，未提交到仓库。
+- 仅 backend、worker、runner 被强制重建；PostgreSQL 与 Redis 未重启。部署后三个服务均为 `healthy`、RestartCount 为 0，容器内程序集均确认包含 `0.1.0-alpha.70`；`https://101.43.46.244/`、`/health`、`/health/ready` 均返回 HTTP 200。自部署时间 `2026-08-21T08:49:49Z` 起的三服务日志未出现 Error、Critical、Fatal 或未处理异常，仅保留既有 DataProtection、动态 Wolverine codegen 与端口覆盖 Warning。
+- 部署前后 `noctf.io/managed=true` Runtime 容器数量均为 0。空间清理只删除 alpha.58 旧平台镜像及本次临时 Runner 构建产生的三个精确 dangling 中间镜像，没有执行全局 prune，也没有删除题目镜像、当前/回滚平台镜像、卷或备份；根盘最终剩余约 7.2 GB（82% 使用）。
+- 验证：本地 `dotnet build backend/NoCTF.slnx -c Release --no-restore` 通过，0 warning/0 error；服务器四镜像构建成功，前端只出现既有大 chunk、plugin timing 与第三方未使用导入 Warning；迁移、容器健康、版本、外部 HTTPS、启动日志、回滚标签和磁盘边界均已实际核验。
+
 ## 2026-08-21 alpha.69 冻结榜不可变性与 KoH 首次投影时序修复
 
 - `55f28f1d` 修复冻结排行榜仍接受 `endingRound`、并可能从当前数据库与当前比赛配置重建历史窗口的问题。`Frozen` 状态的排行榜、Schema 与 Slot Detail 现在始终只返回已经持久化的冻结快照并忽略轮次窗口参数；只有实时榜可以浏览历史轮次。前端在冻结榜隐藏轮次导航，不能再用后续重判、题目配置或队伍状态改变冻结结果。
