@@ -243,8 +243,10 @@ export function useScoreboardMatrix(competitionId: string) {
       || windowEnd >= latestRound
   })
   const canShowOlderRounds = computed(() => (schema.value?.mode === 'Awdp' || schema.value?.mode === 'Awd')
+    && snapshot.value?.dataScope !== 'Frozen'
     && (schema.value.roundWindowStart ?? 1) > 1)
   const canShowNewerRounds = computed(() => (schema.value?.mode === 'Awdp' || schema.value?.mode === 'Awd')
+    && snapshot.value?.dataScope !== 'Frozen'
     && !viewingLatestRounds.value)
   const detailEndingRound = computed(() => viewingLatestRounds.value
     ? null
