@@ -14,7 +14,9 @@ import {
   scoreboardTeamSolveCount,
 } from '../app/utils/scoreboard'
 import {
+  isScoreboardVersionAtLeast,
   isCoherentScoreboardBundle,
+  newestScoreboardVersion,
   shouldRestoreRequestedRoundWindow,
 } from '../app/utils/scoreboard-coherence'
 
@@ -34,7 +36,21 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).toContain('const requestGeneration = ++generation')
     expect(composable).toContain('requestGeneration !== generation')
     expect(composable).toContain('candidateSnapshot = incoming')
-    expect(composable).not.toContain('(incoming.version ?? 0) >= (snapshot.value?.version ?? 0)')
+    expect(composable).toContain('minimumSnapshotVersion')
+    expect(composable).toContain('isScoreboardVersionAtLeast')
+    expect(composable).toContain("candidateSnapshot?.dataScope === 'Live'")
+    expect(composable).toContain("snapshot.value === null || snapshot.value.dataScope === 'Live'")
+  })
+
+  test('keeps scoreboard versions monotonic without losing 64-bit precision', () => {
+    expect(isScoreboardVersionAtLeast('9007199254740993', '9007199254740992')).toBeTrue()
+    expect(isScoreboardVersionAtLeast('9007199254740991', '9007199254740992')).toBeFalse()
+    expect(isScoreboardVersionAtLeast('00017', '17')).toBeTrue()
+    expect(isScoreboardVersionAtLeast('invalid', '17')).toBeFalse()
+    expect(newestScoreboardVersion('9007199254740992', '9007199254740993'))
+      .toBe('9007199254740993')
+    expect(newestScoreboardVersion('9007199254740993', '9007199254740992'))
+      .toBe('9007199254740993')
   })
 
   test('uses compact realtime versions and a trailing refresh instead of applying hub arithmetic', () => {
