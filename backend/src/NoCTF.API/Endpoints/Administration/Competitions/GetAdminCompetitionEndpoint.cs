@@ -36,14 +36,12 @@ public sealed class GetAdminCompetitionEndpoint(
             ct: ct);
         if (view is null)
             return TypedResults.NotFound();
-        var competitionId = view.Id;
-        var role = user.IsAdministrator || view.OwnerId == user.UserId
-            ? CompetitionAdministrationRoleProtocol.Owner
-            : await authorizer.CanModerateAsync(user.UserId, competitionId, ct)
-                ? CompetitionAdministrationRoleProtocol.Manager
-                : await authorizer.CanJudgeAsync(user.UserId, competitionId, ct)
-                    ? CompetitionAdministrationRoleProtocol.Judge
-                    : CompetitionAdministrationRoleProtocol.Observer;
+        var role = await CompetitionAdministrationRoleResolver.ResolveAsync(
+            view,
+            user,
+            authorizer,
+            ct,
+            accessAlreadyEstablished: true);
         return TypedResults.Ok(CompetitionMapper.ToResponse(view) with
         {
             AdministrationRole = role

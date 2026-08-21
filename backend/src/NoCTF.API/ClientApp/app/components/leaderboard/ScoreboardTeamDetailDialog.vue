@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { Flag, ShieldCheck, Trophy } from '@lucide/vue'
+import { Flag, ShieldCheck, Target, Trophy } from '@lucide/vue'
 import type {
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
   NoCtfapiEndpointsCompetitionsScoreboardTeamResponse,
 } from '~/api'
 import type { echarts } from '~/utils/echarts'
 import {
+  scoreboardDirectionGroups,
   scoreboardRankingStateLabel,
   scoreboardTeamChallengeScore,
   scoreboardTeamChallengeSignals,
+  scoreboardTeamDirectionScore,
 } from '~/utils/scoreboard'
 import type { ScoreboardChallengeColumnGroup } from '~/utils/scoreboard'
 
@@ -48,34 +50,64 @@ const rows = computed(() => props.columnGroups.map((group) => {
   }
 }))
 
+const directionGroups = computed(() => scoreboardDirectionGroups(props.columnGroups))
+
 const radarOption = computed<echarts.EChartsCoreOption>(() => {
-  const indicators = props.columnGroups.map(group => ({
-    name: group.challenge?.title ?? translate('未知题目'),
-    max: Math.max(1, ...props.teams.map((team) => {
-      if (isAwdp.value) {
-        const split = challengeSplitScore(team, group.competitionChallengeId)
-        return Math.max(0, split.attack, split.defense)
-      }
-      return Math.max(0, scoreboardTeamChallengeScore(team, group))
-    })),
-  }))
+  const indicators = directionGroups.value.map((direction) => {
+    const maximum = Math.max(1, ...props.teams.flatMap((team) => {
+      const score = scoreboardTeamDirectionScore(team, direction, props.mode)
+      return isAwdp.value ? [score.attack, score.defense] : [score.total]
+    }))
+    return {
+      name: direction.name,
+      max: Math.max(1, Math.ceil(maximum * 1.1)),
+    }
+  })
+  const selectedScores = props.team
+    ? directionGroups.value.map(direction => scoreboardTeamDirectionScore(props.team!, direction, props.mode))
+    : []
   const data = isAwdp.value
     ? [
-        { name: translate('攻击分'), value: rows.value.map(row => Math.max(0, row.attackScore)) },
-        { name: translate('防御分'), value: rows.value.map(row => Math.max(0, row.defenseScore)) },
+        {
+          name: translate('攻击分'),
+          value: selectedScores.map(score => score.attack),
+          lineStyle: { width: 2 },
+          areaStyle: { opacity: 0.28 },
+          symbol: 'circle',
+          symbolSize: 5,
+        },
+        {
+          name: translate('防御分'),
+          value: selectedScores.map(score => score.defense),
+          lineStyle: { width: 2 },
+          areaStyle: { opacity: 0.28 },
+          symbol: 'circle',
+          symbolSize: 5,
+        },
       ]
-    : [{ name: translate('已结算得分'), value: rows.value.map(row => Math.max(0, row.score)) }]
+    : [{
+        name: translate('已结算得分'),
+        value: selectedScores.map(score => score.total),
+        lineStyle: { width: 2 },
+        areaStyle: { opacity: 0.32 },
+        symbol: 'circle',
+        symbolSize: 5,
+      }]
 
   return {
     tooltip: { trigger: 'item' },
-    legend: { show: isAwdp.value, bottom: 0 },
+    legend: { show: isAwdp.value, bottom: 2 },
     radar: {
       indicator: indicators,
-      radius: '62%',
-      splitNumber: 4,
-      axisName: { fontSize: 11 },
+      center: ['50%', '48%'],
+      radius: '66%',
+      splitNumber: 5,
+      axisName: { fontSize: 12 },
+      splitArea: { areaStyle: { color: ['rgba(148,163,184,0.03)', 'rgba(148,163,184,0.08)'] } },
+      splitLine: { lineStyle: { color: 'rgba(148,163,184,0.24)' } },
+      axisLine: { lineStyle: { color: 'rgba(148,163,184,0.32)' } },
     },
-    series: [{ type: 'radar', data, areaStyle: { opacity: 0.18 } }],
+    series: [{ type: 'radar', data }],
   }
 })
 
@@ -93,7 +125,7 @@ function flagLabel(succeeded: boolean): string {
     <DialogScrollContent class="max-h-[90vh] sm:max-w-4xl">
       <DialogHeader>
         <DialogTitle>{{ team?.teamName ?? $t('队伍详情') }}</DialogTitle>
-        <DialogDescription>{{ $t('各轴展示题目已结算分值，点击矩阵状态图标可查看逐轮明细。') }}</DialogDescription>
+        <DialogDescription>{{ $t('各轴按题目方向汇总已结算分值，点击矩阵状态图标可查看逐轮明细。') }}</DialogDescription>
       </DialogHeader>
 
       <template v-if="team">
@@ -103,9 +135,12 @@ function flagLabel(succeeded: boolean): string {
           <div class="bg-background p-4"><p class="text-xs text-muted-foreground">{{ $t('排名状态') }}</p><p class="mt-1 flex items-center gap-2 font-medium"><Trophy class="size-4 text-primary" aria-hidden="true" />{{ scoreboardRankingStateLabel(team.rankingState) }}</p></div>
         </div>
 
-        <section aria-labelledby="scoreboard-team-radar-title">
-          <h3 id="scoreboard-team-radar-title" class="mb-2 text-sm font-semibold">{{ $t('题目得分雷达') }}</h3>
-          <MiniChart v-if="rows.length" :option="radarOption" height="340px" />
+        <section class="rounded-xl border bg-muted/20 p-4" aria-labelledby="scoreboard-team-radar-title">
+          <div class="mb-2 flex items-center gap-2">
+            <Target class="size-4 text-primary" aria-hidden="true" />
+            <h3 id="scoreboard-team-radar-title" class="text-sm font-semibold">{{ $t('题目方向得分雷达') }}</h3>
+          </div>
+          <MiniChart v-if="directionGroups.length" :option="radarOption" height="360px" />
           <p v-else class="py-10 text-center text-sm text-muted-foreground">{{ $t('暂无数据') }}</p>
         </section>
 

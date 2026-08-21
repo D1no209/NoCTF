@@ -44,13 +44,12 @@ public sealed class ListAdminCompetitionsEndpoint(
         var responses = new List<CompetitionResponse>(items.Count);
         foreach (var item in items)
         {
-            var role = user.IsAdministrator || item.OwnerId == user.UserId
-                ? CompetitionAdministrationRoleProtocol.Owner
-                : await authorizer.CanModerateAsync(user.UserId, item.Id, ct)
-                    ? CompetitionAdministrationRoleProtocol.Manager
-                    : await authorizer.CanJudgeAsync(user.UserId, item.Id, ct)
-                        ? CompetitionAdministrationRoleProtocol.Judge
-                        : CompetitionAdministrationRoleProtocol.Observer;
+            var role = await CompetitionAdministrationRoleResolver.ResolveAsync(
+                item,
+                user,
+                authorizer,
+                ct,
+                accessAlreadyEstablished: true);
             responses.Add(CompetitionMapper.ToResponse(item) with
             {
                 AdministrationRole = role

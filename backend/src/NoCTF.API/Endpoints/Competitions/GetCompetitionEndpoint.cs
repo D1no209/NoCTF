@@ -1,7 +1,9 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Serialization;
+using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Management;
+using NoCTF.Application.Teams.Moderation;
 using NoCTF.Domain.Competitions;
 using Riok.Mapperly.Abstractions;
 using System.Text.Json.Serialization;
@@ -117,9 +119,36 @@ internal static class CompetitionMapper
             view.PracticeModeEnabled);
 }
 
+internal static class CompetitionAdministrationRoleResolver
+{
+    public static async Task<CompetitionAdministrationRoleProtocol?> ResolveAsync(
+        CompetitionView view,
+        IUserContext user,
+        ICompetitionModerationAuthorizer authorizer,
+        CancellationToken cancellationToken,
+        bool accessAlreadyEstablished = false)
+    {
+        if (user.UserId == Guid.Empty)
+            return null;
+        if (user.IsAdministrator || view.OwnerId == user.UserId)
+            return CompetitionAdministrationRoleProtocol.Owner;
+        if (!accessAlreadyEstablished
+            && !await authorizer.CanObserveAsync(user.UserId, view.Id, cancellationToken))
+            return null;
+        if (await authorizer.CanModerateAsync(user.UserId, view.Id, cancellationToken))
+            return CompetitionAdministrationRoleProtocol.Manager;
+        if (await authorizer.CanJudgeAsync(user.UserId, view.Id, cancellationToken))
+            return CompetitionAdministrationRoleProtocol.Judge;
+        return CompetitionAdministrationRoleProtocol.Observer;
+    }
+}
+
 public sealed class GetCompetitionRequest { public Guid CompetitionId { get; set; } }
 
-public sealed class GetCompetitionEndpoint(GetCompetition get)
+public sealed class GetCompetitionEndpoint(
+    GetCompetition get,
+    ICompetitionModerationAuthorizer authorizer,
+    IUserContext user)
     : Endpoint<GetCompetitionRequest, Results<Ok<CompetitionResponse>, NotFound>>
 {
     public override void Configure() { Get("/competitions/{competitionId}"); AllowAnonymous(); }
@@ -127,6 +156,10 @@ public sealed class GetCompetitionEndpoint(GetCompetition get)
     public override async Task<Results<Ok<CompetitionResponse>, NotFound>> ExecuteAsync(GetCompetitionRequest request, CancellationToken ct)
     {
         var view = await get.ExecuteAsync(Route<Guid>("competitionId"), false, ct);
-        return view is null ? TypedResults.NotFound() : TypedResults.Ok(CompetitionMapper.ToResponse(view));
+        if (view is null)
+            return TypedResults.NotFound();
+
+        var role = await CompetitionAdministrationRoleResolver.ResolveAsync(view, user, authorizer, ct);
+        return TypedResults.Ok(CompetitionMapper.ToResponse(view) with { AdministrationRole = role });
     }
 }

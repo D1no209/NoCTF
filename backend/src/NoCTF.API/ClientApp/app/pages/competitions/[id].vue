@@ -15,6 +15,7 @@ const isChallengeIndex = computed(() => route.path === `/competitions/${competit
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const hasCompetitionStaffAccess = computed(() => competition.value?.administrationRole != null)
 
 async function refresh() {
   const { data, error: err } = await getCompetitionEndpoint({
@@ -55,9 +56,15 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
         ...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : []),
         { to: `${base}/leaderboard`, label: translate("记分板"), icon: Trophy },
         ...(competition.value?.mode === 'Ctf' ? [{ to: `${base}/live`, label: translate("3D 大屏"), icon: Orbit }] : []),
-        ...(competition.value?.mode === 'Awdp' ? [{ to: `${base}/awdp-live`, label: translate("中控大屏"), icon: Orbit }] : []),
-        { to: `${base}/teams`, label: translate("队伍"), icon: Users },
-        { to: `${base}/events`, label: translate("动态"), icon: Activity },
+        ...(hasCompetitionStaffAccess.value && competition.value?.mode === 'Awdp'
+          ? [{ to: `${base}/awdp-live`, label: translate("中控大屏"), icon: Orbit }]
+          : []),
+        ...(hasCompetitionStaffAccess.value
+          ? [
+              { to: `${base}/teams`, label: translate("队伍"), icon: Users },
+              { to: `${base}/events`, label: translate("动态"), icon: Activity },
+            ]
+          : []),
       ],
     },
     {
