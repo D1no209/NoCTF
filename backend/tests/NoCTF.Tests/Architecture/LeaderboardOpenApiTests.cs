@@ -88,7 +88,9 @@ public sealed class LeaderboardOpenApiTests
             "netPoints",
             "entryCount",
             "breakdown",
-            "entries"
+            "entries",
+            "offenseState",
+            "defenseState"
         ]);
         var scoreState = ResolveSchema(
             root,
@@ -99,6 +101,18 @@ public sealed class LeaderboardOpenApiTests
         await Assert.That(scoreState.GetProperty("x-enumNames").EnumerateArray()
                 .Select(value => value.GetString()!))
             .IsEquivalentTo(["Pending", "Provisional", "Settled"]);
+        foreach (var propertyName in new[] { "offenseState", "defenseState" })
+        {
+            var operationState = ResolveSchema(
+                root,
+                slot.GetProperty("properties").GetProperty(propertyName));
+            await Assert.That(operationState.GetProperty("enum").EnumerateArray()
+                    .Select(value => value.GetString()!))
+                .IsEquivalentTo(["None", "Failed", "Succeeded"]);
+            await Assert.That(operationState.GetProperty("x-enumNames").EnumerateArray()
+                    .Select(value => value.GetString()!))
+                .IsEquivalentTo(["None", "Failed", "Succeeded"]);
+        }
     }
 
     [Test]

@@ -190,6 +190,13 @@ public sealed record ScoreboardBreakdown(
     long DeductedPoints,
     long NetPoints);
 
+public enum ScoreboardOperationState
+{
+    None,
+    Failed,
+    Succeeded
+}
+
 public sealed record ScoreboardSlotEntry(
     Guid Id,
     ScoreboardEntryKind Kind,
@@ -246,7 +253,11 @@ public sealed record ScoreboardSlot(
     long? NetPoints,
     int EntryCount,
     IReadOnlyList<ScoreboardBreakdown> Breakdowns,
-    IReadOnlyList<ScoreboardSlotEntry> Entries);
+    IReadOnlyList<ScoreboardSlotEntry> Entries)
+{
+    public ScoreboardOperationState OffenseState { get; init; }
+    public ScoreboardOperationState DefenseState { get; init; }
+}
 
 public sealed record ScoreboardChallengeScore(
     Guid CompetitionChallengeId,

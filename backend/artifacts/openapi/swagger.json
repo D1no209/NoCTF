@@ -15006,6 +15006,12 @@
             "items": {
               "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardEntryResponse"
             }
+          },
+          "offenseState": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol"
+          },
+          "defenseState": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol"
           }
         }
       },
@@ -15194,6 +15200,20 @@
           "FirstBlood",
           "SecondBlood",
           "ThirdBlood"
+        ]
+      },
+      "NoCTFAPIEndpointsCompetitionsScoreboardOperationStateProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "None",
+          "Failed",
+          "Succeeded"
+        ],
+        "enum": [
+          "None",
+          "Failed",
+          "Succeeded"
         ]
       },
       "NoCTFAPIEndpointsCompetitionsScoreboardTrackResponse": {
