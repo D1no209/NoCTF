@@ -6,6 +6,7 @@ import type {
 import {
   latestSettledScore,
   scoreboardBreakdown,
+  scoreboardChallengeColumnGroups,
   scoreboardColumnsForChallenge,
   scoreboardEntryKindLabel,
   scoreboardEntryOutcomeLabel,
@@ -88,9 +89,37 @@ describe('normalized scoreboard matrix', () => {
     expect(leaderboardPage).toContain("$t('返回最新轮次')")
   })
 
-  test('keeps unpublished challenge columns in staff projections', () => {
-    expect(leaderboardPage).toContain('if (!challenge.id) continue')
-    expect(leaderboardPage).not.toContain('if (!challenge.id || !challenge.published) continue')
+  test('keeps schema columns when challenge metadata is unpublished or temporarily missing', () => {
+    const publishedChallengeId = crypto.randomUUID()
+    const missingChallengeId = crypto.randomUUID()
+    const groups = scoreboardChallengeColumnGroups({
+      competitionId: crypto.randomUUID(),
+      mode: 'Ctf',
+      revision: '2',
+      challengeCatalogRevision: '1',
+      columns: [
+        { index: 0, competitionChallengeId: publishedChallengeId },
+        { index: 1, competitionChallengeId: missingChallengeId },
+      ],
+    }, [{
+      id: publishedChallengeId,
+      title: 'Hidden challenge',
+      published: false,
+    }])
+
+    expect(groups).toHaveLength(2)
+    expect(groups[0]?.challenge?.published).toBeFalse()
+    expect(groups[1]?.competitionChallengeId).toBe(missingChallengeId)
+    expect(groups[1]?.challenge).toBeNull()
+    expect(groups[1]?.columns.map(column => column.index)).toEqual([1])
+    expect(leaderboardPage).toContain("group.challenge?.title ?? $t('未知题目')")
+  })
+
+  test('refreshes a missing challenge catalog at most once for each revision', () => {
+    expect(leaderboardPage).toContain('let missingCatalogRefreshRevision: string | null = null')
+    expect(leaderboardPage).toContain('missingCatalogRefreshRevision === revision')
+    expect(leaderboardPage).toContain('missingCatalogRefreshRevision = revision')
+    expect(leaderboardPage).toContain("void board.refresh({ catalog: true, schema: false, snapshot: false })")
   })
 
   test('accepts only a revision-coherent catalog, schema and snapshot bundle', () => {
