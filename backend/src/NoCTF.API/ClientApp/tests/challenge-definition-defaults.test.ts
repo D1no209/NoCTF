@@ -12,7 +12,7 @@ import {
 
 describe('challenge definition defaults', () => {
   test.each([
-    ['Ctf', 1],
+    ['Ctf', 2],
     ['Awd', 4],
     ['Awdp', 4],
     ['Koh', 1],
@@ -35,7 +35,7 @@ describe('challenge definition defaults', () => {
   })
 
   test('normalizes submission JSON with the active schema version', () => {
-    expect(JSON.parse(normalizeDefinitionJson('Ctf', '{}')!).schemaVersion).toBe(1)
+    expect(JSON.parse(normalizeDefinitionJson('Ctf', '{}')!).schemaVersion).toBe(2)
     expect(normalizeDefinitionJson('Ctf', '{')).toBeNull()
   })
 
@@ -53,6 +53,10 @@ describe('challenge definition defaults', () => {
     })).toBe('题目定义格式无效,请检查题目定义配置')
     expect(challengeTemplateWriteErrorMessage({ status: 400, detail: 'Definition schemaVersion is missing.' }))
       .toBe('题目定义格式无效,请检查题目定义配置')
+    expect(challengeTemplateWriteErrorMessage({
+      status: 400,
+      detail: 'CTF schemaVersion 1 has no registered upgrader.',
+    })).toBe('题目定义格式无效,请检查题目定义配置')
 
     const createPage = await Bun.file(new URL('../app/pages/admin/challenges/new.vue', import.meta.url)).text()
     const submit = createPage.slice(createPage.indexOf('async function submit'), createPage.indexOf('</script>'))
