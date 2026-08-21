@@ -23,13 +23,16 @@ describe('participant challenge progress', () => {
     expect(page).toContain('v-if="board.error.value"')
   })
 
-  test('hides the participant challenge tab before the competition starts', async () => {
+  test('hides the challenge tab before start and from ineligible participants', async () => {
     const shell = await Bun.file(
       new URL('../app/pages/competitions/[id].vue', import.meta.url),
     ).text()
 
     expect(shell).toContain("competition.value?.status === 'Running'")
-    expect(shell).toContain('...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : [])')
+    expect(shell).toContain("myTeam.value?.registrationStatus === 'Approved'")
+    expect(shell).toContain('!myTeam.value.isBanned')
+    expect(shell).toContain('hasCompetitionStaffAccess.value || hasParticipantChallengeAccess.value')
+    expect(shell).toContain('...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : [])')
   })
 
   test('celebrates a correct flag once and respects reduced motion', async () => {

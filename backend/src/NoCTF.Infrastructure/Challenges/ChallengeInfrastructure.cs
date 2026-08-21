@@ -29,6 +29,7 @@ internal static class ChallengeInfrastructure
         services.AddSingleton<IChallengeRuntimeTemplateCatalog,
             FusionChallengeRuntimeTemplateCatalog>();
         services.AddScoped<IPerTeamRuntimeFlagStore, PostgresPerTeamRuntimeFlagStore>();
+        services.AddScoped<ICompetitionChallengeAudienceAccess, CompetitionChallengeAudienceAccess>();
         services.AddScoped<IChallengeManagementStore, ChallengeManagementStore>();
         services.AddScoped<IChallengeBankStore, ChallengeBankStore>();
         services.AddScoped<CreateChallengeTemplate>();

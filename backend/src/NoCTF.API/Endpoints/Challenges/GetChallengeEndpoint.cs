@@ -86,6 +86,7 @@ public sealed class GetChallengeRequest
 public sealed class GetChallengeEndpoint(
     GetChallenge get,
     IKohChallengeAccessReader kohAccess,
+    ICompetitionChallengeAudienceAccess audienceAccess,
     ICompetitionVisibilityAccess visibilityAccess,
     IUserContext user) : Endpoint<GetChallengeRequest, Results<Ok<ChallengeResponse>, NotFound>>
 {
@@ -101,6 +102,8 @@ public sealed class GetChallengeEndpoint(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
+        if (!await audienceAccess.CanReadAsync(user.UserId, competitionId, ct))
+            return TypedResults.NotFound();
         var visibility = await visibilityAccess.ResolveAsync(
             user.UserId,
             competitionId,
