@@ -17,6 +17,7 @@ public enum GameplayFactAdmissionFailureCode
     CompetitionFinished,
     CompetitionUnavailable,
     BreakRequired,
+    AchievementAlreadySucceeded,
     AttemptsExhausted,
     FlagInvalid,
     FlagBatchNotSupported,
@@ -64,6 +65,14 @@ public static class GameplayFactAdmissionPolicy
             return OperationResult<GameplayFactAdmissionFailureCode>.Failure(
                 GameplayFactAdmissionFailureCode.BreakRequired,
                 "A correct Break submission is required before submitting a Fix.");
+        if (snapshot.Mode == GameMode.Awdp
+            && (kind == GameplayFactKind.BreakAttempt && snapshot.HasCorrectBreak
+                || kind == GameplayFactKind.FixAttempt && snapshot.HasCorrectFix))
+        {
+            return OperationResult<GameplayFactAdmissionFailureCode>.Failure(
+                GameplayFactAdmissionFailureCode.AchievementAlreadySucceeded,
+                "This AWDP attack or defense achievement has already succeeded.");
+        }
         var maxAttempts = kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt ? rules.MaxFlagAttempts : rules.MaxFixAttempts;
         var acceptedAttempts = kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
             ? snapshot.AcceptedFlagAttempts

@@ -28,6 +28,7 @@ public enum PatchUploadFailureCode
     ArchiveTooLarge,
     ArchiveInvalid,
     DefenseTargetNotReady,
+    DefenseAlreadySucceeded,
     AttemptsExhausted,
     DefenseTargetConsumed,
     PatchUploadConflict
@@ -37,6 +38,7 @@ public enum PatchUploadSaveState
 {
     Accepted,
     DefenseTargetNotReady,
+    AchievementAlreadySucceeded,
     DefenseTargetConsumed,
     AttemptsExhausted,
     ConcurrencyConflict
@@ -141,6 +143,10 @@ public sealed class CreatePatchUpload(
                 OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.DefenseTargetNotReady,
                     "The one-shot defense target is no longer ready for a patch."),
+            PatchUploadSaveState.AchievementAlreadySucceeded =>
+                OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
+                    PatchUploadFailureCode.DefenseAlreadySucceeded,
+                    "This AWDP defense achievement has already succeeded."),
             PatchUploadSaveState.AttemptsExhausted =>
                 OperationResult<AcceptedAwdpFix, PatchUploadFailureCode>.Failure(
                     PatchUploadFailureCode.AttemptsExhausted,

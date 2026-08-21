@@ -374,7 +374,7 @@ export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetConflictResponse = {
     code?: NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol;
 };
 
-export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol = 'DefenseNotAvailable' | 'ActiveDefenseTargetExists' | 'BreakRequired' | 'FixAttemptsExhausted' | 'InvalidRuntimeConfiguration' | 'DefenseTargetConcurrency';
+export type NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol = 'DefenseNotAvailable' | 'ActiveDefenseTargetExists' | 'DefenseAlreadySucceeded' | 'BreakRequired' | 'FixAttemptsExhausted' | 'InvalidRuntimeConfiguration' | 'DefenseTargetConcurrency';
 
 export type NoCtfapiEndpointsGameplayFactsFlagGameplayFactAcceptedResponse = {
     gameplayFactId?: string | null;
@@ -388,6 +388,13 @@ export type NoCtfapiEndpointsGameplayFactsFlagGameplayFactItem = {
     state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol;
     statusUrl?: string;
 };
+
+export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureResponse = {
+    code?: NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol;
+    detail?: string | null;
+};
+
+export type NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol = 'ResourceDeleted' | 'ChallengeUnavailable' | 'TeamForbidden' | 'TeamBanned' | 'GameplayFactKindUnsupported' | 'CompetitionPaused' | 'CompetitionNotPublished' | 'CompetitionNotStarted' | 'CompetitionFinished' | 'CompetitionUnavailable' | 'BreakRequired' | 'AchievementAlreadySucceeded' | 'AttemptsExhausted' | 'FlagInvalid' | 'FlagBatchNotSupported' | 'GameplayFactScopeNotFound' | 'GameplayFactConcurrency' | 'PatchUploadNotFound';
 
 export type NoCtfapiEndpointsGameplayFactsSubmitFlagRequest = {
     flag?: string | null;
@@ -405,7 +412,7 @@ export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureResponse = {
     code?: NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol;
 };
 
-export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol = 'ArchiveStreamNotSeekable' | 'ArchiveInvalid' | 'DefenseTargetNotReady' | 'FixAttemptsExhausted' | 'DefenseTargetConsumed';
+export type NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol = 'ArchiveStreamNotSeekable' | 'ArchiveInvalid' | 'DefenseTargetNotReady' | 'DefenseAlreadySucceeded' | 'FixAttemptsExhausted' | 'DefenseTargetConsumed';
 
 export type NoCtfapiEndpointsGameplayFactsUploadPatchRequest = {
     file: Blob | File;
@@ -3266,7 +3273,7 @@ export type SubmitFlagEndpointErrors = {
      * Forbidden
      */
     403: MicrosoftAspNetCoreMvcProblemDetails;
-    409: MicrosoftAspNetCoreMvcProblemDetails;
+    409: NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureResponse;
     /**
      * Too Many Requests
      */

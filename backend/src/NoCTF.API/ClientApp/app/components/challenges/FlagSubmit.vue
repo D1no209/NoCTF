@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { getGameplayFactStatusEndpoint, judgePracticeFlag, submitFlagEndpoint } from '~/api'
-import type { NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse } from '~/api'
+import type {
+  NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
+} from '~/api'
 
 type TrackedSubmission = Pick<
   NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
@@ -138,7 +141,11 @@ async function submit() {
   })
   submitting.value = false
   if (error || !data) {
-    toast.error(parseApiError(error, translate("提交失败")).message)
+    const parsed = parseApiError(error, translate("提交失败"))
+    const code = parsed.code as NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
+    toast.error(code === 'AchievementAlreadySucceeded'
+      ? translate('本题攻击已成功，后续 Flag 不再受理。')
+      : parsed.message)
     return
   }
   const ids = [

@@ -48,14 +48,18 @@ internal static class GameplayFactAdmissionPersistence
             .Select(group => new { Kind = group.Key, Count = group.Count() })
             .ToDictionaryAsync(item => item.Kind, item => item.Count, cancellationToken);
 
-        var hasCorrectBreak = scope.Competition.Mode == GameMode.Awdp
-            && await db.GameplayFacts.AsNoTracking().AnyAsync(fact =>
-                fact.CompetitionId == competitionId
-                && fact.TeamId == scope.Team.Id
-                && fact.CompetitionChallengeId == competitionChallengeId
-                && fact.Kind == GameplayFactKind.BreakAttempt
-                && fact.Result == GameplayFactResult.Correct,
-                cancellationToken);
+        var successfulAwdpKinds = scope.Competition.Mode == GameMode.Awdp
+            ? await db.GameplayFacts.AsNoTracking()
+                .Where(fact => fact.CompetitionId == competitionId
+                    && fact.TeamId == scope.Team.Id
+                    && fact.CompetitionChallengeId == competitionChallengeId
+                    && fact.Result == GameplayFactResult.Correct
+                    && (fact.Kind == GameplayFactKind.BreakAttempt
+                        || fact.Kind == GameplayFactKind.FixAttempt))
+                .Select(fact => fact.Kind)
+                .Distinct()
+                .ToArrayAsync(cancellationToken)
+            : [];
 
         return new(
             competitionId,
@@ -79,7 +83,8 @@ internal static class GameplayFactAdmissionPersistence
             scope.Team.IsBanned,
             scope.Team.RegistrationStatus == TeamRegistrationStatus.Approved,
             true,
-            hasCorrectBreak);
+            successfulAwdpKinds.Contains(GameplayFactKind.BreakAttempt),
+            successfulAwdpKinds.Contains(GameplayFactKind.FixAttempt));
     }
 
     public static bool Matches(
@@ -99,5 +104,6 @@ internal static class GameplayFactAdmissionPersistence
         && current.TeamBanned == expected.TeamBanned
         && current.TeamApproved == expected.TeamApproved
         && current.UserBelongsToTeam == expected.UserBelongsToTeam
-        && current.HasCorrectBreak == expected.HasCorrectBreak;
+        && current.HasCorrectBreak == expected.HasCorrectBreak
+        && current.HasCorrectFix == expected.HasCorrectFix;
 }

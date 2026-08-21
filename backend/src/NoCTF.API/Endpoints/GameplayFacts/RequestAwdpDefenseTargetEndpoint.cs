@@ -15,6 +15,7 @@ public enum AwdpDefenseTargetRequestFailureCodeProtocol
 {
     DefenseNotAvailable,
     ActiveDefenseTargetExists,
+    DefenseAlreadySucceeded,
     BreakRequired,
     FixAttemptsExhausted,
     InvalidRuntimeConfiguration,

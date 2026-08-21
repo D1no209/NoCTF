@@ -2085,18 +2085,18 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
+          "409": {
+            "description": "",
             "content": {
-              "application/problem+json": {
+              "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcProblemDetails"
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureResponse"
                 }
               }
             }
           },
-          "409": {
-            "description": "",
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -14463,6 +14463,7 @@
         "x-enumNames": [
           "DefenseNotAvailable",
           "ActiveDefenseTargetExists",
+          "DefenseAlreadySucceeded",
           "BreakRequired",
           "FixAttemptsExhausted",
           "InvalidRuntimeConfiguration",
@@ -14471,6 +14472,7 @@
         "enum": [
           "DefenseNotAvailable",
           "ActiveDefenseTargetExists",
+          "DefenseAlreadySucceeded",
           "BreakRequired",
           "FixAttemptsExhausted",
           "InvalidRuntimeConfiguration",
@@ -14522,6 +14524,63 @@
             "type": "string"
           }
         }
+      },
+      "NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol"
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "ResourceDeleted",
+          "ChallengeUnavailable",
+          "TeamForbidden",
+          "TeamBanned",
+          "GameplayFactKindUnsupported",
+          "CompetitionPaused",
+          "CompetitionNotPublished",
+          "CompetitionNotStarted",
+          "CompetitionFinished",
+          "CompetitionUnavailable",
+          "BreakRequired",
+          "AchievementAlreadySucceeded",
+          "AttemptsExhausted",
+          "FlagInvalid",
+          "FlagBatchNotSupported",
+          "GameplayFactScopeNotFound",
+          "GameplayFactConcurrency",
+          "PatchUploadNotFound"
+        ],
+        "enum": [
+          "ResourceDeleted",
+          "ChallengeUnavailable",
+          "TeamForbidden",
+          "TeamBanned",
+          "GameplayFactKindUnsupported",
+          "CompetitionPaused",
+          "CompetitionNotPublished",
+          "CompetitionNotStarted",
+          "CompetitionFinished",
+          "CompetitionUnavailable",
+          "BreakRequired",
+          "AchievementAlreadySucceeded",
+          "AttemptsExhausted",
+          "FlagInvalid",
+          "FlagBatchNotSupported",
+          "GameplayFactScopeNotFound",
+          "GameplayFactConcurrency",
+          "PatchUploadNotFound"
+        ]
       },
       "NoCTFAPIEndpointsGameplayFactsSubmitFlagRequest": {
         "type": "object",
@@ -14576,6 +14635,7 @@
           "ArchiveStreamNotSeekable",
           "ArchiveInvalid",
           "DefenseTargetNotReady",
+          "DefenseAlreadySucceeded",
           "FixAttemptsExhausted",
           "DefenseTargetConsumed"
         ],
@@ -14583,6 +14643,7 @@
           "ArchiveStreamNotSeekable",
           "ArchiveInvalid",
           "DefenseTargetNotReady",
+          "DefenseAlreadySucceeded",
           "FixAttemptsExhausted",
           "DefenseTargetConsumed"
         ]

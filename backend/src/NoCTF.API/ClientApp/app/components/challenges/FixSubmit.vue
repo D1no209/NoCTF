@@ -21,6 +21,7 @@ const pendingAction = ref<'request' | 'upload' | null>(null)
 const requestFailureLabels: Record<NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol, string> = {
   DefenseNotAvailable: '当前比赛、队伍或题目不允许申请防御验证环境。',
   ActiveDefenseTargetExists: '已有一次性防御验证环境，请先完成或等待其回收。',
+  DefenseAlreadySucceeded: '本题防御已成功，后续 Fix 不再受理。',
   BreakRequired: '本题要求先完成一次有效 Break，才能申请防御验证。',
   FixAttemptsExhausted: '本题的 Fix 尝试次数已用尽。',
   InvalidRuntimeConfiguration: '一次性防御验证环境配置无效，请联系比赛工作人员。',
@@ -31,6 +32,7 @@ const uploadFailureLabels: Record<NoCtfapiEndpointsGameplayFactsUploadPatchFailu
   ArchiveStreamNotSeekable: '无法验证该 Fix 归档，请重新选择文件。',
   ArchiveInvalid: 'Fix 归档格式无效，请上传有效的 tar.gz 文件。',
   DefenseTargetNotReady: '该一次性防御验证环境尚未就绪或已被回收。',
+  DefenseAlreadySucceeded: '本题防御已成功，后续 Fix 不再受理。',
   FixAttemptsExhausted: '本题的 Fix 尝试次数已用尽。',
   DefenseTargetConsumed: '该一次性防御验证环境已绑定过 Fix，不能再次上传。',
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { History } from '@lucide/vue'
+import { History, ShieldCheck } from '@lucide/vue'
 import { getAwdpParticipantStateEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
@@ -96,7 +96,16 @@ onUnmounted(() => {
           controls="full"
         />
 
+        <Alert v-if="state?.breakActivation" class="border-emerald-500/40 bg-emerald-500/5">
+          <ShieldCheck class="text-emerald-600 dark:text-emerald-400" />
+          <AlertTitle>{{ $t('攻击成果已锁定') }}</AlertTitle>
+          <AlertDescription>
+            {{ $t('本题 Break 已成功并持续生效，后续 Flag 不再受理，也不会产生失败记录或重复播报。') }}
+          </AlertDescription>
+        </Alert>
+
         <FlagSubmit
+          v-else
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
           :title="$t('Break · 提交动态 Flag')"
@@ -137,7 +146,16 @@ onUnmounted(() => {
           </CardContent>
         </Card>
 
+        <Alert v-if="state?.fixActivation" class="border-sky-500/40 bg-sky-500/5">
+          <ShieldCheck class="text-sky-600 dark:text-sky-400" />
+          <AlertTitle>{{ $t('防御成果已锁定') }}</AlertTitle>
+          <AlertDescription>
+            {{ $t('本题 Fix 已成功并持续生效，无需再次申请防御验证。') }}
+          </AlertDescription>
+        </Alert>
+
         <FixSubmit
+          v-else
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
           :defense="state?.defense"

@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application.GameplayFacts.Awdp;
+using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Application.GameplayFacts.PatchUploads;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
@@ -126,6 +128,115 @@ public sealed class AwdpDefenseTargetPersistenceTests
         });
     }
 
+    [Test]
+    [Timeout(300_000)]
+    public async Task Successful_break_and_fix_block_later_work_without_side_effects(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = await StartPostgresAsync(cancellationToken);
+            var options = Options(postgres);
+            var fixture = await SeedAsync(options, cancellationToken);
+            var target = await RequestTargetAsync(options, fixture, cancellationToken);
+            var runtimeId = target.RuntimeInstanceId!.Value;
+
+            await using (var provisioned = new NoCtfDbContext(options))
+            {
+                var runtime = await provisioned.RuntimeInstances.SingleAsync(
+                    item => item.Id == runtimeId,
+                    cancellationToken);
+                runtime.State = RuntimeState.Running;
+                runtime.RunnerId = "runner-1";
+                runtime.ProviderReceiptJson = "{}";
+                runtime.RunningAt = fixture.Now;
+                runtime.ExpiresAt = fixture.Now.AddMinutes(15);
+                runtime.AwdpFixStage = AwdpFixStage.AwaitingPatch;
+                await provisioned.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var attemptDb = new NoCtfDbContext(options);
+            var attemptOutbox = new RecordingOutbox();
+            var intake = new GameplayFactIntakeStore(
+                attemptDb,
+                attemptOutbox,
+                new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()));
+            var staleAdmission = await intake.LoadAdmissionAsync(
+                fixture.CompetitionId,
+                fixture.CompetitionChallengeId,
+                fixture.UserId,
+                cancellationToken);
+            await Assert.That(staleAdmission).IsNotNull();
+
+            await using var patchDb = new NoCtfDbContext(options);
+            var patchOutbox = new RecordingOutbox();
+            var patchStore = new PatchUploadStore(
+                patchDb,
+                patchOutbox,
+                new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()),
+                new FileReferenceLock(),
+                NullLogger<PatchUploadStore>.Instance,
+                new CompetitionEventStore(patchDb, patchOutbox));
+            var stalePatchScope = await patchStore.ResolveScopeAsync(
+                fixture.CompetitionId,
+                fixture.CompetitionChallengeId,
+                runtimeId,
+                fixture.UserId,
+                cancellationToken);
+            await Assert.That(stalePatchScope).IsNotNull();
+
+            await AddSuccessfulAchievementsAsync(options, fixture, cancellationToken);
+
+            const string arbitraryFlag = "flag{ignored-after-success}";
+            var breakResult = await intake.TryAcceptFlagAsync(
+                new(
+                    Guid.CreateVersion7(),
+                    fixture.CompetitionId,
+                    fixture.TeamId,
+                    fixture.CompetitionChallengeId,
+                    fixture.UserId,
+                    GameplayFactKind.BreakAttempt,
+                    arbitraryFlag,
+                    SHA256.HashData(Encoding.UTF8.GetBytes(arbitraryFlag)),
+                    fixture.Now.AddSeconds(2)),
+                staleAdmission!,
+                maxAttempts: null,
+                cancellationToken);
+            await Assert.That(breakResult.State)
+                .IsEqualTo(GameplayFactAcceptanceState.AchievementAlreadySucceeded);
+            await Assert.That(attemptOutbox.Messages).IsEmpty();
+
+            var requestAfterSuccess = await RequestTargetAsync(
+                options,
+                fixture,
+                cancellationToken);
+            await Assert.That(requestAfterSuccess.State)
+                .IsEqualTo(AwdpDefenseTargetRequestState.AchievementAlreadySucceeded);
+
+            var fileId = Guid.CreateVersion7();
+            await AddFilesAsync(options, fixture.Now, [fileId], cancellationToken);
+            var patchResult = await patchStore.SaveAsync(
+                Guid.CreateVersion7(),
+                Guid.CreateVersion7(),
+                stalePatchScope!,
+                fileId,
+                fixture.Now.AddSeconds(3),
+                cancellationToken);
+            await Assert.That(patchResult.State)
+                .IsEqualTo(PatchUploadSaveState.AchievementAlreadySucceeded);
+            await Assert.That(patchOutbox.Messages).IsEmpty();
+
+            await using var verification = new NoCtfDbContext(options);
+            await Assert.That(await verification.GameplayFacts.CountAsync(cancellationToken))
+                .IsEqualTo(2);
+            await Assert.That(await verification.PatchUploads.CountAsync(cancellationToken))
+                .IsEqualTo(0);
+            await Assert.That(await verification.RuntimeInstances.CountAsync(
+                instance => instance.Purpose == RuntimePurpose.AwdpTarget,
+                cancellationToken)).IsEqualTo(1);
+        });
+    }
+
     private static async Task<AwdpDefenseTargetRequestResult> RequestTargetAsync(
         DbContextOptions<NoCtfDbContext> options,
         Fixture fixture,
@@ -197,6 +308,47 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 CreatedAt = now
             });
         }
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task AddSuccessfulAchievementsAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Fixture fixture,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var breakValue = $"flag{{{Guid.NewGuid():N}}}";
+        db.GameplayFacts.AddRange(
+            new GameplayFact
+            {
+                Id = Guid.CreateVersion7(),
+                CompetitionId = fixture.CompetitionId,
+                CompetitionChallengeId = fixture.CompetitionChallengeId,
+                TeamId = fixture.TeamId,
+                ActorUserId = fixture.UserId,
+                Kind = GameplayFactKind.BreakAttempt,
+                Value = breakValue,
+                ValueSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(breakValue)),
+                OccurredAt = fixture.Now,
+                State = GameplayFactState.Completed,
+                Result = GameplayFactResult.Correct,
+                UpdatedAt = fixture.Now
+            },
+            new GameplayFact
+            {
+                Id = Guid.CreateVersion7(),
+                CompetitionId = fixture.CompetitionId,
+                CompetitionChallengeId = fixture.CompetitionChallengeId,
+                TeamId = fixture.TeamId,
+                ActorUserId = fixture.UserId,
+                Kind = GameplayFactKind.FixAttempt,
+                ReferenceKind = GameplayFactReferenceKind.PatchUpload,
+                ReferenceId = Guid.CreateVersion7(),
+                OccurredAt = fixture.Now.AddSeconds(1),
+                State = GameplayFactState.Completed,
+                Result = GameplayFactResult.Correct,
+                UpdatedAt = fixture.Now.AddSeconds(1)
+            });
         await db.SaveChangesAsync(cancellationToken);
     }
 
