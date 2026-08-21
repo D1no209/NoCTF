@@ -305,9 +305,11 @@ internal static class ScoreboardAudienceProjection
             .Where(track => !track.IsInternal && track.VisibleOnLeaderboard)
             .Select(track => track.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var viewerKeys = tracks.Tracks
-            .Where(track => track.IsViewerTrack)
-            .Select(track => track.Key)
+        // Keep one response internally consistent when an administrator changes
+        // a team's track after the projection (especially a frozen projection).
+        var viewerKeys = projection.Snapshot.Teams
+            .Where(team => team.TeamId == tracks.ViewerTeamId)
+            .Select(team => team.TrackKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var teams = projection.Snapshot.Teams
             .Where(team => visibleKeys.Contains(team.TrackKey)

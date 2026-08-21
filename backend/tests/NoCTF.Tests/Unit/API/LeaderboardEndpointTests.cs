@@ -876,6 +876,63 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
+    public async Task Frozen_participant_snapshot_uses_the_frozen_team_track_after_reassignment()
+    {
+        var competitionId = Guid.CreateVersion7();
+        var challengeId = Guid.CreateVersion7();
+        var publicTeamId = Guid.CreateVersion7();
+        var viewerTeamId = Guid.CreateVersion7();
+        var slot = new ScoreboardSlot(
+            0, ScoreboardScoreState.Settled, 1, 0, 1, 1, [], []);
+        var projection = CreateProjection(
+            competitionId,
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(0, challengeId, null)],
+            [
+                new(publicTeamId, "Public", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], []),
+                new(viewerTeamId, "Viewer", "hidden", null, ScoreboardRankingState.Disqualified,
+                    1, 0, [], [slot])
+            ]);
+        projection = projection with
+        {
+            Snapshot = projection.Snapshot with
+            {
+                Visibility = CompetitionLeaderboardVisibility.Frozen,
+                DataScope = LeaderboardDataScope.Frozen,
+                Tracks =
+                [
+                    new("default", "Default", false, true),
+                    new("hidden", "Hidden", true, false),
+                    new("other", "Other", true, false)
+                ]
+            }
+        };
+        await using var app = await CreateApplicationAsync(
+            competitionId,
+            new CachedLeaderboard(frozen: true, projection: projection),
+            new RecordingMessagePublisher(),
+            CompetitionLeaderboardVisibility.Frozen,
+            LeaderboardDataScope.Frozen,
+            trackStore: new ViewerHiddenTrackStore(competitionId, viewerTeamId, "other"));
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard");
+        var snapshot = await response.Content.ReadFromJsonAsync<ScoreboardSnapshotResponse>();
+        using var detailResponse = await client.GetAsync(
+            $"/api/v1/competitions/{competitionId}/leaderboard/teams/{viewerTeamId}/columns/0");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(snapshot!.Teams.Select(team => team.TeamId))
+            .IsEquivalentTo([publicTeamId, viewerTeamId]);
+        await Assert.That(snapshot.Tracks.Select(track => track.Key))
+            .IsEquivalentTo(["default", "hidden"]);
+        await Assert.That(snapshot.Tracks.Single(track => track.Key == "hidden").IsViewerTrack)
+            .IsTrue();
+        await Assert.That(detailResponse.StatusCode).IsEqualTo(HttpStatusCode.OK);
+    }
+
+    [Test]
     public async Task Slot_detail_cursor_is_invalidated_when_frozen_snapshot_identity_changes()
     {
         var competitionId = Guid.CreateVersion7();
@@ -1230,7 +1287,10 @@ public sealed class LeaderboardEndpointTests
             CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
-    private sealed class ViewerHiddenTrackStore(Guid competitionId, Guid viewerTeamId)
+    private sealed class ViewerHiddenTrackStore(
+        Guid competitionId,
+        Guid viewerTeamId,
+        string viewerTrackKey = "hidden")
         : ICompetitionTrackStore
     {
         public Task<CompetitionTracksView?> GetAsync(
@@ -1247,8 +1307,10 @@ public sealed class LeaderboardEndpointTests
                     false,
                     [
                         new("default", "Default", true, true, false, true, true, true, true, true),
-                        new("hidden", "Hidden", false, false, true, true, true, true, false, true, true),
-                        new("other", "Other", false, false, true, true, true, true, false, true)
+                        new("hidden", "Hidden", false, false, true, true, true, true, false, true,
+                            string.Equals(viewerTrackKey, "hidden", StringComparison.OrdinalIgnoreCase)),
+                        new("other", "Other", false, false, true, true, true, true, false, true,
+                            string.Equals(viewerTrackKey, "other", StringComparison.OrdinalIgnoreCase))
                     ],
                     viewerTeamId)
                 : null);

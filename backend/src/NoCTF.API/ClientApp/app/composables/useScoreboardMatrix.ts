@@ -10,7 +10,9 @@ import type {
 } from '~/api'
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 import {
+  isScoreboardVersionAtLeast,
   isCoherentScoreboardBundle,
+  newestScoreboardVersion,
   shouldRestoreRequestedRoundWindow,
 } from '~/utils/scoreboard-coherence'
 import type { ScoreboardRefreshOutcome } from '~/utils/scoreboard-coherence'
@@ -45,7 +47,7 @@ function scoreboardUpdatedPayload(payload: unknown): ScoreboardUpdatedPayload {
 
 /**
  * Owns the three normalized scoreboard resources. Every accepted refresh is
- * generation-fenced, so a late response can never replace newer page state.
+ * generation- and version-fenced, so an older response cannot replace newer page state.
  */
 export function useScoreboardMatrix(competitionId: string) {
   const catalog = ref<NoCtfapiEndpointsCompetitionsScoreboardChallengeCatalogResponse | null>(null)
@@ -61,6 +63,7 @@ export function useScoreboardMatrix(competitionId: string) {
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let coherenceRetryTimer: ReturnType<typeof setTimeout> | null = null
   let coherenceRetryCount = 0
+  let minimumSnapshotVersion: string | null = null
 
   function scheduleProcessingRetry(): void {
     if (retryTimer || stopped) return
@@ -133,10 +136,18 @@ export function useScoreboardMatrix(competitionId: string) {
           const incoming = snapshotResult.data as NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse
           candidateSnapshot = incoming
         }
-        if (isCoherentScoreboardBundle(candidateCatalog, candidateSchema, candidateSnapshot)) {
+        const sameDataScope = candidateSnapshot?.dataScope === snapshot.value?.dataScope
+        let versionFloor = sameDataScope ? (snapshot.value?.version ?? null) : null
+        if (candidateSnapshot?.dataScope === 'Live')
+          versionFloor = newestScoreboardVersion(versionFloor, minimumSnapshotVersion)
+        if (isCoherentScoreboardBundle(candidateCatalog, candidateSchema, candidateSnapshot)
+          && isScoreboardVersionAtLeast(candidateSnapshot?.version, versionFloor)) {
           catalog.value = candidateCatalog
           schema.value = candidateSchema
           snapshot.value = candidateSnapshot
+          minimumSnapshotVersion = candidateSnapshot?.dataScope === 'Live'
+            ? newestScoreboardVersion(minimumSnapshotVersion, candidateSnapshot.version)
+            : null
           coherenceRetryCount = 0
           error.value = null
           outcome = 'accepted'
@@ -187,12 +198,15 @@ export function useScoreboardMatrix(competitionId: string) {
     unwatch = watchCompetition(competitionId, {
       scoreboardUpdated: (raw) => {
         const notice = scoreboardUpdatedPayload(raw)
+        if (snapshot.value === null || snapshot.value.dataScope === 'Live')
+          minimumSnapshotVersion = newestScoreboardVersion(minimumSnapshotVersion, notice.version)
         const wantsCatalog = notice.challengeCatalogRevision !== null
           && notice.challengeCatalogRevision !== (catalog.value?.revision ?? null)
         const wantsSchema = notice.schemaRevision !== null
           && notice.schemaRevision !== (schema.value?.revision ?? null)
-        if (notice.version !== null && notice.version === (snapshot.value?.version ?? null)
-          && !wantsCatalog && !wantsSchema) return
+        const wantsSnapshot = notice.version !== null
+          && !isScoreboardVersionAtLeast(snapshot.value?.version, notice.version)
+        if (!wantsSnapshot && !wantsCatalog && !wantsSchema) return
         void queueRefresh({
           catalog: wantsCatalog,
           schema: wantsSchema,
