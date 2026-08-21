@@ -1,5 +1,6 @@
 using System.Text.Json;
 using NoCTF.Application.Scoring.Leaderboard;
+using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Awd.Configuration;
@@ -222,6 +223,53 @@ public sealed class NormalizedScoreboardProjectionTests
         await Assert.That(slot.Breakdowns.Any(item => item.Kind == ScoreboardBreakdownKind.Availability))
             .IsTrue();
         await AssertArithmetic(attackerRow);
+    }
+
+    [Test]
+    public async Task Awd_explicit_window_keeps_authoritative_total_and_absolute_round_numbers()
+    {
+        var challenge = Challenge(1, "Pwn", "{\"schemaVersion\":4}");
+        var team = Team(1, "Alpha");
+        var configuration = JsonSerializer.Serialize(AwdConfiguration.Default with
+        {
+            ServiceHealthyPoints = 100
+        }, JsonOptions);
+        var rounds = Enumerable.Range(51, ScoreboardRoundWindow.DefaultSize)
+            .Select(number => new LeaderboardAwdRoundFact(
+                challenge.Id,
+                team.Id,
+                AwdRoundSpecificationId.FromRound(number).Value,
+                Start.AddSeconds((number - 1) * 60),
+                Start.AddSeconds(number * 60)))
+            .ToArray();
+        var projection = engine.ProjectScoreboard(new(
+            Guid.NewGuid(),
+            GameMode.Awd,
+            [team],
+            [Fact(team.Id, challenge.Id, GameplayFactKind.AwdServiceTransition, 1,
+                GameplayFactResult.ServiceUp)],
+            [challenge],
+            configuration,
+            Start,
+            AwdRounds: rounds,
+            ProjectedAt: Start.AddSeconds(121 * 60),
+            CompetitionStatus: CompetitionStatus.Running,
+            ScoreboardRoundWindowEnd: 100,
+            ScoreboardLatestRound: 120,
+            AwdAggregates:
+            [
+                new(team.Id, challenge.Id, 6_000, 0, 0, 60, null)
+            ]));
+
+        await Assert.That(projection.Schema.Rounds.Select(round => round.Number))
+            .IsEquivalentTo(Enumerable.Range(51, ScoreboardRoundWindow.DefaultSize));
+        await Assert.That(projection.Schema.RoundWindowStart).IsEqualTo(51);
+        await Assert.That(projection.Schema.RoundWindowEnd).IsEqualTo(100);
+        await Assert.That(projection.Schema.LatestRound).IsEqualTo(120);
+        var row = projection.Snapshot.Teams.Single();
+        await Assert.That(row.TotalScore).IsEqualTo(6_000);
+        await Assert.That(row.ScoreOutsideWindow).IsEqualTo(1_000);
+        await AssertArithmetic(row);
     }
 
     [Test]

@@ -182,11 +182,18 @@ public sealed class LeaderboardEndpointTests
     }
 
     [Test]
-    public async Task Frozen_projection_uses_persisted_snapshot_without_live_refresh()
+    public async Task Frozen_projection_reconstructs_historical_rounds_at_the_frozen_cutoff()
     {
         var competitionId = Guid.CreateVersion7();
         var messages = new RecordingMessagePublisher();
         var snapshots = Substitute.For<ILeaderboardSnapshotFactory>();
+        var historicalWindow = CreateProjection(competitionId, [], [], []);
+        snapshots.CreateScoreboardWindowAsync(
+                competitionId,
+                1,
+                Arg.Any<DateTimeOffset>(),
+                Arg.Any<CancellationToken>())
+            .Returns(historicalWindow);
         await using var app = await CreateApplicationAsync(
             competitionId,
             new CachedLeaderboard(frozen: true),
@@ -207,9 +214,9 @@ public sealed class LeaderboardEndpointTests
             .IsEqualTo(LeaderboardVisibilityProtocol.Frozen);
         await Assert.That(body.DataScope).IsEqualTo(LeaderboardDataScopeProtocol.Frozen);
         await Assert.That(messages.ProjectedCompetitionIds).IsEmpty();
-        _ = snapshots.DidNotReceive().CreateScoreboardWindowAsync(
-            Arg.Any<Guid>(),
-            Arg.Any<int>(),
+        _ = snapshots.Received(1).CreateScoreboardWindowAsync(
+            competitionId,
+            1,
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
     }

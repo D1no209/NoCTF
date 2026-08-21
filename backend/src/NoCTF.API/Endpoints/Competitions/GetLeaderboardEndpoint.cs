@@ -240,6 +240,25 @@ internal static class ScoreboardProtocolMapper
 
 internal static class ScoreboardAudienceProjection
 {
+    public static ScoreboardProjection PreserveSnapshotScope(
+        ScoreboardProjection projection,
+        ScoreboardSnapshot source)
+    {
+        ScoreboardSnapshot Apply(ScoreboardSnapshot snapshot) => snapshot with
+        {
+            Visibility = source.Visibility,
+            DataScope = source.DataScope,
+            DataAsOf = source.DataAsOf
+        };
+        return projection with
+        {
+            Snapshot = Apply(projection.Snapshot),
+            ParticipantView = projection.ParticipantView is { } participant
+                ? participant with { Snapshot = Apply(participant.Snapshot) }
+                : null
+        };
+    }
+
     public static ScoreboardProjection Filter(ScoreboardProjection projection, bool canObserve)
     {
         if (canObserve)
@@ -415,15 +434,19 @@ public sealed class GetLeaderboardEndpoint(
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
             : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
         if (projection is not null
-            && visibility.DataScope != LeaderboardDataScope.Frozen
             && request.EndingRound is int endingRound
-            && visibility.GameMode == NoCTF.Domain.Competitions.GameMode.Awdp)
+            && visibility.GameMode is NoCTF.Domain.Competitions.GameMode.Awdp
+                or NoCTF.Domain.Competitions.GameMode.Awd)
         {
-            projection = await snapshots.CreateScoreboardWindowAsync(
+            var sourceSnapshot = projection.Snapshot;
+            var window = await snapshots.CreateScoreboardWindowAsync(
                 request.CompetitionId,
                 endingRound,
-                projection.Snapshot.DataAsOf ?? projection.Snapshot.GeneratedAt,
+                sourceSnapshot.DataAsOf ?? sourceSnapshot.GeneratedAt,
                 cancellationToken);
+            projection = window is null
+                ? null
+                : ScoreboardAudienceProjection.PreserveSnapshotScope(window, sourceSnapshot);
         }
         if (projection is not null)
         {

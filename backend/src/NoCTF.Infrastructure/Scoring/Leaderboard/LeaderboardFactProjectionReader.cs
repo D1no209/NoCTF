@@ -6,6 +6,7 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.GameModes.Awd.Configuration;
 
 namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 
@@ -16,6 +17,8 @@ namespace NoCTF.Infrastructure.Scoring.Leaderboard;
 /// </summary>
 internal static class LeaderboardFactProjectionReader
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     public static async Task<LeaderboardFactProjectionRows> ReadAsync(
         NoCtfDbContext db,
         Guid competitionId,
@@ -27,6 +30,8 @@ internal static class LeaderboardFactProjectionReader
         IReadOnlyDictionary<Guid, long> hintCosts,
         IReadOnlyList<LeaderboardTeamFact> teams,
         int? endingRound,
+        IReadOnlyList<LeaderboardAwdRoundFact>? awdWindowRounds,
+        IReadOnlyList<LeaderboardChallengeFact> challenges,
         CancellationToken ct)
     {
         var query = db.GameplayFacts.AsNoTracking()
@@ -55,15 +60,32 @@ internal static class LeaderboardFactProjectionReader
                     .Select(group => group.First()), hintCosts));
         }
 
+        if (mode == GameMode.Awd)
+        {
+            var aggregates = await ReadAwdAggregatesAsync(
+                db,
+                competitionId,
+                competitionConfigurationJson,
+                challenges,
+                teams,
+                projectedAt,
+                ct);
+            var legacyRows = await ReadAwdManualAdjustmentsAsync(query, ct);
+            var windowRows = await ReadAwdWindowAsync(query, awdWindowRounds ?? [], ct);
+            return new(
+                Map(legacyRows, hintCosts),
+                Map(windowRows.Concat(legacyRows), hintCosts),
+                aggregates);
+        }
+
         var rows = mode switch
         {
             GameMode.Ctf => await ReadCtfAsync(query, ct),
-            GameMode.Awd => await ReadAwdAsync(db, competitionId, query, ct),
             GameMode.Koh => await ReadKohAsync(query, teams, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
         };
         var mapped = Map(rows, hintCosts);
-        return new(mapped, mapped);
+        return new(mapped, mapped, null);
     }
 
     private static IReadOnlyList<LeaderboardGameplayFact> Map(
@@ -130,15 +152,10 @@ internal static class LeaderboardFactProjectionReader
             group.Max(fact => fact.OccurredAt)))
         .ToListAsync(ct);
 
-    private static async Task<List<FactSummary>> ReadAwdAsync(
-        NoCtfDbContext db,
-        Guid competitionId,
+    private static Task<List<FactSummary>> ReadAwdManualAdjustmentsAsync(
         IQueryable<GameplayFact> query,
-        CancellationToken ct)
-    {
-        var rows = await query
-            .Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
-                || fact.Kind == GameplayFactKind.ManualAdjustment)
+        CancellationToken ct) => query
+            .Where(fact => fact.Kind == GameplayFactKind.ManualAdjustment)
             .GroupBy(fact => new
             {
                 fact.TeamId,
@@ -171,27 +188,283 @@ internal static class LeaderboardFactProjectionReader
                 group.Max(fact => fact.OccurredAt)))
             .ToListAsync(ct);
 
-        var latestTransitionIds = db.ChallengeFlags.AsNoTracking()
-            .Where(flag => flag.TeamId != null
-                && flag.CompetitionChallengeId != null
+    private static async Task<IReadOnlyList<LeaderboardAwdAggregateFact>> ReadAwdAggregatesAsync(
+        NoCtfDbContext db,
+        Guid competitionId,
+        string? competitionConfigurationJson,
+        IReadOnlyList<LeaderboardChallengeFact> challenges,
+        IReadOnlyList<LeaderboardTeamFact> teams,
+        DateTimeOffset projectedAt,
+        CancellationToken ct)
+    {
+        var activeTeamIds = teams
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.EarnsScore)
+            .Select(team => team.Id)
+            .ToArray();
+        var competitiveTeamIds = teams
+            .Where(team => !team.IsBanned && !team.IsDeleted && team.AffectsCompetitiveResults)
+            .Select(team => team.Id)
+            .ToArray();
+        var activeChallengeIds = challenges
+            .Where(challenge => !challenge.IsDeleted)
+            .Select(challenge => challenge.Id)
+            .ToArray();
+        var accumulators = activeTeamIds
+            .SelectMany(teamId => activeChallengeIds.Select(challengeId => new
+            {
+                Key = (TeamId: teamId, ChallengeId: challengeId),
+                Value = new AwdAggregateAccumulator()
+            }))
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+        if (accumulators.Count == 0)
+            return [];
+
+        var configuration = ParseAwdConfiguration(competitionConfigurationJson);
+        var settingsByChallenge = challenges
+            .Where(challenge => activeChallengeIds.Contains(challenge.Id))
+            .ToDictionary(
+                challenge => challenge.Id,
+                challenge => Effective(configuration, challenge.ConfigurationJson));
+        var attackFacts = db.GameplayFacts.AsNoTracking()
+            .Where(fact => fact.CompetitionId == competitionId
+                && fact.OccurredAt <= projectedAt
+                && activeChallengeIds.Contains(fact.CompetitionChallengeId)
+                && fact.TeamId != null
+                && competitiveTeamIds.Contains(fact.TeamId.Value)
+                && fact.VictimTeamId != null
+                && competitiveTeamIds.Contains(fact.VictimTeamId.Value)
+                && fact.VictimTeamId != fact.TeamId
+                && fact.Kind == GameplayFactKind.FlagAttempt
+                && fact.Result == GameplayFactResult.Correct
+                && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
+                && fact.ReferenceId != null);
+        var attackGroups = attackFacts
+            .GroupBy(fact => new
+            {
+                fact.CompetitionChallengeId,
+                AttackerId = fact.TeamId!.Value,
+                VictimId = fact.VictimTeamId!.Value,
+                RoundId = fact.ReferenceId!.Value
+            })
+            .Select(group => new
+            {
+                group.Key.CompetitionChallengeId,
+                group.Key.AttackerId,
+                group.Key.VictimId,
+                group.Key.RoundId,
+                LastAttackAt = group.Max(fact => fact.OccurredAt)
+            })
+            .OrderBy(attack => attack.CompetitionChallengeId)
+            .ThenBy(attack => attack.VictimId)
+            .ThenBy(attack => attack.RoundId)
+            .ThenBy(attack => attack.AttackerId);
+        Guid? currentChallengeId = null;
+        Guid? currentVictimId = null;
+        Guid? currentRoundId = null;
+        var poolAttackers = new List<AwdAttackTuple>();
+
+        void ApplyAttackPool()
+        {
+            if (poolAttackers.Count == 0 || currentChallengeId is null || currentVictimId is null)
+                return;
+
+            var settings = settingsByChallenge[currentChallengeId.Value];
+            if (accumulators.TryGetValue((currentVictimId.Value, currentChallengeId.Value), out var victim))
+                victim.Score = checked(victim.Score - settings.VictimDefensePoolPoints);
+
+            var reward = settings.AttackRewardMode == AttackRewardMode.FixedPerAttack
+                ? settings.AttackPoints
+                : settings.VictimDefensePoolPoints / poolAttackers.Count;
+            foreach (var attack in poolAttackers)
+            {
+                if (!accumulators.TryGetValue((attack.AttackerId, currentChallengeId.Value), out var accumulator))
+                    continue;
+                accumulator.Score = checked(accumulator.Score + reward);
+                accumulator.AttackPoints = checked(accumulator.AttackPoints + reward);
+                accumulator.AttackCount = checked(accumulator.AttackCount + 1);
+                accumulator.LastAttackAt = Later(accumulator.LastAttackAt, attack.LastAttackAt);
+            }
+
+            poolAttackers.Clear();
+        }
+
+        await foreach (var row in attackGroups.AsAsyncEnumerable().WithCancellation(ct))
+        {
+            var attack = new AwdAttackTuple(
+                row.CompetitionChallengeId,
+                row.AttackerId,
+                row.VictimId,
+                row.RoundId,
+                row.LastAttackAt);
+            if (currentChallengeId != attack.CompetitionChallengeId
+                || currentVictimId != attack.VictimId
+                || currentRoundId != attack.RoundId)
+            {
+                ApplyAttackPool();
+                currentChallengeId = attack.CompetitionChallengeId;
+                currentVictimId = attack.VictimId;
+                currentRoundId = attack.RoundId;
+            }
+            poolAttackers.Add(attack);
+        }
+        ApplyAttackPool();
+
+        var roundStates = db.ChallengeFlags.AsNoTracking()
+            .Where(flag => flag.CompetitionChallengeId != null
+                && activeChallengeIds.Contains(flag.CompetitionChallengeId.Value)
+                && flag.TeamId != null
+                && activeTeamIds.Contains(flag.TeamId.Value)
                 && flag.SpecificationKind == SpecificationKind.AwdRound
+                && flag.SpecificationId != null
+                && flag.ValidStart != null
                 && flag.ValidUntil != null
-                && db.CompetitionChallenges.Any(challenge => challenge.Id == flag.CompetitionChallengeId
-                    && challenge.CompetitionId == competitionId))
-            .Select(flag => db.GameplayFacts
-                .Where(fact => fact.CompetitionId == competitionId
-                    && fact.TeamId == flag.TeamId
-                    && fact.CompetitionChallengeId == flag.CompetitionChallengeId
-                    && fact.Kind == GameplayFactKind.AwdServiceTransition
-                    && fact.OccurredAt < flag.ValidUntil)
-                .OrderByDescending(fact => fact.OccurredAt)
+                && flag.ValidUntil <= projectedAt)
+            .Select(flag => new
+            {
+                CompetitionChallengeId = flag.CompetitionChallengeId!.Value,
+                TeamId = flag.TeamId!.Value,
+                Result = db.GameplayFacts.AsNoTracking()
+                    .Where(fact => fact.CompetitionId == competitionId
+                        && fact.TeamId == flag.TeamId
+                        && fact.CompetitionChallengeId == flag.CompetitionChallengeId
+                        && fact.Kind == GameplayFactKind.AwdServiceTransition
+                        && fact.OccurredAt < flag.ValidUntil)
+                    .OrderByDescending(fact => fact.OccurredAt)
+                    .ThenByDescending(fact => fact.Id)
+                    .Select(fact => fact.Result)
+                    .FirstOrDefault()
+            });
+        var availability = await roundStates
+            .GroupBy(round => new
+            {
+                round.CompetitionChallengeId,
+                round.TeamId,
+                IsDown = round.Result == GameplayFactResult.ServiceDown
+            })
+            .Select(group => new AwdAvailabilityAggregate(
+                group.Key.CompetitionChallengeId,
+                group.Key.TeamId,
+                group.Key.IsDown,
+                group.Count()))
+            .ToListAsync(ct);
+        foreach (var item in availability)
+        {
+            if (!accumulators.TryGetValue((item.TeamId, item.CompetitionChallengeId), out var accumulator))
+                continue;
+            var settings = settingsByChallenge[item.CompetitionChallengeId];
+            if (item.IsDown)
+                accumulator.Score = checked(
+                    accumulator.Score - checked((long)item.Count * settings.ServiceUnhealthyPenalty));
+            else
+            {
+                accumulator.Score = checked(
+                    accumulator.Score + checked((long)item.Count * settings.ServiceHealthyPoints));
+                accumulator.UpRoundCount = checked(accumulator.UpRoundCount + item.Count);
+            }
+        }
+
+        return accumulators.Select(pair => new LeaderboardAwdAggregateFact(
+                pair.Key.TeamId,
+                pair.Key.ChallengeId,
+                pair.Value.Score,
+                pair.Value.AttackPoints,
+                pair.Value.AttackCount,
+                pair.Value.UpRoundCount,
+                pair.Value.LastAttackAt))
+            .ToArray();
+    }
+
+    private static AwdConfiguration ParseAwdConfiguration(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return AwdConfiguration.Default;
+        try
+        {
+            return JsonSerializer.Deserialize<AwdConfiguration>(json, JsonOptions)
+                ?? AwdConfiguration.Default;
+        }
+        catch (JsonException)
+        {
+            return AwdConfiguration.Default;
+        }
+    }
+
+    private static AwdScoringSettings Effective(AwdConfiguration competition, string? challengeJson)
+    {
+        AwdChallengeConfiguration? challenge = null;
+        if (!string.IsNullOrWhiteSpace(challengeJson))
+        {
+            try { challenge = JsonSerializer.Deserialize<AwdChallengeConfiguration>(challengeJson, JsonOptions); }
+            catch (JsonException) { }
+        }
+        return new(
+            challenge?.AttackRewardMode ?? competition.AttackRewardMode,
+            challenge?.AttackPoints ?? competition.AttackPoints,
+            challenge?.VictimDefensePoolPoints ?? competition.VictimDefensePoolPoints,
+            challenge?.ServiceHealthyPoints ?? competition.ServiceHealthyPoints,
+            challenge?.ServiceUnhealthyPenalty ?? competition.ServiceUnhealthyPenalty);
+    }
+
+    private static DateTimeOffset? Later(DateTimeOffset? left, DateTimeOffset right) =>
+        left is null || right > left ? right : left;
+
+    private static async Task<List<FactSummary>> ReadAwdWindowAsync(
+        IQueryable<GameplayFact> query,
+        IReadOnlyList<LeaderboardAwdRoundFact> rounds,
+        CancellationToken ct)
+    {
+        if (rounds.Count == 0)
+            return [];
+        var roundIds = rounds.Select(round => round.RoundId).Distinct().ToArray();
+        var startsAt = rounds.Min(round => round.StartsAt);
+        var endsAt = rounds.Max(round => round.EndsAt);
+        var rows = await query
+            .Where(fact => fact.Kind == GameplayFactKind.FlagAttempt
+                && fact.ReferenceKind == GameplayFactReferenceKind.AwdRound
+                && fact.ReferenceId != null
+                && roundIds.Contains(fact.ReferenceId.Value))
+            .GroupBy(fact => new
+            {
+                fact.TeamId,
+                fact.CompetitionChallengeId,
+                fact.Kind,
+                fact.State,
+                fact.Result,
+                fact.FailureCode,
+                fact.ReferenceKind,
+                fact.ReferenceId,
+                fact.VictimTeamId,
+                fact.ActorUserId
+            })
+            .Select(group => new FactSummary(
+                group.OrderBy(fact => fact.OccurredAt).ThenBy(fact => fact.Id).Select(fact => fact.Id).First(),
+                group.Key.TeamId,
+                group.Key.CompetitionChallengeId,
+                group.Key.Kind,
+                group.Min(fact => fact.OccurredAt),
+                group.Key.State,
+                group.Key.Result,
+                group.Key.FailureCode,
+                group.Key.ReferenceKind,
+                group.Key.ReferenceId,
+                group.Key.VictimTeamId,
+                group.Key.ActorUserId,
+                null,
+                group.Count(),
+                group.Max(fact => fact.OccurredAt)))
+            .ToListAsync(ct);
+        var inWindow = query.Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition
+            && fact.OccurredAt >= startsAt
+            && fact.OccurredAt < endsAt);
+        var carryIds = query
+            .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition
+                && fact.OccurredAt < startsAt)
+            .GroupBy(fact => new { fact.TeamId, fact.CompetitionChallengeId })
+            .Select(group => group.OrderByDescending(fact => fact.OccurredAt)
                 .ThenByDescending(fact => fact.Id)
-                .Select(fact => (Guid?)fact.Id)
-                .FirstOrDefault())
-            .Where(id => id != null)
-            .Distinct();
-        rows.AddRange(await db.GameplayFacts.AsNoTracking()
-            .Where(fact => latestTransitionIds.Contains(fact.Id))
+                .Select(fact => fact.Id)
+                .First());
+        rows.AddRange(await inWindow.Concat(query.Where(fact => carryIds.Contains(fact.Id)))
             .Select(fact => new FactSummary(
                 fact.Id,
                 fact.TeamId,
@@ -201,9 +474,9 @@ internal static class LeaderboardFactProjectionReader
                 fact.State,
                 fact.Result,
                 fact.FailureCode,
-                fact.ReferenceKind,
-                fact.ReferenceId,
-                fact.VictimTeamId,
+                null,
+                null,
+                null,
                 fact.ActorUserId,
                 null,
                 1,
@@ -552,6 +825,35 @@ internal static class LeaderboardFactProjectionReader
         DateTimeOffset StartAt,
         DateTimeOffset EndAt);
 
+    private sealed record AwdAttackTuple(
+        Guid CompetitionChallengeId,
+        Guid AttackerId,
+        Guid VictimId,
+        Guid RoundId,
+        DateTimeOffset LastAttackAt);
+
+    private sealed record AwdAvailabilityAggregate(
+        Guid CompetitionChallengeId,
+        Guid TeamId,
+        bool IsDown,
+        int Count);
+
+    private sealed record AwdScoringSettings(
+        AttackRewardMode AttackRewardMode,
+        long AttackPoints,
+        long VictimDefensePoolPoints,
+        long ServiceHealthyPoints,
+        long ServiceUnhealthyPenalty);
+
+    private sealed class AwdAggregateAccumulator
+    {
+        public long Score { get; set; }
+        public long AttackPoints { get; set; }
+        public int AttackCount { get; set; }
+        public int UpRoundCount { get; set; }
+        public DateTimeOffset? LastAttackAt { get; set; }
+    }
+
     private sealed record FactSummary(
         Guid Id,
         Guid? TeamId,
@@ -572,4 +874,5 @@ internal static class LeaderboardFactProjectionReader
 
 internal sealed record LeaderboardFactProjectionRows(
     IReadOnlyList<LeaderboardGameplayFact> Legacy,
-    IReadOnlyList<LeaderboardGameplayFact> Scoreboard);
+    IReadOnlyList<LeaderboardGameplayFact> Scoreboard,
+    IReadOnlyList<LeaderboardAwdAggregateFact>? AwdAggregates = null);

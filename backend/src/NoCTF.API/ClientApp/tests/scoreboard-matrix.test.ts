@@ -56,8 +56,11 @@ describe('normalized scoreboard matrix', () => {
     expect(composable).not.toContain('snapshot.value = null')
   })
 
-  test('pages bounded AWDP round windows and keeps slot details on the selected window', () => {
+  test('pages bounded AWD and AWDP round windows, including frozen history', () => {
     expect(composable).toContain('const requestedEndingRound = ref<number | null>(null)')
+    expect(composable).toContain("schema.value?.mode !== 'Awdp' && schema.value?.mode !== 'Awd'")
+    expect(composable).toContain("schema.value?.mode === 'Awdp' || schema.value?.mode === 'Awd'")
+    expect(composable).not.toContain("snapshot.value?.dataScope !== 'Frozen'")
     expect(composable).toContain('query: { endingRound }')
     expect(composable).toContain('await selectRoundWindow(windowStart - 1)')
     expect(composable).toContain('const nextEnd = Math.min(latestRound, windowEnd + 50)')
@@ -67,6 +70,11 @@ describe('normalized scoreboard matrix', () => {
     expect(leaderboardPage).toContain("$t('较早轮次')")
     expect(leaderboardPage).toContain("$t('较新轮次')")
     expect(leaderboardPage).toContain("$t('返回最新轮次')")
+  })
+
+  test('keeps unpublished challenge columns in staff projections', () => {
+    expect(leaderboardPage).toContain('if (!challenge.id) continue')
+    expect(leaderboardPage).not.toContain('if (!challenge.id || !challenge.published) continue')
   })
 
   test('accepts only a revision-coherent catalog, schema and snapshot bundle', () => {
