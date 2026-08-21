@@ -61,7 +61,7 @@ interface ChallengeColumnGroup {
 const columnGroups = computed<ChallengeColumnGroup[]>(() => {
   const groups: ChallengeColumnGroup[] = []
   for (const challenge of board.catalog.value?.items ?? []) {
-    if (!challenge.id || !challenge.published) continue
+    if (!challenge.id) continue
     const columns = (board.schema.value?.columns ?? [])
       .filter(column => column.competitionChallengeId === challenge.id)
       .sort((left, right) => (left.index ?? 0) - (right.index ?? 0))
@@ -326,7 +326,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="flex items-center gap-2 text-display text-xl"><Trophy class="size-5 text-primary" />{{ $t('排行榜') }}<Badge v-if="board.refreshing.value" variant="secondary">{{ $t('刷新中') }}</Badge></h2>
         <div class="flex flex-wrap items-center gap-3">
-          <div v-if="board.schema.value.mode === 'Awdp'" class="flex flex-wrap items-center gap-2">
+          <div v-if="board.schema.value.mode === 'Awdp' || board.schema.value.mode === 'Awd'" class="flex flex-wrap items-center gap-2">
             <Badge variant="outline" class="font-mono tabular-nums">{{ roundWindowLabel }}</Badge>
             <Button variant="outline" size="sm" :disabled="board.refreshing.value || !board.canShowOlderRounds.value" @click="showOlderRoundWindow">
               <ChevronLeft data-icon="inline-start" />{{ $t('较早轮次') }}

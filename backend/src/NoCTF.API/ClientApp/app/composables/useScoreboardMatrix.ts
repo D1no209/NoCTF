@@ -235,18 +235,16 @@ export function useScoreboardMatrix(competitionId: string) {
       .map(actor => [actor.index!, actor]),
   ))
   const viewingLatestRounds = computed(() => {
-    if (schema.value?.mode !== 'Awdp') return true
+    if (schema.value?.mode !== 'Awdp' && schema.value?.mode !== 'Awd') return true
     const windowEnd = schema.value.roundWindowEnd
     const latestRound = schema.value.latestRound
     return windowEnd === null || windowEnd === undefined
       || latestRound === null || latestRound === undefined
       || windowEnd >= latestRound
   })
-  const canShowOlderRounds = computed(() => snapshot.value?.dataScope !== 'Frozen'
-    && schema.value?.mode === 'Awdp'
+  const canShowOlderRounds = computed(() => (schema.value?.mode === 'Awdp' || schema.value?.mode === 'Awd')
     && (schema.value.roundWindowStart ?? 1) > 1)
-  const canShowNewerRounds = computed(() => snapshot.value?.dataScope !== 'Frozen'
-    && schema.value?.mode === 'Awdp'
+  const canShowNewerRounds = computed(() => (schema.value?.mode === 'Awdp' || schema.value?.mode === 'Awd')
     && !viewingLatestRounds.value)
   const detailEndingRound = computed(() => viewingLatestRounds.value
     ? null

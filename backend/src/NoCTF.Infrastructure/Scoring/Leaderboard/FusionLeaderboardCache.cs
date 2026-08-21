@@ -208,6 +208,13 @@ public sealed class FusionLeaderboardCache(
         var competitionStatusAtProjection = lifecycle.Count > 0
             ? lifecycle[^1].To
             : competition.Status;
+        var awdWindow = competition.Mode == GameMode.Awd
+            ? await ReadAwdScoreboardWindowAsync(
+                challengeEntities.Select(challenge => challenge.Id).ToArray(),
+                projectedAt,
+                scoreboardRoundWindowEnd,
+                ct)
+            : AwdScoreboardWindow.Empty;
         var factRows = await LeaderboardFactProjectionReader.ReadAsync(
             db,
             competitionId,
@@ -219,6 +226,8 @@ public sealed class FusionLeaderboardCache(
             hintCosts,
             teamFacts,
             scoreboardRoundWindowEnd,
+            awdWindow.Rounds,
+            challenges,
             ct);
         var actorIds = factRows.Legacy
             .Concat(factRows.Scoreboard)
@@ -240,27 +249,9 @@ public sealed class FusionLeaderboardCache(
         var legacyFacts = EnrichActors(factRows.Legacy);
         var scoreboardFacts = EnrichActors(factRows.Scoreboard);
 
-        IReadOnlyList<LeaderboardAwdRoundFact> awdRounds = [];
-        if (competition.Mode == GameMode.Awd)
-        {
-            var competitionChallengeIds = challengeEntities.Select(challenge => challenge.Id).ToArray();
-            awdRounds = await db.ChallengeFlags.AsNoTracking()
-                .Where(flag => flag.TeamId != null
-                    && flag.CompetitionChallengeId != null
-                    && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value)
-                    && flag.SpecificationKind == SpecificationKind.AwdRound
-                    && flag.SpecificationId != null
-                    && flag.ValidStart != null
-                    && flag.ValidUntil != null)
-                .Select(flag => new LeaderboardAwdRoundFact(
-                    flag.CompetitionChallengeId!.Value,
-                    flag.TeamId!.Value,
-                    flag.SpecificationId!.Value,
-                    flag.ValidStart!.Value,
-                    flag.ValidUntil!.Value))
-                .ToListAsync(ct);
-        }
-
+        var selectedRoundWindowEnd = competition.Mode == GameMode.Awd
+            ? awdWindow.EndRound
+            : scoreboardRoundWindowEnd;
         var projectionInput = new LeaderboardProjectionInput(
             competitionId,
             competition.Mode,
@@ -270,11 +261,13 @@ public sealed class FusionLeaderboardCache(
             competitionConfigurationJson ?? competition.ConfigurationJson,
             competition.StartAt,
             lifecycle,
-            awdRounds,
+            awdWindow.Rounds,
             projectedAt,
             competitionStatusAtProjection,
             scoreboardFacts,
-            scoreboardRoundWindowEnd);
+            selectedRoundWindowEnd,
+            awdWindow.LatestRound,
+            factRows.AwdAggregates);
         var projection = projectionEngine.Project(projectionInput);
         var legacy = new LeaderboardResponse(competitionId, projectedAt, projection.Entries)
         {
@@ -320,8 +313,11 @@ public sealed class FusionLeaderboardCache(
             Challenges = challenges.Where(challenge => challenge.IsPublished).ToArray(),
             GameplayFacts = legacyFacts.Where(IsParticipantVisible).ToArray(),
             ScoreboardGameplayFacts = scoreboardFacts.Where(IsParticipantVisible).ToArray(),
-            AwdRounds = awdRounds
+            AwdRounds = awdWindow.Rounds
                 .Where(round => publishedChallengeIds.Contains(round.CompetitionChallengeId))
+                .ToArray(),
+            AwdAggregates = factRows.AwdAggregates?
+                .Where(fact => publishedChallengeIds.Contains(fact.CompetitionChallengeId))
                 .ToArray()
         };
         var participantScoreboard = AddResponseMetadata(
@@ -331,6 +327,65 @@ public sealed class FusionLeaderboardCache(
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
         };
         return new(legacy, scoreboard);
+    }
+
+    private async Task<AwdScoreboardWindow> ReadAwdScoreboardWindowAsync(
+        IReadOnlyList<Guid> competitionChallengeIds,
+        DateTimeOffset projectedAt,
+        int? requestedEndingRound,
+        CancellationToken ct)
+    {
+        if (competitionChallengeIds.Count == 0)
+            return AwdScoreboardWindow.Empty;
+
+        var roundMetadata = db.ChallengeFlags.AsNoTracking()
+            .Where(flag => flag.DeletedAt == null
+                && flag.TeamId != null
+                && flag.CompetitionChallengeId != null
+                && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value)
+                && flag.SpecificationKind == SpecificationKind.AwdRound
+                && flag.SpecificationId != null
+                && flag.ValidStart != null
+                && flag.ValidUntil != null
+                && flag.ValidStart <= projectedAt)
+            .GroupBy(flag => flag.SpecificationId!.Value)
+            .Select(group => new
+            {
+                RoundId = group.Key,
+                StartsAt = group.Min(flag => flag.ValidStart!.Value),
+                EndsAt = group.Max(flag => flag.ValidUntil!.Value)
+            })
+            .OrderBy(round => round.StartsAt)
+            .ThenBy(round => round.RoundId);
+        var latestRound = await roundMetadata.CountAsync(ct);
+        if (latestRound == 0)
+            return AwdScoreboardWindow.Empty;
+
+        var endRound = Math.Clamp(requestedEndingRound ?? latestRound, 1, latestRound);
+        var startRound = Math.Max(1, endRound - ScoreboardRoundWindow.DefaultSize + 1);
+        var selected = await roundMetadata
+            .Skip(startRound - 1)
+            .Take(endRound - startRound + 1)
+            .ToListAsync(ct);
+        var selectedRoundIds = selected.Select(round => round.RoundId).ToArray();
+        var rounds = await db.ChallengeFlags.AsNoTracking()
+            .Where(flag => flag.DeletedAt == null
+                && flag.TeamId != null
+                && flag.CompetitionChallengeId != null
+                && competitionChallengeIds.Contains(flag.CompetitionChallengeId.Value)
+                && flag.SpecificationKind == SpecificationKind.AwdRound
+                && flag.SpecificationId != null
+                && selectedRoundIds.Contains(flag.SpecificationId.Value)
+                && flag.ValidStart != null
+                && flag.ValidUntil != null)
+            .Select(flag => new LeaderboardAwdRoundFact(
+                flag.CompetitionChallengeId!.Value,
+                flag.TeamId!.Value,
+                flag.SpecificationId!.Value,
+                flag.ValidStart!.Value,
+                flag.ValidUntil!.Value))
+            .ToListAsync(ct);
+        return new(rounds, startRound, endRound, latestRound);
     }
 
     public async Task RefreshAsync(Guid competitionId, CancellationToken ct)
@@ -456,5 +511,14 @@ public sealed class FusionLeaderboardCache(
                     : null
             }
         };
+    }
+
+    private sealed record AwdScoreboardWindow(
+        IReadOnlyList<LeaderboardAwdRoundFact> Rounds,
+        int? StartRound,
+        int? EndRound,
+        int? LatestRound)
+    {
+        public static AwdScoreboardWindow Empty { get; } = new([], null, null, null);
     }
 }

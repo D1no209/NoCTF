@@ -87,15 +87,19 @@ public sealed class GetScoreboardSlotDetailEndpoint(
             ? await leaderboard.GetFrozenScoreboardAsync(request.CompetitionId, cancellationToken)
             : await leaderboard.GetScoreboardAsync(request.CompetitionId, cancellationToken);
         if (projection is not null
-            && visibility.DataScope != LeaderboardDataScope.Frozen
             && request.EndingRound is int endingRound
-            && visibility.GameMode == NoCTF.Domain.Competitions.GameMode.Awdp)
+            && visibility.GameMode is NoCTF.Domain.Competitions.GameMode.Awdp
+                or NoCTF.Domain.Competitions.GameMode.Awd)
         {
-            projection = await snapshots.CreateScoreboardWindowAsync(
+            var sourceSnapshot = projection.Snapshot;
+            var window = await snapshots.CreateScoreboardWindowAsync(
                 request.CompetitionId,
                 endingRound,
-                projection.Snapshot.DataAsOf ?? projection.Snapshot.GeneratedAt,
+                sourceSnapshot.DataAsOf ?? sourceSnapshot.GeneratedAt,
                 cancellationToken);
+            projection = window is null
+                ? null
+                : ScoreboardAudienceProjection.PreserveSnapshotScope(window, sourceSnapshot);
         }
         if (projection is null)
             return Processing(request.CompetitionId);

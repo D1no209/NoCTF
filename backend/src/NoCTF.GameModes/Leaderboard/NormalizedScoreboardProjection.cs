@@ -139,10 +139,11 @@ internal static class NormalizedScoreboardProjection
             var allGlobalAdjustments = BuildGlobalAdjustments(scoreboardInput, team.Id, actorIndexes);
             var globalAdjustmentNet = allGlobalAdjustments.Aggregate(0L, (total, adjustment) =>
                 checked(total + adjustment.NetPoints));
-            var totalScore = scoreboardInput.Mode == GameMode.Awdp
+            var usesRoundWindow = scoreboardInput.Mode is GameMode.Awd or GameMode.Awdp;
+            var totalScore = usesRoundWindow
                 ? legacyRow?.Score ?? 0
                 : checked(slotNet + globalAdjustmentNet);
-            var scoreOutsideWindow = scoreboardInput.Mode == GameMode.Awdp
+            var scoreOutsideWindow = usesRoundWindow
                 ? checked(totalScore - slotNet - globalAdjustmentNet)
                 : 0;
             var attackScore = scoreboardInput.Mode == GameMode.Awdp
@@ -335,9 +336,15 @@ internal static class NormalizedScoreboardProjection
                 .OrderBy(round => round.StartsAt)
                 .ThenBy(round => round.RoundId)
                 .ToArray();
+            var awdWindowEnd = input.ScoreboardRoundWindowEnd
+                ?? input.ScoreboardLatestRound
+                ?? facts.Length;
+            var awdWindowStart = facts.Length == 0
+                ? (int?)null
+                : Math.Max(1, awdWindowEnd - facts.Length + 1);
             var rounds = facts.Select((round, index) => new ScoreboardRound(
                 round.RoundId,
-                index + 1,
+                awdWindowStart.GetValueOrDefault(1) + index,
                 round.StartsAt,
                 round.EndsAt,
                 round.EndsAt <= projectedAt ? round.EndsAt : null,
@@ -350,9 +357,9 @@ internal static class NormalizedScoreboardProjection
             return new(
                 rounds,
                 rounds.FirstOrDefault(round => round.State == ScoreboardRoundState.Running)?.Number,
-                rounds.FirstOrDefault()?.Number,
-                rounds.LastOrDefault()?.Number,
-                rounds.LastOrDefault()?.Number);
+                awdWindowStart,
+                facts.Length == 0 ? null : awdWindowEnd,
+                input.ScoreboardLatestRound ?? (facts.Length == 0 ? null : awdWindowEnd));
         }
 
         var duration = legacy.RoundDurationSeconds.GetValueOrDefault(300);

@@ -18,6 +18,7 @@ using NoCTF.Domain.Shared;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Leaderboard;
 using NoCTF.GameModes.Registration;
+using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Scoring;
 using NoCTF.Infrastructure.Caching;
@@ -353,23 +354,194 @@ public sealed class LeaderboardProjectionPersistenceTests
                 CompetitionStatus from,
                 CompetitionStatus to,
                 DateTimeOffset occurredAt) => new()
-            {
-                Id = Guid.CreateVersion7(occurredAt),
-                CompetitionId = competitionId,
-                Kind = CompetitionEventKind.CompetitionLifecycleChanged,
-                Level = CompetitionEventLevel.Information,
-                Visibility = CompetitionEventVisibility.Public,
-                PayloadJson = JsonSerializer.Serialize(new
                 {
-                    schemaVersion = 1,
-                    competitionStatus = to,
-                    from,
-                    to,
-                    automatic = true,
-                    reason = "test"
-                }),
-                OccurredAt = occurredAt
-            };
+                    Id = Guid.CreateVersion7(occurredAt),
+                    CompetitionId = competitionId,
+                    Kind = CompetitionEventKind.CompetitionLifecycleChanged,
+                    Level = CompetitionEventLevel.Information,
+                    Visibility = CompetitionEventVisibility.Public,
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        competitionStatus = to,
+                        from,
+                        to,
+                        automatic = true,
+                        reason = "test"
+                    }),
+                    OccurredAt = occurredAt
+                };
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Awd_long_history_uses_a_bounded_round_window_without_losing_total_score(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awd_bounded_round_window")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var projectedAt = DateTimeOffset.UtcNow;
+            var startedAt = projectedAt.AddHours(-2);
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+            var owner = CreateUser(projectedAt);
+            var fixture = CreateFixture(GameMode.Awd, 0, owner.Id, projectedAt);
+            fixture.Competition.StartAt = startedAt;
+            fixture.Competition.RunningSince = startedAt;
+            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(
+                AwdConfiguration.Default with { ServiceHealthyPoints = 100 },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var rounds = Enumerable.Range(1, 60)
+                .Select(number => new ChallengeFlag
+                {
+                    Id = Guid.CreateVersion7(startedAt.AddMinutes(number)),
+                    CompetitionChallengeId = fixture.CompetitionChallenge.Id,
+                    TeamId = fixture.Team.Id,
+                    Flag = $"flag{{round-{number}}}",
+                    FlagSha256 = new byte[32],
+                    SpecificationKind = SpecificationKind.AwdRound,
+                    SpecificationId = AwdRoundSpecificationId.FromRound(number).Value,
+                    ValidStart = startedAt.AddMinutes(number - 1),
+                    ValidUntil = startedAt.AddMinutes(number),
+                    CreatedAt = startedAt.AddMinutes(number - 1)
+                })
+                .ToArray();
+
+            db.Users.Add(owner);
+            db.Competitions.Add(fixture.Competition);
+            db.Challenges.Add(fixture.Challenge);
+            db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
+            db.Teams.Add(fixture.Team);
+            db.ChallengeFlags.AddRange(rounds);
+            await db.SaveChangesAsync(cancellationToken);
+
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.Leaderboards)
+                .Services
+                .BuildServiceProvider();
+            var cache = new FusionLeaderboardCache(
+                db,
+                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                Substitute.For<ILeaderboardRefreshPublisher>(),
+                cacheServices.GetRequiredService<IFusionCacheProvider>());
+
+            var latest = await cache.CreateScoreboardAsync(
+                fixture.Competition.Id,
+                projectedAt,
+                cancellationToken);
+            await Assert.That(latest).IsNotNull();
+            await Assert.That(latest!.Schema.Rounds.Select(round => round.Number))
+                .IsEquivalentTo(Enumerable.Range(11, ScoreboardRoundWindow.DefaultSize));
+            await Assert.That(latest.Schema.LatestRound).IsEqualTo(60);
+            var latestTeam = latest.Snapshot.Teams.Single();
+            await Assert.That(latestTeam.TotalScore).IsEqualTo(6_000);
+            await Assert.That(latestTeam.ScoreOutsideWindow).IsEqualTo(1_000);
+            await Assert.That(latestTeam.TotalScore).IsEqualTo(checked(
+                latestTeam.ScoreOutsideWindow
+                + latestTeam.Slots.Sum(slot => slot.NetPoints.GetValueOrDefault())
+                + latestTeam.GlobalAdjustments.Sum(adjustment => adjustment.NetPoints)));
+
+            var historical = await cache.CreateScoreboardWindowAsync(
+                fixture.Competition.Id,
+                50,
+                projectedAt,
+                cancellationToken);
+            await Assert.That(historical).IsNotNull();
+            await Assert.That(historical!.Schema.Rounds.Select(round => round.Number))
+                .IsEquivalentTo(Enumerable.Range(1, ScoreboardRoundWindow.DefaultSize));
+            var historicalTeam = historical.Snapshot.Teams.Single();
+            await Assert.That(historicalTeam.TotalScore).IsEqualTo(6_000);
+            await Assert.That(historicalTeam.ScoreOutsideWindow).IsEqualTo(1_000);
+
+            var firstAttacker = CreateApprovedTeam(
+                fixture.Competition.Id,
+                owner.Id,
+                "First attacker",
+                projectedAt.AddMinutes(-10));
+            var secondAttacker = CreateApprovedTeam(
+                fixture.Competition.Id,
+                owner.Id,
+                "Second attacker",
+                projectedAt.AddMinutes(-9));
+            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(
+                AwdConfiguration.Default with
+                {
+                    AttackRewardMode = AttackRewardMode.SplitVictimDefensePool,
+                    VictimDefensePoolPoints = 100,
+                    ServiceHealthyPoints = 0
+                },
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            db.Teams.AddRange(firstAttacker, secondAttacker);
+            db.GameplayFacts.AddRange(
+                CreateAttack(firstAttacker.Id, fixture.Team.Id, projectedAt.AddMinutes(-8)),
+                CreateAttack(secondAttacker.Id, fixture.Team.Id, projectedAt.AddMinutes(-7)));
+            await db.SaveChangesAsync(cancellationToken);
+
+            var sharedPool = await cache.CreateScoreboardAsync(
+                fixture.Competition.Id,
+                projectedAt,
+                cancellationToken);
+            await Assert.That(sharedPool).IsNotNull();
+            await Assert.That(sharedPool!.Snapshot.Teams
+                    .Single(team => team.TeamId == fixture.Team.Id).TotalScore)
+                .IsEqualTo(-100);
+            await Assert.That(sharedPool.Snapshot.Teams
+                    .Single(team => team.TeamId == firstAttacker.Id).TotalScore)
+                .IsEqualTo(50);
+            await Assert.That(sharedPool.Snapshot.Teams
+                    .Single(team => team.TeamId == secondAttacker.Id).TotalScore)
+                .IsEqualTo(50);
+
+            Team CreateApprovedTeam(
+                Guid competitionId,
+                Guid captainId,
+                string name,
+                DateTimeOffset registeredAt) => new()
+                {
+                    Id = Guid.CreateVersion7(registeredAt),
+                    CompetitionId = competitionId,
+                    Name = name,
+                    NormalizedName = name.ToUpperInvariant(),
+                    CaptainId = captainId,
+                    MemberIds = [captainId],
+                    InvitationToken = Guid.NewGuid().ToString("N"),
+                    RegistrationStatus = TeamRegistrationStatus.Approved,
+                    RegisteredAt = registeredAt
+                };
+
+            GameplayFact CreateAttack(
+                Guid attackerId,
+                Guid victimId,
+                DateTimeOffset occurredAt) => new()
+                {
+                    Id = Guid.CreateVersion7(occurredAt),
+                    CompetitionId = fixture.Competition.Id,
+                    CompetitionChallengeId = fixture.CompetitionChallenge.Id,
+                    TeamId = attackerId,
+                    ActorUserId = owner.Id,
+                    VictimTeamId = victimId,
+                    Kind = GameplayFactKind.FlagAttempt,
+                    OccurredAt = occurredAt,
+                    ReferenceKind = GameplayFactReferenceKind.AwdRound,
+                    ReferenceId = rounds[0].SpecificationId,
+                    Value = $"flag{{attack-{attackerId:N}}}",
+                    ValueSha256 = new byte[32],
+                    State = GameplayFactState.Completed,
+                    Result = GameplayFactResult.Correct,
+                    UpdatedAt = occurredAt
+                };
         });
     }
 
@@ -650,7 +822,8 @@ public sealed class LeaderboardProjectionPersistenceTests
                     .Where(command => command.Contains("gameplay_facts", StringComparison.OrdinalIgnoreCase))
                     .ToArray();
                 await Assert.That(factQueries.Length).IsGreaterThanOrEqualTo(1);
-                await Assert.That(factQueries.Length).IsLessThanOrEqualTo(2);
+                var maximumFactQueries = fixture.Competition.Mode == GameMode.Awd ? 5 : 2;
+                await Assert.That(factQueries.Length).IsLessThanOrEqualTo(maximumFactQueries);
                 await Assert.That(factQueries.Any(command =>
                         command.Contains("GROUP BY", StringComparison.OrdinalIgnoreCase)))
                     .IsTrue();
@@ -960,19 +1133,19 @@ public sealed class LeaderboardProjectionPersistenceTests
         Guid actorUserId,
         DateTimeOffset occurredAt,
         string value) => new()
-    {
-        Id = Guid.CreateVersion7(occurredAt),
-        CompetitionId = fixture.Competition.Id,
-        CompetitionChallengeId = fixture.CompetitionChallenge.Id,
-        TeamId = fixture.Team.Id,
-        ActorUserId = actorUserId,
-        Kind = GameplayFactKind.ManualAdjustment,
-        OccurredAt = occurredAt,
-        Value = value,
-        State = GameplayFactState.Completed,
-        Result = GameplayFactResult.Applied,
-        UpdatedAt = occurredAt
-    };
+        {
+            Id = Guid.CreateVersion7(occurredAt),
+            CompetitionId = fixture.Competition.Id,
+            CompetitionChallengeId = fixture.CompetitionChallenge.Id,
+            TeamId = fixture.Team.Id,
+            ActorUserId = actorUserId,
+            Kind = GameplayFactKind.ManualAdjustment,
+            OccurredAt = occurredAt,
+            Value = value,
+            State = GameplayFactState.Completed,
+            Result = GameplayFactResult.Applied,
+            UpdatedAt = occurredAt
+        };
 
     private static async Task ReprojectDirtyAsync(
         NoCtfDbContext db,

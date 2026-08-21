@@ -248,6 +248,8 @@ internal static class AwdLeaderboardProjection
         var competitiveTeams = input.Teams
             .Where(team => !team.IsBanned && !team.IsDeleted && team.AffectsCompetitiveResults)
             .ToDictionary(team => team.Id);
+        if (input.AwdAggregates is not null)
+            return ProjectAggregates(input, challenges, teams);
         var values = teams.Keys.ToDictionary(team => team, _ => 0L);
         var cellScores = new Dictionary<(Guid TeamId, Guid ChallengeId), long>();
         var cellSolves = new Dictionary<(Guid TeamId, Guid ChallengeId), (DateTimeOffset At, string? SolverName)>();
@@ -413,6 +415,103 @@ internal static class AwdLeaderboardProjection
                 solve.At == default ? null : solve.At,
                 solve.SolverName);
         }).ToList());
+        return (entries, cells);
+    }
+
+    private static (IReadOnlyList<LeaderboardEntry> Entries, IReadOnlyList<LeaderboardCellFact> Cells)
+        ProjectAggregates(
+            LeaderboardProjectionInput input,
+            IReadOnlyDictionary<Guid, LeaderboardChallengeFact> challenges,
+            IReadOnlyDictionary<Guid, LeaderboardTeamFact> teams)
+    {
+        var aggregates = input.AwdAggregates!
+            .Where(fact => teams.ContainsKey(fact.TeamId)
+                && challenges.ContainsKey(fact.CompetitionChallengeId))
+            .GroupBy(fact => (fact.TeamId, fact.CompetitionChallengeId))
+            .Select(group => new LeaderboardAwdAggregateFact(
+                group.Key.TeamId,
+                group.Key.CompetitionChallengeId,
+                group.Aggregate(0L, (total, fact) => checked(total + fact.Score)),
+                group.Aggregate(0L, (total, fact) => checked(total + fact.AttackPoints)),
+                group.Sum(fact => fact.AttackCount),
+                group.Sum(fact => fact.UpRoundCount),
+                group.Max(fact => fact.LastAttackAt)))
+            .ToArray();
+        var cells = ProjectionPenalties.ApplyManualAdjustments(input, aggregates
+            .Where(fact => fact.Score != 0 || fact.AttackCount != 0 || fact.UpRoundCount != 0)
+            .Select(fact => new LeaderboardCellFact(
+                fact.TeamId,
+                fact.CompetitionChallengeId,
+                fact.Score,
+                fact.LastAttackAt,
+                null))
+            .ToArray());
+        var cellsByTeam = cells
+            .GroupBy(cell => cell.TeamId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.ToDictionary(cell => cell.CompetitionChallengeId));
+        var attackPoints = aggregates
+            .GroupBy(fact => fact.TeamId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Aggregate(0L, (total, fact) => checked(total + fact.AttackPoints)));
+        var attackCounts = aggregates
+            .GroupBy(fact => fact.TeamId)
+            .ToDictionary(group => group.Key, group => group.Sum(fact => fact.AttackCount));
+        var upRoundCounts = aggregates
+            .GroupBy(fact => fact.TeamId)
+            .ToDictionary(group => group.Key, group => group.Sum(fact => fact.UpRoundCount));
+        var lastAttackAt = aggregates
+            .Where(fact => fact.LastAttackAt is not null)
+            .GroupBy(fact => fact.TeamId)
+            .ToDictionary(group => group.Key, group => group.Max(fact => fact.LastAttackAt));
+        var rows = teams.Values.Select(team =>
+        {
+            var teamCells = cellsByTeam.GetValueOrDefault(team.Id, []);
+            var score = teamCells.Values.Aggregate(0L, (total, cell) => checked(total + cell.Score));
+            var attackCount = attackCounts.GetValueOrDefault(team.Id);
+            return new AwdRankedEntry(
+                new LeaderboardEntry(
+                    0,
+                    team.Id,
+                    team.Name,
+                    score,
+                    attackCount,
+                    lastAttackAt.GetValueOrDefault(team.Id),
+                    team.TrackKey),
+                attackPoints.GetValueOrDefault(team.Id),
+                upRoundCounts.GetValueOrDefault(team.Id),
+                attackCount,
+                lastAttackAt.GetValueOrDefault(team.Id),
+                team.RegisteredAt);
+        });
+        var entries = rows
+            .GroupBy(row => row.Entry.TrackKey, StringComparer.OrdinalIgnoreCase)
+            .SelectMany(track => track
+                .OrderByDescending(row => row.Entry.Score)
+                .ThenByDescending(row => row.AttackPoints)
+                .ThenByDescending(row => row.UpRoundCount)
+                .ThenByDescending(row => row.AttackCount)
+                .ThenBy(row => row.LastAttackAt ?? DateTimeOffset.MaxValue)
+                .ThenBy(row => row.RegisteredAt)
+                .ThenBy(row => row.Entry.TeamId)
+                .Select((row, index) => row.Entry with
+                {
+                    Rank = index + 1,
+                    Cells = cellsByTeam.GetValueOrDefault(row.Entry.TeamId, [])
+                        .Values
+                        .OrderBy(cell => challenges[cell.CompetitionChallengeId].Order)
+                        .ThenBy(cell => cell.CompetitionChallengeId)
+                        .Select(cell => new LeaderboardCell(
+                            cell.CompetitionChallengeId,
+                            cell.Score,
+                            cell.SolvedAt,
+                            cell.SolverName,
+                            null))
+                        .ToArray()
+                }))
+            .ToArray();
         return (entries, cells);
     }
 
