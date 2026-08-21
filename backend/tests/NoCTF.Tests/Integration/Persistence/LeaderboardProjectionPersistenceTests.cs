@@ -376,6 +376,133 @@ public sealed class LeaderboardProjectionPersistenceTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Awdp_penalties_enter_the_total_only_after_their_round_settles(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awdp_penalty_settlement")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var firstProjectionAt = DateTimeOffset.UtcNow;
+            var startedAt = firstProjectionAt.AddSeconds(-90);
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+            var owner = CreateUser(firstProjectionAt);
+            var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, firstProjectionAt);
+            fixture.Competition.StartAt = startedAt;
+            fixture.Competition.RunningSince = startedAt;
+            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(new AwdpConfiguration(
+                AwdpConfiguration.CurrentSchemaVersion,
+                60,
+                new(100, 100, 2, ScoreDecayMode.Fixed),
+                new(100, 100, 2, ScoreDecayMode.Fixed),
+                FlagWrongPenalty: 7,
+                RequireBreakBeforeFix: false), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            var settledPenalty = fixture.Facts[0];
+            settledPenalty.OccurredAt = startedAt.AddSeconds(30);
+            settledPenalty.UpdatedAt = settledPenalty.OccurredAt;
+            settledPenalty.Result = GameplayFactResult.Wrong;
+            var pendingPenalty = new GameplayFact
+            {
+                Id = Guid.CreateVersion7(startedAt.AddSeconds(70)),
+                CompetitionId = fixture.Competition.Id,
+                CompetitionChallengeId = fixture.CompetitionChallenge.Id,
+                TeamId = fixture.Team.Id,
+                ActorUserId = owner.Id,
+                Kind = GameplayFactKind.BreakAttempt,
+                OccurredAt = startedAt.AddSeconds(70),
+                Value = "flag{current-round-wrong}",
+                ValueSha256 = new byte[32],
+                State = GameplayFactState.Completed,
+                Result = GameplayFactResult.Wrong,
+                UpdatedAt = startedAt.AddSeconds(70)
+            };
+
+            db.Users.Add(owner);
+            db.Competitions.Add(fixture.Competition);
+            db.Challenges.Add(fixture.Challenge);
+            db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
+            db.Teams.Add(fixture.Team);
+            db.GameplayFacts.AddRange(settledPenalty, pendingPenalty);
+            await db.SaveChangesAsync(cancellationToken);
+
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.Leaderboards)
+                .Services
+                .BuildServiceProvider();
+            var cache = new FusionLeaderboardCache(
+                db,
+                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                Substitute.For<ILeaderboardRefreshPublisher>(),
+                cacheServices.GetRequiredService<IFusionCacheProvider>());
+
+            var beforeSettlement = await cache.CreateBundleAsync(
+                fixture.Competition.Id,
+                firstProjectionAt,
+                cancellationToken);
+            var finishedAt = startedAt.AddSeconds(100);
+            fixture.Competition.Status = CompetitionStatus.Finished;
+            fixture.Competition.UpdatedAt = finishedAt;
+            db.CompetitionEvents.AddRange(
+                LifecycleEvent(
+                    fixture.Competition.Id,
+                    CompetitionStatus.Published,
+                    CompetitionStatus.Running,
+                    startedAt),
+                LifecycleEvent(
+                    fixture.Competition.Id,
+                    CompetitionStatus.Running,
+                    CompetitionStatus.Finished,
+                    finishedAt));
+            await db.SaveChangesAsync(cancellationToken);
+            var afterSettlement = await cache.CreateBundleAsync(
+                fixture.Competition.Id,
+                finishedAt,
+                cancellationToken);
+
+            await Assert.That(beforeSettlement).IsNotNull();
+            await Assert.That(beforeSettlement!.Scoreboard.Snapshot.Teams.Single().TotalScore)
+                .IsEqualTo(-7);
+            await Assert.That(afterSettlement).IsNotNull();
+            await Assert.That(afterSettlement!.Scoreboard.Snapshot.Teams.Single().TotalScore)
+                .IsEqualTo(-14);
+
+            static CompetitionEvent LifecycleEvent(
+                Guid competitionId,
+                CompetitionStatus from,
+                CompetitionStatus to,
+                DateTimeOffset occurredAt) => new()
+                {
+                    Id = Guid.CreateVersion7(occurredAt),
+                    CompetitionId = competitionId,
+                    Kind = CompetitionEventKind.CompetitionLifecycleChanged,
+                    Level = CompetitionEventLevel.Information,
+                    Visibility = CompetitionEventVisibility.Public,
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        competitionStatus = to,
+                        from,
+                        to,
+                        automatic = true,
+                        reason = "test"
+                    }),
+                    OccurredAt = occurredAt
+                };
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Awd_long_history_uses_a_bounded_round_window_without_losing_total_score(
         CancellationToken cancellationToken)
     {

@@ -219,6 +219,7 @@ public sealed class FusionLeaderboardCache(
             db,
             competitionId,
             competition.Mode,
+            competitionStatusAtProjection,
             competitionConfigurationJson ?? competition.ConfigurationJson,
             competition.StartAt,
             lifecycle,
