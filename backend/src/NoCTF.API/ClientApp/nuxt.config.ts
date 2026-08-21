@@ -1,5 +1,11 @@
 import tailwindcss from '@tailwindcss/vite'
 
+const environment = (
+  globalThis as typeof globalThis & { process?: { env?: Record<string, string | undefined> } }
+).process?.env
+const apiProxyTarget = environment?.NUXT_API_PROXY_TARGET ?? 'http://localhost:5080'
+const apiProxySecure = environment?.NUXT_API_PROXY_SECURE !== 'false'
+
 export default defineNuxtConfig({
   ssr: false,
   devtools: {
@@ -36,13 +42,14 @@ export default defineNuxtConfig({
     server: {
       strictPort: true,
       proxy: {
-        '/api': { target: 'http://localhost:5080', changeOrigin: true },
+        '/api': { target: apiProxyTarget, changeOrigin: true, secure: apiProxySecure },
         '/hubs': {
-          target: 'http://localhost:5080',
+          target: apiProxyTarget,
           changeOrigin: true,
+          secure: apiProxySecure,
           ws: true,
         },
-        '/health': { target: 'http://localhost:5080', changeOrigin: true },
+        '/health': { target: apiProxyTarget, changeOrigin: true, secure: apiProxySecure },
       },
     },
   },
