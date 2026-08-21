@@ -30,6 +30,9 @@ public sealed class RequestAwdpDefenseTargetTests
         AwdpDefenseTargetRequestState.ActiveTargetExists,
         AwdpDefenseTargetRequestFailureCode.ActiveDefenseTargetExists)]
     [Arguments(
+        AwdpDefenseTargetRequestState.AchievementAlreadySucceeded,
+        AwdpDefenseTargetRequestFailureCode.DefenseAlreadySucceeded)]
+    [Arguments(
         AwdpDefenseTargetRequestState.BreakRequired,
         AwdpDefenseTargetRequestFailureCode.BreakRequired)]
     [Arguments(

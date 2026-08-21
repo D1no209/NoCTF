@@ -197,6 +197,15 @@ public sealed class AwdpGameplayFactEvaluator(IGameplayFactEvaluator inner) : IG
             return ModeGameplayFactEvaluatorRules.Reject(submission, GameplayFactFailureCode.FlagNotSupported);
         if (submission.Kind != GameplayFactKind.BreakAttempt)
             return inner.Evaluate(context);
+        if (context.PriorFacts.Any(fact =>
+                fact.Kind == GameplayFactKind.BreakAttempt
+                && fact.Result == GameplayFactResult.Correct))
+        {
+            return new(
+                GameplayFactResult.Duplicate,
+                GameplayFactFailureCode.DuplicateAchievement,
+                submission.OccurredAt);
+        }
 
         var exactContext = context with
         {

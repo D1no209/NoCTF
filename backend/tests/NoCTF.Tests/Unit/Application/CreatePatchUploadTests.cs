@@ -116,6 +116,34 @@ public sealed class CreatePatchUploadTests
             .IsEqualTo(registry.RegisteredFileId);
     }
 
+    [Test]
+    public async Task Successful_defense_returns_the_stable_failure_and_cleans_the_new_file()
+    {
+        var store = new RejectingPatchUploadStore(
+            saveState: PatchUploadSaveState.AchievementAlreadySucceeded);
+        var objects = new RecordingObjectStorage();
+        var registry = new RecordingUploadRegistry();
+        var useCase = new CreatePatchUpload(
+            store,
+            new ManagedFileUploads(registry, objects));
+        await using var archive = new MemoryStream(CreatePatchArchive());
+
+        var result = await useCase.ExecuteAsync(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            "fix.tar.gz",
+            "application/gzip",
+            archive,
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(PatchUploadFailureCode.DefenseAlreadySucceeded);
+        await Assert.That(registry.AbandonedFileId)
+            .IsEqualTo(registry.RegisteredFileId);
+    }
+
     private static byte[] CreatePatchArchive()
     {
         using var output = new MemoryStream();

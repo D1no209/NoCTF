@@ -1,5 +1,6 @@
 using NoCTF.Application.GameplayFacts.Intake;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Gameplay;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -44,6 +45,31 @@ public class GameplayFactAdmissionPolicyTests
             var result = Check(Snapshot(status), DateTimeOffset.UtcNow);
             await Assert.That(result.Succeeded).IsFalse();
         }
+    }
+
+    [Test]
+    [Arguments(GameplayFactKind.BreakAttempt, true, false)]
+    [Arguments(GameplayFactKind.FixAttempt, false, true)]
+    public async Task Successful_AWDP_achievement_rejects_later_attempts(
+        GameplayFactKind kind,
+        bool hasCorrectBreak,
+        bool hasCorrectFix)
+    {
+        var snapshot = Snapshot(CompetitionStatus.Running) with
+        {
+            Mode = GameMode.Awdp,
+            HasCorrectBreak = hasCorrectBreak,
+            HasCorrectFix = hasCorrectFix
+        };
+
+        var result = GameplayFactAdmissionPolicy.Check(
+            snapshot,
+            kind,
+            new(true, true, null, null),
+            DateTimeOffset.UtcNow);
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(GameplayFactAdmissionFailureCode.AchievementAlreadySucceeded);
     }
 
     private static GameplayFactAdmissionSnapshot Snapshot(CompetitionStatus status) => new(

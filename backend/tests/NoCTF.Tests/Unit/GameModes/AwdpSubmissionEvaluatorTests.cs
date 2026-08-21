@@ -48,7 +48,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
     }
 
     [Test]
-    public async Task Break_after_prior_correct_remains_correct()
+    public async Task Queued_break_after_prior_correct_is_ignored_as_duplicate()
     {
         const string flag = "flag{awdp-repeat}";
         var receivedAt = DateTimeOffset.UtcNow;
@@ -101,8 +101,9 @@ public sealed class AwdpGameplayFactEvaluatorTests
         var decision = new AwdpGameplayFactEvaluator(new DefaultEfGameplayFactEvaluator())
             .Evaluate(context);
 
-        await Assert.That(decision.Result).IsEqualTo(GameplayFactResult.Correct);
-        await Assert.That(decision.FailureCode).IsNull();
+        await Assert.That(decision.Result).IsEqualTo(GameplayFactResult.Duplicate);
+        await Assert.That(decision.FailureCode)
+            .IsEqualTo(GameplayFactFailureCode.DuplicateAchievement);
     }
 
     [Test]

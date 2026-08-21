@@ -133,6 +133,7 @@ public enum GameplayFactAdmissionFailureCodeProtocol
     CompetitionFinished,
     CompetitionUnavailable,
     BreakRequired,
+    AchievementAlreadySucceeded,
     AttemptsExhausted,
     FlagInvalid,
     FlagBatchNotSupported,
@@ -140,6 +141,10 @@ public enum GameplayFactAdmissionFailureCodeProtocol
     GameplayFactConcurrency,
     PatchUploadNotFound
 }
+
+public sealed record GameplayFactAdmissionFailureResponse(
+    GameplayFactAdmissionFailureCodeProtocol Code,
+    string? Detail);
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Target)]
 public static partial class GameplayFactMapper
@@ -186,7 +191,8 @@ internal static class GameplayFactProblemDetails
         AdmissionFailureCode.TeamBanned or AdmissionFailureCode.TeamForbidden =>
             StatusCodes.Status403Forbidden,
         AdmissionFailureCode.CompetitionFinished or AdmissionFailureCode.CompetitionNotStarted
-            or AdmissionFailureCode.BreakRequired =>
+            or AdmissionFailureCode.BreakRequired
+            or AdmissionFailureCode.AchievementAlreadySucceeded =>
             StatusCodes.Status409Conflict,
         _ => StatusCodes.Status400BadRequest
     };
@@ -242,7 +248,8 @@ public sealed record FlagGameplayFactAcceptedResponse(
 
 public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userContext)
     : Endpoint<SubmitFlagRequest,
-        Results<Accepted<FlagGameplayFactAcceptedResponse>, ProblemHttpResult>>
+        Results<Accepted<FlagGameplayFactAcceptedResponse>,
+            Conflict<GameplayFactAdmissionFailureResponse>, ProblemHttpResult>>
 {
     public override void Configure()
     {
@@ -252,8 +259,6 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
             .WithMetadata(new EnableRateLimitingAttribute("submission"))
             .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
                 StatusCodes.Status403Forbidden)
-            .ProducesProblemFE<Microsoft.AspNetCore.Mvc.ProblemDetails>(
-                StatusCodes.Status409Conflict)
             .Produces(StatusCodes.Status429TooManyRequests));
         Summary(summary =>
         {
@@ -263,7 +268,8 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
         });
     }
 
-    public override async Task<Results<Accepted<FlagGameplayFactAcceptedResponse>, ProblemHttpResult>> ExecuteAsync(
+    public override async Task<Results<Accepted<FlagGameplayFactAcceptedResponse>,
+        Conflict<GameplayFactAdmissionFailureResponse>, ProblemHttpResult>> ExecuteAsync(
         SubmitFlagRequest request,
         CancellationToken cancellationToken)
     {
@@ -278,10 +284,19 @@ public sealed class SubmitFlagEndpoint(SubmitFlag submitFlag, IUserContext userC
             DateTimeOffset.UtcNow,
             cancellationToken);
         if (!result.Succeeded)
+        {
+            if (GameplayFactProblemDetails.StatusFor(result.FailureCode)
+                == StatusCodes.Status409Conflict)
+            {
+                return TypedResults.Conflict(new GameplayFactAdmissionFailureResponse(
+                    GameplayFactMapper.ToProtocol(result.FailureCode!.Value),
+                    result.ErrorMessage));
+            }
             return GameplayFactProblemDetails.Create(
                 GameplayFactProblemDetails.StatusFor(result.FailureCode),
                 result.FailureCode,
                 result.ErrorMessage);
+        }
         var accepted = new List<FlagGameplayFactItem>(values.Count);
         foreach (var submission in result.Value!)
         {

@@ -115,6 +115,10 @@ public sealed class SubmitFlag(IGameplayFactIntakeStore store, IGameplayFactAdmi
     {
         GameplayFactAcceptanceState.Created =>
             OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Success(new(result.GameplayFactId!.Value, result.OccurredAt!.Value)),
+        GameplayFactAcceptanceState.AchievementAlreadySucceeded =>
+            OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
+                GameplayFactAdmissionFailureCode.AchievementAlreadySucceeded,
+                "This AWDP attack achievement has already succeeded."),
         GameplayFactAcceptanceState.AttemptsExhausted =>
             OperationResult<GameplayFactAccepted, GameplayFactAdmissionFailureCode>.Failure(
                 GameplayFactAdmissionFailureCode.AttemptsExhausted, "The maximum number of accepted attempts has been reached."),

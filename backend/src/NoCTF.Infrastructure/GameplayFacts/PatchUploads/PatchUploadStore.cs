@@ -81,6 +81,15 @@ public sealed class PatchUploadStore(
             .SingleOrDefaultAsync(ct);
         if (available is null)
             return null;
+        var defenseAlreadySucceeded = await db.GameplayFacts.AsNoTracking().AnyAsync(fact =>
+            fact.CompetitionId == competitionId
+            && fact.CompetitionChallengeId == competitionChallengeId
+            && fact.TeamId == team.Id
+            && fact.Kind == GameplayFactKind.FixAttempt
+            && fact.Result == GameplayFactResult.Correct,
+            ct);
+        if (defenseAlreadySucceeded)
+            return null;
         var configuration = AwdpConfigurationResolver.Resolve(
             available.ConfigurationJson,
             available.RulesJson,
@@ -158,6 +167,8 @@ public sealed class PatchUploadStore(
             ct);
         if (admission is null || admission.CompetitionStatus != CompetitionStatus.Running)
             return new(PatchUploadSaveState.DefenseTargetNotReady);
+        if (admission.HasCorrectFix)
+            return new(PatchUploadSaveState.AchievementAlreadySucceeded);
         var context = await db.CompetitionChallenges.AsNoTracking()
             .Where(challenge => challenge.Id == scope.CompetitionChallengeId)
             .Join(

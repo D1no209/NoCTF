@@ -566,6 +566,8 @@ public sealed class GameplayFactProcessor(
     {
         if (submission.Kind != GameplayFactKind.BreakAttempt)
             return;
+        if (submission.FailureCode == GameplayFactFailureCode.DuplicateAchievement)
+            return;
 
         var isAwdp = await db.Competitions
             .Where(competition => competition.Id == submission.CompetitionId)

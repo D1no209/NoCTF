@@ -24,7 +24,8 @@ public sealed record GameplayFactAdmissionSnapshot(
     bool TeamBanned,
     bool TeamApproved,
     bool UserBelongsToTeam,
-    bool HasCorrectBreak = false);
+    bool HasCorrectBreak = false,
+    bool HasCorrectFix = false);
 
 public sealed record GameplayFactAdmissionRules(
     bool AllowsFlag,
@@ -44,6 +45,7 @@ public interface IGameplayFactAdmissionModePolicy
 public enum GameplayFactAcceptanceState
 {
     Created,
+    AchievementAlreadySucceeded,
     AttemptsExhausted,
     SnapshotChanged
 }

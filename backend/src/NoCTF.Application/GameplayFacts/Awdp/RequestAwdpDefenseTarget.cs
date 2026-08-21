@@ -8,6 +8,7 @@ public enum AwdpDefenseTargetRequestState
     Created,
     ScopeNotFound,
     ActiveTargetExists,
+    AchievementAlreadySucceeded,
     BreakRequired,
     AttemptsExhausted,
     InvalidConfiguration,
@@ -18,6 +19,7 @@ public enum AwdpDefenseTargetRequestFailureCode
 {
     DefenseNotAvailable,
     ActiveDefenseTargetExists,
+    DefenseAlreadySucceeded,
     BreakRequired,
     FixAttemptsExhausted,
     InvalidRuntimeConfiguration,
@@ -70,6 +72,10 @@ public sealed class RequestAwdpDefenseTarget(IAwdpDefenseTargetStore store)
                 Failure(
                     AwdpDefenseTargetRequestFailureCode.ActiveDefenseTargetExists,
                     "An active one-shot defense target already exists."),
+            AwdpDefenseTargetRequestState.AchievementAlreadySucceeded =>
+                Failure(
+                    AwdpDefenseTargetRequestFailureCode.DefenseAlreadySucceeded,
+                    "This AWDP defense achievement has already succeeded."),
             AwdpDefenseTargetRequestState.BreakRequired =>
                 Failure(
                     AwdpDefenseTargetRequestFailureCode.BreakRequired,

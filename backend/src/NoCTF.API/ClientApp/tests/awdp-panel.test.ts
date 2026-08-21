@@ -54,8 +54,38 @@ describe('AWDP participant panel', () => {
     ).text()
 
     expect(source).not.toContain('loadError')
-    expect(source).not.toContain('<Alert')
     expect(source).not.toContain('加载 AWDP 状态失败')
+  })
+
+  test('locks both action axes after their first success', async () => {
+    const source = await Bun.file(
+      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    ).text()
+
+    expect(source).toContain('<Alert v-if="state?.breakActivation"')
+    expect(source).toContain('<FlagSubmit')
+    expect(source).toContain('v-else')
+    expect(source).toContain('攻击成果已锁定')
+    expect(source).toContain('后续 Flag 不再受理')
+    expect(source).toContain('<Alert v-if="state?.fixActivation"')
+    expect(source).toContain('<FixSubmit')
+    expect(source).toContain('防御成果已锁定')
+    expect(source).toContain('无需再次申请防御验证')
+  })
+
+  test('surfaces stable success-lock failures from generated SDK contracts', async () => {
+    const flag = await Bun.file(
+      new URL('../app/components/challenges/FlagSubmit.vue', import.meta.url),
+    ).text()
+    const fix = await Bun.file(
+      new URL('../app/components/challenges/FixSubmit.vue', import.meta.url),
+    ).text()
+
+    expect(flag).toContain('NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol')
+    expect(flag).toContain("code === 'AchievementAlreadySucceeded'")
+    expect(flag).toContain('本题攻击已成功，后续 Flag 不再受理。')
+    expect(fix).toContain('DefenseAlreadySucceeded')
+    expect(fix).toContain('本题防御已成功，后续 Fix 不再受理。')
   })
 
   test('keeps the challenge page and Fix history as sibling routes', async () => {

@@ -69,6 +69,14 @@ public sealed class GameplayFactIntakeStore(
             received[0].CompetitionChallengeId,
             received[0].UserId,
             cancellationToken);
+        if (current is not null
+            && current.Mode == GameMode.Awdp
+            && received[0].Kind == GameplayFactKind.BreakAttempt
+            && current.HasCorrectBreak)
+        {
+            return received.Select(_ => new GameplayFactAcceptanceResult(
+                GameplayFactAcceptanceState.AchievementAlreadySucceeded)).ToArray();
+        }
         if (!GameplayFactAdmissionPersistence.Matches(snapshot, current)
             || current!.CompetitionStatus != CompetitionStatus.Running)
             return received.Select(_ => new GameplayFactAcceptanceResult(

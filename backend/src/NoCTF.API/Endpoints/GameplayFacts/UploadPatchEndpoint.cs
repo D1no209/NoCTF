@@ -30,6 +30,7 @@ public enum UploadPatchFailureCodeProtocol
     ArchiveStreamNotSeekable,
     ArchiveInvalid,
     DefenseTargetNotReady,
+    DefenseAlreadySucceeded,
     FixAttemptsExhausted,
     DefenseTargetConsumed
 }
@@ -101,6 +102,11 @@ public sealed class UploadPatchEndpoint(
             {
                 return TypedResults.Conflict(new UploadPatchFailureResponse(
                     UploadPatchFailureCodeProtocol.DefenseTargetNotReady));
+            }
+            if (result.FailureCode is PatchUploadFailureCode.DefenseAlreadySucceeded)
+            {
+                return TypedResults.Conflict(new UploadPatchFailureResponse(
+                    UploadPatchFailureCodeProtocol.DefenseAlreadySucceeded));
             }
             if (result.FailureCode is PatchUploadFailureCode.AttemptsExhausted)
             {

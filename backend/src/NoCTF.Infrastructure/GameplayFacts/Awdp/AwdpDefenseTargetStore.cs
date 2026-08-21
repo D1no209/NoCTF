@@ -92,6 +92,17 @@ public sealed class AwdpDefenseTargetStore(
         if (context is null)
             return new(AwdpDefenseTargetRequestState.ScopeNotFound);
 
+        var admission = await GameplayFactAdmissionPersistence.LoadAsync(
+            db,
+            competitionId,
+            competitionChallengeId,
+            userId,
+            cancellationToken);
+        if (admission is null)
+            return new(AwdpDefenseTargetRequestState.ScopeNotFound);
+        if (admission.HasCorrectFix)
+            return new(AwdpDefenseTargetRequestState.AchievementAlreadySucceeded);
+
         var activeTargetExists = await db.RuntimeInstances.AnyAsync(instance =>
             instance.CompetitionId == competitionId
             && instance.CompetitionChallengeId == competitionChallengeId
@@ -119,14 +130,6 @@ public sealed class AwdpDefenseTargetStore(
             template = configuration.Runtime;
             if (template is null || configuration.Checker is null)
                 return new(AwdpDefenseTargetRequestState.InvalidConfiguration);
-            var admission = await GameplayFactAdmissionPersistence.LoadAsync(
-                db,
-                competitionId,
-                competitionChallengeId,
-                userId,
-                cancellationToken);
-            if (admission is null)
-                return new(AwdpDefenseTargetRequestState.ScopeNotFound);
             if (configuration.MaxFixSubmissions > 0
                 && admission.AcceptedFixAttempts >= configuration.MaxFixSubmissions)
             {

@@ -22,7 +22,7 @@ public sealed class EndpointOutcomeOpenApiTests
                     ["400"] = ResponseBodyKind.Problem,
                     ["401"] = ResponseBodyKind.Empty,
                     ["403"] = ResponseBodyKind.Problem,
-                    ["409"] = ResponseBodyKind.Problem,
+                    ["409"] = ResponseBodyKind.Json,
                     ["429"] = ResponseBodyKind.Empty
                 }),
             new OutcomeContract(
