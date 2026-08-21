@@ -13,6 +13,7 @@ public sealed class ListChallengesRequest
 
 public sealed class ListChallengesEndpoint(
     ListChallenges list,
+    ICompetitionChallengeAudienceAccess audienceAccess,
     ICompetitionVisibilityAccess visibilityAccess,
     IUserContext user) : Endpoint<ListChallengesRequest, Results<Ok<ChallengeListResponse>, NotFound>>
 {
@@ -28,6 +29,8 @@ public sealed class ListChallengesEndpoint(
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
+        if (!await audienceAccess.CanReadAsync(user.UserId, competitionId, ct))
+            return TypedResults.NotFound();
         var visibility = await visibilityAccess.ResolveAsync(
             user.UserId,
             competitionId,

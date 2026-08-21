@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Activity, FileCheck, LayoutDashboard, MessageCircleQuestion, Orbit, Puzzle, Trophy, UserRound, Users } from '@lucide/vue'
-import { getCompetitionEndpoint } from '~/api'
-import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
+import { getCompetitionEndpoint, getMyTeamEndpoint } from '~/api'
+import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
 import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
 
 const route = useRoute()
@@ -13,9 +13,25 @@ const isControlScreen = computed(() => [
 const isChallengeIndex = computed(() => route.path === `/competitions/${competitionId.value}/challenges`)
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
+const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const { user } = useAuth()
 const hasCompetitionStaffAccess = computed(() => competition.value?.administrationRole != null)
+const hasParticipantChallengeAccess = computed(() =>
+  myTeam.value?.registrationStatus === 'Approved' && !myTeam.value.isBanned,
+)
+
+async function refreshMyTeam() {
+  if (!user.value || hasCompetitionStaffAccess.value) {
+    myTeam.value = null
+    return
+  }
+  const { data, error: teamError } = await getMyTeamEndpoint({
+    path: { competitionId: competitionId.value },
+  })
+  myTeam.value = teamError || !data ? null : data
+}
 
 async function refresh() {
   const { data, error: err } = await getCompetitionEndpoint({
@@ -31,6 +47,12 @@ async function refresh() {
 }
 
 await refresh()
+await refreshMyTeam()
+
+watch(
+  [() => user.value?.userId, hasCompetitionStaffAccess],
+  () => void refreshMyTeam(),
+)
 
 // 竞赛生命周期实时变更 → 重新拉取详情
 let unwatch: (() => void) | undefined
@@ -48,12 +70,13 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
   const challengesVisible = competition.value?.status === 'Running'
     || competition.value?.status === 'Paused'
     || competition.value?.status === 'Finished'
+  const canReadChallenges = hasCompetitionStaffAccess.value || hasParticipantChallengeAccess.value
   return [
     {
       label: translate("竞赛"),
       items: [
         { to: base, label: translate("概览"), icon: LayoutDashboard, exact: true },
-        ...(challengesVisible ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : []),
+        ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : []),
         { to: `${base}/leaderboard`, label: translate("记分板"), icon: Trophy },
         ...(competition.value?.mode === 'Ctf' ? [{ to: `${base}/live`, label: translate("3D 大屏"), icon: Orbit }] : []),
         ...(hasCompetitionStaffAccess.value && competition.value?.mode === 'Awdp'

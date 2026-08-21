@@ -72,6 +72,14 @@ public static class ParticipantChallengeVisibilityPolicy
             or CompetitionStatus.Finished;
 }
 
+public interface ICompetitionChallengeAudienceAccess
+{
+    Task<bool> CanReadAsync(
+        Guid userId,
+        Guid competitionId,
+        CancellationToken cancellationToken);
+}
+
 public interface IChallengeManagementStore
 {
     Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken cancellationToken);
