@@ -135,8 +135,12 @@ public sealed class CompetitionEvent
                 || value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
                 return null;
 
-            return value.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            var result = value.Deserialize<T>(new JsonSerializerOptions(JsonSerializerDefaults.Web)
                 { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } });
+
+            return typeof(T).IsEnum && !Enum.IsDefined(typeof(T), result)
+                ? null
+                : result;
         }
         catch (JsonException)
         {
