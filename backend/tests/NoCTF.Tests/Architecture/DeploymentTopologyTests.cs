@@ -42,9 +42,9 @@ public sealed class DeploymentTopologyTests
         await Assert.That(hostProgram).Contains("ConfigureNoCtfWorkerMessaging");
         await Assert.That(hostProgram).Contains("ConfigureNoCtfRunnerMessaging");
         await Assert.That(routing)
-            .Contains("PublishMessage<CompetitionEventCommitted>()");
+            .Contains("Route<CompetitionEventCommitted>(options, WorkerQueue.Background)");
         await Assert.That(routing)
-            .Contains("PublishMessage<CompleteAwdpFixRecovery>()");
+            .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
         foreach (var workerQueue in new[]
                  {
                      "WorkerQueue.Control",
