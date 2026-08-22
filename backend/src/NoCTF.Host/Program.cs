@@ -6,6 +6,7 @@ using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
+using NoCTF.Hosting.Observability;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Runner;
@@ -85,8 +86,12 @@ builder.UseWolverine(options =>
     }
 });
 builder.Services.AddNoCtfRoleHealthChecks(builder.Configuration, roles, development);
+builder.Services.AddNoCtfObservability(
+    builder.Configuration,
+    $"noctf-host-{string.Join('-', roles.Values).ToLowerInvariant()}");
 
 var app = builder.Build();
+app.UseNoCtfObservability();
 if (development && (roles.Has(HostRole.Api) || roles.Has(HostRole.Worker)))
     await app.Services.InitializeNoCtfAsync();
 if (roles.Has(HostRole.Api))

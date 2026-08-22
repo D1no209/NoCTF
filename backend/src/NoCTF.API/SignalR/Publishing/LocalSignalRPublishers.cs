@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Observability;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Notifications;
 
@@ -10,13 +12,32 @@ namespace NoCTF.API.SignalR.Publishing;
 public sealed class LocalLeaderboardRefreshPublisher(
     IHubContext<CompetitionHub> hub) : ILeaderboardRefreshPublisher
 {
-    public Task PublishAsync(
+    public async Task PublishAsync(
         ScoreboardProjection projection,
-        CancellationToken cancellationToken) =>
-        hub.Clients.Group($"competition:{projection.Snapshot.CompetitionId:N}").SendAsync(
-            "scoreboardUpdated",
-            ScoreboardUpdated.From(projection),
-            cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var started = Stopwatch.GetTimestamp();
+        var outcome = "success";
+        try
+        {
+            await hub.Clients.Group($"competition:{projection.Snapshot.CompetitionId:N}").SendAsync(
+                "scoreboardUpdated",
+                ScoreboardUpdated.From(projection),
+                cancellationToken);
+        }
+        catch
+        {
+            outcome = "failure";
+            throw;
+        }
+        finally
+        {
+            NoCtfTelemetry.RecordSignalRPublish(
+                "leaderboard",
+                outcome,
+                Stopwatch.GetElapsedTime(started).TotalSeconds);
+        }
+    }
 }
 
 public sealed class LocalGameplayFactStatePublisher(

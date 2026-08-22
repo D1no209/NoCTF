@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Notifications;
+using NoCTF.Application.Observability;
 using NoCTF.Application.Scoring.Leaderboard;
 
 namespace NoCTF.API.SignalR.Hubs;
@@ -10,6 +11,18 @@ namespace NoCTF.API.SignalR.Hubs;
 public sealed class CompetitionHub(
     ICompetitionHubAccess access) : Hub
 {
+    public override async Task OnConnectedAsync()
+    {
+        NoCtfTelemetry.SignalRConnected("competition");
+        await base.OnConnectedAsync();
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        NoCtfTelemetry.SignalRDisconnected("competition");
+        await base.OnDisconnectedAsync(exception);
+    }
+
     public async Task JoinCompetition(Guid competitionId)
     {
         if (!Guid.TryParse(Context.UserIdentifier, out var userId)

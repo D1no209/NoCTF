@@ -1,0 +1,65 @@
+groups:
+  - name: noctf-saturation-and-latency
+    rules:
+      - alert: NoCtfCriticalQueueDelayed
+        expr: max by (queue) (noctf_worker_queue_oldest_age_seconds{queue=~"noctf-control|noctf-gameplay"}) > 15
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "NoCTF 关键队列等待超过 15 秒"
+
+      - alert: NoCtfRuntimeWaitingTooLong
+        expr: max(noctf_runtime_waiting_oldest_age_seconds) > 30
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Runtime 最长等待时间超过 30 秒"
+
+      - alert: NoCtfLeaderboardDirtyTooLong
+        expr: max(noctf_leaderboard_dirty_oldest_age_seconds) > 45
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: "排行榜脏标记超过 45 秒"
+
+      - alert: NoCtfApiP95High
+        expr: histogram_quantile(0.95, sum by (le, endpoint) (rate(noctf_api_request_duration_seconds_bucket[5m]))) > 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "API P95 持续高于 800ms"
+
+      - alert: NoCtfApiServerErrorRateHigh
+        expr: sum(rate(noctf_api_requests_total{outcome="server_error"}[5m])) / clamp_min(sum(rate(noctf_api_requests_total[5m])), 1) > 0.02
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "API 5xx 比例超过 2%"
+
+      - alert: NoCtfPostgresConnectionsHigh
+        expr: sum(pg_stat_activity_count) / clamp_min(pg_settings_max_connections, 1) > 0.8
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "PostgreSQL 连接使用率超过 80%"
+
+      - alert: NoCtfRedisP99High
+        expr: histogram_quantile(0.99, sum by (le, endpoint) (rate(noctf_redis_operation_duration_seconds_bucket[5m]))) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "NoCTF Redis 操作 P99 超过 50ms"
+
+      - alert: NoCtfRunnerCapacityLow
+        expr: min by (pool) (noctf_runner_capacity_available_ratio) < 0.15
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: "Runner 资源池剩余容量低于 15%"
+
+      - alert: NoCtfDiskSpaceLow
+        expr: min by (instance) (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 0.15
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "主机磁盘剩余空间低于 15%"

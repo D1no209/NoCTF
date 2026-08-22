@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
+using NoCTF.Hosting.Observability;
 using NoCTF.Infrastructure;
 using NoCTF.Worker;
 using Wolverine;
@@ -17,7 +18,9 @@ builder.UseWolverine(options =>
     options.ConfigureNoCtfWorkerMessaging();
 });
 builder.Services.AddNoCtfRoleHealthChecks(builder.Configuration, roles);
+builder.Services.AddNoCtfObservability(builder.Configuration, "noctf-worker");
 
 var app = builder.Build();
+app.UseNoCtfObservability();
 app.MapNoCtfHealthChecks();
 await app.RunAsync();

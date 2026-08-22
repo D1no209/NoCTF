@@ -15,6 +15,7 @@ using NoCTF.Infrastructure.GameplayFacts;
 using NoCTF.Infrastructure.Teams;
 using NoCTF.Infrastructure.DataExports;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Observability;
 
 namespace NoCTF.Infrastructure;
 
@@ -55,6 +56,8 @@ public static class ServiceRegistration
         services.AddNoCtfAuthentication();
         services.AddNoCtfAdministration(configuration, exporting, development);
         services.AddNoCtfDataExports();
+        if (!exporting)
+            services.AddHostedService<OperationalMetricsCollector>();
 
         return services;
     }
