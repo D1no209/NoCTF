@@ -47,7 +47,7 @@ public static class ServiceRegistration
         services.AddNoCtfMessaging(exporting, development);
         services.AddNoCtfRuntime(configuration, development);
         services.AddNoCtfSubmissions();
-        services.AddNoCtfScoring();
+        services.AddNoCtfScoring(development);
         services.AddNoCtfNotifications(development);
         services.AddNoCtfTeams();
         services.AddNoCtfChallenges();

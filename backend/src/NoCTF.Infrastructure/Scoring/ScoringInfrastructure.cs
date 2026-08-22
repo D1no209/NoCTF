@@ -8,13 +8,17 @@ namespace NoCTF.Infrastructure.Scoring;
 
 internal static class ScoringInfrastructure
 {
-    internal static IServiceCollection AddNoCtfScoring(this IServiceCollection services)
+    internal static IServiceCollection AddNoCtfScoring(
+        this IServiceCollection services,
+        bool development)
     {
         services.AddSingleton<ILeaderboardProjectorCatalog, LeaderboardProjectorCatalog>();
         services.AddSingleton<ILeaderboardProjectionEngine, LeaderboardProjectionEngine>();
         services.AddScoped<ILeaderboardCache, FusionLeaderboardCache>();
         services.AddScoped<ILeaderboardSnapshotFactory, FusionLeaderboardCache>();
         services.AddScoped<IScoreboardDetailReader, ScoreboardDetailReader>();
+        if (!development)
+            services.AddSingleton<ILeaderboardPublicationFence, RedisLeaderboardPublicationFence>();
         return services;
     }
 }

@@ -26,6 +26,7 @@ using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Scoring.Leaderboard;
 using NoCTF.Infrastructure.Teams.Moderation;
 using NoCTF.Worker;
+using Npgsql;
 using NSubstitute;
 using Testcontainers.PostgreSql;
 using ZiggyCreatures.Caching.Fusion;
@@ -35,6 +36,61 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class LeaderboardProjectionPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Publication_runs_after_projection_lock_release_and_failure_requeues_projection(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_projection_publication_failure")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.MigrateAsync(cancellationToken);
+            var owner = CreateUser(now);
+            var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
+            db.Users.Add(owner);
+            db.Competitions.Add(fixture.Competition);
+            db.Challenges.Add(fixture.Challenge);
+            db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
+            db.Teams.Add(fixture.Team);
+            db.GameplayFacts.AddRange(fixture.Facts);
+            await db.SaveChangesAsync(cancellationToken);
+
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.Leaderboards)
+                .Services
+                .BuildServiceProvider();
+            var fence = new LockObservingFailingPublicationFence(
+                postgres.GetConnectionString(),
+                fixture.Competition.Id);
+            var cache = new FusionLeaderboardCache(
+                db,
+                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                Substitute.For<ILeaderboardRefreshPublisher>(),
+                cacheServices.GetRequiredService<IFusionCacheProvider>(),
+                fence);
+
+            await Assert.That(async () =>
+                    await cache.RefreshAsync(fixture.Competition.Id, cancellationToken))
+                .Throws<InvalidOperationException>();
+            await db.Entry(fixture.Competition).ReloadAsync(cancellationToken);
+
+            await Assert.That(fence.ProjectionLockWasAvailable).IsTrue();
+            await Assert.That(fixture.Competition.LeaderboardDirty).IsTrue();
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Failed_projection_commit_preserves_the_last_successful_cache(
@@ -1405,5 +1461,50 @@ public sealed class LeaderboardProjectionPersistenceTests
             failNextCommit = false;
             throw new InvalidOperationException("Injected leaderboard projection commit failure.");
         }
+    }
+
+    private sealed class LockObservingFailingPublicationFence(
+        string connectionString,
+        Guid competitionId) : ILeaderboardPublicationFence
+    {
+        public bool ProjectionLockWasAvailable { get; private set; }
+
+        public Task<long> IssueAsync(
+            Guid ignoredCompetitionId,
+            long minimumFence,
+            CancellationToken cancellationToken) => Task.FromResult(minimumFence);
+
+        public async Task<bool> TryCommitAsync(
+            Guid ignoredCompetitionId,
+            long fence,
+            string payload,
+            CancellationToken cancellationToken)
+        {
+            await using var connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var claim = new NpgsqlCommand(
+                "SELECT pg_try_advisory_lock(hashtextextended(@competition_id, 0))",
+                connection);
+            claim.Parameters.AddWithValue("competition_id", competitionId.ToString("N"));
+            ProjectionLockWasAvailable = (bool)(await claim.ExecuteScalarAsync(cancellationToken))!;
+            if (ProjectionLockWasAvailable)
+            {
+                await using var release = new NpgsqlCommand(
+                    "SELECT pg_advisory_unlock(hashtextextended(@competition_id, 0))",
+                    connection);
+                release.Parameters.AddWithValue("competition_id", competitionId.ToString("N"));
+                _ = await release.ExecuteScalarAsync(cancellationToken);
+            }
+            throw new InvalidOperationException("Injected leaderboard publication failure.");
+        }
+
+        public Task<LeaderboardFencedPayload?> GetAsync(
+            Guid ignoredCompetitionId,
+            CancellationToken cancellationToken) => Task.FromResult<LeaderboardFencedPayload?>(null);
+
+        public Task<bool> IsCurrentAsync(
+            Guid ignoredCompetitionId,
+            long fence,
+            CancellationToken cancellationToken) => Task.FromResult(false);
     }
 }
