@@ -1,5 +1,12 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-22 alpha.72 遗漏功能归并与三栏题目工作区
+
+- 将此前滞留在 `codex/fix-scoreboard-audit-20260820` 工作树中的全部有效产品改动纳入 Git 历史，并在最新 `origin/main`（alpha.71）之上无冲突 rebase。改动包含：参赛者三栏题目工作区（左侧按方向分组题目、中间页内题目详情、右上赛事导航、右下赛事播报）、旧题目详情与通知/提交/Fix 历史链接的页内定位、参赛资格校验、AWDP 首次攻防成功状态锁定、排行榜矩阵与雷达图修正、首页登录后隐藏注册入口、参赛者说明文案压缩、平台审计日志降噪与可读操作说明，以及管理员设置用户账号激活状态。
+- 平台账号状态接口使用独立强类型 FastEndpoints `ExecuteAsync`/`TypedResults` 端点并由 Application/Infrastructure 执行业务与持久化；OpenAPI 由工具导出，TypeScript SDK 由 `bun run api:gen` 生成，前端未手写 URL、DTO、枚举或失败码。没有新增业务表、EF migration 或 snapshot；EF model drift 检查无变化。
+- 版本从 `0.1.0-alpha.71` 递增至 `0.1.0-alpha.72`。本阶段仅提交并推送代码，不包含生产部署；生产环境仍保持 alpha.71，直到收到明确部署指令。
+- 验证：Release solution build 0 warning/0 error；完整非 Integration TUnit 870/870；前端 `bun test` 264/264、`bun run typecheck` 与 production `bun run build` 通过；C# analyzers、EF model drift 和 `git diff --check` 通过；OpenAPI 与 SDK 连续第二轮生成 SHA-256 完全一致。新增真实 PostgreSQL 定向测试已纳入测试集，但本机 Docker daemon 不可用，测试框架将对应 Integration 用例按设计跳过，未将其误报为通过。
+
 ## 2026-08-22 alpha.71 AWDP 防御结果兜底文案与生产部署
 
 - `ad444bb2` 修正 AWDP 一次性 Fix 验证结果的前端兜底语义：除明确的 `Correct` 与 `AwdpExploitSucceeded` 外，未知或缺失失败码统一显示“防御异常：服务异常”，不再显示并非后端预设结果的“防御未通过”。选手题目面板与 Fix 历史页使用同一规则；删除了已失效的英文翻译键，并补充前端回归测试。`053fd74c` 将版本从 `0.1.0-alpha.70` 递增到 `0.1.0-alpha.71`。
