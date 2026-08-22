@@ -32,7 +32,7 @@ builder.Services.AddNoCtfApi(builder.Configuration, includeInfrastructure: true,
 builder.Services.AddNoCtfAuthentication(builder.Configuration);
 if (development)
 {
-    builder.Services.AddNoCtfWorkerRole();
+    builder.Services.AddNoCtfWorkerRole(collectQueueMetrics: false);
     builder.Services.AddNoCtfRunner(builder.Configuration, development: true);
 }
 if (!exportSwagger && !development)
@@ -43,7 +43,7 @@ builder.UseWolverine(options =>
     options.ConfigureNoCtfApiMessaging(development);
     if (development)
     {
-        options.ConfigureNoCtfWorkerMessaging(durable: false);
+        options.ConfigureNoCtfWorkerMessaging(builder.Configuration, durable: false);
         options.ConfigureNoCtfRunnerMessaging(builder.Configuration, durable: false);
         options.StubAllExternalTransports();
     }

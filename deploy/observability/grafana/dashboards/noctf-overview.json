@@ -34,8 +34,8 @@
       "type": "timeseries", "title": "Wolverine 队列积压与最老等待", "id": 5,
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
       "targets": [
-        { "expr": "noctf_worker_queue_depth", "legendFormat": "{{queue}} depth" },
-        { "expr": "noctf_worker_queue_oldest_age_seconds", "legendFormat": "{{queue}} oldest(s)" }
+        { "expr": "max by (queue) (noctf_worker_queue_depth)", "legendFormat": "{{queue}} depth" },
+        { "expr": "max by (queue) (noctf_worker_queue_oldest_age_seconds)", "legendFormat": "{{queue}} oldest(s)" }
       ]
     },
     {

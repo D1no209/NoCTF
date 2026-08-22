@@ -62,7 +62,7 @@ else
 }
 
 if (roles.Has(HostRole.Worker))
-    builder.Services.AddNoCtfWorkerRole();
+    builder.Services.AddNoCtfWorkerRole(collectQueueMetrics: !development);
 if (roles.Has(HostRole.Runner))
     builder.Services.AddNoCtfRunner(builder.Configuration, development);
 if (!development)
@@ -72,7 +72,7 @@ builder.UseWolverine(options =>
 {
     options.ConfigureNoCtfApiMessaging(development && roles.Has(HostRole.Api));
     if (roles.Has(HostRole.Worker))
-        options.ConfigureNoCtfWorkerMessaging(durable: !development);
+        options.ConfigureNoCtfWorkerMessaging(builder.Configuration, durable: !development);
     if (roles.Has(HostRole.Runner))
         options.ConfigureNoCtfRunnerMessaging(builder.Configuration, durable: !development);
     if (development)

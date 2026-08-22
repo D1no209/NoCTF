@@ -164,9 +164,17 @@ services:
         HTTPS_PROXY: ${HTTPS_PROXY:-}
         ALL_PROXY: ${ALL_PROXY:-}
     restart: unless-stopped
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__PostgreSql: >-
+      environment:
+        ASPNETCORE_URLS: http://+:8080
+        Worker__Queues__0: ${WORKER_QUEUE_0:-control}
+        Worker__Queues__1: ${WORKER_QUEUE_1:-gameplay}
+        Worker__Queues__2: ${WORKER_QUEUE_2:-projection}
+        Worker__Queues__3: ${WORKER_QUEUE_3:-background}
+        Worker__Concurrency__Control: ${WORKER_CONTROL_CONCURRENCY:-2}
+        Worker__Concurrency__Gameplay: ${WORKER_GAMEPLAY_CONCURRENCY:-8}
+        Worker__Concurrency__Projection: ${WORKER_PROJECTION_CONCURRENCY:-2}
+        Worker__Concurrency__Background: ${WORKER_BACKGROUND_CONCURRENCY:-2}
+        ConnectionStrings__PostgreSql: >-
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
       Authentication__SigningKey: ${JWT_SECRET:?set JWT_SECRET}
