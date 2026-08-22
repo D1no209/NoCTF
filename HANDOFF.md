@@ -4,7 +4,10 @@
 
 - 将此前滞留在 `codex/fix-scoreboard-audit-20260820` 工作树中的全部有效产品改动纳入 Git 历史，并在最新 `origin/main`（alpha.71）之上无冲突 rebase。改动包含：参赛者三栏题目工作区（左侧按方向分组题目、中间页内题目详情、右上赛事导航、右下赛事播报）、旧题目详情与通知/提交/Fix 历史链接的页内定位、参赛资格校验、AWDP 首次攻防成功状态锁定、排行榜矩阵与雷达图修正、首页登录后隐藏注册入口、参赛者说明文案压缩、平台审计日志降噪与可读操作说明，以及管理员设置用户账号激活状态。
 - 平台账号状态接口使用独立强类型 FastEndpoints `ExecuteAsync`/`TypedResults` 端点并由 Application/Infrastructure 执行业务与持久化；OpenAPI 由工具导出，TypeScript SDK 由 `bun run api:gen` 生成，前端未手写 URL、DTO、枚举或失败码。没有新增业务表、EF migration 或 snapshot；EF model drift 检查无变化。
-- 版本从 `0.1.0-alpha.71` 递增至 `0.1.0-alpha.72`。本阶段仅提交并推送代码，不包含生产部署；生产环境仍保持 alpha.71，直到收到明确部署指令。
+- 版本从 `0.1.0-alpha.71` 递增至 `0.1.0-alpha.72`。功能代码已快进推送到远程 `main@050aab33`，生产仓库 `/root/NoCTF` 通过先决提交为 `053fd74c` 的增量 Git bundle 快进到同一提交；bundle 为 86,969 字节，SHA-256 为 `272db8b9cf5f97cd9753b2a097ad2246e4a07ed1b60af107f1d3f780b5501b38`，生产专用且未跟踪的 Compose overlay 保持原样。
+- 部署前数据库备份为 `/root/backups/noctf-pre-alpha72-050aab33-20260822T061551Z.dump`，SHA-256 为 `8f1c16ada82e54585d4572a51aa02f9a46d853aaca059771da39354144a07842`，并已使用当前 PostgreSQL 容器中的 `pg_restore --list` 验证可读；本阶段没有 EF migration 或模型变化，因此没有运行迁移。
+- 新 Backend 镜像为 `8c377d8846a`、Worker 镜像为 `77710937036`，均保留 `alpha72-050aab33` 标签；上一版 Backend `alpha71-053fd74c` 与 alpha.70 平台回滚镜像继续保留。仅 Backend 与 Worker 以 `--no-deps --no-build --force-recreate` 切换，Runner、PostgreSQL、Redis 未重启；两项新服务均为 `healthy`、RestartCount 为 0，容器内程序集均确认包含 `0.1.0-alpha.72`，公开首页、`/health`、`/health/ready` 均返回 HTTP 200，生产 OpenAPI 已包含管理员账号状态接口。
+- 部署前后 `noctf.io/managed=true` Runtime 容器数量均为 0，切换后的 Backend/Worker 日志没有 Error、Critical、Fatal 或 Unhandled 匹配。空间清理只删除不再承担当前或相邻回滚用途的四个精确 alpha.59 平台镜像；没有执行全局 prune，也没有删除题目镜像、卷、备份或生产配置。根盘部署后剩余约 4.3 GB。
 - 验证：Release solution build 0 warning/0 error；完整非 Integration TUnit 870/870；前端 `bun test` 264/264、`bun run typecheck` 与 production `bun run build` 通过；C# analyzers、EF model drift 和 `git diff --check` 通过；OpenAPI 与 SDK 连续第二轮生成 SHA-256 完全一致。新增真实 PostgreSQL 定向测试已纳入测试集，但本机 Docker daemon 不可用，测试框架将对应 Integration 用例按设计跳过，未将其误报为通过。
 
 ## 2026-08-22 alpha.71 AWDP 防御结果兜底文案与生产部署
