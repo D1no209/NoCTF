@@ -21,6 +21,7 @@ async function selectChallenge(challengeId: string): Promise<void> {
     :competition-id="competitionId"
     :selected-challenge-id="selectedChallengeId"
     challenge-selection-mode="inline"
+    show-challenge-navigator
     @select-challenge="selectChallenge"
   >
     <CompetitionChallengeDetail

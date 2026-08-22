@@ -5,9 +5,11 @@ const props = withDefaults(defineProps<{
   competitionId: string
   selectedChallengeId?: string | null
   challengeSelectionMode?: 'inline' | 'navigate'
+  showChallengeNavigator?: boolean
 }>(), {
   selectedChallengeId: null,
   challengeSelectionMode: 'navigate',
+  showChallengeNavigator: false,
 })
 
 const emit = defineEmits<{
@@ -40,8 +42,14 @@ function handleReady(challengeId: string | null): void {
 </script>
 
 <template>
-  <div class="grid min-h-[calc(100svh-12rem)] items-stretch gap-4 xl:grid-cols-[15rem_minmax(0,1fr)_19rem]">
+  <div
+    class="grid min-h-[calc(100svh-12rem)] items-stretch gap-4"
+    :class="showChallengeNavigator
+      ? 'xl:grid-cols-[15rem_minmax(0,1fr)_19rem]'
+      : 'xl:grid-cols-[minmax(0,1fr)_19rem]'"
+  >
     <CompetitionChallengeNavigator
+      v-if="showChallengeNavigator"
       :competition-id="competitionId"
       :selected-challenge-id="selectedChallengeId"
       @ready="handleReady"
