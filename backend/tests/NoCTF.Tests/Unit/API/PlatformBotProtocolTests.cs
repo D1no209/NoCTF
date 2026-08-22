@@ -51,4 +51,16 @@ public sealed class PlatformBotProtocolTests
 
         await Assert.That(json).IsEqualTo("\"LastAdministratorProtected\"");
     }
+
+    [Test]
+    public async Task Managed_account_status_and_conflict_serialize_as_named_enums()
+    {
+        var status = JsonSerializer.Serialize(
+            PlatformManagedUserAccountStatusProtocol.Disabled);
+        var conflict = JsonSerializer.Serialize(
+            UpdatePlatformUserAccountStatusConflictCode.AnonymizedAccountImmutable);
+
+        await Assert.That(status).IsEqualTo("\"Disabled\"");
+        await Assert.That(conflict).IsEqualTo("\"AnonymizedAccountImmutable\"");
+    }
 }

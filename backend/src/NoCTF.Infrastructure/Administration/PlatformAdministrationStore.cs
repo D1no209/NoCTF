@@ -1,8 +1,12 @@
+using System.Text.Json;
 using NoCTF.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using NoCTF.Application.Administration;
+using NoCTF.Application.Administration.UserAccounts;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Notifications;
+using NoCTF.Domain.Shared;
 using NoCTF.Infrastructure.Administration;
 using Wolverine.Persistence.Durability;
 
@@ -13,6 +17,9 @@ public sealed class PlatformAdministrationStore(
     IProcessDeadLetterStore deadLetters,
     IPasswordHasher<User> passwordHasher) : IPlatformAdministrationStore
 {
+    private static readonly JsonSerializerOptions JsonOptions =
+        new(JsonSerializerDefaults.Web);
+
     public async Task<IReadOnlyList<PlatformUserView>> ListUsersAsync(CancellationToken ct) =>
         await db.Users.AsNoTracking()
             .OrderBy(user => user.CreatedAt)
@@ -123,6 +130,41 @@ public sealed class PlatformAdministrationStore(
         return new(UpdatePlatformRoleState.Updated, Map(user));
     }
 
+    public async Task<UpdatePlatformUserStatusResult> UpdateAccountStatusAsync(
+        Guid userId,
+        Guid actorUserId,
+        UserAccountStatus accountStatus,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await ActiveHumanAdministratorMutationGuard.AcquireAsync(db, ct);
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        if (user is null)
+            return new(UpdatePlatformUserStatusState.UserNotFound);
+        if (user.AccountStatus == UserAccountStatus.Anonymized
+            || accountStatus == UserAccountStatus.Anonymized)
+        {
+            return new(UpdatePlatformUserStatusState.AnonymizedAccountImmutable);
+        }
+        if (user.AccountStatus == accountStatus)
+            return new(UpdatePlatformUserStatusState.Updated, Map(user));
+        if (ActiveHumanAdministratorMutationGuard.Contains(user)
+            && accountStatus != UserAccountStatus.Active
+            && await ActiveHumanAdministratorMutationGuard.CountAsync(db, ct) <= 1)
+        {
+            return new(UpdatePlatformUserStatusState.LastAdministratorProtected);
+        }
+
+        user.AccountStatus = accountStatus;
+        user.TokenVersion = checked(user.TokenVersion + 1);
+        user.UpdatedAt = now;
+        RecordAccountStatusChange(user, actorUserId, accountStatus, now);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return new(UpdatePlatformUserStatusState.Updated, Map(user));
+    }
+
     public async Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
         DateTimeOffset now,
@@ -160,6 +202,48 @@ public sealed class PlatformAdministrationStore(
             user.Id, user.UserName, user.Email, user.Kind, user.Role, user.AccountStatus,
             user.TokenVersion,
             user.EmailVerifiedAt != null, user.CreatedAt, user.UpdatedAt);
+
+    private void RecordAccountStatusChange(
+        User user,
+        Guid actorUserId,
+        UserAccountStatus accountStatus,
+        DateTimeOffset occurredAt)
+    {
+        var action = accountStatus switch
+        {
+            UserAccountStatus.Active => UserAccountLifecycleAction.Activated,
+            UserAccountStatus.Banned => UserAccountLifecycleAction.Banned,
+            UserAccountStatus.Disabled => UserAccountLifecycleAction.Disabled,
+            _ => throw new InvalidOperationException(
+                $"Account status {accountStatus} cannot be assigned by an administrator.")
+        };
+        db.Notifications.Add(new Notification
+        {
+            Id = Guid.CreateVersion7(occurredAt),
+            SourceType = NotificationSourceType.User,
+            SourceId = actorUserId,
+            TargetType = NotificationTargetType.PlatformAdministrators,
+            TargetId = Notification.PlatformAdministratorsTargetId,
+            Kind = NotificationKind.UserAccountLifecycleChanged,
+            ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
+                1,
+                user.Id,
+                user.UserName,
+                action,
+                accountStatus switch
+                {
+                    UserAccountStatus.Active => "manual_activate",
+                    UserAccountStatus.Banned => "manual_ban",
+                    UserAccountStatus.Disabled => "manual_disable",
+                    _ => throw new InvalidOperationException(
+                        $"Unsupported account status {accountStatus}.")
+                },
+                false), JsonOptions),
+            RelatedType = EntityReferenceKind.User,
+            RelatedId = user.Id,
+            SentAt = occurredAt
+        });
+    }
 
     private static DeadLetterView Map(DeadLetterEnvelope envelope) =>
         new(

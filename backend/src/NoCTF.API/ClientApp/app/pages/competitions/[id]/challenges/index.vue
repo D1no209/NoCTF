@@ -1,21 +1,23 @@
 <script setup lang="ts">
-import { Flag, ShieldCheck, Swords, Users } from '@lucide/vue'
+import { ChevronRight, Flag, ShieldCheck, Swords, Users } from '@lucide/vue'
 import { getMyTeamEndpoint, listChallengesEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsChallengesChallengeResponse,
   NoCtfapiEndpointsCompetitionsLeaderboardDataScopeProtocol,
 } from '~/api'
+import { competitionWorkspaceNavigationKey } from '~/components/app/workspace-nav'
 import { bloodRankLabel } from '~/components/leaderboard/types'
 import { scoreboardBreakdown, scoreboardColumnsForChallenge, scoreboardSlot } from '~/utils/scoreboard'
 
 type Challenge = NoCtfapiEndpointsChallengesChallengeResponse
 
 const route = useRoute()
+const router = useRouter()
 const competitionId = route.params.id as string
 const ctx = inject(competitionContextKey)!
+const workspaceNavGroups = inject(competitionWorkspaceNavigationKey, computed(() => []))
 const { isLoggedIn } = useAuth()
 const isAwdp = computed(() => ctx.competition.value?.mode === 'Awdp')
-
 const items = ref<Challenge[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -28,21 +30,21 @@ async function loadMyTeam(): Promise<void> {
     myTeamId.value = null
     return
   }
-  const { data, error: err } = await getMyTeamEndpoint({ path: { competitionId } })
-  myTeamId.value = err ? null : data?.id ?? null
+  const { data, error: requestError } = await getMyTeamEndpoint({ path: { competitionId } })
+  myTeamId.value = requestError ? null : data?.id ?? null
 }
 
 onMounted(async () => {
-  const [{ data, error: err }] = await Promise.all([
+  const [{ data, error: requestError }] = await Promise.all([
     listChallengesEndpoint({ path: { competitionId } }),
     loadMyTeam(),
   ])
   loading.value = false
-  if (err || !data) {
-    error.value = parseApiError(err, translate("加载题目失败")).message
+  if (requestError || !data) {
+    error.value = parseApiError(requestError, translate('加载题目失败')).message
     return
   }
-  items.value = (data.items ?? []).filter((c) => c.isPublished)
+  items.value = (data.items ?? []).filter(challenge => challenge.isPublished)
   dataScope.value = data.dataScope ?? 'Live'
 })
 
@@ -60,8 +62,7 @@ interface ChallengeProgress {
 
 const progressByChallenge = computed(() => {
   const progress = new Map<string, ChallengeProgress>()
-  if (board.snapshot.value?.dataScope === 'Hidden')
-    return progress
+  if (board.snapshot.value?.dataScope === 'Hidden') return progress
 
   for (const challenge of board.catalog.value?.items ?? []) {
     if (!challenge.id) continue
@@ -108,18 +109,16 @@ const progressByChallenge = computed(() => {
 })
 
 function progressFor(challengeId?: string): ChallengeProgress | null {
-  if (!board.snapshot.value || board.snapshot.value.dataScope === 'Hidden')
-    return null
-  return progressByChallenge.value.get(challengeId ?? '')
-    ?? {
-      solveCount: 0,
-      solvedByMyTeam: false,
-      bloodRank: null,
-      attackCount: 0,
-      defenseCount: 0,
-      attackSucceeded: false,
-      defenseSucceeded: false,
-    }
+  if (!board.snapshot.value || board.snapshot.value.dataScope === 'Hidden') return null
+  return progressByChallenge.value.get(challengeId ?? '') ?? {
+    solveCount: 0,
+    solvedByMyTeam: false,
+    bloodRank: null,
+    attackCount: 0,
+    defenseCount: 0,
+    attackSucceeded: false,
+    defenseSucceeded: false,
+  }
 }
 
 function awdpProgressLabel(progress: ChallengeProgress | null): string | null {
@@ -131,22 +130,37 @@ function awdpProgressLabel(progress: ChallengeProgress | null): string | null {
 }
 
 const groups = computed(() => {
-  const map = new Map<string, Challenge[]>()
+  const grouped = new Map<string, Challenge[]>()
   for (const item of items.value) {
     const direction = item.direction || translate('未分类')
-    const list = map.get(direction) ?? []
-    list.push(item)
-    map.set(direction, list)
+    const challenges = grouped.get(direction) ?? []
+    challenges.push(item)
+    grouped.set(direction, challenges)
   }
-  return [...map.entries()].map(([direction, challenges]) => ({
+  return [...grouped.entries()].map(([direction, challenges]) => ({
     direction,
-    challenges: challenges.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    challenges: challenges.sort((left, right) => (left.order ?? 0) - (right.order ?? 0)),
   }))
 })
+
+const requestedChallengeId = computed(() => typeof route.query.challenge === 'string' ? route.query.challenge : null)
+const selectedChallengeId = computed(() => {
+  const requested = requestedChallengeId.value
+  if (requested && items.value.some(item => item.id === requested)) return requested
+  return items.value[0]?.id ?? null
+})
+
+async function selectChallenge(challengeId: string): Promise<void> {
+  if (selectedChallengeId.value === challengeId && requestedChallengeId.value === challengeId) return
+  await router.replace({
+    path: `/competitions/${competitionId}/challenges`,
+    query: { ...route.query, challenge: challengeId },
+  })
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-8">
+  <div class="flex flex-col gap-3">
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>
@@ -162,100 +176,97 @@ const groups = computed(() => {
       <AlertDescription>{{ $t('排行榜已冻结,题目分数显示为冻结时快照。') }}</AlertDescription>
     </Alert>
 
-    <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
-      <main class="min-w-0">
-        <div v-if="loading" class="grid gap-5 sm:grid-cols-2">
-          <Skeleton v-for="i in 6" :key="i" class="h-28 w-full" />
+    <div
+      class="grid min-h-[calc(100svh-12rem)] items-stretch gap-4 xl:grid-cols-[15rem_minmax(0,1fr)_19rem]"
+    >
+      <aside class="min-h-0 border-y bg-background/30 xl:sticky xl:top-20 xl:max-h-[calc(100svh-6rem)]" :aria-label="$t('题目列表')">
+        <header class="border-b px-4 py-3">
+          <h2 class="text-sm font-semibold">{{ $t('题目列表') }}</h2>
+          <p class="mt-1 text-xs text-muted-foreground">{{ $t('按方向选择题目并在中间查看详情') }}</p>
+        </header>
+
+        <div v-if="loading" class="flex flex-col gap-2 p-3">
+          <Skeleton v-for="index in 7" :key="index" class="h-12 w-full" />
         </div>
 
-        <Empty v-else-if="!items.length" class="border border-dashed py-12">
+        <Empty v-else-if="!items.length" class="border-0 py-12">
           <EmptyHeader>
             <EmptyTitle>{{ $t('暂无已发布的题目') }}</EmptyTitle>
-            <EmptyDescription>{{ $t('题目开放后会同步显示在右侧赛事播报中') }}</EmptyDescription>
           </EmptyHeader>
         </Empty>
 
-        <div v-else class="flex flex-col gap-8">
-          <section v-for="group in groups" :key="group.direction" class="flex flex-col gap-4">
-            <h2 class="flex items-center gap-2.5 text-display text-lg">
+        <div v-else class="flex max-h-[calc(100svh-12rem)] flex-col gap-4 overflow-y-auto p-3">
+          <section v-for="group in groups" :key="group.direction" class="flex flex-col gap-2">
+            <h3 class="flex items-center gap-2 px-1 text-xs font-semibold">
               <component
                 :is="directionIcon(group.direction)"
-                class="size-5"
+                class="size-4"
                 :class="directionTextClass(group.direction)"
+                aria-hidden="true"
               />
-              {{ group.direction }}
-              <Badge variant="secondary" class="font-mono tabular-nums">{{ group.challenges.length }}</Badge>
-            </h2>
-            <div class="grid gap-5 sm:grid-cols-2">
-              <NuxtLink
-                v-for="challenge in group.challenges"
-                :key="challenge.id"
-                :to="`/competitions/${competitionId}/challenges/${challenge.id}`"
-                class="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <Card
-                  class="relative h-full overflow-hidden transition-[transform,border-color,box-shadow,background-color] duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg"
-                  :class="progressFor(challenge.id)?.solvedByMyTeam || progressFor(challenge.id)?.attackSucceeded || progressFor(challenge.id)?.defenseSucceeded ? 'border-primary/50 bg-primary/5' : ''"
-                >
-                  <Flag
-                    v-if="progressFor(challenge.id)?.solvedByMyTeam"
-                    aria-hidden="true"
-                    class="pointer-events-none absolute -right-2 -bottom-2 size-20 -rotate-12 text-primary/10"
-                  />
-                  <CardHeader>
-                    <div class="flex items-start justify-between gap-2">
-                      <CardTitle class="text-base leading-snug group-hover:text-primary">
-                        {{ challenge.title }}
-                      </CardTitle>
-                      <Badge variant="outline" :class="directionBadgeClass(challenge.direction)">
-                        {{ challenge.direction }}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent class="relative flex items-end justify-between gap-3">
-                    <div class="flex flex-col items-start gap-2">
-                      <Badge v-if="!board.snapshot.value && board.error.value" variant="destructive"> {{ $t('加载记分板失败') }} </Badge>
-                      <Badge v-else-if="!board.snapshot.value && board.processing.value" variant="secondary"> {{ $t('记分板数据投影中,请稍候…') }} </Badge>
-                      <Badge v-else-if="isAwdp && board.snapshot.value?.currentRoundId" variant="secondary">{{ $t('本轮待结算') }}</Badge>
-                      <Badge v-if="isAwdp && awdpProgressLabel(progressFor(challenge.id))" variant="secondary" class="gap-1">
-                        <Flag v-if="progressFor(challenge.id)?.solvedByMyTeam" class="size-3" />
-                        <Swords v-else-if="progressFor(challenge.id)?.attackSucceeded" class="size-3" />
-                        <ShieldCheck v-else class="size-3" />
-                        {{ awdpProgressLabel(progressFor(challenge.id)) }}
-                      </Badge>
-                      <Badge v-else-if="!isAwdp && progressFor(challenge.id)?.solvedByMyTeam" variant="secondary" class="gap-1">
-                        <Flag class="size-3" />
-                        {{ progressFor(challenge.id)?.bloodRank
-                          ? bloodRankLabel(progressFor(challenge.id)?.bloodRank)
-                          : $t('已解出') }}
-                      </Badge>
-                    </div>
-                    <span
-                      v-if="isAwdp && progressFor(challenge.id)"
-                      class="flex items-center gap-2 text-xs text-muted-foreground"
-                      :aria-label="$t('攻击成功 {attack} 支，防御成功 {defense} 支', { attack: progressFor(challenge.id)?.attackCount ?? 0, defense: progressFor(challenge.id)?.defenseCount ?? 0 })"
-                    >
-                      <span class="flex items-center gap-1"><Swords class="size-3.5" aria-hidden="true" /><span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.attackCount ?? 0 }}</span></span>
-                      <span class="flex items-center gap-1"><ShieldCheck class="size-3.5" aria-hidden="true" /><span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.defenseCount ?? 0 }}</span></span>
-                    </span>
-                    <span
-                      v-else-if="progressFor(challenge.id)"
-                      class="flex items-center gap-1 text-xs text-muted-foreground"
-                      :aria-label="$t('{count} 支队伍已解出', { count: progressFor(challenge.id)?.solveCount ?? 0 })"
-                    >
-                      <Users class="size-3.5" aria-hidden="true" />
-                      <span class="font-mono tabular-nums">{{ progressFor(challenge.id)?.solveCount ?? 0 }}</span>
-                      <span>{{ $t('解出') }}</span>
-                    </span>
-                  </CardContent>
-                </Card>
-              </NuxtLink>
-            </div>
+              <span class="truncate">{{ group.direction }}</span>
+              <span class="ml-auto font-mono text-[0.6875rem] tabular-nums text-muted-foreground">{{ group.challenges.length }}</span>
+            </h3>
+
+            <button
+              v-for="challenge in group.challenges"
+              :key="challenge.id"
+              type="button"
+              class="group flex w-full items-center gap-2 rounded-md border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :class="selectedChallengeId === challenge.id
+                ? 'border-primary bg-primary/10 text-foreground'
+                : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'"
+              :aria-current="selectedChallengeId === challenge.id ? 'true' : undefined"
+              @click="selectChallenge(challenge.id!)"
+            >
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-sm font-medium">{{ challenge.title }}</span>
+                <span v-if="isAwdp && progressFor(challenge.id)" class="mt-1 flex items-center gap-2 text-[0.6875rem]">
+                  <span class="flex items-center gap-1"><Swords class="size-3" /><span class="font-mono">{{ progressFor(challenge.id)?.attackCount ?? 0 }}</span></span>
+                  <span class="flex items-center gap-1"><ShieldCheck class="size-3" /><span class="font-mono">{{ progressFor(challenge.id)?.defenseCount ?? 0 }}</span></span>
+                  <span v-if="board.snapshot.value?.currentRoundId" class="truncate text-muted-foreground">{{ $t('本轮待结算') }}</span>
+                </span>
+                <span v-else-if="progressFor(challenge.id)" class="mt-1 flex items-center gap-1 text-[0.6875rem]">
+                  <Users class="size-3" />
+                  <span>{{ $t('{count} 支队伍已解出', { count: progressFor(challenge.id)?.solveCount ?? 0 }) }}</span>
+                </span>
+              </span>
+              <Flag
+                v-if="progressFor(challenge.id)?.solvedByMyTeam"
+                class="size-4 shrink-0 text-primary"
+                :aria-label="progressFor(challenge.id)?.bloodRank
+                  ? bloodRankLabel(progressFor(challenge.id)?.bloodRank)
+                  : $t('已解出')"
+              />
+              <component
+                :is="progressFor(challenge.id)?.attackSucceeded ? Swords : ShieldCheck"
+                v-else-if="isAwdp && awdpProgressLabel(progressFor(challenge.id))"
+                class="size-4 shrink-0 text-primary"
+                :aria-label="awdpProgressLabel(progressFor(challenge.id)) ?? undefined"
+              />
+              <ChevronRight class="size-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </button>
           </section>
         </div>
+      </aside>
+
+      <main class="min-w-0 border-y px-1 py-4 md:px-3 md:py-5">
+        <CompetitionChallengeDetail
+          v-if="selectedChallengeId"
+          :competition-id="competitionId"
+          :competition-challenge-id="selectedChallengeId"
+        />
+        <Empty v-else class="h-full min-h-80 border-0">
+          <EmptyHeader>
+            <EmptyTitle>{{ $t('选择题目查看详情') }}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       </main>
 
-      <CompetitionBroadcastPanel :competition-id="competitionId" />
+      <aside class="grid min-h-0 content-start gap-4 sm:grid-cols-2 xl:sticky xl:top-20 xl:max-h-[calc(100svh-6rem)] xl:grid-cols-1 xl:grid-rows-[auto_minmax(0,1fr)]">
+        <CompetitionWorkspaceNavigation :groups="workspaceNavGroups" />
+        <CompetitionBroadcastPanel class="min-h-0 xl:static xl:flex xl:h-full xl:flex-col" :competition-id="competitionId" fill />
+      </aside>
     </div>
   </div>
 </template>

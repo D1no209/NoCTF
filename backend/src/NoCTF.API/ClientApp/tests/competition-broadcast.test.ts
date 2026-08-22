@@ -62,7 +62,7 @@ describe('competition broadcast projection', () => {
   test('links challenge broadcasts to the matching challenge', () => {
     expect(competitionBroadcastTargetPath(event('HintPublished', {
       competitionChallengeId: 'challenge-1',
-    }))).toBe('/competitions/competition-1/challenges/challenge-1')
+    }))).toBe('/competitions/competition-1/challenges?challenge=challenge-1')
   })
 
   test('mounts the compact panel beside challenges and removes the overlapping tab', async () => {
@@ -76,10 +76,13 @@ describe('competition broadcast projection', () => {
       new URL('../app/components/competition/CompetitionBroadcastPanel.vue', import.meta.url),
     ).text()
 
-    expect(challengePage).toContain('<CompetitionBroadcastPanel :competition-id="competitionId" />')
-    expect(challengePage).toContain('xl:grid-cols-[minmax(0,1fr)_18rem]')
+    expect(challengePage).toContain('<CompetitionBroadcastPanel')
+    expect(challengePage).toContain('xl:grid-cols-[15rem_minmax(0,1fr)_19rem]')
+    expect(challengePage).toContain('<CompetitionWorkspaceNavigation')
+    expect(challengePage).toContain('<CompetitionChallengeDetail')
+    expect(challengePage).toContain('@click="selectChallenge(challenge.id!)"')
     expect(shell).toContain('isChallengeIndex')
-    expect(shell).toContain("isChallengeIndex ? 'max-w-6xl' : 'max-w-5xl'")
+    expect(shell).toContain('competition && isChallengeIndex')
     expect(shell).not.toContain("label: '公告/通知'")
     expect(panel).toContain('kinds: competitionBroadcastKinds')
     expect(panel).toContain('competitionEventChanged: () => void load()')

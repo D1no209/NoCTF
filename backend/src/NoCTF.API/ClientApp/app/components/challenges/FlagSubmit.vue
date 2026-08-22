@@ -187,7 +187,7 @@ function resultVariant(result?: string | null) {
 </script>
 
 <template>
-  <Card class="relative overflow-hidden">
+  <section class="relative flex flex-col gap-4 overflow-hidden" aria-labelledby="flag-submit-title">
     <Transition name="flag-celebration">
       <div
         v-if="celebrating"
@@ -199,12 +199,12 @@ function resultVariant(result?: string | null) {
         <span aria-hidden="true" class="flag-celebration-mark">🎉</span>
       </div>
     </Transition>
-    <CardHeader>
-      <CardTitle class="text-base">{{ title }}</CardTitle>
-      <CardDescription v-if="description">{{ description }}</CardDescription>
-      <CardDescription v-else-if="practice">{{ $t('练习模式只验证 Flag 正误，不会产生分数、血榜或排行榜变化。') }}</CardDescription>
-    </CardHeader>
-    <CardContent>
+    <header class="flex flex-col gap-1">
+      <h3 id="flag-submit-title" class="text-sm font-semibold">{{ title }}</h3>
+      <p v-if="description" class="text-sm text-muted-foreground">{{ description }}</p>
+      <p v-else-if="practice" class="text-sm text-muted-foreground">{{ $t('练习模式只验证 Flag 正误，不会产生分数、血榜或排行榜变化。') }}</p>
+    </header>
+    <div>
       <form @submit.prevent="submit">
         <FieldGroup>
           <Field>
@@ -256,8 +256,8 @@ function resultVariant(result?: string | null) {
           </AlertDescription>
         </Alert>
       </div>
-    </CardContent>
-  </Card>
+    </div>
+  </section>
 </template>
 
 <style scoped>

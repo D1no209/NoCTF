@@ -33,6 +33,18 @@ public sealed record UpdatePlatformRoleResult(
     PlatformUserView? User = null,
     PlatformRoleAssignmentBlockers? Blockers = null);
 
+public enum UpdatePlatformUserStatusState
+{
+    Updated,
+    UserNotFound,
+    AnonymizedAccountImmutable,
+    LastAdministratorProtected
+}
+
+public sealed record UpdatePlatformUserStatusResult(
+    UpdatePlatformUserStatusState State,
+    PlatformUserView? User = null);
+
 public enum CreateBotState
 {
     Created,
@@ -83,6 +95,12 @@ public interface IPlatformAdministrationStore
     Task<UpdatePlatformRoleResult> UpdateRoleAsync(
         Guid userId,
         UserRole role,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<UpdatePlatformUserStatusResult> UpdateAccountStatusAsync(
+        Guid userId,
+        Guid actorUserId,
+        UserAccountStatus accountStatus,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<PlatformUserView?> InvalidateTokensAsync(
@@ -171,6 +189,21 @@ public sealed class ManagePlatform(
         DateTimeOffset now,
         CancellationToken ct = default) =>
         store.UpdateRoleAsync(userId, role, now, ct);
+    public Task<UpdatePlatformUserStatusResult> UpdateAccountStatusAsync(
+        Guid userId,
+        Guid actorUserId,
+        UserAccountStatus accountStatus,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        accountStatus == UserAccountStatus.Anonymized
+            ? Task.FromResult(new UpdatePlatformUserStatusResult(
+                UpdatePlatformUserStatusState.AnonymizedAccountImmutable))
+            : store.UpdateAccountStatusAsync(
+                userId,
+                actorUserId,
+                accountStatus,
+                now,
+                ct);
     public Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
         DateTimeOffset now,

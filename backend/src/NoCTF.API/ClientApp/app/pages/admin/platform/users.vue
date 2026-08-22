@@ -7,12 +7,15 @@ import {
   adminPlatformInvalidateUserTokens,
   adminPlatformListUsers,
   adminPlatformPreviewUserDeletion,
+  adminPlatformUpdateUserAccountStatus,
   adminPlatformUpdateUserRole,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionMode,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse,
+  NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol,
+  NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictCode,
 } from '~/api'
 import { createLatestRequestGuard } from '~/lib/latest-request'
 
@@ -20,6 +23,8 @@ definePageMeta({ middleware: 'platform-admin' })
 
 type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 type DeletionPreview = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse
+type ManagedAccountStatus = NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol
+type AccountStatusConflictCode = NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictCode
 
 const { user: currentUser } = useAuth()
 
@@ -31,6 +36,11 @@ const roleFilter = ref('all')
 
 const ROLE_LABELS: Record<string, string> = { User: '用户', Organizer: '组织者', Administrator: '管理员' }
 const STATUS_LABELS: Record<string, string> = { Active: '正常', Banned: '已封禁', Disabled: '已禁用', Anonymized: '已匿名' }
+const MANAGED_ACCOUNT_STATUS_OPTIONS: ReadonlyArray<{ value: ManagedAccountStatus, label: string }> = [
+  { value: 'Active', label: '正常' },
+  { value: 'Banned', label: '已封禁' },
+  { value: 'Disabled', label: '已禁用' },
+]
 const REFERENCE_LABELS: Record<string, string> = {
   CompetitionOwner: '竞赛负责人',
   CompetitionCollaborator: '竞赛协作者',
@@ -76,7 +86,9 @@ const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref<PlatformUser | null>(null)
 const pendingRole = ref('User')
+const pendingAccountStatus = ref<ManagedAccountStatus>('Active')
 const roleSaving = ref(false)
+const accountStatusSaving = ref(false)
 const invalidating = ref(false)
 const detailRequests = createLatestRequestGuard()
 
@@ -102,6 +114,9 @@ async function openDetail(user: PlatformUser): Promise<void> {
   }
   detail.value = data ?? null
   pendingRole.value = data?.role ?? 'User'
+  if (data?.accountStatus === 'Active' || data?.accountStatus === 'Banned' || data?.accountStatus === 'Disabled') {
+    pendingAccountStatus.value = data.accountStatus
+  }
 }
 
 async function saveRole(): Promise<void> {
@@ -124,6 +139,41 @@ async function saveRole(): Promise<void> {
   detail.value = data ?? detail.value
   toast.success(translate("角色已更新"))
   await load()
+}
+
+function accountStatusConflictMessage(code: string | undefined): string | null {
+  switch (code as AccountStatusConflictCode | undefined) {
+    case 'LastAdministratorProtected':
+      return translate('不能停用最后一名有效管理员')
+    case 'AnonymizedAccountImmutable':
+      return translate('已匿名化账户不可恢复')
+    default:
+      return null
+  }
+}
+
+async function saveAccountStatus(): Promise<void> {
+  if (!detail.value?.id || detail.value.accountStatus === 'Anonymized') return
+  accountStatusSaving.value = true
+  const { data, error } = await adminPlatformUpdateUserAccountStatus({
+    path: { userId: detail.value.id },
+    body: { accountStatus: pendingAccountStatus.value },
+  })
+  accountStatusSaving.value = false
+  if (error) {
+    const apiError = parseApiError(error)
+    toast.error(accountStatusConflictMessage(apiError.code) ?? apiError.message)
+    return
+  }
+
+  if (data) {
+    detail.value = data
+    const index = users.value.findIndex(user => user.id === data.id)
+    if (index >= 0) users.value.splice(index, 1, data)
+  }
+  toast.success(pendingAccountStatus.value === 'Active'
+    ? translate('账户已激活')
+    : translate('账户状态已更新，该用户的现有会话已失效。'))
 }
 
 async function invalidateTokens(): Promise<void> {
@@ -348,6 +398,49 @@ onMounted(() => {
                   <Spinner v-if="roleSaving" data-icon="inline-start" /> {{ $t('保存') }} </Button>
               </div>
               <FieldDescription v-if="detail.id === currentUser?.userId">{{ $t('不能修改自己的角色。') }}</FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel for="user-account-status">{{ $t('账户状态') }}</FieldLabel>
+              <div class="flex items-center gap-2">
+                <Select
+                  v-model="pendingAccountStatus"
+                  :disabled="detail.id === currentUser?.userId || detail.accountStatus === 'Anonymized'"
+                >
+                  <SelectTrigger id="user-account-status" class="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem
+                        v-for="option in MANAGED_ACCOUNT_STATUS_OPTIONS"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ $t(option.label) }}
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Button
+                  :disabled="accountStatusSaving
+                    || pendingAccountStatus === detail.accountStatus
+                    || detail.id === currentUser?.userId
+                    || detail.accountStatus === 'Anonymized'"
+                  @click="saveAccountStatus"
+                >
+                  <Spinner v-if="accountStatusSaving" data-icon="inline-start" />
+                  {{ $t('保存') }}
+                </Button>
+              </div>
+              <FieldDescription v-if="detail.id === currentUser?.userId">
+                {{ $t('不能修改自己的账户状态。') }}
+              </FieldDescription>
+              <FieldDescription v-else-if="detail.accountStatus === 'Anonymized'">
+                {{ $t('已匿名化账户不可修改。') }}
+              </FieldDescription>
+              <FieldDescription v-else>
+                {{ $t('修改账户状态会吊销该用户的现有访问与刷新令牌。') }}
+              </FieldDescription>
             </Field>
           </FieldGroup>
 

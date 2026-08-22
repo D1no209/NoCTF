@@ -5,7 +5,12 @@ import type { NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse } from
 
 type CompetitionEvent = NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse
 
-const props = defineProps<{ competitionId: string }>()
+const props = withDefaults(defineProps<{
+  competitionId: string
+  fill?: boolean
+}>(), {
+  fill: false,
+})
 const ctx = inject(competitionContextKey)!
 const items = ref<CompetitionEvent[]>([])
 const loading = ref(true)
@@ -56,7 +61,11 @@ onUnmounted(() => unwatch?.())
 </script>
 
 <template>
-  <aside class="rounded-xl border bg-card xl:sticky xl:top-24" aria-labelledby="competition-broadcast-title">
+  <aside
+    class="rounded-xl border bg-card"
+    :class="fill ? 'flex min-h-0 flex-col' : 'xl:sticky xl:top-24'"
+    aria-labelledby="competition-broadcast-title"
+  >
     <header class="flex items-center justify-between gap-3 border-b px-4 py-3">
       <div class="flex items-center gap-2">
         <Megaphone class="size-4 text-primary" aria-hidden="true" />
@@ -76,7 +85,7 @@ onUnmounted(() => unwatch?.())
       <p class="text-sm text-muted-foreground">{{ $t('暂无赛事播报') }}</p>
       <p class="mt-1 text-xs text-muted-foreground/80">{{ $t('血榜、题目与纪律消息会在这里更新') }}</p>
     </div>
-    <ol v-else class="max-h-[32rem] divide-y overflow-y-auto">
+    <ol v-else class="divide-y overflow-y-auto" :class="fill ? 'min-h-0 flex-1' : 'max-h-[32rem]'">
       <li v-for="event in items" :key="event.id">
         <NuxtLink
           v-if="competitionBroadcastTargetPath(event)"

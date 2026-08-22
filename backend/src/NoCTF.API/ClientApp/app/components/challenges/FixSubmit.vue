@@ -131,11 +131,9 @@ async function uploadFix(): Promise<void> {
 </script>
 
 <template>
-  <Card>
-    <CardHeader>
-      <CardTitle class="text-base">{{ $t('防御验证') }}</CardTitle>
-    </CardHeader>
-    <CardContent class="flex flex-col gap-4">
+  <section class="flex flex-col gap-4" aria-labelledby="fix-submit-title">
+    <h3 id="fix-submit-title" class="text-sm font-semibold">{{ $t('防御验证') }}</h3>
+    <div class="flex flex-col gap-4">
       <Alert v-if="targetCreating">
         <Spinner class="mr-2 inline size-3" />
         <AlertDescription class="inline">{{ $t('正在准备防御验证…') }}</AlertDescription>
@@ -200,6 +198,6 @@ async function uploadFix(): Promise<void> {
         <Spinner v-if="pendingAction === 'request'" data-icon="inline-start" />
         {{ pendingAction === 'request' ? $t('申请中…') : completedAndRecycled || targetFailed ? $t('重新申请防御') : $t('申请防御环境') }}
       </Button>
-    </CardContent>
-  </Card>
+    </div>
+  </section>
 </template>

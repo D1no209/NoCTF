@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Application.Competitions.Management;
 using NoCTF.Infrastructure.Caching;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Management;
 using NoCTF.Application.Teams.Registration;
@@ -137,7 +139,12 @@ public sealed class CompetitionManagementPersistenceTests
                     CompetitionStatus.Draft));
             await db.SaveChangesAsync(cancellationToken);
 
-            var store = new CompetitionManagementStore(db, readModels: readModels);
+            var outbox = new OpenApiTransactionalMessageOutbox();
+            var store = new CompetitionManagementStore(
+                db,
+                outbox,
+                new CompetitionEventStore(db, outbox),
+                readModels);
             var result = await store
                 .FindAsync(competitionId, includeDraft: false, cancellationToken);
             var listed = await store.ListAsync(includeDraft: false, cancellationToken);
@@ -169,6 +176,11 @@ public sealed class CompetitionManagementPersistenceTests
             await Assert.That(refreshed!.Title).IsEqualTo("Renamed competition");
             await Assert.That(refreshedList.Single(item => item.Id == competitionId).Title)
                 .IsEqualTo("Renamed competition");
+            var updateEvent = await db.CompetitionEvents.AsNoTracking()
+                .SingleAsync(item => item.CompetitionId == competitionId
+                    && item.Kind == CompetitionEventKind.CompetitionUpdated,
+                    cancellationToken);
+            await Assert.That(updateEvent.ActorUserId).IsEqualTo(ownerId);
 
             var runningCompetition = await db.Competitions.SingleAsync(
                 item => item.Id == competitionId,

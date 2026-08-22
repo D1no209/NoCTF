@@ -26,11 +26,11 @@ describe('notificationTargetPath', () => {
     expect(notificationTargetPath(notification('ChallengePublished', 'competition-1', {
       competitionChallengeId: 'challenge-1',
     })))
-      .toBe('/competitions/competition-1/challenges/challenge-1')
+      .toBe('/competitions/competition-1/challenges?challenge=challenge-1')
     expect(notificationTargetPath(notification('BloodAwarded', 'competition-1', {
       competitionChallengeId: 'challenge-1',
     })))
-      .toBe('/competitions/competition-1/challenges/challenge-1')
+      .toBe('/competitions/competition-1/challenges?challenge=challenge-1')
   })
 
   test('routes question activity to the matching consultation and reads its root thread', () => {

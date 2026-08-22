@@ -31,6 +31,7 @@ public enum PlatformAuditKindProtocol
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<UserAccountLifecycleActionProtocol>))]
 public enum UserAccountLifecycleActionProtocol
 {
+    Activated,
     Banned,
     Disabled,
     Anonymized,

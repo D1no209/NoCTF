@@ -104,7 +104,10 @@ public sealed class CompetitionEvent
     [NotMapped] public Guid? GameplayFactId => Reference(EntityReferenceKind.GameplayFact) ?? PayloadValue<Guid>("gameplayFactId");
     [NotMapped] public Guid? QuestionId => Reference(EntityReferenceKind.Notification) ?? PayloadValue<Guid>("questionId");
     [NotMapped] public CompetitionStatus? CompetitionStatus => PayloadValue<CompetitionStatus>("competitionStatus");
+    [NotMapped] public CompetitionStatus? PreviousCompetitionStatus => PayloadValue<CompetitionStatus>("from");
     [NotMapped] public CompetitionLeaderboardVisibility? LeaderboardVisibility => PayloadValue<CompetitionLeaderboardVisibility>("leaderboardVisibility");
+    [NotMapped] public CompetitionLeaderboardVisibility? PreviousLeaderboardVisibility =>
+        PayloadValue<CompetitionLeaderboardVisibility>("from");
     [NotMapped] public NoCTF.Domain.Teams.TeamRegistrationStatus? TeamRegistrationStatus => PayloadValue<NoCTF.Domain.Teams.TeamRegistrationStatus>("teamRegistrationStatus");
     [NotMapped] public NoCTF.Domain.Gameplay.GameplayFactKind? GameplayFactKind => PayloadValue<NoCTF.Domain.Gameplay.GameplayFactKind>("gameplayFactKind");
     [NotMapped] public NoCTF.Domain.Gameplay.GameplayFactState? GameplayFactState => PayloadValue<NoCTF.Domain.Gameplay.GameplayFactState>("gameplayFactState");
@@ -118,6 +121,7 @@ public sealed class CompetitionEvent
     [NotMapped] public string? Reason => PayloadText("reason");
     [NotMapped] public string? TrackKey => PayloadText("trackKey");
     [NotMapped] public string? PreviousTrackKey => PayloadText("previousTrackKey");
+    [NotMapped] public bool Automatic => PayloadValue<bool>("automatic") ?? false;
 
     private Guid? Reference(EntityReferenceKind kind) =>
         SubjectType == kind ? SubjectId : RelatedType == kind ? RelatedId : null;

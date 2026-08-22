@@ -65,11 +65,11 @@ describe('AWDP participant panel', () => {
     expect(source).toContain('<Alert v-if="state?.breakActivation"')
     expect(source).toContain('<FlagSubmit')
     expect(source).toContain('v-else')
-    expect(source).toContain('攻击成果已锁定')
+    expect(source).toContain('攻击已锁定，后续 Flag 不再受理')
     expect(source).toContain('后续 Flag 不再受理')
     expect(source).toContain('<Alert v-if="state?.fixActivation"')
     expect(source).toContain('<FixSubmit')
-    expect(source).toContain('防御成果已锁定')
+    expect(source).toContain('防御已锁定，无需再次申请防御验证')
     expect(source).toContain('无需再次申请防御验证')
   })
 

@@ -148,17 +148,14 @@ const stateVariant = computed(() => {
 </script>
 
 <template>
-  <Card>
-    <CardHeader>
-      <div class="flex items-center justify-between gap-2">
-        <CardTitle class="text-base">{{ $t('题目环境') }}</CardTitle>
+  <section class="flex flex-col gap-4" aria-labelledby="runtime-card-title">
+    <header class="flex items-center justify-between gap-2">
+        <h3 id="runtime-card-title" class="text-sm font-semibold">{{ $t('题目环境') }}</h3>
         <Badge v-if="runtime" :variant="stateVariant">
           {{ runtimeStateLabel(runtime.state) }}
         </Badge>
-      </div>
-      <CardDescription v-if="controls === 'reset-only'"> {{ $t('AWD 模式下环境由平台统一发放,仅支持重置') }} </CardDescription>
-    </CardHeader>
-    <CardContent class="flex flex-col gap-4">
+    </header>
+    <div class="flex flex-col gap-4">
       <Skeleton v-if="loading" class="h-16 w-full" />
 
       <template v-else>
@@ -172,10 +169,6 @@ const stateVariant = computed(() => {
         <Alert v-else-if="timedOut">
           <AlertDescription>{{ $t('环境状态更新超时,请稍后手动刷新。') }}</AlertDescription>
         </Alert>
-
-        <div v-if="!loadError && !runtime" class="text-sm text-muted-foreground">
-          {{ controls === 'full' ? $t('环境尚未启动,点击「启动环境」获取你的专属实例。') : $t('平台尚未为本队发放环境。') }}
-        </div>
 
         <template v-if="!loadError && runtime">
           <div v-if="isRunning && runtime.urls?.length" class="flex flex-col gap-1">
@@ -214,6 +207,6 @@ const stateVariant = computed(() => {
           </template>
         </div>
       </template>
-    </CardContent>
-  </Card>
+    </div>
+  </section>
 </template>

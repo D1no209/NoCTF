@@ -17,6 +17,14 @@ public sealed class OpenApiPlatformAdministrationStore : IPlatformAdministration
     public Task<UpdatePlatformRoleResult> UpdateRoleAsync(
         Guid userId, UserRole role, DateTimeOffset now, CancellationToken cancellationToken) =>
         Task.FromResult(new UpdatePlatformRoleResult(UpdatePlatformRoleState.UserNotFound));
+    public Task<UpdatePlatformUserStatusResult> UpdateAccountStatusAsync(
+        Guid userId,
+        Guid actorUserId,
+        UserAccountStatus accountStatus,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new UpdatePlatformUserStatusResult(
+            UpdatePlatformUserStatusState.UserNotFound));
     public Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId, DateTimeOffset now, CancellationToken cancellationToken) =>
         Task.FromResult<PlatformUserView?>(null);

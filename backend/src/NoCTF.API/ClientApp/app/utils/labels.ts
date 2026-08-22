@@ -248,18 +248,18 @@ const notificationTargetResolvers = {
     ? `/competitions/${context.competitionId}/my/submissions`
     : context.detailPath,
   RuntimeStateChanged: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges/${context.challengeId}`
+    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
     : context.detailPath,
   StartGateFailed: context => context.detailPath,
   ManagementFailure: context => context.detailPath,
   BloodAwarded: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges/${context.challengeId}`
+    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
     : context.detailPath,
   ChallengePublished: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges/${context.challengeId}`
+    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
     : context.detailPath,
   HintPublished: context => context.competitionId && context.challengeId
-    ? `/competitions/${context.competitionId}/challenges/${context.challengeId}`
+    ? `/competitions/${context.competitionId}/challenges?challenge=${context.challengeId}`
     : context.detailPath,
   TeamBanned: context => context.competitionId
     ? `/competitions/${context.competitionId}/my/team#ban-appeal`

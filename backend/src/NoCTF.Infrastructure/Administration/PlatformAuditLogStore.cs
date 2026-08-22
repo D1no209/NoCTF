@@ -13,6 +13,41 @@ namespace NoCTF.Infrastructure.Administration;
 
 public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLogStore
 {
+    private static readonly CompetitionEventKind[] AuditedCompetitionEventKinds =
+    [
+        CompetitionEventKind.CompetitionCreated,
+        CompetitionEventKind.CompetitionUpdated,
+        CompetitionEventKind.CompetitionDeleted,
+        CompetitionEventKind.CompetitionLifecycleChanged,
+        CompetitionEventKind.LeaderboardVisibilityChanged,
+        CompetitionEventKind.ChallengeCreated,
+        CompetitionEventKind.ChallengeUpdated,
+        CompetitionEventKind.ChallengePublished,
+        CompetitionEventKind.ChallengeUnpublished,
+        CompetitionEventKind.ChallengeDeleted,
+        CompetitionEventKind.HintPublished,
+        CompetitionEventKind.TeamRegistrationChanged,
+        CompetitionEventKind.TeamDeleted,
+        CompetitionEventKind.TeamBanned,
+        CompetitionEventKind.TeamUnbanned,
+        CompetitionEventKind.ProtectedGameplayFactValueAccessed,
+        CompetitionEventKind.CheatIncidentConfirmed,
+        CompetitionEventKind.CheatIncidentDismissed,
+        CompetitionEventKind.CheatIncidentSuperseded,
+        CompetitionEventKind.CheatIncidentCorrected,
+        CompetitionEventKind.ProtectedCompetitionExportCreated,
+        CompetitionEventKind.TeamBanAppealUpheld,
+        CompetitionEventKind.TeamBanAppealAccepted,
+        CompetitionEventKind.TeamBanCorrectionPublished,
+        CompetitionEventKind.RuntimeForceTerminationRequested,
+        CompetitionEventKind.RuntimeForceTerminationCompleted,
+        CompetitionEventKind.RuntimeForceTerminationFailed,
+        CompetitionEventKind.AnnouncementPublished,
+        CompetitionEventKind.ChallengeDescriptionUpdated,
+        CompetitionEventKind.TrackConfigurationUpdated,
+        CompetitionEventKind.TeamTrackChanged
+    ];
+
     private static readonly JsonSerializerOptions JsonOptions =
         new(JsonSerializerDefaults.Web);
 
@@ -24,7 +59,9 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
         if (query.Kind is not PlatformAuditKind.UserAccountLifecycle
             and not PlatformAuditKind.CompetitionAdministration)
         {
-            var competitionEvents = db.CompetitionEvents.AsNoTracking();
+            var competitionEvents = db.CompetitionEvents.AsNoTracking()
+                .Where(item => item.ActorUserId != null
+                    && AuditedCompetitionEventKinds.Contains(item.Kind));
             if (query.From is not null)
                 competitionEvents = competitionEvents.Where(item =>
                     item.OccurredAt >= query.From.Value);
@@ -75,10 +112,10 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 item.CompetitionId,
                 item.CompetitionId,
                 item.ActorUserId,
-                null,
-                null,
-                null,
-                null,
+                item.PreviousCompetitionStatus,
+                item.CompetitionStatus,
+                item.PreviousLeaderboardVisibility,
+                item.LeaderboardVisibility,
                 null,
                 item.Kind,
                 item.Level,
@@ -94,7 +131,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 null,
                 competitionTitles.GetValueOrDefault(item.CompetitionId),
                 item.Reason,
-                false,
+                item.Automatic,
                 item.OccurredAt)));
         }
 

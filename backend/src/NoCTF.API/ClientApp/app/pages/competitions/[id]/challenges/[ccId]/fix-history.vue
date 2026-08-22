@@ -101,7 +101,7 @@ function outcomeVariant(item: FixAttempt) {
     <div class="flex flex-wrap items-start justify-between gap-4">
       <div>
         <Button as-child variant="ghost" size="sm" class="mb-2 -ml-3">
-          <NuxtLink :to="`/competitions/${competitionId}/challenges/${competitionChallengeId}`">
+          <NuxtLink :to="`/competitions/${competitionId}/challenges?challenge=${competitionChallengeId}`">
             <ArrowLeft data-icon="inline-start" />
             {{ $t('返回题目') }}
           </NuxtLink>

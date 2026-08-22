@@ -368,7 +368,6 @@ function setAppealOpen(open: boolean) {
       <Card v-if="isCaptain">
         <CardHeader>
           <CardTitle class="text-base">{{ $t('邀请成员') }}</CardTitle>
-          <CardDescription> {{ $t('邀请码在创建队伍时生成;出于安全考虑无法回显当前值,轮换后会显示新的邀请码') }} </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-3">
           <div v-if="invitationToken" class="flex flex-wrap items-center gap-2">
