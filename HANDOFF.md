@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-22 alpha.71 AWDP 防御结果兜底文案与生产部署
+
+- `ad444bb2` 修正 AWDP 一次性 Fix 验证结果的前端兜底语义：除明确的 `Correct` 与 `AwdpExploitSucceeded` 外，未知或缺失失败码统一显示“防御异常：服务异常”，不再显示并非后端预设结果的“防御未通过”。选手题目面板与 Fix 历史页使用同一规则；删除了已失效的英文翻译键，并补充前端回归测试。`053fd74c` 将版本从 `0.1.0-alpha.70` 递增到 `0.1.0-alpha.71`。
+- 本阶段没有新增业务表、字段、EF migration、HTTP/OpenAPI 或 TypeScript SDK 变化。精确比较 `alpha.70..alpha.71` 后，业务改动仅涉及 Backend 镜像内嵌的 SPA；Worker、Runner 与数据库代码没有变化，因此生产只强制重建并切换 Backend，PostgreSQL、Redis、Worker、Runner 均未重启。
+- 代码已快进推送到远程 `main`，生产仓库 `/root/NoCTF` 同步到 `053fd74c`。部署前数据库备份为 `/root/backups/noctf-pre-alpha71-053fd74c-20260822T042801Z.dump`，SHA-256 为 `4f8692a582048be6c386b6498d494f6413cafc8d7e68840835c0e34968ae44a3`，并已使用 `pg_restore --list` 验证可读；本阶段没有迁移需要执行。
+- 新 Backend 镜像 ID 为 `1cca3692e155`，保留回滚标签 `deploy-backend:alpha71-053fd74c`；上一版 alpha.70 平台镜像与标签原样保留。切换后 `deploy-backend-1` 为 `healthy`，容器内程序集确认包含 `0.1.0-alpha.71`；`https://101.43.46.244/`、`/health`、`/health/ready` 均返回 HTTP 200，部署后近 10 分钟日志未出现 Error、Critical、Fatal 或未处理异常。
+- 部署前后 `noctf.io/managed=true` Runtime 容器数量均为 0。清理只移除了本次 Runner 构建诊断产生的精确 Alpine 临时容器和临时 Dockerfile/Kompose 下载文件，没有执行全局 prune，也没有删除题目镜像、卷、数据库备份或生产专用 Compose 覆盖文件。服务器仓库状态仍只包含原有未跟踪的 `deploy/docker-compose.prod.yml` 与 `deploy/docker-compose.prod.yml.pre-alpha55`。
+- 验证：原工作树定向前端测试 14/14 通过，`bun run typecheck` 与 `git diff --check` 通过；干净发布工作树定向 AWDP 测试 7/7 通过；生产 Backend Docker 构建（含 Nuxt production generate）成功，只保留既有大 chunk、plugin timing 与第三方未使用导入 Warning。生产健康、版本、外部 HTTPS、日志、回滚标签和 Runtime 资源边界均已实际核验。
+
 ## 2026-08-21 alpha.70 仓库清理与生产部署
 
 - `fe422201` 将本地部署传输产物 `.tmp-noctf-*.bundle` 纳入根 `.gitignore`，防止临时 Git bundle 污染状态；没有删除业务代码、测试、部署清单或用户文件。`af907ecb` 将版本从 `0.1.0-alpha.69` 递增到 `0.1.0-alpha.70`。本阶段没有新增业务表、字段、EF migration、HTTP/OpenAPI 或 TypeScript SDK 变化。
