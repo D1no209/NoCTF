@@ -5,6 +5,7 @@ import { listCompetitionsEndpoint } from '~/api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse } from '~/api'
 
 const { configuration } = usePlatform()
+const { isLoggedIn } = useAuth()
 
 const items = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse[]>([])
 
@@ -71,7 +72,7 @@ const modes = [
               <NuxtLink to="/competitions"> {{ $t('浏览竞赛') }} <ArrowRight data-icon="inline-end" />
               </NuxtLink>
             </Button>
-            <Button size="lg" variant="outline" as-child>
+            <Button v-if="!isLoggedIn" size="lg" variant="outline" as-child>
               <NuxtLink to="/auth/register">{{ $t('立即注册') }}</NuxtLink>
             </Button>
           </div>

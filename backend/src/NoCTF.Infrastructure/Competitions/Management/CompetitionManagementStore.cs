@@ -162,6 +162,7 @@ public sealed class CompetitionManagementStore(
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Staff,
             command.UpdatedAt,
+            ActorUserId: command.ActorId,
             CompetitionStatus: competition.Status), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);

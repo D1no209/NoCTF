@@ -42,7 +42,7 @@ export function competitionBroadcastTargetPath(
   event: NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse,
 ): string | null {
   if (event.competitionChallengeId) {
-    return `/competitions/${event.competitionId}/challenges/${event.competitionChallengeId}`
+    return `/competitions/${event.competitionId}/challenges?challenge=${event.competitionChallengeId}`
   }
   if (event.kind === 'TeamBanned' || event.kind === 'TeamBanCorrectionPublished')
     return `/competitions/${event.competitionId}/teams`

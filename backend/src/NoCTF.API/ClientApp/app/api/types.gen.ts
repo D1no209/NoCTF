@@ -1323,7 +1323,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = 'CompetitionLifecycle' | 'UserAccountLifecycle' | 'CompetitionAdministration' | 'CompetitionLeaderboardVisibility' | 'CompetitionEvent';
 
-export type NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol = 'Banned' | 'Disabled' | 'Anonymized' | 'PhysicallyDeleted';
+export type NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol = 'Activated' | 'Banned' | 'Disabled' | 'Anonymized' | 'PhysicallyDeleted';
 
 export type NoCtfapiEndpointsAdministrationPlatformListPlatformAuditLogsRequest = {
     [key: string]: never;
@@ -1389,6 +1389,18 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformConfigurationRe
     description?: string | null;
     expectedRevision: number;
 };
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictResponse = {
+    code?: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictCode;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictCode = 'AnonymizedAccountImmutable' | 'LastAdministratorProtected';
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusRequest = {
+    accountStatus: NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol = 'Active' | 'Banned' | 'Disabled';
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse = {
     code?: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode;
@@ -5978,6 +5990,46 @@ export type AdminPlatformSendEmailVerificationTestResponses = {
 };
 
 export type AdminPlatformSendEmailVerificationTestResponse = AdminPlatformSendEmailVerificationTestResponses[keyof AdminPlatformSendEmailVerificationTestResponses];
+
+export type AdminPlatformUpdateUserAccountStatusData = {
+    body: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusRequest;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}/account-status';
+};
+
+export type AdminPlatformUpdateUserAccountStatusErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictResponse;
+};
+
+export type AdminPlatformUpdateUserAccountStatusError = AdminPlatformUpdateUserAccountStatusErrors[keyof AdminPlatformUpdateUserAccountStatusErrors];
+
+export type AdminPlatformUpdateUserAccountStatusResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse;
+};
+
+export type AdminPlatformUpdateUserAccountStatusResponse = AdminPlatformUpdateUserAccountStatusResponses[keyof AdminPlatformUpdateUserAccountStatusResponses];
 
 export type AdminPlatformUpdateUserRoleData = {
     body: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest;

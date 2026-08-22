@@ -79,8 +79,8 @@ onUnmounted(() => {
       <Skeleton class="h-80 w-full" />
     </div>
 
-    <div v-else class="grid items-start gap-5 xl:grid-cols-2">
-      <section class="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5" aria-labelledby="awdp-attack-title">
+    <div v-else class="grid items-start gap-6 xl:grid-cols-2 xl:gap-0">
+      <section class="flex min-w-0 flex-col gap-5 xl:pr-6" aria-labelledby="awdp-attack-title">
         <header class="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
           <div class="flex flex-wrap items-center gap-2">
             <h2 id="awdp-attack-title" class="text-lg font-semibold">{{ $t('攻击靶机 · Break 环境') }}</h2>
@@ -91,6 +91,7 @@ onUnmounted(() => {
         </header>
 
         <RuntimeCard
+          class="border-b pb-5"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
           controls="full"
@@ -98,23 +99,20 @@ onUnmounted(() => {
 
         <Alert v-if="state?.breakActivation" class="border-emerald-500/40 bg-emerald-500/5">
           <ShieldCheck class="text-emerald-600 dark:text-emerald-400" />
-          <AlertTitle>{{ $t('攻击成果已锁定') }}</AlertTitle>
-          <AlertDescription>
-            {{ $t('本题 Break 已成功并持续生效，后续 Flag 不再受理，也不会产生失败记录或重复播报。') }}
-          </AlertDescription>
+          <AlertTitle>{{ $t('攻击已锁定，后续 Flag 不再受理') }}</AlertTitle>
         </Alert>
 
         <FlagSubmit
           v-else
+          class="border-t pt-5"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
-          :title="$t('Break · 提交动态 Flag')"
-          :description="$t('提交当前攻击实例中取得的单个动态 Flag。重置实例后，旧 generation 的 Flag 会立即失效。')"
+          :title="$t('提交 Flag')"
           @evaluated="refreshAndPoll"
         />
       </section>
 
-      <section class="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5" aria-labelledby="awdp-defense-title">
+      <section class="flex min-w-0 flex-col gap-5 border-t pt-6 xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0" aria-labelledby="awdp-defense-title">
         <header class="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
           <div class="flex flex-wrap items-center gap-2">
             <h2 id="awdp-defense-title" class="text-lg font-semibold">{{ $t('防御轨 · Fix') }}</h2>
@@ -130,11 +128,8 @@ onUnmounted(() => {
           </Button>
         </header>
 
-        <Card v-if="state?.defense?.gameplayFactId">
-          <CardHeader>
-            <CardTitle class="text-base">{{ $t('最近一次 Fix 验证') }}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <section v-if="state?.defense?.gameplayFactId" class="border-b pb-5" aria-labelledby="awdp-last-fix-title">
+            <h3 id="awdp-last-fix-title" class="mb-3 text-sm font-semibold">{{ $t('最近一次 Fix 验证') }}</h3>
             <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
               <Badge v-if="state.defense.state" variant="outline">
                 {{ gameplayFactStateLabel(state.defense.state) }}
@@ -143,19 +138,16 @@ onUnmounted(() => {
                 {{ defenseOutcome }}
               </strong>
             </div>
-          </CardContent>
-        </Card>
+        </section>
 
         <Alert v-if="state?.fixActivation" class="border-sky-500/40 bg-sky-500/5">
           <ShieldCheck class="text-sky-600 dark:text-sky-400" />
-          <AlertTitle>{{ $t('防御成果已锁定') }}</AlertTitle>
-          <AlertDescription>
-            {{ $t('本题 Fix 已成功并持续生效，无需再次申请防御验证。') }}
-          </AlertDescription>
+          <AlertTitle>{{ $t('防御已锁定，无需再次申请防御验证') }}</AlertTitle>
         </Alert>
 
         <FixSubmit
           v-else
+          class="border-t pt-5"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
           :defense="state?.defense"

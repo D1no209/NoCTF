@@ -46,7 +46,7 @@ describe('protected downloads', () => {
 
   test('all protected download pages use generated SDK operations', async () => {
     const paths = [
-      '../app/pages/competitions/[id]/challenges/[ccId]/index.vue',
+      '../app/components/challenges/CompetitionChallengeDetail.vue',
       '../app/pages/admin/platform/logs.vue',
       '../app/pages/admin/platform/audit.vue',
       '../app/pages/admin/competitions/[id]/exports.vue',

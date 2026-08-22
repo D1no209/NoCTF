@@ -13,6 +13,7 @@ import type {
   NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
 } from '~/api'
 import { downloadSdkFile } from '~/utils/download'
+import { platformAuditActionText } from '~/utils/platform-audit'
 
 definePageMeta({ middleware: 'platform-admin' })
 
@@ -25,11 +26,6 @@ const KIND_LABELS: Record<string, string> = {
 const EXPORT_STATUS: Record<string, { label: string; variant: 'secondary' | 'outline' | 'destructive' | 'default' }> = {
   Queued: { label: '排队中', variant: 'outline' }, Processing: { label: '处理中', variant: 'secondary' }, Available: { label: '可下载', variant: 'default' }, Failed: { label: '失败', variant: 'destructive' }, Expired: { label: '已过期', variant: 'outline' },
 }
-const COMPETITION_STATUS_LABELS: Record<string, string> = {
-  Draft: '草稿', Visible: '可见', Published: '已发布', Running: '进行中', Paused: '已暂停', Finished: '已结束',
-}
-const VISIBILITY_LABELS: Record<string, string> = { Normal: '正常', Frozen: '冻结', Blackout: '封榜' }
-const ACCOUNT_ACTION_LABELS: Record<string, string> = { Banned: '封禁', Disabled: '禁用', Anonymized: '匿名化', PhysicallyDeleted: '物理删除' }
 
 const kind = ref('all')
 const actorId = ref('')
@@ -64,28 +60,6 @@ const { items, loading, error: listError, hasMore, initialized, loadMore, reset 
 function applyFilters(): void {
   reset({ preserveItems: true })
   void loadMore()
-}
-
-function detailText(log: AuditLog): string {
-  if (log.kind === 'CompetitionLifecycle' && log.fromCompetitionStatus !== null && log.fromCompetitionStatus !== undefined) {
-    const fromKey = COMPETITION_STATUS_LABELS[String(log.fromCompetitionStatus)]
-    const toKey = COMPETITION_STATUS_LABELS[String(log.toCompetitionStatus)]
-    const fromLabel = fromKey ? translate(fromKey) : log.fromCompetitionStatus
-    const toLabel = toKey ? translate(toKey) : log.toCompetitionStatus
-    return translate('状态 {from} → {to}', { from: fromLabel ?? '-', to: toLabel ?? '-' })
-  }
-  if (log.kind === 'UserAccountLifecycle' && log.userAccountAction !== null && log.userAccountAction !== undefined) {
-    const action = ACCOUNT_ACTION_LABELS[String(log.userAccountAction)]
-    return action ? translate(action) : String(log.userAccountAction)
-  }
-  if (log.kind === 'CompetitionLeaderboardVisibility' && log.fromLeaderboardVisibility !== null && log.fromLeaderboardVisibility !== undefined) {
-    const fromKey = VISIBILITY_LABELS[String(log.fromLeaderboardVisibility)]
-    const toKey = VISIBILITY_LABELS[String(log.toLeaderboardVisibility)]
-    const fromLabel = fromKey ? translate(fromKey) : log.fromLeaderboardVisibility
-    const toLabel = toKey ? translate(toKey) : log.toLeaderboardVisibility
-    return translate('可见性 {from} → {to}', { from: fromLabel ?? '-', to: toLabel ?? '-' })
-  }
-  return log.reason ?? '-'
 }
 
 // ---------- 数据导出 ----------
@@ -213,7 +187,7 @@ onMounted(() => {
               <TableHead class="w-44">{{ $t('时间') }}</TableHead>
               <TableHead class="w-32">{{ $t('类型') }}</TableHead>
               <TableHead>{{ $t('主体') }}</TableHead>
-              <TableHead>{{ $t('内容') }}</TableHead>
+              <TableHead>{{ $t('操作') }}</TableHead>
               <TableHead class="w-32">{{ $t('操作者') }}</TableHead>
             </TableRow>
           </TableHeader>
@@ -230,7 +204,7 @@ onMounted(() => {
                 <div class="truncate" :title="log.subjectId">{{ log.subjectDisplayName ?? log.subjectId }}</div>
               </TableCell>
               <TableCell class="max-w-md">
-                <div class="truncate" :title="detailText(log)">{{ detailText(log) }}</div>
+                <div class="font-medium" :title="platformAuditActionText(log)">{{ platformAuditActionText(log) }}</div>
               </TableCell>
               <TableCell class="max-w-32 truncate font-mono text-xs text-muted-foreground" :title="log.actorId ?? ''">
                 {{ log.actorId ?? $t('系统') }}

@@ -408,6 +408,7 @@ GET  /api/v1/admin/data-exports/{dataExportId}/download
 POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
 PUT  /api/v1/admin/platform/users/{userId}/role
+PUT  /api/v1/admin/platform/users/{userId}/account-status
 POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
 GET  /api/v1/admin/platform/dead-letters
 GET  /api/v1/admin/platform/dead-letters/{messageId}

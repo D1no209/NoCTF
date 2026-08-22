@@ -113,6 +113,23 @@ public sealed class PlatformAuditLogStoreTests
                     }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
                     OccurredAt = now.AddMinutes(1.5)
                 });
+                seed.CompetitionEvents.Add(new CompetitionEvent
+                {
+                    Id = Guid.CreateVersion7(now.AddMilliseconds(7)),
+                    CompetitionId = competitionId,
+                    Kind = CompetitionEventKind.CompetitionCreated,
+                    Level = CompetitionEventLevel.Information,
+                    Visibility = CompetitionEventVisibility.Staff,
+                    ActorUserId = actorId,
+                    SubjectType = EntityReferenceKind.Competition,
+                    SubjectId = competitionId,
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        schemaVersion = 1,
+                        competitionStatus = CompetitionStatus.Draft
+                    }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    OccurredAt = now.AddMinutes(1.75)
+                });
                 await seed.SaveChangesAsync(cancellationToken);
             }
 
@@ -124,6 +141,8 @@ public sealed class PlatformAuditLogStoreTests
             await Assert.That(all).Count().IsEqualTo(3);
             await Assert.That(all[0].Kind).IsEqualTo(PlatformAuditKind.UserAccountLifecycle);
             await Assert.That(all[1].Kind).IsEqualTo(PlatformAuditKind.CompetitionEvent);
+            await Assert.That(all[1].CompetitionEventKind)
+                .IsEqualTo(CompetitionEventKind.CompetitionCreated);
             await Assert.That(all[2].Kind).IsEqualTo(PlatformAuditKind.CompetitionLifecycle);
             await Assert.That(all[2].CompetitionEventKind)
                 .IsEqualTo(CompetitionEventKind.CompetitionLifecycleChanged);
@@ -150,7 +169,9 @@ public sealed class PlatformAuditLogStoreTests
                 cancellationToken);
             await Assert.That(eventOnly).Count().IsEqualTo(1);
             await Assert.That(eventOnly[0].CompetitionEventKind)
-                .IsEqualTo(CompetitionEventKind.RuntimeStateChanged);
+                .IsEqualTo(CompetitionEventKind.CompetitionCreated);
+            await Assert.That(all.Any(item =>
+                item.CompetitionEventKind == CompetitionEventKind.RuntimeStateChanged)).IsFalse();
 
             var firstPage = await store.QueryAsync(
                 new(null, null, null, null, actorId, null, null, 1),

@@ -125,7 +125,7 @@ function resultText(submission: Submission) {
         <TableRow v-for="submission in items" :key="submission.id">
           <TableCell>
             <NuxtLink
-              :to="`/competitions/${competitionId}/challenges/${submission.competitionChallengeId}`"
+              :to="`/competitions/${competitionId}/challenges?challenge=${submission.competitionChallengeId}`"
               class="font-medium hover:underline"
             >
               {{ challengeTitles[submission.competitionChallengeId!] ?? $t('未知题目') }}

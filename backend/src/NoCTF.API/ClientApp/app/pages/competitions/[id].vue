@@ -2,6 +2,7 @@
 import { Activity, FileCheck, LayoutDashboard, MessageCircleQuestion, Orbit, Puzzle, Trophy, UserRound, Users } from '@lucide/vue'
 import { getCompetitionEndpoint, getMyTeamEndpoint } from '~/api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
+import { competitionWorkspaceNavigationKey } from '~/components/app/workspace-nav'
 import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
 
 const route = useRoute()
@@ -105,16 +106,40 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
     },
   ]
 })
+
+provide(competitionWorkspaceNavigationKey, navGroups)
 </script>
 
 <template>
   <NuxtPage v-if="isControlScreen" />
 
+  <div
+    v-else-if="competition && isChallengeIndex"
+    class="mx-auto flex w-full max-w-[120rem] flex-col gap-4 px-3 py-4 md:px-5"
+  >
+    <div class="flex flex-col gap-1 border-b pb-4">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
+        <ModeBadge :mode="competition.mode" />
+        <LifecycleBadge :status="competition.status" />
+      </div>
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
+        <span class="text-muted-foreground">
+          {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
+        </span>
+        <CompetitionCountdown
+          :start-time="competition.startTime"
+          :end-time="competition.endTime"
+          :status="competition.status"
+          class="font-medium text-primary"
+        />
+      </div>
+    </div>
+    <NuxtPage />
+  </div>
+
   <AppWorkspaceNav v-else-if="competition" :groups="navGroups" :title="competition.title">
-    <div
-      class="mx-auto flex w-full flex-col gap-6 px-4 py-8 md:px-6"
-      :class="isChallengeIndex ? 'max-w-6xl' : 'max-w-5xl'"
-    >
+    <div class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
       <div class="flex flex-col gap-2">
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
@@ -138,11 +163,7 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
     </div>
   </AppWorkspaceNav>
 
-  <div
-    v-else
-    class="mx-auto flex w-full flex-col gap-6 px-4 py-8"
-    :class="isChallengeIndex ? 'max-w-6xl' : 'max-w-5xl'"
-  >
+  <div v-else class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
     <Alert v-if="error" variant="destructive">
       <AlertDescription>{{ error }}</AlertDescription>
     </Alert>

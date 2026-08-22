@@ -1,4 +1,4 @@
-import type { Component } from 'vue'
+import type { Component, ComputedRef, InjectionKey } from 'vue'
 
 export interface WorkspaceNavItem {
   to: string
@@ -12,3 +12,6 @@ export interface WorkspaceNavGroup {
   label?: string
   items: WorkspaceNavItem[]
 }
+
+export const competitionWorkspaceNavigationKey: InjectionKey<ComputedRef<WorkspaceNavGroup[]>>
+  = Symbol('competition-workspace-navigation')
