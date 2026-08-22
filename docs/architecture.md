@@ -67,6 +67,14 @@ API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务�
 
 平台部署配置 RunnerId、一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。同 Pool 多节点竞争同一 durable queue。节点通过 Redis TTL heartbeat 发布容量。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RunnerPool、RuntimeProvider、ProviderReceiptJson 与展开 URL。
 
+每次心跳同时维护 `runner-pool:{pool}:candidates` 有序集合。候选分数采用内存、CPU 与 PID
+三者中最高的已用比例，并加入不超过 `1e-6` 的随机扰动避免同分节点长期固定成为首选。
+调度热路径只读取压力最低的前 8 个候选，Lua 脚本原子校验成员资格、心跳、容量和
+`runner-claim:{runtimeInstanceId}` 幂等所有权，再扣减容量并更新分数。前 8 个候选均不可用时，
+只执行一次池索引重建与原子兜底选择，避免池中后续可用节点被误判为容量不足。释放 Claim
+会在同一脚本内恢复容量并更新候选分数；过期心跳在分配时从候选集合剔除。Runner/Runtime ID
+仅进入 Trace 与结构化日志，不作为 Prometheus 标签。
+
 `file://` OVA URL 必须在 Pool 所有候选节点可访问。平台 API 不下载或管理 OVA；配置固定
 预期 SHA-256，Libvirt Provider 负责读取/下载、校验、内容寻址缓存以及多 VM Appliance
 导入。

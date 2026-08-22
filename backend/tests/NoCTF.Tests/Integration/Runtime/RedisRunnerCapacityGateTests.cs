@@ -38,6 +38,11 @@ public sealed class RedisRunnerCapacityGateTests
             await Assert.That(initialized).IsEqualTo(RunnerAvailabilityRegistrationOutcome.Online);
             await Assert.That(await database.SetContainsAsync($"runner-pool:{pool}:members", runner)).IsTrue();
             await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsTrue();
+            var initialCandidateScore = await database.SortedSetScoreAsync(
+                $"runner-pool:{pool}:candidates",
+                runner);
+            await Assert.That(initialCandidateScore).IsNotNull();
+            await Assert.That(initialCandidateScore!.Value).IsLessThan(0.0000011d);
             await Assert.That((long)(await database.HashGetAsync(
                 $"runner:{runner}:capacity", "availableMemoryBytes"))!).IsEqualTo(1024);
             await Assert.That(await database.KeyTimeToLiveAsync($"runner:{runner}:capacity")).IsNotNull();
@@ -58,6 +63,14 @@ public sealed class RedisRunnerCapacityGateTests
             await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsFalse();
             await Assert.That(await database.KeyExistsAsync($"runner:{runner}:capacity")).IsFalse();
             await Assert.That(await database.SetContainsAsync($"runner-pool:{pool}:members", runner)).IsTrue();
+            var staleClaim = await gate.TryClaimAsync(
+                new RunnerCapacityRequest(Guid.CreateVersion7(), pool, 1, 1, 1),
+                cancellationToken);
+            await Assert.That(staleClaim.Availability)
+                .IsEqualTo(RunnerCapacityAvailability.Insufficient);
+            await Assert.That(await database.SortedSetScoreAsync(
+                $"runner-pool:{pool}:candidates",
+                runner)).IsNull();
         });
     }
 
@@ -92,6 +105,9 @@ public sealed class RedisRunnerCapacityGateTests
             await Assert.That(await database.SetContainsAsync($"runner-pool:{pool}:members", runner)).IsTrue();
             await Assert.That(await database.KeyExistsAsync($"runner:{runner}:heartbeat")).IsFalse();
             await Assert.That(await database.KeyExistsAsync($"runner:{runner}:capacity")).IsFalse();
+            await Assert.That(await database.SortedSetScoreAsync(
+                $"runner-pool:{pool}:candidates",
+                runner)).IsNull();
         });
     }
 
@@ -192,6 +208,82 @@ public sealed class RedisRunnerCapacityGateTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Pool_claim_selects_the_lowest_pressure_candidate(CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await container.StartAsync(cancellationToken);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var database = redis.GetDatabase();
+            const string pool = "integration";
+            const string busyRunner = "runner-a-busy";
+            const string idleRunner = "runner-z-idle";
+            await RegisterRunnerAsync(database, pool, busyRunner);
+            await RegisterRunnerAsync(database, pool, idleRunner);
+            await database.HashSetAsync($"runner:{busyRunner}:capacity",
+            [
+                new("availableMemoryBytes", 128),
+                new("availableNanoCpus", 20),
+                new("availablePids", 2)
+            ]);
+            await database.SortedSetAddAsync(
+                $"runner-pool:{pool}:candidates",
+                [new(busyRunner, 0.875d), new(idleRunner, 0d)]);
+
+            var gate = new RedisRunnerCapacityGate(redis);
+            var claim = await gate.TryClaimAsync(
+                new RunnerCapacityRequest(Guid.CreateVersion7(), pool, 64, 10, 1),
+                cancellationToken);
+
+            await Assert.That(claim.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
+            await Assert.That(claim.RunnerId).IsEqualTo(idleRunner);
+            await AssertCapacityAsync(database, busyRunner, memory: 128, nanoCpus: 20, pids: 2);
+            await AssertCapacityAsync(database, idleRunner, memory: 960, nanoCpus: 90, pids: 9);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Pool_claim_rebuilds_the_index_when_top_candidates_cannot_fit(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder("redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await container.StartAsync(cancellationToken);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(container.GetConnectionString());
+            var database = redis.GetDatabase();
+            const string pool = "integration";
+            for (var index = 0; index < 8; index++)
+            {
+                var runner = $"runner-full-{index}";
+                await RegisterRunnerAsync(database, pool, runner);
+                await database.HashSetAsync($"runner:{runner}:capacity", "availableMemoryBytes", 0);
+                await database.SortedSetAddAsync(
+                    $"runner-pool:{pool}:candidates",
+                    runner,
+                    index / 100d);
+            }
+
+            const string availableRunner = "runner-available-ninth";
+            await RegisterRunnerAsync(database, pool, availableRunner);
+            await database.SortedSetRemoveAsync($"runner-pool:{pool}:candidates", availableRunner);
+
+            var gate = new RedisRunnerCapacityGate(redis);
+            var claim = await gate.TryClaimAsync(
+                new RunnerCapacityRequest(Guid.CreateVersion7(), pool, 512, 40, 2),
+                cancellationToken);
+
+            await Assert.That(claim.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
+            await Assert.That(claim.RunnerId).IsEqualTo(availableRunner);
+            await Assert.That(await database.SortedSetLengthAsync(
+                $"runner-pool:{pool}:candidates")).IsEqualTo(9);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Claim_requires_live_runner_and_release_restores_capacity(CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -208,7 +300,10 @@ public sealed class RedisRunnerCapacityGateTests
             {
                 new("availableMemoryBytes", 1024),
                 new("availableNanoCpus", 100),
-                new("availablePids", 10)
+                new("availablePids", 10),
+                new("totalMemoryBytes", 1024),
+                new("totalNanoCpus", 100),
+                new("totalPids", 10)
             });
 
             var gate = new RedisRunnerCapacityGate(redis);
@@ -234,6 +329,11 @@ public sealed class RedisRunnerCapacityGateTests
             await Assert.That(release).IsEqualTo(RunnerCapacityReleaseOutcome.Released);
             var remaining = await database.HashGetAsync($"runner:{runner}:capacity", "availableMemoryBytes");
             await Assert.That((long)remaining!).IsEqualTo(1024);
+            var restoredCandidateScore = await database.SortedSetScoreAsync(
+                $"runner-pool:{pool}:candidates",
+                runner);
+            await Assert.That(restoredCandidateScore).IsNotNull();
+            await Assert.That(restoredCandidateScore!.Value).IsLessThan(0.0000011d);
 
             await database.HashSetAsync($"runner:{runner}:capacity", new HashEntry[]
             {
@@ -388,12 +488,18 @@ public sealed class RedisRunnerCapacityGateTests
             await Assert.That(claimed.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
             await database.KeyDeleteAsync($"runner:{runner}:heartbeat");
 
+            var replay = await gate.TryClaimAsync(
+                new RunnerCapacityRequest(claimedRuntimeId, pool, 256, 25, 2),
+                cancellationToken);
             var rejected = await gate.TryClaimForRunnerAsync(
                 new RunnerCapacityRequest(Guid.CreateVersion7(), pool, 256, 25, 2),
                 runner,
                 cancellationToken);
             var released = await gate.ReleaseAsync(claimedRuntimeId, runner, cancellationToken);
 
+            await Assert.That(replay.Availability).IsEqualTo(RunnerCapacityAvailability.Claimed);
+            await Assert.That(replay.RunnerId).IsEqualTo(runner);
+            await Assert.That(replay.State).IsEqualTo(RunnerCapacityClaimState.AlreadyOwned);
             await Assert.That(rejected.Availability)
                 .IsEqualTo(RunnerCapacityAvailability.Insufficient);
             await Assert.That(released).IsEqualTo(RunnerCapacityReleaseOutcome.Released);

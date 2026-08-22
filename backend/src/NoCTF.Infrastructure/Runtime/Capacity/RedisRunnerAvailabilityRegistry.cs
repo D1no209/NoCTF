@@ -24,12 +24,28 @@ public sealed record RunnerAvailabilityRegistration(
 public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis)
 {
     private const string RegistrationSchema = "1";
+    private const double CandidateJitterMaximum = 0.000001d;
 
     private const string RegisterScript = """
+        local function pressure(capacityKey, jitter)
+            local availableMemory = tonumber(redis.call('HGET', capacityKey, 'availableMemoryBytes') or '0')
+            local availableCpu = tonumber(redis.call('HGET', capacityKey, 'availableNanoCpus') or '0')
+            local availablePids = tonumber(redis.call('HGET', capacityKey, 'availablePids') or '0')
+            local totalMemory = tonumber(redis.call('HGET', capacityKey, 'totalMemoryBytes') or '0')
+            local totalCpu = tonumber(redis.call('HGET', capacityKey, 'totalNanoCpus') or '0')
+            local totalPids = tonumber(redis.call('HGET', capacityKey, 'totalPids') or '0')
+            if totalMemory <= 0 or totalCpu <= 0 or totalPids <= 0 then return 1 + jitter end
+            return math.max(
+                1 - (availableMemory / totalMemory),
+                1 - (availableCpu / totalCpu),
+                1 - (availablePids / totalPids)) + jitter
+        end
+
         redis.call('SADD', KEYS[1], ARGV[1])
 
         if ARGV[9] ~= '1' then
             redis.call('DEL', KEYS[3])
+            redis.call('ZREM', KEYS[4], ARGV[1])
             if redis.call('EXISTS', KEYS[2]) == 1 then
                 redis.call('PEXPIRE', KEYS[2], ARGV[6])
             end
@@ -44,6 +60,7 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         if not trusted then
             local wasOnline = redis.call('EXISTS', KEYS[3])
             redis.call('DEL', KEYS[3])
+            redis.call('ZREM', KEYS[4], ARGV[1])
             if ARGV[8] == '1' or wasOnline == 1 then return 0 end
             redis.call('HSET', KEYS[2],
                 'registrationSchema', ARGV[2],
@@ -57,6 +74,7 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
 
         redis.call('PEXPIRE', KEYS[2], ARGV[6])
         redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
+        redis.call('ZADD', KEYS[4], pressure(KEYS[2], tonumber(ARGV[10])), ARGV[1])
         return 1
         """;
 
@@ -79,7 +97,8 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
             [
                 new RedisKey($"runner-pool:{registration.RunnerPool}:members"),
                 new RedisKey($"runner:{registration.RunnerId}:capacity"),
-                new RedisKey($"runner:{registration.RunnerId}:heartbeat")
+                new RedisKey($"runner:{registration.RunnerId}:heartbeat"),
+                new RedisKey($"runner-pool:{registration.RunnerPool}:candidates")
             ],
             [
                 registration.RunnerId,
@@ -90,7 +109,8 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
                 checked((long)registration.TimeToLive.TotalMilliseconds),
                 heartbeat,
                 registration.HasActiveAssignments ? 1 : 0,
-                registration.ProviderAvailable ? 1 : 0
+                registration.ProviderAvailable ? 1 : 0,
+                Random.Shared.NextDouble() * CandidateJitterMaximum
             ]);
 
         return result switch
