@@ -1,5 +1,15 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-23 alpha.77 可观测性、Worker 隔离队列与高并发调度优化
+
+- 建立 OpenTelemetry/Prometheus/Grafana 可观测性基线。API、Worker、Runner 与统一 Host 暴露 Prometheus 指标并保留现有 Redis 平台日志；指标覆盖 API 请求与限流、Flag/Fix/Runtime 操作、SignalR、Wolverine 队列与 Handler、PostgreSQL/Redis、Runner 容量与 Claim、排行榜脏标记/投影/发布。Prometheus 标签仅使用 endpoint、queue、outcome、pool、mode 等有界维度，具体比赛、队伍与 Runtime 标识只进入日志或 Trace。新增可选 observability Compose、Prometheus 抓取与首批告警、Grafana provisioning/dashboard 及部署说明。
+- 新增 `tests/load/noctf-baseline.js` 的 k6 可重复压测基线，包含公开读取和受控认证操作、P95/P99/错误率阈值、远程目标硬阻断及凭据仅从环境变量注入。已使用官方 `grafana/k6:0.57.0` 容器执行 `inspect` 并修复 k6 不提供浏览器 `URL` 构造器导致的本地目标误判；没有向生产或现有测试服务器发送压测流量。完整优化前后实压仍需要一套隔离、可丢弃且带专用比赛/账号的环境，未将该缺口误报为通过。
+- Worker 仍使用同一二进制和 Durable Inbox/Outbox，但 Wolverine 工作负载按 `noctf-control`、`noctf-gameplay`、`noctf-projection`、`noctf-background` 四条持久队列隔离；支持按配置选择监听队列并设置独立并发上限，维护 Agent 只派发重活。生命周期/轮次/恢复、Flag/Fix/Runtime/作弊、排行榜投影、邮件/通知/导出/文件清理分别路由到对应队列，并记录独立积压、最旧消息、吞吐、重试、死信与执行耗时指标。
+- 排行榜发布改为 PostgreSQL advisory lock + RepeatableRead 快照 + Redis fencing token。数据库事务提交后领取单调 fence 并立即释放数据库锁/连接，Redis Lua 仅允许新 fence 覆盖缓存，随后才发布 SignalR；旧 Worker 晚到无法覆盖新快照，Redis 重启可由 PostgreSQL 重新投影，发布失败会重新标脏。测试覆盖乱序发布、Redis 状态丢失、失败重试和 Worker 重投。
+- Runner 分配改为 `runner-pool:{pool}:candidates` Redis Sorted Set 候选索引，分数取 CPU/内存/PID 的主导资源使用率并带微小随机扰动；热路径只探测压力最低的 8 个候选，Lua 原子检查心跳、容量和现有 `runner-claim:{runtimeInstanceId}` 后扣减容量并更新索引。前 8 个均不合适时只进行一次全池索引重建并原子选择可用候选，避免漏掉第 9 个可用 Runner；释放 Claim 会恢复容量和候选分，旧 Claim 仍可兼容释放。指标不包含 Runner/Runtime 高基数 ID。
+- 提交边界：`57fa59e6` 可观测性基线、`ae9b40b0` 压测基线、`54da3515` Worker 队列隔离、`4e2070dd` 排行榜 fencing、`da042adb` Runner 候选索引、`f0c06042` k6 运行时兼容修复、`170ed10a` 版本递增。版本从 `0.1.0-alpha.76` 递增至 `0.1.0-alpha.77`；没有新增业务表、EF migration 或 snapshot。
+- 验证：Release solution build 0 warning/0 error；完整后端 TUnit 1084 项中 1082 通过、0 失败，2 项仅因未启用真实 Kubernetes 集群与未配置 Libvirt 磁盘按设计跳过，真实 PostgreSQL/Redis/Wolverine/Docker 集成均已执行；Runner 真实 Redis 定向测试 11/11；前端 `bun test` 272/272、typecheck 与 production build 通过（仅既有大 chunk、plugin timing 与第三方 exports deprecation warning）；EF model drift、OpenAPI 导出/TypeScript SDK 生成幂等、k6 `inspect` 与 `git diff --check` 均通过。本节提交后统一推送 `main`，未执行生产部署或生产数据操作。
+
 ## 2026-08-22 alpha.76 参赛页面边界、审计恢复与邮箱激活管理
 
 - 参赛端移除旧侧边栏并按页面职责拆分布局：仅题目工作区显示按方向分组的题目列表；咨询、我的队伍、我的提交保留主内容与右侧赛事区域；概览不再显示侧栏；记分板成为独立页面并提供“返回比赛”入口。普通参赛者仍看不到中控大屏、队伍管理和动态入口，这些入口保留在竞赛管理侧。
