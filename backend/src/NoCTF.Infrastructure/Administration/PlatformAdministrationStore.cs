@@ -165,6 +165,38 @@ public sealed class PlatformAdministrationStore(
         return new(UpdatePlatformUserStatusState.Updated, Map(user));
     }
 
+    public async Task<UpdatePlatformUserEmailVerificationResult> UpdateEmailVerificationAsync(
+        Guid userId,
+        Guid actorUserId,
+        bool emailVerified,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, ct);
+        if (user is null)
+            return new(UpdatePlatformUserEmailVerificationState.UserNotFound);
+        if (user.AccountStatus == UserAccountStatus.Anonymized)
+        {
+            return new(
+                UpdatePlatformUserEmailVerificationState.AnonymizedAccountImmutable);
+        }
+
+        var currentlyVerified = user.EmailVerifiedAt is not null;
+        if (currentlyVerified == emailVerified)
+        {
+            return new(UpdatePlatformUserEmailVerificationState.Updated, Map(user));
+        }
+
+        user.EmailVerifiedAt = emailVerified ? now : null;
+        user.TokenVersion = checked(user.TokenVersion + 1);
+        user.UpdatedAt = now;
+        RecordEmailVerificationChange(user, actorUserId, emailVerified, now);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return new(UpdatePlatformUserEmailVerificationState.Updated, Map(user));
+    }
+
     public async Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
         DateTimeOffset now,
@@ -238,6 +270,35 @@ public sealed class PlatformAdministrationStore(
                     _ => throw new InvalidOperationException(
                         $"Unsupported account status {accountStatus}.")
                 },
+                false), JsonOptions),
+            RelatedType = EntityReferenceKind.User,
+            RelatedId = user.Id,
+            SentAt = occurredAt
+        });
+    }
+
+    private void RecordEmailVerificationChange(
+        User user,
+        Guid actorUserId,
+        bool emailVerified,
+        DateTimeOffset occurredAt)
+    {
+        db.Notifications.Add(new Notification
+        {
+            Id = Guid.CreateVersion7(occurredAt),
+            SourceType = NotificationSourceType.User,
+            SourceId = actorUserId,
+            TargetType = NotificationTargetType.PlatformAdministrators,
+            TargetId = Notification.PlatformAdministratorsTargetId,
+            Kind = NotificationKind.UserAccountLifecycleChanged,
+            ContentJson = JsonSerializer.Serialize(new UserAccountLifecycleFact(
+                1,
+                user.Id,
+                user.UserName,
+                emailVerified
+                    ? UserAccountLifecycleAction.EmailVerified
+                    : UserAccountLifecycleAction.EmailUnverified,
+                emailVerified ? "manual_verify_email" : "manual_unverify_email",
                 false), JsonOptions),
             RelatedType = EntityReferenceKind.User,
             RelatedId = user.Id,

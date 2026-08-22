@@ -25,6 +25,14 @@ public sealed class OpenApiPlatformAdministrationStore : IPlatformAdministration
         CancellationToken cancellationToken) =>
         Task.FromResult(new UpdatePlatformUserStatusResult(
             UpdatePlatformUserStatusState.UserNotFound));
+    public Task<UpdatePlatformUserEmailVerificationResult> UpdateEmailVerificationAsync(
+        Guid userId,
+        Guid actorUserId,
+        bool emailVerified,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(new UpdatePlatformUserEmailVerificationResult(
+            UpdatePlatformUserEmailVerificationState.UserNotFound));
     public Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId, DateTimeOffset now, CancellationToken cancellationToken) =>
         Task.FromResult<PlatformUserView?>(null);

@@ -45,6 +45,17 @@ public sealed record UpdatePlatformUserStatusResult(
     UpdatePlatformUserStatusState State,
     PlatformUserView? User = null);
 
+public enum UpdatePlatformUserEmailVerificationState
+{
+    Updated,
+    UserNotFound,
+    AnonymizedAccountImmutable
+}
+
+public sealed record UpdatePlatformUserEmailVerificationResult(
+    UpdatePlatformUserEmailVerificationState State,
+    PlatformUserView? User = null);
+
 public enum CreateBotState
 {
     Created,
@@ -101,6 +112,12 @@ public interface IPlatformAdministrationStore
         Guid userId,
         Guid actorUserId,
         UserAccountStatus accountStatus,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
+    Task<UpdatePlatformUserEmailVerificationResult> UpdateEmailVerificationAsync(
+        Guid userId,
+        Guid actorUserId,
+        bool emailVerified,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<PlatformUserView?> InvalidateTokensAsync(
@@ -204,6 +221,13 @@ public sealed class ManagePlatform(
                 accountStatus,
                 now,
                 ct);
+    public Task<UpdatePlatformUserEmailVerificationResult> UpdateEmailVerificationAsync(
+        Guid userId,
+        Guid actorUserId,
+        bool emailVerified,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        store.UpdateEmailVerificationAsync(userId, actorUserId, emailVerified, now, ct);
     public Task<PlatformUserView?> InvalidateTokensAsync(
         Guid userId,
         DateTimeOffset now,

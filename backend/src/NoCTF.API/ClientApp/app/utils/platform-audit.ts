@@ -25,6 +25,8 @@ const ACCOUNT_ACTION_LABELS: Record<string, string> = {
   Activated: '激活账户',
   Banned: '封禁账户',
   Disabled: '禁用账户',
+  EmailVerified: '激活用户邮箱',
+  EmailUnverified: '撤销用户邮箱激活',
   Anonymized: '匿名化账户',
   PhysicallyDeleted: '物理删除账户',
 }

@@ -16,6 +16,99 @@ public sealed class PlatformUserAccountStatusPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Email_verification_changes_invalidate_tokens_and_are_audited(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_platform_email_verification")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            await using (var migrationDb = new NoCtfDbContext(options))
+                await migrationDb.Database.MigrateAsync(cancellationToken);
+
+            var now = DateTimeOffset.UtcNow;
+            var actorId = Guid.CreateVersion7(now);
+            var targetId = Guid.CreateVersion7(now.AddTicks(1));
+            await using (var seedDb = new NoCtfDbContext(options))
+            {
+                var target = User(
+                    targetId,
+                    "email-target",
+                    UserRole.User,
+                    UserAccountStatus.Active,
+                    7,
+                    now);
+                target.EmailVerifiedAt = null;
+                seedDb.Users.AddRange(
+                    User(actorId, "email-actor", UserRole.Administrator,
+                        UserAccountStatus.Active, 3, now),
+                    target);
+                await seedDb.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var deadLetters = new WolverineProcessDeadLetters(
+                postgres.GetConnectionString());
+            await using var operationDb = new NoCtfDbContext(options);
+            var store = new PlatformAdministrationStore(
+                operationDb,
+                deadLetters,
+                new PasswordHasher<User>());
+            var verified = await store.UpdateEmailVerificationAsync(
+                targetId,
+                actorId,
+                true,
+                now.AddMinutes(1),
+                cancellationToken);
+            var duplicate = await store.UpdateEmailVerificationAsync(
+                targetId,
+                actorId,
+                true,
+                now.AddMinutes(2),
+                cancellationToken);
+            var unverified = await store.UpdateEmailVerificationAsync(
+                targetId,
+                actorId,
+                false,
+                now.AddMinutes(3),
+                cancellationToken);
+
+            await Assert.That(verified.State)
+                .IsEqualTo(UpdatePlatformUserEmailVerificationState.Updated);
+            await Assert.That(verified.User!.EmailVerified).IsTrue();
+            await Assert.That(verified.User.TokenVersion).IsEqualTo(8);
+            await Assert.That(duplicate.User!.TokenVersion).IsEqualTo(8);
+            await Assert.That(unverified.User!.EmailVerified).IsFalse();
+            await Assert.That(unverified.User.TokenVersion).IsEqualTo(9);
+
+            await using var verification = new NoCtfDbContext(options);
+            var facts = await verification.Notifications.AsNoTracking()
+                .Where(notification =>
+                    notification.Kind == NotificationKind.UserAccountLifecycleChanged)
+                .OrderBy(notification => notification.SentAt)
+                .Select(notification => notification.ContentJson)
+                .ToArrayAsync(cancellationToken);
+            var actions = facts.Select(content =>
+                    JsonSerializer.Deserialize<UserAccountLifecycleFact>(
+                        content,
+                        new JsonSerializerOptions(JsonSerializerDefaults.Web))!.Action)
+                .ToArray();
+            await Assert.That(actions).IsEquivalentTo([
+                UserAccountLifecycleAction.EmailVerified,
+                UserAccountLifecycleAction.EmailUnverified
+            ]);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Account_status_changes_invalidate_tokens_audit_and_preserve_an_administrator(
         CancellationToken cancellationToken)
     {

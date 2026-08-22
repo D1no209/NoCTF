@@ -7404,6 +7404,77 @@
         ]
       }
     },
+    "/api/v1/admin/platform/users/{userId}/email-verification": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Updates a platform user's email verification status.",
+        "description": "Marks an email as verified or unverified and invalidates the user's existing tokens when the status changes.",
+        "operationId": "AdminPlatformUpdateUserEmailVerification",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "UpdatePlatformUserEmailVerificationRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": [
+              "Administrator"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/admin/platform/users/{userId}/role": {
       "put": {
         "tags": [
@@ -18487,6 +18558,8 @@
           "Activated",
           "Banned",
           "Disabled",
+          "EmailVerified",
+          "EmailUnverified",
           "Anonymized",
           "PhysicallyDeleted"
         ],
@@ -18494,6 +18567,8 @@
           "Activated",
           "Banned",
           "Disabled",
+          "EmailVerified",
+          "EmailUnverified",
           "Anonymized",
           "PhysicallyDeleted"
         ]
@@ -18809,6 +18884,34 @@
           "Banned",
           "Disabled"
         ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictCode"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictCode": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "AnonymizedAccountImmutable"
+        ],
+        "enum": [
+          "AnonymizedAccountImmutable"
+        ]
+      },
+      "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "emailVerified": {
+            "type": "boolean"
+          }
+        }
       },
       "NoCTFAPIEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse": {
         "type": "object",
