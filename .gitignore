@@ -33,6 +33,7 @@ yarn-error.log*
 # Local deployment bundles
 /.tmp-noctf-*.tar
 /.tmp-noctf-*.tgz
+/backend/docker-assets/kompose-linux-*
 
 # .NET build/test outputs
 **/bin/

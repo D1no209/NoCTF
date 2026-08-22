@@ -268,6 +268,11 @@ public sealed class DeploymentTopologyTests
         await Assert.That(ci).Contains(
             "-strict -ignore-missing-schemas -summary /manifests");
         await Assert.That(ci).DoesNotContain("-skip");
+        await Assert.That(ci).Contains("-o ServerAliveInterval=30");
+        await Assert.That(ci).Contains("-o ServerAliveCountMax=20");
+        await Assert.That(ci).Contains("kompose-linux-amd64");
+        await Assert.That(ci).Contains(
+            "echo \"$kompose_sha256  $kompose_asset\" | sha256sum -c -");
 
         var standardApiVersions = new HashSet<string>(StringComparer.Ordinal)
         {
@@ -308,6 +313,7 @@ public sealed class DeploymentTopologyTests
     public async Task External_deployment_artifacts_are_immutable_and_verified()
     {
         var dockerfile = await ReadAsync("backend", "Dockerfile");
+        var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
         var deploymentFiles = new[]
         {
             await ReadAsync("deploy", "docker-compose.yml"),
@@ -330,6 +336,13 @@ public sealed class DeploymentTopologyTests
                 "^FROM [^ ]+@sha256:[a-f0-9]{64} AS [^ ]+$"))).IsTrue();
         await Assert.That(dockerfile).Contains("sha256sum -c -");
         await Assert.That(dockerfile).Contains("KOMPOSE_SHA256=");
+        await Assert.That(dockerfile).Contains("--retry-all-errors");
+        await Assert.That(dockerfile).Contains("--speed-time 30");
+        await Assert.That(dockerfile).Contains("COPY backend/docker-assets/");
+        await Assert.That(deployScript).Contains(
+            "kompose_asset_path=${5:?verified Kompose asset path is required}");
+        await Assert.That(deployScript).Contains(
+            "backend/docker-assets/kompose-linux-amd64");
 
         var externalRuntimeImages = deploymentFiles
             .SelectMany(content => content.Split('\n'))
