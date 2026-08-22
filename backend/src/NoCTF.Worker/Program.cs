@@ -15,7 +15,7 @@ builder.UseWolverine(options =>
 {
     options.ConfigureNoCtfPersistence(builder.Configuration, roles);
     options.ConfigureNoCtfMessageRouting(builder.Configuration, roles);
-    options.ConfigureNoCtfWorkerMessaging();
+    options.ConfigureNoCtfWorkerMessaging(builder.Configuration);
 });
 builder.Services.AddNoCtfRoleHealthChecks(builder.Configuration, roles);
 builder.Services.AddNoCtfObservability(builder.Configuration, "noctf-worker");

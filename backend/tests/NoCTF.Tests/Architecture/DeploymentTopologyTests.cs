@@ -45,8 +45,16 @@ public sealed class DeploymentTopologyTests
             .Contains("PublishMessage<CompetitionEventCommitted>()");
         await Assert.That(routing)
             .Contains("PublishMessage<CompleteAwdpFixRecovery>()");
-        await Assert.That(routing)
-            .Contains("ToPostgresqlQueue(\"noctf-worker\")");
+        foreach (var workerQueue in new[]
+                 {
+                     "WorkerQueue.Control",
+                     "WorkerQueue.Gameplay",
+                     "WorkerQueue.Projection",
+                     "WorkerQueue.Background"
+                 })
+        {
+            await Assert.That(routing).Contains(workerQueue);
+        }
         foreach (var runnerAvailabilitySetting in new[]
                  {
                      "Runner__Capacity__MemoryBytes",

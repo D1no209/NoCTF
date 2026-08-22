@@ -27,7 +27,7 @@ public static class ObservabilityExtensions
                 ]))
             .WithMetrics(metrics => metrics
                 .AddMeter(NoCtfTelemetry.MeterName)
-                .AddMeter("Wolverine")
+                .AddMeter("Wolverine*")
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()

@@ -5,6 +5,7 @@ using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Observability;
+using NoCTF.Hosting;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Postgresql;
@@ -14,9 +15,13 @@ namespace NoCTF.Worker;
 
 public static class WorkerRole
 {
-    public static IServiceCollection AddNoCtfWorkerRole(this IServiceCollection services)
+    public static IServiceCollection AddNoCtfWorkerRole(
+        this IServiceCollection services,
+        bool collectQueueMetrics = true)
     {
         services.AddSingularAgent<MaintenanceTickAgent>();
+        if (collectQueueMetrics)
+            services.AddHostedService<WorkerQueueMetricsCollector>();
         return services;
     }
 
@@ -28,6 +33,7 @@ public static class WorkerRole
 
     public static void ConfigureNoCtfWorkerMessaging(
         this WolverineOptions options,
+        IConfiguration configuration,
         bool durable = true)
     {
         options.Discovery.IncludeType(typeof(BackendMessageHandlers));
@@ -39,6 +45,8 @@ public static class WorkerRole
         options.Durability.FirstHealthCheckExecution = TimeSpan.FromSeconds(1);
         options.Durability.ScheduledJobFirstExecution = TimeSpan.FromSeconds(1);
         options.Durability.ScheduledJobPollingTime = TimeSpan.FromSeconds(1);
+        options.Durability.DurabilityMetricsEnabled = true;
+        options.Durability.UpdateMetricsPeriod = TimeSpan.FromSeconds(5);
         options.Policies.OnException<TimeoutException>()
             .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
         options.Policies.OnException<System.Net.Http.HttpRequestException>()
@@ -48,7 +56,14 @@ public static class WorkerRole
         options.Policies.OnException<Npgsql.NpgsqlException>()
             .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
         options.Policies.OnException<DbUpdateConcurrencyException>().RetryTimes(5);
-        if (durable)
-            options.ListenToPostgresqlQueue("noctf-worker").UseDurableInbox();
+        if (!durable)
+            return;
+
+        foreach (var queue in WorkerQueues.GetEnabled(configuration))
+        {
+            options.ListenToPostgresqlQueue(WorkerQueues.GetName(queue))
+                .MaximumParallelMessages(WorkerQueues.GetConcurrency(configuration, queue))
+                .UseDurableInbox();
+        }
     }
 }

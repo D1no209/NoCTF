@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using NoCTF.Application.Messaging;
 
 namespace NoCTF.Application.Observability;
 
@@ -52,6 +53,8 @@ public static class NoCtfTelemetry
     private static long _oldestDirtyAgeSeconds;
     private static long _waitingRuntimeCount;
     private static long _oldestWaitingRuntimeAgeSeconds;
+    private static readonly long[] WorkerQueueDepths = new long[WorkerQueueNames.All.Count];
+    private static readonly long[] WorkerQueueOldestAgeSeconds = new long[WorkerQueueNames.All.Count];
 
     static NoCtfTelemetry()
     {
@@ -70,6 +73,14 @@ public static class NoCtfTelemetry
         Meter.CreateObservableGauge(
             "noctf.runtime.waiting.oldest_age",
             () => Interlocked.Read(ref _oldestWaitingRuntimeAgeSeconds),
+            unit: "s");
+        Meter.CreateObservableGauge(
+            "noctf.worker.queue.depth",
+            ObserveWorkerQueueDepth,
+            unit: "{message}");
+        Meter.CreateObservableGauge(
+            "noctf.worker.queue.oldest_age",
+            ObserveWorkerQueueOldestAge,
             unit: "s");
     }
 
@@ -157,4 +168,26 @@ public static class NoCtfTelemetry
             ref _oldestWaitingRuntimeAgeSeconds,
             Math.Max(0, (long)oldestWaitingRuntimeAge.TotalSeconds));
     }
+
+    public static void UpdateWorkerQueueSnapshot(
+        WorkerQueue queue,
+        long depth,
+        TimeSpan oldestAge)
+    {
+        var index = (int)queue;
+        Interlocked.Exchange(ref WorkerQueueDepths[index], Math.Max(0, depth));
+        Interlocked.Exchange(
+            ref WorkerQueueOldestAgeSeconds[index],
+            Math.Max(0, (long)oldestAge.TotalSeconds));
+    }
+
+    private static IEnumerable<Measurement<long>> ObserveWorkerQueueDepth() =>
+        WorkerQueueNames.All.Select(queue => new Measurement<long>(
+            Interlocked.Read(ref WorkerQueueDepths[(int)queue]),
+            new KeyValuePair<string, object?>("queue", WorkerQueueNames.GetName(queue))));
+
+    private static IEnumerable<Measurement<long>> ObserveWorkerQueueOldestAge() =>
+        WorkerQueueNames.All.Select(queue => new Measurement<long>(
+            Interlocked.Read(ref WorkerQueueOldestAgeSeconds[(int)queue]),
+            new KeyValuePair<string, object?>("queue", WorkerQueueNames.GetName(queue))));
 }
