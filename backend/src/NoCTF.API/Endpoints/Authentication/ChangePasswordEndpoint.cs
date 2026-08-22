@@ -33,7 +33,10 @@ public enum ChangePasswordFailureCode
 
 public sealed record ChangePasswordFailureResponse(ChangePasswordFailureCode Code);
 
-public sealed class ChangePasswordEndpoint(ChangePassword change, IUserContext user)
+public sealed class ChangePasswordEndpoint(
+    ChangePassword change,
+    IUserContext user,
+    IConfiguration configuration)
     : Endpoint<ChangePasswordRequest,
         Results<NoContent, Conflict<ChangePasswordFailureResponse>>>
 {
@@ -63,8 +66,8 @@ public sealed class ChangePasswordEndpoint(ChangePassword change, IUserContext u
                 ChangePasswordFailureCode.CurrentPasswordInvalid));
 
         HttpContext.Response.Cookies.Delete(
-            "__Secure-noctf_refresh",
-            new CookieOptions { Path = "/api/v1/auth" });
+            RefreshCookie.Name(configuration),
+            RefreshCookie.DeleteOptions(configuration));
         return TypedResults.NoContent();
     }
 }

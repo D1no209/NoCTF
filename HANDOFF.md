@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-22 alpha.74 CI 恢复与受控生产自动部署
+
+- 版本从 `0.1.0-alpha.73` 递增至 `0.1.0-alpha.74`。修复随机附件批次文件名校验依赖当前操作系统路径规则的问题：统一下载名与以 Flag 为名的变体现在显式拒绝 `/`、`\\`，Linux CI 不会再把 Windows 风格的子路径当作合法 Flag；补充两个方向的跨平台回归测试。
+- GitHub Actions 在完整 `build-test` 成功后，仅对 `main` 的 push 串行执行生产部署。CI 使用 `git archive` 打包精确提交，上传到独立临时目录并解包至 `/root/noctf-releases/<sha>`，不覆盖或依赖服务器 `/root/NoCTF` 中已有的生产专用未提交配置；Compose 继续复用 `/root/NoCTF/.env` 与 `/root/NoCTF/deploy/docker-compose.prod.yml`。
+- 部署前自动验证 Compose、检查磁盘、备份 PostgreSQL 为 custom-format dump 并用 `pg_restore --list` 校验；数据库迁移成功后才切换 Backend/Worker/Runner，等待健康检查并验证 `/health/ready`。失败时恢复先前平台镜像；release 目录保留 current/previous 两版，数据库备份保留最近十份。
+- 空间清理保持有界：仅清理停止超过 24 小时且带 `noctf.io/managed=true` 标签的容器、迁移临时容器、dangling 镜像、旧 build cache 和无容器引用的旧 `deploy-*` 平台镜像；至少保留当前镜像和一组回滚镜像，不执行 volume/system 全局 prune，不删除题目镜像、数据库卷或生产配置。低于 6 GiB 时清空未使用 build cache，并在仍不足时安全终止部署。
+- 将 Refresh Cookie 的 Secure 策略集中为一个实现。默认仍使用 `__Secure-noctf_refresh`、`Secure=true`；明确隔离的纯 HTTP 测试部署可通过 `AUTHENTICATION_REFRESH_COOKIE_SECURE=false` 使用无前缀 Cookie，登录、刷新、退出、全局退出、改密和重置密码使用同一策略。公网 TLS 部署继续保持默认安全值。
+- 本地验证：Release solution build 0 warning/0 error；完整 TUnit 1072 项中 878 通过、0 失败，194 项因本机 Docker/Kubernetes/Libvirt 环境不可用按设计跳过；随机附件定向 19/19、认证端点定向 3/3、部署拓扑 10/10；C# analyzer、两份 Compose config、GitHub Actions YAML 解析、部署脚本 `bash -n` 和 `git diff --check` 通过。首次生产自动部署由本节所属 `main` 推送触发，最终 CI 与生产健康结果以该次 GitHub Actions 运行记录为准。
+
 ## 2026-08-22 alpha.73 参赛端工作区、AWDP 攻防语义与赛道邀请码本地修复
 
 - 本阶段在本地 `main` 上继续修复参赛端体验与 AWDP 产品语义，尚未推送或部署。版本从 `0.1.0-alpha.72` 递增至 `0.1.0-alpha.73`。

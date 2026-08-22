@@ -28,7 +28,8 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
     {
         if (!RefreshRequestGuard.IsAllowed(HttpContext.Request, configuration))
             return TypedResults.Unauthorized();
-        if (!HttpContext.Request.Cookies.TryGetValue("__Secure-noctf_refresh", out var refreshToken)
+        var cookieName = RefreshCookie.Name(configuration);
+        if (!HttpContext.Request.Cookies.TryGetValue(cookieName, out var refreshToken)
             || string.IsNullOrWhiteSpace(refreshToken))
         {
             return TypedResults.Unauthorized();
@@ -39,24 +40,16 @@ public sealed class RefreshTokenEndpoint(RefreshAccessToken refresh, IConfigurat
         {
             // Same __Secure- prefix rule as LogoutEndpoint: the deletion needs the Secure
             // attribute or browsers ignore it.
-            HttpContext.Response.Cookies.Delete("__Secure-noctf_refresh", new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict,
-                Path = "/api/v1/auth"
-            });
+            HttpContext.Response.Cookies.Delete(
+                cookieName,
+                RefreshCookie.DeleteOptions(configuration));
             return TypedResults.Unauthorized();
         }
 
-        HttpContext.Response.Cookies.Append("__Secure-noctf_refresh", result.Value!.RefreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/api/v1/auth",
-            MaxAge = TimeSpan.FromDays(30)
-        });
+        HttpContext.Response.Cookies.Append(
+            cookieName,
+            result.Value!.RefreshToken,
+            RefreshCookie.Options(configuration));
         return TypedResults.Ok(new RefreshTokenResponse(
             result.Value.UserId,
             result.Value.UserName,

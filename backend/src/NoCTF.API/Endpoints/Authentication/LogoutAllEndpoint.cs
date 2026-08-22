@@ -6,7 +6,10 @@ using NoCTF.Application.Authentication.Account;
 
 namespace NoCTF.API.Endpoints.Authentication;
 
-public sealed class LogoutAllEndpoint(LogoutAll logoutAll, IUserContext user)
+public sealed class LogoutAllEndpoint(
+    LogoutAll logoutAll,
+    IUserContext user,
+    IConfiguration configuration)
     : EndpointWithoutRequest<Results<NoContent, NotFound>>
 {
     public override void Configure()
@@ -25,17 +28,9 @@ public sealed class LogoutAllEndpoint(LogoutAll logoutAll, IUserContext user)
         var result = await logoutAll.ExecuteAsync(user.UserId, DateTimeOffset.UtcNow, ct);
         if (!result.Succeeded)
             return TypedResults.NotFound();
-        // See LogoutEndpoint: the __Secure- prefixed cookie can only be cleared with
-        // the Secure attribute present.
         HttpContext.Response.Cookies.Delete(
-            "__Secure-noctf_refresh",
-            new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = true,
-                SameSite = SameSiteMode.Strict,
-                Path = "/api/v1/auth"
-            });
+            RefreshCookie.Name(configuration),
+            RefreshCookie.DeleteOptions(configuration));
         return TypedResults.NoContent();
     }
 }
