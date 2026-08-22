@@ -32,4 +32,27 @@ describe('api error localization', () => {
       detail: 'The platform log query range must be between zero and 14 days.',
     }).message).toBe('The platform log query range must be between zero and 14 days.')
   })
+
+  test('does not expose unknown English diagnostics in the Chinese locale', () => {
+    setLocale('zh-CN')
+
+    expect(parseApiError({
+      status: 500,
+      title: 'An error occurred while processing your request.',
+    }).message).toBe('服务器内部错误,请稍后重试')
+
+    expect(parseApiError({
+      status: 400,
+      detail: 'Unexpected legacy payload value.',
+    }).message).toBe('请求参数有误,请检查输入')
+  })
+
+  test('keeps unknown English diagnostics in the English locale', () => {
+    setLocale('en')
+
+    expect(parseApiError({
+      status: 500,
+      title: 'An error occurred while processing your request.',
+    }).message).toBe('An error occurred while processing your request.')
+  })
 })

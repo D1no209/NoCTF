@@ -9,6 +9,7 @@ import {
 import type { NoCtfapiEndpointsAdministrationDataExportsDataExportResponse } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 import { downloadSdkFile } from '~/utils/download'
+import { userFacingErrorMessage } from '~/utils/api-error'
 
 definePageMeta({ middleware: 'auth' })
 
@@ -39,7 +40,7 @@ async function exportEvents() {
     toast.success(translate("事件导出已开始下载"))
   }
   catch (e) {
-    toast.error(e instanceof Error ? e.message : translate("导出失败"))
+    toast.error(userFacingErrorMessage(e instanceof Error ? e.message : null, translate("导出失败")))
   }
   finally {
     exportingEvents.value = false
@@ -54,6 +55,10 @@ const includeProtectedFlags = ref(false)
 const exportReason = ref('')
 const creating = ref(false)
 const downloadingId = ref<string | null>(null)
+
+function exportFailureText(detail: string | null | undefined): string {
+  return userFacingErrorMessage(detail, translate("导出任务失败,请重试"))
+}
 
 async function loadExports() {
   loadingExports.value = true
@@ -105,7 +110,7 @@ async function downloadExport(item: NoCtfapiEndpointsAdministrationDataExportsDa
     )
   }
   catch (e) {
-    toast.error(e instanceof Error ? e.message : translate("下载失败"))
+    toast.error(userFacingErrorMessage(e instanceof Error ? e.message : null, translate("下载失败")))
   }
   finally {
     downloadingId.value = null
@@ -198,7 +203,7 @@ onMounted(loadExports)
               <TableCell class="max-w-40 truncate">{{ e.reason ?? '-' }}</TableCell>
               <TableCell class="max-w-48 truncate font-mono text-xs">
                 {{ e.fileName ?? '-' }}
-                <span v-if="e.failureDetail" class="block text-destructive">{{ e.failureDetail }}</span>
+                <span v-if="e.failureDetail" class="block text-destructive">{{ exportFailureText(e.failureDetail) }}</span>
               </TableCell>
               <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(e.expiresAt) }}</TableCell>
               <TableCell class="text-right">

@@ -14,6 +14,7 @@ import type {
 } from '~/api'
 import { downloadSdkFile } from '~/utils/download'
 import { platformAuditActionText } from '~/utils/platform-audit'
+import { userFacingErrorMessage } from '~/utils/api-error'
 
 definePageMeta({ middleware: 'platform-admin' })
 
@@ -68,6 +69,10 @@ const exportsLoading = ref(false)
 const exportsError = ref<string | null>(null)
 const creatingExport = ref(false)
 const downloadingId = ref<string | null>(null)
+
+function exportFailureText(detail: string | null | undefined): string {
+  return userFacingErrorMessage(detail, translate("导出任务失败,请重试"))
+}
 
 async function loadExports(): Promise<void> {
   exportsLoading.value = true
@@ -265,8 +270,8 @@ onMounted(() => {
                 <Badge :variant="EXPORT_STATUS[String(item.status)]?.variant ?? 'outline'">
                   {{ EXPORT_STATUS[String(item.status)]?.label ? $t(EXPORT_STATUS[String(item.status)]!.label) : item.status }}
                 </Badge>
-                <p v-if="item.failureDetail" class="mt-1 text-xs text-destructive" :title="item.failureDetail">
-                  {{ item.failureDetail }}
+                <p v-if="item.failureDetail" class="mt-1 text-xs text-destructive" :title="exportFailureText(item.failureDetail)">
+                  {{ exportFailureText(item.failureDetail) }}
                 </p>
               </TableCell>
               <TableCell class="max-w-56 truncate font-mono text-xs" :title="item.fileName ?? ''">

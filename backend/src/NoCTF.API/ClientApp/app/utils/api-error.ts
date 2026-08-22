@@ -1,4 +1,4 @@
-import { localizeMessage, translate } from './i18n'
+import { currentLocale, localizeMessage, translate } from './i18n'
 
 /**
  * Normalized API error parsed from RFC 9457 problem+json responses.
@@ -27,6 +27,28 @@ interface ProblemDetailsLike {
   errors?: Record<string, string[]>
 }
 
+function isUntranslatedEnglish(message: string): boolean {
+  return currentLocale() === 'zh-CN'
+    && /[A-Za-z]{3}/.test(message)
+    && !/[\u3400-\u9FFF]/.test(message)
+}
+
+/**
+ * Localize backend text without leaking raw English diagnostics into the Chinese UI.
+ * Known backend messages keep their explicit translation; unknown diagnostics fall
+ * back to the caller's stable user-facing description.
+ */
+export function userFacingErrorMessage(
+  message: string | null | undefined,
+  fallback = translate("请求失败,请稍后重试"),
+): string {
+  const source = message?.trim()
+  if (!source) return fallback
+
+  const localized = localizeMessage(source)
+  return isUntranslatedEnglish(localized) ? fallback : localized
+}
+
 /** Convert an SDK error payload into a user-facing ApiError. */
 export function parseApiError(error: unknown, fallback = translate("请求失败,请稍后重试")): ApiError {
   if (error instanceof ApiError) return error
@@ -34,7 +56,13 @@ export function parseApiError(error: unknown, fallback = translate("请求失败
     const problem = error as ProblemDetailsLike
     const firstFieldError = problem.errors ? Object.values(problem.errors).flat()[0] : undefined
     // 字段级校验错误(FluentValidation)优先于泛泛的 title("One or more validation errors occurred")。
-    const message = localizeMessage(problem.detail ?? firstFieldError ?? problem.title ?? fallback)
+    const statusFallback = problem.status === undefined
+      ? fallback
+      : statusErrorMessage(problem.status)
+    const message = userFacingErrorMessage(
+      problem.detail ?? firstFieldError ?? problem.title,
+      statusFallback,
+    )
     return new ApiError(message, {
       status: problem.status,
       code: problem.code,
