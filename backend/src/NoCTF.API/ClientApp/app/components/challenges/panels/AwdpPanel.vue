@@ -33,7 +33,7 @@ const defenseOutcome = computed(() => {
   if (defense.failureCode === 'AwdpExploitSucceeded') return translate('防御异常：EXP 利用成功')
   if (defense.failureCode === 'AwdpServiceAbnormal') return translate('防御异常：服务异常')
   if (defense.state === 'PlatformFailed') return translate('防御验证失败')
-  return translate('防御未通过')
+  return translate('防御异常：服务异常')
 })
 
 async function refreshState(): Promise<boolean> {

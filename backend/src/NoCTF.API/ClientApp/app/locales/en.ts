@@ -1866,7 +1866,6 @@ export const englishMessages: Record<string, string> = {
   "防御异常：EXP 利用成功": "Defense failed: exploit succeeded",
   "防御异常：服务异常": "Defense failed: service abnormal",
   "防御验证失败": "Defense verification failed",
-  "防御未通过": "Defense did not pass",
   "Fix 历史": "Fix history",
   "加载 Fix 历史失败": "Failed to load Fix history",
   "返回题目": "Back to challenge",
