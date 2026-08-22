@@ -410,6 +410,7 @@ POST /api/v1/admin/platform/bots
 POST /api/v1/admin/platform/bots/{userId}/tokens
 PUT  /api/v1/admin/platform/users/{userId}/role
 PUT  /api/v1/admin/platform/users/{userId}/account-status
+PUT  /api/v1/admin/platform/users/{userId}/email-verification
 POST /api/v1/admin/platform/users/{userId}/tokens/invalidate
 GET  /api/v1/admin/platform/dead-letters
 GET  /api/v1/admin/platform/dead-letters/{messageId}
