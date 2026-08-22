@@ -96,10 +96,13 @@ describe('AWDP participant panel', () => {
 
     expect(panel).toContain('防御异常：EXP 利用成功')
     expect(panel).toContain('防御异常：服务异常')
+    expect(panel).not.toContain('防御未通过')
     expect(panel).not.toContain('失败原因')
     expect(history).toContain('listGameplayFactsEndpoint')
     expect(history).toContain("kind: 'FixAttempt'")
     expect(history).toContain('competitionChallengeId')
+    expect(history).toContain('防御异常：服务异常')
+    expect(history).not.toContain('防御未通过')
     expect(history).not.toContain('/api/v1/')
   })
 })

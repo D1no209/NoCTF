@@ -87,7 +87,7 @@ function outcome(item: FixAttempt): string {
   if (item.failureCode === 'AwdpExploitSucceeded') return translate('防御异常：EXP 利用成功')
   if (item.failureCode === 'AwdpServiceAbnormal') return translate('防御异常：服务异常')
   if (item.state === 'PlatformFailed') return translate('防御验证失败')
-  return translate('防御未通过')
+  return translate('防御异常：服务异常')
 }
 
 function outcomeVariant(item: FixAttempt) {
