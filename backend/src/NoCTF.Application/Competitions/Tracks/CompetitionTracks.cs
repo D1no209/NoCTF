@@ -15,7 +15,8 @@ public sealed record CompetitionTrackView(
     bool AffectsDynamicChallengeScore,
     bool VisibleOnLeaderboard,
     bool AffectsCompetitiveResults,
-    bool IsViewerTrack = false);
+    bool IsViewerTrack = false,
+    bool RequiresInvitationCode = false);
 
 public sealed record CompetitionTracksView(
     Guid CompetitionId,
@@ -40,12 +41,18 @@ public enum CompetitionTrackFailureCode
     AssignmentConflict
 }
 
+public sealed record CompetitionTrackInvitationCodeUpdate(
+    string TrackKey,
+    string? InvitationCode,
+    bool ClearInvitationCode);
+
 public sealed record UpdateCompetitionTracksCommand(
     Guid CompetitionId,
     int ExpectedRevision,
     IReadOnlyList<CompetitionTrackDefinition> Tracks,
     Guid ActorUserId,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    IReadOnlyList<CompetitionTrackInvitationCodeUpdate>? InvitationCodeUpdates = null);
 
 public sealed record AssignTeamTrackCommand(
     Guid CompetitionId,
@@ -166,13 +173,30 @@ public sealed class UpdateCompetitionTracks(ICompetitionTrackStore store)
         CancellationToken cancellationToken = default)
     {
         var errors = CompetitionTrackPolicy.Validate(mode, command.Tracks);
+        foreach (var update in command.InvitationCodeUpdates ?? [])
+        {
+            if (update.InvitationCode is not null
+                && update.InvitationCode.Trim().Length is < 8 or > 128)
+            {
+                errors = errors.Append(
+                    $"Track '{update.TrackKey}' invitation code must be between 8 and 128 characters.")
+                    .ToArray();
+            }
+        }
         if (errors.Count > 0)
             return OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Failure(
                 CompetitionTrackFailureCode.InvalidConfiguration,
                 string.Join(" ", errors));
         return await store.UpdateAsync(command with
         {
-            Tracks = CompetitionTrackPolicy.Normalize(command.Tracks).Tracks
+            Tracks = CompetitionTrackPolicy.Normalize(command.Tracks).Tracks,
+            InvitationCodeUpdates = command.InvitationCodeUpdates?.Select(update => update with
+            {
+                TrackKey = CompetitionTrackConfiguration.NormalizeKey(update.TrackKey) ?? string.Empty,
+                InvitationCode = string.IsNullOrWhiteSpace(update.InvitationCode)
+                    ? null
+                    : update.InvitationCode.Trim()
+            }).ToArray()
         }, cancellationToken);
     }
 }

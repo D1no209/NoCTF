@@ -83,6 +83,36 @@ public class TeamRegistrationTests
     }
 
     [Test]
+    public async Task CreateTeam_Requires_valid_invitation_code_for_protected_track()
+    {
+        var configuration = new CompetitionTrackConfiguration(1,
+        [
+            Track("formal", isDefault: true),
+            Track("invite", invitationCodeHash: CompetitionTrackInvitationCode.Hash("let-me-in"))
+        ]);
+        var policy = new TeamRegistrationPolicy(
+            CompetitionStatus.Published,
+            AutoApprove: true,
+            CompetitionDeleted: false,
+            Mode: GameMode.Ctf,
+            TrackConfigurationJson: CompetitionTrackConfiguration.Serialize(configuration));
+        var store = new Store(policy);
+        var create = new CreateTeam(store);
+
+        var missing = await create.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), "missing", DateTimeOffset.UtcNow, "invite"));
+        var invalid = await create.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), "invalid", DateTimeOffset.UtcNow, "invite", "wrong-code"));
+        var valid = await create.ExecuteAsync(new(
+            Guid.NewGuid(), Guid.NewGuid(), "valid", DateTimeOffset.UtcNow, "invite", " let-me-in "));
+
+        await Assert.That(missing.FailureCode).IsEqualTo(TeamRegistrationFailure.TrackInvitationRequired);
+        await Assert.That(invalid.FailureCode).IsEqualTo(TeamRegistrationFailure.TrackInvitationInvalid);
+        await Assert.That(valid.Succeeded).IsTrue();
+        await Assert.That(valid.Value!.TrackKey).IsEqualTo("invite");
+    }
+
+    [Test]
     public async Task ReviewTeamRegistration_FinishedCompetitionRejectsBeforeWrite()
     {
         var store = new Store(new(CompetitionStatus.Finished, true, false));
@@ -132,7 +162,8 @@ public class TeamRegistrationTests
         string key,
         bool isDefault = false,
         bool publicSelectable = true,
-        bool isInternal = false) => new(
+        bool isInternal = false,
+        string? invitationCodeHash = null) => new(
         key,
         key,
         isDefault,
@@ -142,5 +173,6 @@ public class TeamRegistrationTests
         EarnsBlood: !isInternal,
         AffectsDynamicChallengeScore: !isInternal,
         VisibleOnLeaderboard: !isInternal,
-        AffectsCompetitiveResults: !isInternal);
+        AffectsCompetitiveResults: !isInternal,
+        InvitationCodeHash: invitationCodeHash);
 }

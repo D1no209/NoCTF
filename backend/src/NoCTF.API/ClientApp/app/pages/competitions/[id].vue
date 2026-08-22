@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Activity, FileCheck, LayoutDashboard, MessageCircleQuestion, Orbit, Puzzle, Trophy, UserRound, Users } from '@lucide/vue'
+import { FileCheck, LayoutDashboard, MessageCircleQuestion, Puzzle, Trophy, UserRound } from '@lucide/vue'
 import { getCompetitionEndpoint, getMyTeamEndpoint } from '~/api'
 import type { NoCtfapiEndpointsCompetitionsCompetitionResponse, NoCtfapiEndpointsTeamsTeamResponse } from '~/api'
 import { competitionWorkspaceNavigationKey } from '~/components/app/workspace-nav'
@@ -11,7 +11,16 @@ const isControlScreen = computed(() => [
   `/competitions/${competitionId.value}/live`,
   `/competitions/${competitionId.value}/awdp-live`,
 ].includes(route.path))
-const isChallengeIndex = computed(() => route.path === `/competitions/${competitionId.value}/challenges`)
+const usesParticipantWorkspace = computed(() => {
+  const base = `/competitions/${competitionId.value}`
+  return [
+    `${base}/challenges`,
+    `${base}/leaderboard`,
+    `${base}/questions`,
+    `${base}/my/team`,
+    `${base}/my/submissions`,
+  ].includes(route.path)
+})
 
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
@@ -79,16 +88,6 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => {
         { to: base, label: translate("概览"), icon: LayoutDashboard, exact: true },
         ...(challengesVisible && canReadChallenges ? [{ to: `${base}/challenges`, label: translate("题目"), icon: Puzzle }] : []),
         { to: `${base}/leaderboard`, label: translate("记分板"), icon: Trophy },
-        ...(competition.value?.mode === 'Ctf' ? [{ to: `${base}/live`, label: translate("3D 大屏"), icon: Orbit }] : []),
-        ...(hasCompetitionStaffAccess.value && competition.value?.mode === 'Awdp'
-          ? [{ to: `${base}/awdp-live`, label: translate("中控大屏"), icon: Orbit }]
-          : []),
-        ...(hasCompetitionStaffAccess.value
-          ? [
-              { to: `${base}/teams`, label: translate("队伍"), icon: Users },
-              { to: `${base}/events`, label: translate("动态"), icon: Activity },
-            ]
-          : []),
       ],
     },
     {
@@ -114,7 +113,7 @@ provide(competitionWorkspaceNavigationKey, navGroups)
   <NuxtPage v-if="isControlScreen" />
 
   <div
-    v-else-if="competition && isChallengeIndex"
+    v-else-if="competition && usesParticipantWorkspace"
     class="mx-auto flex w-full max-w-[120rem] flex-col gap-4 px-3 py-4 md:px-5"
   >
     <div class="flex flex-col gap-1 border-b pb-4">

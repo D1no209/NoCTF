@@ -107,7 +107,15 @@ const teamRegistrationOpen = computed(() => {
 const createOpen = ref(false)
 const createName = ref('')
 const createTrackKey = ref('')
+const createTrackInvitationCode = ref('')
 const createPending = ref(false)
+const selectedCreateTrack = computed(() => selectableTracks.value.find(
+  track => track.key === createTrackKey.value,
+))
+
+watch(createTrackKey, () => {
+  createTrackInvitationCode.value = ''
+})
 
 async function submitCreate() {
   if (!createName.value.trim() || !createTrackKey.value) return
@@ -117,6 +125,9 @@ async function submitCreate() {
     body: {
       name: createName.value.trim(),
       trackKey: createTrackKey.value,
+      trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode
+        ? createTrackInvitationCode.value.trim()
+        : null,
     },
   })
   createPending.value = false
@@ -127,6 +138,7 @@ async function submitCreate() {
   toast.success(translate("队伍创建成功"))
   createOpen.value = false
   createName.value = ''
+  createTrackInvitationCode.value = ''
   await loadMyTeam()
 }
 
@@ -227,8 +239,23 @@ const isCaptain = computed(
                         </Select>
                         <FieldDescription>{{ $t('请选择队伍参加的赛道；创建后比赛管理员仍可调整。') }}</FieldDescription>
                       </Field>
+                      <Field v-if="selectedCreateTrack?.requiresInvitationCode">
+                        <FieldLabel for="track-invitation-code">{{ $t('赛道邀请码') }}</FieldLabel>
+                        <Input
+                          id="track-invitation-code"
+                          v-model="createTrackInvitationCode"
+                          type="password"
+                          required
+                          autocomplete="off"
+                          maxlength="128"
+                        />
+                      </Field>
                       <Field>
-                        <Button type="submit" class="w-full" :disabled="createPending || !createTrackKey">
+                        <Button
+                          type="submit"
+                          class="w-full"
+                          :disabled="createPending || !createTrackKey || selectedCreateTrack?.requiresInvitationCode && !createTrackInvitationCode.trim()"
+                        >
                           <Spinner v-if="createPending" data-icon="inline-start" /> {{ $t('创建') }} </Button>
                       </Field>
                     </FieldGroup>

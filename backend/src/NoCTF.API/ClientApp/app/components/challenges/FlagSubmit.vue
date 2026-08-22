@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { getGameplayFactStatusEndpoint, judgePracticeFlag, submitFlagEndpoint } from '~/api'
+import { getGameplayFactStatusEndpoint, judgeAwdpBreakFlag, judgePracticeFlag, submitFlagEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol,
   NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
@@ -22,8 +22,9 @@ const props = withDefaults(
     title?: string
     description?: string
     practice?: boolean
+    readOnlyJudgement?: boolean
   }>(),
-  { multiple: false, title: translate("提交 Flag"), description: '', practice: false },
+  { multiple: false, title: translate("提交 Flag"), description: '', practice: false, readOnlyJudgement: false },
 )
 
 const emit = defineEmits<{ evaluated: [] }>()
@@ -102,6 +103,38 @@ async function submit() {
     : [input.value.trim()].filter(Boolean)
   if (!lines.length) return
   submitting.value = true
+  if (props.readOnlyJudgement) {
+    const { data, error } = await judgeAwdpBreakFlag({
+      path: {
+        competitionId: props.competitionId,
+        competitionChallengeId: props.competitionChallengeId,
+      },
+      body: { flag: lines[0]! },
+    })
+    submitting.value = false
+    if (error || !data) {
+      const parsed = parseApiError(error, translate('Flag 验证失败'))
+      const message = parsed.code === 'AchievementNotSucceeded'
+        ? translate('本题攻击尚未成功')
+        : parsed.code === 'JudgementUnavailable'
+          ? translate('当前题目不支持只读 Flag 验证')
+          : parsed.code === 'FlagInvalid'
+            ? translate('Flag 格式无效')
+            : parsed.status === 403
+              ? translate('当前账号没有可参与本题的已审核队伍')
+              : parsed.message
+      toast.error(message)
+      return
+    }
+    if (data.result === 'Correct') {
+      toast.success(translate('Flag 正确；本次验证不产生任何比赛记录'))
+      celebrateCorrectFlag()
+    }
+    else {
+      toast.error(translate('Flag 错误'))
+    }
+    return
+  }
   if (props.practice) {
     const { data, error } = await judgePracticeFlag({
       path: {
@@ -144,7 +177,7 @@ async function submit() {
     const parsed = parseApiError(error, translate("提交失败"))
     const code = parsed.code as NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol | undefined
     toast.error(code === 'AchievementAlreadySucceeded'
-      ? translate('本题攻击已成功，后续 Flag 不再受理。')
+      ? translate('本题攻击已成功，请使用验证模式确认 Flag 正误。')
       : parsed.message)
     return
   }

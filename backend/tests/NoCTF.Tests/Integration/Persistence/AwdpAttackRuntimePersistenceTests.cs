@@ -3,18 +3,21 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Challenges.Flags;
+using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
 using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Flags;
 using NoCTF.GameModes.Registration;
 using NoCTF.Infrastructure.Challenges.Flags;
+using NoCTF.Infrastructure.GameplayFacts.Awdp;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Runtime.Administration;
 using NoCTF.Infrastructure.Runtime.Instances;
@@ -27,6 +30,80 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("AwdpPlayerRuntime")]
 public sealed class AwdpAttackRuntimePersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Successful_break_blocks_new_attack_runtimes_and_allows_read_only_flag_judgement(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awdp_read_only_break")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            const string correctFlag = "flag{completed-awdp-break}";
+
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                setup.GameplayFacts.Add(new GameplayFact
+                {
+                    Id = Guid.CreateVersion7(fixture.Now.AddSeconds(1)),
+                    CompetitionId = fixture.CompetitionId,
+                    CompetitionChallengeId = fixture.CompetitionChallengeId,
+                    TeamId = fixture.TeamIds[0],
+                    ActorUserId = fixture.UserIds[0],
+                    Kind = GameplayFactKind.BreakAttempt,
+                    Value = correctFlag,
+                    ValueSha256 = SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(correctFlag)),
+                    OccurredAt = fixture.Now,
+                    State = GameplayFactState.Completed,
+                    Result = GameplayFactResult.Correct,
+                    UpdatedAt = fixture.Now
+                });
+                await setup.SaveChangesAsync(cancellationToken);
+            }
+
+            await using var db = new NoCtfDbContext(options);
+            var judge = new JudgeAwdpBreakFlag(new AwdpBreakFlagJudge(db));
+            var correct = await judge.ExecuteAsync(new(
+                fixture.CompetitionId,
+                fixture.CompetitionChallengeId,
+                fixture.UserIds[0],
+                correctFlag), cancellationToken);
+            var wrong = await judge.ExecuteAsync(new(
+                fixture.CompetitionId,
+                fixture.CompetitionChallengeId,
+                fixture.UserIds[0],
+                "flag{wrong}"), cancellationToken);
+
+            await Assert.That(correct.Judgement)
+                .IsEqualTo(AwdpBreakFlagJudgement.Correct);
+            await Assert.That(wrong.Judgement)
+                .IsEqualTo(AwdpBreakFlagJudgement.Wrong);
+            await Assert.That(await db.GameplayFacts.CountAsync(cancellationToken)).IsEqualTo(1);
+            await Assert.That(await db.CompetitionEvents.CountAsync(cancellationToken)).IsEqualTo(0);
+            await Assert.That(await db.Notifications.CountAsync(cancellationToken)).IsEqualTo(0);
+
+            var restart = await CreateStore(db).MutatePlayerRuntimeAsync(new(
+                fixture.CompetitionId,
+                fixture.CompetitionChallengeId,
+                fixture.UserIds[0],
+                RuntimeAction.Start,
+                null,
+                fixture.Now.AddMinutes(1)), cancellationToken);
+            await Assert.That(restart.Runtime).IsNull();
+            await Assert.That(restart.Failure).IsEqualTo(RuntimeMutationFailure.InvalidState);
+            await Assert.That(await db.RuntimeInstances.CountAsync(cancellationToken)).IsEqualTo(0);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Attack_provisioning_accepts_worker_injected_flag_without_legacy_flag_injection(

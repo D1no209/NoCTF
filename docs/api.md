@@ -133,6 +133,7 @@ Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向�
 ```text
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag
+POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets
 POST /api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-defense-targets/{runtimeInstanceId}/fix
 GET  /api/v1/competitions/{competitionId}/gameplay-facts/{gameplayFactId}
@@ -150,7 +151,7 @@ AWD 可二选一使用 flag 或 flags；CTF/AWDP Break 必须只用 flag。AWD f
 `FlagInvalid`/400 且零写入。每项创建独立 GameplayFact；数据库不保存 batch。单 flag 的 202 body 返回
 GameplayFactId/state/statusUrl；flags 保持输入顺序，不返回 BatchId。
 
-第一条 AWDP 防御路由申请一次性干净 Target，返回 RuntimeInstanceId 和状态地址。Target 进入 AwaitingPatch 后，第二条 multipart 单文件路由在事务中唯一绑定 PatchUpload/FixAttempt，并直接返回 PatchUploadId、GameplayFactId 与事实状态；没有独立的 Fix trigger。归档校验失败不消费 Target，成功绑定后同一 Target 不再接受第二次上传。
+AWDP Break 首次正确后，普通 Flag 提交不再创建新 GameplayFact、计分、播报或改变 Runtime；只读 judgement 路由仅验证当前 Flag 正误，供赛后复现和 WP 使用。第一条 AWDP 防御路由申请一次性干净 Target，返回 RuntimeInstanceId 和状态地址。Target 进入 AwaitingPatch 后，第二条 multipart 单文件路由在事务中唯一绑定 PatchUpload/FixAttempt，并直接返回 PatchUploadId、GameplayFactId 与事实状态；没有独立的 Fix trigger。归档校验失败不消费 Target，成功绑定后同一 Target 不再接受第二次上传。
 
 ## Runtime
 

@@ -142,7 +142,7 @@ describe('CTF control screen projection', () => {
       new URL('../app/pages/competitions/[id]/live.vue', import.meta.url),
     ).text()
     const shell = await Bun.file(
-      new URL('../app/pages/competitions/[id].vue', import.meta.url),
+      new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
     ).text()
     const scene = await Bun.file(
       new URL('../app/lib/live-city-3d.ts', import.meta.url),
@@ -172,10 +172,6 @@ describe('CTF control screen projection', () => {
     expect(shell).toContain("competition.value?.mode === 'Awdp'")
     expect(shell).toContain('label: translate("中控大屏")')
     expect(shell).toContain('label: translate("3D 大屏")')
-    expect(shell).toContain('competition.value?.mode === \'Ctf\'')
-    expect(shell).toContain('competition.value?.administrationRole != null')
-    expect(shell).toContain('hasCompetitionStaffAccess.value && competition.value?.mode === \'Awdp\'')
-    expect(shell).toContain('...(hasCompetitionStaffAccess.value')
     expect(scene).toContain('radius: this.citySpan * 1.1 + 36')
     expect(scene).toContain('height: this.citySpan * 1.1 + 42')
     expect(scene).toContain("els.labelPts.textContent = `${state.score} pts`")

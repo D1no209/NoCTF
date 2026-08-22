@@ -17,6 +17,7 @@ public sealed record CompetitionTrackResponse(
     bool AffectsDynamicChallengeScore,
     bool VisibleOnLeaderboard,
     bool AffectsCompetitiveResults,
+    bool RequiresInvitationCode,
     bool IsViewerTrack);
 
 public sealed record CompetitionTrackListResponse(
@@ -39,6 +40,7 @@ internal static class CompetitionTrackProtocolMapping
         view.AffectsDynamicChallengeScore,
         view.VisibleOnLeaderboard,
         view.AffectsCompetitiveResults,
+        view.RequiresInvitationCode,
         view.IsViewerTrack);
 
     public static CompetitionTrackListResponse ToResponse(CompetitionTracksView view) => new(

@@ -21,7 +21,9 @@ public sealed record UpdateCompetitionTrackRequest(
     bool EarnsBlood,
     bool AffectsDynamicChallengeScore,
     bool VisibleOnLeaderboard,
-    bool AffectsCompetitiveResults);
+    bool AffectsCompetitiveResults,
+    string? InvitationCode,
+    bool ClearInvitationCode);
 
 public sealed record UpdateCompetitionTracksRequest(
     int ExpectedRevision,
@@ -122,7 +124,11 @@ public sealed class UpdateCompetitionTracksEndpoint(
                 track.VisibleOnLeaderboard,
                 track.AffectsCompetitiveResults)).ToArray(),
             user.UserId,
-            DateTimeOffset.UtcNow), current.Mode, cancellationToken);
+            DateTimeOffset.UtcNow,
+            request.Tracks.Select(track => new CompetitionTrackInvitationCodeUpdate(
+                track.Key,
+                track.InvitationCode,
+                track.ClearInvitationCode)).ToArray()), current.Mode, cancellationToken);
         if (result.FailureCode == CompetitionTrackFailureCode.CompetitionNotFound)
             return TypedResults.NotFound();
         if (!result.Succeeded)

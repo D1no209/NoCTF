@@ -34,6 +34,8 @@ const registrationMessages = {
   CompetitionActive: '比赛进行中，不能执行此队伍操作。',
   TrackNotFound: '所选赛道不存在。',
   TrackNotPublicSelectable: '所选赛道不允许参赛者自行选择。',
+  TrackInvitationRequired: '该赛道需要邀请码。',
+  TrackInvitationInvalid: '赛道邀请码错误。',
 } satisfies Record<NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol, string>
 
 export function competitionTrackErrorMessage(error: unknown, fallback: string): string {

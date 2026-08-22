@@ -9,7 +9,7 @@ describe('AWDP participant panel', () => {
     expect(source).toContain('攻击靶机 · Break 环境')
     expect(source).toContain('防御轨 · Fix')
     expect(source).toContain('<RuntimeCard')
-    expect(source).toContain('controls="full"')
+    expect(source).toContain(":controls=\"state?.breakActivation ? 'readonly' : 'full'\"")
     expect(source).toContain('<FlagSubmit')
     expect(source).toContain('<FixSubmit')
     expect(source).not.toContain('创建本队独立攻击实例')
@@ -57,16 +57,16 @@ describe('AWDP participant panel', () => {
     expect(source).not.toContain('加载 AWDP 状态失败')
   })
 
-  test('locks both action axes after their first success', async () => {
+  test('locks scoring changes but keeps read-only Break validation after first success', async () => {
     const source = await Bun.file(
       new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
 
-    expect(source).toContain('<Alert v-if="state?.breakActivation"')
     expect(source).toContain('<FlagSubmit')
-    expect(source).toContain('v-else')
-    expect(source).toContain('攻击已锁定，后续 Flag 不再受理')
-    expect(source).toContain('后续 Flag 不再受理')
+    expect(source).toContain(":title=\"state?.breakActivation ? $t('验证 Flag') : $t('提交 Flag')\"")
+    expect(source).toContain(':read-only-judgement="!!state?.breakActivation"')
+    expect(source).not.toContain('攻击已锁定，后续 Flag 不再受理')
+    expect(source).not.toContain('后续 Flag 不再受理')
     expect(source).toContain('<Alert v-if="state?.fixActivation"')
     expect(source).toContain('<FixSubmit')
     expect(source).toContain('防御已锁定，无需再次申请防御验证')
@@ -82,19 +82,26 @@ describe('AWDP participant panel', () => {
     ).text()
 
     expect(flag).toContain('NoCtfapiEndpointsGameplayFactsGameplayFactAdmissionFailureCodeProtocol')
+    expect(flag).toContain('judgeAwdpBreakFlag')
+    expect(flag).toContain('readOnlyJudgement')
     expect(flag).toContain("code === 'AchievementAlreadySucceeded'")
-    expect(flag).toContain('本题攻击已成功，后续 Flag 不再受理。')
+    expect(flag).toContain('本题攻击已成功，请使用验证模式确认 Flag 正误。')
+    expect(flag).toContain('Flag 正确；本次验证不产生任何比赛记录')
     expect(fix).toContain('DefenseAlreadySucceeded')
     expect(fix).toContain('本题防御已成功，后续 Fix 不再受理。')
   })
 
-  test('keeps the challenge page and Fix history as sibling routes', async () => {
+  test('keeps challenge details in the workspace and redirects legacy Fix history route into the dialog', async () => {
     const challengePage = Bun.file(
       new URL('../app/pages/competitions/[id]/challenges/[ccId]/index.vue', import.meta.url),
     )
     const historyPage = Bun.file(
       new URL('../app/pages/competitions/[id]/challenges/[ccId]/fix-history.vue', import.meta.url),
     )
+    const panel = await Bun.file(
+      new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
+    ).text()
+    const historyRedirect = await historyPage.text()
     const obsoleteNestedParent = Bun.file(
       new URL('../app/pages/competitions/[id]/challenges/[ccId].vue', import.meta.url),
     )
@@ -102,6 +109,10 @@ describe('AWDP participant panel', () => {
     expect(await challengePage.exists()).toBe(true)
     expect(await historyPage.exists()).toBe(true)
     expect(await obsoleteNestedParent.exists()).toBe(false)
+    expect(panel).toContain('<AwdpFixHistory')
+    expect(panel).toContain("query.fixHistory = '1'")
+    expect(historyRedirect).toContain('navigateTo')
+    expect(historyRedirect).toContain("fixHistory: '1'")
   })
 
   test('labels the AWDP checker as a one-shot Fix verifier', async () => {
@@ -121,7 +132,7 @@ describe('AWDP participant panel', () => {
       new URL('../app/components/challenges/panels/AwdpPanel.vue', import.meta.url),
     ).text()
     const history = await Bun.file(
-      new URL('../app/pages/competitions/[id]/challenges/[ccId]/fix-history.vue', import.meta.url),
+      new URL('../app/components/challenges/AwdpFixHistory.vue', import.meta.url),
     ).text()
 
     expect(panel).toContain('防御异常：EXP 利用成功')

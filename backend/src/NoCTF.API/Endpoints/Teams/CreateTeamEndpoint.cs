@@ -49,7 +49,9 @@ public enum TeamRegistrationFailureCodeProtocol
     TeamReviewConflict,
     CompetitionActive,
     TrackNotFound,
-    TrackNotPublicSelectable
+    TrackNotPublicSelectable,
+    TrackInvitationRequired,
+    TrackInvitationInvalid
 }
 
 public sealed record TeamRegistrationFailureResponse(
@@ -62,6 +64,7 @@ public sealed class CreateTeamRequest
 
     public Guid CompetitionId { get; set; }
     public required string TrackKey { get; set; }
+    public string? TrackInvitationCode { get; set; }
     public string Name
     {
         get => name;

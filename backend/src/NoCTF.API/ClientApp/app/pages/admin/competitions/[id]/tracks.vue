@@ -17,7 +17,12 @@ const { competitionId, canWrite } = useCompetitionAdmin()
 const revision = ref(0)
 const mode = ref<'Ctf' | 'Awd' | 'Awdp' | 'Koh'>('Ctf')
 const frozen = ref(false)
-const tracks = ref<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest[]>([])
+type TrackForm = Omit<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode'> & {
+  requiresInvitationCode: boolean
+  invitationCodeConfigured: boolean
+  invitationCode: string
+}
+const tracks = ref<TrackForm[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const error = ref<string | null>(null)
@@ -44,6 +49,10 @@ async function load() {
     affectsDynamicChallengeScore: item.affectsDynamicChallengeScore ?? false,
     visibleOnLeaderboard: item.visibleOnLeaderboard ?? false,
     affectsCompetitiveResults: item.affectsCompetitiveResults ?? false,
+    requiresInvitationCode: item.requiresInvitationCode ?? false,
+    invitationCodeConfigured: item.requiresInvitationCode ?? false,
+    invitationCode: '',
+    clearInvitationCode: false,
   }))
   error.value = null
 }
@@ -61,6 +70,10 @@ function addTrack() {
     affectsDynamicChallengeScore: mode.value === 'Ctf',
     visibleOnLeaderboard: true,
     affectsCompetitiveResults: true,
+    requiresInvitationCode: false,
+    invitationCodeConfigured: false,
+    invitationCode: '',
+    clearInvitationCode: false,
   })
 }
 
@@ -73,7 +86,18 @@ function setDefault(index: number) {
   tracks.value.forEach((track, trackIndex) => { track.isDefault = trackIndex === index })
 }
 
-function setInternal(track: NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, internal: boolean) {
+function clearInvitationRequirement(track: TrackForm) {
+  track.requiresInvitationCode = false
+  track.invitationCode = ''
+  track.clearInvitationCode = track.invitationCodeConfigured
+}
+
+function setPublicSelectable(track: TrackForm, selectable: boolean) {
+  track.isPublicSelectable = selectable
+  if (!selectable) clearInvitationRequirement(track)
+}
+
+function setInternal(track: TrackForm, internal: boolean) {
   track.isInternal = internal
   if (!internal) return
   track.isPublicSelectable = false
@@ -82,14 +106,52 @@ function setInternal(track: NoCtfapiEndpointsAdministrationCompetitionsUpdateCom
   track.affectsDynamicChallengeScore = false
   track.visibleOnLeaderboard = false
   track.affectsCompetitiveResults = false
+  clearInvitationRequirement(track)
+}
+
+function setInvitationRequired(track: TrackForm, required: boolean) {
+  track.requiresInvitationCode = required
+  track.clearInvitationCode = !required && track.invitationCodeConfigured
+  if (!required) {
+    track.invitationCode = ''
+    return
+  }
+  track.clearInvitationCode = false
 }
 
 async function save() {
   if (saving.value || frozen.value || !canWrite.value) return
+  const invalidInvitationTrack = tracks.value.find(track =>
+    track.requiresInvitationCode
+    && !track.invitationCodeConfigured
+    && !track.invitationCode?.trim(),
+  )
+  if (invalidInvitationTrack) {
+    const trackName = invalidInvitationTrack.name?.trim() || invalidInvitationTrack.key?.trim() || translate('未命名赛道')
+    error.value = translate('赛道「{name}」需要填写邀请码。', { name: trackName })
+    toast.error(error.value)
+    return
+  }
   saving.value = true
   const { data, error: requestError } = await adminCompetitionTracksUpdate({
     path: { competitionId },
-    body: { expectedRevision: revision.value, tracks: tracks.value },
+    body: {
+      expectedRevision: revision.value,
+      tracks: tracks.value.map(track => ({
+        key: track.key,
+        name: track.name,
+        isDefault: track.isDefault,
+        isPublicSelectable: track.isPublicSelectable,
+        isInternal: track.isInternal,
+        earnsScore: track.earnsScore,
+        earnsBlood: track.earnsBlood,
+        affectsDynamicChallengeScore: track.affectsDynamicChallengeScore,
+        visibleOnLeaderboard: track.visibleOnLeaderboard,
+        affectsCompetitiveResults: track.affectsCompetitiveResults,
+        invitationCode: track.requiresInvitationCode ? track.invitationCode.trim() : null,
+        clearInvitationCode: track.clearInvitationCode,
+      })),
+    },
   })
   saving.value = false
   if (requestError || !data) {
@@ -149,6 +211,7 @@ onMounted(load)
             <TableHead>{{ $t('动态分值') }}</TableHead>
             <TableHead>{{ $t('排行榜可见') }}</TableHead>
             <TableHead>{{ $t('参与竞争') }}</TableHead>
+            <TableHead class="min-w-56">{{ $t('赛道邀请码') }}</TableHead>
             <TableHead v-if="canWrite && !frozen" class="w-14"><span class="sr-only">{{ $t('操作') }}</span></TableHead>
           </TableRow>
         </TableHeader>
@@ -157,13 +220,33 @@ onMounted(load)
             <TableCell><Input v-model="track.key" :disabled="!canWrite || frozen" maxlength="64" class="font-mono" /></TableCell>
             <TableCell><Input v-model="track.name" :disabled="!canWrite || frozen" maxlength="80" /></TableCell>
             <TableCell><Checkbox :model-value="track.isDefault" :disabled="!canWrite || frozen" @update:model-value="value => value && setDefault(index)" /></TableCell>
-            <TableCell><Checkbox v-model="track.isPublicSelectable" :disabled="!canWrite || frozen || track.isInternal" /></TableCell>
+            <TableCell><Checkbox :model-value="track.isPublicSelectable" :disabled="!canWrite || frozen || track.isInternal" @update:model-value="value => setPublicSelectable(track, value === true)" /></TableCell>
             <TableCell><Checkbox :model-value="track.isInternal" :disabled="!canWrite || frozen" @update:model-value="value => setInternal(track, value === true)" /></TableCell>
             <TableCell><Checkbox v-model="track.earnsScore" :disabled="!canWrite || frozen || track.isInternal" /></TableCell>
             <TableCell><Checkbox v-model="track.earnsBlood" :disabled="!canWrite || frozen || track.isInternal || mode !== 'Ctf'" /></TableCell>
             <TableCell><Checkbox v-model="track.affectsDynamicChallengeScore" :disabled="!canWrite || frozen || track.isInternal || mode !== 'Ctf'" /></TableCell>
             <TableCell><Checkbox v-model="track.visibleOnLeaderboard" :disabled="!canWrite || frozen || track.isInternal" /></TableCell>
             <TableCell><Checkbox v-model="track.affectsCompetitiveResults" :disabled="!canWrite || frozen || track.isInternal" /></TableCell>
+            <TableCell>
+              <div class="flex items-center gap-2">
+                <Checkbox
+                  :model-value="track.requiresInvitationCode"
+                  :disabled="!canWrite || frozen || track.isInternal || !track.isPublicSelectable"
+                  :aria-label="$t('要求赛道邀请码')"
+                  @update:model-value="value => setInvitationRequired(track, value === true)"
+                />
+                <Input
+                  v-if="track.requiresInvitationCode"
+                  v-model="track.invitationCode"
+                  type="password"
+                  minlength="8"
+                  maxlength="128"
+                  :disabled="!canWrite || frozen"
+                  :placeholder="track.invitationCodeConfigured ? $t('留空以保留现有邀请码') : $t('输入 8-128 位邀请码')"
+                />
+                <span v-else class="text-xs text-muted-foreground">{{ $t('不限制') }}</span>
+              </div>
+            </TableCell>
             <TableCell v-if="canWrite && !frozen">
               <Button variant="ghost" size="icon" :disabled="track.isDefault" :aria-label="$t('删除赛道')" @click="removeTrack(index)">
                 <Trash2 class="size-4" />

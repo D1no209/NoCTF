@@ -94,7 +94,8 @@ function resultText(submission: Submission) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <CompetitionParticipantWorkspace :competition-id="competitionId">
+    <div class="flex flex-col gap-4">
     <h2 class="text-display text-lg">{{ $t('我的提交') }}</h2>
 
     <Alert v-if="error" variant="destructive">
@@ -149,5 +150,6 @@ function resultText(submission: Submission) {
       <Button variant="outline" :disabled="loading" @click="loadMore">
         <Spinner v-if="loading" data-icon="inline-start" /> {{ $t('加载更多') }} </Button>
     </div>
-  </div>
+    </div>
+  </CompetitionParticipantWorkspace>
 </template>

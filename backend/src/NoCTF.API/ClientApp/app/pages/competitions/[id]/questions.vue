@@ -322,7 +322,8 @@ const participantLimitReached = computed(() =>
 </script>
 
 <template>
-  <div class="grid items-start gap-5 lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
+  <CompetitionParticipantWorkspace :competition-id="competitionId">
+    <div class="grid items-start gap-5 lg:grid-cols-[minmax(17rem,22rem)_minmax(0,1fr)] xl:grid-cols-[22rem_minmax(0,1fr)]">
     <div class="flex min-w-0 flex-col gap-4">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold">{{ $t('咨询问答') }}</h2>
@@ -536,5 +537,6 @@ const participantLimitReached = computed(() =>
         </CardContent>
       </Card>
     </div>
-  </div>
+    </div>
+  </CompetitionParticipantWorkspace>
 </template>

@@ -365,7 +365,7 @@ describe('AWDP control screen implementation contract', () => {
       new URL('../app/pages/competitions/[id]/awdp-live.vue', import.meta.url),
     ).text()
     const shell = await Bun.file(
-      new URL('../app/pages/competitions/[id].vue', import.meta.url),
+      new URL('../app/pages/admin/competitions/[id].vue', import.meta.url),
     ).text()
     const stage = await Bun.file(
       new URL('../app/components/awdp-control/AwdpEventStage.vue', import.meta.url),
@@ -399,7 +399,7 @@ describe('AWDP control screen implementation contract', () => {
     expect(page).not.toContain('/api/v1')
     expect(page).not.toContain('.mp4')
     expect(shell).toContain("competition.value?.mode === 'Awdp'")
-    expect(shell).toContain('`${base}/awdp-live`')
+    expect(shell).toContain('`/competitions/${competitionId}/awdp-live`')
     expect(stage).toContain('AwdpAttackSuccessAnimation')
     expect(stage).toContain('AwdpAttackFailureAnimation')
     expect(stage).toContain('AwdpDefenseSuccessAnimation')
