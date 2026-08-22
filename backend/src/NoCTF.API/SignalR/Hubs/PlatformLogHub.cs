@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using NoCTF.Application.Observability;
 
 namespace NoCTF.API.SignalR.Hubs;
 
@@ -10,10 +11,17 @@ public sealed class PlatformLogHub : Hub
 
     public override async Task OnConnectedAsync()
     {
+        NoCtfTelemetry.SignalRConnected("platform_logs");
         await Groups.AddToGroupAsync(
             Context.ConnectionId,
             AdministratorsGroup,
             Context.ConnectionAborted);
         await base.OnConnectedAsync();
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        NoCtfTelemetry.SignalRDisconnected("platform_logs");
+        await base.OnDisconnectedAsync(exception);
     }
 }

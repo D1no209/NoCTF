@@ -2,7 +2,9 @@ using FastEndpoints;
 using FastEndpoints.Swagger;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using NoCTF.Application.Observability;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Routing;
 using NoCTF.Application.Authentication.Login;
 using NoCTF.Application.Authentication.RefreshJwt;
 using NoCTF.Application.Authentication.Account;
@@ -164,6 +166,13 @@ public static class ServiceRegistration
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = (context, _) =>
+            {
+                var route = (context.HttpContext.GetEndpoint() as RouteEndpoint)?
+                    .RoutePattern.RawText ?? "unmatched";
+                NoCtfTelemetry.RecordRateLimitRejection(route);
+                return ValueTask.CompletedTask;
+            };
             options.AddPolicy("submission", context =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     $"{context.User.FindFirstValue(ClaimTypes.NameIdentifier)

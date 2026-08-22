@@ -1,5 +1,6 @@
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
+using NoCTF.Hosting.Observability;
 using NoCTF.Runner;
 using NoCTF.Runner.Composition;
 using Wolverine;
@@ -16,8 +17,10 @@ builder.UseWolverine(options =>
     options.ConfigureNoCtfRunnerMessaging(builder.Configuration);
 });
 builder.Services.AddNoCtfRoleHealthChecks(builder.Configuration, roles);
+builder.Services.AddNoCtfObservability(builder.Configuration, "noctf-runner");
 
 var app = builder.Build();
+app.UseNoCtfObservability();
 app.MapNoCtfHealthChecks();
 app.Run();
 

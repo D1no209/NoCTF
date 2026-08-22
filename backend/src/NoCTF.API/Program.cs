@@ -7,6 +7,7 @@ using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Administration.PlatformLogs;
 using NoCTF.Hosting;
 using NoCTF.Hosting.Health;
+using NoCTF.Hosting.Observability;
 using NoCTF.Infrastructure;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Runner;
@@ -56,6 +57,8 @@ builder.Services.AddNoCtfRoleHealthChecks(
     builder.Configuration,
     roles,
     development || exportSwagger);
+if (!exportSwagger)
+    builder.Services.AddNoCtfObservability(builder.Configuration, "noctf-api");
 
 var app = builder.Build();
 if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))
@@ -67,6 +70,8 @@ if (args.Contains("--migrate-only", StringComparer.OrdinalIgnoreCase))
 }
 if (development)
     await app.Services.InitializeNoCtfAsync();
+if (!exportSwagger)
+    app.UseNoCtfObservability();
 app.UseNoCtfPipeline();
 app.UseNoCtfEndpoints();
 app.MapNoCtfHealthChecks();
