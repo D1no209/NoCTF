@@ -33,14 +33,14 @@ describe('protected downloads', () => {
     expect(result.fileName).toBe('fallback.bin')
   })
 
-  test('preserves a generated client problem response', async () => {
+  test('preserves generated client problem metadata while localizing its message', async () => {
     expect(readProtectedDownload(async () => ({
       error: { status: 403, detail: 'download forbidden' },
       response: new Response(null, { status: 403 }),
     }))).rejects.toMatchObject({
       name: 'ApiError',
       status: 403,
-      message: 'download forbidden',
+      message: '没有权限执行此操作',
     })
   })
 
