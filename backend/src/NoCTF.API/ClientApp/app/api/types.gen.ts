@@ -1341,7 +1341,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = 'CompetitionLifecycle' | 'UserAccountLifecycle' | 'CompetitionAdministration' | 'CompetitionLeaderboardVisibility' | 'CompetitionEvent';
 
-export type NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol = 'Activated' | 'Banned' | 'Disabled' | 'Anonymized' | 'PhysicallyDeleted';
+export type NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol = 'Activated' | 'Banned' | 'Disabled' | 'EmailVerified' | 'EmailUnverified' | 'Anonymized' | 'PhysicallyDeleted';
 
 export type NoCtfapiEndpointsAdministrationPlatformListPlatformAuditLogsRequest = {
     [key: string]: never;
@@ -1419,6 +1419,16 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStat
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol = 'Active' | 'Banned' | 'Disabled';
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictResponse = {
+    code?: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictCode;
+};
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictCode = 'AnonymizedAccountImmutable';
+
+export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationRequest = {
+    emailVerified?: boolean;
+};
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictResponse = {
     code?: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleConflictCode;
@@ -6087,6 +6097,42 @@ export type AdminPlatformUpdateUserAccountStatusResponses = {
 };
 
 export type AdminPlatformUpdateUserAccountStatusResponse = AdminPlatformUpdateUserAccountStatusResponses[keyof AdminPlatformUpdateUserAccountStatusResponses];
+
+export type AdminPlatformUpdateUserEmailVerificationData = {
+    body: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationRequest;
+    path: {
+        userId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/platform/users/{userId}/email-verification';
+};
+
+export type AdminPlatformUpdateUserEmailVerificationErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+    409: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserEmailVerificationConflictResponse;
+};
+
+export type AdminPlatformUpdateUserEmailVerificationError = AdminPlatformUpdateUserEmailVerificationErrors[keyof AdminPlatformUpdateUserEmailVerificationErrors];
+
+export type AdminPlatformUpdateUserEmailVerificationResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse;
+};
+
+export type AdminPlatformUpdateUserEmailVerificationResponse = AdminPlatformUpdateUserEmailVerificationResponses[keyof AdminPlatformUpdateUserEmailVerificationResponses];
 
 export type AdminPlatformUpdateUserRoleData = {
     body: NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest;

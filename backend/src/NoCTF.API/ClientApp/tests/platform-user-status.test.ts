@@ -34,4 +34,20 @@ describe('platform user account status management', () => {
     expect(source).toContain("case 'AnonymizedAccountImmutable':")
     expect(source).toContain("translate('已匿名化账户不可恢复')")
   })
+
+  test('manages email activation independently through the generated SDK', async () => {
+    const source = await Bun.file(pageUrl).text()
+
+    expect(source).toContain('adminPlatformUpdateUserEmailVerification')
+    expect(source).toContain("body: { emailVerified: pendingEmailVerification.value === 'Verified' }")
+    expect(source).toContain("(pendingEmailVerification === 'Verified') === detail.emailVerified")
+    expect(source).toContain("$t('邮箱激活状态')")
+    expect(source).toContain("$t('已激活')")
+    expect(source).toContain("$t('未激活')")
+    const handler = source.slice(
+      source.indexOf('async function saveEmailVerification'),
+      source.indexOf('async function invalidateTokens'),
+    )
+    expect(handler).not.toContain('detailOpen.value = false')
+  })
 })

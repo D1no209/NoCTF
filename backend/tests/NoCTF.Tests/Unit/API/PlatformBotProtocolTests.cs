@@ -63,4 +63,13 @@ public sealed class PlatformBotProtocolTests
         await Assert.That(status).IsEqualTo("\"Disabled\"");
         await Assert.That(conflict).IsEqualTo("\"AnonymizedAccountImmutable\"");
     }
+
+    [Test]
+    public async Task Email_verification_conflict_serializes_as_a_named_enum()
+    {
+        var conflict = JsonSerializer.Serialize(
+            UpdatePlatformUserEmailVerificationConflictCode.AnonymizedAccountImmutable);
+
+        await Assert.That(conflict).IsEqualTo("\"AnonymizedAccountImmutable\"");
+    }
 }

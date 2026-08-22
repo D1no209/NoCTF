@@ -34,6 +34,8 @@ public enum UserAccountLifecycleActionProtocol
     Activated,
     Banned,
     Disabled,
+    EmailVerified,
+    EmailUnverified,
     Anonymized,
     PhysicallyDeleted
 }

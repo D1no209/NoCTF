@@ -8,6 +8,7 @@ import {
   adminPlatformListUsers,
   adminPlatformPreviewUserDeletion,
   adminPlatformUpdateUserAccountStatus,
+  adminPlatformUpdateUserEmailVerification,
   adminPlatformUpdateUserRole,
 } from '~/api'
 import type {
@@ -25,6 +26,7 @@ type PlatformUser = NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse
 type DeletionPreview = NoCtfapiEndpointsAdministrationPlatformPlatformUserDeletionPreviewResponse
 type ManagedAccountStatus = NoCtfapiEndpointsAdministrationPlatformPlatformManagedUserAccountStatusProtocol
 type AccountStatusConflictCode = NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictCode
+type EmailVerificationDraft = 'Verified' | 'Unverified'
 
 const { user: currentUser } = useAuth()
 
@@ -87,8 +89,10 @@ const detailLoading = ref(false)
 const detail = ref<PlatformUser | null>(null)
 const pendingRole = ref('User')
 const pendingAccountStatus = ref<ManagedAccountStatus>('Active')
+const pendingEmailVerification = ref<EmailVerificationDraft>('Unverified')
 const roleSaving = ref(false)
 const accountStatusSaving = ref(false)
+const emailVerificationSaving = ref(false)
 const invalidating = ref(false)
 const detailRequests = createLatestRequestGuard()
 
@@ -117,6 +121,7 @@ async function openDetail(user: PlatformUser): Promise<void> {
   if (data?.accountStatus === 'Active' || data?.accountStatus === 'Banned' || data?.accountStatus === 'Disabled') {
     pendingAccountStatus.value = data.accountStatus
   }
+  pendingEmailVerification.value = data?.emailVerified ? 'Verified' : 'Unverified'
 }
 
 async function saveRole(): Promise<void> {
@@ -174,6 +179,32 @@ async function saveAccountStatus(): Promise<void> {
   toast.success(pendingAccountStatus.value === 'Active'
     ? translate('账户已激活')
     : translate('账户状态已更新，该用户的现有会话已失效。'))
+}
+
+async function saveEmailVerification(): Promise<void> {
+  if (!detail.value?.id || detail.value.accountStatus === 'Anonymized') return
+  emailVerificationSaving.value = true
+  const { data, error } = await adminPlatformUpdateUserEmailVerification({
+    path: { userId: detail.value.id },
+    body: { emailVerified: pendingEmailVerification.value === 'Verified' },
+  })
+  emailVerificationSaving.value = false
+  if (error) {
+    const apiError = parseApiError(error)
+    toast.error(apiError.code === 'AnonymizedAccountImmutable'
+      ? translate('已匿名化账户不可修改。')
+      : apiError.message)
+    return
+  }
+
+  if (data) {
+    detail.value = data
+    const index = users.value.findIndex(user => user.id === data.id)
+    if (index >= 0) users.value.splice(index, 1, data)
+  }
+  toast.success(pendingEmailVerification.value === 'Verified'
+    ? translate('邮箱已由管理员标记为已验证')
+    : translate('邮箱验证状态已撤销'))
 }
 
 async function invalidateTokens(): Promise<void> {
@@ -440,6 +471,40 @@ onMounted(() => {
               </FieldDescription>
               <FieldDescription v-else>
                 {{ $t('修改账户状态会吊销该用户的现有访问与刷新令牌。') }}
+              </FieldDescription>
+            </Field>
+            <Field>
+              <FieldLabel for="user-email-verification">{{ $t('邮箱激活状态') }}</FieldLabel>
+              <div class="flex items-center gap-2">
+                <Select
+                  v-model="pendingEmailVerification"
+                  :disabled="detail.accountStatus === 'Anonymized'"
+                >
+                  <SelectTrigger id="user-email-verification" class="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="Verified">{{ $t('已激活') }}</SelectItem>
+                      <SelectItem value="Unverified">{{ $t('未激活') }}</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Button
+                  :disabled="emailVerificationSaving
+                    || (pendingEmailVerification === 'Verified') === detail.emailVerified
+                    || detail.accountStatus === 'Anonymized'"
+                  @click="saveEmailVerification"
+                >
+                  <Spinner v-if="emailVerificationSaving" data-icon="inline-start" />
+                  {{ $t('保存') }}
+                </Button>
+              </div>
+              <FieldDescription v-if="detail.accountStatus === 'Anonymized'">
+                {{ $t('已匿名化账户不可修改。') }}
+              </FieldDescription>
+              <FieldDescription v-else>
+                {{ $t('修改邮箱激活状态会吊销该用户的现有访问与刷新令牌。') }}
               </FieldDescription>
             </Field>
           </FieldGroup>
