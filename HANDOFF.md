@@ -1,5 +1,13 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-22 alpha.76 参赛页面边界、审计恢复与邮箱激活管理
+
+- 参赛端移除旧侧边栏并按页面职责拆分布局：仅题目工作区显示按方向分组的题目列表；咨询、我的队伍、我的提交保留主内容与右侧赛事区域；概览不再显示侧栏；记分板成为独立页面并提供“返回比赛”入口。普通参赛者仍看不到中控大屏、队伍管理和动态入口，这些入口保留在竞赛管理侧。
+- 管理端队伍列表的队名可打开详情抽屉，展示赛道、报名/封禁状态、注册时间、成员和队长身份。平台用户抽屉新增与账号启用状态相互独立的“邮箱激活状态”：管理员可以标记邮箱已验证或撤销验证；变更递增 TokenVersion、写入强类型账号生命周期审计，重复设置幂等，匿名化账号保持不可变。
+- 修复历史审计事件中旧数值枚举导致平台审计接口 500 的问题：无效枚举负载按未知值安全呈现，不再中断整页查询。中文界面的未知英文后端诊断统一回退为本地化状态提示，同时保留题目定义错误等专用中文指导；下载、导出和列表错误不会再泄露英文兜底文本。
+- 邮箱激活管理使用独立强类型 FastEndpoints `ExecuteAsync`/`TypedResults` 端点，并通过 Application/Infrastructure 事务写入；接口、OpenAPI、生成 TypeScript SDK 和 `docs/api.md` 同步更新。没有新增业务表、EF migration 或 snapshot，EF model drift 检查无变化。版本从 `0.1.0-alpha.75` 递增至 `0.1.0-alpha.76`。
+- 验证：Release solution build 0 warning/0 error；完整非 Integration TUnit 877/877；前端 `bun test` 272/272、`bun run typecheck` 与 production `bun run build` 通过（仅既有大 chunk、plugin timing 与第三方 exports deprecation warning）；OpenAPI 导出与 `bun run api:gen` 幂等，`git diff --check` 通过。本机 Docker daemon 不可用，真实 PostgreSQL/Redis/Wolverine Integration 测试未执行，未将其误报为通过。本节提交后的统一 `main` push 将触发受控 CI 与自动部署。
+
 ## 2026-08-22 alpha.75 自动部署长连接与外部工具下载加固
 
 - 首次 alpha.74 自动部署的完整 `build-test` 全部通过，但生产部署在 Runner 镜像下载 Kompose CLI 期间连续五分钟没有终端输出，GitHub Actions 到生产服务器的 SSH 会话被中间网络设备以 `Broken pipe` 断开。切换尚未发生，原 Backend/Worker/Runner 始终保持健康；失败构建进程与未生效 release 已按精确 PID/路径终止和删除，数据库备份继续保留。
