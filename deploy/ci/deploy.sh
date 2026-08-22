@@ -5,7 +5,9 @@ archive_path=${1:?release archive path is required}
 commit_sha=${2:?commit SHA is required}
 config_root=${3:-/root/NoCTF}
 release_root=${4:-/root/noctf-releases}
+kompose_asset_path=${5:?verified Kompose asset path is required}
 minimum_free_kb=${NOCTF_DEPLOY_MIN_FREE_KB:-6291456}
+kompose_sha256=65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147
 
 [[ "$commit_sha" =~ ^[0-9a-f]{40}$ ]] || {
     echo "Invalid deployment commit SHA." >&2
@@ -16,6 +18,10 @@ archive_path=$(realpath "$archive_path")
 upload_dir=$(dirname "$archive_path")
 [[ $(basename "$archive_path") == "noctf-release.tar.gz" ]]
 [[ $(basename "$upload_dir") == "noctf-ci-upload-$commit_sha" ]]
+kompose_asset_path=$(realpath "$kompose_asset_path")
+[[ $(dirname "$kompose_asset_path") == "$upload_dir" ]]
+[[ $(basename "$kompose_asset_path") == "kompose-linux-amd64" ]]
+echo "$kompose_sha256  $kompose_asset_path" | sha256sum -c -
 
 config_root=$(realpath "$config_root")
 mkdir -p "$release_root"
@@ -47,8 +53,18 @@ if [[ ! -d "$release_dir" ]]; then
     tar -xzf "$archive_path" -C "$release_tmp"
     [[ -f "$release_tmp/deploy/docker-compose.yml" ]]
     [[ -f "$release_tmp/backend/Dockerfile" ]]
+    install -d -m 0755 "$release_tmp/backend/docker-assets"
+    install -m 0644 \
+        "$kompose_asset_path" \
+        "$release_tmp/backend/docker-assets/kompose-linux-amd64"
+    echo "$kompose_sha256  $release_tmp/backend/docker-assets/kompose-linux-amd64" \
+        | sha256sum -c -
     mv "$release_tmp" "$release_dir"
 fi
+
+[[ -f "$release_dir/backend/docker-assets/kompose-linux-amd64" ]]
+echo "$kompose_sha256  $release_dir/backend/docker-assets/kompose-linux-amd64" \
+    | sha256sum -c -
 
 compose=(
     docker compose

@@ -1,5 +1,11 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-22 alpha.75 自动部署长连接与外部工具下载加固
+
+- 首次 alpha.74 自动部署的完整 `build-test` 全部通过，但生产部署在 Runner 镜像下载 Kompose CLI 期间连续五分钟没有终端输出，GitHub Actions 到生产服务器的 SSH 会话被中间网络设备以 `Broken pipe` 断开。切换尚未发生，原 Backend/Worker/Runner 始终保持健康；失败构建进程与未生效 release 已按精确 PID/路径终止和删除，数据库备份继续保留。
+- 版本递增至 `0.1.0-alpha.75`。生产发布不再要求服务器直接访问缓慢的 GitHub Release：CI 下载固定版本的 Kompose amd64 二进制并校验 SHA-256，随后和精确提交归档一同上传；服务器部署脚本再次校验后才注入该 release 的 Docker 构建上下文，Dockerfile 最终还会第三次校验。非 CI 的本地构建保留有界、可续传的 `curl` 回退。SSH/SCP 同时增加连接超时、30 秒应用层 keepalive 与容错次数，长时间镜像构建不再因无控制台输出断线。架构测试覆盖预载资产、下载回退与 SSH keepalive 配置。
+- 生产磁盘的有界清理已在失败部署前生效，根盘使用率从约 92% 降至 78%、可用约 9.1 GiB；未执行全局 prune，未删除 volume、题目镜像、PostgreSQL/Redis 数据或生产专用配置。alpha.75 推送后应重新观察完整 CI、备份校验、迁移、服务健康与 release 指针，再将实际结果补充到本节。
+
 ## 2026-08-22 alpha.74 CI 恢复与受控生产自动部署
 
 - 版本从 `0.1.0-alpha.73` 递增至 `0.1.0-alpha.74`。修复随机附件批次文件名校验依赖当前操作系统路径规则的问题：统一下载名与以 Flag 为名的变体现在显式拒绝 `/`、`\\`，Linux CI 不会再把 Windows 风格的子路径当作合法 Flag；补充两个方向的跨平台回归测试。
