@@ -12,9 +12,11 @@ import {
   adminUnbanTeam,
   adminUpholdTeamBanAppeal,
   adminTeamTrackAssign,
+  userProfileGet,
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationTeamsAdminTeamBanCaseResponse,
+  NoCtfapiEndpointsAuthenticationPublicUserProfileResponse,
   NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse,
   NoCtfapiEndpointsTeamsTeamResponse,
 } from '~/api'
@@ -30,6 +32,21 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const pendingId = ref<string | null>(null)
 const tracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]>([])
+const selectedTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
+const teamMembers = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse[]>([])
+const teamDetailLoading = ref(false)
+
+async function openTeamDetail(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
+  selectedTeam.value = team
+  teamMembers.value = []
+  teamDetailLoading.value = true
+  const memberIds = team.memberIds ?? []
+  const responses = await Promise.all(memberIds.map(userId => userProfileGet({ path: { userId } })))
+  if (selectedTeam.value?.id === team.id) {
+    teamMembers.value = responses.flatMap(response => response.data ? [response.data] : [])
+    teamDetailLoading.value = false
+  }
+}
 
 async function load() {
   loading.value = true
@@ -244,7 +261,15 @@ onMounted(() => {
         </TableHeader>
         <TableBody>
           <TableRow v-for="t in teams" :key="t.id">
-            <TableCell class="font-medium">{{ t.name }}</TableCell>
+            <TableCell>
+              <button
+                type="button"
+                class="rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                @click="openTeamDetail(t)"
+              >
+                {{ t.name }}
+              </button>
+            </TableCell>
             <TableCell>
               <Select
                 v-if="canWrite"
@@ -291,6 +316,50 @@ onMounted(() => {
         </TableBody>
       </Table>
     </div>
+
+    <Sheet :open="selectedTeam !== null" @update:open="open => { if (!open) selectedTeam = null }">
+      <SheetContent class="overflow-y-auto sm:max-w-lg">
+        <SheetHeader>
+          <SheetTitle>{{ $t('队伍详情') }}</SheetTitle>
+          <SheetDescription>{{ selectedTeam?.name }}</SheetDescription>
+        </SheetHeader>
+        <div v-if="selectedTeam" class="mt-6 flex flex-col gap-6">
+          <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">
+            <dt class="text-muted-foreground">{{ $t('赛道') }}</dt>
+            <dd>{{ selectedTeam.trackName ?? selectedTeam.trackKey }}</dd>
+            <dt class="text-muted-foreground">{{ $t('注册状态') }}</dt>
+            <dd>{{ enumLabel(TeamRegistrationStatusLabel, selectedTeam.registrationStatus) }}</dd>
+            <dt class="text-muted-foreground">{{ $t('封禁状态') }}</dt>
+            <dd>{{ selectedTeam.isBanned ? $t('已封禁') : $t('正常') }}</dd>
+            <dt class="text-muted-foreground">{{ $t('注册时间') }}</dt>
+            <dd class="font-mono tabular-nums">{{ adminFormatDateTime(selectedTeam.registeredAt) }}</dd>
+          </dl>
+          <Separator />
+          <section class="flex flex-col gap-3">
+            <h3 class="font-semibold">{{ $t('成员（{count}）', { count: selectedTeam.memberIds?.length ?? 0 }) }}</h3>
+            <div v-if="teamDetailLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner class="size-4" />{{ $t('加载中') }}
+            </div>
+            <div v-else class="flex flex-col divide-y rounded-md border">
+              <div v-for="member in teamMembers" :key="member.userId" class="flex items-center gap-3 p-3">
+                <Avatar class="size-9">
+                  <AvatarImage v-if="member.avatarUrl" :src="member.avatarUrl" :alt="member.userName ?? ''" />
+                  <AvatarFallback>{{ member.userName?.slice(0, 2) }}</AvatarFallback>
+                </Avatar>
+                <div class="min-w-0 flex-1">
+                  <NuxtLink :to="`/users/${member.userId}`" class="font-medium hover:underline">
+                    {{ member.userName }}
+                  </NuxtLink>
+                  <p v-if="member.email" class="truncate text-xs text-muted-foreground">{{ member.email }}</p>
+                </div>
+                <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('队长') }}</Badge>
+              </div>
+              <p v-if="!teamMembers.length" class="p-3 text-sm text-muted-foreground">{{ $t('暂无成员') }}</p>
+            </div>
+          </section>
+        </div>
+      </SheetContent>
+    </Sheet>
 
     <Separator />
 
