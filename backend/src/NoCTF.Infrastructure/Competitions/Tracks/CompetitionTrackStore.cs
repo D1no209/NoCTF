@@ -99,7 +99,23 @@ public sealed class CompetitionTrackStore(
             return Failure(CompetitionTrackFailureCode.InvalidConfiguration,
                 string.Join(" ", validationErrors));
 
-        var normalized = CompetitionTrackPolicy.Normalize(command.Tracks);
+        var currentConfiguration = CompetitionTrackConfiguration.ParseOrDefault(
+            competition.Mode,
+            competition.TrackConfigurationJson);
+        var normalized = CompetitionTrackPolicy.Normalize(command.Tracks.Select(track =>
+        {
+            var existingHash = currentConfiguration.Find(track.Key)?.InvitationCodeHash;
+            var invitationUpdate = command.InvitationCodeUpdates?.FirstOrDefault(update =>
+                string.Equals(update.TrackKey, track.Key, StringComparison.OrdinalIgnoreCase));
+            var nextHash = track.IsInternal || !track.IsPublicSelectable
+                ? null
+                : invitationUpdate?.ClearInvitationCode == true
+                    ? null
+                    : invitationUpdate?.InvitationCode is not null
+                        ? CompetitionTrackInvitationCode.Hash(invitationUpdate.InvitationCode)
+                        : existingHash;
+            return track with { InvitationCodeHash = nextHash };
+        }).ToArray());
         var nextKeys = normalized.Tracks.Select(track => track.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var usedKeys = await db.Teams.AsNoTracking()
@@ -113,10 +129,7 @@ public sealed class CompetitionTrackStore(
                 $"Track '{missingUsedKey}' is still assigned to one or more teams.");
 
         var nextJson = CompetitionTrackConfiguration.Serialize(normalized);
-        var currentJson = CompetitionTrackConfiguration.Serialize(
-            CompetitionTrackConfiguration.ParseOrDefault(
-                competition.Mode,
-                competition.TrackConfigurationJson));
+        var currentJson = CompetitionTrackConfiguration.Serialize(currentConfiguration);
         if (string.Equals(nextJson, currentJson, StringComparison.Ordinal))
         {
             await transaction.CommitAsync(cancellationToken);
@@ -222,7 +235,9 @@ public sealed class CompetitionTrackStore(
         track.EarnsBlood,
         track.AffectsDynamicChallengeScore,
         track.VisibleOnLeaderboard,
-        track.AffectsCompetitiveResults);
+        track.AffectsCompetitiveResults,
+        IsViewerTrack: false,
+        track.RequiresInvitationCode);
 
     private static OperationResult<CompetitionTracksView, CompetitionTrackFailureCode> Failure(
         CompetitionTrackFailureCode code,

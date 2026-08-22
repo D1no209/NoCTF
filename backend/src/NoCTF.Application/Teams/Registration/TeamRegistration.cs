@@ -9,7 +9,8 @@ public sealed record CreateTeamCommand(
     Guid UserId,
     string Name,
     DateTimeOffset RegisteredAt,
-    string TrackKey);
+    string TrackKey,
+    string? TrackInvitationCode = null);
 public sealed record TeamView(
     Guid Id,
     Guid CompetitionId,
@@ -45,7 +46,9 @@ public enum TeamRegistrationFailure
     TeamReviewConflict,
     CompetitionActive,
     TrackNotFound,
-    TrackNotPublicSelectable
+    TrackNotPublicSelectable,
+    TrackInvitationRequired,
+    TrackInvitationInvalid
 }
 public sealed record TeamCreateStoreResult(TeamView? Team, TeamRegistrationFailure? Failure = null);
 public sealed record TeamReviewStoreResult(bool Changed, TeamRegistrationFailure? Failure = null);
@@ -114,6 +117,22 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
                 TeamRegistrationFailure.TrackNotPublicSelectable,
                 "The selected competition track cannot be selected by participants.");
+        if (requestedTrack.RequiresInvitationCode
+            && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
+        {
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                TeamRegistrationFailure.TrackInvitationRequired,
+                "The selected competition track requires an invitation code.");
+        }
+        if (requestedTrack.RequiresInvitationCode
+            && !CompetitionTrackInvitationCode.Verify(
+                requestedTrack.InvitationCodeHash,
+                command.TrackInvitationCode))
+        {
+            return OperationResult<TeamView, TeamRegistrationFailure>.Failure(
+                TeamRegistrationFailure.TrackInvitationInvalid,
+                "The competition track invitation code is invalid.");
+        }
         var created = await store.TryCreateAsync(command with { Name = name, TrackKey = requestedTrack.Key },
             policy.AutoApprove ? TeamRegistrationStatus.Approved : TeamRegistrationStatus.Pending, ct);
         return created.Team is not null

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Puzzle, Settings, ShieldAlert, Trophy, Users } from '@lucide/vue'
+import { Activity, Container, Download, FileCheck, GitBranch, KeyRound, LayoutDashboard, Megaphone, Orbit, Puzzle, Settings, ShieldAlert, Trophy, Users } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
   adminCreateCompetitionAnnouncement,
@@ -121,12 +121,16 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => [
       { to: `${base}/configuration`, label: translate("配置"), icon: Settings },
       { to: `${base}/tracks`, label: translate("赛道"), icon: GitBranch },
       { to: `${base}/challenges`, label: translate("题目"), icon: Puzzle },
-      { to: `${base}/teams`, label: translate("团队"), icon: Users },
+      { to: `${base}/teams`, label: translate("队伍管理"), icon: Users },
     ],
   },
   {
     label: translate("监控"),
     items: [
+      ...(competition.value?.mode === 'Awdp'
+        ? [{ to: `/competitions/${competitionId}/awdp-live`, label: translate("中控大屏"), icon: Orbit }]
+        : [{ to: `/competitions/${competitionId}/live`, label: translate("3D 大屏"), icon: Orbit }]),
+      { to: `/competitions/${competitionId}/events`, label: translate("动态"), icon: Activity },
       { to: `${base}/submissions`, label: translate("提交"), icon: FileCheck },
       { to: `${base}/runtimes`, label: translate("运行时"), icon: Container },
       { to: `${base}/cheats`, label: translate("作弊"), icon: ShieldAlert },

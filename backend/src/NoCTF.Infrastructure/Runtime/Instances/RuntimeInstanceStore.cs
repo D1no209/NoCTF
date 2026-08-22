@@ -90,6 +90,9 @@ public sealed class RuntimeInstanceStore(
             return new(null, RuntimeMutationFailure.Unsupported);
         if (scope.Mode == GameMode.Awd && command.Action is RuntimeAction.Start or RuntimeAction.Stop or RuntimeAction.Extend)
             return new(null, RuntimeMutationFailure.Unsupported);
+        if (scope is { Mode: GameMode.Awdp, HasCorrectBreak: true }
+            && command.Action is RuntimeAction.Start or RuntimeAction.Reset or RuntimeAction.Extend)
+            return new(null, RuntimeMutationFailure.InvalidState);
         var purpose = PurposeFor(scope);
         var includesLegacyAwdpPurpose = scope.Mode == GameMode.Awdp
             && purpose == RuntimePurpose.AwdpAttack;
@@ -389,7 +392,14 @@ public sealed class RuntimeInstanceStore(
                 item.Competition.MaxConcurrentRuntimeInstancesPerTeam,
                 item.Competition.ConfigurationJson,
                 item.Challenge.RulesJson,
-                item.Template.DefinitionJson))
+                item.Template.DefinitionJson,
+                db.GameplayFacts.Any(fact =>
+                    fact.CompetitionId == competitionId
+                    && fact.CompetitionChallengeId == competitionChallengeId
+                    && fact.TeamId == item.Team.Id
+                    && fact.Kind == NoCTF.Domain.Gameplay.GameplayFactKind.BreakAttempt
+                    && fact.State == NoCTF.Domain.Gameplay.GameplayFactState.Completed
+                    && fact.Result == NoCTF.Domain.Gameplay.GameplayFactResult.Correct)))
             .SingleOrDefaultAsync(ct);
 
     private Task LockCompetitionAsync(Guid competitionId, CancellationToken ct) =>
@@ -453,5 +463,6 @@ public sealed class RuntimeInstanceStore(
         int MaxConcurrentRuntimeInstances,
         string CompetitionConfigurationJson,
         string RulesJson,
-        string DefinitionJson);
+        string DefinitionJson,
+        bool HasCorrectBreak);
 }

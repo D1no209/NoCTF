@@ -2,25 +2,25 @@ import { describe, expect, test } from 'bun:test'
 
 describe('participant challenge progress', () => {
   test('shows solve counts and a color-independent solved marker', async () => {
-    const page = await Bun.file(
-      new URL('../app/pages/competitions/[id]/challenges/index.vue', import.meta.url),
+    const navigator = await Bun.file(
+      new URL('../app/components/competition/CompetitionChallengeNavigator.vue', import.meta.url),
     ).text()
 
-    expect(page).toContain("scoreboardBreakdown(slot, 'Solve')")
-    expect(page).toContain("scoreboardBreakdown(slot, 'Attack')")
-    expect(page).toContain("scoreboardBreakdown(slot, 'Defense')")
-    expect(page).toContain('progress.attackSucceeded && progress.defenseSucceeded')
-    expect(page).toContain("if (progress.attackSucceeded) return translate('攻击成功')")
-    expect(page).toContain("if (progress.defenseSucceeded) return translate('防御成功')")
-    expect(page).toContain('本轮待结算')
-    expect(page).not.toContain('currentBreakScore')
-    expect(page).not.toContain('currentFixScore')
-    expect(page).toContain('bloodRankLabel')
-    expect(page).toContain('支队伍已解出')
-    expect(page).toContain('已解出')
-    expect(page).toContain('<Flag')
-    expect(page).toContain('useScoreboardMatrix(competitionId)')
-    expect(page).toContain('v-if="board.error.value"')
+    expect(navigator).toContain("scoreboardBreakdown(slot, 'Solve')")
+    expect(navigator).toContain("scoreboardBreakdown(slot, 'Attack')")
+    expect(navigator).toContain("scoreboardBreakdown(slot, 'Defense')")
+    expect(navigator).toContain('progress.attackSucceeded && progress.defenseSucceeded')
+    expect(navigator).toContain("if (progress.attackSucceeded) return translate('攻击成功')")
+    expect(navigator).toContain("if (progress.defenseSucceeded) return translate('防御成功')")
+    expect(navigator).toContain('本轮待结算')
+    expect(navigator).not.toContain('currentBreakScore')
+    expect(navigator).not.toContain('currentFixScore')
+    expect(navigator).toContain('bloodRankLabel')
+    expect(navigator).toContain('支队伍已解出')
+    expect(navigator).toContain('已解出')
+    expect(navigator).toContain('<Flag')
+    expect(navigator).toContain('useScoreboardMatrix(props.competitionId)')
+    expect(navigator).toContain('v-if="board.error.value"')
   })
 
   test('hides the challenge tab before start and from ineligible participants', async () => {

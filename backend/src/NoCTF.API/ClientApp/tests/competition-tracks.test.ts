@@ -36,6 +36,8 @@ describe('competition track error presentation', () => {
     'CompetitionActive',
     'TrackNotFound',
     'TrackNotPublicSelectable',
+    'TrackInvitationRequired',
+    'TrackInvitationInvalid',
   ] satisfies NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol[]
 
   test('maps every generated track failure code', () => {
@@ -57,6 +59,9 @@ describe('competition track pages', () => {
     expect(admin).toContain('adminCompetitionTracksGet')
     expect(admin).toContain('adminCompetitionTracksUpdate')
     expect(admin).toContain('if (saving.value || frozen.value || !canWrite.value) return')
+    expect(admin).toContain('setInvitationRequired')
+    expect(admin).toContain('clearInvitationRequirement')
+    expect(admin).toContain('需要填写邀请码')
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
     expect(teams).toContain('adminTeamTrackAssign')
     expect(teams).toContain('expectedTeamVersion: team.concurrencyVersion ?? 0')
@@ -69,7 +74,10 @@ describe('competition track pages', () => {
 
     expect(overview).toContain('listCompetitionTracks')
     expect(overview).toContain('trackKey: createTrackKey.value')
+    expect(overview).toContain('trackInvitationCode: selectedCreateTrack.value?.requiresInvitationCode')
+    expect(overview).toContain('createTrackInvitationCode')
     expect(overview).toContain('track.isPublicSelectable')
+    expect(overview).toContain('selectedCreateTrack?.requiresInvitationCode')
     expect(overview).toContain('v-if="selectableTracks.length > 0"')
     expect(overview).not.toContain('createTrackKey.value = selectableTracks.value.find')
     expect(leaderboard).toContain("all.filter(team => team.trackKey === selectedTrackKey.value)")

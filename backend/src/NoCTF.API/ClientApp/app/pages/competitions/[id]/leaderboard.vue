@@ -303,7 +303,8 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <CompetitionParticipantWorkspace :competition-id="competitionId">
+    <div class="flex flex-col gap-6">
     <Alert v-if="board.error.value" variant="destructive">
       <AlertDescription class="flex items-center justify-between gap-3"><span>{{ board.error.value }}</span><Button variant="outline" size="sm" @click="board.refresh()">{{ $t('重试') }}</Button></AlertDescription>
     </Alert>
@@ -408,5 +409,6 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
         </template>
       </DialogScrollContent>
     </Dialog>
-  </div>
+    </div>
+  </CompetitionParticipantWorkspace>
 </template>

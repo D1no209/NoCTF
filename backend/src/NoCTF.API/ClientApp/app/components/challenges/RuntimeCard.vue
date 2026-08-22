@@ -21,8 +21,8 @@ const props = withDefaults(
   defineProps<{
     competitionId: string
     competitionChallengeId: string
-    /** full = CTF 全操作;reset-only = AWD 仅重置 */
-    controls?: 'full' | 'reset-only'
+    /** full = CTF 全操作;reset-only = AWD 仅重置;readonly = 只显示最终状态 */
+    controls?: 'full' | 'reset-only' | 'readonly'
   }>(),
   { controls: 'full' },
 )
@@ -190,7 +190,7 @@ const stateVariant = computed(() => {
               <Spinner v-if="busy && polling" data-icon="inline-start" /> {{ $t('启动环境') }} </Button>
             <Button v-if="isRunning" variant="outline" :disabled="busy" @click="stop"> {{ $t('停止') }} </Button>
           </template>
-          <Button v-if="runtime" variant="outline" :disabled="busy" @click="reset">
+          <Button v-if="runtime && controls !== 'readonly'" variant="outline" :disabled="busy" @click="reset">
             <Spinner v-if="polling" data-icon="inline-start" /> {{ $t('重置环境') }} </Button>
           <template v-if="controls === 'full' && isRunning">
             <div class="flex items-center gap-2">

@@ -58,6 +58,18 @@ public sealed class TeamRegistrationStore(
             return new(null, TeamRegistrationFailure.TrackNotFound);
         if (track.IsInternal || !track.IsPublicSelectable)
             return new(null, TeamRegistrationFailure.TrackNotPublicSelectable);
+        if (track.RequiresInvitationCode
+            && string.IsNullOrWhiteSpace(command.TrackInvitationCode))
+        {
+            return new(null, TeamRegistrationFailure.TrackInvitationRequired);
+        }
+        if (track.RequiresInvitationCode
+            && !CompetitionTrackInvitationCode.Verify(
+                track.InvitationCodeHash,
+                command.TrackInvitationCode))
+        {
+            return new(null, TeamRegistrationFailure.TrackInvitationInvalid);
+        }
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
             && x.MemberIds.Contains(command.UserId), ct))

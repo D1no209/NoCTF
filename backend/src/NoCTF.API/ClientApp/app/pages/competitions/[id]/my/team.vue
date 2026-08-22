@@ -238,7 +238,8 @@ function setAppealOpen(open: boolean) {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <CompetitionParticipantWorkspace :competition-id="competitionId">
+    <div class="flex flex-col gap-6">
     <Alert v-if="loadError" variant="destructive">
       <AlertDescription>{{ loadError }}</AlertDescription>
     </Alert>
@@ -480,5 +481,6 @@ function setAppealOpen(open: boolean) {
         </CardContent>
       </Card>
     </template>
-  </div>
+    </div>
+  </CompetitionParticipantWorkspace>
 </template>

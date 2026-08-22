@@ -14,6 +14,21 @@ const props = defineProps<{
 
 const state = ref<NoCtfapiEndpointsGameplayFactsAwdpParticipantStateResponse | null>(null)
 const loading = ref(true)
+const route = useRoute()
+const router = useRouter()
+const fixHistoryOpen = ref(route.query.fixHistory === '1')
+
+watch(() => route.query.fixHistory, value => {
+  fixHistoryOpen.value = value === '1'
+})
+
+async function setFixHistoryOpen(open: boolean): Promise<void> {
+  fixHistoryOpen.value = open
+  const query = { ...route.query }
+  if (open) query.fixHistory = '1'
+  else delete query.fixHistory
+  await router.replace({ query })
+}
 
 const defenseTransitionInProgress = computed(() => {
   const factState = state.value?.defense?.state
@@ -94,20 +109,15 @@ onUnmounted(() => {
           class="border-b pb-5"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
-          controls="full"
+          :controls="state?.breakActivation ? 'readonly' : 'full'"
         />
 
-        <Alert v-if="state?.breakActivation" class="border-emerald-500/40 bg-emerald-500/5">
-          <ShieldCheck class="text-emerald-600 dark:text-emerald-400" />
-          <AlertTitle>{{ $t('攻击已锁定，后续 Flag 不再受理') }}</AlertTitle>
-        </Alert>
-
         <FlagSubmit
-          v-else
           class="border-t pt-5"
           :competition-id="competition.id!"
           :competition-challenge-id="challenge.id!"
-          :title="$t('提交 Flag')"
+          :title="state?.breakActivation ? $t('验证 Flag') : $t('提交 Flag')"
+          :read-only-judgement="!!state?.breakActivation"
           @evaluated="refreshAndPoll"
         />
       </section>
@@ -120,11 +130,9 @@ onUnmounted(() => {
               {{ $t('已于第 {round} 轮生效', { round: state.fixActivation.effectiveRound ?? '-' }) }}
             </Badge>
           </div>
-          <Button as-child variant="outline" size="sm">
-            <NuxtLink :to="`/competitions/${competition.id}/challenges/${challenge.id}/fix-history`">
-              <History data-icon="inline-start" />
-              {{ $t('Fix 历史') }}
-            </NuxtLink>
+          <Button variant="outline" size="sm" @click="setFixHistoryOpen(true)">
+            <History data-icon="inline-start" />
+            {{ $t('Fix 历史') }}
           </Button>
         </header>
 
@@ -156,5 +164,19 @@ onUnmounted(() => {
         />
       </section>
     </div>
+
+    <Dialog :open="fixHistoryOpen" @update:open="setFixHistoryOpen">
+      <DialogScrollContent class="max-h-[85vh] sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>{{ $t('Fix 历史') }}</DialogTitle>
+          <DialogDescription>{{ challenge.title }}</DialogDescription>
+        </DialogHeader>
+        <AwdpFixHistory
+          v-if="fixHistoryOpen"
+          :competition-id="competition.id!"
+          :competition-challenge-id="challenge.id!"
+        />
+      </DialogScrollContent>
+    </Dialog>
   </div>
 </template>

@@ -1792,6 +1792,90 @@
         ]
       }
     },
+    "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement": {
+      "post": {
+        "tags": [
+          "Competitions"
+        ],
+        "summary": "Checks an AWDP Break Flag after the attack achievement succeeded.",
+        "description": "Returns only correctness. It never creates GameplayFact, score, event, notification, cheat incident or Runtime changes.",
+        "operationId": "JudgeAwdpBreakFlag",
+        "parameters": [
+          {
+            "name": "competitionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "competitionChallengeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "x-name": "JudgeAwdpBreakFlagRequest",
+          "description": "",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsJudgeAwdpBreakFlagRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementConflictResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag": {
       "post": {
         "tags": [
@@ -13103,7 +13187,9 @@
           "TeamReviewConflict",
           "CompetitionActive",
           "TrackNotFound",
-          "TrackNotPublicSelectable"
+          "TrackNotPublicSelectable",
+          "TrackInvitationRequired",
+          "TrackInvitationInvalid"
         ],
         "enum": [
           "InvalidTeamName",
@@ -13118,7 +13204,9 @@
           "TeamReviewConflict",
           "CompetitionActive",
           "TrackNotFound",
-          "TrackNotPublicSelectable"
+          "TrackNotPublicSelectable",
+          "TrackInvitationRequired",
+          "TrackInvitationInvalid"
         ]
       },
       "NoCTFAPIEndpointsTeamsCreateTeamRequest": {
@@ -13130,6 +13218,10 @@
         "properties": {
           "trackKey": {
             "type": "string"
+          },
+          "trackInvitationCode": {
+            "type": "string",
+            "nullable": true
           },
           "name": {
             "type": "string"
@@ -14337,6 +14429,67 @@
       "NoCTFAPIEndpointsGameplayFactsGetGameplayFactStatusRequest": {
         "type": "object",
         "additionalProperties": false
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "result": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Correct",
+          "Wrong"
+        ],
+        "enum": [
+          "Correct",
+          "Wrong"
+        ]
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementConflictResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementFailureCodeProtocol"
+          }
+        }
+      },
+      "NoCTFAPIEndpointsGameplayFactsAwdpBreakFlagJudgementFailureCodeProtocol": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "JudgementUnavailable",
+          "TeamNotEligible",
+          "AchievementNotSucceeded",
+          "FlagInvalid"
+        ],
+        "enum": [
+          "JudgementUnavailable",
+          "TeamNotEligible",
+          "AchievementNotSucceeded",
+          "FlagInvalid"
+        ]
+      },
+      "NoCTFAPIEndpointsGameplayFactsJudgeAwdpBreakFlagRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "flag"
+        ],
+        "properties": {
+          "flag": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 0,
+            "nullable": false
+          }
+        }
       },
       "NoCTFAPIEndpointsGameplayFactsPracticeFlagJudgementResponse": {
         "type": "object",
@@ -15761,6 +15914,9 @@
             "type": "boolean"
           },
           "affectsCompetitiveResults": {
+            "type": "boolean"
+          },
+          "requiresInvitationCode": {
             "type": "boolean"
           },
           "isViewerTrack": {
@@ -19888,6 +20044,13 @@
             "type": "boolean"
           },
           "affectsCompetitiveResults": {
+            "type": "boolean"
+          },
+          "invitationCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "clearInvitationCode": {
             "type": "boolean"
           }
         }

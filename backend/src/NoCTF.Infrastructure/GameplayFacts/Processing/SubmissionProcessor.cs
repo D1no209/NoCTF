@@ -506,14 +506,11 @@ public sealed class GameplayFactProcessor(
                 submission,
                 evaluation,
                 cancellationToken);
-        if (previousGameplayFactResult != GameplayFactResult.Correct)
-        {
-            await StopSolvedChallengeRuntimesAsync(
-                submission,
-                submission,
-                now,
-                cancellationToken);
-        }
+        await StopSolvedChallengeRuntimesAsync(
+            submission,
+            submission,
+            now,
+            cancellationToken);
         if (bloodAward is not null)
             await outbox.PublishAsync(bloodAward);
         await events.RecordAsync(new(

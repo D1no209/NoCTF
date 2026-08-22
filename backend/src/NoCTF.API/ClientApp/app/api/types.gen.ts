@@ -33,10 +33,11 @@ export type NoCtfapiEndpointsTeamsTeamRegistrationFailureResponse = {
     message?: string;
 };
 
-export type NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol = 'InvalidTeamName' | 'CompetitionNotFound' | 'RegistrationClosed' | 'UserAlreadyRegistered' | 'TeamNameOrMembershipConflict' | 'TeamNotFound' | 'CompetitionFinished' | 'TeamLocked' | 'TeamConflict' | 'TeamReviewConflict' | 'CompetitionActive' | 'TrackNotFound' | 'TrackNotPublicSelectable';
+export type NoCtfapiEndpointsTeamsTeamRegistrationFailureCodeProtocol = 'InvalidTeamName' | 'CompetitionNotFound' | 'RegistrationClosed' | 'UserAlreadyRegistered' | 'TeamNameOrMembershipConflict' | 'TeamNotFound' | 'CompetitionFinished' | 'TeamLocked' | 'TeamConflict' | 'TeamReviewConflict' | 'CompetitionActive' | 'TrackNotFound' | 'TrackNotPublicSelectable' | 'TrackInvitationRequired' | 'TrackInvitationInvalid';
 
 export type NoCtfapiEndpointsTeamsCreateTeamRequest = {
     trackKey: string;
+    trackInvitationCode?: string | null;
     name?: string;
 };
 
@@ -317,6 +318,22 @@ export type NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol = 'TargetProvisio
 
 export type NoCtfapiEndpointsGameplayFactsGetGameplayFactStatusRequest = {
     [key: string]: never;
+};
+
+export type NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementResponse = {
+    result?: NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementProtocol;
+};
+
+export type NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementProtocol = 'Correct' | 'Wrong';
+
+export type NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementConflictResponse = {
+    code?: NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementFailureCodeProtocol;
+};
+
+export type NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementFailureCodeProtocol = 'JudgementUnavailable' | 'TeamNotEligible' | 'AchievementNotSucceeded' | 'FlagInvalid';
+
+export type NoCtfapiEndpointsGameplayFactsJudgeAwdpBreakFlagRequest = {
+    flag: string;
 };
 
 export type NoCtfapiEndpointsGameplayFactsPracticeFlagJudgementResponse = {
@@ -686,6 +703,7 @@ export type NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse = {
     affectsDynamicChallengeScore?: boolean;
     visibleOnLeaderboard?: boolean;
     affectsCompetitiveResults?: boolean;
+    requiresInvitationCode?: boolean;
     isViewerTrack?: boolean;
 };
 
@@ -1713,6 +1731,8 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackReq
     affectsDynamicChallengeScore?: boolean;
     visibleOnLeaderboard?: boolean;
     affectsCompetitiveResults?: boolean;
+    invitationCode?: string | null;
+    clearInvitationCode?: boolean;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPosterResponse = {
@@ -3143,6 +3163,43 @@ export type GetGameplayFactStatusEndpointResponses = {
 };
 
 export type GetGameplayFactStatusEndpointResponse = GetGameplayFactStatusEndpointResponses[keyof GetGameplayFactStatusEndpointResponses];
+
+export type JudgeAwdpBreakFlagData = {
+    body: NoCtfapiEndpointsGameplayFactsJudgeAwdpBreakFlagRequest;
+    path: {
+        competitionId: string;
+        competitionChallengeId: string;
+    };
+    query?: never;
+    url: '/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement';
+};
+
+export type JudgeAwdpBreakFlagErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    409: NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementConflictResponse;
+};
+
+export type JudgeAwdpBreakFlagError = JudgeAwdpBreakFlagErrors[keyof JudgeAwdpBreakFlagErrors];
+
+export type JudgeAwdpBreakFlagResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsGameplayFactsAwdpBreakFlagJudgementResponse;
+};
+
+export type JudgeAwdpBreakFlagResponse = JudgeAwdpBreakFlagResponses[keyof JudgeAwdpBreakFlagResponses];
 
 export type JudgePracticeFlagData = {
     body: NoCtfapiEndpointsGameplayFactsJudgePracticeFlagRequest;

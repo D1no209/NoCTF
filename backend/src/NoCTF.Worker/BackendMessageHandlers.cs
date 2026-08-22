@@ -1137,6 +1137,53 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken)
     {
         var applied = false;
+        var solvedRuntimes = await db.RuntimeInstances
+            .Where(instance =>
+                (instance.State == RuntimeState.Queued
+                    || instance.State == RuntimeState.Provisioning
+                    || instance.State == RuntimeState.Running)
+                && (instance.RuntimeKind == RuntimeKind.Container
+                    || instance.RuntimeKind == RuntimeKind.Compose)
+                && (instance.Purpose == RuntimePurpose.Player
+                    && db.GameplayFacts.Any(fact =>
+                        fact.CompetitionId == instance.CompetitionId
+                        && fact.CompetitionChallengeId == instance.CompetitionChallengeId
+                        && fact.TeamId == instance.TeamId
+                        && fact.Kind == GameplayFactKind.FlagAttempt
+                        && fact.State == GameplayFactState.Completed
+                        && fact.Result == GameplayFactResult.Correct)
+                    || instance.Purpose == RuntimePurpose.AwdpAttack
+                    && db.GameplayFacts.Any(fact =>
+                        fact.CompetitionId == instance.CompetitionId
+                        && fact.CompetitionChallengeId == instance.CompetitionChallengeId
+                        && fact.TeamId == instance.TeamId
+                        && fact.Kind == GameplayFactKind.BreakAttempt
+                        && fact.State == GameplayFactState.Completed
+                        && fact.Result == GameplayFactResult.Correct)))
+            .OrderBy(instance => instance.Id)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+        foreach (var instance in solvedRuntimes)
+        {
+            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
+            if (instance.State == RuntimeState.Queued
+                && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson)
+                && instance.RunnerId is null)
+            {
+                instance.State = RuntimeState.Stopped;
+                instance.StoppedAt = message.At;
+            }
+            else
+            {
+                instance.State = RuntimeState.Stopping;
+                instance.RunnerAssignmentReleaseToken = null;
+                await outbox.PublishAsync(new StopRuntime(
+                    instance.Id,
+                    instance.ProcessingVersion));
+            }
+        }
+        applied |= solvedRuntimes.Count > 0;
+
         var expiredRuntimes = await db.RuntimeInstances
             .Where(instance => instance.State == RuntimeState.Running
                 && instance.ExpiresAt != null
@@ -1303,7 +1350,7 @@ public static class BackendMessageHandlers
         foreach (var audit in resourceAudits)
             await outbox.PublishToRunnerNodeAsync(audit);
         applied |= resourceAudits.Count > 0;
-        if (pageIsFull || expiredRuntimes.Count == 500)
+        if (pageIsFull || expiredRuntimes.Count == 500 || solvedRuntimes.Count == 500)
             await outbox.PublishAsync(new ReconcileRunnerAssignments(
                 message.At,
                 pageIsFull ? assignments[^1].Id : null));

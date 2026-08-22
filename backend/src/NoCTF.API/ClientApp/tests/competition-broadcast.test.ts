@@ -69,6 +69,12 @@ describe('competition broadcast projection', () => {
     const challengePage = await Bun.file(
       new URL('../app/pages/competitions/[id]/challenges/index.vue', import.meta.url),
     ).text()
+    const participantWorkspace = await Bun.file(
+      new URL('../app/components/competition/CompetitionParticipantWorkspace.vue', import.meta.url),
+    ).text()
+    const challengeNavigator = await Bun.file(
+      new URL('../app/components/competition/CompetitionChallengeNavigator.vue', import.meta.url),
+    ).text()
     const shell = await Bun.file(
       new URL('../app/pages/competitions/[id].vue', import.meta.url),
     ).text()
@@ -76,13 +82,14 @@ describe('competition broadcast projection', () => {
       new URL('../app/components/competition/CompetitionBroadcastPanel.vue', import.meta.url),
     ).text()
 
-    expect(challengePage).toContain('<CompetitionBroadcastPanel')
-    expect(challengePage).toContain('xl:grid-cols-[15rem_minmax(0,1fr)_19rem]')
-    expect(challengePage).toContain('<CompetitionWorkspaceNavigation')
+    expect(challengePage).toContain('<CompetitionParticipantWorkspace')
+    expect(participantWorkspace).toContain('<CompetitionBroadcastPanel')
+    expect(participantWorkspace).toContain('xl:grid-cols-[15rem_minmax(0,1fr)_19rem]')
+    expect(participantWorkspace).toContain('<CompetitionWorkspaceNavigation')
     expect(challengePage).toContain('<CompetitionChallengeDetail')
-    expect(challengePage).toContain('@click="selectChallenge(challenge.id!)"')
-    expect(shell).toContain('isChallengeIndex')
-    expect(shell).toContain('competition && isChallengeIndex')
+    expect(challengeNavigator).toContain("@click=\"emit('select', challenge.id!)\"")
+    expect(shell).toContain('usesParticipantWorkspace')
+    expect(shell).toContain('competition && usesParticipantWorkspace')
     expect(shell).not.toContain("label: '公告/通知'")
     expect(panel).toContain('kinds: competitionBroadcastKinds')
     expect(panel).toContain('competitionEventChanged: () => void load()')
