@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, Download, History, Medal, Trophy } from '@lucide/vue'
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, History, Medal, Trophy } from '@lucide/vue'
 import { getScoreboardAdjustmentDetailEndpoint, getScoreboardSlotDetailEndpoint } from '~/api'
 import type {
   NoCtfapiEndpointsCompetitionsScoreboardAdjustmentDetailResponse,
@@ -303,8 +303,14 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
 </script>
 
 <template>
-  <CompetitionParticipantWorkspace :competition-id="competitionId">
-    <div class="flex flex-col gap-6">
+  <div class="flex flex-col gap-6">
+    <div>
+      <Button variant="ghost" size="sm" as-child>
+        <NuxtLink :to="`/competitions/${competitionId}`">
+          <ArrowLeft data-icon="inline-start" />{{ $t('返回比赛') }}
+        </NuxtLink>
+      </Button>
+    </div>
     <Alert v-if="board.error.value" variant="destructive">
       <AlertDescription class="flex items-center justify-between gap-3"><span>{{ board.error.value }}</span><Button variant="outline" size="sm" @click="board.refresh()">{{ $t('重试') }}</Button></AlertDescription>
     </Alert>
@@ -409,6 +415,5 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
         </template>
       </DialogScrollContent>
     </Dialog>
-    </div>
-  </CompetitionParticipantWorkspace>
+  </div>
 </template>

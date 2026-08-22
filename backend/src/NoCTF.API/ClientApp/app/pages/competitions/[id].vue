@@ -11,17 +11,6 @@ const isControlScreen = computed(() => [
   `/competitions/${competitionId.value}/live`,
   `/competitions/${competitionId.value}/awdp-live`,
 ].includes(route.path))
-const usesParticipantWorkspace = computed(() => {
-  const base = `/competitions/${competitionId.value}`
-  return [
-    `${base}/challenges`,
-    `${base}/leaderboard`,
-    `${base}/questions`,
-    `${base}/my/team`,
-    `${base}/my/submissions`,
-  ].includes(route.path)
-})
-
 const competition = ref<NoCtfapiEndpointsCompetitionsCompetitionResponse | null>(null)
 const myTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 const loading = ref(true)
@@ -113,7 +102,7 @@ provide(competitionWorkspaceNavigationKey, navGroups)
   <NuxtPage v-if="isControlScreen" />
 
   <div
-    v-else-if="competition && usesParticipantWorkspace"
+    v-else-if="competition"
     class="mx-auto flex w-full max-w-[120rem] flex-col gap-4 px-3 py-4 md:px-5"
   >
     <div class="flex flex-col gap-1 border-b pb-4">
@@ -136,31 +125,6 @@ provide(competitionWorkspaceNavigationKey, navGroups)
     </div>
     <NuxtPage />
   </div>
-
-  <AppWorkspaceNav v-else-if="competition" :groups="navGroups" :title="competition.title">
-    <div class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
-      <div class="flex flex-col gap-2">
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 class="text-display text-2xl md:text-3xl">{{ competition.title }}</h1>
-          <ModeBadge :mode="competition.mode" />
-          <LifecycleBadge :status="competition.status" />
-        </div>
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs tabular-nums md:text-sm">
-          <span class="text-muted-foreground">
-            {{ formatDateTime(competition.startTime) }} ~ {{ formatDateTime(competition.endTime) }}
-          </span>
-          <CompetitionCountdown
-            :start-time="competition.startTime"
-            :end-time="competition.endTime"
-            :status="competition.status"
-            class="font-medium text-primary"
-          />
-        </div>
-      </div>
-
-      <NuxtPage />
-    </div>
-  </AppWorkspaceNav>
 
   <div v-else class="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
     <Alert v-if="error" variant="destructive">
