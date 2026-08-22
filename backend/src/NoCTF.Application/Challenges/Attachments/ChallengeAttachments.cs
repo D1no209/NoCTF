@@ -377,6 +377,7 @@ public sealed class ManageChallengeAttachments(
     {
         var normalized = fileName.Trim();
         if (normalized.Length is < 1 or > 260
+            || ContainsDirectorySeparator(normalized)
             || normalized != Path.GetFileName(normalized)
             || normalized.Any(char.IsControl))
             return null;
@@ -389,10 +390,14 @@ public sealed class ManageChallengeAttachments(
         return bytes.Length is >= 1 and <= 4096
             && value != "."
             && value != ".."
+            && !ContainsDirectorySeparator(value)
             && value == Path.GetFileName(value)
             && !value.Any(char.IsControl)
             && !bytes.Contains((byte)0);
     }
+
+    private static bool ContainsDirectorySeparator(string value) =>
+        value.Contains('/') || value.Contains('\\');
 }
 
 public sealed class GetChallengeAttachments(

@@ -118,8 +118,10 @@ Nginx 必须传递 `Host`、`X-Forwarded-Host`、`X-Forwarded-For` 和
 `10.0.0.0/8` 换成 ingress-controller 的精确 Pod CIDR，禁止使用 `TrustAll`。内部
 `RunnerScoring__CallbackBaseUrl` 与归档地址继续使用受限网络中的 HTTP Service 地址，
 并由 Runner JWT、audience、resource、Runtime generation 和 processing version 验证。
-Refresh Cookie 始终由 API 显式设置 `Secure=true`、`HttpOnly=true`、`SameSite=Strict`，
-不随上游 HTTP 改为不安全 Cookie。API CORS 继续使用精确 Origin+credentials。
+Refresh Cookie 默认由 API 设置 `Secure=true`、`HttpOnly=true`、`SameSite=Strict`。
+仅在明确隔离的纯 HTTP 测试部署中可设置 `AUTHENTICATION_REFRESH_COOKIE_SECURE=false`；
+此时 Cookie 会移除 `__Secure-` 前缀。公网生产部署仍应终止 TLS 并保持默认值。
+API CORS 继续使用精确 Origin+credentials。
 
 当前威胁模型信任办赛管理员、管理员维护的题目配置、Runner Pool 配置及平台托管镜像，
 不防御管理员内鬼。选手、题目业务容器及其网络输入仍是不可信边界。

@@ -355,20 +355,22 @@ public sealed class DeploymentTopologyTests
             .Select(line => line.Trim())
             .Where(line => line.StartsWith("- uses:", StringComparison.Ordinal))
             .ToArray();
-        await Assert.That(actionReferences).Count().IsEqualTo(4);
+        await Assert.That(actionReferences).Count().IsEqualTo(5);
         await Assert.That(actionReferences.All(line =>
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
                 "^- uses: [a-z0-9-]+/[a-z0-9-]+@[a-f0-9]{40} # v[0-9]+$"))).IsTrue();
 
-        foreach (var action in new[]
+        foreach (var (action, count) in new[]
                  {
-                     "actions/checkout", "actions/setup-dotnet",
-                     "actions/setup-node", "oven-sh/setup-bun"
+                     ("actions/checkout", 2),
+                     ("actions/setup-dotnet", 1),
+                     ("actions/setup-node", 1),
+                     ("oven-sh/setup-bun", 1)
                  })
         {
             await Assert.That(actionReferences.Count(line =>
-                line.StartsWith($"- uses: {action}@", StringComparison.Ordinal))).IsEqualTo(1);
+                line.StartsWith($"- uses: {action}@", StringComparison.Ordinal))).IsEqualTo(count);
         }
 
         var ciServiceImages = ci.Split('\n')

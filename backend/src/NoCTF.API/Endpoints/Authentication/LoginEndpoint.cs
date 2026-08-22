@@ -30,7 +30,7 @@ public sealed class LoginValidator : Validator<LoginRequest>
     }
 }
 
-public sealed class LoginEndpoint(LoginUser login)
+public sealed class LoginEndpoint(LoginUser login, IConfiguration configuration)
     : Endpoint<LoginRequest, Results<Ok<LoginResponse>, UnauthorizedHttpResult>>
 {
     public override void Configure()
@@ -48,14 +48,10 @@ public sealed class LoginEndpoint(LoginUser login)
         {
             return TypedResults.Unauthorized();
         }
-        HttpContext.Response.Cookies.Append("__Secure-noctf_refresh", result.Value!.RefreshToken, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/api/v1/auth",
-            MaxAge = TimeSpan.FromDays(30)
-        });
+        HttpContext.Response.Cookies.Append(
+            RefreshCookie.Name(configuration),
+            result.Value!.RefreshToken,
+            RefreshCookie.Options(configuration));
         return TypedResults.Ok(new LoginResponse(
             result.Value!.UserId,
             result.Value.UserName,

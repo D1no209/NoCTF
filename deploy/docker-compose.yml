@@ -68,6 +68,7 @@ services:
       Authentication__SigningKey: ${JWT_SECRET:?set JWT_SECRET}
       Authentication__Issuer: ${JWT_ISSUER:-NoCTF}
       Authentication__Audience: ${JWT_AUDIENCE:-NoCTF.Api}
+      Authentication__RefreshCookieSecure: ${AUTHENTICATION_REFRESH_COOKIE_SECURE:-true}
       RunnerScoring__SigningKey: ${RUNNER_SCORING_SECRET:-${JWT_SECRET}}
       RunnerScoring__Issuer: ${RUNNER_SCORING_ISSUER:-NoCTF.Runner}
       RunnerScoring__Audience: ${RUNNER_SCORING_AUDIENCE:-NoCTF.ScoringInput}

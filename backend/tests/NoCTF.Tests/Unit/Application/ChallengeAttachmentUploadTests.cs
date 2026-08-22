@@ -265,6 +265,30 @@ public sealed class ChallengeAttachmentUploadTests
     }
 
     [Test]
+    [Arguments("../challenge.zip")]
+    [Arguments("folder/challenge.zip")]
+    [Arguments("folder\\challenge.zip")]
+    public async Task Invalid_player_download_file_name_is_rejected_on_every_platform(string fileName)
+    {
+        var harness = CreateHarness();
+        using var content = new MemoryStream([1]);
+
+        var result = await harness.UseCase.UploadRandomBatchAsync(
+            ChallengeId,
+            ActorId,
+            false,
+            fileName,
+            [new("flag{one}", "application/octet-stream", content)],
+            DateTimeOffset.Parse("2026-08-14T00:00:00Z"));
+
+        await Assert.That(result.FailureCode)
+            .IsEqualTo(ChallengeAttachmentFailureCode.InvalidFileName);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default, default!, default, default);
+        await harness.Store.DidNotReceiveWithAnyArgs().AddRandomBatchAsync(
+            default, default, default, default!, default!, default);
+    }
+
+    [Test]
     public async Task Empty_random_batch_is_rejected_before_storage()
     {
         var harness = CreateHarness();

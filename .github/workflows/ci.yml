@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
@@ -132,3 +135,104 @@ jobs:
         run: |
           dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --configuration Release --no-build --no-launch-profile -- --export-openapi
           git diff --exit-code backend/artifacts/openapi/swagger.json backend/src/NoCTF.API/wwwroot/openapi/v1.json
+
+  deploy-production:
+    needs: build-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    concurrency:
+      group: noctf-production-deploy
+      cancel-in-progress: false
+    env:
+      DEPLOY_HOST: ${{ secrets.NOCTF_DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.NOCTF_DEPLOY_USER }}
+      DEPLOY_PORT: ${{ secrets.NOCTF_DEPLOY_PORT }}
+      DEPLOY_PATH: ${{ secrets.NOCTF_DEPLOY_PATH }}
+      DEPLOY_SSH_KEY: ${{ secrets.NOCTF_DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.NOCTF_DEPLOY_KNOWN_HOSTS }}
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          : "${DEPLOY_HOST:?NOCTF_DEPLOY_HOST is required}"
+          : "${DEPLOY_USER:?NOCTF_DEPLOY_USER is required}"
+          : "${DEPLOY_SSH_KEY:?NOCTF_DEPLOY_SSH_KEY is required}"
+          : "${DEPLOY_KNOWN_HOSTS:?NOCTF_DEPLOY_KNOWN_HOSTS is required}"
+          DEPLOY_PORT=${DEPLOY_PORT:-22}
+          DEPLOY_PATH=${DEPLOY_PATH:-/root/NoCTF}
+          [[ "$DEPLOY_HOST" =~ ^[A-Za-z0-9.:-]+$ ]]
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$DEPLOY_PORT" =~ ^[0-9]+$ ]]
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]
+
+      - name: Configure SSH
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/noctf_deploy"
+          chmod 600 "$HOME/.ssh/noctf_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Package exact commit
+        shell: bash
+        run: |
+          git archive \
+            --format=tar.gz \
+            --output="$RUNNER_TEMP/noctf-release.tar.gz" \
+            "$GITHUB_SHA"
+          tar -tzf "$RUNNER_TEMP/noctf-release.tar.gz" >/dev/null
+
+      - name: Upload and deploy
+        shell: bash
+        run: |
+          DEPLOY_PORT=${DEPLOY_PORT:-22}
+          DEPLOY_PATH=${DEPLOY_PATH:-/root/NoCTF}
+          remote_parent=$(dirname "$DEPLOY_PATH")
+          remote_upload="$remote_parent/noctf-ci-upload-$GITHUB_SHA"
+          release_root="$remote_parent/noctf-releases"
+          ssh_options=(
+            -i "$HOME/.ssh/noctf_deploy"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -p "$DEPLOY_PORT"
+          )
+          scp_options=(
+            -i "$HOME/.ssh/noctf_deploy"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -P "$DEPLOY_PORT"
+          )
+          ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p -- '$remote_upload'"
+          scp "${scp_options[@]}" \
+            "$RUNNER_TEMP/noctf-release.tar.gz" \
+            deploy/ci/deploy.sh \
+            "$DEPLOY_USER@$DEPLOY_HOST:$remote_upload/"
+          ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash '$remote_upload/deploy.sh' '$remote_upload/noctf-release.tar.gz' '$GITHUB_SHA' '$DEPLOY_PATH' '$release_root'"
+
+      - name: Remove interrupted upload
+        if: always()
+        shell: bash
+        run: |
+          DEPLOY_PORT=${DEPLOY_PORT:-22}
+          DEPLOY_PATH=${DEPLOY_PATH:-/root/NoCTF}
+          [[ "$DEPLOY_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]] || exit 0
+          remote_upload="$(dirname "$DEPLOY_PATH")/noctf-ci-upload-$GITHUB_SHA"
+          ssh \
+            -i "$HOME/.ssh/noctf_deploy" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "test \"$(basename "$remote_upload")\" = 'noctf-ci-upload-$GITHUB_SHA' && rm -rf -- '$remote_upload'" \
+            || true

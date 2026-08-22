@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NoCTF.Application.Storage;
@@ -58,10 +59,35 @@ public sealed class ChangePasswordEndpointTests
         await Assert.That(cookie).Contains("path=/api/v1/auth");
     }
 
-    private static async Task<WebApplication> CreateApplicationAsync(ChangePasswordState state)
+    [Test]
+    public async Task Http_test_deployment_clears_the_unprefixed_refresh_cookie()
+    {
+        await using var app = await CreateApplicationAsync(
+            ChangePasswordState.Changed,
+            refreshCookieSecure: false);
+        using var client = app.GetTestClient();
+
+        using var response = await client.PutAsJsonAsync(
+            "/api/v1/auth/password",
+            new { currentPassword = "old-pass", newPassword = "new-pass" });
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+        var cookie = response.Headers.GetValues("Set-Cookie").Single();
+        await Assert.That(cookie).Contains("noctf_refresh=");
+        await Assert.That(cookie).DoesNotContain("__Secure-noctf_refresh=");
+        await Assert.That(cookie).DoesNotContain("; secure");
+    }
+
+    private static async Task<WebApplication> CreateApplicationAsync(
+        ChangePasswordState state,
+        bool refreshCookieSecure = true)
     {
         var builder = WebApplication.CreateBuilder();
         builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Authentication:RefreshCookieSecure"] = refreshCookieSecure.ToString()
+        });
         builder.Services.AddProblemDetails();
         builder.Services.AddFastEndpoints(options =>
         {

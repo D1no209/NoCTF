@@ -31,7 +31,9 @@ public enum CompletePasswordResetFailureCode
 public sealed record CompletePasswordResetFailureResponse(
     CompletePasswordResetFailureCode Code);
 
-public sealed class CompletePasswordResetEndpoint(CompletePasswordReset completePasswordReset)
+public sealed class CompletePasswordResetEndpoint(
+    CompletePasswordReset completePasswordReset,
+    IConfiguration configuration)
     : Endpoint<CompletePasswordResetRequest,
         Results<NoContent, BadRequest<CompletePasswordResetFailureResponse>>>
 {
@@ -65,8 +67,8 @@ public sealed class CompletePasswordResetEndpoint(CompletePasswordReset complete
         }
 
         HttpContext.Response.Cookies.Delete(
-            "__Secure-noctf_refresh",
-            new CookieOptions { Path = "/api/v1/auth" });
+            RefreshCookie.Name(configuration),
+            RefreshCookie.DeleteOptions(configuration));
         return TypedResults.NoContent();
     }
 }
