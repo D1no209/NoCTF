@@ -2065,4 +2065,5 @@ export const englishMessages: Record<string, string> = {
   "调整排行榜可见性：{from} → {to}": "Change leaderboard visibility: {from} → {to}",
   "变更账户状态": "Change account status",
   "执行竞赛管理操作": "Perform competition administration action",
+  "导出任务失败,请重试": "Export task failed. Please try again.",
 }
