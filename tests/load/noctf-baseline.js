@@ -137,12 +137,11 @@ function request(method, path, body, headers, endpoint, acceptedStatuses) {
 }
 
 function guardTarget() {
-  let hostname
-  try {
-    hostname = new URL(baseUrl).hostname.toLowerCase()
-  } catch {
+  const match = /^(?:https?):\/\/(\[[^\]]+\]|[^/:?#]+)(?::\d+)?(?:[/?#]|$)/i.exec(baseUrl)
+  if (!match) {
     throw new Error(`BASE_URL is invalid: ${baseUrl}`)
   }
+  const hostname = match[1].replace(/^\[|\]$/g, '').toLowerCase()
 
   const safeHosts = new Set(['localhost', '127.0.0.1', '::1', 'host.docker.internal'])
   if (!safeHosts.has(hostname) && __ENV.ALLOW_REMOTE_TEST_TARGET !== 'I_UNDERSTAND') {
