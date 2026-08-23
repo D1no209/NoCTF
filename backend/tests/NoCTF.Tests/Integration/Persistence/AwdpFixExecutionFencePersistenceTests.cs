@@ -50,17 +50,14 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var first = await AcquireAsync(options, request, cancellationToken);
             await Assert.That(first.Disposition)
                 .IsEqualTo(AwdpFixExecutionFenceDisposition.Execute);
-            await Assert.That(first.RuntimeProcessingVersion).IsEqualTo(1);
 
             var uncertain = await AcquireAsync(options, request, cancellationToken);
             await Assert.That(uncertain.Disposition)
                 .IsEqualTo(AwdpFixExecutionFenceDisposition.Recover);
-            await Assert.That(uncertain.RuntimeProcessingVersion).IsEqualTo(2);
 
             var resumedCleanup = await AcquireAsync(options, request, cancellationToken);
             await Assert.That(resumedCleanup.Disposition)
                 .IsEqualTo(AwdpFixExecutionFenceDisposition.Recover);
-            await Assert.That(resumedCleanup.RuntimeProcessingVersion).IsEqualTo(2);
 
             await using (var staleResultDb = new NoCtfDbContext(options))
             {
@@ -70,10 +67,9 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                         fixture.GameplayFactId,
                         fixture.RuntimeInstanceId,
                         1,
-                        first.RuntimeProcessingVersion,
                         AwdpFixOutcome.DefenseSucceeded,
                         fixture.Now.AddSeconds(1)), cancellationToken);
-                await Assert.That(staleResult).IsEqualTo(InternalResultDisposition.Superseded);
+                await Assert.That(staleResult).IsEqualTo(InternalResultDisposition.Applied);
             }
 
             var replayOutbox = new RecordingOutbox();
@@ -83,7 +79,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                     fixture.GameplayFactId,
                     fixture.RuntimeInstanceId,
                     1,
-                    uncertain.RuntimeProcessingVersion,
                     fixture.RunnerPool,
                     fixture.RunnerId,
                     fixture.Now.AddSeconds(2)),
@@ -102,9 +97,8 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                 await Assert.That(runtimes[0].State).IsEqualTo(RuntimeState.Stopped);
                 var fact = await verification.GameplayFacts.AsNoTracking()
                     .SingleAsync(item => item.Id == fixture.GameplayFactId, cancellationToken);
-                await Assert.That(fact.State).IsEqualTo(GameplayFactState.PlatformFailed);
-                await Assert.That(fact.FailureCode)
-                    .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
+                await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
+                await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
             }
             await Assert.That(replayOutbox.Messages.OfType<DispatchRuntime>().Count())
                 .IsEqualTo(0);
@@ -119,7 +113,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                     fixture.GameplayFactId,
                     fixture.RuntimeInstanceId,
                     1,
-                    uncertain.RuntimeProcessingVersion,
                     fixture.RunnerPool,
                     fixture.RunnerId,
                     fixture.Now.AddSeconds(2)),
@@ -134,7 +127,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Changed_source_revision_fails_closed_after_cleanup_without_replay(
+    public async Task Source_update_does_not_block_cleanup_without_replay(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -144,13 +137,13 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var fixture = await SeedAsync(options, cancellationToken);
             var request = Request(fixture);
             _ = await AcquireAsync(options, request, cancellationToken);
-            var recovery = await AcquireAsync(options, request, cancellationToken);
+            _ = await AcquireAsync(options, request, cancellationToken);
             await using (var mutation = new NoCtfDbContext(options))
             {
                 var challenge = await mutation.CompetitionChallenges.SingleAsync(
                     item => item.Id == fixture.CompetitionChallengeId,
                     cancellationToken);
-                challenge.Revision++;
+                challenge.Order++;
                 await mutation.SaveChangesAsync(cancellationToken);
             }
 
@@ -161,7 +154,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                     fixture.GameplayFactId,
                     fixture.RuntimeInstanceId,
                     1,
-                    recovery.RuntimeProcessingVersion,
                     fixture.RunnerPool,
                     fixture.RunnerId,
                     fixture.Now.AddSeconds(2)),
@@ -194,7 +186,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var options = Options(postgres);
             var fixture = await SeedAsync(options, cancellationToken);
             var request = Request(fixture);
-            var first = await AcquireAsync(options, request, cancellationToken);
+            _ = await AcquireAsync(options, request, cancellationToken);
 
             await using (var stageDb = new NoCtfDbContext(options))
             {
@@ -205,7 +197,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                         fixture.GameplayFactId,
                         fixture.RuntimeInstanceId,
                         1,
-                        first.RuntimeProcessingVersion,
                         AwdpFixStage.PatchApplying,
                         AwdpFixStage.CheckerRunning), cancellationToken);
                 await Assert.That(advanced).IsTrue();
@@ -221,7 +212,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
                         fixture.GameplayFactId,
                         fixture.RuntimeInstanceId,
                         1,
-                        first.RuntimeProcessingVersion,
                         AwdpFixOutcome.DefenseSucceeded,
                         fixture.Now.AddSeconds(1)), cancellationToken);
                 await Assert.That(applied).IsEqualTo(InternalResultDisposition.Applied);
@@ -274,7 +264,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             fixture.PatchUploadId,
             fixture.RuntimeInstanceId,
             1,
-            0,
             fixture.Now.AddMinutes(15),
             fixture.RunnerPool,
             fixture.RunnerId);
@@ -336,7 +325,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             OwnerId = ownerId,
             Mode = GameMode.Awdp,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
-            ConfigurationRevision = 3,
             ConfigurationUpdatedAt = now,
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
             StartAt = now.AddMinutes(-1),
@@ -353,7 +341,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             Title = "Fence target",
             Visibility = ChallengeVisibility.Private,
             DefinitionJson = JsonSerializer.Serialize(definition, jsonOptions),
-            Revision = 5,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -366,7 +353,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             IsPublished = true,
             RulesJson = new GameModeChallengeConfigurationCatalog()
                 .GetDefaultJson(GameMode.Awdp),
-            Revision = 7,
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -427,9 +413,6 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = factId,
             AwdpFixStage = AwdpFixStage.PatchApplying,
-            SourceCompetitionConfigurationRevision = 3,
-            SourceCompetitionChallengeRevision = 7,
-            SourceChallengeDefinitionRevision = 5,
             Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,

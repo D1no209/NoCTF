@@ -32,7 +32,6 @@ public sealed record AwdpCheckerWork(
     TimeSpan Timeout);
 
 public sealed record AwdpFixWork(
-    long RuntimeProcessingVersion,
     AwdpFixArchive Archive,
     ContainerReceipt TargetReceipt,
     string PatchEntrypoint,
@@ -51,7 +50,6 @@ public sealed record AwdpFixRecoveryWork(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
     int Generation,
-    long RecoveryProcessingVersion,
     RuntimeProvider Provider,
     string? ProviderReceiptJson,
     string RunnerPool,
@@ -121,7 +119,6 @@ public sealed class AwdpFixWorkReader(
             message.PatchUploadId,
             message.RuntimeInstanceId,
             message.Generation,
-            message.RuntimeProcessingVersion,
             message.Deadline,
             message.RunnerPool,
             message.RunnerId), cancellationToken);
@@ -135,7 +132,6 @@ public sealed class AwdpFixWorkReader(
                     message.GameplayFactId,
                     fenceResult.RuntimeInstanceId,
                     fenceResult.Generation,
-                    fenceResult.RuntimeProcessingVersion,
                     fenceResult.Provider,
                     fenceResult.ProviderReceiptJson,
                     fenceResult.RunnerPool,
@@ -166,7 +162,6 @@ public sealed class AwdpFixWorkReader(
                         && runtime.Purpose == RuntimePurpose.AwdpTarget
                         && runtime.GameplayFactId == message.GameplayFactId
                         && runtime.Generation == message.Generation
-                        && runtime.ProcessingVersion == fenceResult.RuntimeProcessingVersion
                         && runtime.State == RuntimeState.Running
                         && runtime.RunnerPool == message.RunnerPool
                         && runtime.RunnerId == message.RunnerId),
@@ -190,8 +185,7 @@ public sealed class AwdpFixWorkReader(
                     item.File,
                     item.Runtime,
                     ChallengeRulesJson = challenge.RulesJson,
-                    challenge.ChallengeId,
-                    challenge.Revision
+                    challenge.ChallengeId
                 })
             .Join(
                 db.Challenges.AsNoTracking(),
@@ -204,7 +198,6 @@ public sealed class AwdpFixWorkReader(
                     item.Runtime,
                     item.ChallengeRulesJson,
                     ChallengeDefinitionJson = challenge.DefinitionJson,
-                    item.Revision,
                     item.GameplayFact
                 })
             .Join(
@@ -261,7 +254,6 @@ public sealed class AwdpFixWorkReader(
             message.GameplayFactId,
             message.RuntimeInstanceId,
             message.Generation,
-            fenceResult.RuntimeProcessingVersion,
             message.Deadline,
             now));
         var archiveToken = tokens.IssueFixArchiveRead(
@@ -275,7 +267,6 @@ public sealed class AwdpFixWorkReader(
         return new(
             AwdpFixExecutionFenceDisposition.Execute,
             new(
-                fenceResult.RuntimeProcessingVersion,
                 new(
                     new Uri(
                         baseUri,
@@ -454,7 +445,6 @@ public sealed class AwdpFixVerificationHandler(
                         message.GameplayFactId,
                         message.RuntimeInstanceId,
                         message.Generation,
-                        work.RuntimeProcessingVersion,
                         AwdpFixStage.PatchApplying,
                         AwdpFixStage.CheckerRunning), cancellationToken);
                     if (!advanced)
@@ -484,7 +474,6 @@ public sealed class AwdpFixVerificationHandler(
             message.GameplayFactId,
             message.RuntimeInstanceId,
             message.Generation,
-            work.RuntimeProcessingVersion,
             result,
             DateTimeOffset.UtcNow));
         await outbox.FlushOutgoingMessagesAsync();
@@ -532,7 +521,6 @@ public sealed class AwdpFixVerificationHandler(
             recovery.GameplayFactId,
             recovery.RuntimeInstanceId,
             recovery.Generation,
-            recovery.RecoveryProcessingVersion,
             recovery.RunnerPool,
             recovery.RunnerId,
             DateTimeOffset.UtcNow));

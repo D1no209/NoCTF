@@ -15,7 +15,6 @@ public sealed record AwdpFixExecutionFenceRequest(
     Guid PatchUploadId,
     Guid RuntimeInstanceId,
     int Generation,
-    long RuntimeProcessingVersion,
     DateTimeOffset Deadline,
     string RunnerPool,
     string RunnerId);
@@ -24,7 +23,6 @@ public sealed record AwdpFixExecutionFenceResult(
     AwdpFixExecutionFenceDisposition Disposition,
     Guid RuntimeInstanceId,
     int Generation,
-    long RuntimeProcessingVersion,
     RuntimeProvider Provider,
     string? ProviderReceiptJson,
     string RunnerPool,
@@ -36,7 +34,6 @@ public sealed record AwdpFixExecutionFenceResult(
             AwdpFixExecutionFenceDisposition.Superseded,
             request.RuntimeInstanceId,
             request.Generation,
-            request.RuntimeProcessingVersion,
             default,
             null,
             request.RunnerPool,
@@ -47,7 +44,6 @@ public sealed record AwdpFixStageTransitionRequest(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
     int Generation,
-    long RuntimeProcessingVersion,
     AwdpFixStage ExpectedStage,
     AwdpFixStage NextStage);
 

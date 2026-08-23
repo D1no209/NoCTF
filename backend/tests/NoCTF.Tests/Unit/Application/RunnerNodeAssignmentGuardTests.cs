@@ -27,5 +27,5 @@ public sealed class RunnerNodeAssignmentGuardTests
     }
 
     private static CleanupAwdpTarget Create(string pool, string runnerId) =>
-        new(Guid.CreateVersion7(), 3, 7, pool, runnerId);
+        new(Guid.CreateVersion7(), 3, pool, runnerId);
 }

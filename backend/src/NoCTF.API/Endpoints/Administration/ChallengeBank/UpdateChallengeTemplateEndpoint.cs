@@ -20,7 +20,6 @@ public sealed class UpdateChallengeTemplateRequest
     public string? Description { get; set; }
     public string Direction { get; set; } = string.Empty;
     public string DefinitionJson { get; set; } = string.Empty;
-    public int? ExpectedRevision { get; set; }
 }
 
 public sealed class UpdateChallengeTemplateValidator : Validator<UpdateChallengeTemplateRequest>
@@ -31,7 +30,6 @@ public sealed class UpdateChallengeTemplateValidator : Validator<UpdateChallenge
         RuleFor(request => request.Visibility).NotNull().IsInEnum();
         RuleFor(request => request.Title).NotEmpty().MaximumLength(160);
         RuleFor(request => request.Direction).NotEmpty().MaximumLength(96);
-        RuleFor(request => request.ExpectedRevision).NotNull().GreaterThanOrEqualTo(0);
     }
 }
 
@@ -76,7 +74,6 @@ public sealed class UpdateChallengeTemplateEndpoint(
             request.Description,
             request.Direction,
             request.DefinitionJson,
-            request.ExpectedRevision!.Value,
             DateTimeOffset.UtcNow), ct);
         return ChallengeTemplateUpdateResponseMapper.ToResponse(result);
     }
@@ -96,8 +93,7 @@ public static class ChallengeTemplateUpdateResponseMapper
                 TypedResults.Ok(ChallengeTemplateMapper.ToResponse(result.Template!)),
             ChallengeTemplateWriteState.NotFoundOrForbidden =>
                 TypedResults.NotFound(),
-            ChallengeTemplateWriteState.RevisionConflict
-                or ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
+            ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
                 TypedResults.Conflict(
                     ChallengeTemplateWriteResponseMapper.ToConflict(result)),
             ChallengeTemplateWriteState.InvalidRequest

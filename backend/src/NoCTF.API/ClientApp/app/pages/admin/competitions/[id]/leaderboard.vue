@@ -45,7 +45,6 @@ async function save() {
       body: {
         visibility: visibility.value,
         startsAt: localInputToIso(startsAt.value) ?? null,
-        expectedRevision: current.value.revision ?? 0,
         reason: reason.value.trim() || null,
       },
     })
@@ -55,7 +54,7 @@ async function save() {
     toast.success(translate("记分板可见性已更新"))
   }
   catch (e) {
-    toastWriteError(e, load)
+    toastWriteError(e)
   }
   finally {
     saving.value = false

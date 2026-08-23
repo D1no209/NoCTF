@@ -37,7 +37,6 @@ public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
             new("runtime_instance_id", request.RuntimeInstanceId.ToString("D")),
             new("generation", request.Generation.ToString(), ClaimValueTypes.Integer32),
             new("checker_sequence", request.CheckerSequence.ToString(), ClaimValueTypes.Integer64),
-            new("processing_version", request.ProcessingVersion.ToString(), ClaimValueTypes.Integer64),
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);
 
@@ -49,7 +48,6 @@ public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
             new("gameplay_fact_id", request.GameplayFactId.ToString("D")),
             new("runtime_instance_id", request.RuntimeInstanceId.ToString("D")),
             new("generation", request.Generation.ToString(), ClaimValueTypes.Integer32),
-            new("runtime_processing_version", request.RuntimeProcessingVersion.ToString(), ClaimValueTypes.Integer64),
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);
 

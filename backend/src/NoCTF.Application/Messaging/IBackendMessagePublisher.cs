@@ -9,7 +9,7 @@ public interface IBackendMessagePublisher
     ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken);
     ValueTask ApplyCompetitionVisibilityAsync(
         Guid competitionId,
-        int visibilityRevision,
+        DateTimeOffset scheduledAt,
         CancellationToken cancellationToken) => ValueTask.CompletedTask;
     ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken);
     ValueTask CleanupCompetitionRuntimesAsync(

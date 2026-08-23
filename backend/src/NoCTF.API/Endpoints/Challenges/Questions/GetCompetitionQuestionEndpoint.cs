@@ -80,7 +80,6 @@ public sealed record CompetitionQuestionResponse(
     CompetitionQuestionParticipantRoleCode LastActorRole,
     int ParticipantMessagesRemaining,
     int MaxParticipantMessagesBeforeHandlerReply,
-    int Revision,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     bool CanReply,
@@ -113,7 +112,6 @@ internal static class CompetitionQuestionResponseMapper
             (CompetitionQuestionParticipantRoleCode)source.LastActorRole,
             source.ParticipantMessagesRemaining,
             source.MaxParticipantMessagesBeforeHandlerReply,
-            source.Revision,
             source.CreatedAt,
             source.UpdatedAt,
             CanReply: asker

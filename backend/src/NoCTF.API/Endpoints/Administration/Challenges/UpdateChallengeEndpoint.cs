@@ -17,7 +17,6 @@ public sealed class UpdateChallengeRequest
     public long? BaseScore { get; set; }
     public int? Order { get; set; }
     public bool? IsPublished { get; set; }
-    public int? ExpectedRevision { get; set; }
 }
 
 public sealed class UpdateChallengeValidator : Validator<UpdateChallengeRequest>
@@ -28,7 +27,6 @@ public sealed class UpdateChallengeValidator : Validator<UpdateChallengeRequest>
         RuleFor(request => request.BaseScore).NotNull().GreaterThanOrEqualTo(0);
         RuleFor(request => request.Order).NotNull().GreaterThanOrEqualTo(0);
         RuleFor(request => request.IsPublished).NotNull();
-        RuleFor(request => request.ExpectedRevision).NotNull().GreaterThanOrEqualTo(0);
     }
 }
 
@@ -38,7 +36,6 @@ public enum CompetitionChallengeConflictCode
     ResourceIdConflict,
     ChallengeOrderConflict,
     ChallengeTemplateConflict,
-    RevisionConflict,
     LifecycleStateConflict,
     ChallengeTemplateNotFound,
     ChallengeTemplateModeMismatch
@@ -59,8 +56,6 @@ internal static class CompetitionChallengeConflictMapper
                 CompetitionChallengeConflictCode.ChallengeOrderConflict,
             ChallengeMutationFailure.ChallengeTemplateConflict =>
                 CompetitionChallengeConflictCode.ChallengeTemplateConflict,
-            ChallengeMutationFailure.RevisionConflict =>
-                CompetitionChallengeConflictCode.RevisionConflict,
             ChallengeMutationFailure.LifecycleStateConflict =>
                 CompetitionChallengeConflictCode.LifecycleStateConflict,
             ChallengeMutationFailure.TemplateNotFound =>
@@ -92,7 +87,7 @@ public sealed class UpdateChallengeEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Updates a competition challenge.";
-            summary.Description = "Updates scoring, ordering, and publication state using optimistic concurrency.";
+            summary.Description = "Updates scoring, ordering, and publication state.";
         });
     }
 
@@ -116,7 +111,6 @@ public sealed class UpdateChallengeEndpoint(
             request.BaseScore!.Value,
             request.Order!.Value,
             request.IsPublished!.Value,
-            request.ExpectedRevision!.Value,
             DateTimeOffset.UtcNow,
             request.CustomTitle), ct);
         if (result.Challenge is not null)
@@ -127,14 +121,12 @@ public sealed class UpdateChallengeEndpoint(
             ChallengeMutationFailure.CompetitionNotFound
                 or ChallengeMutationFailure.ChallengeNotFound =>
                 TypedResults.NotFound(),
-            ChallengeMutationFailure.RevisionConflict
-                or ChallengeMutationFailure.ChallengeOrderConflict =>
+            ChallengeMutationFailure.ChallengeOrderConflict =>
                 TypedResults.Conflict(
                     CompetitionChallengeConflictMapper.ToResponse(result.Failure.Value)),
             ChallengeMutationFailure.InvalidBaseScore
                 or ChallengeMutationFailure.InvalidTitle
-                or ChallengeMutationFailure.InvalidOrder
-                or ChallengeMutationFailure.InvalidRevision =>
+                or ChallengeMutationFailure.InvalidOrder =>
                 TypedResults.Problem(
                     statusCode: StatusCodes.Status400BadRequest,
                     title: "Challenge was not updated.",

@@ -34,29 +34,23 @@ public sealed class PlatformConfigurationStore(
                 (_, token) => LoadAsync(token),
                 token: ct).AsTask();
 
-    public async Task<PlatformConfigurationView?> UpdateAsync(
+    public async Task<PlatformConfigurationView> UpdateAsync(
         string name,
         string? description,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken ct)
     {
         var settings = await db.PlatformSettings.SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
-        if (settings.Revision != expectedRevision)
-            return null;
-
         settings.Name = name;
         settings.Description = description;
-        settings.Revision = checked(settings.Revision + 1);
         settings.UpdatedAt = now;
         return await SaveAsync(settings, ct);
     }
 
-    public async Task<PlatformLogoReplacement?> ReplaceLogoAsync(
+    public async Task<PlatformLogoReplacement> ReplaceLogoAsync(
         Guid fileId,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -64,20 +58,15 @@ public sealed class PlatformConfigurationStore(
         var settings = await db.PlatformSettings.SingleAsync(
             candidate => candidate.Id == SettingsId,
             ct);
-        if (settings.Revision != expectedRevision)
-            return null;
         if (!await fileLock.AcquireAsync(db, fileId, ct))
-            return null;
+            throw new InvalidOperationException("The uploaded platform logo file is unavailable.");
 
         var previousFileId = settings.LogoFileId;
         settings.LogoFileId = fileId;
-        settings.Revision = checked(settings.Revision + 1);
         settings.UpdatedAt = now;
         if (previousFileId is { } previous && previous != fileId)
             await outbox.PublishAsync(new CleanupFile(previous));
         var updated = await SaveAsync(settings, ct, updateCache: false);
-        if (updated is null)
-            return null;
         await transaction.CommitAsync(ct);
         if (cache is not null)
             await cache.SetAsync(CacheKey, updated, token: ct);
@@ -93,23 +82,16 @@ public sealed class PlatformConfigurationStore(
                     file.Id, file.ObjectKey, file.FileName, file.ContentType))
             .SingleOrDefaultAsync(ct);
 
-    private async Task<PlatformConfigurationView?> SaveAsync(
+    private async Task<PlatformConfigurationView> SaveAsync(
         PlatformSettings settings,
         CancellationToken ct,
         bool updateCache = true)
     {
-        try
-        {
-            await db.SaveChangesAsync(ct);
-            var view = ToView(settings);
-            if (cache is not null && updateCache)
-                await cache.SetAsync(CacheKey, view, token: ct);
-            return view;
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return null;
-        }
+        await db.SaveChangesAsync(ct);
+        var view = ToView(settings);
+        if (cache is not null && updateCache)
+            await cache.SetAsync(CacheKey, view, token: ct);
+        return view;
     }
 
     private async Task<PlatformConfigurationView> LoadAsync(CancellationToken ct) =>
@@ -121,42 +103,37 @@ public sealed class PlatformConfigurationStore(
             settings.Name,
             settings.Description,
             settings.LogoFileId,
-            settings.Revision,
             settings.UpdatedAt);
 }
 
 public sealed class OpenApiPlatformConfigurationStore : IPlatformConfigurationStore
 {
     private static readonly PlatformConfigurationView Default =
-        new("NoCTF", null, null, 1, DateTimeOffset.UnixEpoch);
+        new("NoCTF", null, null, DateTimeOffset.UnixEpoch);
 
     public Task<PlatformConfigurationView> GetAsync(CancellationToken cancellationToken) =>
         Task.FromResult(Default);
 
-    public Task<PlatformConfigurationView?> UpdateAsync(
+    public Task<PlatformConfigurationView> UpdateAsync(
         string name,
         string? description,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
-        Task.FromResult<PlatformConfigurationView?>(Default with
+        Task.FromResult(Default with
         {
             Name = name,
             Description = description,
-            Revision = expectedRevision + 1,
             UpdatedAt = now
         });
 
-    public Task<PlatformLogoReplacement?> ReplaceLogoAsync(
+    public Task<PlatformLogoReplacement> ReplaceLogoAsync(
         Guid fileId,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
-        Task.FromResult<PlatformLogoReplacement?>(new(
+        Task.FromResult(new PlatformLogoReplacement(
             Default with
             {
                 LogoFileId = fileId,
-                Revision = expectedRevision + 1,
                 UpdatedAt = now
             },
             null));

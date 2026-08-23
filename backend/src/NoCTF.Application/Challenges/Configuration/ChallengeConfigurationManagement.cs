@@ -9,8 +9,6 @@ public sealed record ChallengeConfigurationView(
     GameMode Mode,
     string Json,
     string CompetitionConfigurationJson,
-    int CompetitionConfigurationRevision,
-    int Revision,
     CompetitionStatus CompetitionStatus,
     int EligibleTeamCount,
     DateTimeOffset UpdatedAt);
@@ -54,8 +52,6 @@ public interface IChallengeConfigurationStore
     Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
-        int expectedCompetitionConfigurationRevision,
         string json,
         DateTimeOffset updatedAt,
         CancellationToken cancellationToken);
@@ -65,18 +61,15 @@ public enum ChallengeConfigurationUpdateFailure
 {
     CompetitionNotFound,
     ConfigurationLocked,
-    ChallengeNotFound,
-    RevisionConflict
+    ChallengeNotFound
 }
 
 public enum ChallengeConfigurationFailureCode
 {
-    InvalidRevision,
     InvalidConfiguration,
     CompetitionNotFound,
     ConfigurationLocked,
-    ChallengeNotFound,
-    ConfigurationConflict
+    ChallengeNotFound
 }
 public sealed record ChallengeConfigurationUpdateResult(
     ChallengeConfigurationView? Configuration,
@@ -98,15 +91,10 @@ public sealed class UpdateChallengeConfiguration(
     public async Task<OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         string json,
         DateTimeOffset updatedAt,
         CancellationToken ct = default)
     {
-        if (expectedRevision < 0)
-            return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
-                ChallengeConfigurationFailureCode.InvalidRevision,
-                "Expected revision cannot be negative.");
         if (string.IsNullOrWhiteSpace(json))
             return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(
                 ChallengeConfigurationFailureCode.InvalidConfiguration,
@@ -130,26 +118,22 @@ public sealed class UpdateChallengeConfiguration(
         var result = await store.TryUpdateAsync(
             competitionId,
             competitionChallengeId,
-            expectedRevision,
-            current.CompetitionConfigurationRevision,
             json,
             updatedAt,
             ct);
         if (result.Configuration is null)
         {
-            var failure = result.Failure ?? ChallengeConfigurationUpdateFailure.RevisionConflict;
+            var failure = result.Failure ?? ChallengeConfigurationUpdateFailure.ChallengeNotFound;
             return OperationResult<ChallengeConfigurationView, ChallengeConfigurationFailureCode>.Failure(failure switch
             {
                 ChallengeConfigurationUpdateFailure.CompetitionNotFound => ChallengeConfigurationFailureCode.CompetitionNotFound,
                 ChallengeConfigurationUpdateFailure.ConfigurationLocked => ChallengeConfigurationFailureCode.ConfigurationLocked,
-                ChallengeConfigurationUpdateFailure.ChallengeNotFound => ChallengeConfigurationFailureCode.ChallengeNotFound,
-                _ => ChallengeConfigurationFailureCode.ConfigurationConflict
+                _ => ChallengeConfigurationFailureCode.ChallengeNotFound
             }, failure switch
             {
                 ChallengeConfigurationUpdateFailure.CompetitionNotFound => "Competition was not found.",
                 ChallengeConfigurationUpdateFailure.ConfigurationLocked => "Active or finished challenge configuration is read-only.",
-                ChallengeConfigurationUpdateFailure.ChallengeNotFound => "Challenge was not found.",
-                _ => "Challenge configuration revision changed concurrently."
+                _ => "Challenge was not found."
             });
         }
 

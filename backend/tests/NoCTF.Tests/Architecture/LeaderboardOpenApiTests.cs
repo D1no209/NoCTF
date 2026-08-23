@@ -157,12 +157,11 @@ public sealed class LeaderboardOpenApiTests
         await Assert.That(PropertyNames(request)).IsEquivalentTo([
             "visibility",
             "startsAt",
-            "expectedRevision",
             "reason"
         ]);
         await Assert.That(request.GetProperty("required").EnumerateArray()
                 .Select(property => property.GetString()!))
-            .IsEquivalentTo(["visibility", "expectedRevision"]);
+            .IsEquivalentTo(["visibility"]);
         await Assert.That(adminPath.GetProperty("put").GetProperty("responses")
                 .EnumerateObject().Select(response => response.Name))
             .IsEquivalentTo(["200", "400", "409", "404", "401", "403"]);

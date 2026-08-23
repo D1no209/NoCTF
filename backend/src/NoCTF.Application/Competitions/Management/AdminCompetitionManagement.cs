@@ -17,7 +17,6 @@ public enum CompetitionOwnerTransferState
     Transferred,
     InvalidOwnerId,
     NotFound,
-    RevisionConflict,
     UserNotFound,
     RoleNotEligible
 }

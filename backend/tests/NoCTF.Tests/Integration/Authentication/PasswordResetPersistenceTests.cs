@@ -257,15 +257,13 @@ public sealed class PasswordResetPersistenceTests
                 SmtpFromAddress: "no-reply@noctf.test",
                 SmtpFromName: "NoCTF",
                 SmtpTimeoutSeconds: 10,
-                Revision: 1,
                 UpdatedAt: DateTimeOffset.UnixEpoch));
 
-        public Task<EmailVerificationConfigurationView?> UpdateAsync(
+        public Task<EmailVerificationConfigurationView> UpdateAsync(
             UpdateEmailVerificationConfigurationCommand command,
             CancellationToken cancellationToken) => throw new NotSupportedException();
 
-        public Task<EmailVerificationConfigurationView?> ReplacePasswordAsync(
-            long expectedRevision,
+        public Task<EmailVerificationConfigurationView> ReplacePasswordAsync(
             string password,
             DateTimeOffset now,
             CancellationToken cancellationToken) => throw new NotSupportedException();

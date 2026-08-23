@@ -28,15 +28,13 @@ public sealed class CompetitionPermissionProtocolTests
                 "OwnerId",
                 "ManagerIds",
                 "JudgeIds",
-                "ObserverIds",
-                "PermissionRevision"
+                "ObserverIds"
             ]);
         await Assert.That(properties["CompetitionId"].PropertyType).IsEqualTo(typeof(Guid));
         await Assert.That(properties["OwnerId"].PropertyType).IsEqualTo(typeof(Guid));
         await Assert.That(IsGuidCollection(properties["ManagerIds"].PropertyType)).IsTrue();
         await Assert.That(IsGuidCollection(properties["JudgeIds"].PropertyType)).IsTrue();
         await Assert.That(IsGuidCollection(properties["ObserverIds"].PropertyType)).IsTrue();
-        await Assert.That(properties["PermissionRevision"].PropertyType).IsEqualTo(typeof(int));
 
         var publicProperties = typeof(CompetitionResponse).GetProperties()
             .Select(property => property.Name)
@@ -44,7 +42,6 @@ public sealed class CompetitionPermissionProtocolTests
         await Assert.That(publicProperties).DoesNotContain("ManagerIds");
         await Assert.That(publicProperties).DoesNotContain("JudgeIds");
         await Assert.That(publicProperties).DoesNotContain("ObserverIds");
-        await Assert.That(publicProperties).DoesNotContain("PermissionRevision");
     }
 
     [Test]
@@ -73,41 +70,31 @@ public sealed class CompetitionPermissionProtocolTests
     }
 
     [Test]
-    public async Task Update_request_requires_a_non_negative_permission_revision()
+    public async Task Update_request_is_a_complete_last_write_wins_replacement()
     {
-        var revision = typeof(UpdateCompetitionPermissionsRequest)
-            .GetProperty("ExpectedPermissionRevision", BindingFlags.Public | BindingFlags.Instance);
+        var properties = typeof(UpdateCompetitionPermissionsRequest)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .ToArray();
 
-        await Assert.That(revision).IsNotNull();
-        await Assert.That(Nullable.GetUnderlyingType(revision!.PropertyType) ?? revision.PropertyType)
-            .IsEqualTo(typeof(int));
-
-        var request = (UpdateCompetitionPermissionsRequest)Activator.CreateInstance(
-            typeof(UpdateCompetitionPermissionsRequest))!;
-        var validator = new UpdateCompetitionPermissionsValidator();
-        var missingValidation = validator.Validate(request);
-        await Assert.That(missingValidation.Errors
-            .Any(error => error.PropertyName == "ExpectedPermissionRevision"))
-            .IsTrue();
-
-        revision.SetValue(request, -1);
-        var negativeValidation = validator.Validate(request);
-
-        await Assert.That(negativeValidation.Errors
-            .Any(error => error.PropertyName == "ExpectedPermissionRevision"))
-            .IsTrue();
+        await Assert.That(properties).IsEquivalentTo([
+            "CompetitionId",
+            "ManagerIds",
+            "JudgeIds",
+            "ObserverIds"
+        ]);
     }
 
     [Test]
-    [Arguments("RevisionConflict")]
-    [Arguments("EmailNotVerified")]
-    public async Task New_conflict_codes_serialize_as_named_enums(string name)
+    public async Task Conflict_codes_serialize_as_named_enums()
     {
-        var code = Enum.Parse<CompetitionResourceManagerConflictCode>(name);
+        foreach (var code in Enum.GetValues<CompetitionResourceManagerConflictCode>())
+        {
+            var name = code.ToString();
+            var json = JsonSerializer.Serialize(code, JsonOptions);
 
-        var json = JsonSerializer.Serialize(code, JsonOptions);
-
-        await Assert.That(json).IsEqualTo($"\"{name}\"");
+            await Assert.That(json).IsEqualTo($"\"{name}\"");
+        }
     }
 
     private static Type? ApiType(string name) =>

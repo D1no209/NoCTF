@@ -68,11 +68,9 @@ public sealed class CompetitionManagementStore(
             CreatedAt = command.CreatedAt,
             UpdatedAt = command.CreatedAt,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
-            ConfigurationRevision = 0,
             ConfigurationUpdatedAt = command.CreatedAt,
             TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(
                 CompetitionTrackConfiguration.DefaultFor(command.Mode)),
-            TrackConfigurationRevision = 0,
             TrackConfigurationUpdatedAt = command.CreatedAt,
             FlagDerivationSecret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)
         };
@@ -115,7 +113,6 @@ public sealed class CompetitionManagementStore(
 
     public async Task<CompetitionView?> UpdateAsync(
         UpdateCompetitionCommand command,
-        CompetitionStatus expectedStatus,
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
@@ -124,8 +121,7 @@ public sealed class CompetitionManagementStore(
             ct);
         var competition = await db.Competitions
             .SingleOrDefaultAsync(x => x.Id == command.CompetitionId
-                && x.DeletedAt == null
-                && x.Status == expectedStatus, ct);
+                && x.DeletedAt == null, ct);
         if (competition is null)
             return null;
         if (competition.PracticeModeEnabled

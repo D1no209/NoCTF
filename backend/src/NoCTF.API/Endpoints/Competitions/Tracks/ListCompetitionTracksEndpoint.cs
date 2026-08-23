@@ -23,7 +23,6 @@ public sealed record CompetitionTrackResponse(
 public sealed record CompetitionTrackListResponse(
     Guid CompetitionId,
     GameModeProtocol Mode,
-    int Revision,
     bool IsFrozen,
     IReadOnlyList<CompetitionTrackResponse> Items);
 
@@ -46,7 +45,6 @@ internal static class CompetitionTrackProtocolMapping
     public static CompetitionTrackListResponse ToResponse(CompetitionTracksView view) => new(
         view.CompetitionId,
         CompetitionProtocolMapper.ToProtocol(view.Mode),
-        view.Revision,
         view.IsFrozen,
         view.Tracks.Select(ToResponse).ToArray());
 }

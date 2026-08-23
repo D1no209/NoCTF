@@ -22,7 +22,6 @@ const expectedFailureText = {
   InvalidChallengeReference: '关联题目无效、未发布或不属于当前比赛',
   TeamActiveQuestionLimitReached: '本队已有 7 个活跃咨询',
   ParticipantMessageLimitReached: '工作人员回复前最多连续发送 4 条消息',
-  RevisionConflict: '咨询已被其他成员更新',
   InvalidTransition: '当前咨询状态不允许执行此操作',
   QuestionClosed: '该咨询已关闭',
 } satisfies Record<NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode, string>
@@ -52,24 +51,23 @@ describe('competition question presentation state', () => {
     expect(competitionQuestionRoleLabel.PlatformAdministrator).toBe('平台管理员')
   })
 
-  test('counts revisions after the thread was last viewed', () => {
-    expect(competitionQuestionUnreadCount(6, 4, 'Judge', 'Asker')).toBe(2)
-    expect(competitionQuestionUnreadCount(6, 6, 'Judge', 'Asker')).toBe(0)
+  test('marks a thread unread when its immutable activity timestamp advances', () => {
+    expect(competitionQuestionUnreadCount('2026-08-11T12:00:06Z', '2026-08-11T12:00:04Z', 'Judge', 'Asker')).toBe(1)
+    expect(competitionQuestionUnreadCount('2026-08-11T12:00:06Z', '2026-08-11T12:00:06Z', 'Judge', 'Asker')).toBe(0)
   })
 
   test('surfaces one initial unread handler reply for an unvisited participant thread', () => {
-    expect(competitionQuestionUnreadCount(3, undefined, 'Judge', 'Asker')).toBe(1)
-    expect(competitionQuestionUnreadCount(3, undefined, 'Participant', 'Asker')).toBe(0)
-    expect(competitionQuestionUnreadCount(3, undefined, 'Judge', 'Handler')).toBe(0)
+    expect(competitionQuestionUnreadCount('2026-08-11T12:00:03Z', undefined, 'Judge', 'Asker')).toBe(1)
+    expect(competitionQuestionUnreadCount('2026-08-11T12:00:03Z', undefined, 'Participant', 'Asker')).toBe(0)
+    expect(competitionQuestionUnreadCount('2026-08-11T12:00:03Z', undefined, 'Judge', 'Handler')).toBe(0)
   })
 })
 
 describe('competition question cursor collection', () => {
   const baseTime = Date.parse('2026-08-11T12:00:00.000Z')
-  const question = (index: number, revision = 0): Question => ({
+  const question = (index: number): Question => ({
     id: `00000000-0000-0000-0000-${index.toString().padStart(12, '0')}`,
     title: `Question ${index}`,
-    revision,
     updatedAt: new Date(baseTime - index * 1000).toISOString(),
   })
 
@@ -94,7 +92,6 @@ describe('competition question cursor collection', () => {
     const replied: Question = {
       ...serverItems[160],
       title: 'Updated by reply',
-      revision: 1,
       updatedAt: new Date(baseTime + 2000).toISOString(),
     }
     visible = mergeCompetitionQuestions(visible, [created, replied, ...serverItems.slice(0, 50)])

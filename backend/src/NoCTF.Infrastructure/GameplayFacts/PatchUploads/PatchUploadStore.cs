@@ -234,7 +234,6 @@ public sealed class PatchUploadStore(
             patchUploadId,
             target.Id,
             target.Generation,
-            target.ProcessingVersion,
             deadline,
             target.RunnerPool,
             target.RunnerId));
@@ -242,7 +241,6 @@ public sealed class PatchUploadStore(
             fact.Id,
             target.Id,
             target.Generation,
-            target.ProcessingVersion,
             deadline,
             target.RunnerPool,
             target.RunnerId), deadline);

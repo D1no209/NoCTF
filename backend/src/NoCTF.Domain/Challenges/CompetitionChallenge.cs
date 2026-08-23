@@ -6,7 +6,6 @@ namespace NoCTF.Domain.Challenges;
 public sealed class CompetitionChallenge
 {
     public Guid Id { get; set; }
-    public long CriticalSectionVersion { get; set; }
     public Guid CompetitionId { get; set; }
     public Guid ChallengeId { get; set; }
     [MaxLength(160)]
@@ -15,11 +14,7 @@ public sealed class CompetitionChallenge
     public int Order { get; set; }
     public bool IsPublished { get; set; }
     public string RulesJson { get; set; } = string.Empty;
-    [ConcurrencyCheck]
-    public int Revision { get; set; }
     public int LastScheduledAwdRound { get; set; }
-    public int AwdScheduleCompetitionRevision { get; set; }
-    public long AwdScheduleChallengeRevision { get; set; }
     public DateTimeOffset? AwdScheduleDueAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }

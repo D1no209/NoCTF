@@ -77,7 +77,7 @@ async function saveMeta() {
     await refresh()
   }
   catch (e) {
-    toastWriteError(e, refresh)
+    toastWriteError(e)
   }
   finally {
     savingMeta.value = false
@@ -102,14 +102,14 @@ async function saveConfig(json: string) {
   try {
     const { data, error } = await adminCompetitionConfigurationUpdate({
       path: { competitionId },
-      body: { json, expectedRevision: config.value.revision ?? 0 },
+      body: { json },
     })
     if (error) throw error
     config.value = data ?? config.value
     toast.success(translate("模式配置已保存"))
   }
   catch (e) {
-    toastWriteError(e, loadConfig)
+    toastWriteError(e)
   }
   finally {
     savingConfig.value = false
@@ -210,14 +210,13 @@ onMounted(loadConfig)
       <CardHeader>
         <CardTitle>{{ $t('模式配置') }}</CardTitle>
         <CardDescription>
-          {{ $t('{mode} 模式的专属配置；保存时携带修订版本进行乐观并发校验', { mode: enumLabel(GameModeLabel, config?.mode) }) }}
+          {{ $t('{mode} 模式的专属配置', { mode: enumLabel(GameModeLabel, config?.mode) }) }}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <CompetitionModeConfigEditor
           :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
           :json="config?.json"
-          :revision="config?.revision"
           :readonly="!canWrite"
           :loading="configLoading"
           :saving="savingConfig"

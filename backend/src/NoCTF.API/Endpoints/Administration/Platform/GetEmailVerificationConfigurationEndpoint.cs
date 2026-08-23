@@ -21,7 +21,6 @@ public sealed record EmailVerificationConfigurationResponse(
     string SmtpFromAddress,
     string SmtpFromName,
     int SmtpTimeoutSeconds,
-    long Revision,
     DateTimeOffset UpdatedAt);
 
 internal static class EmailVerificationConfigurationMapping
@@ -44,7 +43,6 @@ internal static class EmailVerificationConfigurationMapping
             configuration.SmtpFromAddress,
             configuration.SmtpFromName,
             configuration.SmtpTimeoutSeconds,
-            configuration.Revision,
             configuration.UpdatedAt);
 }
 

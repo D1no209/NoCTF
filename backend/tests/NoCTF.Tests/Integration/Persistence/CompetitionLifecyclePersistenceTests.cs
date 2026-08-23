@@ -450,7 +450,6 @@ public sealed class CompetitionLifecyclePersistenceTests
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerPool = "awd",
             State = RuntimeState.Running,
-            ProcessingVersion = 1,
             ProviderReceiptJson = "{\"id\":\"runtime\"}",
             NextCheckerDueAt = now.AddMinutes(1),
             CreatedAt = now,

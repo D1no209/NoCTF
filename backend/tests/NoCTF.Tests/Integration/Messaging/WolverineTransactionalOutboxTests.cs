@@ -100,7 +100,6 @@ public sealed class WolverineTransactionalOutboxTests
                 await Assert.That(fact.FailureCode)
                     .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
                 await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
-                await Assert.That(runtime.ProcessingVersion).IsEqualTo(6);
             }
             finally
             {
@@ -127,7 +126,6 @@ public sealed class WolverineTransactionalOutboxTests
                     Guid.NewGuid(),
                     Guid.NewGuid(),
                     3,
-                    12,
                     "test-pool",
                     "test-runner",
                     DateTimeOffset.UtcNow);
@@ -685,9 +683,7 @@ public sealed class WolverineTransactionalOutboxTests
                 var message = new AdvanceAwdRound(
                     competitionId,
                     competitionChallengeId,
-                    now,
-                    0,
-                    0);
+                    now);
                 var bus = host.Services.GetRequiredService<IMessageBus>();
                 await bus.SendAsync(message);
                 await bus.SendAsync(message);
@@ -854,7 +850,6 @@ public sealed class WolverineTransactionalOutboxTests
             OwnerId = ownerId,
             Mode = GameMode.Awdp,
             ConfigurationJson = "{}",
-            ConfigurationRevision = 3,
             ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddMinutes(-1),
@@ -871,7 +866,6 @@ public sealed class WolverineTransactionalOutboxTests
             Title = "AWDP result target",
             Visibility = ChallengeVisibility.Private,
             DefinitionJson = "{}",
-            Revision = 5,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -883,7 +877,6 @@ public sealed class WolverineTransactionalOutboxTests
             BaseScore = 100,
             IsPublished = true,
             RulesJson = "{}",
-            Revision = 7,
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -921,16 +914,12 @@ public sealed class WolverineTransactionalOutboxTests
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = fixture.GameplayFactId,
             AwdpFixStage = AwdpFixStage.PatchApplying,
-            SourceCompetitionConfigurationRevision = 3,
-            SourceCompetitionChallengeRevision = 7,
-            SourceChallengeDefinitionRevision = 5,
             Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerPool = "test-pool",
             RunnerId = "test-runner",
             State = RuntimeState.Running,
-            ProcessingVersion = 5,
             ProviderReceiptJson = "{}",
             CreatedAt = now,
             RunningAt = now,
@@ -1137,14 +1126,12 @@ public sealed class WolverineTransactionalOutboxTests
                 competitionChallengeId,
                 patchUploadId,
                 runtimeInstanceId,
-                1,
                 5,
                 now.AddMinutes(5),
                 "test-pool",
                 "test-runner");
             var archiveBytes = CreateFixArchive();
             var work = new AwdpFixWork(
-                5,
                 new(
                     new Uri("https://api.example.test/fix-archive"),
                     "archive-token",

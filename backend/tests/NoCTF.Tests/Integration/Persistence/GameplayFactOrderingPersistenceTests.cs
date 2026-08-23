@@ -630,7 +630,6 @@ public sealed class GameplayFactOrderingPersistenceTests
             RunnerId = "runner-fact-tests",
             State = RuntimeState.Running,
             ProviderReceiptJson = "{}",
-            ProcessingVersion = 1,
             CreatedAt = fixture.Now.AddMinutes(-1),
             RunningAt = fixture.Now.AddMinutes(-1),
             ExpiresAt = fixture.Now.AddMinutes(30)

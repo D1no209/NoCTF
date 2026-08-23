@@ -387,8 +387,7 @@ public sealed class TeamRegistrationStore(
 
     private static TeamView Map(Team x) => new(
         x.Id, x.CompetitionId, x.Name, x.AvatarFileId, x.CaptainId, x.MemberIds,
-        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TrackKey, x.TrackKey,
-        x.ConcurrencyVersion);
+        x.RegistrationStatus, x.IsLocked, x.IsBanned, x.RegisteredAt, x.TrackKey, x.TrackKey);
 
     private static TeamView Map(Team team, CompetitionTrackConfiguration configuration) => new(
         team.Id,
@@ -402,8 +401,7 @@ public sealed class TeamRegistrationStore(
         team.IsBanned,
         team.RegisteredAt,
         team.TrackKey,
-        configuration.Find(team.TrackKey)?.Name ?? team.TrackKey,
-        team.ConcurrencyVersion);
+        configuration.Find(team.TrackKey)?.Name ?? team.TrackKey);
 
     private static string CreateInvitationToken()
     {

@@ -35,7 +35,7 @@ public sealed class CompetitionPermissionsOpenApiTests
     }
 
     [Test]
-    public async Task Permission_schemas_are_complete_minimal_and_revision_fenced()
+    public async Task Permission_schemas_are_complete_minimal_and_last_write_wins()
     {
         using var swagger = await ReadSwaggerAsync();
         var root = swagger.RootElement;
@@ -50,21 +50,13 @@ public sealed class CompetitionPermissionsOpenApiTests
                 "ownerId",
                 "managerIds",
                 "judgeIds",
-                "observerIds",
-                "permissionRevision"
+                "observerIds"
             ]);
         AssertGuid(permissions, "competitionId");
         AssertGuid(permissions, "ownerId");
         AssertGuidArray(permissions, "managerIds");
         AssertGuidArray(permissions, "judgeIds");
         AssertGuidArray(permissions, "observerIds");
-        var permissionRevision = permissions.GetProperty("properties")
-            .GetProperty("permissionRevision");
-        await Assert.That(permissionRevision.GetProperty("type").GetString())
-            .IsEqualTo("integer");
-        await Assert.That(permissionRevision.GetProperty("format").GetString())
-            .IsEqualTo("int32");
-
         var candidates = ResponseSchema(
             root,
             Operation(root, CandidatesPath, "get"),
@@ -93,19 +85,12 @@ public sealed class CompetitionPermissionsOpenApiTests
                 .GetProperty("content")
                 .GetProperty("application/json")
                 .GetProperty("schema"));
+        await Assert.That(PropertyNames(request))
+            .IsEquivalentTo(["managerIds", "judgeIds", "observerIds"]);
         await Assert.That(request.GetProperty("required")
             .EnumerateArray()
-            .Select(item => item.GetString())
-            .Contains("expectedPermissionRevision", StringComparer.Ordinal))
-            .IsTrue();
-        var expectedRevision = request.GetProperty("properties")
-            .GetProperty("expectedPermissionRevision");
-        await Assert.That(expectedRevision.GetProperty("type").GetString())
-            .IsEqualTo("integer");
-        await Assert.That(expectedRevision.GetProperty("format").GetString())
-            .IsEqualTo("int32");
-        await Assert.That(expectedRevision.GetProperty("minimum").GetDouble())
-            .IsEqualTo(0);
+            .Select(item => item.GetString()!))
+            .IsEquivalentTo(["managerIds", "judgeIds", "observerIds"]);
 
         var conflict = ResponseSchema(root, update, "409");
         var conflictCode = ResolveSchema(
@@ -113,10 +98,15 @@ public sealed class CompetitionPermissionsOpenApiTests
             conflict.GetProperty("properties").GetProperty("code"));
         var conflictValues = conflictCode.GetProperty("enum")
             .EnumerateArray()
-            .Select(item => item.GetString())
+            .Select(item => item.GetString()!)
             .ToArray();
-        await Assert.That(conflictValues).Contains("RevisionConflict");
-        await Assert.That(conflictValues).Contains("EmailNotVerified");
+        await Assert.That(conflictValues).IsEquivalentTo([
+            "RolesOverlap",
+            "OwnerIncluded",
+            "UserNotFound",
+            "RoleNotEligible",
+            "EmailNotVerified"
+        ]);
     }
 
     [Test]
@@ -133,7 +123,6 @@ public sealed class CompetitionPermissionsOpenApiTests
         await Assert.That(properties).DoesNotContain("managerIds");
         await Assert.That(properties).DoesNotContain("judgeIds");
         await Assert.That(properties).DoesNotContain("observerIds");
-        await Assert.That(properties).DoesNotContain("permissionRevision");
     }
 
     private static JsonElement Operation(

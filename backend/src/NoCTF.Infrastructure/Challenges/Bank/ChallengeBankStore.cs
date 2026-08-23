@@ -122,12 +122,14 @@ public sealed class ChallengeBankStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var entity = await WriteAuthorized(db.Challenges, command.ActorId, command.IsAdministrator)
-            .SingleOrDefaultAsync(challenge => challenge.Id == command.ChallengeId, ct);
-        if (entity is null)
+        var entity = await ChallengeTemplateCriticalSection.AcquireAsync(
+            db,
+            command.ChallengeId,
+            ct);
+        if (entity is null
+            || entity.DeletedAt is not null
+            || !CanWrite(entity, command.ActorId, command.IsAdministrator))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
-        if (entity.Revision != command.ExpectedRevision)
-            return new(ChallengeTemplateWriteState.RevisionConflict);
         if (HasSameEditableContent(entity, command))
         {
             var unchanged = await Project(db.Challenges.AsNoTracking()
@@ -190,7 +192,6 @@ public sealed class ChallengeBankStore(
         entity.Description = command.Description;
         entity.Direction = command.Direction;
         entity.DefinitionJson = command.DefinitionJson;
-        entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
         foreach (var reference in publishedReferences)
         {
@@ -203,23 +204,16 @@ public sealed class ChallengeBankStore(
                 ActorUserId: command.ActorId,
                 CompetitionChallengeId: reference.Id), ct);
         }
-        try
+        await db.SaveChangesAsync(ct);
+        if (catalogChanged)
         {
-            await db.SaveChangesAsync(ct);
-            if (catalogChanged)
-            {
-                _ = await db.Competitions
-                    .Where(competition => db.CompetitionChallenges.IgnoreQueryFilters().Any(instance =>
-                        instance.CompetitionId == competition.Id
-                        && instance.ChallengeId == entity.Id
-                        && instance.DeletedAt == null))
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(competition => competition.LeaderboardDirty, true), ct);
-            }
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return new(ChallengeTemplateWriteState.RevisionConflict);
+            _ = await db.Competitions
+                .Where(competition => db.CompetitionChallenges.IgnoreQueryFilters().Any(instance =>
+                    instance.CompetitionId == competition.Id
+                    && instance.ChallengeId == entity.Id
+                    && instance.DeletedAt == null))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(competition => competition.LeaderboardDirty, true), ct);
         }
         var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
@@ -237,17 +231,18 @@ public sealed class ChallengeBankStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
+        if (entity is null
+            || entity.DeletedAt is not null
+            || !CanWrite(entity, actorId, isAdministrator))
+            return ChallengeTemplateDeleteFailure.NotFound;
         if (await db.CompetitionChallenges.IgnoreQueryFilters().AsNoTracking().AnyAsync(
                 item => item.ChallengeId == challengeId && item.DeletedAt == null,
                 ct))
             return ChallengeTemplateDeleteFailure.InUse;
-        if (!await SoftDeleteEntityAsync(
-                challengeId,
-                actorId,
-                isAdministrator,
-                now,
-                ct))
-            return ChallengeTemplateDeleteFailure.NotFound;
+        entity.DeletedAt = now;
+        entity.UpdatedAt = now;
+        await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return null;
     }
@@ -260,13 +255,10 @@ public sealed class ChallengeBankStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var entity = await WriteAuthorized(
-                db.Challenges.IgnoreQueryFilters(),
-                actorId,
-                isAdministrator)
-            .SingleOrDefaultAsync(challenge =>
-                challenge.Id == challengeId && challenge.DeletedAt != null, ct);
-        if (entity is null)
+        var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
+        if (entity is null
+            || entity.DeletedAt is null
+            || !CanWrite(entity, actorId, isAdministrator))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
         var eligibility = await ResourceManagerRoleGuard.AcquireAndCheckAsync(
             db,
@@ -285,7 +277,6 @@ public sealed class ChallengeBankStore(
                 UserIds: eligibility.RoleIneligibleUserIds);
         }
         entity.DeletedAt = null;
-        entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         var result = await Project(db.Challenges.AsNoTracking()
@@ -300,19 +291,16 @@ public sealed class ChallengeBankStore(
         Guid actorId,
         bool isAdministrator,
         Guid[] managerIds,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct)
     {
         var normalized = managerIds.Distinct().Order().ToArray();
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var entity = await db.Challenges.SingleOrDefaultAsync(challenge =>
-            challenge.Id == challengeId &&
-            (isAdministrator || challenge.OwnerId == actorId), ct);
-        if (entity is null)
+        var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
+        if (entity is null
+            || entity.DeletedAt is not null
+            || !(isAdministrator || entity.OwnerId == actorId))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
-        if (entity.Revision != expectedRevision)
-            return new(ChallengeTemplateWriteState.RevisionConflict);
         if (normalized.Contains(entity.OwnerId))
         {
             return new(
@@ -336,7 +324,6 @@ public sealed class ChallengeBankStore(
                 UserIds: eligibility.RoleIneligibleUserIds);
         }
         entity.ManagerIds = normalized;
-        entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         var result = await Project(db.Challenges.AsNoTracking()
@@ -351,18 +338,15 @@ public sealed class ChallengeBankStore(
         Guid actorId,
         bool isAdministrator,
         Guid ownerId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var entity = await db.Challenges.SingleOrDefaultAsync(challenge =>
-            challenge.Id == challengeId &&
-            (isAdministrator || challenge.OwnerId == actorId), ct);
-        if (entity is null)
+        var entity = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
+        if (entity is null
+            || entity.DeletedAt is not null
+            || !(isAdministrator || entity.OwnerId == actorId))
             return new(ChallengeTemplateWriteState.NotFoundOrForbidden);
-        if (entity.Revision != expectedRevision)
-            return new(ChallengeTemplateWriteState.RevisionConflict);
         var previousOwnerId = entity.OwnerId;
         var managerIds = entity.ManagerIds
             .Append(previousOwnerId)
@@ -388,40 +372,13 @@ public sealed class ChallengeBankStore(
         }
         entity.OwnerId = ownerId;
         entity.ManagerIds = managerIds;
-        entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return new(ChallengeTemplateWriteState.RevisionConflict);
-        }
+        await db.SaveChangesAsync(ct);
         var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
         await transaction.CommitAsync(ct);
         return new(ChallengeTemplateWriteState.Succeeded, result);
-    }
-
-    private async Task<bool> SoftDeleteEntityAsync(
-        Guid challengeId,
-        Guid actorId,
-        bool isAdministrator,
-        DateTimeOffset now,
-        CancellationToken ct)
-    {
-        var entity = await WriteAuthorized(db.Challenges, actorId, isAdministrator)
-            .SingleOrDefaultAsync(challenge =>
-                challenge.Id == challengeId && challenge.DeletedAt == null, ct);
-        if (entity is null)
-            return false;
-        entity.DeletedAt = now;
-        entity.Revision = checked(entity.Revision + 1);
-        entity.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
-        return true;
     }
 
     private static bool HasSameEditableContent(
@@ -469,6 +426,14 @@ public sealed class ChallengeBankStore(
                 challenge.OwnerId == actorId ||
                 challenge.ManagerIds.Contains(actorId));
 
+    private static bool CanWrite(
+        Challenge challenge,
+        Guid actorId,
+        bool isAdministrator) =>
+        isAdministrator
+        || challenge.OwnerId == actorId
+        || challenge.ManagerIds.Contains(actorId);
+
     private IQueryable<ChallengeTemplateView> Project(IQueryable<Challenge> source) =>
         source.Select(challenge => new ChallengeTemplateView(
             challenge.Id,
@@ -480,7 +445,6 @@ public sealed class ChallengeBankStore(
             challenge.Description,
             challenge.Direction,
             challenge.DefinitionJson,
-            challenge.Revision,
             challenge.DeletedAt,
             db.CompetitionChallenges.IgnoreQueryFilters().Count(item =>
                 item.ChallengeId == challenge.Id && item.DeletedAt == null),

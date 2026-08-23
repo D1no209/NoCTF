@@ -18,13 +18,12 @@ public sealed class EmailVerificationConfigurationStore(
         ToView(await db.PlatformSettings.AsNoTracking()
             .SingleAsync(settings => settings.Id == SettingsId, ct));
 
-    public async Task<EmailVerificationConfigurationView?> UpdateAsync(
+    public async Task<EmailVerificationConfigurationView> UpdateAsync(
         UpdateEmailVerificationConfigurationCommand command,
         CancellationToken ct)
     {
-        var updated = await db.PlatformSettings
-            .Where(settings => settings.Id == SettingsId
-                && settings.Revision == command.ExpectedRevision)
+        await db.PlatformSettings
+            .Where(settings => settings.Id == SettingsId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(settings => settings.EmailVerificationEnabled, command.Enabled)
                 .SetProperty(settings => settings.EmailPublicBaseUrl, command.PublicBaseUrl.TrimEnd('/'))
@@ -46,28 +45,24 @@ public sealed class EmailVerificationConfigurationStore(
                 .SetProperty(settings => settings.EmailSmtpFromAddress, command.SmtpFromAddress.Trim())
                 .SetProperty(settings => settings.EmailSmtpFromName, command.SmtpFromName.Trim())
                 .SetProperty(settings => settings.EmailSmtpTimeoutSeconds, command.SmtpTimeoutSeconds)
-                .SetProperty(settings => settings.Revision, settings => settings.Revision + 1)
                 .SetProperty(settings => settings.UpdatedAt, command.Now),
                 ct);
-        return updated == 1 ? await GetAsync(ct) : null;
+        return await GetAsync(ct);
     }
 
-    public async Task<EmailVerificationConfigurationView?> ReplacePasswordAsync(
-        long expectedRevision,
+    public async Task<EmailVerificationConfigurationView> ReplacePasswordAsync(
         string password,
         DateTimeOffset now,
         CancellationToken ct)
     {
         var ciphertext = secrets.Protect(password);
-        var updated = await db.PlatformSettings
-            .Where(settings => settings.Id == SettingsId
-                && settings.Revision == expectedRevision)
+        await db.PlatformSettings
+            .Where(settings => settings.Id == SettingsId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(settings => settings.EmailSmtpPasswordCiphertext, ciphertext)
-                .SetProperty(settings => settings.Revision, settings => settings.Revision + 1)
                 .SetProperty(settings => settings.UpdatedAt, now),
                 ct);
-        return updated == 1 ? await GetAsync(ct) : null;
+        return await GetAsync(ct);
     }
 
     public async Task<EmailVerificationDeliveryConfiguration?> GetDeliveryConfigurationAsync(
@@ -118,7 +113,6 @@ public sealed class EmailVerificationConfigurationStore(
             settings.EmailSmtpFromAddress,
             settings.EmailSmtpFromName,
             settings.EmailSmtpTimeoutSeconds,
-            settings.Revision,
             settings.UpdatedAt);
 
     private static SmtpSecurityMode ResolveSecurityMode(PlatformSettings settings) =>

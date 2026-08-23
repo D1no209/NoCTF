@@ -7,8 +7,7 @@ public sealed record CompetitionVisibilityAccessDecision(
     GameMode GameMode,
     CompetitionStatus CompetitionStatus,
     CompetitionLeaderboardVisibility Visibility,
-    LeaderboardDataScope DataScope,
-    int VisibilityRevision);
+    LeaderboardDataScope DataScope);
 
 public interface ICompetitionVisibilityAccess
 {
@@ -27,14 +26,12 @@ public sealed record CompetitionVisibilityConfigurationView(
     CompetitionLeaderboardVisibility ConfiguredVisibility,
     CompetitionLeaderboardVisibility EffectiveVisibility,
     DateTimeOffset? StartsAt,
-    DateTimeOffset? AppliedAt,
-    int Revision);
+    DateTimeOffset? AppliedAt);
 
 public enum CompetitionVisibilityMutationState
 {
     Updated,
     NotFound,
-    RevisionConflict,
     InvalidSchedule,
     CompetitionFinished
 }
@@ -50,7 +47,6 @@ public sealed record UpdateCompetitionVisibilityCommand(
     Guid CompetitionId,
     CompetitionLeaderboardVisibility Visibility,
     DateTimeOffset? StartsAt,
-    int ExpectedRevision,
     Guid ActorId,
     string? Reason,
     DateTimeOffset Now);
@@ -93,7 +89,7 @@ public interface ICompetitionVisibilityStore
 
     Task ApplyScheduledAsync(
         Guid competitionId,
-        int expectedRevision,
+        DateTimeOffset scheduledAt,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
@@ -119,8 +115,6 @@ public sealed class UpdateCompetitionVisibility(ICompetitionVisibilityStore stor
             cancellationToken);
         if (current is null)
             return new(CompetitionVisibilityMutationState.NotFound);
-        if (current.Revision != command.ExpectedRevision)
-            return new(CompetitionVisibilityMutationState.RevisionConflict, current);
         var validationFailure = CompetitionVisibilityRules.Validate(
             current.CompetitionStatus,
             current.CompetitionStartTime,
@@ -137,12 +131,12 @@ public sealed class ApplyScheduledCompetitionVisibility(ICompetitionVisibilitySt
 {
     public Task ExecuteAsync(
         Guid competitionId,
-        int expectedRevision,
+        DateTimeOffset scheduledAt,
         DateTimeOffset now,
         CancellationToken cancellationToken = default) =>
         store.ApplyScheduledAsync(
             competitionId,
-            expectedRevision,
+            scheduledAt,
             now,
             cancellationToken);
 }

@@ -31,7 +31,6 @@ public static class RuntimeClaimFactory
                 when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
                 new ClaimContainerRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     new ContainerRequest(
@@ -61,7 +60,6 @@ public static class RuntimeClaimFactory
                 when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
                 new ClaimComposeRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     new ComposeRequest(
@@ -84,7 +82,6 @@ public static class RuntimeClaimFactory
             OvaRuntimeDefinition definition when instance.RuntimeProvider == RuntimeProvider.Libvirt =>
                 new ClaimOvaRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     new OvaRuntimeRequest(

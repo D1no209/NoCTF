@@ -199,7 +199,6 @@ public static class BackendMessageHandlers
                         target.Runtime.Id,
                         target.Runtime.Generation,
                         target.Runtime.CheckerSequence,
-                        target.Runtime.ProcessingVersion,
                         message.At));
                     applied = true;
                 }
@@ -216,9 +215,6 @@ public static class BackendMessageHandlers
                 target.Runtime.CompetitionChallengeId,
                 target.Runtime.Generation,
                 target.Runtime.CheckerSequence,
-                target.Runtime.ProcessingVersion,
-                target.Competition.ConfigurationRevision,
-                target.Challenge.Revision,
                 target.Runtime.CheckerDeadlineAt.Value,
                 target.Runtime.RunnerPool,
                 target.Runtime.RunnerId!));
@@ -272,8 +268,7 @@ public static class BackendMessageHandlers
             code = "awd_flag_injection_failed",
             message.CompetitionChallengeId,
             message.ChallengeFlagId,
-            message.Generation,
-            message.ProcessingVersion
+            message.Generation
         });
         db.Notifications.Add(new Notification
         {
@@ -318,8 +313,7 @@ public static class BackendMessageHandlers
             message.CompetitionChallengeId,
             message.RuntimeInstanceId,
             message.Generation,
-            message.CheckerSequence,
-            message.ProcessingVersion
+            message.CheckerSequence
         });
         db.Notifications.Add(new Notification
         {
@@ -405,7 +399,7 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken) =>
         visibility.ExecuteAsync(
             message.CompetitionId,
-            message.VisibilityRevision,
+            message.ScheduledAt,
             DateTimeOffset.UtcNow,
             cancellationToken);
 
@@ -651,7 +645,6 @@ public static class BackendMessageHandlers
             || previous.GameplayFactId != fact.Id
             || previous.Generation != message.Generation
             || previous.State != RuntimeState.Stopping
-            || previous.ProcessingVersion != message.RecoveryProcessingVersion
             || !string.Equals(previous.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(previous.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return;
@@ -659,7 +652,6 @@ public static class BackendMessageHandlers
         previous.State = RuntimeState.Stopped;
         previous.StoppedAt = message.CleanedAt;
         previous.AwdpFixStage = AwdpFixStage.Completed;
-        previous.ProcessingVersion = checked(previous.ProcessingVersion + 1);
         await RecordRuntimeStateAsync(
             events,
             previous,
@@ -712,7 +704,6 @@ public static class BackendMessageHandlers
             || runtime.Purpose != RuntimePurpose.AwdpTarget
             || runtime.GameplayFactId != submission.Id
             || runtime.Generation != message.Generation
-            || runtime.ProcessingVersion != message.RuntimeProcessingVersion
             || runtime.State != RuntimeState.Running
             || !string.Equals(runtime.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(runtime.RunnerId, message.RunnerId, StringComparison.Ordinal)
@@ -726,7 +717,6 @@ public static class BackendMessageHandlers
         runtime.AwdpFixStage = AwdpFixStage.Completed;
         runtime.State = RuntimeState.Stopping;
         runtime.RunnerAssignmentReleaseToken = null;
-        runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
         await events.RecordAsync(new(
             submission.CompetitionId,
             CompetitionEventKind.GameplayFactAdjudicated,
@@ -751,7 +741,6 @@ public static class BackendMessageHandlers
             cancellationToken);
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
-            runtime.ProcessingVersion,
             runtime.Generation,
             message.RunnerPool,
             message.RunnerId));
@@ -793,9 +782,7 @@ public static class BackendMessageHandlers
                     Template = challenge
                 })
             .SingleOrDefaultAsync(item => item.Instance.Id == message.RuntimeInstanceId, cancellationToken);
-        if (target is null ||
-            target.Instance.State != RuntimeState.Queued ||
-            target.Instance.ProcessingVersion != message.ProcessingVersion)
+        if (target is null || target.Instance.State != RuntimeState.Queued)
             return;
 
         var awdpConfiguration = target.Instance.Purpose == RuntimePurpose.AwdpTarget
@@ -810,7 +797,6 @@ public static class BackendMessageHandlers
         {
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
             await FailAwdpSubmissionAsync(target.Instance, db, outbox, cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
@@ -851,8 +837,6 @@ public static class BackendMessageHandlers
             {
                 target.Instance.State = RuntimeState.Failed;
                 target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-                target.Instance.ProcessingVersion =
-                    checked(target.Instance.ProcessingVersion + 1);
                 await RecordRuntimeStateAsync(
                     events,
                     target.Instance,
@@ -887,7 +871,6 @@ public static class BackendMessageHandlers
                 }
                 claim = new ClaimContainerRuntime(
                     target.Instance.Id,
-                    target.Instance.ProcessingVersion,
                     target.Instance.Generation,
                     target.Instance.RunnerPool,
                     definition);
@@ -906,7 +889,6 @@ public static class BackendMessageHandlers
         {
             target.Instance.State = RuntimeState.Failed;
             target.Instance.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-            target.Instance.ProcessingVersion = checked(target.Instance.ProcessingVersion + 1);
             await FailAwdpSubmissionAsync(target.Instance, db, outbox, cancellationToken);
             await RecordRuntimeStateAsync(
                 events,
@@ -976,9 +958,7 @@ public static class BackendMessageHandlers
         var instance = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
-        if (instance is null ||
-            instance.State != RuntimeState.Stopping ||
-            instance.ProcessingVersion != message.ProcessingVersion)
+        if (instance is null || instance.State != RuntimeState.Stopping)
             return;
         if (string.IsNullOrWhiteSpace(instance.ProviderReceiptJson))
         {
@@ -996,13 +976,12 @@ public static class BackendMessageHandlers
 
             instance.State = RuntimeState.Stopped;
             instance.StoppedAt = DateTimeOffset.UtcNow;
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
                 candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                     && candidate.State == RuntimeState.Queued,
                 cancellationToken);
             if (replacement is not null)
-                await outbox.PublishAsync(new DispatchRuntime(replacement.Id, replacement.ProcessingVersion));
+                await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
             await RecordRuntimeStateAsync(
                 events,
                 instance,
@@ -1043,7 +1022,6 @@ public static class BackendMessageHandlers
             {
                 instance.State = RuntimeState.Stopped;
                 instance.StoppedAt = now;
-                instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
                 await RecordRuntimeStateAsync(
                     events,
                     instance,
@@ -1055,8 +1033,7 @@ public static class BackendMessageHandlers
 
             instance.State = RuntimeState.Stopping;
             instance.RunnerAssignmentReleaseToken = null;
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
-            await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
+            await outbox.PublishAsync(new StopRuntime(instance.Id));
             await RecordRuntimeStateAsync(
                 events,
                 instance,
@@ -1111,7 +1088,7 @@ public static class BackendMessageHandlers
             .OrderBy(instance => instance.CreatedAt)
             .ToListAsync(cancellationToken);
         foreach (var instance in queued)
-            await outbox.PublishAsync(new DispatchRuntime(instance.Id, instance.ProcessingVersion));
+            await outbox.PublishAsync(new DispatchRuntime(instance.Id));
         await outbox.FlushOutgoingMessagesAsync();
     }
 
@@ -1166,7 +1143,6 @@ public static class BackendMessageHandlers
             .ToListAsync(cancellationToken);
         foreach (var instance in solvedRuntimes)
         {
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             if (instance.State == RuntimeState.Queued
                 && string.IsNullOrWhiteSpace(instance.ProviderReceiptJson)
                 && instance.RunnerId is null)
@@ -1179,8 +1155,7 @@ public static class BackendMessageHandlers
                 instance.State = RuntimeState.Stopping;
                 instance.RunnerAssignmentReleaseToken = null;
                 await outbox.PublishAsync(new StopRuntime(
-                    instance.Id,
-                    instance.ProcessingVersion));
+                    instance.Id));
             }
         }
         applied |= solvedRuntimes.Count > 0;
@@ -1197,10 +1172,9 @@ public static class BackendMessageHandlers
         {
             instance.State = RuntimeState.Stopping;
             instance.RunnerAssignmentReleaseToken = null;
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             if (!string.IsNullOrWhiteSpace(instance.ProviderReceiptJson)
                 || instance.RunnerId is not null)
-                await outbox.PublishAsync(new StopRuntime(instance.Id, instance.ProcessingVersion));
+                await outbox.PublishAsync(new StopRuntime(instance.Id));
             else
             {
                 instance.State = RuntimeState.Stopped;
@@ -1332,7 +1306,6 @@ public static class BackendMessageHandlers
             if (action == RunnerAssignmentRecoveryAction.Ignore)
                 continue;
 
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             applied = true;
             switch (action)
             {
@@ -1524,21 +1497,18 @@ public static class BackendMessageHandlers
             RuntimeKind.Container => outbox.PublishToRunnerNodeAsync(
                 new StopContainerRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
                 new StopComposeRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             RuntimeKind.OvaVm => outbox.PublishToRunnerNodeAsync(
                 new StopOvaRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     runnerId)),

@@ -30,7 +30,6 @@ public sealed class RuntimeClaimHandler(
         CancellationToken cancellationToken) =>
         ExecuteAsync(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
             CapacityLimits(
@@ -38,10 +37,9 @@ public sealed class RuntimeClaimHandler(
                 message.Definition.Limits,
                 podCount: 1),
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
-            (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
+            runnerId => outbox.PublishToRunnerNodeAsync(
                 new ProvisionContainerRuntime(
                     message.RuntimeInstanceId,
-                    nextVersion,
                     message.Generation,
                     message.RunnerPool,
                     runnerId,
@@ -58,7 +56,6 @@ public sealed class RuntimeClaimHandler(
         CancellationToken cancellationToken) =>
         ExecuteAsync(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
             CapacityLimits(
@@ -66,10 +63,9 @@ public sealed class RuntimeClaimHandler(
                 message.Definition.Limits,
                 message.Definition.ServiceResources.Count),
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
-            (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
+            runnerId => outbox.PublishToRunnerNodeAsync(
                 new ProvisionComposeRuntime(
                     message.RuntimeInstanceId,
-                    nextVersion,
                     message.Generation,
                     message.RunnerPool,
                     runnerId,
@@ -86,15 +82,13 @@ public sealed class RuntimeClaimHandler(
         CancellationToken cancellationToken) =>
         ExecuteAsync(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
             message.Definition.Limits,
             scheduledAt => outbox.ScheduleToRunnerPoolAsync(message, scheduledAt),
-            (nextVersion, runnerId) => outbox.PublishToRunnerNodeAsync(
+            runnerId => outbox.PublishToRunnerNodeAsync(
                 new ProvisionOvaRuntime(
                     message.RuntimeInstanceId,
-                    nextVersion,
                     message.Generation,
                     message.RunnerPool,
                     runnerId,
@@ -120,12 +114,11 @@ public sealed class RuntimeClaimHandler(
 
     private async Task<MessageExecutionOutcome> ExecuteAsync(
         Guid runtimeInstanceId,
-        long processingVersion,
         int generation,
         string runnerPool,
         RuntimeResourceLimits limits,
         Func<DateTimeOffset, ValueTask> scheduleRetry,
-        Func<long, string, ValueTask> publishProvision,
+        Func<string, ValueTask> publishProvision,
         CancellationToken cancellationToken)
     {
         var configuredPool = configuredRunner.Value.Pool;
@@ -142,12 +135,10 @@ public sealed class RuntimeClaimHandler(
             cancellationToken);
         if (instance is null
             || instance.State != RuntimeState.Queued
-            || instance.ProcessingVersion != processingVersion
             || instance.Generation != generation)
             return instance is not null
                 && instance.State == RuntimeState.Provisioning
                 && instance.Generation == generation
-                && instance.ProcessingVersion == checked(processingVersion + 1)
                 && string.Equals(instance.RunnerId, runnerId, StringComparison.Ordinal)
                 ? MessageExecutionOutcome.Idempotent
                 : MessageExecutionOutcome.Superseded;
@@ -170,20 +161,17 @@ public sealed class RuntimeClaimHandler(
 
         try
         {
-            var nextVersion = checked(processingVersion + 1);
             int updated;
             if (db.Database.IsRelational())
             {
                 updated = await db.RuntimeInstances
                     .Where(candidate => candidate.Id == runtimeInstanceId
                         && candidate.State == RuntimeState.Queued
-                        && candidate.ProcessingVersion == processingVersion
                         && candidate.Generation == generation)
                     .ExecuteUpdateAsync(
                         setters => setters
                             .SetProperty(candidate => candidate.State, RuntimeState.Provisioning)
-                            .SetProperty(candidate => candidate.RunnerId, runnerId)
-                            .SetProperty(candidate => candidate.ProcessingVersion, nextVersion),
+                            .SetProperty(candidate => candidate.RunnerId, runnerId),
                         cancellationToken);
             }
             else
@@ -191,7 +179,6 @@ public sealed class RuntimeClaimHandler(
                 var tracked = await db.RuntimeInstances.SingleOrDefaultAsync(
                     candidate => candidate.Id == runtimeInstanceId
                         && candidate.State == RuntimeState.Queued
-                        && candidate.ProcessingVersion == processingVersion
                         && candidate.Generation == generation,
                     cancellationToken);
                 if (tracked is null)
@@ -202,7 +189,6 @@ public sealed class RuntimeClaimHandler(
                 {
                     tracked.State = RuntimeState.Provisioning;
                     tracked.RunnerId = runnerId;
-                    tracked.ProcessingVersion = nextVersion;
                     await db.SaveChangesAsync(cancellationToken);
                     updated = 1;
                 }
@@ -218,7 +204,7 @@ public sealed class RuntimeClaimHandler(
                 return MessageExecutionOutcome.Superseded;
             }
 
-            await publishProvision(nextVersion, runnerId);
+            await publishProvision(runnerId);
             await outbox.FlushOutgoingMessagesAsync();
             return MessageExecutionOutcome.Applied;
         }

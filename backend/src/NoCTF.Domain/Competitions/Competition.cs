@@ -15,23 +15,15 @@ public sealed class Competition
     public Guid[] ManagerIds { get; set; } = [];
     public Guid[] JudgeIds { get; set; } = [];
     public Guid[] ObserverIds { get; set; } = [];
-    [ConcurrencyCheck]
-    public int PermissionRevision { get; set; }
     public GameMode Mode { get; set; }
     public string ConfigurationJson { get; set; } = string.Empty;
     public string? TrackConfigurationJson { get; set; }
-    [ConcurrencyCheck]
-    public int TrackConfigurationRevision { get; set; }
     public DateTimeOffset TrackConfigurationUpdatedAt { get; set; }
-    [ConcurrencyCheck]
-    public int ConfigurationRevision { get; set; }
     public DateTimeOffset ConfigurationUpdatedAt { get; set; }
     public bool LeaderboardDirty { get; set; } = true;
     public CompetitionLeaderboardVisibility LeaderboardVisibility { get; set; }
     public DateTimeOffset? LeaderboardVisibilityStartsAt { get; set; }
     public DateTimeOffset? LeaderboardVisibilityAppliedAt { get; set; }
-    [ConcurrencyCheck]
-    public int LeaderboardVisibilityRevision { get; set; }
     public string? FrozenLeaderboardSnapshotJson { get; set; }
     [MaxLength(32)]
     public byte[] FlagDerivationSecret { get; set; } = [];
@@ -39,7 +31,6 @@ public sealed class Competition
     public DateTimeOffset EndAt { get; set; }
     public DateTimeOffset? RunningSince { get; set; }
     public long AccumulatedRunningSeconds { get; set; }
-    [ConcurrencyCheck]
     public CompetitionStatus Status { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
     public bool AllowTeamRegistrationWhileRunning { get; set; }

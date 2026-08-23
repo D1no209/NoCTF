@@ -14,7 +14,6 @@ import { competitionTrackErrorMessage } from '~/lib/competition-track'
 definePageMeta({ middleware: 'auth' })
 
 const { competitionId, canWrite } = useCompetitionAdmin()
-const revision = ref(0)
 const mode = ref<'Ctf' | 'Awd' | 'Awdp' | 'Koh'>('Ctf')
 const frozen = ref(false)
 type TrackForm = Omit<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest, 'invitationCode'> & {
@@ -35,7 +34,6 @@ async function load() {
     error.value = competitionTrackErrorMessage(requestError, translate('加载赛道配置失败'))
     return
   }
-  revision.value = data.revision ?? 0
   mode.value = data.mode ?? 'Ctf'
   frozen.value = data.isFrozen ?? false
   tracks.value = (data.items ?? []).map(item => ({
@@ -136,7 +134,6 @@ async function save() {
   const { data, error: requestError } = await adminCompetitionTracksUpdate({
     path: { competitionId },
     body: {
-      expectedRevision: revision.value,
       tracks: tracks.value.map(track => ({
         key: track.key,
         name: track.name,

@@ -15,7 +15,6 @@ public sealed record ChallengeTemplateView(
     string? Description,
     string Direction,
     string DefinitionJson,
-    int Revision,
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
@@ -28,7 +27,6 @@ public enum ChallengeTemplateWriteState
     InvalidDefinition,
     ResourceIdConflict,
     NotFoundOrForbidden,
-    RevisionConflict,
     ActiveCompetitionModeConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
@@ -65,7 +63,6 @@ public sealed record UpdateChallengeTemplateCommand(
     string? Description,
     string Direction,
     string DefinitionJson,
-    int ExpectedRevision,
     DateTimeOffset UpdatedAt);
 
 public interface IChallengeBankStore
@@ -99,7 +96,6 @@ public interface IChallengeBankStore
         Guid actorId,
         bool isAdministrator,
         Guid[] managerIds,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<ChallengeTemplateWriteResult> TransferOwnerAsync(
@@ -107,7 +103,6 @@ public interface IChallengeBankStore
         Guid actorId,
         bool isAdministrator,
         Guid ownerId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
@@ -123,8 +118,7 @@ public enum ChallengeTemplateValidationFailureCode
     InvalidMode,
     InvalidTitle,
     InvalidDirection,
-    InvalidDefinition,
-    InvalidRevision
+    InvalidDefinition
 }
 
 public enum ChallengeTemplateDeleteFailureCode
@@ -139,8 +133,7 @@ public static class ChallengeTemplateValidation
         GameMode mode,
         string title,
         string direction,
-        string definitionJson,
-        int expectedRevision = 0)
+        string definitionJson)
     {
         if (!Enum.IsDefined(mode))
             return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
@@ -157,10 +150,6 @@ public static class ChallengeTemplateValidation
             return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
                 ChallengeTemplateValidationFailureCode.InvalidDefinition,
                 "DefinitionJson is required.");
-        if (expectedRevision < 0)
-            return OperationResult<ChallengeTemplateValidationFailureCode>.Failure(
-                ChallengeTemplateValidationFailureCode.InvalidRevision,
-                "ExpectedRevision cannot be negative.");
         return OperationResult<ChallengeTemplateValidationFailureCode>.Success();
     }
 }
@@ -242,8 +231,7 @@ public sealed class UpdateChallengeTemplate(
             command.Mode,
             command.Title,
             command.Direction,
-            definitionJson,
-            command.ExpectedRevision);
+            definitionJson);
         if (!validation.Succeeded)
         {
             return new(
@@ -315,22 +303,20 @@ public sealed class UpdateChallengeTemplatePermissions(IChallengeBankStore store
         Guid actorId,
         bool isAdministrator,
         IReadOnlyList<Guid> managerIds,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
-        if (expectedRevision < 0 || managerIds.Any(id => id == Guid.Empty))
+        if (managerIds.Any(id => id == Guid.Empty))
         {
             return Task.FromResult(new ChallengeTemplateWriteResult(
                 ChallengeTemplateWriteState.InvalidRequest,
-                Detail: "ManagerIds and ExpectedRevision are invalid."));
+                Detail: "ManagerIds are invalid."));
         }
         return store.UpdatePermissionsAsync(
             challengeId,
             actorId,
             isAdministrator,
             managerIds.Distinct().ToArray(),
-            expectedRevision,
             now,
             ct);
     }
@@ -343,22 +329,20 @@ public sealed class TransferChallengeTemplateOwner(IChallengeBankStore store)
         Guid actorId,
         bool isAdministrator,
         Guid ownerId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
-        if (ownerId == Guid.Empty || expectedRevision < 0)
+        if (ownerId == Guid.Empty)
         {
             return Task.FromResult(new ChallengeTemplateWriteResult(
                 ChallengeTemplateWriteState.InvalidRequest,
-                Detail: "OwnerId and ExpectedRevision are invalid."));
+                Detail: "OwnerId is invalid."));
         }
         return store.TransferOwnerAsync(
             challengeId,
             actorId,
             isAdministrator,
             ownerId,
-            expectedRevision,
             now,
             ct);
     }

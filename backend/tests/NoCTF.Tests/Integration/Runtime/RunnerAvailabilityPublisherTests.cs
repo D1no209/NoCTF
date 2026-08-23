@@ -145,7 +145,6 @@ public sealed class RunnerAvailabilityPublisherTests
                 await Assert.That(cleaned.RunnerId).IsNull();
                 await Assert.That(cleaned.RunnerAssignmentReleaseToken).IsNull();
                 await Assert.That(cleaned.RunnerUnavailableAt).IsNull();
-                await Assert.That(cleaned.ProcessingVersion).IsEqualTo(8);
 
                 var otherProvider = await cleanupVerify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(
@@ -255,7 +254,6 @@ public sealed class RunnerAvailabilityPublisherTests
                 RunnerUnavailableAt = now,
                 State = RuntimeState.Failed,
                 FailureCode = RuntimeFailureCode.CleanupFailed,
-                ProcessingVersion = 7,
                 ProviderReceiptJson = JsonSerializer.Serialize(new ContainerReceipt(
                     runtimeInstanceId,
                     RuntimeProvider.Docker,

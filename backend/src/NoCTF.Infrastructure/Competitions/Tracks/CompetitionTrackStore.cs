@@ -28,8 +28,7 @@ public sealed class CompetitionTrackStore(
                 item.Id,
                 item.Mode,
                 item.Status,
-                item.TrackConfigurationJson,
-                item.TrackConfigurationRevision
+                item.TrackConfigurationJson
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (competition is null)
@@ -68,7 +67,6 @@ public sealed class CompetitionTrackStore(
             competition.Id,
             competition.Mode,
             competition.Status,
-            competition.TrackConfigurationRevision,
             CompetitionTrackPolicy.IsFrozen(competition.Status),
             tracks,
             viewerTeamId);
@@ -90,10 +88,6 @@ public sealed class CompetitionTrackStore(
         if (CompetitionTrackPolicy.IsFrozen(competition.Status))
             return Failure(CompetitionTrackFailureCode.ConfigurationLocked,
                 "Track definitions are frozen after the competition first starts.");
-        if (competition.TrackConfigurationRevision != command.ExpectedRevision)
-            return Failure(CompetitionTrackFailureCode.ConfigurationConflict,
-                "Track configuration revision is stale.");
-
         var validationErrors = CompetitionTrackPolicy.Validate(competition.Mode, command.Tracks);
         if (validationErrors.Count > 0)
             return Failure(CompetitionTrackFailureCode.InvalidConfiguration,
@@ -138,7 +132,6 @@ public sealed class CompetitionTrackStore(
         }
 
         competition.TrackConfigurationJson = nextJson;
-        competition.TrackConfigurationRevision = checked(competition.TrackConfigurationRevision + 1);
         competition.TrackConfigurationUpdatedAt = command.UpdatedAt;
         competition.LeaderboardDirty = true;
         await events.RecordAsync(new CompetitionEventDraft(
@@ -184,19 +177,15 @@ public sealed class CompetitionTrackStore(
             cancellationToken);
         if (team is null)
             return AssignmentFailure(CompetitionTrackFailureCode.TeamNotFound, "Team was not found.");
-        if (team.ConcurrencyVersion != command.ExpectedTeamVersion)
-            return AssignmentFailure(CompetitionTrackFailureCode.AssignmentConflict,
-                "Team revision is stale.");
         if (string.Equals(team.TrackKey, track.Key, StringComparison.OrdinalIgnoreCase))
         {
             await transaction.CommitAsync(cancellationToken);
             return OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode>.Success(
-                new TeamTrackAssignmentView(team.CompetitionId, team.Id, team.TrackKey, team.ConcurrencyVersion));
+                new TeamTrackAssignmentView(team.CompetitionId, team.Id, team.TrackKey));
         }
 
         var previousTrackKey = team.TrackKey;
         team.TrackKey = track.Key;
-        team.ConcurrencyVersion = checked(team.ConcurrencyVersion + 1);
         competition.LeaderboardDirty = true;
         await events.RecordAsync(new CompetitionEventDraft(
             competition.Id,
@@ -212,7 +201,7 @@ public sealed class CompetitionTrackStore(
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode>.Success(
-            new TeamTrackAssignmentView(team.CompetitionId, team.Id, team.TrackKey, team.ConcurrencyVersion));
+            new TeamTrackAssignmentView(team.CompetitionId, team.Id, team.TrackKey));
     }
 
     private static CompetitionTracksView Map(
@@ -221,7 +210,6 @@ public sealed class CompetitionTrackStore(
         competition.Id,
         competition.Mode,
         competition.Status,
-        competition.TrackConfigurationRevision,
         CompetitionTrackPolicy.IsFrozen(competition.Status),
         configuration.Tracks.Select(Map).ToArray());
 

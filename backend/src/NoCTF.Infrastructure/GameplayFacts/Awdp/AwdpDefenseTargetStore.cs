@@ -178,12 +178,9 @@ public sealed class AwdpDefenseTargetStore(
             template,
             placement,
             generation,
-            context.Competition.ConfigurationRevision,
-            context.Challenge.Revision,
-            context.Template.Revision,
             now);
         db.RuntimeInstances.Add(target);
-        await outbox.PublishAsync(new DispatchRuntime(target.Id, target.ProcessingVersion));
+        await outbox.PublishAsync(new DispatchRuntime(target.Id));
         await events.RecordAsync(new(
             competitionId,
             CompetitionEventKind.RuntimeCreated,

@@ -113,8 +113,6 @@ public sealed class FlagSubmissionBatchTests
                 Guid.NewGuid(),
                 competitionChallengeId,
                 mode,
-                1,
-                1,
                 "{}",
                 "{}",
                 0,

@@ -165,49 +165,11 @@ public class ChallengeManagementTests
     }
 
     [Test]
-    [Arguments(ChallengeMutation.Update)]
-    [Arguments(ChallengeMutation.Delete)]
-    [Arguments(ChallengeMutation.Restore)]
-    public async Task Mutation_Succeeds_UsesExpectedRevision(ChallengeMutation mutation)
-    {
-        var competitionId = Guid.NewGuid();
-        var store = new Store();
-
-        var failure = await ExecuteMutationAsync(
-            mutation,
-            store,
-            competitionId);
-
-        await Assert.That(failure).IsNull();
-        await Assert.That(store.LastExpectedRevision).IsEqualTo(0);
-    }
-
-    [Test]
-    [Arguments(ChallengeMutation.Update)]
-    [Arguments(ChallengeMutation.Delete)]
-    [Arguments(ChallengeMutation.Restore)]
-    public async Task Mutation_InvalidRevision_IsRejectedBeforeStoreOrSideEffects(
-        ChallengeMutation mutation)
-    {
-        var store = new Store();
-
-        var failure = await ExecuteMutationAsync(
-            mutation,
-            store,
-            expectedRevision: -1);
-
-        await Assert.That(failure).IsEqualTo(ChallengeMutationFailure.InvalidRevision);
-        await Assert.That(store.MutationCalls).IsEqualTo(0);
-    }
-
-    [Test]
     [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.CompetitionNotFound)]
     [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.ChallengeNotFound)]
     [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.ChallengeOrderConflict)]
-    [Arguments(ChallengeMutation.Update, ChallengeMutationFailure.RevisionConflict)]
     [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.CompetitionNotFound)]
     [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.ChallengeNotFound)]
-    [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.RevisionConflict)]
     [Arguments(ChallengeMutation.Delete, ChallengeMutationFailure.LifecycleStateConflict)]
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.CompetitionNotFound)]
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.TemplateNotFound)]
@@ -215,7 +177,6 @@ public class ChallengeManagementTests
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeNotFound)]
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeOrderConflict)]
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.ChallengeTemplateConflict)]
-    [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.RevisionConflict)]
     [Arguments(ChallengeMutation.Restore, ChallengeMutationFailure.LifecycleStateConflict)]
     public async Task Mutation_TypedFailure_IsPropagated(
         ChallengeMutation mutation,
@@ -239,28 +200,22 @@ public class ChallengeManagementTests
     private static async Task<ChallengeMutationFailure?> ExecuteMutationAsync(
         ChallengeMutation mutation,
         Store store,
-        Guid? competitionId = null,
-        int expectedRevision = 0)
+        Guid? competitionId = null)
     {
         var actualCompetitionId = competitionId ?? Guid.NewGuid();
         return mutation switch
         {
             ChallengeMutation.Update => (await new UpdateChallenge(store)
-                .ExecuteAsync(UpdateCommand(actualCompetitionId) with
-                {
-                    ExpectedRevision = expectedRevision
-                })).Failure,
+                .ExecuteAsync(UpdateCommand(actualCompetitionId))).Failure,
             ChallengeMutation.Delete => await new DeleteChallenge(store)
                 .ExecuteAsync(
                     actualCompetitionId,
                     Guid.NewGuid(),
-                    expectedRevision,
                     DateTimeOffset.UtcNow),
             ChallengeMutation.Restore => await new DeleteChallenge(store)
                 .RestoreAsync(
                     actualCompetitionId,
                     Guid.NewGuid(),
-                    expectedRevision,
                     DateTimeOffset.UtcNow),
             _ => throw new ArgumentOutOfRangeException(nameof(mutation), mutation, null)
         };
@@ -280,7 +235,6 @@ public class ChallengeManagementTests
         100,
         2,
         true,
-        0,
         DateTimeOffset.UtcNow);
 
     private sealed class Store : IChallengeManagementStore
@@ -296,7 +250,6 @@ public class ChallengeManagementTests
             100,
             1,
             false,
-            0,
             null,
             false,
             DateTimeOffset.UtcNow,
@@ -307,7 +260,6 @@ public class ChallengeManagementTests
         public ChallengeMutationFailure? MutationFailure { get; init; }
         public int CreateCalls { get; private set; }
         public int MutationCalls { get; private set; }
-        public int? LastExpectedRevision { get; private set; }
         public bool? LastIncludeUnpublished { get; private set; }
         public string? LastCustomTitle { get; private set; }
 
@@ -353,7 +305,6 @@ public class ChallengeManagementTests
         {
             MutationCalls++;
             LastCustomTitle = command.CustomTitle;
-            LastExpectedRevision = command.ExpectedRevision;
             return Task.FromResult(MutationFailure is null
                 ? new ChallengeMutationResult(challenge)
                 : new ChallengeMutationResult(null, MutationFailure));
@@ -362,24 +313,20 @@ public class ChallengeManagementTests
         public Task<ChallengeMutationFailure?> SoftDeleteAsync(
             Guid competitionId,
             Guid challengeId,
-            int expectedRevision,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             MutationCalls++;
-            LastExpectedRevision = expectedRevision;
             return Task.FromResult(MutationFailure);
         }
 
         public Task<ChallengeMutationFailure?> RestoreAsync(
             Guid competitionId,
             Guid challengeId,
-            int expectedRevision,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             MutationCalls++;
-            LastExpectedRevision = expectedRevision;
             return Task.FromResult(MutationFailure);
         }
     }

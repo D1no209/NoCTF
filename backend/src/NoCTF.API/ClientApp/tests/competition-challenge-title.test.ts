@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { competitionChallengeConflictMessage } from '../app/lib/competition-challenge-conflict'
-import { ApiError, statusErrorMessage } from '../app/utils/api-error'
-import { isRevisionConflict } from '../app/utils/admin-format'
+import { statusErrorMessage } from '../app/utils/api-error'
 
 describe('competition challenge custom title', () => {
   test('allows an optional competition-only title while adding from the question bank', async () => {
@@ -32,13 +31,11 @@ describe('competition challenge custom title', () => {
       .toBe('该顺序已被其他题目占用,请更换顺序。')
     expect(competitionChallengeConflictMessage({ code: 'ResourceIdConflict' }))
       .toBe('题目资源标识冲突,请重新添加。')
-    expect(competitionChallengeConflictMessage({ code: 'RevisionConflict' }))
-      .toBe('题目已被其他人修改,请刷新后重试。')
+    expect(competitionChallengeConflictMessage({ code: 'LifecycleStateConflict' }))
+      .toBeUndefined()
   })
 
-  test('only treats the exact revision code as a revision conflict', () => {
-    expect(isRevisionConflict(new ApiError('conflict', { status: 409, code: 'ChallengeOrderConflict' }))).toBe(false)
-    expect(isRevisionConflict(new ApiError('conflict', { status: 409, code: 'RevisionConflict' }))).toBe(true)
+  test('keeps generic HTTP conflicts separate from typed add conflicts', () => {
     expect(statusErrorMessage(409)).toBe('请求与当前状态冲突,请检查后重试')
   })
 

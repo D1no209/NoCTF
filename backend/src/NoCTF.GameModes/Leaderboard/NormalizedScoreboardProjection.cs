@@ -37,8 +37,7 @@ internal static class NormalizedScoreboardProjection
             challenge.Direction,
             Category = challenge.Direction,
             challenge.Order,
-            challenge.IsPublished,
-            challenge.Revision
+            challenge.IsPublished
         })));
         var catalog = new ScoreboardChallengeCatalog(
             input.CompetitionId,
@@ -49,8 +48,7 @@ internal static class NormalizedScoreboardProjection
                 challenge.Direction,
                 challenge.Direction,
                 challenge.Order,
-                challenge.IsPublished,
-                challenge.Revision)).ToArray());
+                challenge.IsPublished)).ToArray());
 
         var roundProjection = BuildRounds(scoreboardInput, legacy, projectedAt);
         var columns = BuildColumns(input.Mode, challenges, roundProjection.Rounds);

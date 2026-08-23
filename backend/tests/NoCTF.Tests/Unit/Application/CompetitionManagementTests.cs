@@ -159,7 +159,9 @@ public class CompetitionManagementTests
         }
         public Task<CompetitionView?> FindAsync(Guid competitionId, bool includeDraft, CancellationToken cancellationToken) => Task.FromResult(Last);
         public Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<CompetitionView>>(Last is null ? [] : [Last]);
-        public Task<CompetitionView?> UpdateAsync(UpdateCompetitionCommand command, CompetitionStatus expectedStatus, CancellationToken cancellationToken) => Task.FromResult(Last);
+        public Task<CompetitionView?> UpdateAsync(
+            UpdateCompetitionCommand command,
+            CancellationToken cancellationToken) => Task.FromResult(Last);
         public Task<bool> SoftDeleteAsync(Guid competitionId, CompetitionStatus expectedStatus, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken) => Task.FromResult(true);
     }
 }

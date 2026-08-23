@@ -30,7 +30,6 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new ProvisionContainerRuntime(
             runtimeInstanceId,
-            ProcessingVersion: 8,
             Generation: 3,
             RunnerPool: "default",
             RunnerId: "runner-a",
@@ -88,7 +87,6 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new StopContainerRuntime(
             runtimeInstanceId,
-            8,
             3,
             "default",
             "runner-a");
@@ -134,7 +132,6 @@ public sealed class ContainerRuntimeHandlerTests
             providerHealth: health);
         var message = new ProvisionContainerRuntime(
             runtimeInstanceId,
-            ProcessingVersion: 8,
             Generation: 3,
             RunnerPool: "default",
             RunnerId: "runner-a",
@@ -186,7 +183,7 @@ public sealed class ContainerRuntimeHandlerTests
                 Generation: 3)));
 
         var result = await handler.Handle(
-            new StopContainerRuntime(runtimeInstanceId, 8, 3, "default", "runner-a"),
+            new StopContainerRuntime(runtimeInstanceId, 3, "default", "runner-a"),
             CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
@@ -212,7 +209,6 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new StopContainerRuntime(
             runtimeInstanceId,
-            8,
             3,
             "default",
             "runner-a");
@@ -258,7 +254,6 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new ForceTerminateRuntime(
             runtimeInstanceId,
-            9,
             3,
             RuntimeProvider.Docker,
             "default",
@@ -290,7 +285,6 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new ForceTerminateRuntime(
             runtimeInstanceId,
-            9,
             3,
             RuntimeProvider.Docker,
             "default",

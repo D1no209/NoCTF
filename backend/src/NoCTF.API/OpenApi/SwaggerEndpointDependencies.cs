@@ -26,7 +26,7 @@ internal sealed class SwaggerGameplayFactStore : IGameplayFactIntakeStore
     public Task<GameplayFactAcceptanceResult> TryAcceptFlagAsync(
         FlagGameplayFactReceived received, GameplayFactAdmissionSnapshot snapshot, int? maxAttempts,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.AdmissionRejected));
     public Task<IReadOnlyList<GameplayFactAcceptanceResult>> TryAcceptFlagsAsync(
         IReadOnlyList<FlagGameplayFactReceived> received,
         GameplayFactAdmissionSnapshot snapshot,
@@ -34,15 +34,15 @@ internal sealed class SwaggerGameplayFactStore : IGameplayFactIntakeStore
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<GameplayFactAcceptanceResult>>(
             received.Select(_ => new GameplayFactAcceptanceResult(
-                GameplayFactAcceptanceState.SnapshotChanged)).ToArray());
+                GameplayFactAcceptanceState.AdmissionRejected)).ToArray());
     public Task<GameplayFactAcceptanceResult> TryAcceptHintUnlockAsync(
         HintUnlockGameplayFactReceived received,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.AdmissionRejected));
     public Task<GameplayFactAcceptanceResult> TryAcceptManualAdjustmentAsync(
         ManualAdjustmentGameplayFactReceived received,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.AdmissionRejected));
 }
 
 internal sealed class SwaggerPatchUploadStore : IPatchUploadStore
@@ -226,7 +226,10 @@ internal sealed class SwaggerBackendMessagePublisher : IBackendMessagePublisher
 {
     public ValueTask ProjectLeaderboardAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     public ValueTask RebuildCompetitionAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
-    public ValueTask ApplyCompetitionVisibilityAsync(Guid competitionId, int visibilityRevision, CancellationToken cancellationToken) => ValueTask.CompletedTask;
+    public ValueTask ApplyCompetitionVisibilityAsync(
+        Guid competitionId,
+        DateTimeOffset scheduledAt,
+        CancellationToken cancellationToken) => ValueTask.CompletedTask;
     public ValueTask CleanupCompetitionRuntimesAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
     public ValueTask ProvisionCompetitionRuntimesAsync(Guid competitionId, CancellationToken cancellationToken) => ValueTask.CompletedTask;
 }

@@ -23,8 +23,7 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
                 competition.OwnerId,
                 competition.ManagerIds,
                 competition.JudgeIds,
-                competition.ObserverIds,
-                competition.PermissionRevision))
+                competition.ObserverIds))
             .SingleOrDefaultAsync(ct);
         if (snapshot is null)
             return new(CompetitionPermissionSnapshotState.NotFound);
@@ -96,9 +95,6 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
             ct);
         if (competition.OwnerId != command.ActorId && !administrator)
             return new(CompetitionPermissionUpdateState.Forbidden);
-        if (competition.PermissionRevision != command.ExpectedPermissionRevision)
-            return new(CompetitionPermissionUpdateState.RevisionConflict);
-
         var userIds = command.ManagerIds
             .Concat(command.JudgeIds)
             .Concat(command.ObserverIds)
@@ -175,16 +171,8 @@ public sealed class CompetitionPermissionStore(NoCtfDbContext db) : ICompetition
         competition.ManagerIds = command.ManagerIds.Distinct().Order().ToArray();
         competition.JudgeIds = command.JudgeIds.Distinct().Order().ToArray();
         competition.ObserverIds = command.ObserverIds.Distinct().Order().ToArray();
-        competition.PermissionRevision = checked(competition.PermissionRevision + 1);
         competition.UpdatedAt = DateTimeOffset.UtcNow;
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return new(CompetitionPermissionUpdateState.RevisionConflict);
-        }
+        await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return new(CompetitionPermissionUpdateState.Updated);
     }

@@ -11,7 +11,6 @@ namespace NoCTF.API.Endpoints.Challenges.Questions;
 public sealed class AddCompetitionQuestionMessageRequest
 {
     public string Body { get; set; } = string.Empty;
-    public int? ExpectedRevision { get; set; }
 }
 public sealed class AddCompetitionQuestionMessageValidator
     : Validator<AddCompetitionQuestionMessageRequest>
@@ -22,7 +21,6 @@ public sealed class AddCompetitionQuestionMessageValidator
             .NotEmpty()
             .MinimumLength(CompetitionQuestionRules.MinimumBodyLength)
             .MaximumLength(CompetitionQuestionRules.MaximumBodyLength);
-        RuleFor(request => request.ExpectedRevision).NotNull().GreaterThanOrEqualTo(0);
     }
 }
 
@@ -66,15 +64,13 @@ public sealed class AddCompetitionQuestionMessageEndpoint(
             Route<Guid>("questionId"),
             user.UserId,
             request.Body,
-            request.ExpectedRevision!.Value,
             DateTimeOffset.UtcNow), ct);
         return result.Failure switch
         {
             null => TypedResults.Ok(CompetitionQuestionResponseMapper.ToResponse(result.Question!)),
             CompetitionQuestionFailure.NotFound => TypedResults.NotFound(),
             CompetitionQuestionFailure.Forbidden => TypedResults.Forbid(),
-            CompetitionQuestionFailure.RevisionConflict
-                or CompetitionQuestionFailure.InvalidTransition
+            CompetitionQuestionFailure.InvalidTransition
                 or CompetitionQuestionFailure.QuestionClosed
                 or CompetitionQuestionFailure.TeamActiveQuestionLimitReached
                 or CompetitionQuestionFailure.ParticipantMessageLimitReached => TypedResults.Conflict(

@@ -210,8 +210,6 @@ public sealed class CompetitionLifecycleStore(
             competition.LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal;
             competition.LeaderboardVisibilityStartsAt = null;
             competition.LeaderboardVisibilityAppliedAt = now;
-            competition.LeaderboardVisibilityRevision = checked(
-                competition.LeaderboardVisibilityRevision + 1);
             competition.FrozenLeaderboardSnapshotJson = null;
         }
         competition.Status = to;
@@ -247,16 +245,14 @@ public sealed class CompetitionLifecycleStore(
                 .Where(challenge => challenge.CompetitionId == competitionId
                     && challenge.IsPublished
                     && challenge.DeletedAt == null)
-                .Select(challenge => new { challenge.Id, challenge.Revision })
+                .Select(challenge => challenge.Id)
                 .ToListAsync(cancellationToken);
-            foreach (var challenge in challenges)
+            foreach (var challengeId in challenges)
             {
                 await outbox.PublishAsync(new AdvanceAwdRound(
                     competitionId,
-                    challenge.Id,
-                    now,
-                    competition.ConfigurationRevision,
-                    challenge.Revision));
+                    challengeId,
+                    now));
             }
         }
         if (competition.Mode == GameMode.Koh && to == CompetitionStatus.Running)
@@ -265,27 +261,18 @@ public sealed class CompetitionLifecycleStore(
                 .Where(challenge => challenge.CompetitionId == competitionId
                     && challenge.IsPublished
                     && challenge.DeletedAt == null)
-                .Select(challenge => new { challenge.Id, challenge.Revision })
+                .Select(challenge => challenge.Id)
                 .ToListAsync(cancellationToken);
-            foreach (var challenge in challenges)
+            foreach (var challengeId in challenges)
             {
                 await outbox.PublishAsync(new PollKohChallenge(
                     competitionId,
-                    challenge.Id,
-                    competition.ConfigurationRevision,
-                    challenge.Revision,
+                    challengeId,
                     competition.RunningSince!.Value,
                     now));
             }
         }
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return false;
-        }
+        await db.SaveChangesAsync(cancellationToken);
         if (transaction is not null)
         {
             await transaction.CommitAsync(cancellationToken);

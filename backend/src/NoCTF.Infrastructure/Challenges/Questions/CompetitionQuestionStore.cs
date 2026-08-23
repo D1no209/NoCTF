@@ -178,8 +178,7 @@ public sealed class CompetitionQuestionStore(
             NotificationKind.QuestionOpened,
             CompetitionQuestionNotificationEvent.Opened,
             root.Title,
-            command.Now,
-            0));
+            command.Now));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -271,18 +270,6 @@ public sealed class CompetitionQuestionStore(
                 command.QuestionId,
                 aggregate.Root.TeamId,
                 command.ActorUserId);
-        if (aggregate.Revision != command.ExpectedRevision)
-        {
-            var current = await BuildViewAsync(aggregate, access.Value.Access, true, ct);
-            WarnFailure(
-                CompetitionQuestionFailure.RevisionConflict,
-                command.CompetitionId,
-                command.QuestionId,
-                aggregate.Root.TeamId,
-                command.ActorUserId);
-            return new(current, CompetitionQuestionFailure.RevisionConflict);
-        }
-
         var actorRole = access.Value.ActorRole;
         var nextStatus = CompetitionQuestionRules.StatusAfterMessage(aggregate.Status, actorRole);
         if (nextStatus is null)
@@ -364,8 +351,7 @@ public sealed class CompetitionQuestionStore(
                 ? CompetitionQuestionNotificationEvent.AskerFollowedUp
                 : CompetitionQuestionNotificationEvent.HandlerReplied,
             aggregate.Root.Title,
-            command.Now,
-            aggregate.Revision + 1));
+            command.Now));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -402,17 +388,6 @@ public sealed class CompetitionQuestionStore(
                 command.QuestionId,
                 aggregate.Root.TeamId,
                 command.ActorUserId);
-        if (aggregate.Revision != command.ExpectedRevision)
-        {
-            var current = await BuildViewAsync(aggregate, access.Value.Access, true, ct);
-            WarnFailure(
-                CompetitionQuestionFailure.RevisionConflict,
-                command.CompetitionId,
-                command.QuestionId,
-                aggregate.Root.TeamId,
-                command.ActorUserId);
-            return new(current, CompetitionQuestionFailure.RevisionConflict);
-        }
         var role = access.Value.ActorRole;
         if (!CompetitionQuestionRules.CanTransition(aggregate.Status, command.Status, role))
             return Failure(
@@ -455,8 +430,7 @@ public sealed class CompetitionQuestionStore(
             NotificationKind.QuestionStatusChanged,
             CompetitionQuestionNotificationEvent.StatusChanged,
             aggregate.Root.Title,
-            command.Now,
-            aggregate.Revision + 1));
+            command.Now));
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -1194,7 +1168,6 @@ public sealed class CompetitionQuestionStore(
             lastActorRole,
             remainingParticipantMessages,
             maximumParticipantMessages,
-            question.Revision,
             question.RootNotification.SentAt,
             question.Nodes.Count == 0 ? question.RootNotification.SentAt : question.Nodes[^1].SentAt,
             entries);
@@ -1307,8 +1280,6 @@ public sealed class CompetitionQuestionStore(
         QuestionRootPayload Root,
         List<Notification> Nodes)
     {
-        public int Revision => Nodes.Count;
-
         public DateTimeOffset UpdatedAt => Nodes.Count == 0
             ? RootNotification.SentAt
             : Nodes[^1].SentAt;

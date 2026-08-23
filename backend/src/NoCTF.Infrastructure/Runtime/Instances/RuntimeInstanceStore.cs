@@ -69,7 +69,7 @@ public sealed class RuntimeInstanceStore(
             .Select(instance => new RuntimeInstanceView(
                 instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId,
                 instance.Purpose, instance.Generation, instance.RuntimeKind, instance.RuntimeProvider, instance.RunnerPool,
-                instance.State, instance.FailureCode, instance.ProcessingVersion, instance.Urls,
+                instance.State, instance.FailureCode, instance.Urls,
                 instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt))
             .FirstOrDefaultAsync(ct);
     }
@@ -166,10 +166,7 @@ public sealed class RuntimeInstanceStore(
                     cleanupTarget.State = RuntimeState.Stopping;
                     cleanupTarget.FailureCode = null;
                     cleanupTarget.RunnerAssignmentReleaseToken = null;
-                    cleanupTarget.ProcessingVersion = checked(cleanupTarget.ProcessingVersion + 1);
-                    await outbox.PublishAsync(new StopRuntime(
-                        cleanupTarget.Id,
-                        cleanupTarget.ProcessingVersion));
+                    await outbox.PublishAsync(new StopRuntime(cleanupTarget.Id));
                     await events.RecordAsync(new(
                         cleanupTarget.CompetitionId,
                         CompetitionEventKind.RuntimeStateChanged,
@@ -195,7 +192,7 @@ public sealed class RuntimeInstanceStore(
                 catch (InvalidOperationException) { return new(null, RuntimeMutationFailure.ConfigurationInvalid); }
                 db.RuntimeInstances.Add(entity);
                 if (cleanupTarget is null)
-                    await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
+                    await outbox.PublishAsync(new DispatchRuntime(entity.Id));
                 break;
             case RuntimeAction.Reset:
                 if (current is null
@@ -211,10 +208,9 @@ public sealed class RuntimeInstanceStore(
                     return new(null, RuntimeMutationFailure.CapacityExceeded);
                 current.State = RuntimeState.Stopping;
                 current.RunnerAssignmentReleaseToken = null;
-                current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 if (scope.Mode == GameMode.Awdp)
                     await runtimeFlags.InvalidateGenerationAsync(current.Id, command.Now, ct);
-                await outbox.PublishAsync(new StopRuntime(current.Id, current.ProcessingVersion));
+                await outbox.PublishAsync(new StopRuntime(current.Id));
                 try
                 {
                     entity = await CreateAsync(
@@ -232,7 +228,6 @@ public sealed class RuntimeInstanceStore(
                     return new(null, RuntimeMutationFailure.InvalidState);
                 if (current.State == RuntimeState.Stopping)
                     return new(Map(current));
-                current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 entity = current;
                 if (scope.Mode == GameMode.Awdp)
                     await runtimeFlags.InvalidateGenerationAsync(current.Id, command.Now, ct);
@@ -245,7 +240,7 @@ public sealed class RuntimeInstanceStore(
                 {
                     current.State = RuntimeState.Stopping;
                     current.RunnerAssignmentReleaseToken = null;
-                    await outbox.PublishAsync(new StopRuntime(entity.Id, entity.ProcessingVersion));
+                    await outbox.PublishAsync(new StopRuntime(entity.Id));
                 }
                 break;
             case RuntimeAction.Extend:
@@ -255,7 +250,6 @@ public sealed class RuntimeInstanceStore(
                 if (remaining <= TimeSpan.Zero || remaining >= TimeSpan.FromMinutes(10))
                     return new(null, RuntimeMutationFailure.InvalidState);
                 current.ExpiresAt = command.Now.Add(command.Extension!.Value);
-                current.ProcessingVersion = checked(current.ProcessingVersion + 1);
                 entity = current;
                 break;
             default:
@@ -453,7 +447,7 @@ public sealed class RuntimeInstanceStore(
         new(
             instance.Id, instance.CompetitionId, instance.CompetitionChallengeId, instance.TeamId,
             instance.Purpose, instance.Generation, instance.RuntimeKind, instance.RuntimeProvider, instance.RunnerPool,
-            instance.State, instance.FailureCode, instance.ProcessingVersion, instance.Urls,
+            instance.State, instance.FailureCode, instance.Urls,
             instance.CreatedAt, instance.RunningAt, instance.ExpiresAt, instance.StoppedAt);
 
     private sealed record RuntimeScope(

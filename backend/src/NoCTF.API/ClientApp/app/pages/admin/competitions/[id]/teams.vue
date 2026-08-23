@@ -69,7 +69,7 @@ async function assignTrack(team: NoCtfapiEndpointsTeamsTeamResponse, trackKey: s
   try {
     const { error: requestError } = await adminTeamTrackAssign({
       path: { competitionId, teamId: team.id },
-      body: { trackKey, expectedTeamVersion: team.concurrencyVersion ?? 0 },
+      body: { trackKey },
     })
     if (requestError) throw requestError
     toast.success(translate('队伍赛道已更新'))

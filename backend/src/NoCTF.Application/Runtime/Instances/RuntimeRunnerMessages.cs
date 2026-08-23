@@ -5,28 +5,24 @@ namespace NoCTF.Application.Runtime.Instances;
 
 public sealed record ClaimContainerRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     ContainerRequest Definition) : IRunnerPoolMessage;
 
 public sealed record ClaimComposeRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     ComposeRequest Definition) : IRunnerPoolMessage;
 
 public sealed record ClaimOvaRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     OvaRuntimeRequest Definition) : IRunnerPoolMessage;
 
 public sealed record ProvisionContainerRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId,
@@ -34,7 +30,6 @@ public sealed record ProvisionContainerRuntime(
 
 public sealed record ProvisionComposeRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId,
@@ -42,7 +37,6 @@ public sealed record ProvisionComposeRuntime(
 
 public sealed record ProvisionOvaRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId,
@@ -50,21 +44,18 @@ public sealed record ProvisionOvaRuntime(
 
 public sealed record StopContainerRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId) : IRuntimeStopMessage;
 
 public sealed record StopComposeRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId) : IRuntimeStopMessage;
 
 public sealed record StopOvaRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId) : IRuntimeStopMessage;
@@ -76,7 +67,6 @@ public sealed record ReconcileRuntimeResources(
 
 public sealed record ForceTerminateRuntime(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     RuntimeProvider Provider,
     string RunnerPool,
@@ -88,14 +78,12 @@ public sealed record ForceTerminateRuntime(
 public interface IRuntimeProvisionMessage : IRunnerNodeMessage
 {
     Guid RuntimeInstanceId { get; }
-    long ProcessingVersion { get; }
     int Generation { get; }
 }
 
 public interface IRuntimeStopMessage : IRunnerNodeMessage
 {
     Guid RuntimeInstanceId { get; }
-    long ProcessingVersion { get; }
     int Generation { get; }
 }
 
@@ -126,7 +114,6 @@ public interface IRuntimeNodeWorkReader
 
 public sealed record RuntimeProvisioned(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerId,
     RuntimeProvider Provider,
@@ -140,20 +127,17 @@ public sealed record RuntimeProvisioned(
 
 public sealed record RuntimeProvisionFailed(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     RuntimeFailureCode FailureCode,
     string RunnerId);
 
 public sealed record RuntimeProvisionCanceled(
     Guid RuntimeInstanceId,
-    long ProvisionProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId);
 
 public sealed record RuntimeProvisionTerminated(
     Guid RuntimeInstanceId,
-    long ProvisionProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId,
@@ -161,13 +145,11 @@ public sealed record RuntimeProvisionTerminated(
 
 public sealed record RuntimeStopped(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId);
 public sealed record RuntimeStopFailed(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerPool,
     string RunnerId,
@@ -175,7 +157,6 @@ public sealed record RuntimeStopFailed(
 
 public sealed record RuntimeForceTerminated(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerId,
     Guid ActorUserId,
@@ -186,7 +167,6 @@ public sealed record RuntimeForceTerminated(
 
 public sealed record RuntimeForceTerminationFailed(
     Guid RuntimeInstanceId,
-    long ProcessingVersion,
     int Generation,
     string RunnerId,
     Guid ActorUserId,

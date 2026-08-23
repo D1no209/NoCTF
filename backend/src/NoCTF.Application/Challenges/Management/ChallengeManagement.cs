@@ -19,7 +19,6 @@ public sealed record UpdateCompetitionChallengeCommand(
     long BaseScore,
     int Order,
     bool IsPublished,
-    int ExpectedRevision,
     DateTimeOffset UpdatedAt,
     string? CustomTitle = null);
 
@@ -34,7 +33,6 @@ public sealed record ChallengeView(
     long BaseScore,
     int Order,
     bool IsPublished,
-    int Revision,
     DateTimeOffset? DeletedAt,
     bool HasRuntime,
     DateTimeOffset CreatedAt,
@@ -46,7 +44,6 @@ public enum ChallengeMutationFailure
     InvalidTitle,
     InvalidBaseScore,
     InvalidOrder,
-    InvalidRevision,
     CompetitionNotFound,
     TemplateNotFound,
     TemplateModeMismatch,
@@ -54,7 +51,6 @@ public enum ChallengeMutationFailure
     ResourceIdConflict,
     ChallengeOrderConflict,
     ChallengeTemplateConflict,
-    RevisionConflict,
     LifecycleStateConflict
 }
 
@@ -104,13 +100,11 @@ public interface IChallengeManagementStore
     Task<ChallengeMutationFailure?> SoftDeleteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<ChallengeMutationFailure?> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 }
@@ -183,9 +177,6 @@ public sealed class UpdateChallenge(IChallengeManagementStore store)
             return new(null, ChallengeMutationFailure.InvalidBaseScore);
         if (command.Order < 0)
             return new(null, ChallengeMutationFailure.InvalidOrder);
-        if (command.ExpectedRevision < 0)
-            return new(null, ChallengeMutationFailure.InvalidRevision);
-
         var result = await store.UpdateAsync(command with { CustomTitle = customTitle }, ct);
         if (result.Challenge is null)
             return result;
@@ -207,13 +198,11 @@ public sealed class DeleteChallenge(IChallengeManagementStore store)
     public Task<ChallengeMutationFailure?> ExecuteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default) =>
         ChangeAsync(
             competitionId,
             competitionChallengeId,
-            expectedRevision,
             now,
             restore: false,
             ct);
@@ -221,13 +210,11 @@ public sealed class DeleteChallenge(IChallengeManagementStore store)
     public Task<ChallengeMutationFailure?> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default) =>
         ChangeAsync(
             competitionId,
             competitionChallengeId,
-            expectedRevision,
             now,
             restore: true,
             ct);
@@ -235,25 +222,19 @@ public sealed class DeleteChallenge(IChallengeManagementStore store)
     private async Task<ChallengeMutationFailure?> ChangeAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         DateTimeOffset now,
         bool restore,
         CancellationToken ct)
     {
-        if (expectedRevision < 0)
-            return ChallengeMutationFailure.InvalidRevision;
-
         var failure = restore
             ? await store.RestoreAsync(
                 competitionId,
                 competitionChallengeId,
-                expectedRevision,
                 now,
                 ct)
             : await store.SoftDeleteAsync(
                 competitionId,
                 competitionChallengeId,
-                expectedRevision,
                 now,
                 ct);
         if (failure is not null)

@@ -256,7 +256,7 @@ async function submitReply() {
   try {
     const { data, error } = await addCompetitionQuestionMessage({
       path: { competitionId, questionId: detail.value.id! },
-      body: { body: reply.value.trim(), expectedRevision: detail.value.revision ?? 0 },
+      body: { body: reply.value.trim() },
     })
     if (error || !data) {
       replyError.value = competitionQuestionErrorMessage(error, translate("发送失败"))
@@ -285,7 +285,7 @@ async function changeStatus(status: 'Resolved' | 'Closed') {
   try {
     const { data, error } = await changeCompetitionQuestionStatus({
       path: { competitionId, questionId: detail.value.id! },
-      body: { status, expectedRevision: detail.value.revision ?? 0 },
+      body: { status },
     })
     if (error || !data) {
       toast.error(competitionQuestionErrorMessage(error, translate("状态更新失败")))

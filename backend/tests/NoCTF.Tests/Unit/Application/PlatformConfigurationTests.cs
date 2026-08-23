@@ -15,14 +15,12 @@ public sealed class PlatformConfigurationTests
         store.UpdateAsync(
                 "NoCTF Arena",
                 "Competition platform",
-                3,
                 now,
                 Arg.Any<CancellationToken>())
             .Returns(new PlatformConfigurationView(
                 "NoCTF Arena",
                 "Competition platform",
                 null,
-                4,
                 now));
         var objects = Substitute.For<IStore>();
         var configuration = new ManagePlatformConfiguration(
@@ -33,14 +31,12 @@ public sealed class PlatformConfigurationTests
         var result = await configuration.UpdateAsync(
             "  NoCTF Arena  ",
             "  Competition platform  ",
-            3,
             now);
 
         await Assert.That(result.State).IsEqualTo(PlatformConfigurationUpdateState.Updated);
         await store.Received(1).UpdateAsync(
             "NoCTF Arena",
             "Competition platform",
-            3,
             now,
             Arg.Any<CancellationToken>());
     }
@@ -60,7 +56,6 @@ public sealed class PlatformConfigurationTests
             "image/png",
             new byte[] { 1, 2 },
             maximumBytes: 1,
-            expectedRevision: 1,
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.State).IsEqualTo(PlatformLogoUpdateState.InvalidSize);
@@ -86,7 +81,7 @@ public sealed class PlatformConfigurationTests
             "logo.png",
             "image/png",
             new byte[] { 0xFF, 0xD8, 0xFF, 0x00 },
-            1,
+            16,
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.State).IsEqualTo(PlatformLogoUpdateState.InvalidFormat);
@@ -122,7 +117,6 @@ public sealed class PlatformConfigurationTests
             .Returns(Task.CompletedTask);
         store.ReplaceLogoAsync(
                 Arg.Do<Guid>(value => attachedFileId = value),
-                2,
                 now,
                 Arg.Any<CancellationToken>())
             .Returns(call => new PlatformLogoReplacement(
@@ -130,7 +124,6 @@ public sealed class PlatformConfigurationTests
                     "NoCTF",
                     null,
                     Guid.NewGuid(),
-                    3,
                     now),
                 Guid.NewGuid()));
         var configuration = new ManagePlatformConfiguration(
@@ -142,7 +135,6 @@ public sealed class PlatformConfigurationTests
             "logo.png",
             "image/png",
             png,
-            2,
             now);
 
         await Assert.That(result.State).IsEqualTo(PlatformLogoUpdateState.Updated);

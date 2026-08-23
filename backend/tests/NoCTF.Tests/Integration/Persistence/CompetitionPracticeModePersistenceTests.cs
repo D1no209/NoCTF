@@ -190,7 +190,7 @@ public sealed class CompetitionPracticeModePersistenceTests
                 current.MaxActiveQuestionsPerTeam,
                 current.MaxParticipantMessagesBeforeHandlerReply,
                 current.AllowChallengeOwnersToHandleQuestions,
-                PracticeModeEnabled: false), current.Status, ct);
+                PracticeModeEnabled: false), ct);
 
             await Assert.That(updated).IsNull();
             await Assert.That(await db.Competitions
@@ -204,7 +204,7 @@ public sealed class CompetitionPracticeModePersistenceTests
         CancellationToken ct)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(ct);
+        await db.Database.EnsureCreatedAsync(ct);
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7(now);
         var userId = Guid.CreateVersion7(now.AddTicks(1));

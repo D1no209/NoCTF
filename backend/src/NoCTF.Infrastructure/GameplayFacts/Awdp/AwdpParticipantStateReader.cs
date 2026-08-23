@@ -89,7 +89,6 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 runtime.RunnerPool,
                 runtime.State,
                 runtime.FailureCode,
-                runtime.ProcessingVersion,
                 runtime.Urls,
                 runtime.CreatedAt,
                 runtime.RunningAt,

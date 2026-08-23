@@ -67,7 +67,7 @@ public sealed class CompetitionTrackEndpointTests
         await using var app = await CreateApplicationAsync(store, Access.Judge);
         using var response = await app.GetTestClient().PutAsJsonAsync(
             $"/api/v1/admin/competitions/{CompetitionId}/teams/{TeamId}/track",
-            new { trackKey = "internal", expectedTeamVersion = 0 });
+            new { trackKey = "internal" });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(store.AssignCalls).IsEqualTo(0);
@@ -80,7 +80,7 @@ public sealed class CompetitionTrackEndpointTests
         await using var app = await CreateApplicationAsync(store, Access.Moderator);
         using var response = await app.GetTestClient().PutAsJsonAsync(
             $"/api/v1/admin/competitions/{CompetitionId}/teams/{TeamId}/track",
-            new { trackKey = "internal", expectedTeamVersion = 0 });
+            new { trackKey = "internal" });
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(store.AssignCalls).IsEqualTo(1);
@@ -89,7 +89,6 @@ public sealed class CompetitionTrackEndpointTests
 
     private static object UpdateBody() => new
     {
-        expectedRevision = 0,
         tracks = new[]
         {
             new
@@ -166,7 +165,6 @@ public sealed class CompetitionTrackEndpointTests
                 CompetitionId,
                 GameMode.Ctf,
                 CompetitionStatus.Published,
-                0,
                 false,
                 [Track("default", false), Track("internal", true)]));
         }
@@ -177,7 +175,7 @@ public sealed class CompetitionTrackEndpointTests
         {
             UpdateCalls++;
             return Task.FromResult(OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Success(
-                new(CompetitionId, GameMode.Ctf, CompetitionStatus.Published, 1, false,
+                new(CompetitionId, GameMode.Ctf, CompetitionStatus.Published, false,
                     command.Tracks.Select(track => Track(track.Key, track.IsInternal)).ToArray())));
         }
 
@@ -188,7 +186,7 @@ public sealed class CompetitionTrackEndpointTests
             AssignCalls++;
             LastAssignedTrack = command.TrackKey;
             return Task.FromResult(OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode>.Success(
-                new(CompetitionId, TeamId, command.TrackKey, 1)));
+                new(CompetitionId, TeamId, command.TrackKey)));
         }
 
         private static CompetitionTrackView Track(string key, bool internalTrack) => new(

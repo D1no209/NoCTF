@@ -92,7 +92,6 @@ async function save() {
         managerIds: managerIds.value,
         judgeIds: judgeIds.value,
         observerIds: observerIds.value,
-        expectedPermissionRevision: permissions.value.permissionRevision ?? 0,
       },
     })
     if (error) throw error
@@ -100,7 +99,7 @@ async function save() {
     toast.success(translate("权限已保存"))
   }
   catch (e) {
-    toastWriteError(e, load)
+    toastWriteError(e)
   }
   finally {
     saving.value = false
@@ -157,7 +156,7 @@ onMounted(load)
         <CardHeader>
           <CardTitle>{{ $t('协作权限') }}</CardTitle>
           <CardDescription>
-            {{ $t('负责人：{owner} · 权限修订版本：{revision}', { owner: candidateName(permissions.ownerId ?? ''), revision: permissions.permissionRevision ?? 0 }) }}
+            {{ $t('负责人：{owner}', { owner: candidateName(permissions.ownerId ?? '') }) }}
           </CardDescription>
         </CardHeader>
         <CardContent class="flex flex-col gap-6">

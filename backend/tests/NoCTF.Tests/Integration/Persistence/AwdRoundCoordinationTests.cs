@@ -50,9 +50,7 @@ public sealed class AwdRoundCoordinationTests
                 new AdvanceAwdRound(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    fixture.Now,
-                    0,
-                    0),
+                    fixture.Now),
                 cancellationToken);
             await Assert.That(advance).IsEqualTo(MessageExecutionOutcome.Applied);
             var generate = outbox.Published.OfType<GenerateAwdFlags>().Single();
@@ -75,22 +73,6 @@ public sealed class AwdRoundCoordinationTests
             await Assert.That(outbox.Scheduled.Select(item => item.Message)
                 .OfType<AdvanceAwdRound>().Count()).IsEqualTo(1);
 
-            var competition = await db.Competitions.SingleAsync(
-                candidate => candidate.Id == fixture.CompetitionId,
-                cancellationToken);
-            competition.ConfigurationRevision = 1;
-            await db.SaveChangesAsync(cancellationToken);
-            var configurationReplacement = await coordinator.AdvanceAsync(
-                new AdvanceAwdRound(
-                    fixture.CompetitionId,
-                    fixture.CompetitionChallengeId,
-                    fixture.Now,
-                    1,
-                    0),
-                cancellationToken);
-            await Assert.That(configurationReplacement)
-                .IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
-
             var extendedUntil = generate.ValidUntil.AddMinutes(2);
             await db.ChallengeFlags.ExecuteUpdateAsync(
                 setters => setters.SetProperty(flagFact => flagFact.ValidUntil, extendedUntil),
@@ -99,18 +81,12 @@ public sealed class AwdRoundCoordinationTests
                 new AdvanceAwdRound(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    fixture.Now,
-                    1,
-                    0),
+                    fixture.Now),
                 cancellationToken);
             await Assert.That(resumeReplacement).IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
             await Assert.That(outbox.Scheduled.Select(item => item.Message)
-                .OfType<AdvanceAwdRound>().Count()).IsEqualTo(3);
-            var currentRoundGenerate = generate with
-            {
-                ValidUntil = extendedUntil,
-                CompetitionConfigurationRevision = 1
-            };
+                .OfType<AdvanceAwdRound>().Count()).IsEqualTo(2);
+            var currentRoundGenerate = generate with { ValidUntil = extendedUntil };
 
             var greenTeamId = Guid.CreateVersion7();
             var greenRuntimeId = Guid.CreateVersion7();
@@ -146,11 +122,10 @@ public sealed class AwdRoundCoordinationTests
                 cancellationToken);
             await Assert.That(generatedForLateTeam).IsEqualTo(MessageExecutionOutcome.Applied);
             await Assert.That(outbox.Scheduled.Select(item => item.Message)
-                .OfType<AdvanceAwdRound>().Count()).IsEqualTo(3);
+                .OfType<AdvanceAwdRound>().Count()).IsEqualTo(2);
             await RuntimeWriteBackHandler.Handle(
                 new RuntimeProvisioned(
                     greenRuntimeId,
-                    0,
                     1,
                     "runner-a",
                     RuntimeProvider.Docker,
@@ -187,9 +162,7 @@ public sealed class AwdRoundCoordinationTests
                 new AdvanceAwdRound(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    currentRoundGenerate.ValidUntil,
-                    1,
-                    0),
+                    currentRoundGenerate.ValidUntil),
                 cancellationToken);
             await Assert.That(delayedAdvance).IsEqualTo(MessageExecutionOutcome.Applied);
             var currentGenerate = outbox.Published.OfType<GenerateAwdFlags>().Last();
@@ -213,9 +186,7 @@ public sealed class AwdRoundCoordinationTests
                 new AdvanceAwdRound(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    currentGenerate.ValidUntil,
-                    1,
-                    0),
+                    currentGenerate.ValidUntil),
                 cancellationToken);
             var emptyRound = outbox.Published.OfType<GenerateAwdFlags>().Last();
             var emptyGenerated = await coordinator.GenerateFlagsAsync(emptyRound, cancellationToken);
@@ -227,9 +198,7 @@ public sealed class AwdRoundCoordinationTests
                 new AdvanceAwdRound(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    fixture.Now,
-                    0,
-                    0),
+                    fixture.Now),
                 cancellationToken);
             await Assert.That(stale).IsEqualTo(MessageExecutionOutcome.Superseded);
         });

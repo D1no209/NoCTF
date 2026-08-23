@@ -30,8 +30,6 @@ public sealed class ChallengeConfigurationStore(
                 item.Competition.Mode,
                 item.Configuration.RulesJson,
                 item.Competition.ConfigurationJson,
-                item.Competition.ConfigurationRevision,
-                item.Configuration.Revision,
                 item.Competition.Status,
                 db.Teams.Count(team => team.CompetitionId == item.Competition.Id
                     && team.RegistrationStatus == TeamRegistrationStatus.Approved
@@ -43,8 +41,6 @@ public sealed class ChallengeConfigurationStore(
     public async Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
         Guid challengeId,
-        int expectedRevision,
-        int expectedCompetitionConfigurationRevision,
         string json,
         DateTimeOffset updatedAt,
         CancellationToken ct)
@@ -53,12 +49,11 @@ public sealed class ChallengeConfigurationStore(
         var status = await CompetitionStateReader.ReadAsync(db, competitionId, ct);
         if (status is null) return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
         var competition = await db.Competitions.AsNoTracking()
-            .Where(candidate => candidate.Id == competitionId
-                && candidate.ConfigurationRevision == expectedCompetitionConfigurationRevision)
-            .Select(candidate => new { candidate.Mode, candidate.ConfigurationRevision })
+            .Where(candidate => candidate.Id == competitionId)
+            .Select(candidate => new { candidate.Mode })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
-            return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
+            return new(null, ChallengeConfigurationUpdateFailure.CompetitionNotFound);
         var published = await db.CompetitionChallenges.AsNoTracking()
             .Where(challenge => challenge.Id == challengeId
                 && challenge.CompetitionId == competitionId
@@ -67,40 +62,34 @@ public sealed class ChallengeConfigurationStore(
             .SingleOrDefaultAsync(ct);
         if (published is null)
             return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
-        int changed;
         if (db.Database.IsRelational())
         {
-            changed = await db.CompetitionChallenges
+            var changed = await db.CompetitionChallenges
                 .Where(configuration =>
                     configuration.Id == challengeId
-                    && configuration.Revision == expectedRevision
                     && configuration.CompetitionId == competitionId
                     && configuration.DeletedAt == null
                     )
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(configuration => configuration.RulesJson, json)
-                    .SetProperty(configuration => configuration.Revision, expectedRevision + 1)
                     .SetProperty(configuration => configuration.UpdatedAt, updatedAt), ct);
+            if (changed != 1)
+                return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
         }
         else
         {
-            // EF Core InMemory does not support ExecuteUpdateAsync; apply the same
-            // optimistic-concurrency update through the change tracker.
             var tracked = await db.CompetitionChallenges.SingleOrDefaultAsync(
                 configuration => configuration.Id == challengeId
-                    && configuration.Revision == expectedRevision
                     && configuration.CompetitionId == competitionId
                     && configuration.DeletedAt == null, ct);
             if (tracked is not null)
             {
                 tracked.RulesJson = json;
-                tracked.Revision = expectedRevision + 1;
                 tracked.UpdatedAt = updatedAt;
             }
-            changed = tracked is null ? 0 : 1;
+            if (tracked is null)
+                return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
         }
-
-        if (changed != 1) return new(null, ChallengeConfigurationUpdateFailure.RevisionConflict);
         await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         if (competition.Mode == GameMode.Awd
             && status == CompetitionStatus.Running
@@ -136,9 +125,7 @@ public sealed class ChallengeConfigurationStore(
             await outbox.PublishAsync(new AdvanceAwdRound(
                 competitionId,
                 challengeId,
-                updatedAt,
-                competition.ConfigurationRevision,
-                checked(expectedRevision + 1)));
+                updatedAt));
         }
         if (!db.Database.IsRelational())
             await db.SaveChangesAsync(ct);

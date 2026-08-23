@@ -90,7 +90,6 @@ public sealed class OvaRuntimeHandlerTests
                     System.Text.Json.JsonSerializer.Serialize(receipt))));
         var message = new StopOvaRuntime(
             receipt.OperationId,
-            8,
             3,
             "default",
             "runner-a");
@@ -120,7 +119,6 @@ public sealed class OvaRuntimeHandlerTests
                     System.Text.Json.JsonSerializer.Serialize(receipt))));
         var message = new StopOvaRuntime(
             receipt.OperationId,
-            8,
             3,
             "default",
             "runner-a");
@@ -160,7 +158,6 @@ public sealed class OvaRuntimeHandlerTests
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         return new(
             runtimeInstanceId,
-            8,
             3,
             "default",
             "runner-a",

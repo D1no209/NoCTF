@@ -232,14 +232,14 @@ public sealed class LeaderboardEndpointTests
         var projection = CreateProjection(
             competitionId,
             [
-                new(publishedId, "Published", "PWN", "PWN", 1, true, 2),
-                new(unpublishedId, "Draft", "WEB", "WEB", 2, false, 3)
+                new(publishedId, "Published", "PWN", "PWN", 1, true),
+                new(unpublishedId, "Draft", "WEB", "WEB", 2, false)
             ],
             [new(4, publishedId, null), new(9, unpublishedId, null)],
             []);
         var participantProjection = CreateProjection(
             competitionId,
-            [new(publishedId, "Published", "PWN", "PWN", 1, true, 2)],
+            [new(publishedId, "Published", "PWN", "PWN", 1, true)],
             [new(0, publishedId, null)],
             []);
         projection = projection with
@@ -284,8 +284,8 @@ public sealed class LeaderboardEndpointTests
         var projection = CreateProjection(
             competitionId,
             [
-                new(publishedId, "Published", "PWN", "PWN", 1, true, 2),
-                new(unpublishedId, "Draft", "WEB", "WEB", 2, false, 3)
+                new(publishedId, "Published", "PWN", "PWN", 1, true),
+                new(unpublishedId, "Draft", "WEB", "WEB", 2, false)
             ],
             [new(4, publishedId, null), new(9, unpublishedId, null)],
             [
@@ -309,7 +309,7 @@ public sealed class LeaderboardEndpointTests
         };
         var participantProjection = CreateProjection(
             competitionId,
-            [new(publishedId, "Published", "PWN", "PWN", 1, true, 2)],
+            [new(publishedId, "Published", "PWN", "PWN", 1, true)],
             [new(0, publishedId, null)],
             [
                 new(teamId, "Alpha", "default", 2, ScoreboardRankingState.Eligible, 10, 0, [],
@@ -409,7 +409,7 @@ public sealed class LeaderboardEndpointTests
             []);
         var projection = CreateProjection(
             competitionId,
-            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
             [new(0, challengeId, null)],
             [
                 new(firstTeamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, 400, 0, [], [slot]),
@@ -559,7 +559,7 @@ public sealed class LeaderboardEndpointTests
             []);
         var projection = CreateProjection(
             competitionId,
-            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
             [new(0, challengeId, null)],
             [new(teamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, -30, 0, [], [slot])]);
         projection = projection with
@@ -656,7 +656,7 @@ public sealed class LeaderboardEndpointTests
             []);
         var projection = CreateProjection(
             competitionId,
-            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
             [new(0, challengeId, roundId)],
             [new(teamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, -30, 0, [], [slot])]);
         projection = projection with
@@ -752,7 +752,7 @@ public sealed class LeaderboardEndpointTests
         };
         var projection = CreateProjection(
             competitionId,
-            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
             [new(0, challengeId, null)],
             [
                 new(publicTeamId, "Public", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], [slot]),
@@ -835,7 +835,7 @@ public sealed class LeaderboardEndpointTests
         var otherHiddenTeamId = Guid.CreateVersion7();
         var projection = CreateProjection(
             competitionId,
-            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
             [new(0, challengeId, null)],
             [
                 new(publicTeamId, "Public", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], []),
@@ -886,7 +886,7 @@ public sealed class LeaderboardEndpointTests
             0, ScoreboardScoreState.Settled, 1, 0, 1, 1, [], []);
         var projection = CreateProjection(
             competitionId,
-            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
             [new(0, challengeId, null)],
             [
                 new(publicTeamId, "Public", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], []),
@@ -943,7 +943,7 @@ public sealed class LeaderboardEndpointTests
             0, ScoreboardScoreState.Settled, 1, 0, 1, 2, [], []);
         var first = CreateProjection(
             competitionId,
-            [new(challengeId, "Challenge", "PWN", "PWN", 1, true, 1)],
+            [new(challengeId, "Challenge", "PWN", "PWN", 1, true)],
             [new(0, challengeId, null)],
             [new(teamId, "Alpha", "default", 1, ScoreboardRankingState.Eligible, 1, 0, [], [slot])]);
         first = first with
@@ -1058,8 +1058,7 @@ public sealed class LeaderboardEndpointTests
                         gameMode,
                         NoCTF.Domain.Competitions.CompetitionStatus.Running,
                         visibility,
-                        dataScope,
-                        2)
+                        dataScope)
                     : null);
     }
 
@@ -1081,7 +1080,6 @@ public sealed class LeaderboardEndpointTests
                     competitionId,
                     GameMode.Ctf,
                     CompetitionStatus.Running,
-                    0,
                     true,
                     [new CompetitionTrackView(
                         CompetitionTrackConfiguration.DefaultTrackKey,
@@ -1270,7 +1268,6 @@ public sealed class LeaderboardEndpointTests
                     competitionId,
                     GameMode.Ctf,
                     CompetitionStatus.Running,
-                    1,
                     false,
                     [
                         new("default", "Default", true, true, false, true, true, true, true, true),
@@ -1303,7 +1300,6 @@ public sealed class LeaderboardEndpointTests
                     competitionId,
                     GameMode.Ctf,
                     CompetitionStatus.Running,
-                    1,
                     false,
                     [
                         new("default", "Default", true, true, false, true, true, true, true, true),

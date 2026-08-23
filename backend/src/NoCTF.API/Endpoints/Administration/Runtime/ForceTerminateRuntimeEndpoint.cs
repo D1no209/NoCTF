@@ -10,7 +10,6 @@ namespace NoCTF.API.Endpoints.Administration.Runtime;
 
 public sealed class ForceTerminateRuntimeRequest
 {
-    public required long ExpectedProcessingVersion { get; set; }
     public string Reason { get; set; } = string.Empty;
 }
 
@@ -18,7 +17,6 @@ public sealed class ForceTerminateRuntimeValidator : Validator<ForceTerminateRun
 {
     public ForceTerminateRuntimeValidator()
     {
-        RuleFor(request => request.ExpectedProcessingVersion).GreaterThanOrEqualTo(0);
         RuleFor(request => request.Reason).NotEmpty().MinimumLength(8).MaximumLength(512);
     }
 }
@@ -54,7 +52,6 @@ public sealed class ForceTerminateRuntimeEndpoint(
         var result = await runtimes.ForceTerminateAsync(
             competitionId,
             runtimeInstanceId,
-            request.ExpectedProcessingVersion,
             user.UserId,
             request.Reason,
             DateTimeOffset.UtcNow,
@@ -73,8 +70,6 @@ public sealed class ForceTerminateRuntimeEndpoint(
                     : "Runtime force termination was rejected.",
                 detail: result.Failure switch
                 {
-                    RuntimeMutationFailure.Conflict =>
-                        "The runtime changed after it was loaded. Refresh and try again.",
                     RuntimeMutationFailure.NotStuck =>
                         "The runtime is not an eligible long-running Provisioning or Stopping instance.",
                     _ => "A reason between 8 and 512 characters is required."

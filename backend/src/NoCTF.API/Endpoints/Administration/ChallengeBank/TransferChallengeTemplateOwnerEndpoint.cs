@@ -10,7 +10,6 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 public sealed class TransferChallengeTemplateOwnerRequest
 {
     public Guid OwnerId { get; set; }
-    public int ExpectedRevision { get; set; }
 }
 
 public sealed class TransferChallengeTemplateOwnerValidator
@@ -19,7 +18,6 @@ public sealed class TransferChallengeTemplateOwnerValidator
     public TransferChallengeTemplateOwnerValidator()
     {
         RuleFor(request => request.OwnerId).NotEmpty();
-        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
     }
 }
 
@@ -59,7 +57,6 @@ public sealed class TransferChallengeTemplateOwnerEndpoint(
             user.UserId,
             user.IsAdministrator,
             request.OwnerId,
-            request.ExpectedRevision,
             DateTimeOffset.UtcNow,
             ct);
         return result.State switch
@@ -71,8 +68,7 @@ public sealed class TransferChallengeTemplateOwnerEndpoint(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Challenge template ownership was not transferred.",
                 detail: result.Detail),
-            ChallengeTemplateWriteState.RevisionConflict
-                or ChallengeTemplateWriteState.UserNotFound
+            ChallengeTemplateWriteState.UserNotFound
                 or ChallengeTemplateWriteState.RoleNotEligible =>
                 TypedResults.Conflict(
                     ChallengeTemplateWriteResponseMapper.ToConflict(result)),

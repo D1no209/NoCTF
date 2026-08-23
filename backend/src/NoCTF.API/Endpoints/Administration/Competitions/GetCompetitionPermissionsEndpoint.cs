@@ -10,8 +10,7 @@ public sealed record CompetitionPermissionsResponse(
     Guid OwnerId,
     IReadOnlyList<Guid> ManagerIds,
     IReadOnlyList<Guid> JudgeIds,
-    IReadOnlyList<Guid> ObserverIds,
-    int PermissionRevision);
+    IReadOnlyList<Guid> ObserverIds);
 
 internal static class CompetitionPermissionsMapper
 {
@@ -22,8 +21,7 @@ internal static class CompetitionPermissionsMapper
             snapshot.OwnerId,
             snapshot.ManagerIds,
             snapshot.JudgeIds,
-            snapshot.ObserverIds,
-            snapshot.PermissionRevision);
+            snapshot.ObserverIds);
 }
 
 public sealed class GetCompetitionPermissionsEndpoint(

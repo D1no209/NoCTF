@@ -278,7 +278,6 @@ public sealed class GitOpsPersistenceContractTests
                     beforeTitleReset.BaseScore,
                     beforeTitleReset.Order,
                     beforeTitleReset.IsPublished,
-                    beforeTitleReset.Revision,
                     now.AddSeconds(1),
                     null),
                 cancellationToken);
@@ -288,7 +287,6 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(await competitionChallenges.SoftDeleteAsync(
                 competitionId,
                 competitionChallengeId,
-                restoredTemplateTitle.Challenge.Revision,
                 now,
                 cancellationToken)).IsNull();
             var deletedCompetitionChallenge = (await competitionChallenges.ListAsync(
@@ -306,7 +304,6 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(await competitionChallenges.RestoreAsync(
                 competitionId,
                 competitionChallengeId,
-                deletedCompetitionChallenge.Revision,
                 now,
                 cancellationToken)).IsNull();
 
@@ -318,7 +315,6 @@ public sealed class GitOpsPersistenceContractTests
             await Assert.That(await competitionChallenges.SoftDeleteAsync(
                 competitionId,
                 competitionChallengeId,
-                restoredCompetitionChallenge.Revision,
                 now,
                 cancellationToken)).IsNull();
             await Assert.That(await challengeBank.SoftDeleteAsync(

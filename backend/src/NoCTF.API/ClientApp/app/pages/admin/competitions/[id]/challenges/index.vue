@@ -128,7 +128,6 @@ async function removeChallenge() {
   try {
     const { error } = await adminDeleteCompetitionChallenge({
       path: { competitionId, competitionChallengeId: target.id },
-      query: { expectedRevision: target.revision ?? 0 },
     })
     if (error) throw error
     toast.success(translate("题目已删除"))
@@ -152,14 +151,13 @@ async function restoreChallenge(c: NoCtfapiEndpointsChallengesChallengeResponse)
   try {
     const { error } = await adminRestoreCompetitionChallenge({
       path: { competitionId, competitionChallengeId: c.id },
-      query: { expectedRevision: c.revision ?? 0 },
     })
     if (error) throw error
     toast.success(translate("题目已恢复"))
     await load()
   }
   catch (e) {
-    toastWriteError(e, load)
+    toastWriteError(e)
   }
   finally {
     pendingId.value = null

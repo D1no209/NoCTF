@@ -5,7 +5,6 @@ public sealed record AwdCheckerTokenRequest(
     Guid RuntimeInstanceId,
     int Generation,
     long CheckerSequence,
-    long ProcessingVersion,
     DateTimeOffset Deadline,
     DateTimeOffset IssuedAt);
 
@@ -14,7 +13,6 @@ public sealed record AwdpFixResultTokenRequest(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
     int Generation,
-    long RuntimeProcessingVersion,
     DateTimeOffset Deadline,
     DateTimeOffset IssuedAt);
 

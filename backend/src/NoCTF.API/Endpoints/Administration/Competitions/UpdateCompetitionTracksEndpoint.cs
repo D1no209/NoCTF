@@ -26,7 +26,6 @@ public sealed record UpdateCompetitionTrackRequest(
     bool ClearInvitationCode);
 
 public sealed record UpdateCompetitionTracksRequest(
-    int ExpectedRevision,
     IReadOnlyList<UpdateCompetitionTrackRequest> Tracks);
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<CompetitionTrackFailureCodeProtocol>))]
@@ -52,7 +51,6 @@ public sealed class UpdateCompetitionTracksValidator : Validator<UpdateCompetiti
 {
     public UpdateCompetitionTracksValidator()
     {
-        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
         RuleFor(request => request.Tracks).NotNull().Must(tracks => tracks.Count is >= 1 and <= 32);
     }
 }
@@ -86,7 +84,7 @@ public sealed class UpdateCompetitionTracksEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Updates competition tracks before the competition starts.";
-            summary.Description = "Validates the complete track definition set and applies optimistic concurrency.";
+            summary.Description = "Validates and applies the complete track definition set.";
         });
     }
 
@@ -111,7 +109,6 @@ public sealed class UpdateCompetitionTracksEndpoint(
 
         var result = await update.ExecuteAsync(new UpdateCompetitionTracksCommand(
             competitionId,
-            request.ExpectedRevision,
             request.Tracks.Select(track => new CompetitionTrackDefinition(
                 track.Key,
                 track.Name,

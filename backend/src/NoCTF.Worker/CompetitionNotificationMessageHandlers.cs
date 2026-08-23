@@ -41,7 +41,7 @@ public static class CompetitionNotificationMessageHandlers
             message.CompetitionId,
             message.CompetitionChallengeId,
             NotificationKind.ChallengePublished,
-            $"challenge-published:{message.CompetitionChallengeId:N}:{message.Revision}",
+            $"challenge-published:{message.CompetitionChallengeId:N}:{message.PublishedAt.UtcTicks}",
             new ChallengePublishedPayload(
                 message.CompetitionId,
                 message.CompetitionChallengeId,
@@ -63,7 +63,6 @@ public static class CompetitionNotificationMessageHandlers
                 candidate.Id == message.CompetitionChallengeId
                 && candidate.CompetitionId == message.CompetitionId, ct);
         var isCurrent = challenge is not null
-            && challenge.Revision == message.PublicationRevision
             && challenge.Hints.Any(hint =>
                 hint.Id == message.HintId
                 && hint.HiddenAt == null
@@ -96,7 +95,7 @@ public static class CompetitionNotificationMessageHandlers
             message.CompetitionId,
             message.HintId,
             NotificationKind.HintPublished,
-            $"hint-published:{message.HintId:N}:{message.PublicationRevision}",
+            $"hint-published:{message.HintId:N}:{message.PublishedAt.UtcTicks}",
             new HintPublishedPayload(
                 message.CompetitionId,
                 message.CompetitionChallengeId,
@@ -268,7 +267,7 @@ public static class CompetitionNotificationMessageHandlers
             message.CompetitionId,
             message.QuestionId,
             message.Kind,
-            $"competition-question:{message.QuestionId:N}:{message.EntryId?.ToString("N") ?? "root"}:{message.Revision}:{(short)message.Event}",
+            $"competition-question:{message.QuestionId:N}:{message.EntryId?.ToString("N") ?? "root"}:{message.OccurredAt.UtcTicks}:{(short)message.Event}",
             new CompetitionQuestionActivityPayload(
                 message.CompetitionId,
                 message.QuestionId,

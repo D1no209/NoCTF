@@ -16,7 +16,6 @@ public sealed record AwdCheckResult(
     Guid RuntimeInstanceId,
     int Generation,
     long CheckerSequence,
-    long ProcessingVersion,
     AwdServiceState State,
     DateTimeOffset OccurredAt)
 {
@@ -24,14 +23,12 @@ public sealed record AwdCheckResult(
         Guid runtimeInstanceId,
         int generation,
         long checkerSequence,
-        long processingVersion,
         AwdServiceState state,
         DateTimeOffset occurredAt) =>
         new(
             runtimeInstanceId,
             generation,
             checkerSequence,
-            processingVersion,
             state,
             occurredAt);
 }
@@ -54,7 +51,6 @@ public sealed record AwdpFixResult(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
     int Generation,
-    long RuntimeProcessingVersion,
     AwdpFixOutcome Outcome,
     DateTimeOffset OccurredAt)
 {
@@ -62,7 +58,6 @@ public sealed record AwdpFixResult(
         Guid gameplayFactId,
         Guid runtimeInstanceId,
         int generation,
-        long runtimeProcessingVersion,
         AwdpFixOutcome outcome,
         DateTimeOffset occurredAt)
     {
@@ -72,7 +67,6 @@ public sealed record AwdpFixResult(
             gameplayFactId,
             runtimeInstanceId,
             generation,
-            runtimeProcessingVersion,
             outcome,
             occurredAt);
     }

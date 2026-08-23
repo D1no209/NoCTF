@@ -48,12 +48,6 @@ public sealed class CompetitionVisibilityStore(
 
         var competition = await db.Competitions
             .SingleAsync(candidate => candidate.Id == command.CompetitionId, ct);
-        if (competition.LeaderboardVisibilityRevision != command.ExpectedRevision)
-        {
-            return new(
-                CompetitionVisibilityMutationState.RevisionConflict,
-                View(competition, command.Now));
-        }
         var validationFailure = CompetitionVisibilityRules.Validate(
             competition.Status,
             competition.StartAt,
@@ -72,7 +66,6 @@ public sealed class CompetitionVisibilityStore(
         DateTimeOffset? startsAt = command.Visibility == CompetitionLeaderboardVisibility.Normal
             ? null
             : TruncateToMicroseconds(command.StartsAt ?? command.Now);
-        var revision = checked(competition.LeaderboardVisibilityRevision + 1);
         var after = scheduled
             ? CompetitionLeaderboardVisibility.Normal
             : command.Visibility;
@@ -106,7 +99,6 @@ public sealed class CompetitionVisibilityStore(
         competition.LeaderboardVisibility = command.Visibility;
         competition.LeaderboardVisibilityStartsAt = startsAt;
         competition.LeaderboardVisibilityAppliedAt = scheduled ? null : command.Now;
-        competition.LeaderboardVisibilityRevision = revision;
         competition.FrozenLeaderboardSnapshotJson = frozenSnapshotJson;
         competition.UpdatedAt = command.Now;
 
@@ -135,7 +127,7 @@ public sealed class CompetitionVisibilityStore(
         if (scheduled)
         {
             await outbox.ScheduleAsync(
-                new ApplyCompetitionVisibility(competition.Id, revision),
+                new ApplyCompetitionVisibility(competition.Id, startsAt!.Value),
                 startsAt!.Value);
         }
         else if (before != after || after == CompetitionLeaderboardVisibility.Frozen)
@@ -155,7 +147,7 @@ public sealed class CompetitionVisibilityStore(
 
     public async Task ApplyScheduledAsync(
         Guid competitionId,
-        int expectedRevision,
+        DateTimeOffset scheduledAt,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -166,16 +158,16 @@ public sealed class CompetitionVisibilityStore(
             return;
         var competition = await db.Competitions
             .SingleAsync(candidate => candidate.Id == competitionId, ct);
-        if (competition.LeaderboardVisibilityRevision != expectedRevision
-            || competition.LeaderboardVisibility == CompetitionLeaderboardVisibility.Normal
+        if (competition.LeaderboardVisibility == CompetitionLeaderboardVisibility.Normal
             || competition.LeaderboardVisibilityAppliedAt is not null
             || competition.Status == CompetitionStatus.Finished
-            || competition.LeaderboardVisibilityStartsAt is not { } startsAt)
+            || competition.LeaderboardVisibilityStartsAt is not { } startsAt
+            || startsAt != scheduledAt)
             return;
         if (startsAt > now)
         {
             await outbox.ScheduleAsync(
-                new ApplyCompetitionVisibility(competition.Id, expectedRevision),
+                new ApplyCompetitionVisibility(competition.Id, scheduledAt),
                 startsAt);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
@@ -252,8 +244,7 @@ public sealed class CompetitionVisibilityStore(
                 competition.LeaderboardVisibilityStartsAt,
                 now),
             competition.LeaderboardVisibilityStartsAt,
-            competition.LeaderboardVisibilityAppliedAt,
-            competition.LeaderboardVisibilityRevision);
+            competition.LeaderboardVisibilityAppliedAt);
 
     private static string? NormalizeReason(string? reason) =>
         string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();

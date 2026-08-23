@@ -10,7 +10,6 @@ namespace NoCTF.API.Endpoints.Challenges.Questions;
 public sealed class ChangeCompetitionQuestionStatusRequest
 {
     public CompetitionQuestionStatusCode? Status { get; set; }
-    public int? ExpectedRevision { get; set; }
 }
 public sealed class ChangeCompetitionQuestionStatusValidator
     : Validator<ChangeCompetitionQuestionStatusRequest>
@@ -18,7 +17,6 @@ public sealed class ChangeCompetitionQuestionStatusValidator
     public ChangeCompetitionQuestionStatusValidator()
     {
         RuleFor(request => request.Status).NotNull().IsInEnum();
-        RuleFor(request => request.ExpectedRevision).NotNull().GreaterThanOrEqualTo(0);
     }
 }
 
@@ -60,15 +58,13 @@ public sealed class ChangeCompetitionQuestionStatusEndpoint(
             Route<Guid>("questionId"),
             user.UserId,
             CompetitionQuestionResponseMapper.ToDomain(request.Status!.Value),
-            request.ExpectedRevision!.Value,
             DateTimeOffset.UtcNow), ct);
         return result.Failure switch
         {
             null => TypedResults.Ok(CompetitionQuestionResponseMapper.ToResponse(result.Question!)),
             CompetitionQuestionFailure.NotFound => TypedResults.NotFound(),
             CompetitionQuestionFailure.Forbidden => TypedResults.Forbid(),
-            CompetitionQuestionFailure.RevisionConflict
-                or CompetitionQuestionFailure.InvalidTransition
+            CompetitionQuestionFailure.InvalidTransition
                 or CompetitionQuestionFailure.QuestionClosed => TypedResults.Conflict(
                     CompetitionQuestionFailureMapper.ToResponse(result)),
             CompetitionQuestionFailure.InvalidRequest => TypedResults.Problem(

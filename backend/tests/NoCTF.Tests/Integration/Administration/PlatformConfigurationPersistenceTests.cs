@@ -14,7 +14,7 @@ public sealed class PlatformConfigurationPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Singleton_configuration_persists_and_rejects_a_stale_revision(
+    public async Task Singleton_configuration_persists_with_last_write_wins(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -47,13 +47,11 @@ public sealed class PlatformConfigurationPersistenceTests
                 var updated = await store.UpdateAsync(
                     "NoCTF Arena",
                     "Production competition platform",
-                    seeded.Revision,
                     now,
                     cancellationToken);
 
                 await Assert.That(seeded.Name).IsEqualTo("NoCTF");
                 await Assert.That(updated).IsNotNull();
-                await Assert.That(updated!.Revision).IsEqualTo(seeded.Revision + 1);
 
                 db.Files.Add(new StoredFile
                 {
@@ -68,7 +66,6 @@ public sealed class PlatformConfigurationPersistenceTests
                 await db.SaveChangesAsync(cancellationToken);
                 var logo = await store.ReplaceLogoAsync(
                     logoFileId,
-                    updated.Revision,
                     now.AddSeconds(1),
                     cancellationToken);
                 await Assert.That(logo).IsNotNull();
@@ -78,18 +75,16 @@ public sealed class PlatformConfigurationPersistenceTests
             await using (var db = new NoCtfDbContext(options))
             {
                 var store = new PlatformConfigurationStore(db, caches);
-                var stale = await store.UpdateAsync(
-                    "Stale name",
+                var latest = await store.UpdateAsync(
+                    "Latest name",
                     null,
-                    1,
                     now.AddMinutes(1),
                     cancellationToken);
                 var persisted = await store.GetAsync(cancellationToken);
 
-                await Assert.That(stale).IsNull();
-                await Assert.That(persisted.Name).IsEqualTo("NoCTF Arena");
-                await Assert.That(persisted.Description)
-                    .IsEqualTo("Production competition platform");
+                await Assert.That(latest.Name).IsEqualTo("Latest name");
+                await Assert.That(persisted.Name).IsEqualTo("Latest name");
+                await Assert.That(persisted.Description).IsNull();
                 await Assert.That(persisted.LogoFileId).IsEqualTo(logoFileId);
             }
         });

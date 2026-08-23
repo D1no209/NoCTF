@@ -143,8 +143,7 @@ public sealed record ScoreboardChallengeCatalogItem(
     string Direction,
     string Category,
     int Order,
-    bool IsPublished,
-    int Revision);
+    bool IsPublished);
 
 public sealed record ScoreboardChallengeCatalog(
     Guid CompetitionId,

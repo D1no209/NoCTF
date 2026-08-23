@@ -8,7 +8,7 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class RunnerScoringTokenIssuerTests
 {
     [Test]
-    public async Task Awd_checker_token_binds_resource_version_sequence_and_callback_window()
+    public async Task Awd_checker_token_binds_resource_generation_sequence_and_callback_window()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -24,7 +24,7 @@ public sealed class RunnerScoringTokenIssuerTests
         var deadline = issuedAt.AddMinutes(1);
 
         var encoded = issuer.IssueAwdChecker(new AwdCheckerTokenRequest(
-            "runner-a", runtimeId, 3, 4, 5, deadline, issuedAt));
+            "runner-a", runtimeId, 3, 4, deadline, issuedAt));
 
         var token = new JwtSecurityTokenHandler().ReadJwtToken(encoded);
         await Assert.That(token.Audiences).Contains("audience");
@@ -32,16 +32,16 @@ public sealed class RunnerScoringTokenIssuerTests
             .IsEqualTo("internal");
         await Assert.That(token.Claims.Single(claim => claim.Type == "resource").Value)
             .IsEqualTo($"runtime:{runtimeId:D}");
-        await Assert.That(token.Claims.Single(claim => claim.Type == "processing_version").Value)
-            .IsEqualTo("5");
         await Assert.That(token.Claims.Single(claim => claim.Type == "checker_sequence").Value)
             .IsEqualTo("4");
+        await Assert.That(token.Claims.Any(claim => claim.Type == "processing_version"))
+            .IsFalse();
         await Assert.That(token.ValidTo)
             .IsEqualTo(deadline.AddHours(24).UtcDateTime);
     }
 
     [Test]
-    public async Task Awdp_callback_token_binds_submission_target_and_versions()
+    public async Task Awdp_callback_token_binds_submission_target_and_generation()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -57,7 +57,7 @@ public sealed class RunnerScoringTokenIssuerTests
         var issuedAt = DateTimeOffset.Parse("2026-07-24T00:00:00Z");
 
         var encoded = issuer.IssueAwdpFixResult(new AwdpFixResultTokenRequest(
-            "runner-a", gameplayFactId, runtimeId, 3, 5, issuedAt.AddMinutes(2), issuedAt));
+            "runner-a", gameplayFactId, runtimeId, 3, issuedAt.AddMinutes(2), issuedAt));
 
         var token = new JwtSecurityTokenHandler().ReadJwtToken(encoded);
         await Assert.That(token.Claims.Single(claim => claim.Type == "permission").Value)
@@ -66,8 +66,8 @@ public sealed class RunnerScoringTokenIssuerTests
             .IsEqualTo($"gameplay-fact:{gameplayFactId:D}:runtime:{runtimeId:D}");
         await Assert.That(token.Claims.Single(claim => claim.Type == "generation").Value)
             .IsEqualTo("3");
-        await Assert.That(token.Claims.Single(claim => claim.Type == "runtime_processing_version").Value)
-            .IsEqualTo("5");
+        await Assert.That(token.Claims.Any(claim => claim.Type == "runtime_processing_version"))
+            .IsFalse();
     }
 
     [Test]

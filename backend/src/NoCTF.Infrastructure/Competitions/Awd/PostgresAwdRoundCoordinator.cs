@@ -76,10 +76,6 @@ public sealed class PostgresAwdRoundCoordinator(
             || target.Competition.Mode != GameMode.Awd
             || !target.Challenge.IsPublished)
             return MessageExecutionOutcome.RejectedBusiness;
-        if (target.Competition.ConfigurationRevision != message.CompetitionConfigurationRevision
-            || target.Challenge.Revision != message.ProcessingVersion)
-            return MessageExecutionOutcome.Superseded;
-
         var handledAt = timeProvider.GetUtcNow();
         var latest = await LoadLatestWindowAsync(message.CompetitionChallengeId, cancellationToken);
         if (latest.Conflict)
@@ -96,9 +92,7 @@ public sealed class PostgresAwdRoundCoordinator(
             await outbox.PublishAsync(new AdvanceAwdRound(
                 message.CompetitionId,
                 message.CompetitionChallengeId,
-                handledAt,
-                message.CompetitionConfigurationRevision,
-                message.ProcessingVersion));
+                handledAt));
             await db.SaveChangesAsync(cancellationToken);
             await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
             return MessageExecutionOutcome.Superseded;
@@ -132,7 +126,6 @@ public sealed class PostgresAwdRoundCoordinator(
                 TeamId = instance.TeamId!.Value,
                 instance.Id,
                 instance.Generation,
-                instance.ProcessingVersion,
                 instance.RunnerPool,
                 RunnerId = instance.RunnerId!
             })
@@ -186,7 +179,6 @@ public sealed class PostgresAwdRoundCoordinator(
                     message.CompetitionChallengeId,
                     flagId,
                     runtime.Generation,
-                    runtime.ProcessingVersion,
                     message.ValidUntil,
                     runtime.RunnerPool,
                     runtime.RunnerId));
@@ -196,26 +188,20 @@ public sealed class PostgresAwdRoundCoordinator(
         var scheduledSuccessor = !ScheduleMatches(
             target.Challenge,
             message.Round.Round,
-            message.ValidUntil,
-            message.CompetitionConfigurationRevision,
-            message.ProcessingVersion);
+            message.ValidUntil);
         if (scheduledSuccessor)
         {
             SetScheduleFence(
                 target.Challenge,
                 message.Round.Round,
-                message.ValidUntil,
-                message.CompetitionConfigurationRevision,
-                message.ProcessingVersion);
+                message.ValidUntil);
             if (message.ValidUntil < target.Competition.EndAt)
             {
                 await outbox.ScheduleAsync(
                     new AdvanceAwdRound(
                         message.CompetitionId,
                         message.CompetitionChallengeId,
-                        message.ValidUntil,
-                        message.CompetitionConfigurationRevision,
-                        message.ProcessingVersion),
+                        message.ValidUntil),
                     message.ValidUntil);
             }
         }
@@ -260,10 +246,6 @@ public sealed class PostgresAwdRoundCoordinator(
             || target.Competition.Mode != GameMode.Awd
             || !target.Challenge.IsPublished)
             return MessageExecutionOutcome.RejectedBusiness;
-        if (target.Competition.ConfigurationRevision != message.CompetitionConfigurationRevision
-            || target.Challenge.Revision != message.ProcessingVersion)
-            return MessageExecutionOutcome.Superseded;
-
         var latest = await LoadLatestWindowAsync(
             message.CompetitionChallengeId,
             cancellationToken);
@@ -327,9 +309,7 @@ public sealed class PostgresAwdRoundCoordinator(
                     message.CompetitionChallengeId,
                     AwdRoundSpecificationId.FromRound(window.Round),
                     window.ValidStart,
-                    window.ValidUntil,
-                    message.CompetitionConfigurationRevision,
-                    message.ProcessingVersion));
+                    window.ValidUntil));
                 if (latest.Window is not null)
                     await outbox.PublishAsync(new ProjectLeaderboard(message.CompetitionId));
                 await db.SaveChangesAsync(cancellationToken);
@@ -453,16 +433,12 @@ public sealed class PostgresAwdRoundCoordinator(
         if (ScheduleMatches(
                 challenge,
                 round,
-                dueAt,
-                message.CompetitionConfigurationRevision,
-                message.ProcessingVersion))
+                dueAt))
             return false;
         SetScheduleFence(
             challenge,
             round,
-            dueAt,
-            message.CompetitionConfigurationRevision,
-            message.ProcessingVersion);
+            dueAt);
         await outbox.ScheduleAsync(message with { At = dueAt }, dueAt);
         return true;
     }
@@ -480,26 +456,18 @@ public sealed class PostgresAwdRoundCoordinator(
     private static bool ScheduleMatches(
         CompetitionChallenge challenge,
         int round,
-        DateTimeOffset dueAt,
-        int competitionRevision,
-        long challengeRevision) =>
+        DateTimeOffset dueAt) =>
         challenge.LastScheduledAwdRound == round
         && challenge.AwdScheduleDueAt is { } scheduledAt
-        && ToPostgresTimestamp(scheduledAt) == ToPostgresTimestamp(dueAt)
-        && challenge.AwdScheduleCompetitionRevision == competitionRevision
-        && challenge.AwdScheduleChallengeRevision == challengeRevision;
+        && ToPostgresTimestamp(scheduledAt) == ToPostgresTimestamp(dueAt);
 
     private static void SetScheduleFence(
         CompetitionChallenge challenge,
         int round,
-        DateTimeOffset dueAt,
-        int competitionRevision,
-        long challengeRevision)
+        DateTimeOffset dueAt)
     {
         challenge.LastScheduledAwdRound = round;
         challenge.AwdScheduleDueAt = ToPostgresTimestamp(dueAt);
-        challenge.AwdScheduleCompetitionRevision = competitionRevision;
-        challenge.AwdScheduleChallengeRevision = challengeRevision;
     }
 
     private static AwdPersistedRoundWindow ToPostgresTimestamp(

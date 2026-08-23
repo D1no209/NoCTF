@@ -337,12 +337,13 @@ public sealed class AdminCompetitionStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        if (await CompetitionStateReader.ReadAsync(db, competitionId, ct) is null)
-            return new(CompetitionOwnerTransferState.NotFound);
-        var entity = await db.Competitions.SingleOrDefaultAsync(competition =>
-            competition.Id == competitionId &&
-            (isAdministrator || competition.OwnerId == actorId), ct);
-        if (entity is null)
+        var entity = await db.Competitions
+            .FromSqlInterpolated($"SELECT * FROM competitions WHERE id = {competitionId} FOR UPDATE")
+            .IgnoreQueryFilters()
+            .SingleOrDefaultAsync(ct);
+        if (entity is null
+            || entity.DeletedAt is not null
+            || !(isAdministrator || entity.OwnerId == actorId))
             return new(CompetitionOwnerTransferState.NotFound);
         var previousOwnerId = entity.OwnerId;
         var managerIds = entity.ManagerIds
@@ -379,16 +380,8 @@ public sealed class AdminCompetitionStore(
             .Distinct()
             .Order()
             .ToArray();
-        entity.PermissionRevision = checked(entity.PermissionRevision + 1);
         entity.UpdatedAt = now;
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return new(CompetitionOwnerTransferState.RevisionConflict);
-        }
+        await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         if (readModels is not null)
             await readModels.InvalidateAsync(entity.Id, ct);

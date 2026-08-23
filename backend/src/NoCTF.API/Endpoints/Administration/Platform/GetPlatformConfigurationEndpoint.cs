@@ -10,7 +10,6 @@ public sealed record PlatformConfigurationResponse(
     string Name,
     string? Description,
     string? LogoUrl,
-    long Revision,
     DateTimeOffset UpdatedAt);
 
 internal static class PlatformConfigurationMapping
@@ -23,7 +22,6 @@ internal static class PlatformConfigurationMapping
             configuration.Name,
             configuration.Description,
             PublicPlatformConfigurationMapping.LogoUrl(configuration, links, httpContext),
-            configuration.Revision,
             configuration.UpdatedAt);
 }
 
@@ -41,7 +39,7 @@ public sealed class GetPlatformConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Returns editable platform branding configuration.";
-            summary.Description = "Returns public branding fields with their optimistic revision.";
+            summary.Description = "Returns editable public branding fields.";
         });
     }
 

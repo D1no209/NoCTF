@@ -20,7 +20,6 @@ const staticFailureMessages = {
   CompetitionNotAcceptingQuestions: '当前比赛状态不允许创建咨询。',
   TeamNotEligible: '当前队伍尚不具备发起咨询的资格。',
   InvalidChallengeReference: '关联题目无效、未发布或不属于当前比赛。',
-  RevisionConflict: '咨询已被其他成员更新，请刷新后再发送。',
   InvalidTransition: '当前咨询状态不允许执行此操作。',
   QuestionClosed: '该咨询已关闭；如需继续沟通，请重新创建咨询。',
 } satisfies Partial<Record<FailureCode, string>>
@@ -58,22 +57,21 @@ export function competitionQuestionErrorMessage(
 }
 
 export function competitionQuestionUnreadCount(
-  revision: number | undefined,
-  seenRevision: number | undefined,
+  updatedAt: string | undefined,
+  seenUpdatedAt: string | undefined,
   lastActorRole: ParticipantRole | undefined,
   access: QuestionAccess | undefined,
 ): number {
-  const current = Math.max(0, revision ?? 0)
-  if (seenRevision !== undefined)
-    return Math.max(0, current - seenRevision)
+  if (seenUpdatedAt !== undefined)
+    return questionTime(updatedAt) > questionTime(seenUpdatedAt) ? 1 : 0
 
   return access === 'Asker' && isCompetitionQuestionHandlerRole(lastActorRole) ? 1 : 0
 }
 
 /**
  * Merge cursor pages and independently fetched thread details without
- * duplicating a question. Revision is authoritative; UpdatedAt orders equal
- * revisions and keeps recently active threads at the top.
+ * duplicating a question. UpdatedAt identifies the freshest projection and
+ * keeps recently active threads at the top.
  */
 export function mergeCompetitionQuestions(
   current: readonly CompetitionQuestion[],
@@ -104,14 +102,16 @@ function isFresherQuestion(
   candidate: CompetitionQuestion,
   current: CompetitionQuestion,
 ): boolean {
-  const revisionDelta = (candidate.revision ?? 0) - (current.revision ?? 0)
-  if (revisionDelta !== 0) return revisionDelta > 0
   return questionTimestamp(candidate) > questionTimestamp(current)
 }
 
 function questionTimestamp(question: CompetitionQuestion): number {
-  const value = Date.parse(question.updatedAt ?? '')
-  return Number.isFinite(value) ? value : 0
+  return questionTime(question.updatedAt)
+}
+
+function questionTime(value: string | undefined): number {
+  const timestamp = Date.parse(value ?? '')
+  return Number.isFinite(timestamp) ? timestamp : 0
 }
 
 function asFailurePayload(error: unknown): FailurePayload | null {

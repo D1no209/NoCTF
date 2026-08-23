@@ -83,9 +83,6 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
             !long.TryParse(
                 User.FindFirstValue("checker_sequence"),
                 out var checkerSequence) ||
-            !long.TryParse(
-                User.FindFirstValue("processing_version"),
-                out var processingVersion) ||
             !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
             DateTimeOffset.UtcNow > DateTimeOffset.FromUnixTimeSeconds(deadline).AddHours(24))
             return TypedResults.Unauthorized();
@@ -93,7 +90,6 @@ public sealed class RecordAwdCheckResultEndpoint(RecordInternalResult record)
             runtimeId,
             generation,
             checkerSequence,
-            processingVersion,
             InternalResultProtocolMapper.ToDomain(request.State),
             DateTimeOffset.UtcNow), ct);
         return disposition switch

@@ -312,7 +312,6 @@ public sealed class SmtpEmailVerificationDeliveryTests
             SmtpFromAddress: configuration.SmtpFromAddress,
             SmtpFromName: configuration.SmtpFromName,
             SmtpTimeoutSeconds: configuration.SmtpTimeoutSeconds,
-            Revision: 1,
             UpdatedAt: DateTimeOffset.UnixEpoch);
 
     private static async Task<IReadOnlyList<MimeKit.MimeMessage>> ReadMessagesAsync(

@@ -128,7 +128,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                     [],
                     FlagTemplate: new("changed", "[TEAMHASH]", false)),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            competition.ConfigurationRevision++;
             var futureUserId = Guid.CreateVersion7();
             var futureTeamId = Guid.CreateVersion7();
             db.Users.Add(new User

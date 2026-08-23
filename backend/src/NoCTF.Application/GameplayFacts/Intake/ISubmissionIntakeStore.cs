@@ -25,10 +25,10 @@ public interface IGameplayFactIntakeStore
     Task<GameplayFactAcceptanceResult> TryAcceptHintUnlockAsync(
         HintUnlockGameplayFactReceived received,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.AdmissionRejected));
 
     Task<GameplayFactAcceptanceResult> TryAcceptManualAdjustmentAsync(
         ManualAdjustmentGameplayFactReceived received,
         CancellationToken cancellationToken) =>
-        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.SnapshotChanged));
+        Task.FromResult(new GameplayFactAcceptanceResult(GameplayFactAcceptanceState.AdmissionRejected));
 }

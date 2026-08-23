@@ -39,8 +39,7 @@ public sealed record LeaderboardChallengeFact(
     bool IsDeleted,
     string? ConfigurationJson = null,
     int Order = 0,
-    bool IsPublished = true,
-    int Revision = 0);
+    bool IsPublished = true);
 
 public sealed record LeaderboardGameplayFact(
     Guid GameplayFactId,

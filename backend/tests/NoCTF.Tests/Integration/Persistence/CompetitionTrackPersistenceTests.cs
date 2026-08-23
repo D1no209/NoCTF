@@ -123,7 +123,6 @@ public sealed class CompetitionTrackPersistenceTests
                 var store = CreateStore(updateDb);
                 var updated = await store.UpdateAsync(new(
                     competitionId,
-                    ExpectedRevision: 0,
                     tracks,
                     ownerId,
                     now), cancellationToken);
@@ -133,7 +132,6 @@ public sealed class CompetitionTrackPersistenceTests
                     competitionId,
                     teamId,
                     " INTERNAL ",
-                    ExpectedTeamVersion: 0,
                     ownerId,
                     now.AddSeconds(1)), cancellationToken);
                 await Assert.That(assigned.Succeeded).IsTrue();
@@ -163,14 +161,12 @@ public sealed class CompetitionTrackPersistenceTests
             {
                 var result = await CreateStore(conflictDb).UpdateAsync(new(
                     competitionId,
-                    ExpectedRevision: 1,
                     [Track("default", "Official", isDefault: true)],
                     ownerId,
                     now.AddSeconds(2)), cancellationToken);
                 await Assert.That(result.FailureCode).IsEqualTo(CompetitionTrackFailureCode.TrackInUse);
             }
 
-            long expectedTeamVersion = 1;
             foreach (var frozenStatus in new[]
                      {
                          CompetitionStatus.Running,
@@ -192,15 +188,12 @@ public sealed class CompetitionTrackPersistenceTests
                         competitionId,
                         teamId,
                         "default",
-                        ExpectedTeamVersion: expectedTeamVersion,
                         ownerId,
                         now.AddSeconds(3)), cancellationToken);
                 await Assert.That(assignment.Succeeded).IsTrue();
                 await Assert.That(assignment.Value!.TrackKey).IsEqualTo("default");
-                expectedTeamVersion = assignment.Value.TeamVersion;
                 var update = await store.UpdateAsync(new(
                         competitionId,
-                        ExpectedRevision: 1,
                         tracks,
                         ownerId,
                         now.AddSeconds(4)), cancellationToken);
@@ -212,11 +205,9 @@ public sealed class CompetitionTrackPersistenceTests
                     competitionId,
                     teamId,
                     "internal",
-                    ExpectedTeamVersion: assignment.Value.TeamVersion,
                     ownerId,
                     now.AddSeconds(5)), cancellationToken);
                 await Assert.That(restored.Succeeded).IsTrue();
-                expectedTeamVersion = restored.Value!.TeamVersion;
             }
 
             await using var verify = new NoCtfDbContext(options);
@@ -230,7 +221,6 @@ public sealed class CompetitionTrackPersistenceTests
                 .Select(item => item.Kind)
                 .ToArrayAsync(cancellationToken);
             await Assert.That(team.TrackKey).IsEqualTo("internal");
-            await Assert.That(competition.TrackConfigurationRevision).IsEqualTo(1);
             await Assert.That(competition.LeaderboardDirty).IsTrue();
             await Assert.That(eventKinds.Count(kind =>
                     kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.TrackConfigurationUpdated))

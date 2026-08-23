@@ -10,7 +10,7 @@
 4. [`PLAN.md`](PLAN.md)
 5. [`NoCTF-backend-handoff-2026-07-24.md`](NoCTF-backend-handoff-2026-07-24.md)
 
-## 当前阶段：阶段 1
+## 当前阶段：阶段 2
 
 - [x] 建立独立分支并记录 main 基线。
 - [x] 完整阅读项目规范、权威规范、现有 schema、OpenAPI、SDK 和 Wolverine 拓扑。
@@ -23,13 +23,20 @@
 
 ## 阶段 1：删除 Revision 协议闭环
 
-- [ ] 建立阶段 1 字段、类型、接口、消息和测试基线。
-- [ ] 删除领域实体和 EF 映射中的伪 Revision/ConcurrencyToken 字段。
-- [ ] 删除 Application command/query/store 的 ExpectedRevision 协议。
-- [ ] 删除 API/OpenAPI/生成 SDK/前端中的 Revision 冲突协议。
-- [ ] 保留业务唯一冲突和真正的 Token/Schema/Payload/外部协议版本。
-- [ ] 通过 LWW、唯一冲突、真实 PostgreSQL 并发和契约门禁。
-- [ ] 更新 HANDOFF 并创建阶段 1 独立提交。
+- [x] 建立阶段 1 字段、类型、接口、消息和测试基线。
+- [x] 删除领域实体和 EF 映射中的伪 Revision/ConcurrencyToken 字段。
+- [x] 删除 Application command/query/store 的 ExpectedRevision 协议。
+- [x] 删除 API/OpenAPI/生成 SDK/前端中的 Revision 冲突协议。
+- [x] 保留业务唯一冲突和真正的 Token/Schema/Payload/外部协议版本。
+- [x] 通过 LWW、唯一冲突、真实 PostgreSQL 并发和契约门禁。
+- [x] 更新 HANDOFF 并创建阶段 1 独立提交。
+
+## 阶段 2：核心实体和隐私模型
+
+- [ ] 建立 User、Competition、Team、Challenge 字段和隐私边界基线。
+- [ ] 完成核心实体最小模型收敛，不新增业务表。
+- [ ] 以真实 PostgreSQL 验证唯一约束、邮箱 canonicalization 和隐私读取边界。
+- [ ] 更新 HANDOFF 并创建阶段 2 独立提交。
 
 ## 后续阶段
 

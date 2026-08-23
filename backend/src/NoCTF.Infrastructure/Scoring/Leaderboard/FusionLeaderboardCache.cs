@@ -177,8 +177,7 @@ public sealed class FusionLeaderboardCache(
                 false,
                 instance.RulesJson,
                 instance.Order,
-                instance.IsPublished,
-                instance.Revision))
+                instance.IsPublished))
             .ToList();
 
         var hintCosts = challengeEntities

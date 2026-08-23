@@ -6,7 +6,7 @@ type Question = NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse
 
 export function useCompetitionQuestionReadState(competitionId: string) {
   const { user } = useAuth()
-  const seenRevisions = ref<Record<string, number>>({})
+  const seenUpdatedAt = ref<Record<string, string>>({})
 
   function storageKey(): string | null {
     return user.value?.userId
@@ -19,20 +19,20 @@ export function useCompetitionQuestionReadState(competitionId: string) {
     if (!key) return
     try {
       const stored = JSON.parse(safeLocalStorage.getItem(key) ?? '{}') as Record<string, unknown>
-      seenRevisions.value = Object.fromEntries(
-        Object.entries(stored).filter((entry): entry is [string, number] => Number.isInteger(entry[1])),
+      seenUpdatedAt.value = Object.fromEntries(
+        Object.entries(stored).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
       )
     }
     catch {
-      seenRevisions.value = {}
+      seenUpdatedAt.value = {}
     }
   }
 
   function unreadCount(question: Question): number {
     const questionId = question.id
     return competitionQuestionUnreadCount(
-      question.revision,
-      questionId ? seenRevisions.value[questionId] : undefined,
+      question.updatedAt,
+      questionId ? seenUpdatedAt.value[questionId] : undefined,
       question.lastActorRole,
       question.access,
     )
@@ -40,13 +40,13 @@ export function useCompetitionQuestionReadState(competitionId: string) {
 
   function markRead(question: Question): void {
     if (!question.id) return
-    seenRevisions.value = {
-      ...seenRevisions.value,
-      [question.id]: Math.max(0, question.revision ?? 0),
+    seenUpdatedAt.value = {
+      ...seenUpdatedAt.value,
+      [question.id]: question.updatedAt ?? new Date().toISOString(),
     }
     const key = storageKey()
     if (key)
-      safeLocalStorage.setItem(key, JSON.stringify(seenRevisions.value))
+      safeLocalStorage.setItem(key, JSON.stringify(seenUpdatedAt.value))
   }
 
   onMounted(load)

@@ -93,7 +93,6 @@ public sealed class CtfFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
-        var challengeRevision = challenge.GetProperty("revision").GetInt32();
 
         var configurationJson = JsonSerializer.Serialize(new
         {
@@ -102,19 +101,18 @@ public sealed class CtfFullBoundaryTests
             bloodRewards = new[] { new { policy = 0, value = 25m } },
             maxFlagAttempts = 5
         }, JsonOptions);
-        var updatedConfiguration = await SendJsonAsync(
+        await SendJsonAsync(
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration",
-            new { expectedRevision = challengeRevision, json = configurationJson },
+            new { json = configurationJson },
             HttpStatusCode.OK,
             cancellationToken);
-        challengeRevision = updatedConfiguration.GetProperty("revision").GetInt32();
         await SendJsonAsync(
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, baseScore = 500, order = 0, isPublished = true, expectedRevision = challengeRevision },
+            new { customTitle = (string?)null, baseScore = 500, order = 0, isPublished = true },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -155,7 +153,6 @@ public sealed class CtfFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var composeCompetitionChallengeId = composeChallenge.GetProperty("id").GetGuid();
-        var composeChallengeRevision = composeChallenge.GetProperty("revision").GetInt32();
         var composeConfigurationJson = JsonSerializer.Serialize(new
         {
             schemaVersion = 2,
@@ -163,20 +160,16 @@ public sealed class CtfFullBoundaryTests
             bloodRewards = Array.Empty<object>(),
             maxFlagAttempts = 5
         }, JsonOptions);
-        var updatedComposeConfiguration = await SendJsonAsync(
+        await SendJsonAsync(
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{composeCompetitionChallengeId}/configuration",
             new
             {
-                expectedRevision = composeChallengeRevision,
                 json = composeConfigurationJson
             },
             HttpStatusCode.OK,
             cancellationToken);
-        composeChallengeRevision = updatedComposeConfiguration
-            .GetProperty("revision")
-            .GetInt32();
         await SendJsonAsync(
             admin,
             HttpMethod.Put,
@@ -186,8 +179,7 @@ public sealed class CtfFullBoundaryTests
                 customTitle = (string?)null,
                 baseScore = 250,
                 order = 1,
-                isPublished = true,
-                expectedRevision = composeChallengeRevision
+                isPublished = true
             },
             HttpStatusCode.OK,
             cancellationToken);

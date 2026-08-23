@@ -12,7 +12,7 @@ public sealed class CompetitionConfigurationUpdateTests
         var useCase = new UpdateCompetitionConfiguration(
             store, new Validator());
 
-        var result = await useCase.ExecuteAsync(store.CompetitionId, 1, "{\"value\":2}", DateTimeOffset.UtcNow);
+        var result = await useCase.ExecuteAsync(store.CompetitionId, "{\"value\":2}", DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.AllowWhileRunning).IsTrue();
@@ -25,7 +25,7 @@ public sealed class CompetitionConfigurationUpdateTests
         var useCase = new UpdateCompetitionConfiguration(
             store, new Validator());
 
-        var result = await useCase.ExecuteAsync(store.CompetitionId, 1, "{\"value\":2}", DateTimeOffset.UtcNow);
+        var result = await useCase.ExecuteAsync(store.CompetitionId, "{\"value\":2}", DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.UpdateCalls).IsEqualTo(1);
@@ -38,7 +38,7 @@ public sealed class CompetitionConfigurationUpdateTests
         var useCase = new UpdateCompetitionConfiguration(
             store, new Validator());
 
-        var result = await useCase.ExecuteAsync(store.CompetitionId, 1, "{\"value\":2}", DateTimeOffset.UtcNow);
+        var result = await useCase.ExecuteAsync(store.CompetitionId, "{\"value\":2}", DateTimeOffset.UtcNow);
 
         await Assert.That(result.Succeeded).IsTrue();
         await Assert.That(store.UpdateCalls).IsEqualTo(1);
@@ -52,21 +52,19 @@ public sealed class CompetitionConfigurationUpdateTests
 
         public Task<CompetitionConfigurationView?> FindAsync(Guid competitionId, CancellationToken cancellationToken) =>
             Task.FromResult<CompetitionConfigurationView?>(new(
-                CompetitionId, GameMode.Ctf, "{\"value\":1}", 1, status, 2, [], DateTimeOffset.UtcNow));
+                CompetitionId, GameMode.Ctf, "{\"value\":1}", status, 2, [], DateTimeOffset.UtcNow));
 
         public Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
             Guid competitionId,
-            int expectedRevision,
             string json,
             bool allowWhileRunning,
-            IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
             DateTimeOffset now,
             CancellationToken cancellationToken)
         {
             UpdateCalls++;
             AllowWhileRunning = allowWhileRunning;
             return Task.FromResult(new CompetitionConfigurationUpdateResult(
-                new(competitionId, GameMode.Ctf, json, expectedRevision + 1, status, 2, [], now)));
+                new(competitionId, GameMode.Ctf, json, status, 2, [], now)));
         }
     }
 

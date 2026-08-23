@@ -24,7 +24,6 @@ public sealed record RuntimeInstanceView(
     string RunnerPool,
     RuntimeState State,
     RuntimeFailureCode? FailureCode,
-    long ProcessingVersion,
     IReadOnlyList<string> Urls,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,

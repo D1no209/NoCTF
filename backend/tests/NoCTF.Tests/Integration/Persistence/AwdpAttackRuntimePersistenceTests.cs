@@ -208,7 +208,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
             cancellationToken);
         runtime.State = RuntimeState.Failed;
         runtime.FailureCode = RuntimeFailureCode.InvalidConfiguration;
-        runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -485,16 +484,12 @@ public sealed class AwdpAttackRuntimePersistenceTests
             CompetitionChallengeId = fixture.CompetitionChallengeId,
             TeamId = fixture.TeamIds[0],
             Purpose = RuntimePurpose.AwdpAttack,
-            SourceCompetitionConfigurationRevision = 1,
-            SourceCompetitionChallengeRevision = 1,
-            SourceChallengeDefinitionRevision = 1,
             Generation = generation,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerId = "runner-1",
             RunnerPool = "awdp-tests",
             State = RuntimeState.Provisioning,
-            ProcessingVersion = 1,
             CreatedAt = fixture.Now
         };
         db.RuntimeInstances.Add(runtime);
@@ -540,7 +535,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
             : new Dictionary<string, string>(StringComparer.Ordinal);
         return new(
             claim.RuntimeInstanceId,
-            claim.ProcessingVersion,
             claim.Generation,
             claim.RunnerPool,
             "runner-1",
@@ -582,7 +576,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
         await Assert.That(claim.Definition.UrlBindings!.Single().Exposure)
             .IsEqualTo(RuntimeExposure.OwnerOnly);
         entity.State = RuntimeState.Provisioning;
-        entity.ProcessingVersion = 1;
         entity.RunnerId = "runner-1";
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -596,7 +589,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
         await RuntimeWriteBackHandler.Handle(new RuntimeProvisioned(
             runtime.Id,
             1,
-            runtime.Generation,
             "runner-1",
             RuntimeProvider.Docker,
             "{}",

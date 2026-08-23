@@ -37,14 +37,35 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "FOR UPDATE"
             ],
+            ["backend/src/NoCTF.Infrastructure/Challenges/ChallengeTemplateCriticalSection.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Challenges/TeamChallengeCriticalSection.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Administration/ActiveHumanAdministratorMutationGuard.cs"] =
             [
                 "ExecuteSqlInterpolated",
                 "LOCK TABLE"
             ],
+            ["backend/src/NoCTF.Infrastructure/Administration/ResourceManagerRoleGuard.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Authentication/PasswordResetStore.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Competitions/Administration/AdminCompetitionStore.cs"] =
             [
                 "ExecuteSqlInterpolated",
+                "FromSqlInterpolated",
                 "FOR UPDATE",
                 "WITH RECURSIVE"
             ],
@@ -73,6 +94,11 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "FOR UPDATE"
             ],
+            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Intake/SubmissionAttemptLock.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/SubmissionProcessor.cs"] =
             [
                 "ExecuteSqlInterpolated",
@@ -83,9 +109,24 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "FOR UPDATE"
             ],
+            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/BloodRankCriticalSection.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Runtime/Instances/RuntimeInstanceStore.cs"] =
             [
                 "ExecuteSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Runtime/Instances/SharedRuntimeScopeLock.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
+            ["backend/src/NoCTF.Infrastructure/Runtime/Instances/TeamRuntimeQuota.cs"] =
+            [
+                "FromSqlInterpolated",
                 "FOR UPDATE"
             ],
             ["backend/src/NoCTF.Infrastructure/Scoring/Leaderboard/FusionLeaderboardCache.cs"] =

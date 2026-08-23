@@ -309,7 +309,6 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerPool = "scope-tests",
             State = RuntimeState.Running,
-            ProcessingVersion = 1,
             Urls = [runtime.Url],
             ParticipantUrlIndexes = [0],
             CreatedAt = now.AddMinutes(-1),

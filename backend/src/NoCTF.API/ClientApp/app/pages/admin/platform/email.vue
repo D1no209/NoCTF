@@ -78,17 +78,11 @@ async function save(): Promise<void> {
   if (!configuration.value) return
   saving.value = true
   const { data, error } = await adminPlatformUpdateEmailVerificationConfiguration({
-    body: { ...form, expectedRevision: configuration.value.revision ?? 0 },
+    body: { ...form },
   })
   saving.value = false
   if (error) {
-    if (isRevisionConflict(error)) {
-      toast.error(translate("配置已被他人修改,请刷新后重试"))
-      await load()
-    }
-    else {
-      toast.error(parseApiError(error).message)
-    }
+    toast.error(parseApiError(error).message)
     return
   }
   if (data) configuration.value = data
@@ -99,18 +93,11 @@ async function replacePassword(): Promise<void> {
   if (!configuration.value || !newPassword.value) return
   passwordSaving.value = true
   const { data, error } = await adminPlatformReplaceEmailVerificationPassword({
-    body: { password: newPassword.value, expectedRevision: configuration.value.revision ?? 0 },
+    body: { password: newPassword.value },
   })
   passwordSaving.value = false
   if (error) {
-    if (isRevisionConflict(error)) {
-      toast.error(translate("配置已被他人修改,请刷新后重试"))
-      passwordOpen.value = false
-      await load()
-    }
-    else {
-      toast.error(parseApiError(error).message)
-    }
+    toast.error(parseApiError(error).message)
     return
   }
   passwordOpen.value = false
@@ -149,8 +136,8 @@ onMounted(() => {
           <div>
             <CardTitle>{{ $t('邮箱验证配置') }}</CardTitle>
             <CardDescription>
-              {{ $t('注册验证与密码重置邮件（修订版本 {revision}，更新于', { revision: configuration.revision ?? 0 }) }}
-              <AdminDateTime :value="configuration.updatedAt" />）
+              {{ $t('注册验证与密码重置邮件，更新于') }}
+              <AdminDateTime :value="configuration.updatedAt" />
             </CardDescription>
           </div>
           <div class="flex items-center gap-2">

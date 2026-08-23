@@ -17,7 +17,7 @@ public sealed class ChallengeAttachmentPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Add_inserts_attachment_metadata_and_advances_template_revision(
+    public async Task Add_inserts_attachment_metadata_and_updates_template_timestamp(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -32,13 +32,13 @@ public sealed class ChallengeAttachmentPersistenceTests
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
                 .Options;
-            var now = DateTimeOffset.UtcNow;
+            var now = DateTimeOffset.FromUnixTimeMilliseconds(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             var administratorId = Guid.CreateVersion7();
             var challengeId = Guid.CreateVersion7();
             var attachmentId = Guid.CreateVersion7();
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             db.Users.Add(new User
             {
                 Id = administratorId,
@@ -90,10 +90,8 @@ public sealed class ChallengeAttachmentPersistenceTests
                 .SingleAsync(item => item.Id == attachmentId, cancellationToken);
             await Assert.That(attachment.ChallengeId).IsEqualTo(challengeId);
             await Assert.That(attachment.Length).IsEqualTo(7);
-            var challenge = await db.Challenges.SingleAsync(
-                item => item.Id == challengeId,
-                cancellationToken);
-            await Assert.That(challenge.Revision).IsEqualTo(1);
+            var challenge = await db.Challenges.SingleAsync(item => item.Id == challengeId, cancellationToken);
+            await Assert.That(challenge.UpdatedAt).IsEqualTo(now);
         });
     }
 
@@ -186,9 +184,6 @@ public sealed class ChallengeAttachmentPersistenceTests
                 && flag.TeamId == null
                 && flag.SpecificationKind == SpecificationKind.Attachment
                 && attachmentIds.Contains(flag.SpecificationId!.Value))).IsTrue();
-            await Assert.That((await db.Challenges.SingleAsync(
-                challenge => challenge.Id == challengeId,
-                cancellationToken)).Revision).IsEqualTo(1);
         });
     }
 

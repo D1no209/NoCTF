@@ -149,7 +149,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 questionId,
                 fixture.ObserverId,
                 "观察员只能读取，不能回复咨询。",
-                0,
                 fixture.Now.AddMinutes(10)), ct);
             await Assert.That(observerReply.Failure)
                 .IsEqualTo(CompetitionQuestionFailure.Forbidden);
@@ -159,7 +158,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 questionId,
                 fixture.JudgeId,
                 "裁判已确认题目服务正在恢复。",
-                0,
                 fixture.Now.AddMinutes(11)), ct);
             await Assert.That(judgeReply.Failure).IsNull();
             await Assert.That(judgeReply.Question!.Entries.Last().ActorRole)
@@ -213,7 +211,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 questions[0].Id,
                 fixture.ManagerId,
                 CompetitionQuestionStatus.Resolved,
-                questions[0].Revision,
                 fixture.Now.AddMinutes(20)), ct);
             await Assert.That(resolved.Failure).IsNull();
             db.ChangeTracker.Clear();
@@ -222,7 +219,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 questions[1].Id,
                 fixture.ManagerId,
                 CompetitionQuestionStatus.Closed,
-                questions[1].Revision,
                 fixture.Now.AddMinutes(21)), ct);
             await Assert.That(closed.Failure).IsNull();
             db.ChangeTracker.Clear();
@@ -246,7 +242,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 resolved.Question!.Id,
                 fixture.MemberTwoId,
                 "重新追问会再次占用一个活跃咨询名额。",
-                resolved.Question.Revision,
                 fixture.Now.AddMinutes(40)), ct);
             await Assert.That(blockedReopen.Failure)
                 .IsEqualTo(CompetitionQuestionFailure.TeamActiveQuestionLimitReached);
@@ -256,7 +251,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 questions[2].Id,
                 fixture.ManagerId,
                 CompetitionQuestionStatus.Closed,
-                questions[2].Revision,
                 fixture.Now.AddMinutes(41)), ct);
             await Assert.That(released.Failure).IsNull();
             db.ChangeTracker.Clear();
@@ -265,7 +259,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 resolved.Question.Id,
                 fixture.MemberTwoId,
                 "现在已有空余活跃名额，允许继续追问。",
-                resolved.Question.Revision,
                 fixture.Now.AddMinutes(42)), ct);
             await Assert.That(reopened.Failure).IsNull();
             db.ChangeTracker.Clear();
@@ -275,7 +268,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 reopened.Question!.Id,
                 fixture.MemberOneId,
                 "这是工作人员回复前的第三条队伍消息。",
-                reopened.Question.Revision,
                 fixture.Now.AddMinutes(43)), ct);
             await Assert.That(thirdParticipantMessage.Failure).IsNull();
             db.ChangeTracker.Clear();
@@ -284,7 +276,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 thirdParticipantMessage.Question!.Id,
                 fixture.MemberTwoId,
                 "第四条消息必须等待工作人员回复。",
-                thirdParticipantMessage.Question.Revision,
                 fixture.Now.AddMinutes(44)), ct);
             await Assert.That(fourthParticipantMessage.Failure)
                 .IsEqualTo(CompetitionQuestionFailure.ParticipantMessageLimitReached);
@@ -295,7 +286,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 thirdParticipantMessage.Question.Id,
                 fixture.ManagerId,
                 "工作人员回复后，队伍连续发送额度已经重置。",
-                thirdParticipantMessage.Question.Revision,
                 fixture.Now.AddMinutes(45)), ct);
             await Assert.That(handlerReply.Failure).IsNull();
             db.ChangeTracker.Clear();
@@ -304,7 +294,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 handlerReply.Question!.Id,
                 fixture.MemberTwoId,
                 "额度重置后允许继续补充消息。",
-                handlerReply.Question.Revision,
                 fixture.Now.AddMinutes(46)), ct);
             await Assert.That(afterReset.Failure).IsNull();
             await Assert.That(afterReset.Question!.ParticipantMessagesRemaining).IsEqualTo(2);

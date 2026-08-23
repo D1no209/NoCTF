@@ -42,7 +42,7 @@ public sealed class OwnershipTransferPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var previousOwnerId = Guid.CreateVersion7();
@@ -85,7 +85,6 @@ public sealed class OwnershipTransferPersistenceTests
                 Title = "Ownership transfer challenge",
                 Direction = "Web",
                 DefinitionJson = """{"schemaVersion":1}""",
-                Revision = 4,
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -104,7 +103,6 @@ public sealed class OwnershipTransferPersistenceTests
                 previousOwnerId,
                 false,
                 newOwnerId,
-                4,
                 transferredAt,
                 cancellationToken);
 
@@ -112,13 +110,11 @@ public sealed class OwnershipTransferPersistenceTests
                 .IsEqualTo(CompetitionOwnerTransferState.Transferred);
             await Assert.That(challenge.State)
                 .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
-            await Assert.That(challenge.Template!.Revision).IsEqualTo(5);
             await Assert.That((await new ChallengeBankStore(db).TransferOwnerAsync(
                 challengeId,
                 newOwnerId,
                 false,
                 Guid.NewGuid(),
-                5,
                 transferredAt.AddSeconds(1),
                 cancellationToken)).State)
                 .IsEqualTo(ChallengeTemplateWriteState.UserNotFound);
@@ -143,7 +139,6 @@ public sealed class OwnershipTransferPersistenceTests
                 .IsEquivalentTo([previousOwnerId, existingManagerId]);
             await Assert.That(persistedChallenge.ManagerIds.Count(id => id == previousOwnerId))
                 .IsEqualTo(1);
-            await Assert.That(persistedChallenge.Revision).IsEqualTo(5);
 
             var concurrentChallengeId = Guid.CreateVersion7();
             db.Challenges.Add(new Challenge
@@ -155,7 +150,6 @@ public sealed class OwnershipTransferPersistenceTests
                 Title = "Concurrent ownership transfer",
                 Direction = "Web",
                 DefinitionJson = """{"schemaVersion":1}""",
-                Revision = 7,
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -191,7 +185,6 @@ public sealed class OwnershipTransferPersistenceTests
                 previousOwnerId,
                 true,
                 newOwnerId,
-                7,
                 transferredAt,
                 cancellationToken);
             await WaitForPostgresSleepAsync(db, cancellationToken);
@@ -200,7 +193,6 @@ public sealed class OwnershipTransferPersistenceTests
                 previousOwnerId,
                 true,
                 alternateOwnerId,
-                7,
                 transferredAt,
                 cancellationToken);
             var concurrentTransfers = await Task.WhenAll(
@@ -209,7 +201,7 @@ public sealed class OwnershipTransferPersistenceTests
 
             await Assert.That(concurrentTransfers.Count(
                     result => result.State == ChallengeTemplateWriteState.Succeeded))
-                .IsEqualTo(1);
+                .IsEqualTo(2);
             db.ChangeTracker.Clear();
             var concurrentChallenge = await db.Challenges
                 .AsNoTracking()
@@ -218,14 +210,14 @@ public sealed class OwnershipTransferPersistenceTests
                 new[] { newOwnerId, alternateOwnerId }.Contains(concurrentChallenge.OwnerId))
                 .IsTrue();
             await Assert.That(concurrentChallenge.ManagerIds)
-                .IsEquivalentTo([previousOwnerId]);
-            await Assert.That(concurrentChallenge.Revision).IsEqualTo(8);
+                .IsEquivalentTo(new[] { previousOwnerId, newOwnerId, alternateOwnerId }
+                    .Where(id => id != concurrentChallenge.OwnerId));
         });
     }
 
     [Test]
     [Timeout(300_000)]
-    public async Task Concurrent_competition_transfers_return_one_explicit_conflict(
+    public async Task Concurrent_competition_transfers_preserve_all_previous_owners(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -242,7 +234,7 @@ public sealed class OwnershipTransferPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var previousOwnerId = Guid.CreateVersion7();
@@ -320,10 +312,7 @@ public sealed class OwnershipTransferPersistenceTests
 
             await Assert.That(transfers.Count(
                     result => result.State == CompetitionOwnerTransferState.Transferred))
-                .IsEqualTo(1);
-            await Assert.That(transfers.Count(
-                    result => result.State == CompetitionOwnerTransferState.RevisionConflict))
-                .IsEqualTo(1);
+                .IsEqualTo(2);
             db.ChangeTracker.Clear();
             var persisted = await db.Competitions
                 .AsNoTracking()
@@ -331,7 +320,13 @@ public sealed class OwnershipTransferPersistenceTests
             await Assert.That(new[] { firstNewOwnerId, secondNewOwnerId })
                 .Contains(persisted.OwnerId);
             await Assert.That(persisted.ManagerIds)
-                .IsEquivalentTo([previousOwnerId, existingManagerId]);
+                .IsEquivalentTo(new[]
+                {
+                    previousOwnerId,
+                    existingManagerId,
+                    firstNewOwnerId,
+                    secondNewOwnerId
+                }.Where(id => id != persisted.OwnerId));
             await Assert.That(persisted.ManagerIds.Contains(persisted.OwnerId)).IsFalse();
             await Assert.That(persisted.JudgeIds.Contains(persisted.OwnerId)).IsFalse();
             await Assert.That(persisted.ObserverIds.Contains(persisted.OwnerId)).IsFalse();
@@ -340,7 +335,7 @@ public sealed class OwnershipTransferPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Template_delete_and_reference_creation_return_an_explicit_conflict(
+    public async Task Template_delete_and_reference_creation_preserve_the_reference_invariant(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -357,7 +352,7 @@ public sealed class OwnershipTransferPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7();
@@ -442,7 +437,7 @@ public sealed class OwnershipTransferPersistenceTests
 
             await Assert.That(await deleteTask).IsNull();
             await Assert.That((await createTask).Failure)
-                .IsEqualTo(ChallengeMutationFailure.RevisionConflict);
+                .IsEqualTo(ChallengeMutationFailure.TemplateNotFound);
 
             db.ChangeTracker.Clear();
             var templateDeletedAt = await db.Challenges
@@ -463,13 +458,13 @@ public sealed class OwnershipTransferPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Attachment_revision_and_owner_transfer_do_not_lose_an_increment(
+    public async Task Attachment_add_and_owner_transfer_are_serialized(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_attachment_revision_concurrency")
+                .WithDatabase("noctf_attachment_owner_transfer")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
                 .Build();
@@ -480,7 +475,7 @@ public sealed class OwnershipTransferPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var previousOwnerId = Guid.CreateVersion7();
@@ -496,22 +491,22 @@ public sealed class OwnershipTransferPersistenceTests
                 OwnerId = previousOwnerId,
                 Mode = GameMode.Ctf,
                 Visibility = ChallengeVisibility.Private,
-                Title = "Attachment revision serialization",
+                Title = "Attachment and owner transfer serialization",
                 Direction = "Web",
                 DefinitionJson = """{"schemaVersion":1}""",
-                Revision = 7,
                 CreatedAt = now,
                 UpdatedAt = now
             });
             await db.SaveChangesAsync(cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 """
-                CREATE FUNCTION noctf_delay_challenge_revision_update()
+                CREATE FUNCTION noctf_delay_challenge_attachment_update()
                 RETURNS trigger
                 LANGUAGE plpgsql
                 AS $$
                 BEGIN
-                    IF NEW.revision IS DISTINCT FROM OLD.revision THEN
+                    IF NEW.owner_id = OLD.owner_id
+                       AND NEW.updated_at IS DISTINCT FROM OLD.updated_at THEN
                         PERFORM pg_sleep(1);
                     END IF;
                     RETURN NEW;
@@ -521,10 +516,10 @@ public sealed class OwnershipTransferPersistenceTests
                 cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 """
-                CREATE TRIGGER noctf_delay_challenge_revision_update
+                CREATE TRIGGER noctf_delay_challenge_attachment_update
                 BEFORE UPDATE ON challenges
                 FOR EACH ROW
-                EXECUTE FUNCTION noctf_delay_challenge_revision_update();
+                EXECUTE FUNCTION noctf_delay_challenge_attachment_update();
                 """,
                 cancellationToken);
 
@@ -556,7 +551,6 @@ public sealed class OwnershipTransferPersistenceTests
                 previousOwnerId,
                 true,
                 newOwnerId,
-                7,
                 now.AddMinutes(1),
                 cancellationToken);
             await Task.WhenAll(attachmentTask, transferTask);
@@ -564,13 +558,12 @@ public sealed class OwnershipTransferPersistenceTests
             await Assert.That(await attachmentTask)
                 .IsEqualTo(AddChallengeAttachmentState.Added);
             await Assert.That((await transferTask).State)
-                .IsEqualTo(ChallengeTemplateWriteState.RevisionConflict);
+                .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
             db.ChangeTracker.Clear();
             var persisted = await db.Challenges
                 .AsNoTracking()
                 .SingleAsync(item => item.Id == challengeId, cancellationToken);
-            await Assert.That(persisted.OwnerId).IsEqualTo(previousOwnerId);
-            await Assert.That(persisted.Revision).IsEqualTo(8);
+            await Assert.That(persisted.OwnerId).IsEqualTo(newOwnerId);
             await Assert.That(await db.Set<ChallengeAttachment>().AsNoTracking()
                     .AnyAsync(item => item.Id == attachmentId, cancellationToken))
                 .IsTrue();
@@ -596,7 +589,7 @@ public sealed class OwnershipTransferPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7();

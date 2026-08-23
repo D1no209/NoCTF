@@ -114,20 +114,7 @@ export function isoToLocalInput(value: string | null | undefined): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-/** Whether an SDK error payload looks like an optimistic-concurrency (409) conflict. */
-export function isRevisionConflict(error: unknown): boolean {
-  return parseApiError(error).code === 'RevisionConflict'
-}
-
-/**
- * Standard error handling for admin writes: RevisionConflict -> refresh + conflict hint,
- * anything else -> plain error toast.
- */
-export function toastWriteError(error: unknown, refresh?: () => void | Promise<void>): void {
-  if (isRevisionConflict(error)) {
-    toast.error(translate("数据已被他人修改,请刷新后重试"))
-    void refresh?.()
-    return
-  }
+/** Show an administrative write failure without inventing transport-level conflict semantics. */
+export function toastWriteError(error: unknown): void {
   toast.error(parseApiError(error).message)
 }

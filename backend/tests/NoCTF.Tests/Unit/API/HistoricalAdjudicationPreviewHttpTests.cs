@@ -244,7 +244,7 @@ public sealed class HistoricalAdjudicationPreviewHttpTests
             new EmailVerificationConfigurationView(
                 false, "https://example.test", 30, 60, 30, 60, 3,
                 string.Empty, 25, SmtpSecurityMode.StartTls, string.Empty,
-                false, string.Empty, string.Empty, 10, 0, DateTimeOffset.UtcNow));
+                false, string.Empty, string.Empty, 10, DateTimeOffset.UtcNow));
         builder.Services.AddSingleton(emailConfiguration);
         builder.Services.AddSingleton(Substitute.For<IUserAuthenticationStore>());
 

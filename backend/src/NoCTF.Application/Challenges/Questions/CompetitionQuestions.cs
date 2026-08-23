@@ -23,7 +23,6 @@ public enum CompetitionQuestionFailure : short
     SubmissionNotFound,
     TeamActiveQuestionLimitReached,
     ParticipantMessageLimitReached,
-    RevisionConflict,
     InvalidTransition,
     QuestionClosed,
     EntryNotFound
@@ -77,7 +76,6 @@ public sealed record CompetitionQuestionView(
     CompetitionQuestionParticipantRole LastActorRole,
     int ParticipantMessagesRemaining,
     int MaxParticipantMessagesBeforeHandlerReply,
-    int Revision,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<CompetitionQuestionEntryView> Entries);
@@ -102,7 +100,6 @@ public sealed record AddCompetitionQuestionMessageCommand(
     Guid QuestionId,
     Guid ActorUserId,
     string Body,
-    int ExpectedRevision,
     DateTimeOffset Now);
 
 public sealed record ChangeCompetitionQuestionStatusCommand(
@@ -110,7 +107,6 @@ public sealed record ChangeCompetitionQuestionStatusCommand(
     Guid QuestionId,
     Guid ActorUserId,
     CompetitionQuestionStatus Status,
-    int ExpectedRevision,
     DateTimeOffset Now);
 
 public sealed record CompetitionQuestionQuery(
@@ -359,13 +355,6 @@ public sealed class AddCompetitionQuestionMessage(
         AddCompetitionQuestionMessageCommand command,
         CancellationToken ct = default)
     {
-        if (command.ExpectedRevision < 0)
-        {
-            LogFailure(CompetitionQuestionFailure.InvalidRequest, command);
-            return Task.FromResult(new CompetitionQuestionMutationResult(
-                null,
-                CompetitionQuestionFailure.InvalidRequest));
-        }
         var failure = CompetitionQuestionRules.ValidateMessage(command.Body);
         if (failure is not null)
         {
@@ -392,7 +381,7 @@ public sealed class ChangeCompetitionQuestionStatus(ICompetitionQuestionStore st
     public Task<CompetitionQuestionMutationResult> ExecuteAsync(
         ChangeCompetitionQuestionStatusCommand command,
         CancellationToken ct = default) =>
-        command.ExpectedRevision < 0 || !Enum.IsDefined(command.Status)
+        !Enum.IsDefined(command.Status)
             ? Task.FromResult(new CompetitionQuestionMutationResult(
                 null,
                 CompetitionQuestionFailure.InvalidRequest))

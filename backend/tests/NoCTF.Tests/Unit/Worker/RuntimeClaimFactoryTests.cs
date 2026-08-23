@@ -364,7 +364,6 @@ public sealed class RuntimeClaimFactoryTests
             RuntimeProvider = provider,
             RunnerPool = "default",
             State = RuntimeState.Queued,
-            ProcessingVersion = 7,
             CreatedAt = DateTimeOffset.Parse("2026-07-26T00:00:00Z")
         };
 }

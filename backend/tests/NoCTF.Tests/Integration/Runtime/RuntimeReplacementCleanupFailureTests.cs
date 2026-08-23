@@ -47,7 +47,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeForceTerminated(
                         fixture.OldRuntimeId,
-                        fixture.OldProcessingVersion,
                         1,
                         "runner-a",
                         fixture.UserId,
@@ -69,8 +68,7 @@ public sealed class RuntimeReplacementCleanupFailureTests
             await Assert.That(old.StoppedAt).IsEqualTo(completedAt);
             await Assert.That(outbox.Published.OfType<DispatchRuntime>().Single())
                 .IsEqualTo(new DispatchRuntime(
-                    fixture.ReplacementRuntimeId,
-                    fixture.ReplacementProcessingVersion));
+                    fixture.ReplacementRuntimeId));
             var completed = events.Drafts.Single();
             await Assert.That(completed.Kind)
                 .IsEqualTo(NoCTF.Domain.Competitions.Events.CompetitionEventKind.RuntimeForceTerminationCompleted);
@@ -112,22 +110,15 @@ public sealed class RuntimeReplacementCleanupFailureTests
 
             await Assert.That(first.Failure).IsNull();
             await Assert.That(first.Runtime!.State).IsEqualTo(RuntimeState.Stopping);
-            await Assert.That(first.Runtime.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 1));
             await Assert.That(replay.Failure).IsNull();
             await Assert.That(replay.Runtime!.State).IsEqualTo(RuntimeState.Stopping);
-            await Assert.That(replay.Runtime.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 1));
             var stop = outbox.Published.OfType<StopRuntime>().Single();
             await Assert.That(stop.RuntimeInstanceId).IsEqualTo(fixture.OldRuntimeId);
-            await Assert.That(stop.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 1));
 
             await using (var ackDb = new NoCtfDbContext(options))
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeProvisionCanceled(
                         fixture.OldRuntimeId,
-                        fixture.OldProcessingVersion,
                         1,
                         "pool-a",
                         "runner-a"),
@@ -140,8 +131,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 instance => instance.Id == fixture.OldRuntimeId,
                 cancellationToken);
             await Assert.That(stopped.State).IsEqualTo(RuntimeState.Stopped);
-            await Assert.That(stopped.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 2));
             await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
         }, cancellationToken);
     }
@@ -177,20 +166,15 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 cancellationToken);
 
             await Assert.That(stop.Failure).IsNull();
-            await Assert.That(stop.Runtime!.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 1));
             await Assert.That(reset.Runtime).IsNull();
             await Assert.That(reset.Failure).IsEqualTo(RuntimeMutationFailure.InvalidState);
             var stopMessage = outbox.Published.OfType<StopRuntime>().Single();
-            await Assert.That(stopMessage.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 1));
 
             await AddQueuedReplacementAsync(options, fixture, cancellationToken);
             await using (var ackDb = new NoCtfDbContext(options))
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeProvisionTerminated(
                         fixture.OldRuntimeId,
-                        fixture.OldProcessingVersion,
                         1,
                         "pool-a",
                         "runner-a",
@@ -202,8 +186,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
             var dispatch = outbox.Published.OfType<DispatchRuntime>().Single();
             await Assert.That(dispatch.RuntimeInstanceId)
                 .IsEqualTo(fixture.ReplacementRuntimeId);
-            await Assert.That(dispatch.ProcessingVersion)
-                .IsEqualTo(fixture.ReplacementProcessingVersion);
             await using var verify = new NoCtfDbContext(options);
             var old = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
                 instance => instance.Id == fixture.OldRuntimeId,
@@ -212,8 +194,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 instance => instance.Id == fixture.ReplacementRuntimeId,
                 cancellationToken);
             await Assert.That(old.State).IsEqualTo(RuntimeState.Stopped);
-            await Assert.That(old.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 2));
             await Assert.That(replacement.State).IsEqualTo(RuntimeState.Queued);
             await Assert.That(replacement.ReplacesRuntimeInstanceId)
                 .IsEqualTo(fixture.OldRuntimeId);
@@ -238,7 +218,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
-                        fixture.OldProcessingVersion,
                         1,
                         "pool-a",
                         "runner-a",
@@ -262,8 +241,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
             await Assert.That(start.Runtime.State).IsEqualTo(RuntimeState.Queued);
             var stop = outbox.Published.OfType<StopRuntime>().Single();
             await Assert.That(stop.RuntimeInstanceId).IsEqualTo(fixture.OldRuntimeId);
-            await Assert.That(stop.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 2));
             await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
 
             await using var verify = new NoCtfDbContext(options);
@@ -279,8 +256,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
 
             await Assert.That(old.State).IsEqualTo(RuntimeState.Stopping);
             await Assert.That(old.FailureCode).IsNull();
-            await Assert.That(old.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 2));
             await Assert.That(JsonNode.DeepEquals(
                 JsonNode.Parse(old.ProviderReceiptJson!),
                 JsonNode.Parse(fixture.ProviderReceiptJson))).IsTrue();
@@ -325,11 +300,7 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 .ToListAsync(cancellationToken);
             await Assert.That(runtimes).Count().IsEqualTo(2);
             await Assert.That(runtimes[0].State).IsEqualTo(RuntimeState.Stopping);
-            await Assert.That(runtimes[0].ProcessingVersion)
-                .IsEqualTo(fixture.OldProcessingVersion);
             await Assert.That(runtimes[1].State).IsEqualTo(RuntimeState.Queued);
-            await Assert.That(runtimes[1].ProcessingVersion)
-                .IsEqualTo(fixture.ReplacementProcessingVersion);
             await Assert.That(runtimes[1].ReplacesRuntimeInstanceId)
                 .IsEqualTo(fixture.OldRuntimeId);
         }, cancellationToken);
@@ -361,7 +332,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
-                        fixture.OldProcessingVersion,
                         1,
                         "pool-a",
                         "runner-a",
@@ -445,8 +415,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 .ToListAsync(cancellationToken);
             await Assert.That(runtimes).Count().IsEqualTo(2);
             await Assert.That(runtimes[0].State).IsEqualTo(RuntimeState.Stopping);
-            await Assert.That(runtimes[0].ProcessingVersion)
-                .IsEqualTo(fixture.OldProcessingVersion);
             await Assert.That(runtimes[1].State).IsEqualTo(RuntimeState.Stopped);
             await Assert.That(runtimes.Any(instance => instance.State == RuntimeState.Queued))
                 .IsFalse();
@@ -502,7 +470,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                     await RuntimeWriteBackHandler.Handle(
                         new RuntimeStopped(
                             fixture.OldRuntimeId,
-                            fixture.OldProcessingVersion,
                             1,
                             "pool-a",
                             "runner-a"),
@@ -588,7 +555,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
-                        fixture.OldProcessingVersion,
                         1,
                         "pool-a",
                         "runner-a",
@@ -607,16 +573,12 @@ public sealed class RuntimeReplacementCleanupFailureTests
 
             await Assert.That(old.State).IsEqualTo(RuntimeState.Failed);
             await Assert.That(old.FailureCode).IsEqualTo(RuntimeFailureCode.CleanupFailed);
-            await Assert.That(old.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 1));
             await Assert.That(JsonNode.DeepEquals(
                 JsonNode.Parse(old.ProviderReceiptJson!),
                 JsonNode.Parse(fixture.ProviderReceiptJson))).IsTrue();
             await Assert.That(old.RunnerId).IsEqualTo("runner-a");
             await Assert.That(replacement.State).IsEqualTo(RuntimeState.Failed);
             await Assert.That(replacement.FailureCode).IsEqualTo(RuntimeFailureCode.CleanupFailed);
-            await Assert.That(replacement.ProcessingVersion)
-                .IsEqualTo(checked(fixture.ReplacementProcessingVersion + 1));
             await Assert.That(replacement.ReplacesRuntimeInstanceId)
                 .IsEqualTo(fixture.OldRuntimeId);
         }, cancellationToken);
@@ -633,7 +595,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 cancellationToken);
             var message = new RuntimeStopFailed(
                 fixture.OldRuntimeId,
-                fixture.OldProcessingVersion,
                 1,
                 "pool-a",
                 "runner-a",
@@ -655,12 +616,8 @@ public sealed class RuntimeReplacementCleanupFailureTests
 
             await Assert.That(old.State).IsEqualTo(RuntimeState.Failed);
             await Assert.That(old.FailureCode).IsEqualTo(RuntimeFailureCode.CleanupFailed);
-            await Assert.That(old.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 1));
             await Assert.That(replacement.State).IsEqualTo(RuntimeState.Failed);
             await Assert.That(replacement.FailureCode).IsEqualTo(RuntimeFailureCode.CleanupFailed);
-            await Assert.That(replacement.ProcessingVersion)
-                .IsEqualTo(checked(fixture.ReplacementProcessingVersion + 1));
         }, cancellationToken);
     }
 
@@ -679,7 +636,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
-                        fixture.OldProcessingVersion,
                         1,
                         "pool-a",
                         "runner-a",
@@ -698,12 +654,8 @@ public sealed class RuntimeReplacementCleanupFailureTests
 
             await Assert.That(old.State).IsEqualTo(RuntimeState.Failed);
             await Assert.That(old.FailureCode).IsEqualTo(RuntimeFailureCode.CleanupFailed);
-            await Assert.That(old.ProcessingVersion)
-                .IsEqualTo(checked(fixture.OldProcessingVersion + 1));
             await Assert.That(unrelated.State).IsEqualTo(RuntimeState.Queued);
             await Assert.That(unrelated.FailureCode).IsNull();
-            await Assert.That(unrelated.ProcessingVersion)
-                .IsEqualTo(fixture.UnrelatedProcessingVersion);
         }, cancellationToken);
     }
 
@@ -722,7 +674,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeStopFailed(
                         fixture.OldRuntimeId,
-                        checked(fixture.OldProcessingVersion - 1),
                         1,
                         "pool-a",
                         "runner-a",
@@ -741,11 +692,8 @@ public sealed class RuntimeReplacementCleanupFailureTests
 
             await Assert.That(old.State).IsEqualTo(RuntimeState.Stopping);
             await Assert.That(old.FailureCode).IsNull();
-            await Assert.That(old.ProcessingVersion).IsEqualTo(fixture.OldProcessingVersion);
             await Assert.That(replacement.State).IsEqualTo(RuntimeState.Queued);
             await Assert.That(replacement.FailureCode).IsNull();
-            await Assert.That(replacement.ProcessingVersion)
-                .IsEqualTo(fixture.ReplacementProcessingVersion);
         }, cancellationToken);
     }
 
@@ -847,7 +795,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerPool = "pool-a",
             State = RuntimeState.Queued,
-            ProcessingVersion = fixture.ReplacementProcessingVersion,
             ReplacesRuntimeInstanceId = fixture.OldRuntimeId,
             CreatedAt = fixture.Now.AddSeconds(1)
         });
@@ -872,9 +819,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
         var oldRuntimeId = Guid.CreateVersion7();
         var replacementRuntimeId = Guid.CreateVersion7();
         var unrelatedRuntimeId = Guid.CreateVersion7();
-        const long oldProcessingVersion = 7;
-        const long replacementProcessingVersion = 3;
-        const long unrelatedProcessingVersion = 5;
         const string providerReceiptJson = """{"id":"old-resource"}""";
 
         db.Users.Add(new User
@@ -958,7 +902,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
             RunnerPool = "pool-a",
             RunnerId = "runner-a",
             State = RuntimeState.Stopping,
-            ProcessingVersion = oldProcessingVersion,
             ProviderReceiptJson = providerReceiptJson,
             CreatedAt = now
         });
@@ -977,7 +920,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 RuntimeProvider = RuntimeProvider.Docker,
                 RunnerPool = "pool-a",
                 State = RuntimeState.Queued,
-                ProcessingVersion = replacementProcessingVersion,
                 ReplacesRuntimeInstanceId = oldRuntimeId,
                 CreatedAt = now.AddSeconds(1)
             });
@@ -1019,7 +961,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
                 RuntimeProvider = RuntimeProvider.Docker,
                 RunnerPool = "pool-a",
                 State = RuntimeState.Queued,
-                ProcessingVersion = unrelatedProcessingVersion,
                 CreatedAt = now
             });
         }
@@ -1034,9 +975,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
             oldRuntimeId,
             replacementRuntimeId,
             unrelatedRuntimeId,
-            oldProcessingVersion,
-            replacementProcessingVersion,
-            unrelatedProcessingVersion,
             providerReceiptJson);
     }
 
@@ -1049,9 +987,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
         Guid OldRuntimeId,
         Guid ReplacementRuntimeId,
         Guid UnrelatedRuntimeId,
-        long OldProcessingVersion,
-        long ReplacementProcessingVersion,
-        long UnrelatedProcessingVersion,
         string ProviderReceiptJson);
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox

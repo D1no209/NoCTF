@@ -70,7 +70,6 @@ public sealed class AwdCheckerWorkReader(
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
                 && runtime.Generation == message.Generation
-                && runtime.ProcessingVersion == message.ProcessingVersion
                 && runtime.CheckerSequence == message.CheckerSequence
                 && runtime.CheckerDeadlineAt == message.Deadline
                 && runtime.State == RuntimeState.Running
@@ -86,8 +85,7 @@ public sealed class AwdCheckerWorkReader(
                 {
                     Runtime = runtime,
                     ChallengeRules = challenge.RulesJson,
-                    challenge.ChallengeId,
-                    challenge.Revision
+                    challenge.ChallengeId
                 })
             .Join(
                 db.Challenges.AsNoTracking(),
@@ -97,7 +95,6 @@ public sealed class AwdCheckerWorkReader(
                 {
                     pair.Runtime,
                     pair.ChallengeRules,
-                    pair.Revision,
                     ChallengeDefinition = challenge.DefinitionJson
                 })
             .Join(
@@ -109,18 +106,14 @@ public sealed class AwdCheckerWorkReader(
                     pair.Runtime,
                     pair.ChallengeRules,
                     pair.ChallengeDefinition,
-                    pair.Revision,
                     CompetitionConfiguration = competition.ConfigurationJson,
-                    competition.ConfigurationRevision,
                     competition.Status,
                     competition.Mode
                 })
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || target.Mode != NoCTF.Domain.Competitions.GameMode.Awd
-            || target.Status != NoCTF.Domain.Competitions.CompetitionStatus.Running
-            || target.ConfigurationRevision != message.CompetitionConfigurationRevision
-            || target.Revision != message.CompetitionChallengeRevision)
+            || target.Status != NoCTF.Domain.Competitions.CompetitionStatus.Running)
             return null;
         var settings = configurations.Get(
             target.CompetitionConfiguration,
@@ -152,7 +145,6 @@ public sealed class AwdCheckerWorkReader(
             message.RuntimeInstanceId,
             message.Generation,
             message.CheckerSequence,
-            message.ProcessingVersion,
             message.Deadline,
             issuedAt));
         return new(

@@ -23,7 +23,6 @@ export type NoCtfapiEndpointsTeamsTeamResponse = {
     isLocked?: boolean;
     isBanned?: boolean;
     registeredAt?: string;
-    concurrencyVersion?: number;
 };
 
 export type NoCtfapiEndpointsTeamsTeamRegistrationStatusProtocol = 'Pending' | 'Approved' | 'Rejected';
@@ -169,7 +168,6 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol;
     state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
     failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
-    processingVersion?: number;
     urls?: Array<string>;
     createdAt?: string;
     runningAt?: string | null;
@@ -687,7 +685,6 @@ export type NoCtfapiEndpointsCompetitionsCompetitionListResponse = {
 export type NoCtfapiEndpointsCompetitionsTracksCompetitionTrackListResponse = {
     competitionId?: string;
     mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
-    revision?: number;
     isFrozen?: boolean;
     items?: Array<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse>;
 };
@@ -790,7 +787,6 @@ export type NoCtfapiEndpointsChallengesChallengeResponse = {
     baseScore?: number | null;
     order?: number;
     isPublished?: boolean;
-    revision?: number;
     deletedAt?: string | null;
     hasRuntime?: boolean;
     createdAt?: string;
@@ -859,7 +855,6 @@ export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse = {
     lastActorRole?: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionParticipantRoleCode;
     participantMessagesRemaining?: number;
     maxParticipantMessagesBeforeHandlerReply?: number;
-    revision?: number;
     createdAt?: string;
     updatedAt?: string;
     canReply?: boolean;
@@ -897,16 +892,14 @@ export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureRespon
     limit?: number | null;
 };
 
-export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode = 'InvalidRequest' | 'SpamRejected' | 'CompetitionNotAcceptingQuestions' | 'TeamNotEligible' | 'InvalidChallengeReference' | 'TeamActiveQuestionLimitReached' | 'ParticipantMessageLimitReached' | 'RevisionConflict' | 'InvalidTransition' | 'QuestionClosed';
+export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionFailureCode = 'InvalidRequest' | 'SpamRejected' | 'CompetitionNotAcceptingQuestions' | 'TeamNotEligible' | 'InvalidChallengeReference' | 'TeamActiveQuestionLimitReached' | 'ParticipantMessageLimitReached' | 'InvalidTransition' | 'QuestionClosed';
 
 export type NoCtfapiEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest = {
     body: string;
-    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsChallengesQuestionsChangeCompetitionQuestionStatusRequest = {
     status: NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionStatusCode;
-    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsChallengesQuestionsCreateCompetitionQuestionRequest = {
@@ -1051,7 +1044,6 @@ export type NoCtfapiEndpointsAdministrationTeamsAssignTeamTrackResponse = {
     competitionId?: string;
     teamId?: string;
     trackKey?: string;
-    teamVersion?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureResponse = {
@@ -1063,7 +1055,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionTrackFailureCo
 
 export type NoCtfapiEndpointsAdministrationTeamsAssignTeamTrackRequest = {
     trackKey: string;
-    expectedTeamVersion?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationTeamsBanTeamRequest = {
@@ -1117,7 +1108,6 @@ export type NoCtfapiEndpointsAdministrationTeamsUpholdTeamBanAppealRequest = {
 };
 
 export type NoCtfapiEndpointsAdministrationRuntimeForceTerminateRuntimeRequest = {
-    expectedProcessingVersion: number;
     reason: string;
 };
 
@@ -1136,7 +1126,6 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     runnerId?: string | null;
     state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
     failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
-    processingVersion?: number;
     urls?: Array<string>;
     providerReceiptJson?: string | null;
     controlCheckUrl?: string | null;
@@ -1165,10 +1154,6 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeListResponse = {
 
 export type NoCtfapiEndpointsAdministrationRuntimeListAdminRuntimesRequest = {
     [key: string]: never;
-};
-
-export type NoCtfapiEndpointsAdministrationRuntimeTerminateRuntimeRequest = {
-    expectedProcessingVersion: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformPlatformUserResponse = {
@@ -1264,7 +1249,6 @@ export type NoCtfapiEndpointsAdministrationPlatformEmailVerificationConfiguratio
     smtpFromAddress?: string;
     smtpFromName?: string;
     smtpTimeoutSeconds?: number;
-    revision?: number;
     updatedAt?: string;
 };
 
@@ -1274,7 +1258,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformConfigurationResponse
     name?: string;
     description?: string | null;
     logoUrl?: string | null;
-    revision?: number;
     updatedAt?: string;
 };
 
@@ -1402,7 +1385,6 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformUserListResponse = {
 
 export type NoCtfapiEndpointsAdministrationPlatformReplaceEmailVerificationPasswordRequest = {
     password: string;
-    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfigurationRequest = {
@@ -1420,13 +1402,11 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdateEmailVerificationConfig
     smtpFromAddress: string;
     smtpFromName: string;
     smtpTimeoutSeconds: number;
-    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformConfigurationRequest = {
     name: string;
     description?: string | null;
-    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserAccountStatusConflictResponse = {
@@ -1465,7 +1445,6 @@ export type NoCtfapiEndpointsAdministrationPlatformUpdatePlatformUserRoleRequest
 
 export type NoCtfapiEndpointsAdministrationPlatformUploadPlatformLogoRequest = {
     file: Blob | File;
-    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationGameplayFactsCreateManualAdjustmentRequest = {
@@ -1595,7 +1574,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManage
     userIds?: Array<string>;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode = 'RolesOverlap' | 'OwnerIncluded' | 'UserNotFound' | 'RoleNotEligible' | 'EmailNotVerified' | 'RevisionConflict';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionResourceManagerConflictCode = 'RolesOverlap' | 'OwnerIncluded' | 'UserNotFound' | 'RoleNotEligible' | 'EmailNotVerified';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionRequest = {
     title: string;
@@ -1658,7 +1637,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationR
     competitionId?: string;
     mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     json?: string;
-    revision?: number;
     competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
     updatedAt?: string;
 };
@@ -1669,7 +1647,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVis
     effectiveVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     startsAt?: string | null;
     appliedAt?: string | null;
-    revision?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse = {
@@ -1678,7 +1655,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsRes
     managerIds?: Array<string>;
     judgeIds?: Array<string>;
     observerIds?: Array<string>;
-    permissionRevision?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsAdminCompetitionListResponse = {
@@ -1706,7 +1682,6 @@ export type NoCtfapiEndpointsAdministrationCompetitionsTransferCompetitionOwnerR
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionConfigurationRequest = {
-    expectedRevision?: number;
     json: string;
 };
 
@@ -1730,12 +1705,11 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVis
     current?: NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse | null;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionVisibilityMutationCodeProtocol = 'Updated' | 'NotFound' | 'RevisionConflict' | 'InvalidSchedule' | 'CompetitionFinished';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionVisibilityMutationCodeProtocol = 'Updated' | 'NotFound' | 'InvalidSchedule' | 'CompetitionFinished';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest = {
     visibility: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     startsAt?: string | null;
-    expectedRevision: number;
     reason?: string | null;
 };
 
@@ -1743,11 +1717,9 @@ export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionPermissi
     managerIds: Array<string>;
     judgeIds: Array<string>;
     observerIds: Array<string>;
-    expectedPermissionRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTracksRequest = {
-    expectedRevision?: number;
     tracks: Array<NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionTrackRequest>;
 };
 
@@ -1874,7 +1846,7 @@ export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflic
     code: NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode = 'ResourceIdConflict' | 'ChallengeOrderConflict' | 'ChallengeTemplateConflict' | 'RevisionConflict' | 'LifecycleStateConflict' | 'ChallengeTemplateNotFound' | 'ChallengeTemplateModeMismatch';
+export type NoCtfapiEndpointsAdministrationChallengesCompetitionChallengeConflictCode = 'ResourceIdConflict' | 'ChallengeOrderConflict' | 'ChallengeTemplateConflict' | 'LifecycleStateConflict' | 'ChallengeTemplateNotFound' | 'ChallengeTemplateModeMismatch';
 
 export type NoCtfapiEndpointsAdministrationChallengesCreateChallengeRequest = {
     id?: string | null;
@@ -1944,7 +1916,6 @@ export type NoCtfapiEndpointsAdministrationChallengesChallengeConfigurationRespo
     competitionChallengeId?: string;
     mode?: NoCtfapiEndpointsCompetitionsGameModeProtocol;
     json?: string;
-    revision?: number;
     competitionStatus?: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol;
     updatedAt?: string;
 };
@@ -1987,7 +1958,6 @@ export type NoCtfapiEndpointsAdministrationChallengesRestoreChallengeRequest = {
 };
 
 export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeConfigurationRequest = {
-    expectedRevision?: number;
     json: string;
 };
 
@@ -1996,7 +1966,6 @@ export type NoCtfapiEndpointsAdministrationChallengesUpdateChallengeRequest = {
     baseScore: number;
     order: number;
     isPublished: boolean;
-    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateResponse = {
@@ -2009,7 +1978,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateRespons
     description?: string | null;
     direction?: string;
     definitionJson?: string;
-    revision?: number;
     deletedAt?: string | null;
     activeCompetitionReferenceCount?: number;
     createdAt?: string;
@@ -2023,7 +1991,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflic
     userIds: Array<string>;
 };
 
-export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'RevisionConflict' | 'ActiveCompetitionModeConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible';
+export type NoCtfapiEndpointsAdministrationChallengeBankChallengeTemplateConflictCode = 'ResourceIdConflict' | 'ActiveCompetitionModeConflict' | 'OwnerIncludedInManagerSet' | 'UserNotFound' | 'RoleNotEligible';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankCreateChallengeTemplateRequest = {
     id?: string | null;
@@ -2061,7 +2029,6 @@ export type NoCtfapiEndpointsAdministrationChallengeBankListChallengeTemplatesRe
 
 export type NoCtfapiEndpointsAdministrationChallengeBankTransferChallengeTemplateOwnerRequest = {
     ownerId: string;
-    expectedRevision?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeTemplateRequest = {
@@ -2071,12 +2038,10 @@ export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeTemplateR
     description?: string | null;
     direction: string;
     definitionJson?: string;
-    expectedRevision: number;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankUpdateChallengeTemplatePermissionsRequest = {
     managerIds: Array<string>;
-    expectedRevision?: number;
 };
 
 export type NoCtfapiEndpointsAdministrationChallengeBankUploadChallengeAttachmentRequest = {
@@ -5367,7 +5332,7 @@ export type AdminStopTeamRuntimeResponses = {
 export type AdminStopTeamRuntimeResponse = AdminStopTeamRuntimeResponses[keyof AdminStopTeamRuntimeResponses];
 
 export type AdminTerminateRuntimeData = {
-    body: NoCtfapiEndpointsAdministrationRuntimeTerminateRuntimeRequest;
+    body?: never;
     path: {
         competitionId: string;
         runtimeInstanceId: string;
@@ -5377,10 +5342,6 @@ export type AdminTerminateRuntimeData = {
 };
 
 export type AdminTerminateRuntimeErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -8182,17 +8143,11 @@ export type AdminDeleteCompetitionChallengeData = {
         competitionId: string;
         competitionChallengeId: string;
     };
-    query: {
-        expectedRevision: number;
-    };
+    query?: never;
     url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}';
 };
 
 export type AdminDeleteCompetitionChallengeErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */
@@ -8607,17 +8562,11 @@ export type AdminRestoreCompetitionChallengeData = {
         competitionId: string;
         competitionChallengeId: string;
     };
-    query: {
-        expectedRevision: number;
-    };
+    query?: never;
     url: '/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/restore';
 };
 
 export type AdminRestoreCompetitionChallengeErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
     /**
      * Unauthorized
      */

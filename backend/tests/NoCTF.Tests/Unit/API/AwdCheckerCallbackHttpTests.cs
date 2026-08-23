@@ -28,7 +28,7 @@ public sealed class AwdCheckerCallbackHttpTests
         var runtimeId = Guid.Parse("0f66c20e-6064-4a20-a54e-bbe6a79aff56");
         var store = new CapturingInternalResultStore();
         await using var app = await CreateApplicationAsync(
-            Claims(runtimeId, checkerSequence: "23", processingVersion: "41"),
+            Claims(runtimeId, checkerSequence: "23"),
             store);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Authorization =
@@ -44,7 +44,6 @@ public sealed class AwdCheckerCallbackHttpTests
         await Assert.That(store.AwdResult!.RuntimeInstanceId).IsEqualTo(runtimeId);
         await Assert.That(store.AwdResult.Generation).IsEqualTo(3);
         await Assert.That(store.AwdResult.CheckerSequence).IsEqualTo(23);
-        await Assert.That(store.AwdResult.ProcessingVersion).IsEqualTo(41);
     }
 
     [Test]
@@ -53,7 +52,7 @@ public sealed class AwdCheckerCallbackHttpTests
         var runtimeId = Guid.Parse("0f66c20e-6064-4a20-a54e-bbe6a79aff56");
         var store = new CapturingInternalResultStore();
         await using var app = await CreateApplicationAsync(
-            Claims(runtimeId, checkerSequence: "not-a-number", processingVersion: "41"),
+            Claims(runtimeId, checkerSequence: "not-a-number"),
             store);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Authorization =
@@ -80,7 +79,7 @@ public sealed class AwdCheckerCallbackHttpTests
             Disposition = disposition
         };
         await using var app = await CreateApplicationAsync(
-            Claims(runtimeId, checkerSequence: "23", processingVersion: "41"),
+            Claims(runtimeId, checkerSequence: "23"),
             store);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Authorization =
@@ -131,7 +130,6 @@ public sealed class AwdCheckerCallbackHttpTests
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("generation")
                 .RequireClaim("checker_sequence")
-                .RequireClaim("processing_version")
                 .RequireClaim("deadline"));
         });
         builder.Services.AddSingleton(store);
@@ -147,8 +145,7 @@ public sealed class AwdCheckerCallbackHttpTests
 
     private static IReadOnlyList<Claim> Claims(
         Guid runtimeId,
-        string checkerSequence,
-        string processingVersion) =>
+        string checkerSequence) =>
     [
         new("token_type", "internal"),
         new("permission", "awd:check-result:write"),
@@ -156,7 +153,6 @@ public sealed class AwdCheckerCallbackHttpTests
         new("runtime_instance_id", runtimeId.ToString("D")),
         new("generation", "3"),
         new("checker_sequence", checkerSequence),
-        new("processing_version", processingVersion),
         new(
             "deadline",
             DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds().ToString())

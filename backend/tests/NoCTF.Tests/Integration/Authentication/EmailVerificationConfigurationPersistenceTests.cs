@@ -14,7 +14,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Smtp_password_is_encrypted_write_only_and_revision_fenced(
+    public async Task Smtp_password_is_encrypted_write_only_and_last_write_wins(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -49,7 +49,6 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 .IsEqualTo(1);
 
             var passwordUpdated = await store.ReplacePasswordAsync(
-                initial.Revision,
                 "smtp-secret",
                 DateTimeOffset.UtcNow,
                 cancellationToken);
@@ -79,7 +78,6 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 SmtpFromAddress: "no-reply@noctf.example",
                 SmtpFromName: "NoCTF",
                 SmtpTimeoutSeconds: 10,
-                ExpectedRevision: passwordUpdated.Revision,
                 Now: DateTimeOffset.UtcNow), cancellationToken);
             await Assert.That(updated).IsNotNull();
 
@@ -106,7 +104,6 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 SmtpFromAddress: "no-reply@noctf.example",
                 SmtpFromName: "NoCTF",
                 SmtpTimeoutSeconds: 10,
-                ExpectedRevision: passwordUpdated.Revision,
                 Now: DateTimeOffset.UtcNow), cancellationToken);
             await Assert.That(staleUpdate).IsNull();
         });

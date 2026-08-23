@@ -12,11 +12,11 @@ public sealed class WolverineBackendMessagePublisher(IMessageBus bus) : IBackend
 
     public async ValueTask ApplyCompetitionVisibilityAsync(
         Guid competitionId,
-        int visibilityRevision,
+        DateTimeOffset scheduledAt,
         CancellationToken cancellationToken) =>
         await bus.SendAsync(new ApplyCompetitionVisibility(
             competitionId,
-            visibilityRevision));
+            scheduledAt));
 
     public async ValueTask RebuildCompetitionAsync(
         Guid competitionId,

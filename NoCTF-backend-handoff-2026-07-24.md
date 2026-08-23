@@ -2,15 +2,18 @@
 
 > 创建于 2026-07-24，最后核验于 2026-08-06。文件名保留原日期，本文内容以最后核验日期为准。
 
-## 0. 数据模型与 Wolverine 简化迁移（2026-08-23）
+## 0. 数据模型与 Wolverine 简化迁移（2026-08-24）
 
 ### 0.1 当前状态
 
 - 当前分支：`codex/data-model-wolverine-simplification`
 - main/origin/main 基线：`8e366fbda160e24d5142d54f1151bf0024950dc1`
-- 已完成阶段：阶段 0（治理、基线与 Wolverine 6.29.2 Spike）
-- 当前阶段：阶段 1（删除 Revision 协议闭环，尚未开始代码修改）
-- 业务迁移：尚未开始；数据库、HTTP 契约、OpenAPI 和生成 SDK 均未修改。
+- 已完成阶段：阶段 0（治理、基线与 Wolverine 6.29.2 Spike）、阶段 1（删除 Revision 协议闭环）
+- 当前阶段：阶段 2（核心实体和隐私模型，尚未开始代码修改）
+- 阶段 1 提交：本提交（提交后使用 `git log -1 --oneline` 获取哈希）。
+- 数据库状态：目标 EF 模型已删除 Revision 并产生预期 drift；旧 migration/snapshot 仍保持
+  tooling-owned 原样，阶段 10 才通过 EF 工具重建单一初始基线。
+- HTTP 契约、OpenAPI、生成 SDK 与前端已删除 Revision 并发协议；管理更新采用 last-write-wins。
 - 权限：只允许本地实现和分阶段提交；禁止推送、部署和生产数据/队列/对象操作。
 
 本轮最高优先级规范是
@@ -46,6 +49,19 @@ Revision、16 表、`DataExport`、Runtime generation/replacement、`Leaderboard
 - [`docs/data-model-wolverine-stage0-baseline.md`](docs/data-model-wolverine-stage0-baseline.md)
 - [`docs/wolverine-6.29.2-spike.md`](docs/wolverine-6.29.2-spike.md)
 - [`docs/data-model-wolverine-cutover.md`](docs/data-model-wolverine-cutover.md)
+- [`docs/data-model-wolverine-stage1-revision-removal.md`](docs/data-model-wolverine-stage1-revision-removal.md)
+
+### 0.2.1 阶段 1 完成证据
+
+- Release solution build：0 warnings，0 errors。
+- Unit 与 Architecture：`899/899`。
+- 阶段 1 关系型门禁使用真实 PostgreSQL/Testcontainers 定向验证：既有组合 `31/31`，附件
+  更新时间闭环 `1/1`。
+- OpenAPI/协议 `18/18`；OpenAPI 与生成 SDK 重跑后 6 个制品 hash 不变。
+- Frontend：测试 `273/273`，typecheck 与 production build 通过。
+- 完整 Integration 仍被阶段 10 前的预期 EF model drift 阻塞，未报告为通过；未手改 migration
+  或 snapshot。
+- 本轮没有推送、部署或操作生产数据库、Wolverine 队列、对象存储。
 
 ### 0.3 恢复命令
 
@@ -61,16 +77,18 @@ dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll `
   --minimum-expected-tests 3
 ```
 
-阶段 0 退出门禁已全部完成。切换/回滚方案已完成设计评审；生产执行仍要求项目负责人指定真实
+阶段 0、阶段 1 退出门禁已全部完成。切换/回滚方案已完成设计评审；生产执行仍要求项目负责人指定真实
 责任人并确认备份/恢复演练。本轮没有操作生产数据库、队列或对象存储。
 
-阶段 0 提交后恢复阶段 1：
+阶段 1 提交后恢复阶段 2：
 
 ```powershell
 Set-Location E:\SourceCode\NoCTF
 git status --short
 git log -1 --oneline
-rg -n "ExpectedRevision|ConcurrencyVersion|CriticalSectionVersion|ProcessingVersion|Revision" backend/src backend/tests
+Get-Content docs/data-model-wolverine-simplification.md | Select-Object -Skip 729 -First 70
+rg -n "Email|NormalizedEmail|Description|Logo|MemberIds|ManagerIds|JudgeIds|ObserverIds" `
+  backend/src/NoCTF.Domain backend/src/NoCTF.Infrastructure/Persistence
 ```
 
 ## 1. 下一会话目标

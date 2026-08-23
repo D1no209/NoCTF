@@ -42,7 +42,7 @@ public sealed class ChallengeTemplateProtocolTests
     }
 
     [Test]
-    public async Task Update_request_requires_complete_revision_fenced_payload()
+    public async Task Update_request_requires_complete_last_write_wins_payload()
     {
         var validator = new UpdateChallengeTemplateValidator();
         var missing = validator.Validate(new UpdateChallengeTemplateRequest());
@@ -60,30 +60,14 @@ public sealed class ChallengeTemplateProtocolTests
             nameof(UpdateChallengeTemplateRequest.Direction))).IsTrue();
         await Assert.That(missingProperties.Contains(
             nameof(UpdateChallengeTemplateRequest.DefinitionJson))).IsFalse();
-        await Assert.That(missingProperties.Contains(
-            nameof(UpdateChallengeTemplateRequest.ExpectedRevision))).IsTrue();
         await Assert.That(validator.Validate(new UpdateChallengeTemplateRequest
         {
             Mode = GameModeProtocol.Ctf,
             Visibility = ChallengeVisibilityProtocol.Private,
             Title = "Template",
             Direction = "Web",
-            DefinitionJson = """{"schemaVersion":1}""",
-            ExpectedRevision = 0
+            DefinitionJson = """{"schemaVersion":1}"""
         }).IsValid).IsTrue();
-        var negativeRevision = validator.Validate(new UpdateChallengeTemplateRequest
-        {
-            Mode = GameModeProtocol.Ctf,
-            Visibility = ChallengeVisibilityProtocol.Private,
-            Title = "Template",
-            Direction = "Web",
-            DefinitionJson = """{"schemaVersion":1}""",
-            ExpectedRevision = -1
-        });
-        await Assert.That(negativeRevision.Errors.Any(error => string.Equals(
-            error.PropertyName,
-            nameof(UpdateChallengeTemplateRequest.ExpectedRevision),
-            StringComparison.OrdinalIgnoreCase))).IsTrue();
     }
 
     [Test]
@@ -102,8 +86,6 @@ public sealed class ChallengeTemplateProtocolTests
     {
         var notFound = ChallengeTemplateUpdateResponseMapper.ToResponse(
             new(ChallengeTemplateWriteState.NotFoundOrForbidden));
-        var revision = ChallengeTemplateUpdateResponseMapper.ToResponse(
-            new(ChallengeTemplateWriteState.RevisionConflict));
         var activeMode = ChallengeTemplateUpdateResponseMapper.ToResponse(
             new(ChallengeTemplateWriteState.ActiveCompetitionModeConflict));
         var invalidDefinition = ChallengeTemplateUpdateResponseMapper.ToResponse(
@@ -112,8 +94,6 @@ public sealed class ChallengeTemplateProtocolTests
                 Detail: "Definition is invalid."));
 
         await Assert.That(notFound.Result).IsTypeOf<NotFound>();
-        await Assert.That(revision.Result)
-            .IsTypeOf<Conflict<ChallengeTemplateConflictResponse>>();
         await Assert.That(activeMode.Result)
             .IsTypeOf<Conflict<ChallengeTemplateConflictResponse>>();
         var activeModeConflict =

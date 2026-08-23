@@ -32,12 +32,12 @@ public sealed class InternalResultStore(
             return InternalResultDisposition.NotFound;
         if (runtime.Generation != result.Generation)
             return InternalResultDisposition.Superseded;
-        if (runtime.ProcessingVersion < result.ProcessingVersion
-            || runtime.CheckerSequence < result.CheckerSequence)
+        if (runtime.CheckerSequence < result.CheckerSequence)
             return InternalResultDisposition.Conflict;
-        if (runtime.ProcessingVersion > result.ProcessingVersion
-            || runtime.CheckerSequence > result.CheckerSequence)
+        if (runtime.CheckerSequence > result.CheckerSequence)
             return InternalResultDisposition.Superseded;
+        if (runtime.LastAppliedCheckerSequence >= result.CheckerSequence)
+            return InternalResultDisposition.Duplicate;
         var appliedAt = NextAppliedAt(
             result.OccurredAt,
             runtime.CheckerStatusUpdatedAt);
@@ -118,11 +118,10 @@ public sealed class InternalResultStore(
             || runtime.Purpose != RuntimePurpose.AwdpTarget
             || runtime.GameplayFactId != fact.Id)
             return InternalResultDisposition.NotFound;
-        if (runtime.Generation != result.Generation
-            || runtime.ProcessingVersion > result.RuntimeProcessingVersion)
+        if (runtime.Generation != result.Generation)
             return InternalResultDisposition.Superseded;
-        if (runtime.ProcessingVersion < result.RuntimeProcessingVersion)
-            return InternalResultDisposition.Conflict;
+        if (fact.State is GameplayFactState.Completed or GameplayFactState.PlatformFailed)
+            return InternalResultDisposition.Duplicate;
         var context = await db.CompetitionChallenges
             .Where(challenge => challenge.Id == fact.CompetitionChallengeId)
             .Join(
@@ -134,29 +133,16 @@ public sealed class InternalResultStore(
                 db.Challenges,
                 scope => scope.Challenge.ChallengeId,
                 challenge => challenge.Id,
-                (scope, challenge) => new
-                {
-                    scope.Challenge,
-                    scope.Competition,
-                    DefinitionRevision = challenge.Revision
-                })
+                (scope, _) => new { scope.Challenge, scope.Competition })
             .SingleAsync(ct);
         if (context.Competition.Mode != GameMode.Awdp || fact.Kind != GameplayFactKind.FixAttempt)
             return InternalResultDisposition.NotFound;
-        var configurationWasSuperseded =
-            runtime.SourceCompetitionConfigurationRevision
-                != context.Competition.ConfigurationRevision
-            || runtime.SourceCompetitionChallengeRevision != context.Challenge.Revision
-            || runtime.SourceChallengeDefinitionRevision != context.DefinitionRevision;
         var decision = AwdpFixOutcomeMapper.Map(result.Outcome);
-        if (configurationWasSuperseded
-            || decision.Result is null)
+        if (decision.Result is null)
         {
             fact.State = GameplayFactState.PlatformFailed;
-            fact.FailureCode =
-                configurationWasSuperseded
-                    ? GameplayFactFailureCode.CheckerPlatformError
-                    : decision.FailureCode ?? GameplayFactFailureCode.CheckerPlatformError;
+            fact.FailureCode = decision.FailureCode
+                ?? GameplayFactFailureCode.CheckerPlatformError;
         }
         else
         {
@@ -183,7 +169,6 @@ public sealed class InternalResultStore(
         runtime.AwdpFixStage = AwdpFixStage.Completed;
         runtime.State = RuntimeState.Stopping;
         runtime.RunnerAssignmentReleaseToken = null;
-        runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
         await events.RecordAsync(new(
             fact.CompetitionId,
             CompetitionEventKind.GameplayFactAdjudicated,
@@ -232,7 +217,6 @@ public sealed class InternalResultStore(
             RuntimeGeneration: runtime.Generation), ct);
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
-            runtime.ProcessingVersion,
             runtime.Generation,
             runtime.RunnerPool,
             runtime.RunnerId
@@ -241,9 +225,7 @@ public sealed class InternalResultStore(
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
-        return configurationWasSuperseded
-            ? InternalResultDisposition.Superseded
-            : InternalResultDisposition.Applied;
+        return InternalResultDisposition.Applied;
     }
 
     private async Task QueueNextAwdpFixAttemptAsync(

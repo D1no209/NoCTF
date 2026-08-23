@@ -22,7 +22,6 @@ public sealed record CompetitionTracksView(
     Guid CompetitionId,
     GameMode Mode,
     CompetitionStatus Status,
-    int Revision,
     bool IsFrozen,
     IReadOnlyList<CompetitionTrackView> Tracks,
     Guid? ViewerTeamId = null);
@@ -32,13 +31,11 @@ public enum CompetitionTrackFailureCode
     CompetitionNotFound,
     InvalidConfiguration,
     ConfigurationLocked,
-    ConfigurationConflict,
     TrackInUse,
     TeamNotFound,
     TrackNotFound,
     TrackNotPublicSelectable,
-    AssignmentLocked,
-    AssignmentConflict
+    AssignmentLocked
 }
 
 public sealed record CompetitionTrackInvitationCodeUpdate(
@@ -48,7 +45,6 @@ public sealed record CompetitionTrackInvitationCodeUpdate(
 
 public sealed record UpdateCompetitionTracksCommand(
     Guid CompetitionId,
-    int ExpectedRevision,
     IReadOnlyList<CompetitionTrackDefinition> Tracks,
     Guid ActorUserId,
     DateTimeOffset UpdatedAt,
@@ -58,15 +54,13 @@ public sealed record AssignTeamTrackCommand(
     Guid CompetitionId,
     Guid TeamId,
     string TrackKey,
-    long ExpectedTeamVersion,
     Guid ActorUserId,
     DateTimeOffset UpdatedAt);
 
 public sealed record TeamTrackAssignmentView(
     Guid CompetitionId,
     Guid TeamId,
-    string TrackKey,
-    long TeamVersion);
+    string TrackKey);
 
 public interface ICompetitionTrackStore
 {

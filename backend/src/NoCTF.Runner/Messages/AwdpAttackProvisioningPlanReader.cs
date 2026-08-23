@@ -42,7 +42,6 @@ public sealed class AwdpAttackProvisioningPlanReader(IServiceScopeFactory scopes
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Where(candidate => candidate.Id == message.RuntimeInstanceId
                 && candidate.Generation == message.Generation
-                && candidate.ProcessingVersion == message.ProcessingVersion
                 && candidate.State == RuntimeState.Provisioning
                 && candidate.RunnerPool == message.RunnerPool
                 && candidate.RunnerId == message.RunnerId)
