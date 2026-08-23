@@ -31,7 +31,7 @@
 | 项目 | 内容 |
 | --- | --- |
 | 匹配方式 | 精确匹配 |
-| Flag 管理位置 | 平台按比赛题目、队伍和 Runtime generation 自动生成 |
+| Flag 管理位置 | 平台按比赛题目、队伍和 Runtime UUID 自动生成 |
 | 比赛专属模板 | 在 CompetitionChallenge 规则中配置前缀、正文与 Leet 选项 |
 | 注入位置 | 题库 Runtime 定义中的环境变量名，不填写 Flag 明文 |
 | 是否包含在附件/镜像公开层 | 必须为否 |

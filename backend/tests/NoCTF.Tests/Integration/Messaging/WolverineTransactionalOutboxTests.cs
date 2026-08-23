@@ -953,6 +953,8 @@ public sealed class WolverineTransactionalOutboxTests
                 ["Runner:Id"] = awdpFixExecution.Message.RunnerId
             });
             builder.Services.AddSingleton<IAwdpFixWorkReader>(awdpFixExecution.WorkReader);
+            builder.Services.AddOptions<RunnerOptions>()
+                .Bind(builder.Configuration.GetSection(RunnerOptions.SectionName));
             builder.Services.AddSingleton<IRuntimeProviderCatalog>(awdpFixExecution.Providers);
             builder.Services.AddSingleton<IOneShotRuntimeProviderCatalog>(
                 awdpFixExecution.OneShotProviders);
@@ -1041,7 +1043,9 @@ public sealed class WolverineTransactionalOutboxTests
                 .ToPostgresqlQueue("outbox-probe");
             if (awdpFixExecution is not null)
                 options.PublishMessage<RunAwdpFixVerification>()
-                    .ToPostgresqlQueue("outbox-probe");
+                    .ToPostgresqlQueue(
+                        NoCTF.Application.Runtime.Instances.RunnerNodeQueueName
+                            .FromAssignment("test-pool", "test-runner").Value);
         });
         return builder.Build();
     }
@@ -1050,6 +1054,7 @@ public sealed class WolverineTransactionalOutboxTests
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddSingleton(new MaintenanceHostIdentity(hostId));
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingularAgent<MaintenanceTickAgent>();
         builder.UseWolverine(options =>
         {

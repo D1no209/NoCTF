@@ -1,179 +1,169 @@
 # AWDP
 
-## 模式边界
+## 产品边界
 
-AWDP 由攻击与防御两条独立事实流组成；是否允许未完成 Break 就提交 Fix，
-由当前比赛题目的 `RequireBreakBeforeFix` 决定：
+AWDP 是“队伍长期攻击实例 + 一次性 Fix 验证”的攻防模式，不是 AWD 的周期服务检查模型。
 
-- 攻击轨 `BreakAttempt`：队伍启动自己的长期攻击 Runtime，利用漏洞取得该 Runtime generation 的动态 Flag；首个有效 Correct 从所属逻辑轮开始建立持续攻击得分。
-- 防御轨 `FixAttempt`：队伍先申请全新的临时 Fix Target，再向该 Target 唯一上传一次不可变 `tar.gz` Patch；平台应用 Patch 并只运行一次 Checker，首个有效 Correct 从所属逻辑轮开始建立持续防御得分。
+- **Break**：队伍启动绑定自己的攻击 Runtime，利用漏洞获得该 Runtime UUID 的动态 Flag。
+- **Fix**：队伍申请一个全新、干净、无公开入口的验证 Target，唯一上传一次 Patch，平台只运行
+  一次 Checker，得到强类型结果后立即清理所有临时资源。
 
-AWDP 不是 AWD，不使用 `FlagAttempt`、`AwdRound`、加固期、周期服务上下线检查、批量提交其他队伍轮次 Flag 或 AWD 目标列表。AWDP 的 Checker 只属于一次 Fix 验证，不会周期运行，也不会修改队伍的长期攻击 Runtime。
+攻击和防御是两条独立事实流与分值曲线。比赛可通过
+`CompetitionChallenge.RulesJson` 配置是否要求先成功 Break 才允许申请 Fix。
 
-## schema v4 配置
+AWDP 不使用 AWD 的 `AwdRound`、加固期、周期健康检查、批量攻击目标或轮次 Flag 提交。
 
-新建 AWDP 比赛与比赛题目规则使用 `schemaVersion: 4`；题库技术定义继续使用其独立的 definition schema。Competition 配置包含：
+## 配置归属
 
-```text
-RoundDurationSeconds: int > 0
-Break / Fix: ScoreCurveConfiguration         // 两条互不影响的动态曲线
-FlagWrongPenalty / ExploitSucceededPenalty: bigint >= 0
-ServiceAbnormalPenalty: bigint >= 0
-MaxBreakSubmissions / MaxFixSubmissions: int // <= 0 表示无限
-EvaluationDispatchMode: Automatic | ManualBatch
-FlagTemplate: PerTeamFlagTemplate
-```
+题库 `Challenge.DefinitionJson` 只保存可复用技术定义：
 
-`Break` 与 `Fix` 分别包含 InitialPoints、MinimumPoints、DecayTeamCount、DecayMode 与可选 CustomExpression。内置 Fixed、Linear、Quadratic、Exponential、Logarithmic，也可使用受限自定义公式。`CompetitionChallenge.RulesJson` 可以逐项覆盖 Break/Fix 曲线、罚分、次数、
-派发方式、`RequireBreakBeforeFix` 和 `FlagTemplate`。覆盖值 `0` 是显式零，只有
-`null` 表示继承。不同比赛可以为同一题目使用不同 Flag 前缀与正文模板。
+- Player 攻击容器镜像、命令、资源与公开端点；
+- `FlagEnvironmentVariableName` 或目标文件位置；
+- Patch 入口、命令、大小和超时限制；
+- 一次性 Checker 镜像、命令和就绪超时。
 
-题库 `Challenge.DefinitionJson` 只保存可复用的技术定义：
+比赛配置和比赛题目规则保存比赛专属语义：
 
-```text
-Runtime                        // 玩家攻击服务，Container、PerTeam
-Runtime.Definition.FlagEnvironmentVariableName
-PatchEntrypoint / PatchCommand / PatchTimeoutSeconds
-Checker / ReadyTimeoutSeconds
-MaximumPatchUploadBytes
-```
+- 轮次时长；
+- Break/Fix 两条独立分值曲线；
+- 错误、EXP 成功、服务异常等罚分；
+- Break/Fix 提交限制；
+- `RequireBreakBeforeFix`；
+- 动态 Flag 模板。
 
-题目定义不得保存 CompetitionId、TeamId、具体 Flag 或比赛专属 Flag 前缀。AWDP Runtime
-固定使用 `Allocation=PerTeam`、`FlagSource=PerTeam`，并通过 Container 的
-`FlagEnvironmentVariableName`（例如 `FLAG`）声明注入位置。它不使用 AWD 的
-`AwdRotation`，也不另设一套 AWDP 专属 Flag 注入对象。
+不同比赛可以为同一题目使用不同 Flag 格式。出题人只声明注入位置，不填写队伍 ID、
+Runtime ID 或具体动态 Flag。旧的 AWDP 专属 `flagInjection` 对象不属于目标模型。
 
-未知 schema、缺失 Runtime/Checker、公开端点无有效 OwnerOnly URL、非法环境变量名，
-以及与模式不兼容的 Runtime 均在保存或 Start Gate 阶段拒绝。
+## 攻击 Runtime 与动态 Flag
 
-## 不兼容旧计分配置
+玩家启动环境只创建 `Player/AwdpAttack` Runtime：
 
-AWDP schema v4 是刻意的不兼容重设计，不读取或升级旧 `Milestone`、`PerRound`、固定 Points、持续激活配置，或旧的 `FixFailurePenalty`、`ViolationPenalty`、`ServiceDownPenalty`。旧 JSON 在保存、发布和 Start Gate 均被拒绝；工作人员必须明确重配两条分值曲线与三类单次罚分。GameplayFact 与永久比赛事件不被删除或改写，禁赛、解禁及重判通过同一确定性投影重新结算。
+- 必须绑定 Competition、CompetitionChallenge 和真实 Team；
+- 同队同题同时只有一个活动攻击实例；
+- Start、Stop、Reset、Extend 复用标准 Runtime 状态机；
+- Reset 停止旧 UUID 并创建全新 Runtime UUID，不保存 generation/replacement；
+- Worker 生成绑定新 Runtime UUID 的精确动态 Flag，并在 provider 创建请求中注入；
+- Runtime Running 后 Flag 生效；Stop、Reset、失败或到期后失效；
+- 明文 Flag 不进入 URL、普通 API、事件、通知、日志或指标。
 
-## 攻击 Runtime
-
-玩家在题目页创建攻击实例。平台复用标准 `RuntimePurpose.Player` 创建队伍绑定、
-对本队开放的长期 Runtime：
-
-- 绑定 CompetitionId、CompetitionChallengeId、TeamId 和 Generation；
-- 同队同题并发 Start 只得到一个活动实例，重复请求返回稳定当前实例；
-- Start/Stop/Reset/Extend 使用普通玩家 Runtime 状态机；
-- Reset 创建更高 Generation，旧实例进入清理并释放 Runner 容量；
-- 公开端口仍由 Docker host port `0` 随机分配，URL 来自题目定义；
-- Runtime 与后述临时 Fix Target 是不同用途、不同实例、不同网络和不同生命周期。
-
-Runtime 进入创建流程时，平台在 PostgreSQL 临界区为 `(CompetitionChallengeId, TeamId, RuntimeInstanceId)` 幂等创建一条 `SpecificationKind.RuntimeGeneration` 的精确 Flag。相同 generation 的 Wolverine 重投复用同一条 Flag，不生成第二条有效 Flag。
-
-Worker 在派发 Provider 创建请求前读取当前 generation 的 Flag 和最新有效题目配置：
-
-- 将 Flag 合并进题目声明的环境变量，并覆盖镜像中的同名默认值；
-- 只有 Provider Running 写回成功后才设置 `ValidStart`，防止未完成注入的 Flag 被判为有效；
-- Stop、Reset、失败或过期会设置 `ValidUntil`，旧 generation 立即失效。
-
-Flag 明文不得出现在 Runtime URL、普通 API 响应、前端状态、事件、通知、错误或结构化日志中。
+管理端 Runtime 列表必须显示真实队伍名。只有 KoH 等真正共享实例可以显示“共享”。
 
 ## Break 判定
 
-AWDP 只接受单个 `BreakAttempt`，只匹配当前 CompetitionChallenge 的精确 `RuntimeGeneration` Flag：
+AWDP 接受单个 `BreakAttempt`：
 
-- 当前队伍当前 generation 的有效 Flag：`Correct`；
-- 普通错误 Flag：`Wrong`；
-- 尚未完成注入、已停止或旧 generation Flag：`Wrong / FlagExpired`；
-- 其他队伍的有效 Flag：内部 `Rejected / ForeignTeamFlagDetected`，创建工作人员可见的作弊事件；参赛者响应按受保护结果降级为 `Wrong`，不泄露归属；
-- 同队重复提交同一有效 Flag，客观事实仍可保持 Correct，但投影只选 `(OccurredAt, GameplayFactId)` 最早的一条作为唯一攻击激活起点。
+- 当前队伍当前活动 Runtime UUID 的有效 Flag：`Correct`；
+- 已停止/已替换 Runtime UUID 的 Flag：`Wrong / FlagExpired`；
+- 普通错误或格式错误 Flag：`Wrong`；
+- 其他队伍的有效 Flag：内部 `Rejected / ForeignTeamFlagDetected` 并创建工作人员可见作弊事实；
+  参赛者响应降级为普通错误，不能泄露归属。
 
-AWDP Break 不写 `GameplayFactReferenceKind.AwdRound`，也不创建 AWD 服务状态事实。
+同一队伍同题首次有效 Correct 建立持久攻击成功事实。后续即使再次提交正确或错误 Flag，也只
+返回判定结果，不重复计分、不覆盖已成功状态、不创建失败状态、不重复播报，也不能被恶意提交
+用于刷事实。正确 Break 后按规则自动停止攻击 Runtime，但继续允许无副作用的正确性验证，便于
+复现与编写 Writeup。
 
-## Fix 与一次性验证
+## 一次性 Fix 流程
 
-若 `RequireBreakBeforeFix=false`，Fix 可独立提交；开启后，后端必须在创建 FixAttempt
-前确认当前仍存在有效 Correct Break。标准流程是：
+1. 队伍点击“申请防御”；
+2. API 在 PostgreSQL 临界区校验资格、次数和 Break 前置条件，创建 Fix GameplayFact；
+3. 创建绑定 Team 与 GameplayFact 的全新 `AwdpTarget` Runtime；
+4. Target Running 后允许唯一上传一次不可变 `tar.gz` Patch；
+5. 事务内把 PatchUpload、GameplayFact 和 Target 原子绑定；
+6. Runner 安全解包并以 argv 形式执行 Patch；
+7. 只启动一次 Checker；
+8. Checker 返回强类型业务 outcome；
+9. 不论成功、业务失败、平台失败或超时，均幂等停止 Checker/Target，清理网络、端口和容量。
 
-1. 队伍申请防御，平台先做 Break 前置条件、次数和配置检查；
-2. 从题目干净镜像创建绑定当前 Team、但没有公开入口的 `RuntimePurpose.AwdpTarget`；
-3. Target Running 后进入 `AwaitingPatch`，只允许绑定一次 PatchUpload 和一次 FixAttempt；
-4. 选手上传不可变 `tar.gz`，后端在同一 PostgreSQL 临界区原子锁定 Target、PatchUpload 与 FixAttempt；
-5. 安全解包并按 argv 形式执行 Patch；
-6. Patch exit 0 后只启动一次 Checker；
-7. Checker 通过认证 callback 返回结论；
-8. 成功、业务失败、平台失败或超时后都停止 Checker、Target、隔离网络并释放容量。
+同一 Target 的并发上传只有一个成功。文件在建立业务绑定前即因大小或格式被拒绝时，可以在该
+Target 上重新选择文件；一旦绑定 PatchUpload/FixAttempt，就永久锁定。再次尝试必须重新申请
+新的 Target 和 Runtime UUID。
 
-同一个 Target 的并发上传只能有一个成功。归档格式或大小在建立业务绑定前被拒绝时，Target 仍可接受修正后的单次上传；一旦 PatchUpload/FixAttempt 已绑定便永久锁定，不允许替换、再次上传或再次运行 Checker。若需再次尝试，必须重新申请另一个干净 Target。
+Fix Target 不是长期环境，不显示访问地址，不可续期或重置。管理端显示“一次性 Fix 验证
+Target”，并通过 GameplayFact/PatchUpload 展示来源队伍，不得显示“共享”。
 
-Patch 默认入口为 `fix.sh`；不剥离顶层目录，入口必须在 archive 根下精确存在。`{entrypoint}` 只在独立 argv 中替换为 `/noctf/fix/<path>`，不得拼成 shell 文本。
+## Patch 安全
 
-Checker 获得 `TARGET_HOST`、`TARGET_READY_TIMEOUT_SECONDS`、`NOCTF_CALLBACK_URL` 和 `NOCTF_CALLBACK_TOKEN`，但不得获得 Patch 对象键、原文件名、动态 Flag、选手身份或长期攻击 Runtime。回调为：
+- 只接受配置允许的归档格式与大小；
+- 拒绝绝对路径、`..`、符号链接、设备文件和解压炸弹；
+- Patch 入口必须在归档根下精确存在；
+- 命令以 argv 执行，不拼接 shell 文本；
+- Patch 对象键、原文件名、动态 Flag 和选手身份不传给 Checker；
+- 验证容器、网络和卷与队伍攻击 Runtime 隔离。
 
-```text
-POST /api/internal/v1/awdp/fix-results
-outcome: ExploitSucceeded | DefenseSucceeded | ServiceAbnormal
-```
+## Checker 结果
 
-| outcome | Result / Failure |
-|---|---|
-| DefenseSucceeded | Correct |
-| ExploitSucceeded | Wrong / AwdpExploitSucceeded |
-| ServiceAbnormal | Wrong / AwdpServiceAbnormal |
+Checker 结果在领域和跨进程契约中使用强类型枚举。目标映射：
 
-Checker 应先把 EXP 作为子进程执行并捕获失败/崩溃，再执行正常服务交互；服务异常优先级高于 EXP 结果。Checker exit 0 只表示进程正常结束；没有成功 callback 时绝不能推导为 DefenseSucceeded。Runner 级整体验证超时会判为 `ServiceAbnormal`；Checker 主进程异常退出且没有可信业务结果、Runner、Provider 或存储故障为 `PlatformFailed`/稳定平台失败，不得记为 Correct。管理员显式 Rejudge 才会重新创建一次干净验证环境。
+| Outcome | GameplayFact 状态 | Result | 稳定失败码 |
+|---|---|---|---|
+| `DefenseSucceeded` | `Completed` | `Correct` | 无 |
+| `ExploitSucceeded` | `Completed` | `Wrong` | `AwdpExploitSucceeded` |
+| `ServiceAbnormal` | `Completed` | `Rejected` | `AwdpServiceAbnormal` |
+| `PatchFailed` | `Completed` | `Rejected` | `AwdpPatchFailed` |
+| `PatchTimeout` | `Completed` | `Rejected` | `AwdpPatchTimeout` |
+| `PlatformFailed` | `Completed` | `Rejected` | `AwdpPlatformFailed` |
 
-## Fix 重投与 revision fence
+业务 outcome 与详细诊断通过版本化 `AwdpFixResolved` CompetitionEvent payload 传递。详细日志仅
+工作人员可见，不复制 Patch、Flag、Token 或私密内容。Checker exit 0 只表示进程结束；没有可信
+callback 时不得推导 `DefenseSucceeded`。
 
-Provider Running 后，Runner 在执行 Patch 前用 PostgreSQL 事务把 disposable target 推进到 execution fence。结果不确定的 Wolverine 重投不得在同一 Target 上再次执行非幂等 Patch：
+同一 GameplayFact/Checker execution 的重投只收敛一次。完成结果后到达的重复或迟到 callback
+不得覆盖终态，也不得重新启动验证或清理链。
 
-1. 先推进 recovery fence，使旧 callback、超时和迟到结果失效；
-2. 按 RuntimeInstanceId+Generation 精确清理 Target、Checker、网络和工作目录；
-3. 确认 Provider 不存在该 identity，并完成 owner-checked capacity release；
-4. 旧 Runtime 标为 Stopped；仍未得到可信结论的 FixAttempt 收敛为稳定平台失败；
-5. 不创建替代 Target、不自动重放 Patch，也不再次运行 Checker。队伍需要再次显式申请防御。
+## 持久防御成功
 
-创建 Target 时固化 Competition configuration revision、CompetitionChallenge revision 和 Challenge definition revision。结果落库前任一 revision 变化都使该次验证 PlatformFailed；不得隐式拿新定义解释旧请求。
+同一队伍同题首次 `DefenseSucceeded` 建立持久防御成功事实。后续 Fix 尝试可以用于复验，但不能
+把已成功状态改回失败，也不能重复建立首次成功积分或播报。攻击成功和防御成功互相独立；UI 在
+两者都成功时显示组合状态。
 
-## 按轮动态结算
+## 轮次与计分
 
-逻辑轮使用 Competition 生命周期事件计算的 EffectiveRunningTime：
+轮次由比赛开始时间和 `RoundDurationSeconds` 计算，不保存 next-run、当前轮或定时消息。
+Singular Agent 从 PostgreSQL 比赛事实重建当前内存计划，只派发 durable 轮次结算消息；停机期间
+跨过的历史 tick 不补跑。
 
-```text
-round(at) = floor(EffectiveRunningTimeAt(at) / RoundDurationSeconds) + 1
-```
+每个已结束轮次只结算当时已存在的攻击/防御成功事实：
 
-- 每个 Team/CompetitionChallenge/Kind 只选 `(OccurredAt, GameplayFactId)` 最早的有效 Correct，所属逻辑轮成为该轨道的唯一激活轮；
-- 同一题目的 Break 与 Fix 分别取每队首个有效 Correct 作为激活点；后续重复正确提交、重复 callback 或 Wolverine 重投不建立第二个激活点；
-- 每个已完成轮次分别统计截至该轮已激活且 `AffectsCompetitiveResults=true` 的不同队伍数，把该累计人数代入 Break/Fix 曲线，得到该轮整数攻击分和防御分；该轮所有已激活、可计分队伍获得对应轨道的同一分值；`AffectsDynamicChallengeScore` 只用于 CTF 动态题值，不参与 AWDP 结算；
-- 当前进行中的轮次不进入公开排行榜；轮次结束后才追加该轮得分。进入后续轮后，前一轮使用当时的最终激活人数固化结算，后续新增激活只影响后续轮次，不追溯改变它；已激活队伍无需每轮重复提交即可持续累加；
-- 两轨分数独立后相加。启用 `RequireBreakBeforeFix` 时，Fix 必须存在按权威顺序更早的 Correct Break；该 Break 被重判后会确定性重盘依赖结果；
-- Correct/Wrong 重判、队伍禁赛或解禁都会从原始事实全量重播所有轮次，不修改 GameplayFact 或永久事件；
-- Pause 不增加 EffectiveRunningTime，因此不推进收益；Resume 从原逻辑时间继续；Finish 使用结束时点冻结；
-- 三类单次罚分按每条唯一事实最多应用一次：Flag 错误使用 `FlagWrongPenalty`，Fix 验证得到 `ExploitSucceeded` 使用 `ExploitSucceededPenalty`，Fix 验证得到 `ServiceAbnormal` 使用 `ServiceAbnormalPenalty`；Patch 解包错误、Patch 命令非零/超时、Runner/Provider/存储平台失败不套用这三类选手业务罚分。Hint、ManualAdjustment、赛道过滤和 checked Int64 聚合保持原规则。
+- Break 与 Fix 各自按该轮成功队伍数计算独立动态分值；
+- 当前未结束轮不得提前加入正式排行榜；
+- 后续轮曲线变化不改写已结算轮；
+- 禁赛、解禁或重判触发从 PostgreSQL 事实的确定性全量重投影；
+- 计分结果不写累计分或排行榜快照业务表。
 
-即使没有新 GameplayFact，轮次边界也会冻结上一轮并开始显示新一轮的初始曲线值。singular maintenance 每 15 秒以 500 场为一批，按比赛 UUID keyset 遍历全部 Running AWDP schema v4 比赛，比较缓存快照 `DataAsOf` 对应轮次与当前逻辑轮；只有跨轮或缺失快照时设置 `LeaderboardDirty`。随后复用现有 `RefreshDirtyLeaderboards -> ProjectLeaderboard`、PostgreSQL 行锁、Wolverine Outbox 和原子缓存替换。没有新增 schedule 或积分状态表，也不会每秒写库。
+排行榜失效通过事件 fan-out 到独立 Sticky PostgreSQL endpoint，500ms 合并同一比赛的连续失效，
+随后全量 PostgreSQL 投影并原子替换缓存。缓存丢失时可从事实重建；不存在 `LeaderboardDirty`
+或 15 秒脏扫描。
 
-## 玩家状态接口
+## 事件与赛事播报
 
-题目页面通过单一强类型状态接口恢复：当前逻辑轮、攻击 Runtime、最近 Break、Break 激活轮次、最近一次性防御 Target、Patch/GameplayFact、TargetProvisioning/AwaitingPatch/PatchApplying/CheckerRunning/Completed 阶段，以及 Fix 激活轮次。响应应用现有玩家结果脱敏，不返回动态 Flag。
+平台可以为已验证的攻击/防御操作产生永久事件与简洁赛事播报：攻击提交、攻击成功、申请防御、
+Fix 提交、Fix 成功或异常。不得广播明文 Flag、Patch 内容、EXP 细节或私密诊断。重投和重复提交
+不得产生重复播报。
 
-前端固定展示“攻击”和“防御”两栏：攻击区管理长期攻击靶机并提交一个 Flag；防御区先申请一次性干净 Target，等待就绪后唯一上传本次 Patch，随后展示验证中、结果与环境已回收状态。页面不得把 Target 描述为长期题目环境，也不得展示 AWD 对手目标列表、批量 Flag、加固期或周期 Checker 文案。
+## 前端状态
 
-## 赛事中控大屏
+攻击侧显示攻击 Runtime 状态、访问地址、剩余时间和 Flag 判定。防御侧状态固定为：
 
-AWDP 比赛使用独立的 `/competitions/{competitionId}/awdp-live` 现场大屏。它不复用 CTF 的 3D 城市视图，也不改变普通选手页面。大屏采用固定 `1920×1080` 虚拟画布并按视口等比缩放；多余区域留黑，不进行破坏信息密度的响应式重排。
+- 未申请；
+- 创建中；
+- 可上传；
+- 验证中；
+- 已完成；
+- 平台失败，可重新申请。
 
-- 顶栏展示当前逻辑轮、已结算轮、非内部赛道队伍数、题目数和实时倒计时；
-- 左栏展示公开的 `AwdpBreakAttempted`、`AwdpFixAttempted`、`AwdpBreakResolved`、`AwdpFixResolved`；
-- 中央区域只播放已裁决结果，并以 FIFO 队列完整播放攻击成功、攻击失败、防御成功、防御失败四套独立动画；历史事件首次载入只建立基线，不回放旧动画；
-- 右上排行榜只展示已完成轮次的攻击分、防御分和总分，不为当前进行中轮次预测积分；
-- 右下按队伍轮播各题最近的攻击/防御状态和已结算分；内部赛道不得出现在大屏；
-- 底栏通过 JavaScript 动画循环滚动最近公开操作，鼠标悬停或键盘聚焦时暂停；
-- SignalR 只作为失效通知，收到事件或排行榜更新后仍通过生成 SDK 重新读取权威数据；断线时使用定时刷新兜底。
+Fix 历史在题目工作区内打开，不新开独立页面。结果文案必须映射强类型 outcome；未知/缺失业务
+结果默认显示“防御异常：服务异常”，不得自行创造“防御未通过”。
 
-公开结果事件只携带 Team、CompetitionChallenge、GameplayFact 的状态与结果。它们不得复制 Flag、Patch 内容、Checker 输出、失败原因或受保护的作弊证据。AWDP 攻击的业务对象始终是“队伍对题目的攻击操作”，不得在文案或动画中虚构另一支队伍为攻击目标。成功事件的现场动画只能说明操作已通过；实际积分仍等待本轮结束后结算。
+## 必测不变量
 
-## 排名
-
-1. 总分降序；
-2. 已激活 Fix 数降序；
-3. 已激活 Break 数降序；
-4. 累计罚分绝对值升序；
-5. 最后一次有效 Fix 时间升序；无 Fix 为无穷大；
-6. Team.RegisteredAt 升序；
-7. TeamId 升序。
+- Player/AwdpAttack Runtime 绑定 Team，Reset 使用新 UUID；
+- 动态 Flag 注入、失效、跨队作弊检测和重复提交幂等；
+- 正确 Break 自动停止 Runtime，后续仅判断正确性且没有业务副作用；
+- 申请防御每次创建新的干净 AwdpTarget；
+- 同一 Target 只能绑定一个 PatchUpload 和一次 Checker；
+- 成功、失败、超时、中断及重投后临时资源全部释放；
+- 强类型 outcome、事件 payload、GameplayFact 映射和前端文案一致；
+- 每轮只结算结束时事实，Break/Fix 曲线互不影响，历史轮不被后轮改写；
+- 缓存丢失可重建，事件乱序不能让旧投影覆盖新事实；
+- 普通响应、日志、事件、通知和指标不泄露 Flag、Patch、Token 或内部诊断。

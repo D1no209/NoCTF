@@ -5,7 +5,7 @@
 ## 题库模板
 
 - 游戏模式：`AWDP`
-- Break Flag：平台按比赛题目、队伍和 Runtime generation 生成的精确 Flag
+- Break Flag：平台按比赛题目、队伍和 Runtime UUID 生成的精确 Flag
 - 分配语义 / FlagSource：`PerTeam` / `PerTeam`
 - Flag 环境变量：`FLAG` 或题目采用的合法变量名
 - Runtime：Container；不使用 Compose 或 OVA

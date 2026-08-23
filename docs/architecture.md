@@ -59,9 +59,9 @@ Domain <- Application <- API / Worker / Runner / Host
 
 ## 一致性边界
 
-API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务中。消息可至少一次投递，因此 Handler 使用状态、唯一约束或自然幂等规则防重复；GameplayFact 消息不使用 ProcessingVersion，Runtime 仍使用自己的版本栅栏。
+API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务中。消息可至少一次投递，因此 Handler 使用状态、唯一约束或自然幂等规则防重复；不得使用持久化 Revision、ProcessingVersion 或隐藏的版本栅栏替代业务幂等键。
 
-分数投影不写回 GameplayFact。影响排行榜的事务设置 Competition.LeaderboardDirty；Worker 每 15 秒领取脏比赛并全量投影到命名 FusionCache，无论是否有订阅者。
+分数投影不写回 GameplayFact。影响排行榜的业务提交通过 transactional outbox 发布失效消息；Worker 按比赛合并 500ms 内的失效并从 PostgreSQL 全量投影到命名 FusionCache。缓存丢失时由 PostgreSQL 重建，不扫描 Dirty 业务列。
 
 ## Runner Pool
 
@@ -75,7 +75,7 @@ API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务�
 会在同一脚本内恢复容量并更新候选分数；过期心跳在分配时从候选集合剔除。Runner/Runtime ID
 仅进入 Trace 与结构化日志，不作为 Prometheus 标签。
 
-`file://` OVA URL 必须在 Pool 所有候选节点可访问。平台 API 不下载或管理 OVA；配置固定
+`file://` OVA URL 必须在部署所选 Runner 节点可访问。平台 API 不下载或管理 OVA；配置固定
 预期 SHA-256，Libvirt Provider 负责读取/下载、校验、内容寻址缓存以及多 VM Appliance
 导入。
 
@@ -83,6 +83,6 @@ API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务�
 
 Access、Refresh 与内部 JWT 可以共用签名密钥，但必须使用互不接受的 audience、token_type/permission 与验证 Scheme。生产部署可以改用不同签名密钥；验证器不得因密钥相同而跨 Scheme 接受 Token。
 
-调度 Checker 的可信进程签发最小权限 internal JWT，并只把它注入对应 Checker，不把签名密钥或其他 Token 交给题目容器。AWD Checker 可多次写状态，后一次覆盖前一次；Runtime identity/generation 来自 Token。运行退出只区分 Checker 自身正常、异常或超时，不用于判断服务 Up/Down。
+调度 Checker 的可信进程签发最小权限 internal JWT，并只把它注入对应 Checker，不把签名密钥或其他 Token 交给题目容器。每次 AWD Checker 执行对应一条独立 GameplayFact；Runtime UUID 和 Checker execution identity 来自 Token。运行退出只区分 Checker 自身正常、异常或超时，不用于判断服务 Up/Down。
 
 Runner 本身直接消费 Wolverine、访问必要业务表，不给自己签 callback JWT。Runner 启动的不可信 Checker 只能通过 `/api/internal/v1` 最小权限接口写结果。

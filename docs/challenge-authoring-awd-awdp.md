@@ -26,7 +26,7 @@ NoCTF 将“可复用题目模板”和“某场比赛中的题目”严格分�
 ### 2.1 镜像
 
 - 镜像可以使用普通 tag，也可以使用 digest；NoCTF 不强制固定 digest。
-- 生产比赛仍建议使用不可变 tag 或 digest，避免比赛期间同一 tag 被覆盖后，不同 Runtime generation 运行不同内容。
+- 生产比赛可自行选择普通 tag、不可变 tag 或 digest；NoCTF 不强制固定 digest。若覆盖同一 tag，变化只影响之后创建的新 Runtime UUID。
 - 镜像必须能够从平台 Runner 所在环境拉取。私有仓库的认证和网络可达性由平台运维负责。
 - 题目服务应监听容器内固定端口，不能在容器中写死宿主机地址或随机宿主端口。
 - Docker 公网入口必须配置为容器端口到宿主端口 `0` 的映射，由 Docker 分配随机宿主端口。
@@ -191,7 +191,7 @@ wget -qO /dev/null -T 3 \
 - [ ] 两支以上队伍各自得到独立 Runtime，端口不冲突。
 - [ ] 硬化期内只显示本队入口，攻击被拒绝；硬化期后对手入口按配置开放。
 - [ ] 每支队伍同一轮 Flag 不同，下一轮全部轮换。
-- [ ] 注入重复执行幂等，重置 Runtime 后当前 generation 获得当前有效 Flag。
+- [ ] 注入重复执行幂等，重置 Runtime 后新 Runtime UUID 获得当前有效 Flag。
 - [ ] 自己的 Flag、旧 Flag、错误 Flag、重复 Flag均返回明确结果。
 - [ ] 服务正常、主动宕机、Checker 超时、连接失败和恢复均符合预期。
 - [ ] 暂停期间不错误轮换或计分，恢复后从正确有效时间继续。
@@ -322,7 +322,7 @@ tar --format=ustar -czf fix.tar.gz fix.sh
 | `TARGET_HOST` | 一次性目标在隔离网络中的主机名 |
 | `TARGET_READY_TIMEOUT_SECONDS` | 等待目标就绪的秒数 |
 | `NOCTF_CALLBACK_URL` | 本次 Fix 结果回调地址 |
-| `NOCTF_CALLBACK_TOKEN` | 绑定 GameplayFact、Runtime generation 和处理版本的 JWT |
+| `NOCTF_CALLBACK_TOKEN` | 绑定 GameplayFact、Runtime UUID 和 Checker execution identity 的 JWT |
 
 最小 Checker：
 
@@ -381,8 +381,8 @@ Checker 成功回调后以 0 退出。Runner 级验证超时会判为 `ServiceAb
 
 - Break 通过普通 Flag 提交进入，但只允许单个 Flag，不支持 AWD 式批量。
 - AWDP Runtime 生成/使用的 Flag始终精确比较，不使用正则匹配。
-- 本队当前 generation Flag 才能产生 Break；错误、外队、已停止或旧 generation Flag按模式规则拒绝。
-- Reset 为新 generation 生成新 Flag，并立刻使旧 generation 失效；Flag 不通过 URL、事件或普通日志返回。
+- 本队当前活动 Runtime UUID 的 Flag 才能产生 Break；错误、外队、已停止或旧 Runtime UUID Flag 按模式规则拒绝。
+- Reset 为新 Runtime UUID 生成新 Flag，并立刻使旧 Runtime UUID 的 Flag 失效；Flag 不通过 URL、事件或普通日志返回。
 - 开启“先 Break 后 Fix”后，未满足当前规则时上传可以保留，但触发 Fix 会稳定拒绝，不创建 Fix GameplayFact，也不会错误消耗补丁。
 
 ### 4.8 AWDP 验收清单

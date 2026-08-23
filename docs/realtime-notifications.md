@@ -16,13 +16,21 @@ API 多副本使用 Redis SignalR backplane。断线不补历史；客户端重�
 
 ## 排行榜刷新
 
-排行榜刷新不感知订阅者。Worker 每 15 秒扫描 `LeaderboardDirty`，只为脏比赛生成全量快照并替换 FusionCache；SignalR 的 `leaderboardRefreshed` 只在新快照写入成功后发送。缓存缺失的 GET 置 Dirty 并返回 202，订阅动作本身不触发投影。
+排行榜刷新不感知订阅者。影响投影的业务事务通过 Outbox fan-out 到排行榜 Sticky PostgreSQL
+endpoint；消费者立即失效缓存，由 Singular Agent 固定 500 ms 合并并派发全量 PostgreSQL 投影。
+只有新快照成功写入缓存后才发送 `leaderboardRefreshed`。缓存缺失由读取路径重建，不存在 Dirty 扫描。
 
 ## notifications
 
-通知是一行动态受众消息，而不是按 User 展开的收件箱，不维护已读状态或未读数。字段为 Source/Target type+id、Kind、Content、SentAt、Related 引用和 ReplyToId；Question 根、回复、状态变化、公告和自然通知共享此表。比赛管理员公告的 Source 是发送者 UserId，Target 是比赛且默认 TargetType=CompetitionCollaborators。
+通知是一行动态受众消息，而不是按 User 展开的收件箱，不维护已读状态或未读数。字段为
+Source/Target type+id、Kind、Content、SentAt、Related、ThreadRootId 和可空 ReplyToId；Question 根、
+回复、状态变化、公告和自然通知共享此表。根的 ThreadRootId 为空，回复/状态事件指向根；ReplyToId
+只表示非唯一回复上下文。
 
-读取时解析受众：协作者包含 Owner/Manager/Judge/Observer，参赛者包含当前有效 Approved 队伍成员，TeamMembers 解析队伍成员，平台管理员解析当前有效管理员。Question 根发送者永久继承线程访问权限。`GET /notifications/{id}/thread` 用 recursive CTE 返回线性链；SignalR 只发刷新提示，Feed 以 PostgreSQL 为准。
+读取时解析受众：协作者包含 Owner/Manager/Judge/Observer，参赛者包含当前有效 Approved 队伍成员，
+TeamMembers 解析队伍成员，平台管理员解析当前有效管理员。Question 根发送者永久继承线程访问权限。
+`GET /notifications/{id}/thread` 按 ThreadRootId 查询并以 `(sent_at,id)` 排序；并发回复全部 append。
+SignalR 只发刷新提示，Feed 以 PostgreSQL 为准。
 
 Payload 由 NotificationKind 对应强类型 DTO 序列化，只含安全展示字段。按 CreatedAt desc/Id desc keyset 查询。没有 Read/MarkAllRead/Delete/Expiry API。
 

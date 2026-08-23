@@ -15,7 +15,7 @@
 - 四模式投影、血奖、罚分、所有 tie-break；
 - GameplayFact 次数、预占释放、当前结果覆盖和重判平台失败保留结果；
 - 权限矩阵、Team/Competition UUID 数组不变量；
-- 逻辑 URL 与 provider-neutral Runtime 配置验证、Runtime Queued/Reset replacement/ProcessingVersion、Checker 状态后写覆盖及异常退出/超时；
+- 逻辑 URL 与 provider-neutral Runtime 配置验证、Runtime Queued/Reset 新 UUID、每次 Checker 独立事实及异常退出/超时；
 - Problem code/result mapping。
 
 ## PostgreSQL 集成
@@ -42,7 +42,7 @@
   Guest Agent、VmId URL expansion、幂等 cleanup、Pool inventory dispatch 与
   数据库 assignment 精确 orphan reconciliation；
 - 网络隔离与 orphan reaper；
-- AWDP 按队 Attack Runtime、generation Flag 环境变量/文件注入、Reset 失效、公开 URL；
+- AWDP 按队 Attack Runtime、Runtime UUID Flag 环境变量/文件注入、Reset 失效、公开 URL；
 - AWDP disposable Fix target 与 Attack Runtime 隔离、Patch/一次 Checker callback、非零退出、无 callback、timeout、重放与清理；
 - AWD raw command injection 与轮次截止重试。
 
@@ -75,8 +75,8 @@ NOCTF_LIBVIRT_DISK_PATH=/absolute/path/to/fixture.img
 fixture 必须是可由 BIOS/KVM 启动的磁盘镜像，自带 QEMU Guest Agent，并为
 `virtio_net` 接口启用 DHCP；测试不会下载、修改或向 Guest 注入这些依赖。测试运行时
 自行把磁盘流式打包为临时单 VM OVA，验证 SHA-256、qcow2 转换、routed network、
-Guest Agent IPv4、通过 Guest Agent 启动的 HTTP URL、generation 0 receipt stop、
-generation 1 replacement 与按完整 identity orphan cleanup。默认未设置变量时明确
+Guest Agent IPv4、通过 Guest Agent 启动的 HTTP URL、旧 Runtime receipt stop、
+Reset 新 Runtime UUID 与按完整 identity orphan cleanup。默认未设置变量时明确
 skip；Release 的受控 Libvirt Runner 应设置该变量并使用专用 fixture。
 
 ## 端到端
@@ -151,7 +151,7 @@ Smoke 覆盖每种模式至少一条真实依赖流程：
 
 - CTF：注册/队伍/附件或 Runtime/Flag/血奖/Hint/重判；
 - AWD：加固/轮换/批量攻击/重复/服务 Up-Down/轮末投影；
-- AWDP：两队独立 Attack Runtime/端口、真实动态 Flag、错误/外队/旧 generation Break、无需 Break 的 Fix、一次 Checker、Break/Fix 持续按轮叠加、Pause/Resume/Finish 冻结、页面状态恢复；
+- AWDP：两队独立 Attack Runtime/端口、真实动态 Flag、错误/外队/旧 Runtime Break、无需 Break 的 Fix、一次 Checker、Break/Fix 持续按轮叠加、Pause/Resume/Finish 冻结、页面状态恢复；
 - KoH：共享 Runtime/Control Flag、正确/错误/不可用/超时/歧义行为、暂停恢复。
 
 Full 在模式业务流程之后还会验证 API 重启后原 JWT 有效、Redis 停止时认证回退

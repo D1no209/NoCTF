@@ -55,19 +55,11 @@
 - AWDP 防御申请与 Patch 上传是两个 API；上传成功即原子绑定唯一 FixAttempt 并触发一次验证，不存在第三个 Fix trigger，也不是预签名上传会话。
 - 下载先授权；S3 返回 typed `RedirectHttpResult`（60 秒预签名 302），LocalFileSystem 返回 typed `FileStreamHttpResult`。二者必须出现在 Endpoint `Results<...>` 中，不以 SendStreamAsync/HttpResponse 手写。
 
-## Revision 并发
+## 并发
 
-CompetitionChallenge 聚合 update body 与 delete/restore lifecycle 请求必须带
-expectedRevision；delete/restore 使用 required query 标量，成功后同样递增聚合 Revision。
-陈旧 revision 与生命周期状态冲突返回强类型 409，不自动合并。Competition 普通元数据更新
-使用当前状态作为并发栅栏，不引入通用 Revision。Competition 与 CompetitionChallenge 的模式
-配置更新分别携带对应配置的 expectedRevision；数据库条件更新成功后对应 Revision+1。
-Competition 权限数组使用独立 PermissionRevision，全量替换携带 expectedPermissionRevision，
-Owner transfer 同样递增该 revision；它不得复用 ConfigurationRevision 或扩展成通用
-Competition Revision。Attachment、Flag、Hint 没有独立 Revision；GitOps 通过稳定 UUID、
-内容和删除状态收敛，子资源 Endpoint 不要求伪造一套 ExpectedRevision 协议。Hint 写仍属于
-CompetitionChallenge 聚合变更：必须与管理写共享 Competition transaction lock，并原子递增
-父聚合 Revision；排行榜只使用 `LeaderboardDirty`，不暴露 revision。
+可变资源采用 last-write-wins，管理请求和响应不携带 `ExpectedRevision`/Revision 并发协议。
+业务唯一约束、状态机合法迁移、不可变记录、幂等业务键以及 transactional Inbox/Outbox 分别保护
+真正的不变量。409 只表示强类型业务冲突，不得映射为通用“内容已被其他人修改”。
 
 ## 限流
 
@@ -75,7 +67,9 @@ Redis 分布式策略：认证按 IP；普通 API 按 User；Flag 按 Team+题�
 
 ## 幂等
 
-不支持公开 Idempotency-Key。每个通过接入的 GameplayFact 都是新尝试；Patch 上传替换未引用对象；Runtime 由状态机处理重复；配置由 Revision 处理。GameplayFact 内部消息只携带事实 ID，最终结果覆盖同一行；Runtime 自身仍用 ProcessingVersion/Sequence 防迟到写回。
+不支持公开 Idempotency-Key。每个通过接入的 GameplayFact 都是新尝试；Patch 上传替换未引用对象；
+Runtime 以全新 UUID、状态和 MessageId 幂等处理重复；配置后写覆盖。内部消息只携带稳定事实/实例 Id，
+消费端依赖 durable inbox，业务事务依赖 transactional outbox，不使用 ProcessingVersion/Sequence。
 
 ## OpenAPI 验收
 

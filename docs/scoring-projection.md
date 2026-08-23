@@ -2,45 +2,49 @@
 
 ## 事实源
 
-排行榜只读取 PostgreSQL 的当前 `GameplayFact`、Team、CompetitionChallenge、Hint、AWD Round、生命周期事件和当前配置。`GameplayFact` 不保存分数；Projector 按 `Kind` 分发并用 `(OccurredAt, Id)` 确定稳定顺序。
+排行榜只读取 PostgreSQL 的 GameplayFact、Team、CompetitionChallenge、生命周期/可见性事件和当前
+配置。GameplayFact 不保存分值、分差或累计分；Projector 按强类型 Kind 分发并以 `(OccurredAt, Id)`
+确定稳定顺序。缓存与 SignalR 都不是事实源，Redis 全量丢失后必须能从 PostgreSQL 重建。
 
-- CTF：Correct FlagAttempt、Wrong 罚分、Unlocked Hint、Applied ManualAdjustment。
-- AWD：带 VictimTeam/AwdRound 的 Correct FlagAttempt，以及状态变化产生的 AwdServiceTransition。
-- AWDP schema v4：按 Team/CompetitionChallenge/Kind/round 选择最早 Correct，按该轮不同成功队伍数分别计算 Break/Fix 动态曲线；失败事实只应用一次罚分。
-- KoH：每次完成轮询产生的 Controlled/Uncontrolled KohControlObservation；连续同队控制仍分别计分。
+- CTF：正确 Flag、罚分、Hint、ManualAdjustment；
+- AWD：攻击事实和每次独立 Checker GameplayFact；
+- AWDP：每题每轮独立 Break/Fix 成功与强类型验证结果；
+- KoH：每次完成轮询产生的控制观察事实。
 
-配置修改立即影响下一次全量投影，不保存历史配置，也不支持按过去时点重建。冻结排行榜在冻结命令内同步使用当前事实和配置完整生成，并把完整 JSON 保存到 Competition；冻结失败不改变可见性。冻结后只读取这份持久化快照，不接受历史轮次窗口重建；否则后续重判、封禁或配置编辑会用新事实污染旧冻结结果。Normal 排行榜仍可按有界轮次窗口浏览完整历史。
+配置变更影响下一次全量投影，不保存历史配置 Revision。需要冻结的公开结果由不可变比赛事件和事实
+时间表达，不恢复 Competition 上的 Dirty/Snapshot/Revision 列。
 
-## Dirty 与 15 秒全量刷新
+## 事件驱动失效与 500 ms 合并
 
-影响投影的事务在提交前设置 `Competition.LeaderboardDirty=true`。唯一维护 Tick 每秒调度 AWD checker、每 15 秒发布 `RefreshDirtyLeaderboards`、每 30 秒执行 Runner reconciliation 和生命周期推进；是否存在订阅者不影响刷新。
+任何影响计分、资格或可见性的事务都通过 EF transactional outbox 发布强类型失效事件。每个订阅者
+使用独立 Sticky PostgreSQL endpoint；排行榜订阅者收到事件后：
 
-`RefreshDirtyLeaderboards` 使用 `FOR UPDATE SKIP LOCKED` 每批领取最多 500 个脏比赛，在同一短事务中清除 Dirty 并通过 Wolverine Outbox 写入 `ProjectLeaderboard`。投影期间产生的新变更会再次置 Dirty，由下一轮处理，不会丢失。
+1. 立即删除该比赛的 FusionCache/Redis 榜单键；
+2. 把 CompetitionId 加入 Singular Agent 的进程内合并集合；
+3. 固定等待 500 ms，同一窗口只派发一次 durable 全量投影消息；
+4. Handler 从 PostgreSQL 计算完整不可变响应；
+5. 成功后原子替换缓存，再发布强类型 SignalR 刷新通知；
+6. 失败时保持 cache miss 并按 durable 消息策略重试。
 
-`ProjectLeaderboard` 获取 CompetitionId 对应的 PostgreSQL transaction advisory lock，从 PostgreSQL 全量加载并计算完整不可变 `LeaderboardResponse`，然后原子替换缓存并发布 `leaderboardRefreshed`。同一比赛的投影串行，旧任务不能在新任务之后覆盖快照。
+不保存 `Competition.LeaderboardDirty`，不扫描脏比赛，不使用 15 秒刷新。Agent 在失效后崩溃不会使旧
+缓存重新可见；下一次 API cache miss 必须触发 PostgreSQL 重建。投影和发布使用单调发布 fence/协议
+版本阻止晚到旧结果覆盖新结果，但该值不是业务表并发 Revision。
 
-AWDP v4 的分数会在没有新 GameplayFact 的逻辑轮边界变化。singular maintenance 的 15 秒刷新消息以 500 场为一批，按比赛 UUID keyset 遍历全部 Running AWDP v4 比赛；它用生命周期事件分别计算缓存 `DataAsOf` 与当前时刻的 EffectiveRunningTime/轮次，只在跨轮或缓存缺失时设置 Dirty。Pause 不跨轮，Finished 不再进入扫描，最终生命周期投影冻结分数。该机制不新增计划表，也不保存派生攻击/防御状态。
+## Cache miss
 
-失败时保留旧快照、记录 `leaderboard:{competitionId:N}:last-failure`、重新置 Dirty 并让 Wolverine 重试。没有旧快照时 GET 返回 503 `LeaderboardProjectionFailed`；有旧快照时继续返回 200。
-
-## FusionCache
-
-排行榜使用命名缓存 `leaderboards`，稳定 key 为：
+同一 API 实例使用进程内 keyed lock 合并相同 CompetitionId 的并发 miss。多个 API 实例允许同时做
+等价全量投影；只有完整结果可替换缓存。缓存仍使用命名 `leaderboards` FusionCache，稳定键为：
 
 ```text
 leaderboard:{competitionId:N}
-leaderboard:{competitionId:N}:last-failure
 ```
 
-FusionCache 提供 L1，生产环境使用 Redis L2 与 backplane。排行榜业务代码不直接用 Redis `IDatabase` 读写快照；Redis Pub/Sub 仅负责跨 API 节点的 SignalR 通知。快照不使用 60 秒逻辑过期，正常替换由 Dirty 刷新驱动，Redis eviction 按 cache miss 恢复。
-
-- Dirty 且缓存存在：返回旧的完整快照及 `GeneratedAt`。
-- 缓存不存在：原子置 Dirty 并返回 202 Processing。
-- 响应不包含 SnapshotRevision、TargetRevision、Stale 或 LastFailureAt。
+读取不得返回已知失效的旧快照。构建失败时返回明确的强类型投影失败响应，并保留 PostgreSQL 事实供
+后续重试；订阅者数量不参与是否投影的决定。
 
 ## 共享分值衰减曲线
 
-CTF 题值以及 AWDP Break/Fix 分值都使用 `ScoreCurveConfiguration`：
+CTF 题值以及 AWDP Break/Fix 分值使用 `ScoreCurveConfiguration`：
 
 ```text
 InitialPoints: 1..1,000,000
@@ -50,14 +54,26 @@ DecayMode: Fixed | Linear | Quadratic | Exponential | Logarithmic | Custom
 CustomExpression?: string
 ```
 
-令 `x=clamp((solveCount-1)/(decayTeamCount-1),0,1)`。Linear 为 `initial+(minimum-initial)*x`；Quadratic 使用 `x²`；Exponential 使用归一化 `e^(-4x)`；Logarithmic 使用 `log10(1+9x)`；Fixed 恒为 InitialPoints。结果先钳制到 `[MinimumPoints, InitialPoints]`，再使用 AwayFromZero 取整为 signed Int64。`solveCount` 在 CTF 表示当前有效解题队伍数，在 AWDP 表示当前题目、当前轮、当前 Break 或 Fix 轨道的不同成功队伍数。
+令 `x=clamp((solveCount-1)/(decayTeamCount-1),0,1)`。Linear 为
+`initial+(minimum-initial)*x`；Quadratic 使用 `x²`；Exponential 使用归一化 `e^(-4x)`；
+Logarithmic 使用 `log10(1+9x)`；Fixed 恒为 InitialPoints。结果钳制到
+`[MinimumPoints, InitialPoints]` 后以 AwayFromZero 取整为 signed Int64。
 
-Custom 使用受限 DynamicExpresso，仅注入 `initialPoints`、`minimumPoints`、`solveCount`、`eligibleTeamCount`、`decayTeamCount`；禁止 Reflection、assignment、额外程序集和复杂对象。保存前对 0..eligibleTeamCount 的所有整数点验证，运行时同样钳制与取整。任何公式或 checked 聚合错误使整场投影失败并保留旧快照。
+Custom 只允许 `initialPoints`、`minimumPoints`、`solveCount`、`eligibleTeamCount`、
+`decayTeamCount`，禁止 Reflection、assignment、额外程序集和复杂对象。保存前验证所有整数点，投影
+运行时同样钳制与取整。公式或 checked 聚合错误使本次投影失败，不得发布部分结果。
 
-Points、Penalty、Hint Cost、ManualAdjustment 和最终分数使用 checked signed Int64。可配置单项分值、Penalty 与 Hint Cost 位于 0–1,000,000；百分比血奖仍为 0–100。该边界不改变 ManualAdjustment 的规范 Int32 文本边界，也不截断最终聚合分数。Correct solve 及血奖顺序统一按 `(OccurredAt, GameplayFactId)`。
+Points、Penalty、Hint Cost、ManualAdjustment 与总分使用 checked signed Int64。正确事实及血奖稳定
+顺序为 `(OccurredAt, GameplayFactId)`。
 
-公共响应仍是 `challenges[]` 与排序后的 `entries[]` 稀疏矩阵，并返回可见的 `tracks[]`。每条 Entry 带 TrackKey，名次在各赛道内独立计算。普通访问者只读取 VisibleOnLeaderboard 的非内部赛道（以及本队赛道的自身条目）；工作人员可查看全部赛道。EarnsScore=false 不生成排行榜条目。
+## 赛道和可见性
 
-CTF 动态分值的 eligibleTeamCount 与 solveCount 只读取 AffectsDynamicChallengeScore=true 的赛道；不影响动态分值但允许计分的队伍使用正式池的当前题目分值。全比赛一二三血只读取 EarnsBlood=true 的赛道。AWD/AWDP 的攻击或受害结算、KoH 的公开 King 与控制积分只读取 AffectsCompetitiveResults=true 的队伍；内部测试事实仍留在 PostgreSQL，但不能改变公开投影、事件或通知。
+响应包含可见 `tracks[]`、`challenges[]` 与排序后的 `entries[]` 稀疏矩阵。Entry 带 TrackKey，名次
+按赛道独立计算。普通访问者只读取公开且非内部赛道以及本队允许看到的自身数据；工作人员可按权限查看
+全部赛道。`EarnsScore=false` 不产生排行榜条目；内部测试事实保留在 PostgreSQL，但不改变公开投影、
+事件或通知。
 
-响应保留 GeneratedAt、DataScope、DataAsOf、Visibility、Entries、Challenges、Tracks。
+## 验证要求
+
+必须用真实 PostgreSQL/Redis/Wolverine 覆盖：500 ms 合并、多个失效只投影一次、缓存全失重建、晚到
+发布不能覆盖新结果、投影失败保持 miss、Worker 重投幂等，以及封禁/解封/重判后的全量重盘。

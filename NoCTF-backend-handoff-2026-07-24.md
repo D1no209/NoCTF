@@ -2,6 +2,77 @@
 
 > 创建于 2026-07-24，最后核验于 2026-08-06。文件名保留原日期，本文内容以最后核验日期为准。
 
+## 0. 数据模型与 Wolverine 简化迁移（2026-08-23）
+
+### 0.1 当前状态
+
+- 当前分支：`codex/data-model-wolverine-simplification`
+- main/origin/main 基线：`8e366fbda160e24d5142d54f1151bf0024950dc1`
+- 已完成阶段：阶段 0（治理、基线与 Wolverine 6.29.2 Spike）
+- 当前阶段：阶段 1（删除 Revision 协议闭环，尚未开始代码修改）
+- 业务迁移：尚未开始；数据库、HTTP 契约、OpenAPI 和生成 SDK 均未修改。
+- 权限：只允许本地实现和分阶段提交；禁止推送、部署和生产数据/队列/对象操作。
+
+本轮最高优先级规范是
+[`docs/data-model-wolverine-simplification.md`](docs/data-model-wolverine-simplification.md)。旧交接中关于
+Revision、16 表、`DataExport`、Runtime generation/replacement、`LeaderboardDirty` 和 15 秒扫描的
+完成状态只作为迁移前现状证据，不再是目标语义。
+
+### 0.2 已完成证据
+
+- 完整阅读根/ClientApp AGENTS、权威规范、docs README、TODO、PLAN、本文、当前 migrations、
+  OpenAPI/SDK 和 Wolverine 配置/handler/queue/agent/inbox/outbox。
+- 记录基线：.NET `10.0.300`、Bun `1.3.14`、Docker `28.5.1`、测试发现数 `1117`；
+  OpenAPI SHA-256 为
+  `2A34CE9D1F95B208A52F93FD36CF56BF1294A0A2F9E23613D1A6E12880A08FC6`，SDK SHA-256 为
+  `CF04870E40E567353D2205AA96978446127E8CD0FE6E5138C1DC5E61FDC8938F`。
+- 完整研究 Wolverine 官方站点与 `llms.txt`，并用固定版本 `6.29.2` 编译确认 API。
+- 新增真实 PostgreSQL Spike：Sticky fan-out + `IdAndDestination`、competing consumers、缺失 Sticky
+  endpoint fallback 共 `3/3` 通过。
+- 既有 EF transactional outbox/rollback/dead-letter 和 Singular Agent failover 测试逐项通过。
+- 已验证 6.29.2 在 Sticky endpoint 缺失时静默退化为 `local://`；阶段 7 必须实现启动期
+  PostgreSQL endpoint fail-fast。
+- Release build 已通过（0 warnings，0 errors）。
+- Release 完整后端测试：1117 total，1115 passed，0 failed，2 skipped；跳过项仅为未配置的真实
+  Kubernetes 和 Libvirt 目标，没有报告为通过。
+- 前端 `bun test` 274/274、Nuxt typecheck、production build 和 static generate 均通过；仓库无
+  lint script，明确记为不可执行。
+- EF migration model 无漂移，analyzer verify 与 `git diff --check` 通过。
+- 阶段 0 文档冲突扫描为 0 个仍具规范效力的冲突；命中的旧词只在删除清单、禁止性描述、迁移前
+  基线或历史交接记录中。
+
+详细证据：
+
+- [`docs/data-model-wolverine-stage0-baseline.md`](docs/data-model-wolverine-stage0-baseline.md)
+- [`docs/wolverine-6.29.2-spike.md`](docs/wolverine-6.29.2-spike.md)
+- [`docs/data-model-wolverine-cutover.md`](docs/data-model-wolverine-cutover.md)
+
+### 0.3 恢复命令
+
+```powershell
+Set-Location E:\SourceCode\NoCTF
+git status --short
+git branch --show-current
+dotnet restore backend/NoCTF.slnx --locked-mode
+dotnet build backend/NoCTF.slnx -c Release --no-restore
+$env:NOCTF_REQUIRE_DOCKER_INTEGRATION='true'
+dotnet tests/NoCTF.Tests/bin/Debug/net10.0/NoCTF.Tests.dll `
+  --treenode-filter '/*/*/*/*[Category=Wolverine6292Spike]' `
+  --minimum-expected-tests 3
+```
+
+阶段 0 退出门禁已全部完成。切换/回滚方案已完成设计评审；生产执行仍要求项目负责人指定真实
+责任人并确认备份/恢复演练。本轮没有操作生产数据库、队列或对象存储。
+
+阶段 0 提交后恢复阶段 1：
+
+```powershell
+Set-Location E:\SourceCode\NoCTF
+git status --short
+git log -1 --oneline
+rg -n "ExpectedRevision|ConcurrencyVersion|CriticalSectionVersion|ProcessingVersion|Revision" backend/src backend/tests
+```
+
 ## 1. 下一会话目标
 
 2026-07-31 本轮 outcome、上传补偿、Runtime scope、Patch draft、Runtime cleanup/

@@ -27,11 +27,10 @@ PasswordHash。Bot 是否能密码登录由 UserKind 规则决定，而不是由
 `Competition` 是比赛聚合根，拥有：
 
 - Mode、标题、说明、StartAt、EndAt、Status；
-- 公共列与版本化 Mode Configuration JSON；
+- 公共列与带 `schemaVersion` 的 Mode Configuration JSON；
 - OwnerId、ManagerIds、JudgeIds、ObserverIds；
 - TeamRegistrationAutoApprove、MaxTeamMembers、MaxConcurrentRuntimeInstancesPerTeam；
 - 32-byte `FlagDerivationSecret`；
-- ConfigurationRevision、LeaderboardDirty；
 - 版本化的跨模式赛道配置 JSON；
 - 生命周期审计。
 
@@ -53,7 +52,7 @@ Competition 以自己的 `TrackConfigurationJson` 定义 1–32 条跨模式赛�
 
 `Challenge` 是且只属于一个 GameMode 的全局可复用题库模板，拥有题面、方向、模板 Attachment、明文模板静态 Flag，以及 provider-neutral 的 Runtime、Checker、动态 Flag 生成/注入定义。它不包含比赛排序、发布状态、分数、Hint、RuntimeProvider 或 RunnerPool。
 
-`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、BaseScore、Revision、Rules JSON 和 Hint。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Generation；下一次 Start/Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
+`CompetitionChallenge` 是比赛内实例，链接 CompetitionId 与 ChallengeId，拥有可选的比赛内展示名称、Order、IsPublished、BaseScore、Rules JSON 和 Hint。展示名称为空时实时回退到 Challenge.Title；比赛内改名不修改全局题库模板。引用时 Challenge.Mode 必须等于 Competition.Mode。模板定义修改不改动正在运行的 Runtime；下一次 Start 或新 UUID Reset 读取最新定义，不保存题目定义版本，也不自动更新存量 Runtime。
 
 ### GameplayFact
 
@@ -61,7 +60,7 @@ GameplayFact 是玩家、管理员或系统在比赛中的客观行为及其当�
 
 ### RuntimeInstance
 
-RuntimeInstance 表示一个具体 Generation 的外部 Runtime。异步状态保存在 RuntimeInstance/GameplayFact/ChallengeFlag 自身，Wolverine 保存投递状态；不存在 RuntimeOperation 表。
+RuntimeInstance 表示一个具体 UUID 标识的外部 Runtime。Reset 会停止旧实例并创建全新 Runtime UUID。异步状态保存在 RuntimeInstance/GameplayFact/ChallengeFlag 自身，Wolverine 保存投递状态；不存在 RuntimeOperation 表。
 
 ## Competition 生命周期
 
@@ -90,7 +89,7 @@ Visible | Published | Running | Paused -> Finished
 
 Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，并在 Competition advisory lock 的单事务内：
 
-1. 重读状态、StartAt/EndAt 与 revision；只接受 Visible/Published，EndAt 必须仍在未来；
+1. 重读状态与 StartAt/EndAt；只接受 Visible/Published，EndAt 必须仍在未来；
 2. 校验 Competition 配置 schema、至少一个已发布且未删除的 CompetitionChallenge、所有实例模板存在且未删除；
 3. 校验每个已发布题的 Challenge.Mode、Definition/Rules schema、Flag/Attachment/Runtime/Checker/逻辑 URL 组合；
 4. 校验所有 Approved Team 未删除/未 Ban且成员数组有效；
@@ -125,8 +124,8 @@ Owner/Manager 手动 Start 与 StartAt 调度共用一个 Application 用例，�
 | Player | 公开数据与本队 GameplayFact；绝不能访问其他队 Value、系统事实、管理员事实或内部诊断 |
 
 Owner/Manager 必须是 Organizer 或 Administrator；Judge/Observer 必须完成邮箱验证。Owner
-转让后，旧 Owner 自动进入 ManagerIds。权限数组的全量替换由独立 PermissionRevision 防止
-陈旧覆盖；Owner transfer 也递增该 revision。
+转让后，旧 Owner 自动进入 ManagerIds。权限数组全量替换与 Owner transfer 使用 last-write-wins；
+服务端仍在单事务中校验角色、数组互斥和 Owner 不变量。
 
 Challenge 自身由 OwnerId/ManagerIds 控制。Shared 模板可被其他 Organizer 查看题面并引用，但其原始 Flag、对象键与内部 Runtime 配置只对模板管理者可见；Private 改为 Shared/反向修改不破坏既有引用。
 

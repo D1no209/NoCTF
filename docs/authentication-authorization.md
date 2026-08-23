@@ -64,11 +64,9 @@ Administrator 将 Organizer 降级为 User 前，必须确认其不是任何未�
 
 ## 内部 JWT
 
-内部 Scheme 必须验证精确 audience、permission、资源 Claims 与 exp，不能接受用户 Access/Refresh audience。Token 绑定具体 GameplayFactId 或 RuntimeInstanceId/Generation；请求体不能覆盖 Claims 身份。AWDP Token 不携带 GameplayFact ProcessingVersion。
+内部 Scheme 必须验证精确 audience、permission、资源 Claims 与 exp，不能接受用户 Access/Refresh audience。Token 绑定具体 GameplayFactId、RuntimeInstanceId 或 Checker execution identity；请求体不能覆盖 Claims 身份。Token 不携带持久化 Revision/ProcessingVersion 栅栏。
 
-AWD Checker callback 绑定 Runtime identity/generation、checker sequence、runtime processing
-version 和最小写权限。只有 sequence/version 与 Runtime 当前值精确匹配时才可写入；同一次执行
-可以多次更新状态，后一次覆盖前一次。请求体不能覆盖 Token 中的资源身份或 fence。
+AWD Checker callback 绑定 Runtime UUID、独立 Checker GameplayFactId 和最小写权限。相同执行身份的重投幂等写入同一事实，不能覆盖其他 Checker 执行。请求体不能覆盖 Token 中的资源身份。
 
 ## 日志中的敏感内容
 

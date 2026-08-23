@@ -418,8 +418,8 @@ netPoints = null
 
 1. 复用现有排行榜投影能力，不创建排行榜业务表。
 2. 由 Infrastructure 从 PostgreSQL 的 GameplayFact、CompetitionEvent、CompetitionChallenge 和 Team 生成矩阵投影。
-3. 排行榜继续使用 `Competition.LeaderboardDirty`。
-4. 维护 Agent 继续扫描脏比赛并生成完整权威投影。
+3. 排行榜由影响计分、资格或可见性的事件显式 fan-out 到独立 Sticky PostgreSQL endpoint。
+4. Singular Agent 对同一比赛的连续失效合并 500ms，并派发完整权威投影；不保存 Dirty 字段或扫描脏比赛。
 5. 投影完成后原子替换 FusionCache 中的稳定排行榜快照。
 6. 不按订阅者数量决定是否投影。
 7. 队伍按 rank 和稳定 TeamId 排序。
