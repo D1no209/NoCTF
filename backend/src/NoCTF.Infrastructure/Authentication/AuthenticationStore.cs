@@ -24,12 +24,13 @@ public sealed class AuthenticationStore(
         string login,
         CancellationToken ct)
     {
-        var normalized = login.Trim().ToUpperInvariant();
+        var normalizedUserName = login.Trim().ToUpperInvariant();
+        var canonicalEmail = EmailCanonicalizer.Canonicalize(login);
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(
             item => item.Kind == UserKind.Human
                 && item.AccountStatus == UserAccountStatus.Active
-                && (item.NormalizedEmail == normalized
-                || item.NormalizedUserName == normalized
+                && (item.Email == canonicalEmail
+                || item.NormalizedUserName == normalizedUserName
                 || item.Id.ToString() == login),
             ct);
         return ToAuthenticated(user);
@@ -72,14 +73,12 @@ public sealed class AuthenticationStore(
                 user.Kind,
                 user.EmailVerifiedAt != null,
                 user.Description,
-                user.AvatarFileId,
-                user.IsEmailPublic))
+                user.AvatarFileId))
             .SingleOrDefaultAsync(ct);
 
     public async Task<UserProfile?> UpdateProfileAsync(
         Guid userId,
         string? description,
-        bool isEmailPublic,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -90,7 +89,6 @@ public sealed class AuthenticationStore(
             return null;
 
         user.Description = description;
-        user.IsEmailPublic = isEmailPublic;
         user.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         return ToProfile(user);
@@ -142,12 +140,11 @@ public sealed class AuthenticationStore(
         CancellationToken ct)
     {
         var trimmedUserName = userName.Trim();
-        var trimmedEmail = email.Trim();
+        var canonicalEmail = EmailCanonicalizer.Canonicalize(email);
         var normalizedUserName = trimmedUserName.ToUpperInvariant();
-        var normalizedEmail = trimmedEmail.ToUpperInvariant();
         if (await db.Users.AnyAsync(user => user.NormalizedUserName == normalizedUserName, ct))
             return CreateUserState.UserNameConflict;
-        if (await db.Users.AnyAsync(user => user.NormalizedEmail == normalizedEmail, ct))
+        if (await db.Users.AnyAsync(user => user.Email == canonicalEmail, ct))
             return CreateUserState.EmailConflict;
 
         var user = new User
@@ -155,8 +152,7 @@ public sealed class AuthenticationStore(
             Id = userId,
             UserName = trimmedUserName,
             NormalizedUserName = normalizedUserName,
-            Email = trimmedEmail,
-            NormalizedEmail = normalizedEmail,
+            Email = canonicalEmail,
             Kind = UserKind.Human,
             Role = UserRole.User,
             AccountStatus = UserAccountStatus.Active,
@@ -175,7 +171,7 @@ public sealed class AuthenticationStore(
         {
             db.Entry(user).State = EntityState.Detached;
             return await db.Users.AnyAsync(
-                existing => existing.NormalizedEmail == normalizedEmail, ct)
+                existing => existing.Email == canonicalEmail, ct)
                 ? CreateUserState.EmailConflict
                 : CreateUserState.UserNameConflict;
         }
@@ -236,6 +232,5 @@ public sealed class AuthenticationStore(
             user.Kind,
             user.EmailVerifiedAt is not null,
             user.Description,
-            user.AvatarFileId,
-            user.IsEmailPublic);
+            user.AvatarFileId);
 }

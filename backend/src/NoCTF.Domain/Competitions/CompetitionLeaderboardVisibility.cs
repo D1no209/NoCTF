@@ -11,17 +11,22 @@ public enum CompetitionLeaderboardVisibility : short
 public static class CompetitionLeaderboardVisibilityPolicy
 {
     public static CompetitionLeaderboardVisibility EffectiveAt(
-        CompetitionStatus status,
-        CompetitionLeaderboardVisibility configured,
-        DateTimeOffset? startsAt,
+        DateTimeOffset? frozenStartAt,
+        DateTimeOffset? hiddenStartAt,
         DateTimeOffset now)
     {
-        if (status == CompetitionStatus.Finished
-            || configured == CompetitionLeaderboardVisibility.Normal)
-            return CompetitionLeaderboardVisibility.Normal;
+        var frozenEffective = frozenStartAt is { } frozen && frozen <= now;
+        var hiddenEffective = hiddenStartAt is { } hidden && hidden <= now;
 
-        return startsAt is null || startsAt <= now
-            ? configured
-            : CompetitionLeaderboardVisibility.Normal;
+        if (!frozenEffective && !hiddenEffective)
+            return CompetitionLeaderboardVisibility.Normal;
+        if (!hiddenEffective)
+            return CompetitionLeaderboardVisibility.Frozen;
+        if (!frozenEffective)
+            return CompetitionLeaderboardVisibility.Blackout;
+
+        return hiddenStartAt >= frozenStartAt
+            ? CompetitionLeaderboardVisibility.Blackout
+            : CompetitionLeaderboardVisibility.Frozen;
     }
 }

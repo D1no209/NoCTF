@@ -125,7 +125,7 @@ public sealed class CreateTeam(ITeamRegistrationStore store)
         }
         if (requestedTrack.RequiresInvitationCode
             && !CompetitionTrackInvitationCode.Verify(
-                requestedTrack.InvitationCodeHash,
+                requestedTrack.InvitationCode,
                 command.TrackInvitationCode))
         {
             return OperationResult<TeamView, TeamRegistrationFailure>.Failure(

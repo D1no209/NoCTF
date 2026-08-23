@@ -104,7 +104,6 @@ public sealed class TeamBanAppealPersistenceTests
                 candidate => candidate.Id == fixture.CompetitionId,
                 cancellationToken);
             await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Finished);
-            await Assert.That(competition.LeaderboardDirty).IsTrue();
 
             var publicCorrection = await db.CompetitionEvents.AsNoTracking().SingleAsync(
                 @event =>
@@ -164,14 +163,12 @@ public sealed class TeamBanAppealPersistenceTests
             EndAt = now.AddHours(-1),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Teams.Add(new Team
         {
             Id = teamId,
             CompetitionId = competitionId,
             Name = "Appealing Team",
-            NormalizedName = "APPEALING TEAM",
             CaptainId = captainId,
             MemberIds = [captainId, memberId],
             InvitationToken = Guid.NewGuid().ToString("N"),
@@ -210,7 +207,6 @@ public sealed class TeamBanAppealPersistenceTests
             UserName = userName,
             NormalizedUserName = userName.ToUpperInvariant(),
             Email = $"{userName}@example.test",
-            NormalizedEmail = $"{userName.ToUpperInvariant()}@EXAMPLE.TEST",
             PasswordHash = "test",
             Kind = UserKind.Human,
             Role = role,

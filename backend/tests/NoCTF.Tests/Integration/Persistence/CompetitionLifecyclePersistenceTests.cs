@@ -58,7 +58,6 @@ public sealed class CompetitionLifecyclePersistenceTests
                     UserName = "score-owner",
                     NormalizedUserName = "SCORE-OWNER",
                     Email = "score-owner@example.test",
-                    NormalizedEmail = "SCORE-OWNER@EXAMPLE.TEST",
                     PasswordHash = "test",
                     CreatedAt = now,
                     UpdatedAt = now
@@ -76,7 +75,6 @@ public sealed class CompetitionLifecyclePersistenceTests
                     FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
                     CreatedAt = now,
                     UpdatedAt = now,
-                    ConfigurationUpdatedAt = now
                 });
                 seed.Challenges.Add(new Challenge
                 {
@@ -112,7 +110,6 @@ public sealed class CompetitionLifecyclePersistenceTests
                     Id = teamId,
                     CompetitionId = competitionId,
                     Name = "Score Team",
-                    NormalizedName = "SCORE TEAM",
                     CaptainId = ownerId,
                     MemberIds = [ownerId],
                     InvitationToken = new string('s', 32),
@@ -277,8 +274,6 @@ public sealed class CompetitionLifecyclePersistenceTests
                 item => item.Id == fixture.CompetitionId,
                 cancellationToken);
             await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Running);
-            await Assert.That(competition.RunningSince).IsNotNull();
-            await Assert.That(competition.AccumulatedRunningSeconds).IsGreaterThan(0);
             var runtime = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
                 item => item.Id == fixture.RuntimeId,
                 cancellationToken);
@@ -297,8 +292,6 @@ public sealed class CompetitionLifecyclePersistenceTests
                         && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged,
                         cancellationToken))
                 .IsEqualTo(2);
-            await Assert.That((await verify.Competitions.AsNoTracking().SingleAsync(
-                competition => competition.Id == fixture.CompetitionId, cancellationToken)).LeaderboardDirty).IsTrue();
             await Assert.That(outbox.Published.OfType<ProvisionCompetitionRuntimes>().Count())
                 .IsEqualTo(1);
         });
@@ -323,7 +316,6 @@ public sealed class CompetitionLifecyclePersistenceTests
             UserName = "awd-owner",
             NormalizedUserName = "AWD-OWNER",
             Email = "awd-owner@example.test",
-            NormalizedEmail = "AWD-OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -343,7 +335,6 @@ public sealed class CompetitionLifecyclePersistenceTests
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Challenges.Add(new Challenge
         {
@@ -369,7 +360,6 @@ public sealed class CompetitionLifecyclePersistenceTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = "AWD Team",
-            NormalizedName = "AWD TEAM",
             CaptainId = ownerId,
             MemberIds = [ownerId],
             InvitationToken = new string('a', 32),
@@ -400,7 +390,6 @@ public sealed class CompetitionLifecyclePersistenceTests
             UserName = "owner",
             NormalizedUserName = "OWNER",
             Email = "owner@example.test",
-            NormalizedEmail = "OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -413,13 +402,11 @@ public sealed class CompetitionLifecyclePersistenceTests
             Mode = GameMode.Awd,
             Status = CompetitionStatus.Running,
             ConfigurationJson = "{}",
-            RunningSince = now.AddMinutes(-2),
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = new byte[32],
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Challenges.Add(new Challenge
         {

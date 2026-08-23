@@ -1,5 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
+using System.Text.Json.Serialization;
 using NoCTF.API.Endpoints.Competitions;
 using NoCTF.API.Security;
 using NoCTF.Application.Competitions.Tracks;
@@ -18,7 +19,9 @@ public sealed record CompetitionTrackResponse(
     bool VisibleOnLeaderboard,
     bool AffectsCompetitiveResults,
     bool RequiresInvitationCode,
-    bool IsViewerTrack);
+    bool IsViewerTrack,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? InvitationCode = null);
 
 public sealed record CompetitionTrackListResponse(
     Guid CompetitionId,
@@ -40,7 +43,8 @@ internal static class CompetitionTrackProtocolMapping
         view.VisibleOnLeaderboard,
         view.AffectsCompetitiveResults,
         view.RequiresInvitationCode,
-        view.IsViewerTrack);
+        view.IsViewerTrack,
+        view.InvitationCode);
 
     public static CompetitionTrackListResponse ToResponse(CompetitionTracksView view) => new(
         view.CompetitionId,
@@ -73,6 +77,7 @@ public sealed class ListCompetitionTracksEndpoint(
             Route<Guid>("competitionId"),
             user.UserId == Guid.Empty ? null : user.UserId,
             includeInternal: false,
+            includeInvitationCodes: false,
             cancellationToken);
         return view is null
             ? TypedResults.NotFound()

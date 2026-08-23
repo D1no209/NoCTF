@@ -195,7 +195,6 @@ public sealed class PasswordResetPersistenceTests
             UserName = name,
             NormalizedUserName = name.ToUpperInvariant(),
             Email = $"{name}@example.test",
-            NormalizedEmail = $"{name}@example.test".ToUpperInvariant(),
             PasswordHash = "unused",
             Kind = kind,
             Role = UserRole.User,

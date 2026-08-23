@@ -71,7 +71,6 @@ public sealed class AdministratorBootstrapperTests
                 UserName = "ctf-e2e-admin",
                 NormalizedUserName = "CTF-E2E-ADMIN",
                 Email = "player@example.test",
-                NormalizedEmail = "PLAYER@EXAMPLE.TEST",
                 PasswordHash = "test",
                 Role = UserRole.User,
                 CreatedAt = DateTimeOffset.UtcNow,

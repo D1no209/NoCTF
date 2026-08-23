@@ -65,14 +65,13 @@ public sealed class UpdateCurrentUserProfile(IUserAuthenticationStore users)
     public Task<UserProfile?> ExecuteAsync(
         Guid userId,
         string? description,
-        bool isEmailPublic,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
         var normalizedDescription = string.IsNullOrWhiteSpace(description)
             ? null
             : description.Trim();
-        return users.UpdateProfileAsync(userId, normalizedDescription, isEmailPublic, now, ct);
+        return users.UpdateProfileAsync(userId, normalizedDescription, now, ct);
     }
 }
 

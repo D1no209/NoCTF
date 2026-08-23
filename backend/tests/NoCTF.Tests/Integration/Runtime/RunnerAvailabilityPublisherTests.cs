@@ -201,7 +201,6 @@ public sealed class RunnerAvailabilityPublisherTests
             UserName = "owner",
             NormalizedUserName = "OWNER",
             Email = "owner@example.test",
-            NormalizedEmail = "OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -219,7 +218,6 @@ public sealed class RunnerAvailabilityPublisherTests
             Status = CompetitionStatus.Running,
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Challenges.Add(new Challenge
         {

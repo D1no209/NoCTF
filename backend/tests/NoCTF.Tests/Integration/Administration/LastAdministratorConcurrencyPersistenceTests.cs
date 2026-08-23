@@ -444,7 +444,6 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
             UserName = userName,
             NormalizedUserName = userName.ToUpperInvariant(),
             Email = $"{userName}@example.test",
-            NormalizedEmail = $"{userName.ToUpperInvariant()}@EXAMPLE.TEST",
             PasswordHash = "test",
             Kind = kind,
             Role = role,

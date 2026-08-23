@@ -26,8 +26,8 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
                 candidate.ManagerIds,
                 candidate.JudgeIds,
                 candidate.ObserverIds,
-                candidate.LeaderboardVisibility,
-                candidate.LeaderboardVisibilityStartsAt
+                candidate.FrozenStartAt,
+                candidate.HiddenStartAt
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null)
@@ -49,9 +49,8 @@ public sealed class CompetitionVisibilityAccess(NoCtfDbContext db)
             return null;
 
         var visibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-            competition.Status,
-            competition.LeaderboardVisibility,
-            competition.LeaderboardVisibilityStartsAt,
+            competition.FrozenStartAt,
+            competition.HiddenStartAt,
             now);
         var scope = DataScope(identity?.Kind, isCollaborator, visibility);
         return new(

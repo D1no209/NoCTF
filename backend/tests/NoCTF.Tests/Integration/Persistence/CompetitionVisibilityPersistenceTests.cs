@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Events;
-using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Competitions.Lifecycle;
+using NoCTF.Application.Competitions.Visibility;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Scoring.Leaderboard;
@@ -10,8 +10,8 @@ using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Infrastructure.Competitions.Events;
-using NoCTF.Infrastructure.Competitions.Visibility;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Competitions.Visibility;
 using NoCTF.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
 
@@ -23,78 +23,47 @@ public sealed class CompetitionVisibilityPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Scheduled_freeze_is_persisted_applied_once_and_audited(
+    public async Task Visibility_schedule_is_stored_as_two_timestamps_and_audited(
         CancellationToken ct)
     {
-        await RunAsync("noctf_visibility_freeze", async fixture =>
+        await RunAsync("noctf_visibility_schedule", async fixture =>
         {
-            var outbox = new RecordingOutbox();
-            var snapshots = new RecordingSnapshotFactory();
-            var startsAt = fixture.Now.AddMinutes(10);
-            await using (var configureDb = new NoCtfDbContext(fixture.Options))
+            var frozenAt = fixture.Now.AddMinutes(10);
+            var hiddenAt = fixture.Now.AddMinutes(20);
+            await using (var db = new NoCtfDbContext(fixture.Options))
             {
+                var outbox = new RecordingOutbox();
                 var store = new CompetitionVisibilityStore(
-                    configureDb,
-                    snapshots,
-                    outbox,
-                    new CompetitionEventStore(configureDb, outbox));
+                    db,
+                    new CompetitionEventStore(db, outbox));
                 var result = await store.UpdateAsync(new(
                     fixture.CompetitionId,
-                    CompetitionLeaderboardVisibility.Frozen,
-                    startsAt,
+                    frozenAt,
+                    hiddenAt,
                     fixture.HumanObserverId,
-                    "freeze window",
+                    "broadcast windows",
                     fixture.Now), ct);
 
                 await Assert.That(result.State)
                     .IsEqualTo(CompetitionVisibilityMutationState.Updated);
                 await Assert.That(result.Configuration?.EffectiveVisibility)
                     .IsEqualTo(CompetitionLeaderboardVisibility.Normal);
-                await Assert.That(outbox.Scheduled).HasSingleItem();
-                await Assert.That(outbox.Scheduled[0].At).IsEqualTo(startsAt);
-                await Assert.That(snapshots.Requests).IsEmpty();
-            }
-
-            await using (var applyDb = new NoCtfDbContext(fixture.Options))
-            {
-                var store = new CompetitionVisibilityStore(
-                    applyDb,
-                    snapshots,
-                    outbox,
-                    new CompetitionEventStore(applyDb, outbox));
-                await store.ApplyScheduledAsync(
-                    fixture.CompetitionId,
-                    startsAt,
-                    startsAt.AddSeconds(1),
-                    ct);
-                await store.ApplyScheduledAsync(
-                    fixture.CompetitionId,
-                    startsAt,
-                    startsAt.AddSeconds(2),
-                    ct);
+                await Assert.That(outbox.Scheduled).IsEmpty();
             }
 
             await using var verify = new NoCtfDbContext(fixture.Options);
             var competition = await verify.Competitions.AsNoTracking()
                 .SingleAsync(candidate => candidate.Id == fixture.CompetitionId, ct);
-            var snapshot = JsonSerializer.Deserialize<LeaderboardProjectionBundle>(
-                competition.FrozenLeaderboardSnapshotJson!,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            await Assert.That(competition.LeaderboardVisibility)
-                .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
-            await Assert.That(competition.LeaderboardVisibilityAppliedAt).IsNotNull();
-            await Assert.That(snapshot?.Legacy.DataAsOf).IsEqualTo(startsAt.AddSeconds(1));
-            await Assert.That(snapshot?.Legacy.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
-            await Assert.That(snapshot?.Scoreboard.Snapshot.DataAsOf).IsEqualTo(startsAt.AddSeconds(1));
-            await Assert.That(snapshot?.Scoreboard.Snapshot.DataScope).IsEqualTo(LeaderboardDataScope.Frozen);
-            await Assert.That(snapshots.Requests).HasSingleItem();
-            await Assert.That(snapshots.Requests[0].ProjectedAt).IsEqualTo(startsAt.AddSeconds(1));
-            await Assert.That(await verify.CompetitionEvents.AsNoTracking()
-                .CountAsync(@event => @event.CompetitionId == fixture.CompetitionId
-                    && @event.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct))
-                .IsEqualTo(1);
-            await Assert.That((await verify.Competitions.AsNoTracking().SingleAsync(
-                competition => competition.Id == fixture.CompetitionId, ct)).LeaderboardDirty).IsTrue();
+            await Assert.That(competition.FrozenStartAt).IsEqualTo(frozenAt);
+            await Assert.That(competition.HiddenStartAt).IsEqualTo(hiddenAt);
+            var audit = await verify.CompetitionEvents.AsNoTracking()
+                .SingleAsync(@event => @event.CompetitionId == fixture.CompetitionId
+                    && @event.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct);
+            using var payload = JsonDocument.Parse(audit.PayloadJson);
+            await Assert.That(payload.RootElement.GetProperty("frozenStartAt").GetDateTimeOffset())
+                .IsEqualTo(frozenAt);
+            await Assert.That(payload.RootElement.GetProperty("hiddenStartAt").GetDateTimeOffset())
+                .IsEqualTo(hiddenAt);
         });
     }
 
@@ -134,7 +103,7 @@ public sealed class CompetitionVisibilityPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Finishing_competition_reveals_final_board_and_invalidates_schedule(
+    public async Task Finishing_competition_clears_both_visibility_timestamps(
         CancellationToken ct)
     {
         await RunAsync("noctf_visibility_finish", async fixture =>
@@ -162,23 +131,13 @@ public sealed class CompetitionVisibilityPersistenceTests
             await using var verify = new NoCtfDbContext(fixture.Options);
             var competition = await verify.Competitions.AsNoTracking()
                 .SingleAsync(candidate => candidate.Id == fixture.CompetitionId, ct);
-            var audit = await verify.CompetitionEvents
-                .AsNoTracking()
-                .SingleAsync(candidate => candidate.CompetitionId == fixture.CompetitionId
-                    && candidate.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct);
-            var auditPayload = JsonSerializer.Deserialize<VisibilityEventPayload>(
-                audit.PayloadJson,
-                new JsonSerializerOptions(JsonSerializerDefaults.Web));
             await Assert.That(competition.Status).IsEqualTo(CompetitionStatus.Finished);
-            await Assert.That(competition.LeaderboardVisibility)
-                .IsEqualTo(CompetitionLeaderboardVisibility.Normal);
-            await Assert.That(competition.LeaderboardVisibilityStartsAt).IsNull();
-            await Assert.That(competition.FrozenLeaderboardSnapshotJson).IsNull();
-            await Assert.That(auditPayload?.From)
-                .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
-            await Assert.That(auditPayload?.To)
-                .IsEqualTo(CompetitionLeaderboardVisibility.Normal);
-            await Assert.That(auditPayload?.Automatic).IsTrue();
+            await Assert.That(competition.FrozenStartAt).IsNull();
+            await Assert.That(competition.HiddenStartAt).IsNull();
+            await Assert.That(await verify.CompetitionEvents.AsNoTracking()
+                .CountAsync(candidate => candidate.CompetitionId == fixture.CompetitionId
+                    && candidate.Kind == CompetitionEventKind.LeaderboardVisibilityChanged, ct))
+                .IsEqualTo(1);
         }, CompetitionLeaderboardVisibility.Frozen);
     }
 
@@ -209,7 +168,7 @@ public sealed class CompetitionVisibilityPersistenceTests
         CompetitionLeaderboardVisibility visibility)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync();
+        await db.Database.EnsureCreatedAsync();
         var rawNow = DateTimeOffset.UtcNow;
         var now = rawNow.AddTicks(-(rawNow.Ticks % TimeSpan.TicksPerMicrosecond));
         var ownerId = Guid.CreateVersion7(now);
@@ -230,25 +189,16 @@ public sealed class CompetitionVisibilityPersistenceTests
             ObserverIds = [humanObserverId, observerBotId],
             Mode = GameMode.Ctf,
             Status = CompetitionStatus.Running,
-            LeaderboardVisibility = visibility,
-            LeaderboardVisibilityStartsAt = visibility == CompetitionLeaderboardVisibility.Normal
-                ? null
-                : now.AddMinutes(-1),
-            LeaderboardVisibilityAppliedAt = visibility == CompetitionLeaderboardVisibility.Normal
-                ? null
-                : now.AddMinutes(-1),
-            FrozenLeaderboardSnapshotJson = visibility == CompetitionLeaderboardVisibility.Frozen
-                ? JsonSerializer.Serialize(CreateProjectionBundle(
-                    competitionId,
-                    now.AddMinutes(-1),
-                    LeaderboardDataScope.Frozen),
-                    new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            FrozenStartAt = visibility == CompetitionLeaderboardVisibility.Frozen
+                ? now.AddMinutes(-1)
+                : null,
+            HiddenStartAt = visibility == CompetitionLeaderboardVisibility.Blackout
+                ? now.AddMinutes(-1)
                 : null,
             ConfigurationJson = "{}",
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
-            RunningSince = now.AddMinutes(-30),
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -268,7 +218,6 @@ public sealed class CompetitionVisibilityPersistenceTests
         UserName = name,
         NormalizedUserName = name.ToUpperInvariant(),
         Email = $"{name}@example.test",
-        NormalizedEmail = $"{name}@EXAMPLE.TEST",
         PasswordHash = "test",
         Kind = kind,
         CreatedAt = DateTimeOffset.UtcNow,
@@ -282,70 +231,6 @@ public sealed class CompetitionVisibilityPersistenceTests
         Guid HumanObserverId,
         Guid ObserverBotId,
         Guid ParticipantId);
-
-    private sealed record VisibilityEventPayload(
-        int SchemaVersion,
-        CompetitionLeaderboardVisibility From,
-        CompetitionLeaderboardVisibility To,
-        DateTimeOffset? DataCutoffAt,
-        bool Automatic,
-        string? Reason);
-
-    private sealed class RecordingSnapshotFactory : ILeaderboardSnapshotFactory
-    {
-        public List<(Guid CompetitionId, DateTimeOffset ProjectedAt, bool Historical)> Requests { get; } = [];
-
-        public Task<LeaderboardResponse?> CreateAsync(
-            Guid competitionId,
-            DateTimeOffset projectedAt,
-            CancellationToken cancellationToken)
-        {
-            Requests.Add((competitionId, projectedAt, false));
-            return Task.FromResult<LeaderboardResponse?>(new(
-                competitionId,
-                projectedAt,
-                []));
-        }
-
-        public Task<LeaderboardProjectionBundle?> CreateBundleAsync(
-            Guid competitionId,
-            DateTimeOffset projectedAt,
-            CancellationToken cancellationToken)
-        {
-            Requests.Add((competitionId, projectedAt, false));
-            return Task.FromResult<LeaderboardProjectionBundle?>(CreateProjectionBundle(
-                competitionId,
-                projectedAt,
-                LeaderboardDataScope.Live));
-        }
-    }
-
-    private static LeaderboardProjectionBundle CreateProjectionBundle(
-        Guid competitionId,
-        DateTimeOffset projectedAt,
-        LeaderboardDataScope dataScope)
-    {
-        var legacy = new LeaderboardResponse(competitionId, projectedAt, [])
-        {
-            Visibility = dataScope == LeaderboardDataScope.Frozen
-                ? CompetitionLeaderboardVisibility.Frozen
-                : CompetitionLeaderboardVisibility.Normal,
-            DataScope = dataScope,
-            DataAsOf = projectedAt
-        };
-        var catalog = new ScoreboardChallengeCatalog(competitionId, 1, []);
-        var schema = new ScoreboardSchema(competitionId, GameMode.Ctf, 1, 1, [], []);
-        var scoreboard = new ScoreboardProjection(
-            catalog,
-            schema,
-            new ScoreboardSnapshot(competitionId, 1, 1, projectedAt, null, [], [])
-            {
-                Visibility = legacy.Visibility,
-                DataScope = dataScope,
-                DataAsOf = projectedAt
-            });
-        return new(legacy, scoreboard);
-    }
 
     private sealed class RecordingOutbox : ITransactionalMessageOutbox
     {

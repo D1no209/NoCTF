@@ -16,55 +16,21 @@ public sealed record CompetitionTrackDefinition(
     bool AffectsDynamicChallengeScore,
     bool VisibleOnLeaderboard,
     bool AffectsCompetitiveResults,
-    string? InvitationCodeHash = null)
+    string? InvitationCode = null)
 {
     [JsonIgnore]
-    public bool RequiresInvitationCode => !string.IsNullOrWhiteSpace(InvitationCodeHash);
+    public bool RequiresInvitationCode => !string.IsNullOrWhiteSpace(InvitationCode);
 }
 
 public static class CompetitionTrackInvitationCode
 {
-    private const int SaltLength = 16;
-    private const int HashLength = 32;
-    private const int Iterations = 100_000;
-
-    public static string Hash(string value)
+    public static bool Verify(string? invitationCode, string? candidate)
     {
-        var salt = RandomNumberGenerator.GetBytes(SaltLength);
-        var hash = Rfc2898DeriveBytes.Pbkdf2(
-            Encoding.UTF8.GetBytes(value.Trim()),
-            salt,
-            Iterations,
-            HashAlgorithmName.SHA256,
-            HashLength);
-        return $"v1${Convert.ToBase64String(salt)}${Convert.ToBase64String(hash)}";
-    }
-
-    public static bool Verify(string? storedHash, string? candidate)
-    {
-        if (string.IsNullOrWhiteSpace(storedHash) || string.IsNullOrWhiteSpace(candidate))
+        if (string.IsNullOrWhiteSpace(invitationCode) || string.IsNullOrWhiteSpace(candidate))
             return false;
-        var parts = storedHash.Split('$', StringSplitOptions.None);
-        if (parts is not ["v1", _, _])
-            return false;
-        try
-        {
-            var salt = Convert.FromBase64String(parts[1]);
-            var expected = Convert.FromBase64String(parts[2]);
-            if (salt.Length != SaltLength || expected.Length != HashLength)
-                return false;
-            var actual = Rfc2898DeriveBytes.Pbkdf2(
-                Encoding.UTF8.GetBytes(candidate.Trim()),
-                salt,
-                Iterations,
-                HashAlgorithmName.SHA256,
-                HashLength);
-            return CryptographicOperations.FixedTimeEquals(actual, expected);
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
+        var expected = SHA256.HashData(Encoding.UTF8.GetBytes(invitationCode.Trim()));
+        var actual = SHA256.HashData(Encoding.UTF8.GetBytes(candidate.Trim()));
+        return CryptographicOperations.FixedTimeEquals(actual, expected);
     }
 }
 

@@ -156,7 +156,6 @@ public sealed class AwdpParticipantStatePersistenceTests
             Mode = GameMode.Awdp,
             Status = CompetitionStatus.Running,
             ConfigurationJson = RoundConfiguration(roundDurationSeconds: 60),
-            ConfigurationUpdatedAt = now,
             StartAt = now.AddMinutes(-10),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
@@ -189,7 +188,6 @@ public sealed class AwdpParticipantStatePersistenceTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = "State Team",
-            NormalizedName = "STATE TEAM",
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = new string('s', 32),
@@ -274,12 +272,10 @@ public sealed class AwdpParticipantStatePersistenceTests
             Mode = GameMode.Awdp,
             Status = CompetitionStatus.Running,
             ConfigurationJson = RoundConfiguration(60),
-            ConfigurationUpdatedAt = now,
             StartAt = now.AddMinutes(-10),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
             MaxConcurrentRuntimeInstancesPerTeam = 2,
-            LeaderboardDirty = false,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -299,7 +295,6 @@ public sealed class AwdpParticipantStatePersistenceTests
         UserName = name,
         NormalizedUserName = name.ToUpperInvariant(),
         Email = $"{name}@example.test",
-        NormalizedEmail = $"{name.ToUpperInvariant()}@EXAMPLE.TEST",
         PasswordHash = "test",
         CreatedAt = now,
         UpdatedAt = now

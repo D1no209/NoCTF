@@ -6,7 +6,6 @@ import {
 } from '~/api'
 import type {
   NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse,
-  NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol,
 } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 
@@ -18,8 +17,8 @@ const current = ref<NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeader
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const visibility = ref<NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol>('Normal')
-const startsAt = ref('')
+const frozenStartAt = ref('')
+const hiddenStartAt = ref('')
 const reason = ref('')
 const saving = ref(false)
 
@@ -30,8 +29,8 @@ async function load() {
   if (e) error.value = parseApiError(e).message
   else {
     current.value = data ?? null
-    visibility.value = data?.configuredVisibility ?? 'Normal'
-    startsAt.value = isoToLocalInput(data?.startsAt)
+    frozenStartAt.value = isoToLocalInput(data?.frozenStartAt)
+    hiddenStartAt.value = isoToLocalInput(data?.hiddenStartAt)
   }
   loading.value = false
 }
@@ -43,13 +42,15 @@ async function save() {
     const { data, error } = await adminUpdateCompetitionLeaderboardVisibility({
       path: { competitionId },
       body: {
-        visibility: visibility.value,
-        startsAt: localInputToIso(startsAt.value) ?? null,
+        frozenStartAt: localInputToIso(frozenStartAt.value) ?? null,
+        hiddenStartAt: localInputToIso(hiddenStartAt.value) ?? null,
         reason: reason.value.trim() || null,
       },
     })
     if (error) throw error
     current.value = data ?? current.value
+    frozenStartAt.value = isoToLocalInput(current.value.frozenStartAt)
+    hiddenStartAt.value = isoToLocalInput(current.value.hiddenStartAt)
     reason.value = ''
     toast.success(translate("记分板可见性已更新"))
   }
@@ -77,20 +78,16 @@ onMounted(load)
         </CardHeader>
         <CardContent class="flex flex-col gap-2 text-sm">
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">{{ $t('配置的可见性:') }}</span>
-            <Badge variant="secondary">{{ enumLabel(LeaderboardVisibilityLabel, current.configuredVisibility) }}</Badge>
-          </div>
-          <div class="flex items-center gap-2">
             <span class="text-muted-foreground">{{ $t('实际生效:') }}</span>
             <Badge>{{ enumLabel(LeaderboardVisibilityLabel, current.effectiveVisibility) }}</Badge>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">{{ $t('生效时间:') }}</span>
-            <span class="font-mono tabular-nums">{{ current.startsAt ? adminFormatDateTime(current.startsAt) : $t('立即') }}</span>
+            <span class="text-muted-foreground">{{ $t('冻结开始时间:') }}</span>
+            <span class="font-mono tabular-nums">{{ current.frozenStartAt ? adminFormatDateTime(current.frozenStartAt) : $t('未设置') }}</span>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-muted-foreground">{{ $t('上次应用:') }}</span>
-            <span class="font-mono tabular-nums">{{ adminFormatDateTime(current.appliedAt) }}</span>
+            <span class="text-muted-foreground">{{ $t('遮蔽开始时间:') }}</span>
+            <span class="font-mono tabular-nums">{{ current.hiddenStartAt ? adminFormatDateTime(current.hiddenStartAt) : $t('未设置') }}</span>
           </div>
         </CardContent>
       </Card>
@@ -104,23 +101,12 @@ onMounted(load)
           <form @submit.prevent="save">
             <FieldGroup>
               <Field>
-                <FieldLabel for="vis">{{ $t('可见性') }}</FieldLabel>
-                <Select id="vis" v-model="visibility" :disabled="!canWrite">
-                  <SelectTrigger class="w-full max-w-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="Normal">{{ $t('正常') }}</SelectItem>
-                      <SelectItem value="Frozen">{{ $t('冻结') }}</SelectItem>
-                      <SelectItem value="Blackout">{{ $t('遮蔽') }}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <FieldLabel for="frozen-start">{{ $t('冻结开始时间(可选)') }}</FieldLabel>
+                <Input id="frozen-start" v-model="frozenStartAt" type="datetime-local" class="max-w-sm" :readonly="!canWrite" />
               </Field>
               <Field>
-                <FieldLabel for="vis-start">{{ $t('生效时间(可选,留空立即生效)') }}</FieldLabel>
-                <Input id="vis-start" v-model="startsAt" type="datetime-local" class="max-w-sm" :readonly="!canWrite" />
+                <FieldLabel for="hidden-start">{{ $t('遮蔽开始时间(可选)') }}</FieldLabel>
+                <Input id="hidden-start" v-model="hiddenStartAt" type="datetime-local" class="max-w-sm" :readonly="!canWrite" />
               </Field>
               <Field>
                 <FieldLabel for="vis-reason">{{ $t('原因(可选,记入审计)') }}</FieldLabel>

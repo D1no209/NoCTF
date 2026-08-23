@@ -18,19 +18,12 @@ public sealed class Competition
     public GameMode Mode { get; set; }
     public string ConfigurationJson { get; set; } = string.Empty;
     public string? TrackConfigurationJson { get; set; }
-    public DateTimeOffset TrackConfigurationUpdatedAt { get; set; }
-    public DateTimeOffset ConfigurationUpdatedAt { get; set; }
-    public bool LeaderboardDirty { get; set; } = true;
-    public CompetitionLeaderboardVisibility LeaderboardVisibility { get; set; }
-    public DateTimeOffset? LeaderboardVisibilityStartsAt { get; set; }
-    public DateTimeOffset? LeaderboardVisibilityAppliedAt { get; set; }
-    public string? FrozenLeaderboardSnapshotJson { get; set; }
+    public DateTimeOffset? FrozenStartAt { get; set; }
+    public DateTimeOffset? HiddenStartAt { get; set; }
     [MaxLength(32)]
     public byte[] FlagDerivationSecret { get; set; } = [];
     public DateTimeOffset StartAt { get; set; }
     public DateTimeOffset EndAt { get; set; }
-    public DateTimeOffset? RunningSince { get; set; }
-    public long AccumulatedRunningSeconds { get; set; }
     public CompetitionStatus Status { get; set; }
     public bool TeamRegistrationAutoApprove { get; set; } = true;
     public bool AllowTeamRegistrationWhileRunning { get; set; }

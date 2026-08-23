@@ -6,59 +6,85 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class CompetitionVisibilityTests
 {
     [Test]
-    public async Task Effective_visibility_honors_schedule_and_finished_reveal()
+    public async Task Effective_visibility_uses_only_effective_timestamps_and_latest_transition()
     {
         var now = DateTimeOffset.UtcNow;
-        await Assert.That(CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-            CompetitionStatus.Running,
-            CompetitionLeaderboardVisibility.Frozen,
-            now.AddMinutes(1),
-            now)).IsEqualTo(CompetitionLeaderboardVisibility.Normal);
-        await Assert.That(CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-            CompetitionStatus.Running,
-            CompetitionLeaderboardVisibility.Frozen,
-            now,
-            now)).IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
-        await Assert.That(CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-            CompetitionStatus.Finished,
-            CompetitionLeaderboardVisibility.Blackout,
-            now.AddMinutes(-1),
-            now)).IsEqualTo(CompetitionLeaderboardVisibility.Normal);
+        var cases = new[]
+        {
+            (Frozen: (DateTimeOffset?)null, Hidden: (DateTimeOffset?)null,
+                Expected: CompetitionLeaderboardVisibility.Normal),
+            (Frozen: (DateTimeOffset?)now.AddMinutes(1), Hidden: (DateTimeOffset?)null,
+                Expected: CompetitionLeaderboardVisibility.Normal),
+            (Frozen: (DateTimeOffset?)null, Hidden: (DateTimeOffset?)now.AddMinutes(1),
+                Expected: CompetitionLeaderboardVisibility.Normal),
+            (Frozen: (DateTimeOffset?)now.AddMinutes(-1), Hidden: (DateTimeOffset?)now.AddMinutes(1),
+                Expected: CompetitionLeaderboardVisibility.Frozen),
+            (Frozen: (DateTimeOffset?)now.AddMinutes(1), Hidden: (DateTimeOffset?)now.AddMinutes(-1),
+                Expected: CompetitionLeaderboardVisibility.Blackout),
+            (Frozen: (DateTimeOffset?)now, Hidden: (DateTimeOffset?)null,
+                Expected: CompetitionLeaderboardVisibility.Frozen),
+            (Frozen: (DateTimeOffset?)null, Hidden: (DateTimeOffset?)now,
+                Expected: CompetitionLeaderboardVisibility.Blackout),
+            (Frozen: (DateTimeOffset?)now.AddMinutes(-2), Hidden: (DateTimeOffset?)now.AddMinutes(-1),
+                Expected: CompetitionLeaderboardVisibility.Blackout),
+            (Frozen: (DateTimeOffset?)now.AddMinutes(-1), Hidden: (DateTimeOffset?)now.AddMinutes(-2),
+                Expected: CompetitionLeaderboardVisibility.Frozen),
+            (Frozen: (DateTimeOffset?)now, Hidden: (DateTimeOffset?)now,
+                Expected: CompetitionLeaderboardVisibility.Blackout)
+        };
+
+        foreach (var item in cases)
+        {
+            await Assert.That(CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
+                    item.Frozen,
+                    item.Hidden,
+                    now))
+                .IsEqualTo(item.Expected);
+        }
     }
 
     [Test]
-    public async Task Scheduled_visibility_must_be_future_and_inside_competition_window()
+    public async Task Visibility_timestamps_must_be_inside_competition_window()
     {
         var now = DateTimeOffset.UtcNow;
         var store = new RecordingStore(View(now));
         var useCase = new UpdateCompetitionVisibility(store);
 
-        var past = await useCase.ExecuteAsync(Command(now, now.AddSeconds(-1)));
-        var beforeCompetition = await useCase.ExecuteAsync(Command(now, now.AddMinutes(5)));
-        var afterCompetition = await useCase.ExecuteAsync(Command(now, now.AddHours(3)));
+        var beforeCompetition = await useCase.ExecuteAsync(Command(
+            now,
+            frozenStartAt: now.AddMinutes(5)));
+        var atCompetitionEnd = await useCase.ExecuteAsync(Command(
+            now,
+            hiddenStartAt: now.AddHours(2)));
 
-        await Assert.That(past.State).IsEqualTo(CompetitionVisibilityMutationState.InvalidSchedule);
-        await Assert.That(beforeCompetition.State).IsEqualTo(CompetitionVisibilityMutationState.InvalidSchedule);
-        await Assert.That(afterCompetition.State).IsEqualTo(CompetitionVisibilityMutationState.InvalidSchedule);
+        await Assert.That(beforeCompetition.State)
+            .IsEqualTo(CompetitionVisibilityMutationState.InvalidSchedule);
+        await Assert.That(atCompetitionEnd.State)
+            .IsEqualTo(CompetitionVisibilityMutationState.InvalidSchedule);
         await Assert.That(store.Updates).IsEmpty();
     }
 
     [Test]
-    public async Task Immediate_restriction_uses_null_schedule_and_reaches_store()
+    public async Task Clearing_both_timestamps_restores_normal_visibility()
     {
         var now = DateTimeOffset.UtcNow;
-        var store = new RecordingStore(View(now));
-        var useCase = new UpdateCompetitionVisibility(store);
+        var store = new RecordingStore(View(now) with
+        {
+            EffectiveVisibility = CompetitionLeaderboardVisibility.Blackout,
+            HiddenStartAt = now.AddMinutes(10)
+        });
 
-        var result = await useCase.ExecuteAsync(Command(now, startsAt: null));
+        var result = await new UpdateCompetitionVisibility(store)
+            .ExecuteAsync(Command(now));
 
         await Assert.That(result.State).IsEqualTo(CompetitionVisibilityMutationState.Updated);
         await Assert.That(store.Updates).HasSingleItem();
-        await Assert.That(store.Updates[0].StartsAt).IsNull();
+        await Assert.That(store.Updates[0].FrozenStartAt).IsNull();
+        await Assert.That(store.Updates[0].HiddenStartAt).IsNull();
     }
 
     [Test]
-    public async Task Finished_competition_only_accepts_normal_visibility()
+    public async Task Finished_competition_accepts_only_normal_visibility()
     {
         var now = DateTimeOffset.UtcNow;
         var store = new RecordingStore(View(now) with
@@ -66,12 +92,15 @@ public sealed class CompetitionVisibilityTests
             CompetitionStatus = CompetitionStatus.Finished
         });
 
-        var result = await new UpdateCompetitionVisibility(store)
-            .ExecuteAsync(Command(now, startsAt: null));
+        var restricted = await new UpdateCompetitionVisibility(store)
+            .ExecuteAsync(Command(now, frozenStartAt: now.AddMinutes(10)));
+        var normal = await new UpdateCompetitionVisibility(store)
+            .ExecuteAsync(Command(now));
 
-        await Assert.That(result.State)
+        await Assert.That(restricted.State)
             .IsEqualTo(CompetitionVisibilityMutationState.CompetitionFinished);
-        await Assert.That(store.Updates).IsEmpty();
+        await Assert.That(normal.State).IsEqualTo(CompetitionVisibilityMutationState.Updated);
+        await Assert.That(store.Updates).HasSingleItem();
     }
 
     private static CompetitionVisibilityConfigurationView View(DateTimeOffset now) =>
@@ -81,17 +110,17 @@ public sealed class CompetitionVisibilityTests
             now.AddMinutes(10),
             now.AddHours(2),
             CompetitionLeaderboardVisibility.Normal,
-            CompetitionLeaderboardVisibility.Normal,
             null,
             null);
 
     private static UpdateCompetitionVisibilityCommand Command(
         DateTimeOffset now,
-        DateTimeOffset? startsAt) =>
+        DateTimeOffset? frozenStartAt = null,
+        DateTimeOffset? hiddenStartAt = null) =>
         new(
             Guid.CreateVersion7(),
-            CompetitionLeaderboardVisibility.Frozen,
-            startsAt,
+            frozenStartAt,
+            hiddenStartAt,
             Guid.CreateVersion7(),
             null,
             now);
@@ -116,11 +145,5 @@ public sealed class CompetitionVisibilityTests
                 CompetitionVisibilityMutationState.Updated,
                 view));
         }
-
-        public Task ApplyScheduledAsync(
-            Guid competitionId,
-            DateTimeOffset scheduledAt,
-            DateTimeOffset now,
-            CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

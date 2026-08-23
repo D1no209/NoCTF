@@ -44,14 +44,13 @@ public sealed class CompetitionTrackPersistenceTests
 
             await using (var seed = new NoCtfDbContext(options))
             {
-                await seed.Database.MigrateAsync(cancellationToken);
+                await seed.Database.EnsureCreatedAsync(cancellationToken);
                 seed.Users.Add(new User
                 {
                     Id = ownerId,
                     UserName = "track-owner",
                     NormalizedUserName = "TRACK-OWNER",
                     Email = "track-owner@example.test",
-                    NormalizedEmail = "TRACK-OWNER@EXAMPLE.TEST",
                     PasswordHash = "test",
                     Role = UserRole.Organizer,
                     CreatedAt = now,
@@ -70,14 +69,12 @@ public sealed class CompetitionTrackPersistenceTests
                     FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
                     CreatedAt = now,
                     UpdatedAt = now,
-                    ConfigurationUpdatedAt = now
                 });
                 seed.Teams.Add(new Team
                 {
                     Id = teamId,
                     CompetitionId = competitionId,
                     Name = "Internal operators",
-                    NormalizedName = "INTERNAL OPERATORS",
                     CaptainId = ownerId,
                     MemberIds = [ownerId],
                     InvitationToken = new string('a', 32),
@@ -116,6 +113,7 @@ public sealed class CompetitionTrackPersistenceTests
             var tracks = new[]
             {
                 Track("default", "Official", isDefault: true),
+                Track("invite", "Invitation only"),
                 Track("internal", "Internal", isInternal: true)
             };
             await using (var updateDb = new NoCtfDbContext(options))
@@ -125,7 +123,9 @@ public sealed class CompetitionTrackPersistenceTests
                     competitionId,
                     tracks,
                     ownerId,
-                    now), cancellationToken);
+                    now,
+                    [new("invite", "invite-only", ClearInvitationCode: false)]),
+                    cancellationToken);
                 await Assert.That(updated.Succeeded).IsTrue();
 
                 var assigned = await store.AssignAsync(new(
@@ -141,20 +141,38 @@ public sealed class CompetitionTrackPersistenceTests
             {
                 var store = CreateStore(readDb);
                 var anonymous = await store.GetAsync(
-                    competitionId, null, includeInternal: false, cancellationToken);
+                    competitionId,
+                    null,
+                    includeInternal: false,
+                    includeInvitationCodes: false,
+                    cancellationToken);
                 await Assert.That(anonymous!.Tracks.Select(track => track.Key))
-                    .IsEquivalentTo(["default"]);
+                    .IsEquivalentTo(["default", "invite"]);
+                await Assert.That(anonymous.Tracks.All(track => track.InvitationCode is null))
+                    .IsTrue();
 
                 var participant = await store.GetAsync(
-                    competitionId, ownerId, includeInternal: false, cancellationToken);
+                    competitionId,
+                    ownerId,
+                    includeInternal: false,
+                    includeInvitationCodes: false,
+                    cancellationToken);
                 await Assert.That(participant!.ViewerTeamId).IsEqualTo(teamId);
                 await Assert.That(participant.Tracks.Single(track => track.Key == "internal").IsViewerTrack)
                     .IsTrue();
+                await Assert.That(participant.Tracks.All(track => track.InvitationCode is null))
+                    .IsTrue();
 
                 var staff = await store.GetAsync(
-                    competitionId, ownerId, includeInternal: true, cancellationToken);
+                    competitionId,
+                    ownerId,
+                    includeInternal: true,
+                    includeInvitationCodes: true,
+                    cancellationToken);
                 await Assert.That(staff!.Tracks.Select(track => track.Key))
-                    .IsEquivalentTo(["default", "internal"]);
+                    .IsEquivalentTo(["default", "invite", "internal"]);
+                await Assert.That(staff.Tracks.Single(track => track.Key == "invite").InvitationCode)
+                    .IsEqualTo("invite-only");
             }
 
             await using (var conflictDb = new NoCtfDbContext(options))
@@ -213,15 +231,12 @@ public sealed class CompetitionTrackPersistenceTests
             await using var verify = new NoCtfDbContext(options);
             var team = await verify.Teams.AsNoTracking()
                 .SingleAsync(item => item.Id == teamId, cancellationToken);
-            var competition = await verify.Competitions.AsNoTracking()
-                .SingleAsync(item => item.Id == competitionId, cancellationToken);
             var eventKinds = await verify.CompetitionEvents.AsNoTracking()
                 .Where(item => item.CompetitionId == competitionId)
                 .OrderBy(item => item.OccurredAt)
                 .Select(item => item.Kind)
                 .ToArrayAsync(cancellationToken);
             await Assert.That(team.TrackKey).IsEqualTo("internal");
-            await Assert.That(competition.LeaderboardDirty).IsTrue();
             await Assert.That(eventKinds.Count(kind =>
                     kind == NoCTF.Domain.Competitions.Events.CompetitionEventKind.TrackConfigurationUpdated))
                 .IsEqualTo(1);

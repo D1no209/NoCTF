@@ -19,8 +19,6 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(competition => competition.ObserverIds).HasColumnType("uuid[]");
         builder.Property(competition => competition.Mode).HasConversion<short>();
         builder.Property(competition => competition.Status).HasConversion<short>();
-        builder.Property(competition => competition.LeaderboardVisibility).HasConversion<short>();
-        builder.Property(competition => competition.FrozenLeaderboardSnapshotJson).HasColumnType("jsonb");
         // Schema defaults preserve the documented cross-mode question policy when an existing
         // competition row is upgraded; Data Annotations cannot express database defaults.
         builder.Property(competition => competition.MaxActiveQuestionsPerTeam).HasDefaultValue(5);
@@ -28,11 +26,7 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(competition => competition.AllowChallengeOwnersToHandleQuestions).HasDefaultValue(true);
         builder.HasQueryFilter(competition => competition.DeletedAt == null);
         builder.HasIndex(competition => new { competition.Status, competition.StartAt });
-        builder.HasIndex(competition => new
-        {
-            competition.LeaderboardVisibility,
-            competition.LeaderboardVisibilityStartsAt
-        });
+        builder.HasIndex(competition => new { competition.FrozenStartAt, competition.HiddenStartAt });
         builder.HasIndex(competition => competition.ManagerIds).HasMethod("gin");
         builder.HasIndex(competition => competition.JudgeIds).HasMethod("gin");
         builder.HasIndex(competition => competition.ObserverIds).HasMethod("gin");
@@ -59,14 +53,6 @@ internal sealed class CompetitionEntityConfiguration : IEntityTypeConfiguration<
             table.HasCheckConstraint(
                 "ck_competitions_question_limits",
                 "max_active_questions_per_team > 0 AND max_participant_messages_before_handler_reply > 0");
-            table.HasCheckConstraint(
-                "ck_competitions_leaderboard_visibility_state",
-                "leaderboard_visibility BETWEEN 0 AND 2 AND "
-                + "((leaderboard_visibility = 0 AND leaderboard_visibility_starts_at IS NULL AND frozen_leaderboard_snapshot_json IS NULL) "
-                + "OR (leaderboard_visibility = 1 AND leaderboard_visibility_starts_at IS NOT NULL "
-                + "AND ((leaderboard_visibility_applied_at IS NULL AND frozen_leaderboard_snapshot_json IS NULL) "
-                + "OR (leaderboard_visibility_applied_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NOT NULL))) "
-                + "OR (leaderboard_visibility = 2 AND leaderboard_visibility_starts_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NULL))");
         });
     }
 }

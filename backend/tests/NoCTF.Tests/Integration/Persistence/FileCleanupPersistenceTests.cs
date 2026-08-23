@@ -128,7 +128,6 @@ public sealed class FileCleanupPersistenceTests
                         UserName = "shared-file-user",
                         NormalizedUserName = "SHARED-FILE-USER",
                         Email = "shared-file@example.test",
-                        NormalizedEmail = "SHARED-FILE@EXAMPLE.TEST",
                         PasswordHash = "test",
                         AvatarFileId = fileId,
                         CreatedAt = now,

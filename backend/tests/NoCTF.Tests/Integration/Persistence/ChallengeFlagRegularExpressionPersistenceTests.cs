@@ -235,7 +235,6 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
         UserName = name,
         NormalizedUserName = name.ToUpperInvariant(),
         Email = $"{name}@example.test",
-        NormalizedEmail = $"{name.ToUpperInvariant()}@EXAMPLE.TEST",
         PasswordHash = "test",
         Role = UserRole.Organizer,
         CreatedAt = now,

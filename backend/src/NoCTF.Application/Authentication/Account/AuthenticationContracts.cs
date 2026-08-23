@@ -22,15 +22,12 @@ public sealed record UserProfile(
     UserKind Kind,
     bool EmailVerified,
     string? Description = null,
-    Guid? AvatarFileId = null,
-    bool IsEmailPublic = false);
+    Guid? AvatarFileId = null);
 public sealed record PublicUserProfile(
     Guid Id,
     string UserName,
-    string? Email,
     string? Description,
-    Guid? AvatarFileId,
-    bool IsEmailPublic);
+    Guid? AvatarFileId);
 public sealed record UserAvatarReplacement(UserProfile Profile, Guid? PreviousFileId);
 public enum CreateUserState { Created, UserNameConflict, EmailConflict }
 public enum ChangePasswordState { Changed, CurrentPasswordInvalid }
@@ -44,7 +41,6 @@ public interface IUserAuthenticationStore
     Task<UserProfile?> UpdateProfileAsync(
         Guid userId,
         string? description,
-        bool isEmailPublic,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<UserAvatarReplacement?> ReplaceAvatarAsync(

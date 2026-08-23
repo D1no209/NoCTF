@@ -51,14 +51,13 @@ public sealed class PlatformAdministrationStore(
             return new(CreateBotState.UserNameConflict);
 
         var id = Guid.CreateVersion7(now);
-        var email = BotIdentity.DummyEmail(id);
+        var email = EmailCanonicalizer.Canonicalize(BotIdentity.DummyEmail(id));
         var user = new User
         {
             Id = id,
             UserName = trimmedUserName,
             NormalizedUserName = normalizedUserName,
             Email = email,
-            NormalizedEmail = email.ToUpperInvariant(),
             Kind = UserKind.Bot,
             Role = role,
             AccountStatus = UserAccountStatus.Active,

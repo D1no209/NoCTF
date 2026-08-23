@@ -91,7 +91,6 @@ public sealed class UserAccountAdministrationStore(
         user.UserName = $"anonymous-{user.Id:N}";
         user.NormalizedUserName = user.UserName.ToUpperInvariant();
         user.Email = string.Empty;
-        user.NormalizedEmail = string.Empty;
         user.PasswordHash = string.Empty;
         user.Role = UserRole.User;
         user.AccountStatus = UserAccountStatus.Anonymized;
@@ -100,7 +99,6 @@ public sealed class UserAccountAdministrationStore(
         user.Description = null;
         user.AvatarFileId = null;
         user.AvatarFile = null;
-        user.IsEmailPublic = false;
         user.UpdatedAt = now;
         await AnonymizeLeaderboardProjectionsAsync(
             userId,
@@ -262,64 +260,10 @@ public sealed class UserAccountAdministrationStore(
         string anonymousUserName,
         CancellationToken ct)
     {
-        var affectedCompetitionIds = await db.GameplayFacts.AsNoTracking()
-            .Where(fact => fact.ActorUserId == userId)
-            .Select(fact => fact.CompetitionId)
-            .Distinct()
-            .ToArrayAsync(ct);
-        // Frozen projections are immutable score snapshots, but identity erasure must
-        // still replace the presentation name without reprojecting any score facts.
-        var competitions = await db.Competitions.IgnoreQueryFilters()
-            .Where(competition => affectedCompetitionIds.Contains(competition.Id)
-                || competition.FrozenLeaderboardSnapshotJson != null)
-            .ToListAsync(ct);
-        var affectedIds = affectedCompetitionIds.ToHashSet();
-        foreach (var competition in competitions)
-        {
-            if (affectedIds.Contains(competition.Id))
-                competition.LeaderboardDirty = true;
-            if (string.IsNullOrWhiteSpace(competition.FrozenLeaderboardSnapshotJson))
-                continue;
-            var bundle = JsonSerializer.Deserialize<LeaderboardProjectionBundle>(
-                competition.FrozenLeaderboardSnapshotJson,
-                JsonOptions);
-            if (bundle is null)
-                continue;
-            var containsUser = bundle.Scoreboard.DetailActors.Any(actor => actor.UserId == userId)
-                || bundle.Scoreboard.Snapshot.Actors.Any(actor => actor.UserId == userId)
-                || bundle.Legacy.Entries.SelectMany(entry => entry.Cells)
-                    .Any(cell => cell.SolverName == originalUserName);
-            if (!containsUser)
-                continue;
-            var legacy = bundle.Legacy with
-            {
-                Entries = bundle.Legacy.Entries.Select(entry => entry with
-                {
-                    Cells = entry.Cells.Select(cell => cell.SolverName == originalUserName
-                        ? cell with { SolverName = anonymousUserName }
-                        : cell).ToArray()
-                }).ToArray()
-            };
-            var scoreboard = bundle.Scoreboard with
-            {
-                DetailActors = bundle.Scoreboard.DetailActors
-                    .Select(actor => actor.UserId == userId
-                        ? actor with { DisplayName = anonymousUserName }
-                        : actor)
-                    .ToArray(),
-                Snapshot = bundle.Scoreboard.Snapshot with
-                {
-                    Actors = bundle.Scoreboard.Snapshot.Actors
-                        .Select(actor => actor.UserId == userId
-                            ? actor with { DisplayName = anonymousUserName }
-                            : actor)
-                        .ToArray()
-                }
-            };
-            competition.FrozenLeaderboardSnapshotJson = JsonSerializer.Serialize(
-                new LeaderboardProjectionBundle(legacy, scoreboard),
-                JsonOptions);
-        }
+        // Leaderboards are projections over PostgreSQL facts. No identity-bearing
+        // snapshot is persisted on Competition, so the next projection observes the
+        // anonymized User directly.
+        await Task.CompletedTask;
     }
 
 }

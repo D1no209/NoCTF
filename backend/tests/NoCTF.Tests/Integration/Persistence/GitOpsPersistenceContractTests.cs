@@ -62,7 +62,6 @@ public sealed class GitOpsPersistenceContractTests
                 UserName = "repository-bot",
                 NormalizedUserName = "REPOSITORY-BOT",
                 Email = BotIdentity.DummyEmail(botId),
-                NormalizedEmail = BotIdentity.DummyEmail(botId).ToUpperInvariant(),
                 Kind = UserKind.Bot,
                 Role = UserRole.Organizer,
                 CreatedAt = now,
@@ -88,7 +87,6 @@ public sealed class GitOpsPersistenceContractTests
                 Mode = GameMode.Ctf,
                 ConfigurationJson =
                     """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
-                ConfigurationUpdatedAt = now,
                 FlagDerivationSecret = new byte[32],
                 StartAt = now.AddHours(1),
                 EndAt = now.AddHours(2),
@@ -355,7 +353,6 @@ public sealed class GitOpsPersistenceContractTests
             UserName = "administrator",
             NormalizedUserName = "ADMINISTRATOR",
             Email = "administrator@example.test",
-            NormalizedEmail = "ADMINISTRATOR@EXAMPLE.TEST",
             PasswordHash = "test",
             Kind = UserKind.Human,
             Role = UserRole.Administrator,

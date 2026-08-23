@@ -137,7 +137,7 @@ public sealed class ChangePasswordEndpointTests
         public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<UserProfile?> UpdateProfileAsync(Guid userId, string? description,
-            bool isEmailPublic, DateTimeOffset now, CancellationToken cancellationToken) =>
+            DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
         public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, Guid fileId,
             DateTimeOffset now, CancellationToken cancellationToken) =>

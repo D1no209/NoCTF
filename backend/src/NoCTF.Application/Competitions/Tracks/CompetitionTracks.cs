@@ -16,7 +16,8 @@ public sealed record CompetitionTrackView(
     bool VisibleOnLeaderboard,
     bool AffectsCompetitiveResults,
     bool IsViewerTrack = false,
-    bool RequiresInvitationCode = false);
+    bool RequiresInvitationCode = false,
+    string? InvitationCode = null);
 
 public sealed record CompetitionTracksView(
     Guid CompetitionId,
@@ -68,6 +69,7 @@ public interface ICompetitionTrackStore
         Guid competitionId,
         Guid? viewerUserId,
         bool includeInternal,
+        bool includeInvitationCodes,
         CancellationToken cancellationToken);
 
     Task<OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>> UpdateAsync(
@@ -155,8 +157,14 @@ public sealed class GetCompetitionTracks(ICompetitionTrackStore store)
         Guid competitionId,
         Guid? viewerUserId,
         bool includeInternal,
+        bool includeInvitationCodes,
         CancellationToken cancellationToken = default) =>
-        store.GetAsync(competitionId, viewerUserId, includeInternal, cancellationToken);
+        store.GetAsync(
+            competitionId,
+            viewerUserId,
+            includeInternal,
+            includeInvitationCodes,
+            cancellationToken);
 }
 
 public sealed class UpdateCompetitionTracks(ICompetitionTrackStore store)

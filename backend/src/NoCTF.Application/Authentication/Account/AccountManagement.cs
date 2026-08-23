@@ -35,7 +35,7 @@ public sealed class RegisterUser(
         CancellationToken ct = default)
     {
         var userName = command.UserName.Trim();
-        var email = command.Email.Trim();
+        var email = EmailCanonicalizer.Canonicalize(command.Email);
         var id = Guid.CreateVersion7(command.Now);
         var requiresEmailVerification = emailVerification is not null
             && await emailVerification.IsRequiredAsync(ct);
@@ -84,24 +84,17 @@ public sealed class GetPublicUserProfile(IUserAuthenticationStore store)
 {
     public async Task<PublicUserProfile?> ExecuteAsync(
         Guid targetUserId,
-        Guid requesterUserId,
-        bool requesterIsAdministrator,
         CancellationToken ct = default)
     {
         var profile = await store.GetProfileAsync(targetUserId, ct);
         if (profile is null)
             return null;
 
-        var mayViewEmail = requesterIsAdministrator
-            || requesterUserId == targetUserId
-            || profile.IsEmailPublic;
         return new(
             profile.Id,
             profile.UserName,
-            mayViewEmail ? profile.Email : null,
             profile.Description,
-            profile.AvatarFileId,
-            profile.IsEmailPublic);
+            profile.AvatarFileId);
     }
 }
 

@@ -95,7 +95,6 @@ public sealed class AwdRoundCoordinationTests
                 Id = greenTeamId,
                 CompetitionId = fixture.CompetitionId,
                 Name = "Green",
-                NormalizedName = "GREEN",
                 CaptainId = fixture.OwnerId,
                 MemberIds = [fixture.OwnerId],
                 InvitationToken = "fedcba9876543210fedcba9876543210",
@@ -224,7 +223,6 @@ public sealed class AwdRoundCoordinationTests
             UserName = "awd-owner",
             NormalizedUserName = "AWD-OWNER",
             Email = "awd-owner@example.test",
-            NormalizedEmail = "AWD-OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -244,13 +242,11 @@ public sealed class AwdRoundCoordinationTests
                     FlagTemplate = new("competition", "[TEAMHASH]", false)
                 },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
-            RunningSince = now.AddMinutes(-12),
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Challenges.Add(new Challenge
         {
@@ -282,7 +278,6 @@ public sealed class AwdRoundCoordinationTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = "Blue",
-            NormalizedName = "BLUE",
             CaptainId = ownerId,
             MemberIds = [ownerId],
             InvitationToken = "0123456789abcdef0123456789abcdef",

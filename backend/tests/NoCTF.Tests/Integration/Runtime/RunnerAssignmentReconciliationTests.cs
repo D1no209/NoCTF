@@ -2208,7 +2208,6 @@ public sealed class RunnerAssignmentReconciliationTests
             UserName = "owner",
             NormalizedUserName = "OWNER",
             Email = "owner@example.test",
-            NormalizedEmail = "OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -2226,14 +2225,12 @@ public sealed class RunnerAssignmentReconciliationTests
             Status = CompetitionStatus.Running,
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Teams.Add(new Team
         {
             Id = teamId,
             CompetitionId = competitionId,
             Name = "Reconciliation Team",
-            NormalizedName = "RECONCILIATION TEAM",
             CaptainId = ownerId,
             MemberIds = [ownerId],
             InvitationToken = "0123456789abcdef0123456789abcdef",

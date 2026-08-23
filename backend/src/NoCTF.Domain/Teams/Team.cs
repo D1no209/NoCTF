@@ -11,8 +11,6 @@ public sealed class Team
     public string TrackKey { get; set; } = NoCTF.Domain.Competitions.CompetitionTrackConfiguration.DefaultTrackKey;
     [MaxLength(128)]
     public string Name { get; set; } = string.Empty;
-    [MaxLength(128)]
-    public string NormalizedName { get; set; } = string.Empty;
     public Guid? AvatarFileId { get; set; }
     public NoCTF.Domain.Storage.StoredFile? AvatarFile { get; set; }
     public Guid CaptainId { get; set; }

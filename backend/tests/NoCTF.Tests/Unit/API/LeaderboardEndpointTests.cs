@@ -1074,6 +1074,7 @@ public sealed class LeaderboardEndpointTests
             Guid requestedCompetitionId,
             Guid? viewerUserId,
             bool includeInternal,
+            bool includeInvitationCodes,
             CancellationToken cancellationToken) =>
             Task.FromResult<CompetitionTracksView?>(requestedCompetitionId == competitionId
                 ? new CompetitionTracksView(
@@ -1262,6 +1263,7 @@ public sealed class LeaderboardEndpointTests
             Guid requestedCompetitionId,
             Guid? viewerUserId,
             bool includeInternal,
+            bool includeInvitationCodes,
             CancellationToken cancellationToken) =>
             Task.FromResult<CompetitionTracksView?>(requestedCompetitionId == competitionId
                 ? new CompetitionTracksView(
@@ -1294,6 +1296,7 @@ public sealed class LeaderboardEndpointTests
             Guid requestedCompetitionId,
             Guid? viewerUserId,
             bool includeInternal,
+            bool includeInvitationCodes,
             CancellationToken cancellationToken) =>
             Task.FromResult<CompetitionTracksView?>(requestedCompetitionId == competitionId
                 ? new CompetitionTracksView(

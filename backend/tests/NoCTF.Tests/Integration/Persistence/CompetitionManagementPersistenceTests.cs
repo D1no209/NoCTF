@@ -49,7 +49,6 @@ public sealed class CompetitionManagementPersistenceTests
                 UserName = "administrator",
                 NormalizedUserName = "ADMINISTRATOR",
                 Email = "administrator@example.test",
-                NormalizedEmail = "ADMINISTRATOR@EXAMPLE.TEST",
                 PasswordHash = "test",
                 Role = UserRole.Administrator,
                 CreatedAt = now,
@@ -124,7 +123,6 @@ public sealed class CompetitionManagementPersistenceTests
                 UserName = "administrator",
                 NormalizedUserName = "ADMINISTRATOR",
                 Email = "administrator@example.test",
-                NormalizedEmail = "ADMINISTRATOR@EXAMPLE.TEST",
                 PasswordHash = "test",
                 Role = UserRole.Administrator,
                 CreatedAt = now,
@@ -228,6 +226,5 @@ public sealed class CompetitionManagementPersistenceTests
             FlagDerivationSecret = new byte[32],
             CreatedAt = startAt,
             UpdatedAt = startAt,
-            ConfigurationUpdatedAt = startAt
         };
 }

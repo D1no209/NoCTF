@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using FastEndpoints;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -11,8 +10,6 @@ namespace NoCTF.API.Endpoints.Authentication;
 public sealed class UpdateMyProfileRequest
 {
     public string? Description { get; set; }
-    [Required]
-    public bool? IsEmailPublic { get; set; }
 }
 
 public sealed class UpdateMyProfileValidator : Validator<UpdateMyProfileRequest>
@@ -21,7 +18,6 @@ public sealed class UpdateMyProfileValidator : Validator<UpdateMyProfileRequest>
     {
         RuleFor(request => request.Description)
             .MaximumLength(UserProfileRules.MaximumDescriptionLength);
-        RuleFor(request => request.IsEmailPublic).NotNull();
     }
 }
 
@@ -36,7 +32,7 @@ public sealed class UpdateMyProfileEndpoint(
         Put("/auth/me/profile");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("Authentication_UpdateMyProfile"));
-        Summary(summary => summary.Summary = "Updates the current user's profile and email visibility.");
+        Summary(summary => summary.Summary = "Updates the current user's profile.");
     }
 
     public override async Task<Results<Ok<CurrentUserResponse>, NotFound>> ExecuteAsync(
@@ -46,7 +42,6 @@ public sealed class UpdateMyProfileEndpoint(
         var profile = await update.ExecuteAsync(
             user.UserId,
             request.Description,
-            request.IsEmailPublic!.Value,
             DateTimeOffset.UtcNow,
             ct);
         return profile is null

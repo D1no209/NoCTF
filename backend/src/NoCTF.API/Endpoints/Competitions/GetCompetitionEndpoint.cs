@@ -107,9 +107,8 @@ internal static class CompetitionMapper
             view.OwnerId,
             CompetitionProtocolMapper.ToProtocol(
                 CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-                    view.Status,
-                    view.LeaderboardVisibility,
-                    view.LeaderboardVisibilityStartsAt,
+                    view.FrozenStartAt,
+                    view.HiddenStartAt,
                     DateTimeOffset.UtcNow)),
             view.DeletedAt,
             AdministrationRole: null,

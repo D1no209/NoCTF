@@ -20,7 +20,8 @@ public sealed class AdministratorBootstrapper(
             return;
 
         var userName = (configuration["SeedAdmin:UserName"] ?? "admin").Trim();
-        var email = (configuration["SeedAdmin:Email"] ?? "admin@noctf.local").Trim();
+        var email = EmailCanonicalizer.Canonicalize(
+            configuration["SeedAdmin:Email"] ?? "admin@noctf.local");
         Validate(userName, email, password);
 
         if (await db.Users.AsNoTracking().AnyAsync(
@@ -29,10 +30,9 @@ public sealed class AdministratorBootstrapper(
             return;
 
         var normalizedUserName = userName.ToUpperInvariant();
-        var normalizedEmail = email.ToUpperInvariant();
         if (await db.Users.AsNoTracking().AnyAsync(
                 user => user.NormalizedUserName == normalizedUserName
-                    || user.NormalizedEmail == normalizedEmail,
+                    || user.Email == email,
                 ct))
             throw new InvalidOperationException(
                 "SeedAdmin identity belongs to an existing non-administrator user.");
@@ -44,7 +44,6 @@ public sealed class AdministratorBootstrapper(
             UserName = userName,
             NormalizedUserName = normalizedUserName,
             Email = email,
-            NormalizedEmail = normalizedEmail,
             Kind = UserKind.Human,
             Role = UserRole.Administrator,
             EmailVerifiedAt = now,

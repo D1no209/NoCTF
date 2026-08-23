@@ -91,7 +91,6 @@ public sealed class CompetitionChallengeAudienceAccessPersistenceTests
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
-            RunningSince = now.AddMinutes(-30),
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -116,7 +115,6 @@ public sealed class CompetitionChallengeAudienceAccessPersistenceTests
             UserName = name,
             NormalizedUserName = name.ToUpperInvariant(),
             Email = $"{name}@example.test",
-            NormalizedEmail = $"{name}@EXAMPLE.TEST",
             PasswordHash = "test",
             Kind = UserKind.Human,
             Role = role,
@@ -136,7 +134,6 @@ public sealed class CompetitionChallengeAudienceAccessPersistenceTests
             Id = Guid.CreateVersion7(),
             CompetitionId = competitionId,
             Name = $"team-{userId:N}",
-            NormalizedName = $"TEAM-{userId:N}",
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = Guid.NewGuid().ToString("N"),

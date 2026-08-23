@@ -490,7 +490,6 @@ public sealed class WolverineTransactionalOutboxTests
                     UserName = "lifecycle-owner",
                     NormalizedUserName = "LIFECYCLE-OWNER",
                     Email = "lifecycle-owner@example.test",
-                    NormalizedEmail = "LIFECYCLE-OWNER@EXAMPLE.TEST",
                     PasswordHash = "test",
                     CreatedAt = now,
                     UpdatedAt = now
@@ -503,13 +502,11 @@ public sealed class WolverineTransactionalOutboxTests
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Running,
                     ConfigurationJson = "{}",
-                    RunningSince = now.AddMinutes(-1),
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
                     FlagDerivationSecret = new byte[32],
                     CreatedAt = now,
                     UpdatedAt = now,
-                    ConfigurationUpdatedAt = now
                 });
                 await db.SaveChangesAsync(cancellationToken);
             }
@@ -546,13 +543,6 @@ public sealed class WolverineTransactionalOutboxTests
                     competitionId,
                     CompetitionStatus.Finished,
                     cancellationToken);
-                await using var verificationScope = host.Services.CreateAsyncScope();
-                var verificationDb = verificationScope.ServiceProvider
-                    .GetRequiredService<NoCtfDbContext>();
-                await Assert.That(await verificationDb.Competitions.AsNoTracking()
-                    .Where(competition => competition.Id == competitionId)
-                    .Select(competition => competition.LeaderboardDirty)
-                    .SingleAsync(cancellationToken)).IsTrue();
             }
             finally
             {
@@ -590,7 +580,6 @@ public sealed class WolverineTransactionalOutboxTests
                     UserName = "awd-outbox-owner",
                     NormalizedUserName = "AWD-OUTBOX-OWNER",
                     Email = "awd-outbox@example.test",
-                    NormalizedEmail = "AWD-OUTBOX@EXAMPLE.TEST",
                     PasswordHash = "test",
                     CreatedAt = now,
                     UpdatedAt = now
@@ -610,13 +599,11 @@ public sealed class WolverineTransactionalOutboxTests
                         },
                         new System.Text.Json.JsonSerializerOptions(
                             System.Text.Json.JsonSerializerDefaults.Web)),
-                    RunningSince = now.AddMinutes(-1),
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
                     FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
                     CreatedAt = now,
                     UpdatedAt = now,
-                    ConfigurationUpdatedAt = now
                 });
                 db.Challenges.Add(new Challenge
                 {
@@ -650,7 +637,6 @@ public sealed class WolverineTransactionalOutboxTests
                     Id = teamId,
                     CompetitionId = competitionId,
                     Name = "Blue",
-                    NormalizedName = "BLUE",
                     CaptainId = ownerId,
                     MemberIds = [ownerId],
                     InvitationToken = "0123456789abcdef0123456789abcdef",
@@ -834,7 +820,6 @@ public sealed class WolverineTransactionalOutboxTests
             UserName = "awdp-result-owner",
             NormalizedUserName = "AWDP-RESULT-OWNER",
             Email = "awdp-result@example.test",
-            NormalizedEmail = "AWDP-RESULT@EXAMPLE.TEST",
             PasswordHash = "test",
             Kind = UserKind.Human,
             Role = UserRole.User,
@@ -850,7 +835,6 @@ public sealed class WolverineTransactionalOutboxTests
             OwnerId = ownerId,
             Mode = GameMode.Awdp,
             ConfigurationJson = "{}",
-            ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
@@ -884,7 +868,6 @@ public sealed class WolverineTransactionalOutboxTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = "awdp-result-team",
-            NormalizedName = "AWDP-RESULT-TEAM",
             CaptainId = ownerId,
             MemberIds = [ownerId],
             InvitationToken = new string('a', 32),

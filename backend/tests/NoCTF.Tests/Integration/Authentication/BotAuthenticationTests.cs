@@ -42,7 +42,6 @@ public sealed class BotAuthenticationTests
                 UserName = "gitops-bot",
                 NormalizedUserName = "GITOPS-BOT",
                 Email = "bot-test@bot.invalid",
-                NormalizedEmail = "BOT-TEST@BOT.INVALID",
                 Kind = UserKind.Bot,
                 Role = UserRole.Organizer,
                 CreatedAt = DateTimeOffset.UtcNow,

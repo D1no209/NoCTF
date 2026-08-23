@@ -205,16 +205,6 @@ public sealed class ChallengeBankStore(
                 CompetitionChallengeId: reference.Id), ct);
         }
         await db.SaveChangesAsync(ct);
-        if (catalogChanged)
-        {
-            _ = await db.Competitions
-                .Where(competition => db.CompetitionChallenges.IgnoreQueryFilters().Any(instance =>
-                    instance.CompetitionId == competition.Id
-                    && instance.ChallengeId == entity.Id
-                    && instance.DeletedAt == null))
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(competition => competition.LeaderboardDirty, true), ct);
-        }
         var result = await Project(db.Challenges.AsNoTracking()
                 .Where(challenge => challenge.Id == entity.Id))
             .SingleAsync(ct);
