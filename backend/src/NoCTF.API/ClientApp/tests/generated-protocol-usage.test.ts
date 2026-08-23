@@ -51,12 +51,15 @@ describe('generated protocol usage', () => {
     )
   })
 
-  test('narrows untyped hub payloads without declaring transport DTOs', async () => {
+  test('uses generated protocol types in the strongly typed hub contract', async () => {
     const hub = await Bun.file(new URL('../app/composables/useCompetitionHub.ts', import.meta.url)).text()
     const flagSubmit = await Bun.file(new URL('../app/components/challenges/FlagSubmit.vue', import.meta.url)).text()
     const fixSubmit = await Bun.file(new URL('../app/components/challenges/FixSubmit.vue', import.meta.url)).text()
 
     expect(hub).toContain("competitionHubString(payload, 'competitionId')")
+    expect(hub).toContain('export interface CompetitionHubClientEvents')
+    expect(hub).toContain('NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse')
+    expect(hub).not.toContain('gameplayFactStateChanged?: (payload: unknown)')
     expect(flagSubmit).toContain("competitionHubString(payload, 'gameplayFactId')")
     expect(fixSubmit).toContain('NoCtfapiEndpointsGameplayFactsAwdpDefenseTargetRequestFailureCodeProtocol')
     expect(fixSubmit).toContain('NoCtfapiEndpointsGameplayFactsUploadPatchFailureCodeProtocol')

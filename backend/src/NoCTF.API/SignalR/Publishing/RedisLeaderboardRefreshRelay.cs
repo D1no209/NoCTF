@@ -11,7 +11,7 @@ namespace NoCTF.API.SignalR.Publishing;
 
 public sealed class RedisLeaderboardRefreshRelay(
     IConnectionMultiplexer redis,
-    IHubContext<CompetitionHub> hub,
+    IHubContext<CompetitionHub, ICompetitionHubClient> hub,
     ILogger<RedisLeaderboardRefreshRelay> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,8 +28,7 @@ public sealed class RedisLeaderboardRefreshRelay(
                     message.Message.ToString());
                 if (notification is null)
                     return;
-                await hub.Clients.Group($"competition:{notification.CompetitionId:N}").SendAsync(
-                    "scoreboardUpdated",
+                await hub.Clients.Group($"competition:{notification.CompetitionId:N}").ScoreboardUpdated(
                     notification,
                     stoppingToken);
                 NoCtfTelemetry.RecordSignalRPublish(

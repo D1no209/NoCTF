@@ -9,7 +9,7 @@ namespace NoCTF.API.SignalR.Hubs;
 
 [Authorize]
 public sealed class CompetitionHub(
-    ICompetitionHubAccess access) : Hub
+    ICompetitionHubAccess access) : Hub<ICompetitionHubClient>
 {
     public override async Task OnConnectedAsync()
     {
