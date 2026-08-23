@@ -6,7 +6,7 @@
 
 `Storage:Provider` 只能是 `Local` 或 `S3`。Local 要求 `Storage:LocalRoot`；S3 要求 `Storage:S3:Bucket`，标准 AWS 还要求 Region，自定义 ServiceUrl 要求显式 AccessKey/SecretKey，并可配置 SessionToken 与 ForcePathStyle。`IStore` 为进程级 Singleton，由 DI 容器释放。
 
-业务表不再保存 ObjectKey、文件名、MIME、长度或 SHA256；只保存 `FileId`，所有 FK 为 Restrict。Users/Teams Avatar、Competition Poster、Platform Logo、ChallengeAttachment、PatchUpload、DataExport 都引用 `files`。
+业务表不再保存 ObjectKey、文件名、MIME、长度或 SHA256；只保存 `FileId`，所有 FK 为 Restrict。Users/Teams Avatar、Competition Poster、Platform Logo、ChallengeAttachment 和 PatchUpload 引用 `files`。同步导出直接写响应流，不创建 File 或导出业务记录。
 
 API 的 `Uploads` 配置按用途设置压缩前请求文件上限：`MaximumAvatarBytes`、`MaximumLogoBytes`、`MaximumPosterBytes` 默认均为 12 MiB，`MaximumAttachmentBytes` 默认 1 GiB；所有值必须位于 1 byte 至 1 GiB。超过上限返回 413/`UploadTooLarge`，且不会进入图片解析、对象存储或业务引用写入。AWDP Fix 包另由题目定义的 `MaximumPatchUploadBytes` 控制。
 

@@ -1,7 +1,7 @@
 # AWDP PWN 示例题：index-vault
 
 `index-vault` 演示 NoCTF 的完整 AWDP 产品语义：每队拥有一个 `Player` 攻击实例，
-平台按 Runtime generation 生成精确 Flag 并注入 `FLAG` 环境变量；Fix 则在独立的
+平台按 Runtime UUID 生成精确 Flag 并注入 `FLAG` 环境变量；Fix 则在独立的
 `AwdpTarget` 中只执行和检查一次。
 
 服务是一个存在越界读的 TCP note vault：

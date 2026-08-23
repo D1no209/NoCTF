@@ -74,4 +74,4 @@ Competition `WrongSubmissionPenalty`，题目可覆盖，非负。只扣当前 W
 
 ## PerTeamRuntime
 
-按需 Start、每队同题一个当前实例；TTL、十分钟续期、Stop/Reset/容量与 URL 依 [Runtime](../runtime.md)。Start 前保证固定 PerTeam ChallengeFlag 存在；失败不删除 Flag，任何 Generation 复用。
+按需 Start、每队同题一个当前实例；TTL、十分钟续期、Stop/Reset/容量与 URL 依 [Runtime](../runtime.md)。Start 前保证固定 PerTeam ChallengeFlag 存在；失败不删除 Flag，后续新 UUID Runtime 可复用。

@@ -111,9 +111,9 @@ victim -= VictimDefensePoolPoints once
 
 每题配置 CheckerIntervalSeconds（Competition 默认、题覆盖，正整数）。Running 时持续检查，加固期也检查；Paused 停止且不补，Resume 立即一次；同队同题最多一个在执行，前次未结束则跳过 interval。
 
-Checker 是附着到特定 Runtime Generation 的可信一次性 Container，与目标处在同一内部网络。单 Container 目标以 `target` 作为稳定 DNS，Compose 目标使用 service name；Checker 镜像自己知道目标端口，平台不向 Checker传递端口配置。后续 Runtime/Checker 定义变化只影响下一次 Start/Reset。
+Checker 是附着到特定 Runtime UUID 的可信一次性 Container，与目标处在同一内部网络。单 Container 目标以 `target` 作为稳定 DNS，Compose 目标使用 service name；Checker 镜像自己知道目标端口，平台不向 Checker传递端口配置。后续 Runtime/Checker 定义变化只影响下一次 Start 或新 UUID Reset。
 
-Docker Provider 从持久 receipt 与 ownership labels 解析该 Generation 的实际 Container/Compose 网络，不假设 Compose `_default` 网络；Checker 同时加入目标内部网络和隔离 callback 网络，结束时只清理自身与 callback 网络。Kubernetes Provider 复用同一 Runtime identity 与 NetworkPolicy，并只为带 `awd-checker` purpose 的 Pod 增加 callback egress，不把平台访问能力授予题目业务 Pod。
+Docker Provider 从持久 receipt 与 ownership labels 解析该 Runtime 的实际 Container/Compose 网络，不假设 Compose `_default` 网络；Checker 同时加入目标内部网络和隔离 callback 网络，结束时只清理自身与 callback 网络。Kubernetes Provider 复用同一 Runtime identity 与 NetworkPolicy，并只为带 `awd-checker` purpose 的 Pod 增加 callback egress，不把平台访问能力授予题目业务 Pod。
 
 Checker 通过 JWT callback：
 

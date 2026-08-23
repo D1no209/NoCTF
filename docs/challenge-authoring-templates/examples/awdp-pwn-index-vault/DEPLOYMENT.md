@@ -51,7 +51,7 @@ NoCTF 接受可信的 tag 或 digest，不强制固定 digest。正式 Break 流
 | Checker timeout | `30` |
 
 不在题库创建静态 Break Flag。平台会在 Player Runtime 创建事务中为比赛题目、队伍和
-generation 生成精确 Flag，并在 Provider 创建前覆盖注入 `FLAG`。
+Runtime UUID 生成精确 Flag，并在 Provider 创建前覆盖注入 `FLAG`。
 
 ## 3. 添加到比赛
 

@@ -117,8 +117,8 @@ docker run --rm \
    数量和关键附件。记录备份时间、开始/完成时间、操作者和验证结果。
 5. 先用备份时相同的应用版本验收，再按正常 migration 流程升级。验收通过前不得让新旧环境同时
    消费同一队列或操作同一 Runtime provider。
-6. 先启动包含 Api 的宿主，再启动包含 Worker 的宿主，最后启动各 Runner Pool；全合一部署只需启动 Host。Wolverine 会按持久化状态恢复租约和投递；
-   所有外部副作用仍必须依赖既有幂等规则；Runtime 使用自己的 ProcessingVersion，GameplayFact 不使用版本栅栏。
+6. 先启动包含 Worker 的宿主并确认 Singular Agent 与 Sticky PostgreSQL endpoint ready，再启动各 Runner 节点和 API；全合一部署只需启动 Host。Wolverine 会按持久化状态恢复租约和投递；
+   所有外部副作用仍必须依赖业务幂等键、durable inbox 和唯一约束，不使用持久化 ProcessingVersion 栅栏。
 
 ## 自动恢复演练
 

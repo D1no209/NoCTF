@@ -123,9 +123,10 @@ Administrator/Owner/Manager/Judge 与关联模板 Owner/Manager 处理；Platfor
 Observer 只读。只有 Running/Paused 且已批准队伍内的 Human 用户可以发起咨询，Bot 不允许使用。
 Finished 后对话只读。Resolved 可由提问者通过追问重新打开，Closed 为终态。
 
-Question 根就是 `notifications.id`，回复使用 `ReplyToId` 组成不可分叉线性链；读取权限在根发送者离队后仍保留。
+Question 根就是 `notifications.id`；回复和状态事件使用 `ThreadRootId` 指向根，`ReplyToId` 只是
+可空、非唯一回复上下文。线程按 `(sent_at,id)` 排序；读取权限在根发送者离队后仍保留。
 删除 Question publication；面向全体参赛者的通用说明创建 CompetitionAnnouncement。管理员公告 Source 是发送者 UserId，
-Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向选手必须显式选择 CompetitionParticipants。所有写操作使用 Revision 乐观并发控制，发起与回复共享每用户/IP
+Target 是 CompetitionId，默认 TargetType=CompetitionCollaborators；面向选手必须显式选择 CompetitionParticipants。所有写操作采用 last-write-wins，发起与回复共享每用户/IP
 每分钟 8 次的限流策略。
 
 ## GameplayFact 动作
@@ -221,13 +222,12 @@ Lifecycle Endpoint 复用同一 Application state machine，但每个动作仍�
 
 普通删除是可恢复的软删除，恢复不会清理任何历史。物理删除是独立操作，不要求先软删除；调用方应先读取
 `hard-delete-preview`。预览以稳定引用码和数量报告 Team、CompetitionChallenge、GameplayFact、Runtime、
-PatchUpload、DataExport、Notification、PosterFile 及永久 CompetitionEvent。任意引用都会阻止物理删除并
+PatchUpload、Notification、PosterFile 及永久 CompetitionEvent。任意引用都会阻止物理删除并
 由 DELETE 返回同一强类型 409 预览；不存在或无权访问返回 404。CompetitionEvent 永久不可删除，存在
 任何历史事件的比赛因此永远不能物理删除。
 
-排行榜可见性 PUT 使用独立 `expectedRevision` 栅栏，可立即应用 Frozen/Blackout，也可在比赛时间窗
-内定时应用。Frozen 在生效时按精确截止时间重建并持久化快照；新配置会淘汰旧的定时消息。每次
-实际切换记录 Actor、原因、发生时间和冻结截止时间。Finished 只接受 Normal。
+排行榜可见性 PUT 采用 last-write-wins，可立即应用 Frozen/Blackout。需要追溯的切换写入不可变
+CompetitionEvent；不在 Competition 保存 revision、scheduled next-run 或排行榜 snapshot。
 
 比赛事件使用永久、不可变的单表事实流。活动比赛的公共参与者只能读取公开事件，已审批且
 未封禁队伍还能读取本队事件；其查询必须提供最长 31 天的时间窗。Administrator 与该比赛的
@@ -248,13 +248,12 @@ Finished 后执行，只恢复历史计分投影，不重启 Runtime。
 事件提交一次 16–512 字符的私密申诉，全队可读取状态；受影响队伍只看到 `ManualModeration` 或
 `CheatIncident` 来源类别，不读取工作人员理由和证据。Observer/Judge 只读，Administrator、Owner、
 Manager 可私密维持封禁或接受申诉。接受申诉和管理员主动纠错都可在 Finished 后解除当前封禁、
-递增 leaderboard revision 并重投影历史事实；公开事件和通知仅包含比赛、队伍和纠错时间。
+发布排行榜失效事件并重投影历史事实；公开事件和通知仅包含比赛、队伍和纠错时间。
 
 权限 snapshot 与候选用户只允许 Competition Owner 或平台 Administrator 读取。候选响应仅含
 Id、UserName、Kind、Role 与 EmailVerified，不开放平台用户目录中的 Email、TokenVersion。
-权限全量替换必须携带 `expectedPermissionRevision`；成功后专用 PermissionRevision 加一，
-Owner transfer 也递增该 revision。Manager 必须是 Organizer/Administrator，Judge/Observer
-必须完成邮箱验证；revision 或资格冲突返回 typed 409。
+权限全量替换和 Owner transfer 采用 last-write-wins。Manager 必须是 Organizer/Administrator，
+Judge/Observer 必须完成邮箱验证；资格或角色冲突返回 typed 409。
 
 `start-validation` 是只读 GET，返回当前完整结构化错误数组。`flags/generate-missing` 在 Competition advisory lock 下同步只补 CTF PerTeam/KoH 缺失 Flag，成功返回 200 与 `failures` 数组；每项包含 CompetitionChallengeId、TeamId、稳定 code 和说明。响应不返回 Flag 原文、FlagId、生成/现有数量；空数组表示全部目标已满足。请求不处理 RandomOne 或 AWD Round。
 
@@ -316,7 +315,7 @@ POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallenge
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset
 ```
 
-列表按 CreatedAt desc/Id desc keyset，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerPool、RunnerId、State、ExpiresBefore。Manager 可执行常规动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。精确终止使用 RuntimeInstanceId 与 ExpectedProcessingVersion，直接定位列表中的实例，但仍通过持久化 `Stopping -> Stopped` Provider 清理状态机；过期版本返回 409。仅平台 Administrator 可对已停留至少五分钟的 `Provisioning`/`Stopping` 实例执行强制终结，必须提交原因；Runner 先按实例身份标签清理并确认 Provider 资源已不存在，再释放容量、写回 `Stopped` 并派发等待实例，结果记录为工作人员可见的比赛事件。该流程幂等，禁止仅修改数据库状态。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度、状态或 Generation 栅栏的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
+列表按 CreatedAt desc/Id desc keyset，可筛选 CompetitionChallengeId、TeamId、RuntimeKind、Provider、RunnerId、State、ExpiresBefore。Manager 可执行常规动作；Judge/Observer 只读；ProviderReceipt/内部错误只在管理详情返回。精确终止仅使用 RuntimeInstanceId 定位实例，并通过持久化 `Stopping -> Stopped` Provider 清理状态机；同一终态操作依赖状态和幂等资源身份收敛。仅平台 Administrator 可对已停留至少五分钟的 `Provisioning`/`Stopping` 实例执行强制终结，必须提交原因；Runner 先按实例 UUID 标签清理并确认 Provider 资源已不存在，再释放容量、写回 `Stopped` 并派发等待实例，结果记录为工作人员可见的比赛事件。该流程幂等，禁止仅修改数据库状态。带 Team 的动作服务 CTF/AWD，复用玩家 Runtime 状态机，不提供绕过额度或状态的“强制成功”。不带 Team 的三个动作只服务 KoH shared Runtime，不伪造 TeamId；KoH 没有 Extend。
 
 ## CompetitionChallenge Management
 
@@ -343,18 +342,15 @@ DELETE /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallen
 POST /api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/flags/{flagId}/restore
 ```
 
-CompetitionChallenge create/update/delete/restore 的并发冲突统一返回强类型
+CompetitionChallenge create/update/delete/restore 的业务冲突统一返回强类型
 `CompetitionChallengeConflictResponse`。create/update 可携带最长 160 字符的 `customTitle`；
 空白值会规范化为 null，并回退显示题库模板标题。update body 必须包含完整的 BaseScore、Order、
-IsPublished 与非负 expectedRevision；delete/restore 必须通过 required query
-`expectedRevision` 携带当前聚合 revision。成功的 delete/restore 各递增一次 revision；
-陈旧 revision 返回 `RevisionConflict`，当前 revision 但删除状态方向错误返回
-`LifecycleStateConflict`，不自动合并或静默覆盖。restore 还会在同一事务内重验活动 Challenge
+IsPublished；delete/restore 不携带 expectedRevision。删除状态方向错误返回
+`LifecycleStateConflict`。restore 还会在同一事务内重验活动 Challenge
 template、Competition mode 与活动唯一约束。稳定 conflict code 为 `ResourceIdConflict`、
-`ChallengeOrderConflict`、`ChallengeTemplateConflict`、`RevisionConflict`、
-`LifecycleStateConflict`、`ChallengeTemplateNotFound` 和 `ChallengeTemplateModeMismatch`。
-Hint 没有独立 revision，但其增删恢复与 CompetitionChallenge 管理写共享 Competition
-transaction lock，并在同一事务内递增父聚合 revision 与 leaderboard revision。
+`ChallengeOrderConflict`、`ChallengeTemplateConflict`、`LifecycleStateConflict`、
+`ChallengeTemplateNotFound` 和 `ChallengeTemplateModeMismatch`。Hint 增删恢复与
+CompetitionChallenge 管理写共享 Competition transaction lock，并通过 Outbox 发布排行榜失效事件。
 
 ## Admin GameplayFact 与判定
 
@@ -466,16 +462,11 @@ GET  /api/internal/v1/awdp/fix-archives/{gameplayFactId}
 
 全部使用独立 JWT Scheme、精确 audience/permission 与资源 Claims。Request body 不能包含可覆盖 Claims 的 Competition/Team/GameplayFact Id。JWT 由调度该 durable Job 的可信进程签发，不提供公开“任意换 Token”接口。
 
-- AWD callback permission=`awd:check-result:write`，绑定 RuntimeInstanceId、Generation、
-  checker sequence、runtime processing version 与 deadline；请求只提交 typed checker
-  status。sequence/version 与 Runtime 当前值精确匹配的同一次执行可以多次写，后一次覆盖
-  前一次。
-- AWDP callback permission=`awdp:fix-result:write`，绑定 GameplayFactId、RuntimeInstanceId、Generation、Runtime 自身 ProcessingVersion 与 deadline；不存在 GameplayFact ProcessingVersion。
+- AWD callback permission=`awd:check-result:write`，绑定 RuntimeInstanceId 和独立 Checker GameplayFactId；请求只提交 typed checker status。相同 callback identity 的重投幂等命中同一事实，不覆盖其他 Checker 执行。
+- AWDP callback permission=`awdp:fix-result:write`，绑定 GameplayFactId、RuntimeInstanceId 和一次性 Fix attempt identity；结果使用强类型枚举和版本化事件 Payload，相同 callback identity 重投幂等。
 - Archive permission=`awdp:fix-archive:read`，只绑定一个 GameplayFactId/PatchUpload；Runner 使用它读取 archive，Checker callback Token 不含此权限。S3 可返回短时预签名地址，LocalFileSystem 可流式返回。
 
-callback 成功且当前时返回 200。AWD 当前 sequence/version 下的重复或后续 typed status
-更新均返回 200；过时 sequence/version 返回 202 superseded，任一未来 fence 返回 409。
-AWDP 完全相同重放返回相同 200，同版本不同规范化 body 返回 409。Token/claim 不符返回
+callback 成功返回 200。完全相同的 callback identity 重放返回相同 200；同一幂等身份携带不同规范化 body 返回稳定业务冲突。Token/claim 不符返回
 401/403；资源对该 Token 不存在返回 404。过时结果可写结构化日志，但不建审计业务表。
 
 Runner 自身通过 Wolverine 读写，不需要 HTTP callback Endpoint。
@@ -485,5 +476,5 @@ Runner 自身通过 Wolverine 读写，不需要 HTTP callback Endpoint。
 - 创建普通资源返回 201+资源 DTO+Location；异步 GameplayFact/Runtime 返回 202+资源 Id+`statusUrl`；同步读取/更新返回 200；无 body 删除返回 204。无 Batch/Rejudge 实体的 queue-evaluation/集合 rejudge 返回 202，状态通过 GameplayFact 列表查询。
 - 202 不是判定成功。客户端轮询 statusUrl 或接收 SignalR invalidation，最终仍以 GET 资源为事实源。
 - 所有写入必须在返回前完成接入事务与 Outbox commit；commit 失败不得返回资源 Id。
-- 资源 revision 写统一使用 expectedRevision；状态机动作不复用 revision 作为幂等键，而是在事务内校验当前状态。
+- 可变资源写采用 last-write-wins；状态机动作在事务内校验当前状态，并用业务唯一键与 Inbox/Outbox 保证幂等。
 - 每个具体 Endpoint 的 `Results<T...>` 只能声明其真实分支；不能为了省事统一声明 200/400/401/403/404/409/500 全家桶。

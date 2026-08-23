@@ -16,7 +16,7 @@
 ## 题面摘要
 
 服务允许读取 0～3 号 note。原始版本错误允许 `READ 4`，从而泄露当前队伍、当前
-Runtime generation 的动态 Flag。Break 必须从本队 Player 实例中取得；Fix 必须保留
+Runtime UUID 的动态 Flag。Break 必须从本队 Player 实例中取得；Fix 必须保留
 `READ 0` 的业务行为并阻断越界读取。
 
 ## Runtime / Checker 配置
@@ -60,7 +60,7 @@ Runtime generation 的动态 Flag。Break 必须从本队 Player 实例中取得
 ## 交付验收
 
 - [ ] 两支队伍的 Player Runtime、端口与动态 Flag 相互独立。
-- [ ] Reset 后新 generation Flag 可用，旧 Flag 变为 `FlagExpired`。
+- [ ] Reset 后新 Runtime UUID 的 Flag 可用，旧 Runtime UUID 的 Flag 变为 `FlagExpired`。
 - [ ] 外队 Flag 被拒绝并生成工作人员可见证据。
 - [ ] 三态 Fix 业务结果、Patch 非零/超时诊断与九类非法归档全部符合预期。
 - [ ] Checker 只回调一次，回调失败或非零退出收敛为平台失败。

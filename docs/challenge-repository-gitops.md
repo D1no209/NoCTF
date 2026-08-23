@@ -18,7 +18,7 @@ NoCTF 只提供普通用户认证和普通管理 API。仓库中的 GitHub Actio
 - 推送 GHCR，并按需推送自定义 Docker Registry；
 - 把构建产物解析为不可变镜像 digest；
 - 按依赖顺序调用 NoCTF 现有的普通 Challenge、Attachment、Flag、CompetitionChallenge 和 Hint API；
-- 在失败后通过稳定 ID 和 Revision 安全重试。
+- 在失败后通过稳定 ID、幂等 create 和重新读取当前状态安全重试。
 
 NoCTF 不解析 Git 仓库、不执行 Docker build，也不承担仓库级差异计算、批量编排或跨资源事务。
 
@@ -36,7 +36,7 @@ NoCTF 不解析 Git 仓库、不执行 Docker build，也不承担仓库级差�
 - 静态题和静态附件中的 Flag 可以明文提交；
 - CTF 动态容器 Flag、AWD 轮换 Flag 和 KoH Control Flag 由 NoCTF 生成，不进入 Git；
 - Git 是配置期望状态，PostgreSQL 是运行时事实来源；
-- 当前 Runtime Generation 不因 Challenge Definition 修改而热更新，Reset 后才使用新 Definition；
+- 当前 Runtime 不因 Challenge Definition 修改而热更新，Reset 创建的新 Runtime UUID 才使用新 Definition；
 - 不记录题目发布版本，不进行自动版本升级，也不自动修改 Manifest 中的镜像 digest。
 
 ## 领域模型映射
@@ -210,7 +210,7 @@ JWT 只在签发响应中返回一次。NoCTF 不保存完整 JWT。管理员撤
 
 平台管理员可在 `/admin/users` 查看 Human/Bot 类型、Role 和 TokenVersion，创建固定为 Organizer 的 Bot、按受控有效期签发一次性显示的 Access JWT，以及使某个身份的全部现有令牌失效。关闭令牌对话框后，前端必须同时清除显示状态和请求缓存中的完整 JWT。
 
-题库管理者可在 `/admin/challenges` 以稳定 UUID、Revision、可见性和活跃比赛引用数核对 GitOps 清单，并切换查看软删除模板。Delete 和 Restore 必须作用于同一 UUID；仍被活跃比赛引用的模板不得从界面发起删除。
+题库管理者可在 `/admin/challenges` 以稳定 UUID、可见性和活跃比赛引用数核对 GitOps 清单，并切换查看软删除模板。Delete 和 Restore 必须作用于同一 UUID；仍被活跃比赛引用的模板不得从界面发起删除。
 
 建议一场比赛创建一个专用 Bot，并只把该 Bot 加入该 Competition 的 `ManagerIds`。仓库保存：
 
@@ -1207,7 +1207,6 @@ concurrency:
 普通列表和详情响应需要返回：
 
 - 实体 ID；
-- 当前 Revision；
 - DeletedAt 或可恢复状态；
 - Attachment 内容 hash；
 - 调用方执行差异计算所需的字段。
@@ -1245,7 +1244,7 @@ Action 先调用 list API，再按 Manifest ID 比较：
 
 因为平台不提供跨资源原子事务，仓库必须采用安全顺序：
 
-1. 获取 Competition、Challenge 和子资源当前状态与 Revision；
+1. 获取 Competition、Challenge 和子资源当前状态；
 2. 校验 Bot 的 Competition 与 Challenge 权限；
 3. 创建或恢复 Challenge，保持 `Private`；
 4. 更新 Challenge metadata、statement 和 Definition；
@@ -1261,24 +1260,14 @@ Action 先调用 list API，再按 Manifest ID 比较：
 
 新题在所有依赖完成前不会发布。
 
-### Revision 与重试
+### Last-write-wins 与重试
 
-Challenge 与 CompetitionChallenge 聚合更新携带 API 当前返回的 ExpectedRevision；
-CompetitionChallenge soft delete/restore 也必须携带当前聚合 revision，不能把生命周期操作
-当作无条件覆盖。
+Challenge 与 CompetitionChallenge 聚合更新不携带 Revision/ExpectedRevision。GitOps 在每次写入前重新读取当前状态并计算单资源差异；写入采用 last-write-wins，仓库 main 是被管理字段的期望状态。
 Challenge template 的 Mode 只有在不存在未软删除的 CompetitionChallenge 引用时才能改变；
 即使父 Competition 已软删除，仍活动的引用也会返回 typed
 `ActiveCompetitionModeConflict`。仓库必须先显式收敛这些引用的生命周期，不能解析错误文本、
-强制覆盖或把冲突当作可自动重试的普通 revision race。
-Attachment、Flag 和 Hint 不拥有独立 Revision；它们按稳定 UUID、删除状态和内容收敛。
-Hint 变更会推进父 CompetitionChallenge revision，因此后续聚合 update/delete/restore 必须
-重新读取父资源，不得复用 Hint 写之前的 revision。
-发生聚合 Revision conflict 时：
-
-1. 重新读取该资源；
-2. 重新计算单资源差异；
-3. 如果已经达到目标状态则视为成功；
-4. 否则停止 apply 并报告冲突，不强制覆盖未知修改。
+强制覆盖或把业务冲突当作普通网络重试。
+Attachment、Flag 和 Hint 按稳定 UUID、删除状态和内容收敛。写入失败时重新读取资源并重新计算差异；若已达到目标状态则成功，否则只对可重试传输失败重试，业务唯一冲突必须停止并报告。
 
 稳定 UUID 使 create 可重复：
 
@@ -1315,9 +1304,9 @@ apply job 在 GitHub Job Summary 中输出：
 
 允许保存新的 Challenge Definition，但：
 
-- 当前 Runtime Generation 不热更新；
-- 已运行实例继续使用创建该 Generation 时的 Definition；
-- Runtime Reset 后才使用新的 Definition；
+- 当前 Runtime 不热更新；
+- 已运行实例继续使用创建该 Runtime UUID 时的 Definition；
+- Runtime Reset 创建新 UUID 后才使用新的 Definition；
 - 已生成的 per-team ChallengeFlag 不被模板 Flag 修改追溯重写；
 - Rules 修改只影响后续计分、后续尝试或后续调度；
 - 不自动重判既有 GameplayFact，也不改写已经完成的轮次事实；
@@ -1412,9 +1401,9 @@ NoCTF 不新增仓库同步模块。平台只需要补齐普通能力：
 5. Login、Refresh、ChangePassword 对 Bot 的限制；
 6. 平台用户列表和详情返回 UserKind；
 7. 普通 Create API 接受客户端生成的 UUID；
-8. 普通列表/详情 API 暴露 Revision、删除状态和 Attachment hash；
+8. 普通列表/详情 API 暴露删除状态和 Attachment hash；
 9. 现有 Challenge/CompetitionChallenge/Attachment/Flag/Hint API 保持普通用户授权；
-10. 对上述普通 API 补充 Bot 与 Revision 集成测试。
+10. 对上述普通 API 补充 Bot、last-write-wins 与业务冲突集成测试。
 
 数据库 Migration 必须通过 `dotnet ef migrations` 生成，不手工编辑 migration 或 snapshot。
 
@@ -1471,7 +1460,7 @@ NoCTF 不新增仓库同步模块。平台只需要补齐普通能力：
 - Action 只调用普通管理 API；
 - 中途失败后重跑可以继续收敛；
 - 新题在完整创建前保持 Private/unpublished；
-- 当前 Runtime Generation 不被 Definition 更新热替换。
+- 当前 Runtime 不被 Definition 更新热替换。
 
 ### 边界
 
@@ -1487,14 +1476,14 @@ NoCTF 不新增仓库同步模块。平台只需要补齐普通能力：
 
 1. 完成 Bot User、管理员创建和指定时长 Token 签发；
 2. 让普通 Create API 支持 Manifest 提供的稳定 UUID；
-3. 补齐普通 API 的 Revision、删除状态和 Attachment hash；
+3. 补齐普通 API 的删除状态和 Attachment hash；
 4. 建立比赛仓库模板和四种 Mode 的 Manifest schema；
 5. 实现 Issue Form 与 Scaffold Action；
 6. 实现仓库本地 validate/discover/plan/build；
 7. 实现动态 matrix Docker build；
 8. 实现 GHCR 和可选自定义 Registry 推送；
 9. 实现 image-map 收集与 Compose digest 物化；
-10. 实现普通 API apply、Revision 重试和删除顺序；
+10. 实现普通 API apply、重新读取重试和删除顺序；
 11. 补齐 PR/Main GitHub Actions 测试；
 12. 用四种 Mode 的示例比赛完成端到端验收。
 

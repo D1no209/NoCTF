@@ -29,7 +29,7 @@ NoCTF.Application/
   GameplayFacts/Intake/
   GameplayFacts/Processing/
   GameplayFacts/Management/
-  Flags/Generation/
+  Flags/RuntimeScope/
   Flags/Matching/
   Runtime/Lifecycle/
 
@@ -72,7 +72,7 @@ dotnet ef database update
 
 ## 消息
 
-业务写+Outbox 同事务。Handler 假设至少一次投递；GameplayFact 依靠状态、唯一约束和自然键幂等，不引入事实 ProcessingVersion，Runtime 可继续使用自己的 ProcessingVersion。禁止 fire-and-forget、业务 Channel、同步阻塞 async 或在数据库事务中调用外部 Provider。
+业务写+Outbox 同事务。Handler 假设至少一次投递；GameplayFact 与 Runtime 依靠状态、唯一约束、自然键和 durable inbox 幂等，不引入持久化 Revision/ProcessingVersion。禁止 fire-and-forget、业务 Channel、同步阻塞 async 或在数据库事务中调用外部 Provider。
 
 ## 日志
 
