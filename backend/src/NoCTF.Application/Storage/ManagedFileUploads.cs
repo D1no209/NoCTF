@@ -1,14 +1,20 @@
 using System.Security.Cryptography;
+using FluentStorage.Storage;
 
 namespace NoCTF.Application.Storage;
 
-public sealed record ManagedFileUpload(Guid FileId, StoredObject StoredObject);
+public sealed record ManagedFileUpload(
+    Guid FileId,
+    string ObjectKey,
+    string FileName,
+    string ContentType,
+    long ByteLength,
+    string Sha256);
 
 public interface IManagedFileUploadRegistry
 {
     Task RegisterAsync(
-        Guid fileId,
-        StoredObject metadata,
+        ManagedFileUpload file,
         DateTimeOffset createdAt,
         CancellationToken cancellationToken);
 
@@ -17,7 +23,7 @@ public interface IManagedFileUploadRegistry
 
 public sealed class ManagedFileUploads(
     IManagedFileUploadRegistry registry,
-    IObjectStorage objects)
+    IStore objects)
 {
     public async Task<ManagedFileUpload> CreateAsync(
         Guid fileId,
@@ -46,34 +52,27 @@ public sealed class ManagedFileUploads(
             temporary.Position = 0;
             var sha256 = Convert.ToHexString(
                 await SHA256.HashDataAsync(temporary, cancellationToken));
-            var metadata = new StoredObject(
+            var upload = new ManagedFileUpload(
+                fileId,
                 objectKey,
                 fileName,
                 contentType,
                 temporary.Length,
                 sha256);
             await registry.RegisterAsync(
-                fileId,
-                metadata,
+                upload,
                 createdAt,
                 cancellationToken);
 
             try
             {
                 temporary.Position = 0;
-                var stored = await objects.PutAsync(
+                await objects.SetObject(
                     objectKey,
-                    fileName,
-                    contentType,
                     temporary,
-                    cancellationToken);
-                if (!Matches(metadata, stored))
-                {
-                    throw new InvalidDataException(
-                        "Object storage metadata did not match the prepared upload.");
-                }
-
-                return new(fileId, stored);
+                    contentType,
+                    cancellationToken: cancellationToken);
+                return upload;
             }
             catch
             {
@@ -101,11 +100,4 @@ public sealed class ManagedFileUploads(
             // Registration includes a durable delayed cleanup lease as a backstop.
         }
     }
-
-    private static bool Matches(StoredObject expected, StoredObject actual) =>
-        string.Equals(expected.ObjectKey, actual.ObjectKey, StringComparison.Ordinal)
-        && string.Equals(expected.FileName, actual.FileName, StringComparison.Ordinal)
-        && string.Equals(expected.ContentType, actual.ContentType, StringComparison.OrdinalIgnoreCase)
-        && expected.Length == actual.Length
-        && string.Equals(expected.Sha256, actual.Sha256, StringComparison.OrdinalIgnoreCase);
 }

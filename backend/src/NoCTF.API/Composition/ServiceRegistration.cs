@@ -132,7 +132,8 @@ public static class ServiceRegistration
             services.AddScoped<ICompetitionModerationAuthorizer, SwaggerModerationAuthorizer>();
             services.AddSingleton<IBackendMessagePublisher, SwaggerBackendMessagePublisher>();
             services.AddScoped<ILeaderboardCache, SwaggerLeaderboardCache>();
-            services.AddSingleton<IObjectStorage, SwaggerObjectStorage>();
+            services.AddSingleton<FluentStorage.Storage.IStore>(
+                _ => FluentStorage.StorageFactory.InMemory());
             services.AddScoped<IManagedFileUploadRegistry, SwaggerManagedFileUploadRegistry>();
             services.AddScoped<ManagedFileUploads>();
             services.AddSingleton<IAvatarImageProcessor, SwaggerAvatarImageProcessor>();

@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using FastEndpoints;
+using FluentStorage.Storage;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -204,7 +205,7 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             new ChallengeAttachmentStore(serviceProvider.GetRequiredService<NoCtfDbContext>()));
         builder.Services.AddScoped<GetChallengeAttachments>();
         builder.Services.AddSingleton<IUserContext>(new TestUserContext(fixture.UserId));
-        builder.Services.AddSingleton<IObjectStorage>(new TestObjectStorage(fixture.Objects));
+        builder.Services.AddSingleton<IStore>(new TestStore(fixture.Objects));
 
         var app = builder.Build();
         app.UseAuthentication();
@@ -465,40 +466,18 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
         public bool IsAdministrator => false;
     }
 
-    private sealed class TestObjectStorage(IReadOnlyDictionary<string, byte[]> objects)
-        : IObjectStorage
+    private sealed class TestStore(IReadOnlyDictionary<string, byte[]> objects)
+        : StoreBase
     {
-        public Task<StoredObject?> InspectAsync(
+        public override Task<bool> ObjectExists(
             string objectKey,
-            CancellationToken cancellationToken)
-        {
-            if (!objects.TryGetValue(objectKey, out var content))
-                return Task.FromResult<StoredObject?>(null);
-            return Task.FromResult<StoredObject?>(new(
-                objectKey,
-                objectKey,
-                "application/octet-stream",
-                content.LongLength,
-                string.Empty));
-        }
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(objects.ContainsKey(objectKey));
 
-        public Task<StoredObject> PutAsync(
+        public override Task<Stream> OpenRead(
             string objectKey,
-            string fileName,
-            string contentType,
-            Stream content,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<Stream> OpenReadAsync(
-            string objectKey,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken = default) =>
             Task.FromResult<Stream>(new MemoryStream(objects[objectKey], writable: false));
-
-        public Task DeleteAsync(
-            string objectKey,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
     }
 
     private sealed class TestBearerHandler(

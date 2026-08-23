@@ -1,7 +1,9 @@
 using System.Data;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -24,7 +26,7 @@ namespace NoCTF.Infrastructure.DataExports;
 
 public sealed class DataExportProcessor(
     NoCtfDbContext db,
-    IObjectStorage objectStorage,
+    IStore objectStorage,
     ITransactionalMessageOutbox outbox,
     ICompetitionEventRecorder competitionEvents,
     IPlatformAuditLogStore platformAudits,
@@ -72,19 +74,27 @@ public sealed class DataExportProcessor(
         var temporaryPath = Path.Combine(
             Path.GetTempPath(),
             $"noctf-data-export-{job.Id:N}.tmp");
-        StoredObject? storedObject = null;
+        PersistedExportObject? storedObject = null;
         try
         {
             var artifact = await GenerateArtifactAsync(job, temporaryPath, cancellationToken);
             try
             {
                 await using var input = File.OpenRead(temporaryPath);
-                storedObject = await objectStorage.PutAsync(
-                        artifact.ObjectKey,
-                        artifact.FileName,
-                        artifact.ContentType,
-                        input,
-                        cancellationToken);
+                var sha256 = Convert.ToHexString(
+                    await SHA256.HashDataAsync(input, cancellationToken));
+                storedObject = new(
+                    artifact.ObjectKey,
+                    artifact.FileName,
+                    artifact.ContentType,
+                    input.Length,
+                    sha256);
+                input.Position = 0;
+                await objectStorage.SetObject(
+                    artifact.ObjectKey,
+                    input,
+                    artifact.ContentType,
+                    cancellationToken: cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
@@ -640,7 +650,7 @@ public sealed class DataExportProcessor(
 
     private async Task CompleteAsync(
         Guid dataExportId,
-        StoredObject storedObject,
+        PersistedExportObject storedObject,
         CancellationToken cancellationToken)
     {
         db.ChangeTracker.Clear();
@@ -651,7 +661,7 @@ public sealed class DataExportProcessor(
         if (job.Status == DataExportStatus.Expired)
         {
             await transaction.RollbackAsync(cancellationToken);
-            await objectStorage.DeleteAsync(storedObject.ObjectKey, cancellationToken);
+            await objectStorage.DeleteObject(storedObject.ObjectKey, cancellationToken);
             return;
         }
 
@@ -666,7 +676,7 @@ public sealed class DataExportProcessor(
             ObjectKey = storedObject.ObjectKey,
             FileName = storedObject.FileName,
             ContentType = storedObject.ContentType,
-            ByteLength = storedObject.Length,
+            ByteLength = storedObject.ByteLength,
             Sha256 = Convert.FromHexString(storedObject.Sha256),
             CreatedAt = now
         };
@@ -765,7 +775,7 @@ public sealed class DataExportProcessor(
     {
         try
         {
-            await objectStorage.DeleteAsync(objectKey, cancellationToken);
+            await objectStorage.DeleteObject(objectKey, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -826,6 +836,13 @@ public sealed class DataExportProcessor(
         string ObjectKey,
         string FileName,
         string ContentType);
+
+    private sealed record PersistedExportObject(
+        string ObjectKey,
+        string FileName,
+        string ContentType,
+        long ByteLength,
+        string Sha256);
 
     private sealed class DataExportGenerationException(
         DataExportFailureCode failureCode,

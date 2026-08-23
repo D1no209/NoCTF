@@ -2,6 +2,8 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using FluentStorage;
+using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -51,7 +53,7 @@ public sealed class DataExportPersistenceTests
             try
             {
                 var time = new MutableTimeProvider(now);
-                var storage = new LocalObjectStorage(Configuration(storageRoot));
+                using var storage = StorageFactory.Disk(storageRoot);
                 var outbox = new RecordingOutbox();
                 var defaultExportId = Guid.CreateVersion7(now.AddMinutes(1));
                 await InsertExportAsync(
@@ -82,7 +84,7 @@ public sealed class DataExportPersistenceTests
                     await Assert.That(job.File!.ByteLength).IsGreaterThan(0);
                     defaultFileId = job.File.Id;
                     defaultObjectKey = job.File.ObjectKey;
-                    await using var archiveStream = await storage.OpenReadAsync(
+                    await using var archiveStream = await storage.OpenRead(
                         job.File.ObjectKey,
                         cancellationToken);
                     using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read);
@@ -143,7 +145,7 @@ public sealed class DataExportPersistenceTests
                     var job = await verify.DataExports.Include(item => item.File).SingleAsync(
                         item => item.Id == protectedExportId,
                         cancellationToken);
-                    await using var archiveStream = await storage.OpenReadAsync(
+                    await using var archiveStream = await storage.OpenRead(
                         job.File!.ObjectKey,
                         cancellationToken);
                     using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read);
@@ -195,7 +197,7 @@ public sealed class DataExportPersistenceTests
                     await Assert.That(job.File!.ContentType).IsEqualTo("application/x-ndjson");
                     platformFileId = job.File.Id;
                     platformObjectKey = job.File.ObjectKey;
-                    await using var stream = await storage.OpenReadAsync(
+                    await using var stream = await storage.OpenRead(
                         job.File.ObjectKey,
                         cancellationToken);
                     using var reader = new StreamReader(stream, Encoding.UTF8, true);
@@ -222,9 +224,9 @@ public sealed class DataExportPersistenceTests
                         item => item.Id == defaultFileId,
                         cancellationToken)).IsTrue();
                 }
-                await Assert.That(await storage.InspectAsync(
+                await Assert.That(await storage.ObjectExists(
                     defaultObjectKey,
-                    cancellationToken)).IsNotNull();
+                    cancellationToken)).IsTrue();
                 var expiredCleanup = outbox.Published.OfType<CleanupFile>()
                     .Single(message => message.FileId == defaultFileId);
                 await using (var db = new NoCtfDbContext(options))
@@ -241,9 +243,9 @@ public sealed class DataExportPersistenceTests
                         item => item.Id == defaultFileId,
                         cancellationToken)).IsFalse();
                 }
-                await Assert.That(await storage.InspectAsync(
+                await Assert.That(await storage.ObjectExists(
                     defaultObjectKey,
-                    cancellationToken)).IsNull();
+                    cancellationToken)).IsFalse();
 
                 time.Advance(TimeSpan.FromDays(31));
                 await using (var db = new NoCtfDbContext(options))
@@ -276,9 +278,9 @@ public sealed class DataExportPersistenceTests
                         item => item.Id == platformFileId,
                         cancellationToken)).IsTrue();
                 }
-                await Assert.That(await storage.InspectAsync(
+                await Assert.That(await storage.ObjectExists(
                     platformObjectKey,
-                    cancellationToken)).IsNotNull();
+                    cancellationToken)).IsTrue();
                 var purgedCleanup = outbox.Published.OfType<CleanupFile>()
                     .Single(message => message.FileId == platformFileId);
                 await using (var db = new NoCtfDbContext(options))
@@ -295,9 +297,9 @@ public sealed class DataExportPersistenceTests
                         item => item.Id == platformFileId,
                         cancellationToken)).IsFalse();
                 }
-                await Assert.That(await storage.InspectAsync(
+                await Assert.That(await storage.ObjectExists(
                     platformObjectKey,
-                    cancellationToken)).IsNull();
+                    cancellationToken)).IsFalse();
             }
             finally
             {
@@ -355,9 +357,10 @@ public sealed class DataExportPersistenceTests
                 async Task<RequestDataExportResult> RequestAsync(Guid competitionId)
                 {
                     await using var db = new NoCtfDbContext(options);
+                    using var storage = StorageFactory.Disk(storageRoot);
                     var store = new DataExportStore(
                         db,
-                        new LocalObjectStorage(Configuration(storageRoot)),
+                        storage,
                         new RecordingOutbox(),
                         new MutableTimeProvider(now));
                     return await store.RequestAsync(
@@ -386,7 +389,7 @@ public sealed class DataExportPersistenceTests
                     await db.SaveChangesAsync(cancellationToken);
                 }
                 var tinyConfiguration = Configuration(storageRoot, maximumBytes: 128);
-                var storage = new LocalObjectStorage(tinyConfiguration);
+                using var storage = StorageFactory.Disk(storageRoot);
                 await using (var db = new NoCtfDbContext(options))
                 {
                     var processor = new DataExportProcessor(
@@ -419,7 +422,7 @@ public sealed class DataExportPersistenceTests
 
     private static DataExportProcessor Processor(
         NoCtfDbContext db,
-        LocalObjectStorage storage,
+        IStore storage,
         RecordingOutbox outbox,
         TimeProvider time) =>
         new(

@@ -755,7 +755,7 @@ AWDP 完整边界已由 `e24bfac` 独立完成。不要退回共享 target、进
 - 实测分数依次为错误 Break `-7`、正确 Break `+40`、首次 Fix `+60`、Patch 失败 `-11`；
   首次 Fix 后 leaderboard 为 93，最终和 rejudge 后为 82。
 - 该轮历史实现曾让 Runner 按 `Storage:Provider` 直连 MinIO。此权限边界已由 6.33
-  取代：Runner 不再注册 `IObjectStorage` 或持有对象存储凭据，Fix archive 只通过绑定
+  取代：Runner 不再注册平台文件存储或持有对象存储凭据，Fix archive 只通过绑定
   Submission 的最小权限内部 JWT 从 API 下载。
 - 显式 EF 事务内的业务事实先 commit，再 flush Wolverine outgoing messages；修正范围为
   AWD/AWDP result 与 Competition/Challenge configuration 三个既有 store。真实 PostgreSQL
@@ -1944,7 +1944,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
 ### 6.33 AWDP Fix archive 最小权限下载（2026-07-31）
 
 - 本地提交：`817b204 fix(runtime): download awdp archives through api`。
-- Runner 已删除 AWS/S3/Local `IObjectStorage` 注册，不再接收 MinIO/S3 endpoint、bucket
+- Runner 已删除 AWS/S3/Local 文件存储注册，不再接收 MinIO/S3 endpoint、bucket
   或访问凭据。API/Worker 仍按职责访问对象存储。
 - `AwdpFixWorkReader` 使用既有 `IssueFixArchiveRead` 签发绑定
   `PatchUploadId`/`SubmissionId` 的 5 分钟内部 JWT，并通过既有
@@ -2130,9 +2130,9 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   并发只能得到“旧 draft 被消费、新 draft 保留”或“旧 draft 被替换、旧 Id 不可消费”两种
   合法终态，不会产生唯一索引错误或清理已消费对象。
 - 旧 ObjectKey 在替换事务内写入 Wolverine durable outbox，API 将 `CleanupObject` 路由到
-  Worker；Worker 通过幂等 `IObjectStorage.DeleteAsync` 清理。新对象若数据库写入失败仍做
+  Worker；Worker 通过幂等对象删除操作清理。新对象若数据库写入失败仍做
   best-effort 补偿删除，cleanup 失败不掩盖原拒绝。
-- 新增 2 个真实 PostgreSQL+Wolverine+LocalObjectStorage 集成测试和 2 个单元测试；顺序
+- 新增 2 个真实 PostgreSQL+Wolverine+本地磁盘存储集成测试和 2 个单元测试；顺序
   replacement/consume、durable 删除和双方同时等待同一 advisory lock 均通过。
 - 最终核验：Release solution build 0 warning/0 error；478/478 non-Integration passed；
   Integration 共发现 86 项，当前环境可执行的 84/84 passed、0 failed，真实 Kubernetes
@@ -2652,7 +2652,7 @@ dirty；stale GET 不会主动刷新；并发旧投影可以覆盖新快照；Si
   protected-Flag 边界和每个数据集行数；Flag 默认只输出 SHA-256，附件只输出名称、类型、大小和
   SHA-256，队伍邀请令牌、Competition derivation secret 与对象 key 永不导出。平台审计直接遍历
   既有 CompetitionEvent/UserAccountLifecycleAudit 投影视图，不复制数据。文件上传到既有
-  `IObjectStorage`，完成/失败均产生幂等站内通知；下载时重新校验当前角色，protected artifact
+  平台文件存储，完成/失败均产生幂等站内通知；下载时重新校验当前角色，protected artifact
   永远只允许 Administrator。
 - 新增五个强类型 FastEndpoints：比赛任务 GET/POST、平台审计任务 GET/POST、统一下载 GET。
   Endpoint 全部使用 `ExecuteAsync`、具体 HttpResults、`Results<T...>` 和 `TypedResults`，权限、

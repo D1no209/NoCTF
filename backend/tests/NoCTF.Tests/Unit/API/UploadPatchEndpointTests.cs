@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FastEndpoints;
+using FluentStorage.Storage;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -67,7 +68,7 @@ public sealed class UploadPatchEndpointTests
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton<IUserContext>(new TestUserContext());
         builder.Services.AddSingleton<IPatchUploadStore>(new LimitedPatchStore());
-        builder.Services.AddSingleton<IObjectStorage, FailingObjectStorage>();
+        builder.Services.AddSingleton<IStore, FailingStore>();
         builder.Services.AddSingleton<IManagedFileUploadRegistry, FailingUploadRegistry>();
         builder.Services.AddScoped<ManagedFileUploads>();
         builder.Services.AddScoped<CreatePatchUpload>();
@@ -106,22 +107,20 @@ public sealed class UploadPatchEndpointTests
             throw new InvalidOperationException("Storage must not be reached.");
     }
 
-    private sealed class FailingObjectStorage : IObjectStorage
+    private sealed class FailingStore : StoreBase
     {
-        public Task<StoredObject?> InspectAsync(string objectKey, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Storage must not be reached.");
-        public Task<StoredObject> PutAsync(string objectKey, string fileName, string contentType,
-            Stream content, CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("Storage must not be reached.");
-        public Task<Stream> OpenReadAsync(string objectKey, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-        public Task DeleteAsync(string objectKey, CancellationToken cancellationToken) =>
+        public override Task SetObject(
+            string objectKey,
+            Stream content,
+            string contentType,
+            bool append = false,
+            CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("Storage must not be reached.");
     }
 
     private sealed class FailingUploadRegistry : IManagedFileUploadRegistry
     {
-        public Task RegisterAsync(Guid fileId, StoredObject metadata, DateTimeOffset createdAt,
+        public Task RegisterAsync(ManagedFileUpload file, DateTimeOffset createdAt,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Storage must not be reached.");
         public Task AbandonAsync(Guid fileId, CancellationToken cancellationToken) =>

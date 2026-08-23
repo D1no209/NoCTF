@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FastEndpoints;
+using FluentStorage.Storage;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.Application.Storage;
 using NoCTF.Application.GameplayFacts.PatchUploads;
@@ -8,7 +9,7 @@ namespace NoCTF.API.Endpoints.Internal;
 
 public sealed class DownloadFixArchiveEndpoint(
     IFixArchiveReader archives,
-    IObjectStorage objects)
+    IStore objects)
     : EndpointWithoutRequest<Results<FileStreamHttpResult, NotFound, UnauthorizedHttpResult>>
 {
     public override void Configure()
@@ -37,7 +38,9 @@ public sealed class DownloadFixArchiveEndpoint(
         var archive = await archives.FindAsync(routeId, ct);
         if (archive is null)
             return TypedResults.NotFound();
-        var stream = await objects.OpenReadAsync(archive.ObjectKey, ct);
+        var stream = await objects.OpenRead(archive.ObjectKey, ct);
+        if (stream is null)
+            return TypedResults.NotFound();
         return TypedResults.Stream(
             stream,
             string.IsNullOrWhiteSpace(archive.ContentType)

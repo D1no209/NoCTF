@@ -57,12 +57,12 @@ spec:
                 secretKeyRef:
                   name: noctf-secrets
                   key: seed-admin-password
-            - name: AWS_ACCESS_KEY_ID
+            - name: Storage__S3__AccessKey
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets
                   key: minio-access-key
-            - name: AWS_SECRET_ACCESS_KEY
+            - name: Storage__S3__SecretKey
               valueFrom:
                 secretKeyRef:
                   name: noctf-secrets

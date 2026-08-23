@@ -1,3 +1,5 @@
+using FluentStorage.Storage;
+
 namespace NoCTF.Application.Storage;
 
 public enum BusinessFileReferenceState
@@ -64,7 +66,7 @@ public sealed record BusinessFileContent(Stream Content, string ContentType, str
 
 public sealed class ManageBusinessImages(
     IBusinessFileReferenceStore references,
-    IObjectStorage objects,
+    IStore objects,
     ManagedFileUploads uploads)
 {
     public async Task<BusinessFileReferenceResult> ReplaceTeamAvatarAsync(
@@ -120,10 +122,14 @@ public sealed class ManageBusinessImages(
     public async Task<BusinessFileContent?> GetTeamAvatarAsync(
         Guid competitionId,
         Guid teamId,
-        CancellationToken ct = default) =>
-        await references.GetTeamAvatarAsync(competitionId, teamId, ct) is { } file
-            ? new(await objects.OpenReadAsync(file.ObjectKey, ct), file.ContentType, file.FileName)
-            : null;
+        CancellationToken ct = default)
+    {
+        var file = await references.GetTeamAvatarAsync(competitionId, teamId, ct);
+        if (file is null)
+            return null;
+        var content = await objects.OpenRead(file.ObjectKey, ct);
+        return content is null ? null : new(content, file.ContentType, file.FileName);
+    }
 
     public async Task<BusinessFileReferenceResult> ReplaceCompetitionPosterAsync(
         Guid actorUserId,
@@ -173,10 +179,14 @@ public sealed class ManageBusinessImages(
 
     public async Task<BusinessFileContent?> GetCompetitionPosterAsync(
         Guid competitionId,
-        CancellationToken ct = default) =>
-        await references.GetCompetitionPosterAsync(competitionId, ct) is { } file
-            ? new(await objects.OpenReadAsync(file.ObjectKey, ct), file.ContentType, file.FileName)
-            : null;
+        CancellationToken ct = default)
+    {
+        var file = await references.GetCompetitionPosterAsync(competitionId, ct);
+        if (file is null)
+            return null;
+        var content = await objects.OpenRead(file.ObjectKey, ct);
+        return content is null ? null : new(content, file.ContentType, file.FileName);
+    }
 
     private static string NormalizeFileName(string value) =>
         string.IsNullOrWhiteSpace(value) ? "image" : value.Trim()[..Math.Min(value.Trim().Length, 260)];

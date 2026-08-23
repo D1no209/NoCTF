@@ -3,6 +3,7 @@
     <ProjectReference Include="../NoCTF.Domain/NoCTF.Domain.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="FluentStorage" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>

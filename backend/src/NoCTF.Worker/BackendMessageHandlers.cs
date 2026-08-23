@@ -3,6 +3,7 @@ using NoCTF.Application.Storage;
 using NoCTF.Application.Scoring.Leaderboard;
 using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Domain.Platform;
+using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -41,7 +42,7 @@ public static class BackendMessageHandlers
     public static async Task Handle(
         CleanupFile message,
         NoCtfDbContext db,
-        IObjectStorage objects,
+        IStore objects,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
@@ -60,7 +61,7 @@ public static class BackendMessageHandlers
             || await db.DataExports.AnyAsync(item => item.FileId == file.Id, cancellationToken);
         if (referenced)
             return;
-        await objects.DeleteAsync(file.ObjectKey, cancellationToken);
+        await objects.DeleteObject(file.ObjectKey, cancellationToken);
         db.Files.Remove(file);
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

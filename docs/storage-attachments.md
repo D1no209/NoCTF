@@ -2,13 +2,15 @@
 
 ## Provider
 
-统一 `IObjectStorage`：S3Compatible（生产默认）与 LocalFileSystem（开发/测试/单节点）。Bucket/目录不公开。平台生成不可猜测 ObjectKey；原文件名只进入不可变 `files.file_name`。
+底层文件 I/O 直接使用 FluentStorage `IStore`，不再维护 NoCTF 自定义存储接口或 Provider adapter。首版启用 FluentStorage Disk（开发/测试/单节点）和 FluentStorage AWS S3（AWS S3、MinIO 与通用 S3-compatible）；Bucket/目录不公开。平台生成不可猜测 ObjectKey，原文件名只进入不可变 `files.file_name`。
+
+`Storage:Provider` 只能是 `Local` 或 `S3`。Local 要求 `Storage:LocalRoot`；S3 要求 `Storage:S3:Bucket`，标准 AWS 还要求 Region，自定义 ServiceUrl 要求显式 AccessKey/SecretKey，并可配置 SessionToken 与 ForcePathStyle。`IStore` 为进程级 Singleton，由 DI 容器释放。
 
 业务表不再保存 ObjectKey、文件名、MIME、长度或 SHA256；只保存 `FileId`，所有 FK 为 Restrict。Users/Teams Avatar、Competition Poster、Platform Logo、ChallengeAttachment、PatchUpload、DataExport 都引用 `files`。
 
 API 的 `Uploads` 配置按用途设置压缩前请求文件上限：`MaximumAvatarBytes`、`MaximumLogoBytes`、`MaximumPosterBytes` 默认均为 12 MiB，`MaximumAttachmentBytes` 默认 1 GiB；所有值必须位于 1 byte 至 1 GiB。超过上限返回 413/`UploadTooLarge`，且不会进入图片解析、对象存储或业务引用写入。AWDP Fix 包另由题目定义的 `MaximumPatchUploadBytes` 控制。
 
-上传顺序固定为：受控临时文件计算长度/SHA256 → 创建 File 行 → 上传最终对象 → 事务锁定 File 并建立业务引用。替换引用时向 Wolverine Outbox 投递 `CleanupFile(FileId)`；Worker 检查全部引用，确认无引用后先删对象、成功再硬删 File 行，失败按 Wolverine 重试。File 元数据不可编辑，改名/MIME 必须上传新 File。
+上传顺序固定为：受控临时文件计算长度/SHA256 → 创建 File 行 → 通过 `IStore.SetObject` 上传最终对象 → 事务锁定 File 并建立业务引用。替换引用时向 Wolverine Outbox 投递 `CleanupFile(FileId)`；Worker 检查全部引用，确认无引用后通过 `IStore.DeleteObject` 先删对象、成功再硬删 File 行，失败按 Wolverine 重试。File 元数据不可编辑，改名/MIME 必须上传新 File。
 
 对象键：
 
@@ -25,7 +27,7 @@ OVA 不属于对象存储，由 Runtime 配置外部 URL。
 
 Attachment 属于 Challenge 模板。文件内容、显示名称和 MIME 都不可原位修改；任何变化都上传新 File 并替换业务引用。存在 Flag Specification、RandomOne 选择或发布引用时禁止删除。
 
-下载 API 先授权。All 策略允许列出 AttachmentId/显示元数据并按 Id 下载；RandomOne 策略只暴露不带 Id 的单数下载路由，并在该请求中完成隐式选择。S3Compatible 返回 60 秒预签名 GET 的 302；LocalFileSystem 由 API stream。RandomOne 玩家不获得候选 AttachmentId/ObjectKey/列表，任何玩家都不获得 FlagId。
+下载 API 先授权，再通过 `IStore.OpenRead` 由 API 返回文件流；不向客户端暴露 Bucket、ObjectKey 或 Provider URL。All 策略允许列出 AttachmentId/显示元数据并按 Id 下载；RandomOne 策略只暴露不带 Id 的单数下载路由，并在该请求中完成隐式选择。RandomOne 玩家不获得候选 AttachmentId/ObjectKey/列表，任何玩家都不获得 FlagId。
 
 ## AWDP PatchUpload
 
@@ -42,7 +44,11 @@ Runner 在消费后再次验证 Hash/长度/格式并安全解包，拒绝绝对
 
 ## 外部清理
 
-数据库先写待清理事实/Outbox，Worker 删除对象后完成硬删除。外部删除幂等；NotFound 视为成功；最终失败进入 DLQ。软删除不立即丢对象。
+数据库先写待清理事实/Outbox，Worker 通过 FluentStorage 删除对象后完成硬删除。外部删除幂等；NotFound 视为成功；最终失败进入 DLQ。软删除不立即丢对象。
+
+## FluentStorage 切换
+
+本次切换不迁移旧数据库和旧对象，也没有双读、fallback 或 `.metadata` 旁车兼容逻辑。发布时必须先停服，人工清空 PostgreSQL（包括 Wolverine schema）以及对应 bucket/local root，再以空数据库和空对象存储启动。应用启动不会自动执行这些破坏性操作，且本次切换不产生 EF migration。
 
 平台进程不实现备份与恢复 API；外部运维使用统一加密恢复点备份 PostgreSQL、Wolverine schema
 和对象内容/元数据，具体停写、校验与隔离恢复流程见 [备份恢复](backup-recovery.md)。

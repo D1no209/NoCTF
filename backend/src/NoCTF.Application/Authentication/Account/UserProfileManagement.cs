@@ -1,3 +1,4 @@
+using FluentStorage.Storage;
 using NoCTF.Application.Common;
 using NoCTF.Application.Storage;
 
@@ -177,7 +178,7 @@ public sealed record UserAvatarContent(Stream Content, string ContentType);
 
 public sealed class GetUserAvatar(
     IUserAuthenticationStore users,
-    IObjectStorage objects)
+    IStore objects)
 {
     public async Task<UserAvatarContent?> ExecuteAsync(
         Guid userId,
@@ -187,10 +188,7 @@ public sealed class GetUserAvatar(
         if (file is null)
             return null;
 
-        var metadata = await objects.InspectAsync(file.ObjectKey, ct);
-        if (metadata is null)
-            return null;
-
-        return new(await objects.OpenReadAsync(file.ObjectKey, ct), file.ContentType);
+        var content = await objects.OpenRead(file.ObjectKey, ct);
+        return content is null ? null : new(content, file.ContentType);
     }
 }

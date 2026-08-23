@@ -1,3 +1,4 @@
+using FluentStorage.Storage;
 using NoCTF.Application.Common;
 using NoCTF.Application.Storage;
 using System.Text;
@@ -198,10 +199,10 @@ public sealed class ManageChallengeAttachments(
         return OperationResult<ChallengeAttachmentView, ChallengeAttachmentFailureCode>.Success(new(
             attachmentId,
             challengeId,
-            uploaded.StoredObject.FileName,
-            uploaded.StoredObject.ContentType,
-            uploaded.StoredObject.Length,
-            uploaded.StoredObject.Sha256,
+            uploaded.FileName,
+            uploaded.ContentType,
+            uploaded.ByteLength,
+            uploaded.Sha256,
             null,
             null,
             now));
@@ -321,10 +322,10 @@ public sealed class ManageChallengeAttachments(
             entries.Select((entry, index) => new ChallengeAttachmentView(
                 entry.AttachmentId,
                 challengeId,
-                uploadedFiles[index].StoredObject.FileName,
-                uploadedFiles[index].StoredObject.ContentType,
-                uploadedFiles[index].StoredObject.Length,
-                uploadedFiles[index].StoredObject.Sha256,
+                uploadedFiles[index].FileName,
+                uploadedFiles[index].ContentType,
+                uploadedFiles[index].ByteLength,
+                uploadedFiles[index].Sha256,
                 entry.ExactFlag,
                 null,
                 entry.CreatedAt)).ToArray()));
@@ -402,7 +403,7 @@ public sealed class ManageChallengeAttachments(
 
 public sealed class GetChallengeAttachments(
     IChallengeAttachmentStore store,
-    IObjectStorage objects)
+    IStore objects)
 {
     public Task<ChallengeAttachmentSet?> ListAsync(
         Guid competitionId,
@@ -423,10 +424,11 @@ public sealed class GetChallengeAttachments(
             competitionChallengeId,
             attachmentId,
             userId,
-            async (objectKey, token) => await objects.InspectAsync(objectKey, token) is not null,
+            objects.ObjectExists,
             ct);
         if (selected is null)
             return null;
-        return (selected.Metadata, await objects.OpenReadAsync(selected.ObjectKey, ct));
+        var content = await objects.OpenRead(selected.ObjectKey, ct);
+        return content is null ? null : (selected.Metadata, content);
     }
 }

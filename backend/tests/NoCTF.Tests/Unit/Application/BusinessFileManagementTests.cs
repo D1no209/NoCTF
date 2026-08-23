@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using FluentStorage.Storage;
 using NSubstitute;
 using NoCTF.Application.Storage;
 
@@ -19,8 +19,7 @@ public sealed class BusinessFileManagementTests
         Guid registeredFileId = default;
         Guid attachedFileId = default;
         registry.RegisterAsync(
-                Arg.Do<Guid>(value => registeredFileId = value),
-                Arg.Any<StoredObject>(),
+                Arg.Do<ManagedFileUpload>(value => registeredFileId = value.FileId),
                 Now,
                 Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
@@ -63,8 +62,7 @@ public sealed class BusinessFileManagementTests
         var objects = ObjectStorageFor(content);
         Guid registeredFileId = default;
         registry.RegisterAsync(
-                Arg.Do<Guid>(value => registeredFileId = value),
-                Arg.Any<StoredObject>(),
+                Arg.Do<ManagedFileUpload>(value => registeredFileId = value.FileId),
                 Now,
                 Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
@@ -95,21 +93,16 @@ public sealed class BusinessFileManagementTests
         await registry.Received(1).AbandonAsync(registeredFileId, CancellationToken.None);
     }
 
-    private static IObjectStorage ObjectStorageFor(byte[] content)
+    private static IStore ObjectStorageFor(byte[] content)
     {
-        var objects = Substitute.For<IObjectStorage>();
-        objects.PutAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
+        var objects = Substitute.For<IStore>();
+        objects.SetObject(
                 Arg.Any<string>(),
                 Arg.Any<Stream>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
-            .Returns(call => new StoredObject(
-                call.ArgAt<string>(0),
-                call.ArgAt<string>(1),
-                call.ArgAt<string>(2),
-                content.LongLength,
-                Convert.ToHexString(SHA256.HashData(content))));
+            .Returns(Task.CompletedTask);
         return objects;
     }
 }
