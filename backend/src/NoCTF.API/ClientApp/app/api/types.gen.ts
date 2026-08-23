@@ -1288,6 +1288,27 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformContributorResponse =
     avatarUrl?: string;
 };
 
+export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse = {
+    status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
+    sourceAvailable?: boolean;
+    capturedAt?: string;
+    dashboardUrl?: string | null;
+    metrics?: Array<NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse>;
+};
+
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus = 0 | 1 | 2 | 3;
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringMetricResponse = {
+    kind?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind;
+    unit?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit;
+    value?: number | null;
+    status?: NoCtfApplicationAdministrationMonitoringPlatformMonitoringStatus;
+};
+
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringMetricKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+
+export type NoCtfApplicationAdministrationMonitoringPlatformMonitoringUnit = 0 | 1 | 2 | 3 | 4;
+
 export type NoCtfapiEndpointsAdministrationPlatformIssuePlatformBotTokenResponse = {
     accessToken?: string;
     expiresAt?: string;
@@ -5709,6 +5730,33 @@ export type AdminPlatformGetInformationResponses = {
 };
 
 export type AdminPlatformGetInformationResponse = AdminPlatformGetInformationResponses[keyof AdminPlatformGetInformationResponses];
+
+export type AdminPlatformGetMonitoringData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/monitoring';
+};
+
+export type AdminPlatformGetMonitoringErrors = {
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminPlatformGetMonitoringResponses = {
+    /**
+     * Success
+     */
+    200: NoCtfapiEndpointsAdministrationPlatformPlatformMonitoringResponse;
+};
+
+export type AdminPlatformGetMonitoringResponse = AdminPlatformGetMonitoringResponses[keyof AdminPlatformGetMonitoringResponses];
 
 export type AdminPlatformInvalidateUserTokensData = {
     body?: never;

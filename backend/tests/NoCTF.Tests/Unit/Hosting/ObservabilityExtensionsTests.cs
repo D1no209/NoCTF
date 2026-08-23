@@ -1,9 +1,29 @@
+using Microsoft.AspNetCore.Http;
 using NoCTF.Hosting.Observability;
 
 namespace NoCTF.Tests.Unit.Hosting;
 
 public sealed class ObservabilityExtensionsTests
 {
+    [Test]
+    [Arguments("/metrics", 9464, 9464, true)]
+    [Arguments("/metrics", 8080, 9464, false)]
+    [Arguments("/health/ready", 9464, 9464, false)]
+    [Arguments("/metrics/details", 9464, 9464, false)]
+    public async Task Metrics_scraping_is_restricted_to_the_private_listener(
+        string path,
+        int localPort,
+        int metricsPort,
+        bool expected)
+    {
+        var matches = ObservabilityExtensions.IsMetricsScrapeRequest(
+            new PathString(path),
+            localPort,
+            metricsPort);
+
+        await Assert.That(matches).IsEqualTo(expected);
+    }
+
     [Test]
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/flag-submissions", "flag")]
     [Arguments("POST", "/competitions/{competitionId}/challenges/{competitionChallengeId}/practice-flag", "flag")]

@@ -1,4 +1,9 @@
 services:
+  backend:
+    environment:
+      Observability__PrometheusBaseUrl: http://prometheus:9090
+      Observability__GrafanaPublicUrl: ${NOCTF_GRAFANA_PUBLIC_URL:-}
+
   prometheus:
     image: prom/prometheus:v3.14.0
     restart: unless-stopped
