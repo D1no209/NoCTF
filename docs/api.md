@@ -400,6 +400,7 @@ GET  /api/v1/admin/platform/configuration
 PUT  /api/v1/admin/platform/configuration
 POST /api/v1/admin/platform/configuration/logo
 GET  /api/v1/admin/platform/information
+GET  /api/v1/admin/platform/monitoring
 GET  /api/v1/admin/platform/logs
 GET  /api/v1/admin/platform/logs/export
 GET  /api/v1/admin/platform/audit-logs

@@ -10,15 +10,15 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - backend:8080
+          - backend:9464
         labels:
           role: api
       - targets:
-          - worker:8080
+          - worker:9464
         labels:
           role: worker
       - targets:
-          - runner:8080
+          - runner:9464
         labels:
           role: runner
 

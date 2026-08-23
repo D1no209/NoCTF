@@ -54,10 +54,22 @@ public static class ObservabilityExtensions
 
     public static WebApplication UseNoCtfObservability(this WebApplication app)
     {
+        var metricsPort = app.Configuration.GetValue("Observability:MetricsPort", 9464);
+        if (metricsPort is < 1 or > 65_535)
+            throw new InvalidOperationException(
+                "Observability:MetricsPort must be a valid TCP port.");
+
         app.Use(async (context, next) =>
         {
-            if (context.Request.Path.StartsWithSegments("/metrics")
-                || context.Request.Path.StartsWithSegments("/health"))
+            var metricsPath = context.Request.Path == "/metrics";
+            var metricsListener = context.Connection.LocalPort == metricsPort;
+            if (metricsPath != metricsListener)
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            if (metricsPath || context.Request.Path.StartsWithSegments("/health"))
             {
                 await next();
                 return;
@@ -95,9 +107,19 @@ public static class ObservabilityExtensions
                     NoCtfTelemetry.RecordRuntimeOperation(operation, outcome);
             }
         });
-        app.MapPrometheusScrapingEndpoint("/metrics");
+        app.UseOpenTelemetryPrometheusScrapingEndpoint(context =>
+            IsMetricsScrapeRequest(
+                context.Request.Path,
+                context.Connection.LocalPort,
+                metricsPort));
         return app;
     }
+
+    internal static bool IsMetricsScrapeRequest(
+        PathString path,
+        int localPort,
+        int metricsPort) =>
+        path == "/metrics" && localPort == metricsPort;
 
     internal static bool TryClassifyRuntimeOperation(
         string method,

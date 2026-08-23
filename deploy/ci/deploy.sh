@@ -46,12 +46,29 @@ trap cleanup_upload EXIT
     exit 2
 }
 
+observability_env="$config_root/deploy/observability.env"
+if [[ ! -f "$observability_env" ]]; then
+    install -d -m 0755 "$(dirname "$observability_env")"
+    umask 077
+    grafana_password=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
+    [[ ${#grafana_password} -eq 64 ]]
+    printf 'GRAFANA_ADMIN_PASSWORD=%s\n' "$grafana_password" > "$observability_env"
+fi
+chmod 0600 "$observability_env"
+grep -Eq '^GRAFANA_ADMIN_PASSWORD=.{16,}$' "$observability_env" || {
+    echo "Grafana deployment credential is missing or too short." >&2
+    exit 2
+}
+
 if [[ ! -d "$release_dir" ]]; then
     [[ "$release_tmp" == "$release_root/$commit_sha.tmp" ]]
     rm -rf -- "$release_tmp"
     mkdir -p "$release_tmp"
     tar -xzf "$archive_path" -C "$release_tmp"
     [[ -f "$release_tmp/deploy/docker-compose.yml" ]]
+    [[ -f "$release_tmp/deploy/docker-compose.observability.yml" ]]
+    [[ -f "$release_tmp/deploy/observability/prometheus/prometheus.yml" ]]
+    [[ -f "$release_tmp/deploy/observability/grafana/provisioning/dashboards/dashboards.yml" ]]
     [[ -f "$release_tmp/backend/Dockerfile" ]]
     install -d -m 0755 "$release_tmp/backend/docker-assets"
     install -m 0644 \
@@ -70,7 +87,9 @@ compose=(
     docker compose
     --project-name deploy
     --env-file "$config_root/.env"
+    --env-file "$observability_env"
     --file "$release_dir/deploy/docker-compose.yml"
+    --file "$release_dir/deploy/docker-compose.observability.yml"
     --file "$config_root/deploy/docker-compose.prod.yml"
 )
 "${compose[@]}" config --quiet
@@ -243,6 +262,17 @@ fi
 
 if ! curl --fail --silent --show-error \
     http://127.0.0.1:8080/health/ready >/dev/null; then
+    rollback_services
+    exit 1
+fi
+
+if ! "${compose[@]}" up \
+    --detach \
+    --no-deps \
+    --force-recreate \
+    --wait \
+    --wait-timeout 180 \
+    prometheus grafana postgres-exporter redis-exporter node-exporter; then
     rollback_services
     exit 1
 fi

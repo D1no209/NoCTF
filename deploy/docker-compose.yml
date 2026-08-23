@@ -61,7 +61,8 @@ services:
     labels:
       noctf.io/internal-role: scoring-callback-gateway
     environment:
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:8080;http://+:9464
+      Observability__MetricsPort: 9464
       ConnectionStrings__PostgreSql: >-
         Host=postgres;Port=5432;Database=${POSTGRES_DB:-noctf};Username=${POSTGRES_USER:-noctf};Password=${POSTGRES_PASSWORD}
       ConnectionStrings__Redis: redis:6379
@@ -104,6 +105,8 @@ services:
         condition: service_completed_successfully
     ports:
       - "127.0.0.1:${NOCTF_BACKEND_PORT:-8080}:8080"
+    expose:
+      - "9464"
     healthcheck:
       test:
         - CMD
@@ -165,7 +168,8 @@ services:
         ALL_PROXY: ${ALL_PROXY:-}
     restart: unless-stopped
     environment:
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:8080;http://+:9464
+      Observability__MetricsPort: 9464
       Worker__Queues__0: ${WORKER_QUEUE_0:-control}
       Worker__Queues__1: ${WORKER_QUEUE_1:-gameplay}
       Worker__Queues__2: ${WORKER_QUEUE_2:-projection}
@@ -197,6 +201,7 @@ services:
       - /tmp:size=128m,mode=1777
     expose:
       - "8080"
+      - "9464"
     healthcheck:
       test:
         - CMD
@@ -226,7 +231,8 @@ services:
         ALL_PROXY: ${ALL_PROXY:-}
     restart: unless-stopped
     environment:
-      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_URLS: http://+:8080;http://+:9464
+      Observability__MetricsPort: 9464
       Runner__Provider: ${RUNNER_PROVIDER:-Docker}
       Runner__Pool: ${RUNNER_POOL:-default}
       Runner__Id: ${RUNNER_ID:-docker-runner-1}
@@ -260,6 +266,7 @@ services:
       - /tmp:size=256m,mode=1777
     expose:
       - "8080"
+      - "9464"
     healthcheck:
       test:
         - CMD

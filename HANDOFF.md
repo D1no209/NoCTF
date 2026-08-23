@@ -1,5 +1,28 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-23 Alpha.79 私有指标与平台监控入口
+
+- 平台管理的“运维”分组新增“监控”页面，只展示 API、实时连接、关键 Wolverine 队列、
+  Runtime 等待、排行榜投影、Runner 容量、PostgreSQL、Redis 和磁盘空间的固定低基数摘要；
+  页面通过新生成的 `AdminPlatformGetMonitoring` SDK 调用管理员专用强类型接口，每 15 秒仅在
+  页面可见时刷新。前端没有 PromQL 输入、原始指标代理或写死的 Prometheus/Grafana 地址。
+- API、Worker 与 Runner 的 OpenTelemetry Prometheus 抓取端点迁移到容器内专用 `9464`
+  监听器。业务监听器请求 `/metrics` 返回 404，专用监听器除精确 `/metrics` 外同样返回 404；
+  Compose 只在内部网络 `expose` 该端口，不发布到宿主机。Prometheus 与 Grafana 管理端口仅绑定
+  服务器 `127.0.0.1`，完整 Dashboard 通过 SSH 隧道或另行配置的受保护入口访问。
+- 后端只执行预定义 PromQL 并返回枚举化指标、单位和健康状态；具体 ID 不进入标签。Prometheus
+  不可用时接口返回可用的降级快照而非暴露内部异常，页面保留上一份快照并显示本地化错误。
+  HTTP 契约已导出 OpenAPI 并重新生成 TypeScript SDK，路由文档与 OpenAPI 守卫同步更新。
+- CI 的 Compose 门禁新增观测编排验证。生产部署脚本由 CI 使用既有精确提交发布流程启用
+  Prometheus、Grafana 与 exporters；Grafana 初始密码只在服务器本地以 `0600` 文件生成，
+  不进入仓库或发布包。Prometheus 默认保留 7 天且最多 2GB，以适应有限服务器磁盘。
+- 平台版本由 `0.1.0-alpha.78` 递增为 `0.1.0-alpha.79`。没有新增数据表、EF migration 或
+  model snapshot。本阶段未推送、未部署。
+- 验证：Release solution build 0 warning/0 error；完整后端 TUnit 1103 项中 1101 通过、0 失败，
+  2 项仅因未启用真实 Kubernetes 集群与未配置 Libvirt 磁盘按设计跳过；前端完整测试、typecheck
+  与 production build 通过；C# analyzer、EF model drift、OpenAPI/SDK 双次生成幂等、主/single/
+  observability Compose、部署脚本语法及 `git diff --check` 均通过。
+
 ## 2026-08-23 alpha.78 可观测性审计修复
 
 - 修复 CI 与生产自动部署共同使用的 `deploy/docker-compose.yml` 中 Worker `environment` 缩进错误；主 Compose、single Compose 及 observability overlay 均已通过解析。生产部署仍由 CI 唯一负责，本节没有建立第二套手工部署流程。
@@ -2659,4 +2682,3 @@ dotnet run --project backend/src/NoCTF.API/NoCTF.API.csproj --no-build -- --expo
 
 - `.webbridge-tmp/`、`PLAN.md`、`backend/src/NoCTF.API/storage/` 是本地/用户内容，不应加入提交。
 - 不恢复旧 migration、旧表或兼容层；migration 与 snapshot 只能通过 EF CLI 修改。
-

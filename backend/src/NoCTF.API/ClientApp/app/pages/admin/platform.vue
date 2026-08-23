@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, History, Inbox, Info, MailCheck, ScrollText, Users } from '@lucide/vue'
+import { Activity, Bot, History, Inbox, Info, MailCheck, ScrollText, Users } from '@lucide/vue'
 import type { WorkspaceNavGroup } from '~/components/app/workspace-nav'
 
 definePageMeta({ middleware: 'platform-admin' })
@@ -17,6 +17,7 @@ const navGroups = computed<WorkspaceNavGroup[]>(() => [
   {
     label: translate("运维"),
     items: [
+      { to: '/admin/platform/monitoring', label: translate("监控"), icon: Activity },
       { to: '/admin/platform/logs', label: translate("日志"), icon: ScrollText },
       { to: '/admin/platform/audit', label: translate("审计"), icon: History },
       { to: '/admin/platform/dead-letters', label: translate("死信队列"), icon: Inbox },

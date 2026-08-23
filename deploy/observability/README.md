@@ -1,6 +1,6 @@
 # NoCTF 可观测性
 
-该编排在现有 API、Worker、Runner 的 `/metrics` 端点上采集 OpenTelemetry 指标，并补充 PostgreSQL、Redis 与主机指标。平台日志仍使用现有 Redis 日志能力；如设置 `OTEL_EXPORTER_OTLP_ENDPOINT`，Trace 会同时发送到外部 OTLP Collector。
+该编排从 API、Worker、Runner 的容器内专用 `9464` 监听器采集 OpenTelemetry 指标，并补充 PostgreSQL、Redis 与主机指标。公开业务监听器不会响应 `/metrics`，专用监听器也不会响应指标之外的业务路由。平台日志仍使用现有 Redis 日志能力；如设置 `OTEL_EXPORTER_OTLP_ENDPOINT`，Trace 会同时发送到外部 OTLP Collector。
 
 启动：
 
@@ -8,7 +8,7 @@
 docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.observability.yml up -d
 ```
 
-必须设置 `GRAFANA_ADMIN_PASSWORD`。Prometheus 和 Grafana 默认只绑定 `127.0.0.1`，建议通过 SSH 隧道访问，不要直接暴露到公网。
+手工启动时必须设置 `GRAFANA_ADMIN_PASSWORD`。CI 首次部署会在服务器本地生成独立凭据文件，既不写入仓库，也不会出现在构建产物中。Prometheus 和 Grafana 默认只绑定 `127.0.0.1`；平台管理的“监控”页仅展示后端筛选后的固定摘要，不代理 PromQL 或原始指标。完整 Grafana 仅通过 SSH 隧道或单独配置的受保护入口访问，不要直接暴露到公网。
 
 生产部署仍由 CI 调用 `deploy/docker-compose.yml` 和
 `deploy/docker-compose.observability.yml` 完成；本节命令仅用于本地编排验证或运维排障，
