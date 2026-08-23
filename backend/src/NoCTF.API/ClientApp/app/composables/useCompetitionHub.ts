@@ -1,4 +1,10 @@
 import * as signalR from '@microsoft/signalr'
+import type {
+  NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol,
+  NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol,
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse,
+} from '~/api'
 import { getAccessToken, getRealtimeAccessToken } from '~/lib/session'
 import { startRealtimeWithRetry } from '~/lib/realtime-retry'
 
@@ -9,12 +15,44 @@ import { startRealtimeWithRetry } from '~/lib/realtime-retry'
  * 连接为模块级单例:所有 watchCompetition 订阅复用同一条连接,
  * 最后一个订阅者离开时断连。未登录(无 access token)时不连接。
  */
-export interface CompetitionHubHandlers {
-  scoreboardUpdated?: (payload: unknown) => void
-  competitionLifecycleChanged?: (payload: unknown) => void
-  competitionEventChanged?: (payload: unknown) => void
-  /** 定向投递给提交者本人,载荷为该提交的状态视图。 */
-  gameplayFactStateChanged?: (payload: unknown) => void
+export interface ScoreboardUpdatedNotification {
+  competitionId: string
+  version: string
+  schemaRevision: string
+  challengeCatalogRevision: string
+}
+
+export interface CompetitionLifecycleChangedNotification {
+  competitionId: string
+  from: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
+  to: NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol
+  occurredAt: string
+}
+
+export interface CompetitionEventChangedNotification {
+  competitionId: string
+  eventId: string
+  kind: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol
+  level: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol
+  occurredAt: string
+}
+
+export type GameplayFactStateChangedNotification = Required<
+  NoCtfapiEndpointsGameplayFactsGameplayFactStatusResponse
+>
+
+export interface CompetitionHubClientEvents {
+  scoreboardUpdated: ScoreboardUpdatedNotification
+  competitionLifecycleChanged: CompetitionLifecycleChangedNotification
+  competitionEventChanged: CompetitionEventChangedNotification
+  gameplayFactStateChanged: GameplayFactStateChangedNotification
+}
+
+export type CompetitionHubHandlers = {
+  [TEvent in keyof CompetitionHubClientEvents]?: (
+    payload: CompetitionHubClientEvents[TEvent]
+  ) => void
+} & {
   /** 连接(重)建立并完成 Join 后触发,用于全量刷新。 */
   onReconnected?: () => void
 }
@@ -50,10 +88,16 @@ export function competitionHubString(payload: unknown, key: string): string | nu
   return typeof value === 'string' ? value : null
 }
 
-function dispatch(event: keyof CompetitionHubHandlers, payload: unknown, direct = false): void {
+function dispatch<TEvent extends keyof CompetitionHubClientEvents>(
+  event: TEvent,
+  payload: CompetitionHubClientEvents[TEvent],
+  direct = false,
+): void {
   const competitionId = normalizeGuid(competitionHubString(payload, 'competitionId'))
   for (const subscriber of subscribers.values()) {
-    const handler = subscriber.handlers[event]
+    const handler = subscriber.handlers[event] as
+      | ((notification: CompetitionHubClientEvents[TEvent]) => void)
+      | undefined
     if (!handler) continue
     if (!direct && competitionId && normalizeGuid(subscriber.competitionId) !== competitionId) continue
     handler(payload)
@@ -76,9 +120,13 @@ function ensureConnection(): signalR.HubConnection {
     .build()
 
   for (const event of GROUP_EVENTS) {
-    hub.on(event, (payload: unknown) => dispatch(event, payload))
+    hub.on(event, (payload: CompetitionHubClientEvents[typeof event]) => dispatch(event, payload))
   }
-  hub.on('gameplayFactStateChanged', (payload: unknown) => dispatch('gameplayFactStateChanged', payload, true))
+  hub.on(
+    'gameplayFactStateChanged',
+    (payload: GameplayFactStateChangedNotification) =>
+      dispatch('gameplayFactStateChanged', payload, true),
+  )
 
   hub.onreconnected(() => {
     if (connection === hub) void rejoinAll()

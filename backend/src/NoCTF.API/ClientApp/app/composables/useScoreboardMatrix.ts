@@ -8,6 +8,7 @@ import type {
   NoCtfapiEndpointsCompetitionsScoreboardSchemaResponse,
   NoCtfapiEndpointsCompetitionsScoreboardSnapshotResponse,
 } from '~/api'
+import type { ScoreboardUpdatedNotification } from '~/composables/useCompetitionHub'
 import { createTrailingRefresh } from '~/lib/latest-page-refresh'
 import {
   isScoreboardVersionAtLeast,
@@ -36,7 +37,7 @@ function stringField(payload: unknown, key: string): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
 }
 
-function scoreboardUpdatedPayload(payload: unknown): ScoreboardUpdatedPayload {
+function scoreboardUpdatedPayload(payload: ScoreboardUpdatedNotification): ScoreboardUpdatedPayload {
   return {
     competitionId: competitionHubString(payload, 'competitionId'),
     version: stringField(payload, 'version'),

@@ -4,12 +4,13 @@ using NoCTF.API.SignalR.Hubs;
 using NoCTF.Application.Competitions.Events;
 using NoCTF.Infrastructure.Competitions.Events;
 using StackExchange.Redis;
+using NoCTF.API.Endpoints.Competitions.Events;
 
 namespace NoCTF.API.SignalR.Publishing;
 
 public sealed class RedisCompetitionEventRefreshRelay(
     IConnectionMultiplexer redis,
-    IHubContext<CompetitionHub> hub,
+    IHubContext<CompetitionHub, ICompetitionHubClient> hub,
     ILogger<RedisCompetitionEventRefreshRelay> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -26,9 +27,13 @@ public sealed class RedisCompetitionEventRefreshRelay(
                     return;
                 await hub.Clients
                     .Group($"competition:{notification.CompetitionId:N}")
-                    .SendAsync(
-                        "competitionEventChanged",
-                        notification,
+                    .CompetitionEventChanged(
+                        new CompetitionEventChangedNotification(
+                            notification.CompetitionId,
+                            notification.EventId,
+                            CompetitionEventProtocolMapper.ToProtocol(notification.Kind),
+                            CompetitionEventProtocolMapper.ToProtocol(notification.Level),
+                            notification.OccurredAt),
                         stoppingToken);
             }
             catch (JsonException exception)

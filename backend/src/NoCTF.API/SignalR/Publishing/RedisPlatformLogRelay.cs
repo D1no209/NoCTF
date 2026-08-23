@@ -10,7 +10,7 @@ namespace NoCTF.API.SignalR.Publishing;
 
 public sealed class RedisPlatformLogRelay(
     IConnectionMultiplexer redis,
-    IHubContext<PlatformLogHub> hub,
+    IHubContext<PlatformLogHub, IPlatformLogHubClient> hub,
     ILogger<RedisPlatformLogRelay> logger) : BackgroundService
 {
     private static readonly JsonSerializerOptions JsonOptions =
@@ -29,8 +29,7 @@ public sealed class RedisPlatformLogRelay(
                     JsonOptions);
                 if (view is null)
                     return;
-                await hub.Clients.Group(PlatformLogHub.AdministratorsGroup).SendAsync(
-                    "platformLogReceived",
+                await hub.Clients.Group(PlatformLogHub.AdministratorsGroup).PlatformLogReceived(
                     PlatformLogMapping.ToResponse(view),
                     stoppingToken);
             }

@@ -4,12 +4,13 @@ using NoCTF.Application.Notifications;
 using NoCTF.Infrastructure.Notifications;
 using StackExchange.Redis;
 using NoCTF.API.SignalR.Hubs;
+using NoCTF.API.Endpoints.GameplayFacts;
 
 namespace NoCTF.API.SignalR.Publishing;
 
 public sealed class RedisGameplayFactStateRelay(
     IConnectionMultiplexer redis,
-    IHubContext<CompetitionHub> hub,
+    IHubContext<CompetitionHub, ICompetitionHubClient> hub,
     ILogger<RedisGameplayFactStateRelay> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -23,9 +24,8 @@ public sealed class RedisGameplayFactStateRelay(
                 {
                     var notification = JsonSerializer.Deserialize<GameplayFactStateChangedNotification>(value.ToString());
                     if (notification is null) return;
-                    _ = hub.Clients.User(notification.UserId.ToString()).SendAsync(
-                        "gameplayFactStateChanged",
-                        notification.Result,
+                    _ = hub.Clients.User(notification.UserId.ToString()).GameplayFactStateChanged(
+                        GameplayFactMapper.ToStatusResponse(notification.Result),
                         stoppingToken);
                 }
                 catch (JsonException exception)

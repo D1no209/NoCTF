@@ -5,7 +5,7 @@ using NoCTF.Application.Observability;
 namespace NoCTF.API.SignalR.Hubs;
 
 [Authorize(Roles = "Administrator")]
-public sealed class PlatformLogHub : Hub
+public sealed class PlatformLogHub : Hub<IPlatformLogHubClient>
 {
     internal const string AdministratorsGroup = "platform-log-administrators";
 
