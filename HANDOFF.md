@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-23 alpha.78 可观测性审计修复
+
+- 修复 CI 与生产自动部署共同使用的 `deploy/docker-compose.yml` 中 Worker `environment` 缩进错误；主 Compose、single Compose 及 observability overlay 均已通过解析。生产部署仍由 CI 唯一负责，本节没有建立第二套手工部署流程。
+- 删除从未被调用、会永久显示为零的自定义 Wolverine 消息/Handler 指标，改为订阅 Wolverine 官方 `Wolverine:{ApplicationName}` Meter 的原生吞吐、成功、失败、死信和执行耗时指标；补订阅 Npgsql Meter。API 的 Flag/Fix/Runtime 操作埋点只匹配真实 POST 变更端点，不再把读取接口、题库 Flag 管理或受保护 Flag 查看误计为玩法吞吐。
+- Runner 心跳、候选池读取、容量 Claim 与释放全部纳入 Redis 延迟/失败指标。心跳 Lua 原子返回剩余 CPU、内存和 PID，Runner 容量快照改为按同一资源池的所有在线 Runner 汇总，不再被最后一条心跳覆盖；Grafana 和告警使用 available/total 即时计算容量比例，并用 Prometheus target `up` 独立检测 Runner 不可达。
+- 运维快照不再每 15 秒把全部脏比赛与等待 Runtime 时间戳载入内存，改为 PostgreSQL 端聚合 count/min。Grafana 总览补齐 Wolverine、Npgsql、Runner 容量与队列面板；告警不再引用不存在的 ratio 指标。标签继续只使用 endpoint、outcome、queue、pool、mode、resource 等有界值，没有加入比赛、队伍、Runtime 或 Runner ID。
+- 版本从 `0.1.0-alpha.77` 递增至 `0.1.0-alpha.78`。没有新增业务表、字段、EF migration、OpenAPI 或 TypeScript SDK 变化；未推送、未部署、未操作生产数据。
+- 验证：Release solution build 0 warning/0 error；完整后端 TUnit 1096 项中 1094 通过、0 失败，2 项仅因未启用真实 Kubernetes 集群与未配置 Libvirt 磁盘按设计跳过，真实 PostgreSQL/Redis/Wolverine/Docker 集成均已执行；新增 API 操作分类测试 11/11、Runner 多实例容量聚合测试 1/1；C# analyzer、EF model drift、主/single/observability Compose、Grafana JSON、Prometheus 配置与 10 条告警、`git diff --check` 均通过。
+
 ## 2026-08-23 alpha.77 可观测性、Worker 隔离队列与高并发调度优化
 
 - 建立 OpenTelemetry/Prometheus/Grafana 可观测性基线。API、Worker、Runner 与统一 Host 暴露 Prometheus 指标并保留现有 Redis 平台日志；指标覆盖 API 请求与限流、Flag/Fix/Runtime 操作、SignalR、Wolverine 队列与 Handler、PostgreSQL/Redis、Runner 容量与 Claim、排行榜脏标记/投影/发布。Prometheus 标签仅使用 endpoint、queue、outcome、pool、mode 等有界维度，具体比赛、队伍与 Runtime 标识只进入日志或 Trace。新增可选 observability Compose、Prometheus 抓取与首批告警、Grafana provisioning/dashboard 及部署说明。

@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using NoCTF.Application.Observability;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using StackExchange.Redis;
@@ -49,7 +51,7 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
             if redis.call('EXISTS', KEYS[2]) == 1 then
                 redis.call('PEXPIRE', KEYS[2], ARGV[6])
             end
-            return 2
+            return { 2, 0, 0, 0 }
         end
 
         local trusted = redis.call('HGET', KEYS[2], 'registrationSchema') == ARGV[2]
@@ -61,7 +63,7 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
             local wasOnline = redis.call('EXISTS', KEYS[3])
             redis.call('DEL', KEYS[3])
             redis.call('ZREM', KEYS[4], ARGV[1])
-            if ARGV[8] == '1' or wasOnline == 1 then return 0 end
+            if ARGV[8] == '1' or wasOnline == 1 then return { 0, 0, 0, 0 } end
             redis.call('HSET', KEYS[2],
                 'registrationSchema', ARGV[2],
                 'availableMemoryBytes', ARGV[3],
@@ -75,7 +77,12 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         redis.call('PEXPIRE', KEYS[2], ARGV[6])
         redis.call('SET', KEYS[3], ARGV[7], 'PX', ARGV[6])
         redis.call('ZADD', KEYS[4], pressure(KEYS[2], tonumber(ARGV[10])), ARGV[1])
-        return 1
+        return {
+            1,
+            redis.call('HGET', KEYS[2], 'availableMemoryBytes'),
+            redis.call('HGET', KEYS[2], 'availableNanoCpus'),
+            redis.call('HGET', KEYS[2], 'availablePids')
+        }
         """;
 
     public async Task<RunnerAvailabilityRegistrationOutcome> RegisterAsync(
@@ -91,33 +98,82 @@ public sealed class RedisRunnerAvailabilityRegistry(IConnectionMultiplexer redis
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(registration.TimeToLive, TimeSpan.Zero);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var heartbeat = $"provider={registration.Provider};version={registration.Version}";
-        var result = (long)await redis.GetDatabase().ScriptEvaluateAsync(
-            RegisterScript,
-            [
-                new RedisKey($"runner-pool:{registration.RunnerPool}:members"),
-                new RedisKey($"runner:{registration.RunnerId}:capacity"),
-                new RedisKey($"runner:{registration.RunnerId}:heartbeat"),
-                new RedisKey($"runner-pool:{registration.RunnerPool}:candidates")
-            ],
-            [
-                registration.RunnerId,
-                RegistrationSchema,
-                registration.Capacity.MemoryBytes,
-                registration.Capacity.NanoCpus,
-                registration.Capacity.PidsLimit,
-                checked((long)registration.TimeToLive.TotalMilliseconds),
-                heartbeat,
-                registration.HasActiveAssignments ? 1 : 0,
-                registration.ProviderAvailable ? 1 : 0,
-                Random.Shared.NextDouble() * CandidateJitterMaximum
-            ]);
-
-        return result switch
+        var startedAt = Stopwatch.GetTimestamp();
+        var outcome = "success";
+        try
         {
-            1 => RunnerAvailabilityRegistrationOutcome.Online,
-            2 => RunnerAvailabilityRegistrationOutcome.OfflineProviderUnavailable,
-            _ => RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
-        };
+            var database = redis.GetDatabase();
+            var capacityKey = new RedisKey($"runner:{registration.RunnerId}:capacity");
+            var heartbeat = $"provider={registration.Provider};version={registration.Version}";
+            var result = (RedisResult[]?)await database.ScriptEvaluateAsync(
+                RegisterScript,
+                [
+                    new RedisKey($"runner-pool:{registration.RunnerPool}:members"),
+                    capacityKey,
+                    new RedisKey($"runner:{registration.RunnerId}:heartbeat"),
+                    new RedisKey($"runner-pool:{registration.RunnerPool}:candidates")
+                ],
+                [
+                    registration.RunnerId,
+                    RegistrationSchema,
+                    registration.Capacity.MemoryBytes,
+                    registration.Capacity.NanoCpus,
+                    registration.Capacity.PidsLimit,
+                    checked((long)registration.TimeToLive.TotalMilliseconds),
+                    heartbeat,
+                    registration.HasActiveAssignments ? 1 : 0,
+                    registration.ProviderAvailable ? 1 : 0,
+                    Random.Shared.NextDouble() * CandidateJitterMaximum
+                ]);
+
+            if (result is not { Length: 4 })
+                throw new InvalidOperationException("Redis returned an invalid runner registration result.");
+
+            var registrationOutcome = (long)result[0] switch
+            {
+                1 => RunnerAvailabilityRegistrationOutcome.Online,
+                2 => RunnerAvailabilityRegistrationOutcome.OfflineProviderUnavailable,
+                _ => RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted
+            };
+            var online = registrationOutcome == RunnerAvailabilityRegistrationOutcome.Online;
+            NoCtfTelemetry.UpdateRunnerCapacitySnapshot(
+                registration.RunnerPool,
+                registration.RunnerId,
+                online,
+                ReadCapacity(result, 1),
+                registration.Capacity.MemoryBytes,
+                ReadCapacity(result, 2),
+                registration.Capacity.NanoCpus,
+                ReadCapacity(result, 3),
+                registration.Capacity.PidsLimit);
+            return registrationOutcome;
+        }
+        catch
+        {
+            outcome = "failure";
+            NoCtfTelemetry.UpdateRunnerCapacitySnapshot(
+                registration.RunnerPool,
+                registration.RunnerId,
+                false,
+                0,
+                registration.Capacity.MemoryBytes,
+                0,
+                registration.Capacity.NanoCpus,
+                0,
+                registration.Capacity.PidsLimit);
+            throw;
+        }
+        finally
+        {
+            NoCtfTelemetry.RecordRedisOperation(
+                "runner_heartbeat",
+                outcome,
+                Stopwatch.GetElapsedTime(startedAt).TotalSeconds);
+        }
     }
+
+    private static long ReadCapacity(IReadOnlyList<RedisResult> values, int index) =>
+        values.Count > index && long.TryParse(values[index].ToString(), out var value)
+            ? Math.Max(0, value)
+            : 0;
 }

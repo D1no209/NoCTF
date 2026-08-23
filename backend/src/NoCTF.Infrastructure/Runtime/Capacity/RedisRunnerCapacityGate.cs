@@ -185,6 +185,7 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         ArgumentException.ThrowIfNullOrWhiteSpace(runnerPool);
         ArgumentException.ThrowIfNullOrWhiteSpace(runnerId);
         cancellationToken.ThrowIfCancellationRequested();
+        var startedAt = Stopwatch.GetTimestamp();
         try
         {
             var database = redis.GetDatabase();
@@ -195,10 +196,13 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                     new RedisKey($"runner:{runnerId}:heartbeat")
                 ],
                 [runnerId]);
-            return live == 1 ? RunnerHeartbeatStatus.Online : RunnerHeartbeatStatus.Offline;
+            var result = live == 1 ? RunnerHeartbeatStatus.Online : RunnerHeartbeatStatus.Offline;
+            RecordRedisOperation("runner_heartbeat_check", "success", startedAt);
+            return result;
         }
         catch (RedisException)
         {
+            RecordRedisOperation("runner_heartbeat_check", "failure", startedAt);
             return RunnerHeartbeatStatus.Unavailable;
         }
     }
@@ -209,20 +213,24 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(runnerPool);
         cancellationToken.ThrowIfCancellationRequested();
+        var startedAt = Stopwatch.GetTimestamp();
         try
         {
             var members = await redis.GetDatabase()
                 .SetMembersAsync($"runner-pool:{runnerPool}:members");
-            return new(
+            var result = new RunnerPoolInventory(
                 RunnerPoolInventoryAvailability.Available,
                 members.Select(member => member.ToString())
                     .Where(member => !string.IsNullOrWhiteSpace(member))
                     .Distinct(StringComparer.Ordinal)
                     .Order(StringComparer.Ordinal)
                     .ToArray());
+            RecordRedisOperation("runner_inventory", "success", startedAt);
+            return result;
         }
         catch (RedisException)
         {
+            RecordRedisOperation("runner_inventory", "failure", startedAt);
             return new(
                 RunnerPoolInventoryAvailability.Unavailable,
                 []);
@@ -322,27 +330,38 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var startedAt = Stopwatch.GetTimestamp();
         var database = redis.GetDatabase();
-        var claimKey = new RedisKey($"runner-claim:{runtimeInstanceId:N}");
-        var pool = (string?)await database.HashGetAsync(claimKey, "pool");
-        var poolKey = string.IsNullOrWhiteSpace(pool) ? "__legacy__" : pool;
-        var released = (long)await database.ScriptEvaluateAsync(
-            ReleaseScript,
-            [
-                new RedisKey($"runner:{runnerId}:capacity"),
-                claimKey,
-                new RedisKey($"runner:{runnerId}:heartbeat"),
-                new RedisKey($"runner-pool:{poolKey}:members"),
-                new RedisKey($"runner-pool:{poolKey}:candidates")
-            ],
-            [runnerId, NextJitter()]);
-        return released switch
+        try
         {
-            1 => RunnerCapacityReleaseOutcome.Released,
-            0 => RunnerCapacityReleaseOutcome.AlreadyReleased,
-            -1 => RunnerCapacityReleaseOutcome.OwnerMismatch,
-            _ => throw new InvalidOperationException("Redis returned an unknown capacity release result.")
-        };
+            var claimKey = new RedisKey($"runner-claim:{runtimeInstanceId:N}");
+            var pool = (string?)await database.HashGetAsync(claimKey, "pool");
+            var poolKey = string.IsNullOrWhiteSpace(pool) ? "__legacy__" : pool;
+            var released = (long)await database.ScriptEvaluateAsync(
+                ReleaseScript,
+                [
+                    new RedisKey($"runner:{runnerId}:capacity"),
+                    claimKey,
+                    new RedisKey($"runner:{runnerId}:heartbeat"),
+                    new RedisKey($"runner-pool:{poolKey}:members"),
+                    new RedisKey($"runner-pool:{poolKey}:candidates")
+                ],
+                [runnerId, NextJitter()]);
+            var result = released switch
+            {
+                1 => RunnerCapacityReleaseOutcome.Released,
+                0 => RunnerCapacityReleaseOutcome.AlreadyReleased,
+                -1 => RunnerCapacityReleaseOutcome.OwnerMismatch,
+                _ => throw new InvalidOperationException("Redis returned an unknown capacity release result.")
+            };
+            RecordRedisOperation("runner_release", "success", startedAt);
+            return result;
+        }
+        catch (RedisException)
+        {
+            RecordRedisOperation("runner_release", "failure", startedAt);
+            throw;
+        }
     }
 
     private static async Task<RunnerCapacityClaim> TryClaimCandidateAsync(
@@ -425,7 +444,9 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
         string pool,
         RunnerCapacityAvailability availability,
         int attempts,
-        long startedAt) =>
+        long startedAt)
+    {
+        var elapsedSeconds = Stopwatch.GetElapsedTime(startedAt).TotalSeconds;
         NoCtfTelemetry.RecordRunnerClaim(
             pool,
             availability switch
@@ -436,5 +457,16 @@ public sealed class RedisRunnerCapacityGate(IConnectionMultiplexer redis) : IRun
                 _ => "unknown"
             },
             attempts,
+            elapsedSeconds);
+        NoCtfTelemetry.RecordRedisOperation(
+            "runner_claim",
+            availability == RunnerCapacityAvailability.Unavailable ? "failure" : "success",
+            elapsedSeconds);
+    }
+
+    private static void RecordRedisOperation(string endpoint, string outcome, long startedAt) =>
+        NoCtfTelemetry.RecordRedisOperation(
+            endpoint,
+            outcome,
             Stopwatch.GetElapsedTime(startedAt).TotalSeconds);
 }

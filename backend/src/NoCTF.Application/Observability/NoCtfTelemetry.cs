@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using NoCTF.Application.Messaging;
@@ -42,19 +43,14 @@ public static class NoCtfTelemetry
         "noctf.leaderboard.projection.teams", unit: "{team}");
     private static readonly Counter<long> LeaderboardPublishFailures = Meter.CreateCounter<long>(
         "noctf.leaderboard.publish.failures", unit: "{failure}");
-    private static readonly Counter<long> WorkerMessages = Meter.CreateCounter<long>(
-        "noctf.worker.messages", unit: "{message}");
-    private static readonly Histogram<double> WorkerHandlerDuration = Meter.CreateHistogram<double>(
-        "noctf.worker.handler.duration", unit: "s");
-    private static readonly Histogram<double> WorkerQueueWait = Meter.CreateHistogram<double>(
-        "noctf.worker.queue.wait", unit: "s");
-
     private static long _dirtyCompetitionCount;
     private static long _oldestDirtyAgeSeconds;
     private static long _waitingRuntimeCount;
     private static long _oldestWaitingRuntimeAgeSeconds;
     private static readonly long[] WorkerQueueDepths = new long[WorkerQueueNames.All.Count];
     private static readonly long[] WorkerQueueOldestAgeSeconds = new long[WorkerQueueNames.All.Count];
+    private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
+        new(StringComparer.Ordinal);
 
     static NoCtfTelemetry()
     {
@@ -82,6 +78,16 @@ public static class NoCtfTelemetry
             "noctf.worker.queue.oldest_age",
             ObserveWorkerQueueOldestAge,
             unit: "s");
+        Meter.CreateObservableGauge(
+            "noctf.runner.online",
+            ObserveRunnerOnline,
+            unit: "{runner}");
+        Meter.CreateObservableGauge(
+            "noctf.runner.capacity.available",
+            ObserveRunnerCapacityAvailable);
+        Meter.CreateObservableGauge(
+            "noctf.runner.capacity.total",
+            ObserveRunnerCapacityTotal);
     }
 
     public static void RecordApiRequest(string endpoint, string outcome, double elapsedSeconds)
@@ -141,18 +147,6 @@ public static class NoCtfTelemetry
     public static void RecordLeaderboardPublishFailure(string endpoint) =>
         LeaderboardPublishFailures.Add(1, new TagList { { "endpoint", endpoint } });
 
-    public static void RecordWorkerMessage(
-        string queue,
-        string outcome,
-        double handlerSeconds,
-        double waitSeconds)
-    {
-        var tags = new TagList { { "queue", queue }, { "outcome", outcome } };
-        WorkerMessages.Add(1, tags);
-        WorkerHandlerDuration.Record(handlerSeconds, tags);
-        WorkerQueueWait.Record(Math.Max(0, waitSeconds), tags);
-    }
-
     public static void UpdateOperationalSnapshot(
         long dirtyCompetitionCount,
         TimeSpan oldestDirtyAge,
@@ -181,6 +175,30 @@ public static class NoCtfTelemetry
             Math.Max(0, (long)oldestAge.TotalSeconds));
     }
 
+    public static void UpdateRunnerCapacitySnapshot(
+        string pool,
+        string runnerId,
+        bool online,
+        long availableMemoryBytes,
+        long totalMemoryBytes,
+        long availableNanoCpus,
+        long totalNanoCpus,
+        long availablePids,
+        long totalPids)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pool);
+        ArgumentException.ThrowIfNullOrWhiteSpace(runnerId);
+        RunnerCapacitySnapshots[$"{pool}\u001f{runnerId}"] = new(
+            pool,
+            online,
+            ClampAvailable(online, availableMemoryBytes, totalMemoryBytes),
+            Math.Max(0, totalMemoryBytes),
+            ClampAvailable(online, availableNanoCpus, totalNanoCpus),
+            Math.Max(0, totalNanoCpus),
+            ClampAvailable(online, availablePids, totalPids),
+            Math.Max(0, totalPids));
+    }
+
     private static IEnumerable<Measurement<long>> ObserveWorkerQueueDepth() =>
         WorkerQueueNames.All.Select(queue => new Measurement<long>(
             Interlocked.Read(ref WorkerQueueDepths[(int)queue]),
@@ -190,4 +208,60 @@ public static class NoCtfTelemetry
         WorkerQueueNames.All.Select(queue => new Measurement<long>(
             Interlocked.Read(ref WorkerQueueOldestAgeSeconds[(int)queue]),
             new KeyValuePair<string, object?>("queue", WorkerQueueNames.GetName(queue))));
+
+    private static IEnumerable<Measurement<long>> ObserveRunnerOnline() =>
+        RunnerCapacitySnapshots.Values
+            .GroupBy(snapshot => snapshot.Pool, StringComparer.Ordinal)
+            .Select(group => new Measurement<long>(
+                group.LongCount(snapshot => snapshot.Online),
+                new KeyValuePair<string, object?>("pool", group.Key)));
+
+    private static IEnumerable<Measurement<long>> ObserveRunnerCapacityAvailable() =>
+        ObserveRunnerCapacity(total: false);
+
+    private static IEnumerable<Measurement<long>> ObserveRunnerCapacityTotal() =>
+        ObserveRunnerCapacity(total: true);
+
+    private static IEnumerable<Measurement<long>> ObserveRunnerCapacity(bool total) =>
+        RunnerCapacitySnapshots.Values
+            .GroupBy(snapshot => snapshot.Pool, StringComparer.Ordinal)
+            .SelectMany(group => new[]
+            {
+                RunnerCapacityMeasurement(
+                    group.Key,
+                    "memory",
+                    group.Where(snapshot => snapshot.Online).Sum(snapshot =>
+                        total ? snapshot.TotalMemoryBytes : snapshot.AvailableMemoryBytes)),
+                RunnerCapacityMeasurement(
+                    group.Key,
+                    "cpu",
+                    group.Where(snapshot => snapshot.Online).Sum(snapshot =>
+                        total ? snapshot.TotalNanoCpus : snapshot.AvailableNanoCpus)),
+                RunnerCapacityMeasurement(
+                    group.Key,
+                    "pids",
+                    group.Where(snapshot => snapshot.Online).Sum(snapshot =>
+                        total ? snapshot.TotalPids : snapshot.AvailablePids))
+            });
+
+    private static Measurement<long> RunnerCapacityMeasurement(
+        string pool,
+        string resource,
+        long value) => new(
+        value,
+        new KeyValuePair<string, object?>("pool", pool),
+        new KeyValuePair<string, object?>("resource", resource));
+
+    private static long ClampAvailable(bool online, long available, long total) =>
+        online ? Math.Clamp(available, 0, Math.Max(0, total)) : 0;
+
+    private sealed record RunnerCapacitySnapshot(
+        string Pool,
+        bool Online,
+        long AvailableMemoryBytes,
+        long TotalMemoryBytes,
+        long AvailableNanoCpus,
+        long TotalNanoCpus,
+        long AvailablePids,
+        long TotalPids);
 }
