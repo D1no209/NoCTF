@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using AsyncKeyedLock;
 using Wolverine.EntityFrameworkCore;
 
 namespace NoCTF.Infrastructure.Persistence;
@@ -14,7 +15,9 @@ internal static class PersistenceInfrastructure
         bool exporting,
         bool development)
     {
-        services.AddSingleton<LocalCriticalSectionRegistry>();
+        services.AddSingleton(new AsyncKeyedLocker<string>(
+            options => options.PoolSize = 20,
+            StringComparer.Ordinal));
         if (exporting || development)
         {
             var databaseName = exporting

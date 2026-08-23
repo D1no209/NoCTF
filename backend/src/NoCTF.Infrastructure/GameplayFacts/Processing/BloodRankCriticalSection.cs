@@ -3,16 +3,19 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
-public sealed class BloodRankCriticalSection(LocalCriticalSectionRegistry localLeases)
+public sealed class BloodRankCriticalSection(
+    AsyncKeyedLock.AsyncKeyedLocker<string> localLeases)
 {
-    public async ValueTask<IAsyncDisposable> AcquireAsync(
+    public async ValueTask<IDisposable> AcquireAsync(
         NoCtfDbContext db,
         Guid competitionChallengeId,
         CancellationToken cancellationToken)
     {
         if (!db.Database.IsRelational())
-            return await localLeases.AcquireAsync(
-                "blood-rank", competitionChallengeId.ToString("N"), cancellationToken);
+            return await localLeases.LockOrNullAsync(
+                    $"blood-rank:{competitionChallengeId:N}",
+                    TimeSpan.FromSeconds(2), cancellationToken)
+                ?? throw new FeatureCriticalSectionTimeoutException("blood-rank");
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         budget.CancelAfter(TimeSpan.FromSeconds(2));

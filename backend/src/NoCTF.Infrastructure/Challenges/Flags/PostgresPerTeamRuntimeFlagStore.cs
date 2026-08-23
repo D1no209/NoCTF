@@ -14,7 +14,9 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
     : IPerTeamRuntimeFlagStore
 {
     public PostgresPerTeamRuntimeFlagStore(NoCtfDbContext db)
-        : this(db, new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry())) { }
+        : this(db, new TeamChallengeCriticalSection(
+            new AsyncKeyedLock.AsyncKeyedLocker<string>()))
+    { }
 
     public async Task<string> EnsureAsync(
         Guid competitionId,
@@ -23,7 +25,7 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        await using var generationLease = await criticalSection.AcquireAsync(
+        using var generationLease = await criticalSection.AcquireAsync(
             db,
             teamId,
             competitionChallengeId,
@@ -93,7 +95,7 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        await using var generationLease = await criticalSection.AcquireAsync(
+        using var generationLease = await criticalSection.AcquireAsync(
             db,
             teamId,
             competitionChallengeId,

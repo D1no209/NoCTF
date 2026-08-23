@@ -11,7 +11,7 @@ public enum RunnerProviderFailureKind
 }
 
 public sealed class RunnerProviderHealthState(
-    IOptions<RunnerAvailabilityOptions> options,
+    IOptions<RunnerOptions> options,
     TimeProvider timeProvider,
     ILogger<RunnerProviderHealthState> logger)
 {

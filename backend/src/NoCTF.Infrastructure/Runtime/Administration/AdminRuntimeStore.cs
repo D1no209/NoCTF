@@ -36,9 +36,10 @@ public sealed class AdminRuntimeStore(
             placementPolicy,
             runtimeFlags,
             outbox,
-            new TeamRuntimeQuota(new LocalCriticalSectionRegistry()),
-            new SharedRuntimeCriticalSection(new LocalCriticalSectionRegistry()),
-            eventRecorder) { }
+            new TeamRuntimeQuota(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            new SharedRuntimeCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            eventRecorder)
+    { }
 
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -178,7 +179,7 @@ public sealed class AdminRuntimeStore(
         if (scope is null)
             return new(null, RuntimeMutationFailure.NotFound);
 
-        await using var criticalSection = scope.TeamId is Guid teamId
+        using var criticalSection = scope.TeamId is Guid teamId
             ? await runtimeQuota.AcquireLockAsync(db, competitionId, teamId, ct)
             : await sharedRuntimeCriticalSection.AcquireAsync(
                 db,
@@ -262,7 +263,7 @@ public sealed class AdminRuntimeStore(
         if (scope is null)
             return new(null, RuntimeMutationFailure.NotFound);
 
-        await using var criticalSection = scope.TeamId is Guid teamId
+        using var criticalSection = scope.TeamId is Guid teamId
             ? await runtimeQuota.AcquireLockAsync(db, competitionId, teamId, ct)
             : await sharedRuntimeCriticalSection.AcquireAsync(
                 db,
@@ -384,7 +385,7 @@ public sealed class AdminRuntimeStore(
             : RuntimePurpose.Player;
         var includesLegacyAwdpPurpose = purpose == RuntimePurpose.AwdpAttack;
 
-        await using var criticalSection = teamId is Guid lockedTeamId
+        using var criticalSection = teamId is Guid lockedTeamId
             ? await runtimeQuota.AcquireLockAsync(
                 db,
                 competitionId,

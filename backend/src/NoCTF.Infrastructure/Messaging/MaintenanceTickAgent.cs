@@ -5,7 +5,9 @@ using Wolverine.Runtime.Agents;
 
 namespace NoCTF.Infrastructure.Messaging;
 
-public sealed class MaintenanceTickAgent(IServiceScopeFactory scopeFactory)
+public sealed class MaintenanceTickAgent(
+    IServiceScopeFactory scopeFactory,
+    TimeProvider timeProvider)
     : SingularAgent("noctf-maintenance-ticks")
 {
     private CancellationTokenSource? stopping;
@@ -40,10 +42,10 @@ public sealed class MaintenanceTickAgent(IServiceScopeFactory scopeFactory)
     {
         var lastSlowTick = DateTimeOffset.MinValue;
         var lastLeaderboardTick = DateTimeOffset.MinValue;
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1), timeProvider);
         while (!cancellationToken.IsCancellationRequested)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = timeProvider.GetUtcNow();
             await using var scope = scopeFactory.CreateAsyncScope();
             var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
             await bus.PublishAsync(new DispatchAwdCheckers(now));

@@ -299,7 +299,7 @@ public sealed class ComposeRuntimeHandlerTests
         return new(
             new RecordingProviderCatalog(runtime),
             [reconciler ?? new RecordingResourceReconciler(RuntimeProvider.Docker)],
-            configuration,
+            configuration.ToRunnerOptions(),
             capacity,
             reader);
     }

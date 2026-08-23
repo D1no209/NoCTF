@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.Runtime.Provisioning;
@@ -14,7 +15,7 @@ namespace NoCTF.Runner.Messages;
 public sealed class RuntimeResourceReconciliationHandler(
     NoCtfDbContext db,
     IEnumerable<IRuntimeManagedResourceReconciler> reconcilers,
-    IConfiguration configuration,
+    IOptions<RunnerOptions> runnerOptions,
     IRunnerCapacityGate capacity,
     IRuntimeProviderCatalog? providers = null)
 {
@@ -22,20 +23,15 @@ public sealed class RuntimeResourceReconciliationHandler(
         ReconcileRuntimeResources message,
         CancellationToken cancellationToken)
     {
-        var configuredPool = configuration["Runner:Pool"] ?? "default";
-        var configuredRunnerId = configuration["Runner:Id"]
-            ?? throw new InvalidOperationException("Runner:Id is required.");
+        var configuredPool = runnerOptions.Value.Pool;
+        var configuredRunnerId = runnerOptions.Value.Id;
         RunnerNodeAssignmentGuard.Validate(
             message,
             configuredPool,
             configuredRunnerId);
 
-        if (!Enum.TryParse<RuntimeProvider>(
-                configuration["Runner:Provider"],
-                ignoreCase: true,
-                out var configuredProvider)
-            || !Enum.IsDefined(configuredProvider))
-            throw new InvalidOperationException("Runner:Provider is required.");
+        var configuredProvider = runnerOptions.Value.Provider
+            ?? throw new InvalidOperationException("Runner:Provider is required.");
         var reconciler = reconcilers.SingleOrDefault(candidate =>
                 candidate.Provider == configuredProvider)
             ?? throw new InvalidOperationException(

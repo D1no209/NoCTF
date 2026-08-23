@@ -34,10 +34,12 @@ public sealed class PatchUploadStore(
         : this(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()),
+            new GameplayFactAttemptCriticalSection(
+                new AsyncKeyedLock.AsyncKeyedLocker<string>()),
             new FileReferenceLock(),
             logger,
-            null) { }
+            null)
+    { }
 
     public async Task<PatchUploadScope?> ResolveScopeAsync(
         Guid competitionId,
@@ -123,7 +125,7 @@ public sealed class PatchUploadStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
             ct);
-        await using var attemptLease = await attemptCriticalSection.AcquireAsync(
+        using var attemptLease = await attemptCriticalSection.AcquireAsync(
             db,
             scope.TeamId,
             scope.CompetitionChallengeId,

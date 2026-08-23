@@ -23,8 +23,9 @@ public sealed class ChallengeHintStore(
         : this(
             db,
             outbox,
-            new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry()),
-            eventRecorder) { }
+            new TeamChallengeCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            eventRecorder)
+    { }
 
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -209,7 +210,7 @@ public sealed class ChallengeHintStore(
             .SingleOrDefaultAsync(ct);
         if (teamId is null)
             return HintUnlockAttempt.Failed(HintUnlockFailure.NotFound);
-        await using var unlockLease = await criticalSection.AcquireAsync(
+        using var unlockLease = await criticalSection.AcquireAsync(
             db,
             teamId.Value,
             competitionChallengeId,

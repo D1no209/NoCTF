@@ -5,7 +5,7 @@ using NoCTF.Hosting.Health;
 namespace NoCTF.Runner.Composition;
 
 public sealed class RunnerProviderReadinessDependency(
-    IOptions<RunnerAvailabilityOptions> options,
+    IOptions<RunnerOptions> options,
     IServiceProvider services,
     RunnerProviderHealthState providerHealth) : IReadinessDependency
 {

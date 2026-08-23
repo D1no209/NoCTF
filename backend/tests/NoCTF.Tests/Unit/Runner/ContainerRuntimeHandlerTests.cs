@@ -120,7 +120,7 @@ public sealed class ContainerRuntimeHandlerTests
                 "all predefined address pools have been fully subnetted")
         };
         var health = new RunnerProviderHealthState(
-            Options.Create(new RunnerAvailabilityOptions
+            Options.Create(new RunnerOptions
             {
                 ProviderFailureHoldSeconds = 120
             }),
@@ -325,7 +325,7 @@ public sealed class ContainerRuntimeHandlerTests
         return new(
             new RecordingProviderCatalog(lifecycle, sandbox),
             [reconciler ?? new RecordingResourceReconciler()],
-            configuration,
+            configuration.ToRunnerOptions(),
             capacity,
             reader,
             providerHealth: providerHealth);

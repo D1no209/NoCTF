@@ -48,7 +48,7 @@ public sealed class AwdpDefenseTargetStore(
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted,
             cancellationToken);
-        await using var lease = await criticalSection.AcquireAsync(
+        using var lease = await criticalSection.AcquireAsync(
             db,
             scope.TeamId,
             competitionChallengeId,

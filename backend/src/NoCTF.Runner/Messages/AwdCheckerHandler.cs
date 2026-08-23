@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -310,7 +311,7 @@ public sealed class AwdCheckerExecutor(
 public sealed class AwdCheckerHandler(
     IAwdCheckerWorkReader reader,
     IAwdCheckerExecutor executor,
-    IConfiguration configuration,
+    IOptions<RunnerOptions> runnerOptions,
     TimeProvider timeProvider)
 {
     public Task Handle(RunAwdChecker message, CancellationToken cancellationToken) =>
@@ -322,9 +323,8 @@ public sealed class AwdCheckerHandler(
     {
         RunnerNodeAssignmentGuard.Validate(
             message,
-            configuration["Runner:Pool"] ?? "default",
-            configuration["Runner:Id"]
-                ?? throw new InvalidOperationException("Runner:Id is required."));
+            runnerOptions.Value.Pool,
+            runnerOptions.Value.Id);
         if (timeProvider.GetUtcNow() >= message.Deadline)
             return MessageExecutionOutcome.Superseded;
         var work = await reader.ReadAsync(message, cancellationToken);

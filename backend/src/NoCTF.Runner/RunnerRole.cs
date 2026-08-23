@@ -7,6 +7,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Hosting.Messaging;
 using NoCTF.Runner.Messages;
 using Wolverine;
 using Wolverine.EntityFrameworkCore;
@@ -48,17 +49,12 @@ public static class RunnerRole
 
         options.Discovery.IncludeAssembly(typeof(RuntimeProviderHandler).Assembly);
         options.Durability.Mode = DurabilityMode.Balanced;
-        options.Policies.OnException<TimeoutException>()
-            .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
-        options.Policies.OnException<System.Net.Http.HttpRequestException>()
-            .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
-        options.Policies.OnException<Npgsql.NpgsqlException>()
-            .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
-        options.Policies.OnException<DbUpdateConcurrencyException>().RetryTimes(5);
+        options.ConfigureNoCtfInfrastructureRetries();
         if (durable)
         {
             options.ListenToPostgresqlQueue(poolQueueName.Value).UseDurableInbox();
             options.ListenToPostgresqlQueue(nodeQueueName.Value).UseDurableInbox();
         }
     }
+
 }

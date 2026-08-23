@@ -76,7 +76,7 @@ public sealed class AwdpFixVerificationRecoveryTests
             [],
             Substitute.For<IRunnerCapacityGate>(),
             outbox,
-            configuration,
+            configuration.ToRunnerOptions(),
             NullLogger<AwdpFixVerificationHandler>.Instance);
 
         await handler.Handle(message, CancellationToken.None);
@@ -166,7 +166,7 @@ public sealed class AwdpFixVerificationRecoveryTests
             [],
             Substitute.For<IRunnerCapacityGate>(),
             outbox,
-            configuration,
+            configuration.ToRunnerOptions(),
             NullLogger<AwdpFixVerificationHandler>.Instance);
 
         await handler.Handle(message, CancellationToken.None);
@@ -296,7 +296,7 @@ public sealed class AwdpFixVerificationRecoveryTests
             [reconciler],
             capacity,
             outbox,
-            configuration,
+            configuration.ToRunnerOptions(),
             NullLogger<AwdpFixVerificationHandler>.Instance);
         return new(handler, message, reconciler, capacity, outbox, container, sandbox);
     }

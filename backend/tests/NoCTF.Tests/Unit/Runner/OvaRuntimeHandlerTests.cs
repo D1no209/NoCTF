@@ -150,7 +150,7 @@ public sealed class OvaRuntimeHandlerTests
         return new(
             new RecordingProviderCatalog(runtime),
             [reconciler ?? new RecordingResourceReconciler()],
-            configuration,
+            configuration.ToRunnerOptions(),
             capacity,
             reader);
     }

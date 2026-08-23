@@ -35,8 +35,9 @@ public sealed class PostgresAwdRuntimeProvisioner(
             placementPolicy,
             outbox,
             timeProvider,
-            new TeamRuntimeQuota(new LocalCriticalSectionRegistry()),
-            eventRecorder) { }
+            new TeamRuntimeQuota(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            eventRecorder)
+    { }
 
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -104,7 +105,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
         foreach (var teamId in teamIds)
         {
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            await using var quotaLease = await runtimeQuota.AcquireLockAsync(
+            using var quotaLease = await runtimeQuota.AcquireLockAsync(
                 db,
                 competitionId,
                 teamId,

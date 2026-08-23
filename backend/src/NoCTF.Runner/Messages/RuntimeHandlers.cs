@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Runner.Composition;
@@ -16,7 +17,7 @@ namespace NoCTF.Runner.Messages;
 public sealed class RuntimeProviderHandler(
     IRuntimeProviderCatalog providers,
     IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
-    IConfiguration configuration,
+    IOptions<RunnerOptions> runnerOptions,
     IRunnerCapacityGate capacity,
     IRuntimeNodeWorkReader workReader,
     IAwdpAttackProvisioningPlanReader? awdpAttackPlans = null,
@@ -81,7 +82,7 @@ public sealed class RuntimeProviderHandler(
                     message.RuntimeInstanceId,
                     message.ProcessingVersion,
                     message.Generation,
-                    ReadRunnerId(),
+                    runnerOptions.Value.Id,
                     receipt.Provider,
                     JsonSerializer.Serialize(receipt),
                     expanded.Urls,
@@ -310,7 +311,7 @@ public sealed class RuntimeProviderHandler(
                         message.RuntimeInstanceId,
                         message.ProcessingVersion,
                         message.Generation,
-                        ReadRunnerId(),
+                        runnerOptions.Value.Id,
                         receipt.Provider,
                         JsonSerializer.Serialize(receipt),
                         expanded.Urls,
@@ -443,7 +444,7 @@ public sealed class RuntimeProviderHandler(
                     message.RuntimeInstanceId,
                     message.ProcessingVersion,
                     message.Generation,
-                    ReadRunnerId(),
+                    runnerOptions.Value.Id,
                     receipt.Provider,
                     JsonSerializer.Serialize(receipt),
                     expanded.Urls,
@@ -530,12 +531,11 @@ public sealed class RuntimeProviderHandler(
 
     private void ValidateAssignment(IRunnerNodeMessage message)
     {
-        var configuredPool = configuration["Runner:Pool"] ?? "default";
-        RunnerNodeAssignmentGuard.Validate(message, configuredPool, ReadRunnerId());
+        RunnerNodeAssignmentGuard.Validate(
+            message,
+            runnerOptions.Value.Pool,
+            runnerOptions.Value.Id);
     }
-
-    private string ReadRunnerId() => configuration["Runner:Id"]
-        ?? throw new InvalidOperationException("Runner:Id is required.");
 
     private async Task<object> CompleteProvisionFailureAsync(
         IRuntimeProvisionMessage message,
@@ -666,7 +666,7 @@ public sealed class RuntimeProviderHandler(
     {
         var release = await capacity.ReleaseAsync(
             runtimeInstanceId,
-            ReadRunnerId(),
+            runnerOptions.Value.Id,
             cancellationToken);
         if (release == RunnerCapacityReleaseOutcome.OwnerMismatch)
             throw new InvalidOperationException(

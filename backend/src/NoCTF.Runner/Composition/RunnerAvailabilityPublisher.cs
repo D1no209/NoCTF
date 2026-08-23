@@ -12,8 +12,9 @@ namespace NoCTF.Runner.Composition;
 public sealed class RunnerAvailabilityPublisher(
     IServiceScopeFactory scopeFactory,
     RedisRunnerAvailabilityRegistry registry,
-    IOptions<RunnerAvailabilityOptions> configuredOptions,
+    IOptions<RunnerOptions> configuredOptions,
     ILogger<RunnerAvailabilityPublisher> logger,
+    TimeProvider timeProvider,
     RunnerProviderHealthState? providerHealth = null) : BackgroundService
 {
     private static readonly string Version =
@@ -23,11 +24,12 @@ public sealed class RunnerAvailabilityPublisher(
         ?? typeof(RunnerProgramMarker).Assembly.GetName().Version?.ToString()
         ?? "unknown";
 
-    private readonly RunnerAvailabilityOptions options = configuredOptions.Value;
+    private readonly RunnerOptions options = configuredOptions.Value;
     private RunnerAvailabilityRegistrationOutcome? lastOutcome;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var timer = new PeriodicTimer(options.Heartbeat.Interval, timeProvider);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -39,22 +41,22 @@ public sealed class RunnerAvailabilityPublisher(
                     {
                         logger.LogInformation(
                             "Runner {RunnerId} in pool {RunnerPool} is publishing availability.",
-                            options.RunnerId,
-                            options.RunnerPool);
+                            options.Id,
+                            options.Pool);
                     }
                     else if (outcome == RunnerAvailabilityRegistrationOutcome.OfflineCapacityUntrusted)
                     {
                         logger.LogWarning(
                             "Runner {RunnerId} in pool {RunnerPool} remains offline because its Redis capacity is untrusted while assignments may still be active.",
-                            options.RunnerId,
-                            options.RunnerPool);
+                            options.Id,
+                            options.Pool);
                     }
                     else
                     {
                         logger.LogWarning(
                             "Runner {RunnerId} in pool {RunnerPool} is not accepting work because its Runtime provider recently rejected a resource operation.",
-                            options.RunnerId,
-                            options.RunnerPool);
+                            options.Id,
+                            options.Pool);
                     }
                     lastOutcome = outcome;
                 }
@@ -64,24 +66,18 @@ public sealed class RunnerAvailabilityPublisher(
                 logger.LogWarning(
                     exception,
                     "Runner {RunnerId} could not publish availability to Redis.",
-                    options.RunnerId);
+                    options.Id);
             }
             catch (NpgsqlException exception)
             {
                 logger.LogWarning(
                     exception,
                     "Runner {RunnerId} could not verify active assignments before publishing availability.",
-                    options.RunnerId);
+                    options.Id);
             }
 
-            try
-            {
-                await Task.Delay(options.HeartbeatInterval, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
+            if (!await timer.WaitForNextTickAsync(stoppingToken))
                 break;
-            }
         }
     }
 
@@ -92,8 +88,8 @@ public sealed class RunnerAvailabilityPublisher(
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         var hasActiveAssignments = await db.RuntimeInstances.AsNoTracking()
             .AnyAsync(
-                instance => instance.RunnerPool == options.RunnerPool
-                    && instance.RunnerId == options.RunnerId
+                instance => instance.RunnerPool == options.Pool
+                    && instance.RunnerId == options.Id
                     && instance.RuntimeProvider == options.Provider!.Value
                     && (instance.State == RuntimeState.Provisioning
                         || instance.State == RuntimeState.Running
@@ -104,12 +100,12 @@ public sealed class RunnerAvailabilityPublisher(
 
         return await registry.RegisterAsync(
             new RunnerAvailabilityRegistration(
-                options.RunnerPool,
-                options.RunnerId,
+                options.Pool,
+                options.Id,
                 options.Provider!.Value,
                 Version,
-                options.Capacity,
-                options.HeartbeatTtl,
+                options.ResourceCapacity,
+                options.Heartbeat.Ttl,
                 hasActiveAssignments,
                 providerHealth?.IsReady(options.Provider.Value) ?? true),
             cancellationToken);

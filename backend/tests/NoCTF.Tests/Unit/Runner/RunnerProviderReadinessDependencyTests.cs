@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
 using NoCTF.Runner.Composition;
@@ -23,7 +24,7 @@ public sealed class RunnerProviderReadinessDependencyTests
         await using var provider = services.BuildServiceProvider();
         var health = CreateHealth();
         var dependency = new RunnerProviderReadinessDependency(
-            Options.Create(new RunnerAvailabilityOptions
+            Options.Create(new RunnerOptions
             {
                 Provider = RuntimeProvider.Kubernetes
             }),
@@ -42,7 +43,7 @@ public sealed class RunnerProviderReadinessDependencyTests
         await using var provider = new ServiceCollection().BuildServiceProvider();
         var health = CreateHealth();
         var dependency = new RunnerProviderReadinessDependency(
-            Options.Create(new RunnerAvailabilityOptions
+            Options.Create(new RunnerOptions
             {
                 Provider = RuntimeProvider.Libvirt
             }),
@@ -62,10 +63,10 @@ public sealed class RunnerProviderReadinessDependencyTests
         var services = new ServiceCollection();
         services.AddKeyedSingleton(RuntimeProvider.Docker, docker);
         await using var provider = services.BuildServiceProvider();
-        var clock = new MutableTimeProvider(DateTimeOffset.Parse("2026-08-19T00:00:00Z"));
+        var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-08-19T00:00:00Z"));
         var health = CreateHealth(clock, holdSeconds: 60);
         var dependency = new RunnerProviderReadinessDependency(
-            Options.Create(new RunnerAvailabilityOptions
+            Options.Create(new RunnerOptions
             {
                 Provider = RuntimeProvider.Docker
             }),
@@ -95,17 +96,10 @@ public sealed class RunnerProviderReadinessDependencyTests
     private static RunnerProviderHealthState CreateHealth(
         TimeProvider? timeProvider = null,
         int holdSeconds = 120) => new(
-            Options.Create(new RunnerAvailabilityOptions
+            Options.Create(new RunnerOptions
             {
                 ProviderFailureHoldSeconds = holdSeconds
             }),
             timeProvider ?? TimeProvider.System,
             NullLogger<RunnerProviderHealthState>.Instance);
-
-    private sealed class MutableTimeProvider(DateTimeOffset now) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => now;
-
-        public void Advance(TimeSpan duration) => now = now.Add(duration);
-    }
 }

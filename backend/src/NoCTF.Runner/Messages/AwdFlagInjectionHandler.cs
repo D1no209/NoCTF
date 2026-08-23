@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
@@ -137,7 +138,7 @@ public sealed class AwdFlagInjectionHandler(
     IAwdFlagInjectionWorkReader reader,
     IAwdFlagInjectionExecutor executor,
     ITransactionalMessageOutbox outbox,
-    IConfiguration configuration,
+    IOptions<RunnerOptions> runnerOptions,
     TimeProvider timeProvider)
 {
     public Task Handle(InjectAwdFlag message, CancellationToken cancellationToken) =>
@@ -149,9 +150,8 @@ public sealed class AwdFlagInjectionHandler(
     {
         RunnerNodeAssignmentGuard.Validate(
             message,
-            configuration["Runner:Pool"] ?? "default",
-            configuration["Runner:Id"]
-                ?? throw new InvalidOperationException("Runner:Id is required."));
+            runnerOptions.Value.Pool,
+            runnerOptions.Value.Id);
         var work = await reader.ReadAsync(message, cancellationToken);
         if (work is null)
             return MessageExecutionOutcome.Superseded;

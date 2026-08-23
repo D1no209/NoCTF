@@ -12,7 +12,7 @@ using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Unit.Runner;
 
-public sealed class RunnerAvailabilityOptionsTests
+public sealed class RunnerOptionsTests
 {
     [Test]
     public async Task Docker_runtime_log_limits_are_configurable()
@@ -54,14 +54,14 @@ public sealed class RunnerAvailabilityOptionsTests
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
 
-        var options = services.GetRequiredService<IOptions<RunnerAvailabilityOptions>>().Value;
+        var options = services.GetRequiredService<IOptions<RunnerOptions>>().Value;
 
-        await Assert.That(options.RunnerId).IsEqualTo("docker-1");
-        await Assert.That(options.RunnerPool).IsEqualTo("docker");
+        await Assert.That(options.Id).IsEqualTo("docker-1");
+        await Assert.That(options.Pool).IsEqualTo("docker");
         await Assert.That(options.Provider).IsEqualTo(RuntimeProvider.Docker);
         await Assert.That(options.Capacity.MemoryBytes).IsEqualTo(4_294_967_296);
-        await Assert.That(options.HeartbeatInterval).IsEqualTo(TimeSpan.FromSeconds(5));
-        await Assert.That(options.HeartbeatTtl).IsEqualTo(TimeSpan.FromSeconds(15));
+        await Assert.That(options.Heartbeat.Interval).IsEqualTo(TimeSpan.FromSeconds(5));
+        await Assert.That(options.Heartbeat.Ttl).IsEqualTo(TimeSpan.FromSeconds(15));
     }
 
     [Test]
@@ -75,8 +75,8 @@ public sealed class RunnerAvailabilityOptionsTests
             ["Runner:Heartbeat:IntervalSeconds"] = "5",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
-        Func<RunnerAvailabilityOptions> read = () =>
-            services.GetRequiredService<IOptions<RunnerAvailabilityOptions>>().Value;
+        Func<RunnerOptions> read = () =>
+            services.GetRequiredService<IOptions<RunnerOptions>>().Value;
 
         await Assert.That(read).Throws<OptionsValidationException>();
     }
@@ -95,10 +95,30 @@ public sealed class RunnerAvailabilityOptionsTests
             ["Runner:Heartbeat:IntervalSeconds"] = "15",
             ["Runner:Heartbeat:TtlSeconds"] = "15"
         });
-        Func<RunnerAvailabilityOptions> read = () =>
-            services.GetRequiredService<IOptions<RunnerAvailabilityOptions>>().Value;
+        Func<RunnerOptions> read = () =>
+            services.GetRequiredService<IOptions<RunnerOptions>>().Value;
 
         await Assert.That(read).Throws<OptionsValidationException>();
+    }
+
+    [Test]
+    public async Task Runner_configuration_rejects_an_unknown_provider()
+    {
+        using var services = BuildServices(new Dictionary<string, string?>
+        {
+            ["Runner:Provider"] = "mystery",
+            ["Runner:Pool"] = "pool-a",
+            ["Runner:Id"] = "runner-a",
+            ["Runner:Capacity:MemoryBytes"] = "1024",
+            ["Runner:Capacity:NanoCpus"] = "100",
+            ["Runner:Capacity:PidsLimit"] = "10",
+            ["Runner:Heartbeat:IntervalSeconds"] = "5",
+            ["Runner:Heartbeat:TtlSeconds"] = "15"
+        });
+        Func<RunnerOptions> read = () =>
+            services.GetRequiredService<IOptions<RunnerOptions>>().Value;
+
+        await Assert.That(read).Throws<InvalidOperationException>();
     }
 
     [Test]

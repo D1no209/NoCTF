@@ -48,10 +48,11 @@ public sealed class GameplayFactProcessor(
             admissionModePolicy,
             outbox,
             leaderboardSnapshots,
-            new BloodRankCriticalSection(new LocalCriticalSectionRegistry()),
-            new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry()),
+            new BloodRankCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            new TeamChallengeCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
             eventRecorder,
-            logger) { }
+            logger)
+    { }
 
     private static readonly CompetitionEventKind[] CheatResolutionKinds =
     [
@@ -89,7 +90,7 @@ public sealed class GameplayFactProcessor(
         if (requested is null || requested.State != GameplayFactState.Queued)
             return null;
         var scope = await ResolveProcessingScopeAsync(requested, cancellationToken);
-        await using var processingLease = await AcquireProcessingScopeAsync(
+        using var processingLease = await AcquireProcessingScopeAsync(
             scope, cancellationToken);
         if (await ApplyProcessingScope(db.GameplayFacts.AsNoTracking(), scope)
                 .AnyAsync(item => item.State == GameplayFactState.Processing, cancellationToken))
@@ -354,7 +355,7 @@ public sealed class GameplayFactProcessor(
             return;
         var processingScope = await ResolveProcessingScopeAsync(
             submission, cancellationToken);
-        await using var processingLease = await AcquireProcessingScopeAsync(
+        using var processingLease = await AcquireProcessingScopeAsync(
             processingScope, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
@@ -688,7 +689,7 @@ public sealed class GameplayFactProcessor(
                 || mode == GameMode.Ctf && submission.Kind == GameplayFactKind.FlagAttempt);
     }
 
-    private ValueTask<IAsyncDisposable> AcquireProcessingScopeAsync(
+    private ValueTask<IDisposable> AcquireProcessingScopeAsync(
         GameplayFactProcessingScope scope,
         CancellationToken ct) =>
         scope.ChallengeWide

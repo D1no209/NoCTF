@@ -33,8 +33,9 @@ public sealed class PostgresKohRuntimeProvisioner(
             placementPolicy,
             outbox,
             timeProvider,
-            new SharedRuntimeCriticalSection(new LocalCriticalSectionRegistry()),
-            eventRecorder) { }
+            new SharedRuntimeCriticalSection(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            eventRecorder)
+    { }
 
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -88,7 +89,7 @@ public sealed class PostgresKohRuntimeProvisioner(
         foreach (var challenge in challenges.OrderBy(challenge => challenge.Id))
         {
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-            await using var scopeLease = await sharedRuntimeCriticalSection.AcquireAsync(
+            using var scopeLease = await sharedRuntimeCriticalSection.AcquireAsync(
                 db, challenge.Id, cancellationToken);
             if (await CompetitionStateReader.ReadAsync(db, competitionId, cancellationToken)
                 != CompetitionStatus.Running)
