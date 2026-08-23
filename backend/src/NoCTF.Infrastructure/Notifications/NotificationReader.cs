@@ -125,62 +125,16 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         Guid notificationId,
         CancellationToken ct)
     {
-        var authorizedRoot = await (await VisibleToAsync(userId, ct))
-            .AnyAsync(notification => notification.Id == notificationId, ct);
-        if (!authorizedRoot)
+        var selected = await (await VisibleToAsync(userId, ct))
+            .Where(notification => notification.Id == notificationId)
+            .Select(notification => new { notification.Id, notification.ThreadRootId })
+            .SingleOrDefaultAsync(ct);
+        if (selected is null)
             return null;
-        IQueryable<Notification> thread;
-        if (!db.Database.IsRelational())
-        {
-            var notifications = await db.Notifications.AsNoTracking().ToListAsync(ct);
-            var byId = notifications.ToDictionary(notification => notification.Id);
-            var rootId = notificationId;
-            var ancestors = new HashSet<Guid> { rootId };
-            while (byId.TryGetValue(rootId, out var current)
-                && current.ReplyToId is { } parentId
-                && ancestors.Add(parentId))
-            {
-                rootId = parentId;
-            }
-            var threadIds = new HashSet<Guid> { rootId };
-            var changed = true;
-            while (changed)
-            {
-                changed = false;
-                foreach (var notification in notifications)
-                {
-                    if (notification.ReplyToId is not { } parentId
-                        || !threadIds.Contains(parentId)
-                        || !threadIds.Add(notification.Id))
-                        continue;
-                    changed = true;
-                }
-            }
-            thread = db.Notifications.AsNoTracking()
-                .Where(notification => threadIds.Contains(notification.Id));
-        }
-        else
-        {
-            thread = db.Notifications.FromSqlInterpolated($$"""
-            WITH RECURSIVE ancestors AS (
-                SELECT n.* FROM notifications AS n WHERE n.id = {{notificationId}}
-                UNION ALL
-                SELECT parent.* FROM notifications AS parent
-                JOIN ancestors AS child ON child.reply_to_id = parent.id
-            ), root AS (
-                SELECT * FROM ancestors
-                ORDER BY (reply_to_id IS NULL) DESC, sent_at, id
-                LIMIT 1
-            ), thread AS (
-                SELECT * FROM root
-                UNION ALL
-                SELECT child.* FROM notifications AS child
-                JOIN thread AS parent ON child.reply_to_id = parent.id
-            )
-            SELECT DISTINCT * FROM thread
-            """).AsNoTracking();
-        }
-        thread = thread
+        var rootId = selected.ThreadRootId ?? selected.Id;
+        var thread = db.Notifications.AsNoTracking()
+            .Where(notification => notification.Id == rootId
+                || notification.ThreadRootId == rootId)
             .OrderBy(notification => notification.SentAt)
             .ThenBy(notification => notification.Id);
         return await Project(thread).ToListAsync(ct);
@@ -197,6 +151,7 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                 notification.ContentJson,
                 notification.RelatedType,
                 notification.RelatedId,
+                notification.ThreadRootId,
                 notification.ReplyToId,
                 notification.SentAt,
                 notification.SourceId == null
@@ -213,8 +168,9 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
         if (!db.Database.IsRelational())
             return await VisibleToInMemoryAsync(userId, ct);
         return db.Notifications.FromSqlInterpolated($$"""
-            WITH RECURSIVE directly_visible AS (
-                SELECT n.*
+            WITH directly_visible AS (
+                SELECT n.id,
+                       COALESCE(n.thread_root_id, n.id) AS root_id
                 FROM notifications AS n
                 WHERE (n.target_type = 0 AND n.target_id = {{userId}})
                    OR (n.target_type = 1 AND EXISTS (
@@ -239,24 +195,20 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
                          AND u.kind = {{(short)UserKind.Human}}
                          AND u.role = {{(short)UserRole.Administrator}}
                          AND u.account_status = {{(short)UserAccountStatus.Active}}))
-            ), participated_path AS (
-                SELECT n.* FROM notifications AS n
+            ), participated_roots AS (
+                SELECT DISTINCT COALESCE(n.thread_root_id, n.id) AS root_id
+                FROM notifications AS n
                 WHERE n.source_type = {{(short)NotificationSourceType.User}}
                   AND n.source_id = {{userId}}
+            ), visible_roots AS (
+                SELECT root_id FROM directly_visible
                 UNION
-                SELECT parent.* FROM notifications AS parent
-                JOIN participated_path AS child ON child.reply_to_id = parent.id
-            ), visible AS (
-                SELECT * FROM directly_visible
-                UNION
-                SELECT * FROM participated_path
-            ), thread AS (
-                SELECT * FROM visible
-                UNION
-                SELECT child.* FROM notifications AS child
-                JOIN thread AS parent ON child.reply_to_id = parent.id
+                SELECT root_id FROM participated_roots
             )
-            SELECT DISTINCT * FROM thread
+            SELECT n.*
+            FROM notifications AS n
+            JOIN visible_roots AS visible
+              ON n.id = visible.root_id OR n.thread_root_id = visible.root_id
             """).AsNoTracking();
     }
 
@@ -300,46 +252,17 @@ public sealed class NotificationReader(NoCtfDbContext db) : INotificationReader
             _ => false
         };
 
-        var visibleIds = notifications
+        var visibleRootIds = notifications
             .Where(notification => IsDirectlyVisible(notification))
-            .Select(notification => notification.Id)
+            .Select(notification => notification.ThreadRootId ?? notification.Id)
             .ToHashSet();
-        var participatedIds = notifications
+        visibleRootIds.UnionWith(notifications
             .Where(notification => notification.SourceType == NotificationSourceType.User
                 && notification.SourceId == userId)
-            .Select(notification => notification.Id)
-            .ToHashSet();
-
-        var changed = true;
-        while (changed)
-        {
-            changed = false;
-            foreach (var notification in notifications)
-            {
-                if (!participatedIds.Contains(notification.Id)
-                    || notification.ReplyToId is not { } parentId
-                    || !participatedIds.Add(parentId))
-                    continue;
-                changed = true;
-            }
-        }
-        visibleIds.UnionWith(participatedIds);
-
-        changed = true;
-        while (changed)
-        {
-            changed = false;
-            foreach (var notification in notifications)
-            {
-                if (notification.ReplyToId is not { } parentId
-                    || !visibleIds.Contains(parentId)
-                    || !visibleIds.Add(notification.Id))
-                    continue;
-                changed = true;
-            }
-        }
+            .Select(notification => notification.ThreadRootId ?? notification.Id));
 
         return db.Notifications.AsNoTracking()
-            .Where(notification => visibleIds.Contains(notification.Id));
+            .Where(notification => visibleRootIds.Contains(
+                notification.ThreadRootId ?? notification.Id));
     }
 }

@@ -137,7 +137,7 @@ public sealed class CreateCompetitionQuestionEndpoint(
                 new
                 {
                     competitionId,
-                    questionId = result.Question!.Id
+                    threadRootId = result.Question!.ThreadRootId
                 }),
             CompetitionQuestionFailure.NotFound
                 or CompetitionQuestionFailure.SubmissionNotFound => TypedResults.NotFound(),

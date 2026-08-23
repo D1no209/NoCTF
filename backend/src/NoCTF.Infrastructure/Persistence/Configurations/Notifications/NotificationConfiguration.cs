@@ -23,8 +23,14 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
         builder.HasIndex(notification => new
             { notification.RelatedType, notification.RelatedId, notification.SentAt, notification.Id })
             .HasFilter("related_type IS NOT NULL");
-        builder.HasIndex(notification => notification.ReplyToId).IsUnique()
+        builder.HasIndex(notification => new
+            { notification.ThreadRootId, notification.SentAt, notification.Id })
+            .HasFilter("thread_root_id IS NOT NULL");
+        builder.HasIndex(notification => notification.ReplyToId)
             .HasFilter("reply_to_id IS NOT NULL");
+        builder.HasOne<Notification>().WithMany()
+            .HasForeignKey(notification => notification.ThreadRootId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<Notification>().WithMany()
             .HasForeignKey(notification => notification.ReplyToId)
             .OnDelete(DeleteBehavior.Restrict);
@@ -36,6 +42,9 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             table.HasCheckConstraint(
                 "ck_notifications_related_reference",
                 "(related_type IS NULL) = (related_id IS NULL)");
+            table.HasCheckConstraint(
+                "ck_notifications_thread_root",
+                "thread_root_id IS NULL OR thread_root_id <> id");
             table.HasCheckConstraint(
                 "ck_notifications_platform_administrators_target",
                 "target_type <> 4 OR target_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid");

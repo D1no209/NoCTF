@@ -1,10 +1,10 @@
 # NoCTF 数据模型重构交接
 
-## 2026-08-24 数据模型与 Wolverine 简化：阶段 0—2
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 0—3
 
 - 当前分支：`codex/data-model-wolverine-simplification`；权威规范为
   `docs/data-model-wolverine-simplification.md`。阶段 0 提交 `1a195f6c`，阶段 1 提交
-  `e264d49f`，阶段 2 为本节所在提交。未推送、未部署、未操作生产数据库或生产队列。
+  `e264d49f`，阶段 2 提交 `371fd93d`，阶段 3 为本节所在提交。未推送、未部署、未操作生产数据库或生产队列。
 - 阶段 0 已同步治理文档、保存 schema/契约/测试基线，并以 Wolverine `6.29.2` 对真实
   PostgreSQL 完成最小 Spike：PostgreSQL transport、durable inbox/outbox、EF transactional
   outbox、competing consumers、fan-out、`IdAndDestination` 与 Singular Agent 均有版本实证；
@@ -27,9 +27,21 @@
 - 数据切换风险：canonical Email 冲突必须人工处理；旧赛道邀请码哈希不可逆，需要 Owner/Manager
   在切换前重设；旧冻结快照不迁移，切换后从 PostgreSQL 事实重建。任何一项责任人或转换方案
   不成立，必须在阶段 10/11 暂停，不能以清库替代生产迁移。
-- 下一步从阶段 3 `Notifications/Questions` 线程化继续。恢复前先执行
+- 阶段 3 为 Notification 增加可空 `ThreadRootId`：咨询根为 null，回复/状态节点直接指向根；
+  `ReplyToId` 退回为非唯一的可选回复上下文。咨询查询不再递归 ReplyTo 链，统一按
+  `(SentAt, Id)` 稳定排序并从最后一个状态语义节点确定当前状态。Question HTTP 协议、通知载荷、
+  OpenAPI、生成 TypeScript SDK 与前端读取状态全部改用 `threadRootId`，不再生成或兼容旧
+  `questionId` 通知载荷；来源队伍、题目所有者、裁判/管理员和观察者权限保持不变。
+- 阶段 3 验证：Release build 0 warning/0 error；定向 Unit/HTTP 20/20；真实 PostgreSQL
+  `CompetitionQuestionPersistenceTests` 2/2（含并发回复、稳定顺序、隐私和 append-only 根保护）；
+  ClientApp 275/275、typecheck、production build；OpenAPI/SDK 二次生成 SHA-256 不变；
+  `git diff --check` 通过。旧 `MigrateAsync` 集成测试仍因阶段 10 前的预期 model drift 被阻塞，
+  未报告为通过。
+- 阶段 3 已完成。恢复前先执行
   `git status --short`、`git log --oneline -5`，再阅读
-  `docs/data-model-wolverine-stage2-core-privacy.md`；禁止跳到后续 migration 或调度阶段。
+  `docs/data-model-wolverine-stage2-core-privacy.md`、
+  `docs/data-model-wolverine-stage3-notification-threads.md`；下一步只能进入阶段 4 同步流式导出，
+  禁止提前跳到 migration 或调度阶段。
 
 ## 2026-08-23 Alpha.79 私有指标与平台监控入口
 

@@ -18,6 +18,7 @@ public sealed class Notification
     public DateTimeOffset SentAt { get; set; }
     public EntityReferenceKind? RelatedType { get; set; }
     public Guid? RelatedId { get; set; }
+    public Guid? ThreadRootId { get; set; }
     public Guid? ReplyToId { get; set; }
 }
 

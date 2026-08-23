@@ -265,12 +265,12 @@ public static class CompetitionNotificationMessageHandlers
         CancellationToken ct) =>
         delivery.DeliverToUsersAsync(
             message.CompetitionId,
-            message.QuestionId,
+            message.ThreadRootId,
             message.Kind,
-            $"competition-question:{message.QuestionId:N}:{message.EntryId?.ToString("N") ?? "root"}:{message.OccurredAt.UtcTicks}:{(short)message.Event}",
+            $"competition-question:{message.ThreadRootId:N}:{message.EntryId?.ToString("N") ?? "root"}:{message.OccurredAt.UtcTicks}:{(short)message.Event}",
             new CompetitionQuestionActivityPayload(
                 message.CompetitionId,
-                message.QuestionId,
+                message.ThreadRootId,
                 message.EntryId,
                 message.Event,
                 message.Title,

@@ -201,7 +201,10 @@ function notificationContentId(
 export function notificationThreadRootId(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string | null {
-  return notificationContentId(notification, 'questionId') ?? notification.id ?? null
+  return notification.threadRootId
+    ?? notificationContentId(notification, 'threadRootId')
+    ?? notification.id
+    ?? null
 }
 
 interface NotificationTargetContext {
@@ -292,7 +295,8 @@ export function notificationTargetPath(
     detailPath,
     competitionId,
     challengeId: notificationContentId(notification, 'competitionChallengeId'),
-    questionId: notificationContentId(notification, 'questionId')
+    questionId: notification.threadRootId
+      ?? notificationContentId(notification, 'threadRootId')
       ?? (kind === 'QuestionOpened' ? notification.id ?? null : null),
     gameplayFactId: notificationContentId(notification, 'gameplayFactId'),
   }

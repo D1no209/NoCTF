@@ -75,6 +75,7 @@ public sealed class NotificationReaderDevelopmentTests
                 ContentJson = """{"schemaVersion":1,"body":"follow-up"}""",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = competitionId,
+                ThreadRootId = rootId,
                 ReplyToId = rootId,
                 SentAt = now.AddSeconds(1)
             });

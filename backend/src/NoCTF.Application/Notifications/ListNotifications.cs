@@ -13,6 +13,7 @@ public sealed record NotificationView(
     string ContentJson,
     EntityReferenceKind? RelatedType,
     Guid? RelatedId,
+    Guid? ThreadRootId,
     Guid? ReplyToId,
     DateTimeOffset SentAt,
     string? SourceDisplayName = null);

@@ -53,10 +53,10 @@ public sealed class NotificationFeedEndpointTests
         [
             new(firstId, NotificationSourceType.System, null,
                 NotificationTargetType.User, ActorId, NotificationKind.ChallengePublished,
-                "{}", null, null, null, now.AddSeconds(1)),
+                "{}", null, null, null, null, now.AddSeconds(1)),
             new(secondId, NotificationSourceType.System, null,
                 NotificationTargetType.User, ActorId, NotificationKind.HintPublished,
-                "{}", null, null, null, now.AddSeconds(2))
+                "{}", null, null, null, null, now.AddSeconds(2))
         ];
         using var feedResponse = await client.GetAsync(
             $"/api/v1/notifications/feed?limit=2&cursor={Uri.EscapeDataString(initial.NextCursor)}");

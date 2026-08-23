@@ -214,6 +214,7 @@ export type NoCtfapiEndpointsNotificationsNotificationResponse = {
     content?: unknown;
     relatedType?: NoCtfDomainSharedEntityReferenceKind | null;
     relatedId?: string | null;
+    threadRootId?: string | null;
     replyToId?: string | null;
     sentAt?: string;
     sourceDisplayName?: string | null;
@@ -838,7 +839,7 @@ export type NoCtfapiEndpointsGameplayFactsAcceptedGameplayFactResponse = {
 };
 
 export type NoCtfapiEndpointsChallengesQuestionsCompetitionQuestionResponse = {
-    id?: string;
+    threadRootId?: string;
     competitionId?: string;
     competitionChallengeId?: string | null;
     teamId?: string | null;
@@ -3961,10 +3962,10 @@ export type AddCompetitionQuestionMessageData = {
     body: NoCtfapiEndpointsChallengesQuestionsAddCompetitionQuestionMessageRequest;
     path: {
         competitionId: string;
-        questionId: string;
+        threadRootId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/questions/{questionId}/messages';
+    url: '/api/v1/competitions/{competitionId}/questions/{threadRootId}/messages';
 };
 
 export type AddCompetitionQuestionMessageErrors = {
@@ -4002,10 +4003,10 @@ export type ChangeCompetitionQuestionStatusData = {
     body: NoCtfapiEndpointsChallengesQuestionsChangeCompetitionQuestionStatusRequest;
     path: {
         competitionId: string;
-        questionId: string;
+        threadRootId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/questions/{questionId}/status';
+    url: '/api/v1/competitions/{competitionId}/questions/{threadRootId}/status';
 };
 
 export type ChangeCompetitionQuestionStatusErrors = {
@@ -4125,10 +4126,10 @@ export type GetCompetitionQuestionData = {
     body?: never;
     path: {
         competitionId: string;
-        questionId: string;
+        threadRootId: string;
     };
     query?: never;
-    url: '/api/v1/competitions/{competitionId}/questions/{questionId}';
+    url: '/api/v1/competitions/{competitionId}/questions/{threadRootId}';
 };
 
 export type GetCompetitionQuestionErrors = {

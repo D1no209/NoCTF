@@ -29,20 +29,20 @@ export function useCompetitionQuestionReadState(competitionId: string) {
   }
 
   function unreadCount(question: Question): number {
-    const questionId = question.id
+    const threadRootId = question.threadRootId
     return competitionQuestionUnreadCount(
       question.updatedAt,
-      questionId ? seenUpdatedAt.value[questionId] : undefined,
+      threadRootId ? seenUpdatedAt.value[threadRootId] : undefined,
       question.lastActorRole,
       question.access,
     )
   }
 
   function markRead(question: Question): void {
-    if (!question.id) return
+    if (!question.threadRootId) return
     seenUpdatedAt.value = {
       ...seenUpdatedAt.value,
-      [question.id]: question.updatedAt ?? new Date().toISOString(),
+      [question.threadRootId]: question.updatedAt ?? new Date().toISOString(),
     }
     const key = storageKey()
     if (key)

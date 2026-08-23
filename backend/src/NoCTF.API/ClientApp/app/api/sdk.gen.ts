@@ -418,7 +418,7 @@ export const readNotificationFeed = <ThrowOnError extends boolean = false>(optio
 /**
  * Read an authorized notification thread.
  *
- * Returns the immutable linear notification chain in chronological order.
+ * Returns the immutable notification thread in stable chronological order.
  */
 export const readNotificationThreadEndpoint = <ThrowOnError extends boolean = false>(options: Options<ReadNotificationThreadEndpointData, ThrowOnError>): RequestResult<ReadNotificationThreadEndpointResponses, ReadNotificationThreadEndpointErrors, ThrowOnError> => (options.client ?? client).get<ReadNotificationThreadEndpointResponses, ReadNotificationThreadEndpointErrors, ThrowOnError>({
     security: [{
@@ -922,7 +922,7 @@ export const addCompetitionQuestionMessage = <ThrowOnError extends boolean = fal
             scheme: 'bearer',
             type: 'http'
         }],
-    url: '/api/v1/competitions/{competitionId}/questions/{questionId}/messages',
+    url: '/api/v1/competitions/{competitionId}/questions/{threadRootId}/messages',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -941,7 +941,7 @@ export const changeCompetitionQuestionStatus = <ThrowOnError extends boolean = f
             scheme: 'bearer',
             type: 'http'
         }],
-    url: '/api/v1/competitions/{competitionId}/questions/{questionId}/status',
+    url: '/api/v1/competitions/{competitionId}/questions/{threadRootId}/status',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -994,7 +994,7 @@ export const getCompetitionQuestion = <ThrowOnError extends boolean = false>(opt
             scheme: 'bearer',
             type: 'http'
         }],
-    url: '/api/v1/competitions/{competitionId}/questions/{questionId}',
+    url: '/api/v1/competitions/{competitionId}/questions/{threadRootId}',
     ...options
 });
 

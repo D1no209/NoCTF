@@ -90,6 +90,7 @@ public sealed record NotificationResponse(
     JsonElement Content,
     EntityReferenceKind? RelatedType,
     Guid? RelatedId,
+    Guid? ThreadRootId,
     Guid? ReplyToId,
     DateTimeOffset SentAt,
     string? SourceDisplayName);
@@ -154,6 +155,7 @@ public sealed class ListNotificationsEndpoint(
             JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
             item.RelatedType,
             item.RelatedId,
+            item.ThreadRootId,
             item.ReplyToId,
             item.SentAt,
             item.SourceDisplayName)).ToArray();

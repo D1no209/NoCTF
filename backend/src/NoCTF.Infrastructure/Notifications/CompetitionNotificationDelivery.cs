@@ -158,6 +158,7 @@ public sealed class CompetitionNotificationDelivery(
             notification.ContentJson,
             notification.RelatedType,
             notification.RelatedId,
+            notification.ThreadRootId,
             notification.ReplyToId,
             notification.SentAt);
     }

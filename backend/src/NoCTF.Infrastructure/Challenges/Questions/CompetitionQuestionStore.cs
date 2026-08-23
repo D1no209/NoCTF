@@ -153,7 +153,9 @@ public sealed class CompetitionQuestionStore(
             ContentJson = JsonSerializer.Serialize(root, JsonOptions),
             SentAt = command.Now,
             RelatedType = EntityReferenceKind.Competition,
-            RelatedId = command.CompetitionId
+            RelatedId = command.CompetitionId,
+            ThreadRootId = null,
+            ReplyToId = null
         };
         db.Notifications.Add(notification);
         await events.RecordAsync(new(
@@ -221,7 +223,7 @@ public sealed class CompetitionQuestionStore(
         return new(
             items,
             hasMore && items.Length > 0
-                ? new(items[^1].UpdatedAt, items[^1].Id)
+                ? new(items[^1].UpdatedAt, items[^1].ThreadRootId)
                 : null);
     }
 
@@ -541,9 +543,6 @@ public sealed class CompetitionQuestionStore(
         string contentJson,
         DateTimeOffset sentAt)
     {
-        var previous = aggregate.Nodes.Count == 0
-            ? aggregate.RootNotification.Id
-            : aggregate.Nodes[^1].Id;
         return new Notification
         {
             Id = Guid.CreateVersion7(sentAt),
@@ -556,7 +555,8 @@ public sealed class CompetitionQuestionStore(
             SentAt = sentAt,
             RelatedType = aggregate.RootNotification.RelatedType,
             RelatedId = aggregate.RootNotification.RelatedId,
-            ReplyToId = previous
+            ThreadRootId = aggregate.RootNotification.Id,
+            ReplyToId = aggregate.RootNotification.Id
         };
     }
 
@@ -615,48 +615,36 @@ public sealed class CompetitionQuestionStore(
         var positionUpdatedAt = query.Position?.UpdatedAt ?? DateTimeOffset.MinValue;
         var positionId = query.Position?.Id ?? Guid.Empty;
         return await db.Notifications.FromSqlInterpolated($$"""
-            WITH RECURSIVE question_thread AS (
-                SELECT root.id AS root_id,
-                       root.id AS node_id,
-                       root.sent_at AS updated_at,
-                       root.content_json ->> 'status' AS status,
-                       0 AS depth
-                FROM notifications AS root
-                WHERE root.kind = {{(short)NotificationKind.QuestionOpened}}
-                  AND root.target_type = {{(short)NotificationTargetType.CompetitionCollaborators}}
-                  AND root.target_id = {{query.CompetitionId}}
-                  AND ({{query.Subject is null}}
-                       OR root.content_json ->> 'subject' = {{subject}})
-                  AND ({{query.CompetitionChallengeId is null}}
-                       OR root.content_json ->> 'competitionChallengeId' = {{competitionChallengeId}})
-                  AND ({{broadAccess}}
-                       OR root.content_json ->> 'teamId' = {{teamId}}
-                       OR root.content_json ->> 'competitionChallengeId' = ANY ({{challengeIds}}))
-                UNION ALL
-                SELECT parent.root_id,
-                       child.id,
-                       child.sent_at,
-                       COALESCE(child.content_json ->> 'to', parent.status),
-                       parent.depth + 1
-                FROM notifications AS child
-                JOIN question_thread AS parent ON child.reply_to_id = parent.node_id
-            ),
-            question_head AS (
-                SELECT DISTINCT ON (root_id)
-                       root_id,
-                       updated_at,
-                       status
-                FROM question_thread
-                ORDER BY root_id, depth DESC
-            )
             SELECT root.*
             FROM notifications AS root
-            JOIN question_head AS head ON head.root_id = root.id
-            WHERE ({{query.Status is null}} OR head.status = {{status}})
+            LEFT JOIN LATERAL (
+                SELECT node.sent_at AS updated_at,
+                       node.content_json ->> 'to' AS status
+                FROM notifications AS node
+                WHERE node.thread_root_id = root.id
+                  AND node.kind IN (
+                      {{(short)NotificationKind.Message}},
+                      {{(short)NotificationKind.QuestionStatusChanged}})
+                ORDER BY node.sent_at DESC, node.id DESC
+                LIMIT 1
+            ) AS head ON TRUE
+            WHERE root.kind = {{(short)NotificationKind.QuestionOpened}}
+              AND root.target_type = {{(short)NotificationTargetType.CompetitionCollaborators}}
+              AND root.target_id = {{query.CompetitionId}}
+              AND ({{query.Subject is null}}
+                   OR root.content_json ->> 'subject' = {{subject}})
+              AND ({{query.CompetitionChallengeId is null}}
+                   OR root.content_json ->> 'competitionChallengeId' = {{competitionChallengeId}})
+              AND ({{broadAccess}}
+                   OR root.content_json ->> 'teamId' = {{teamId}}
+                   OR root.content_json ->> 'competitionChallengeId' = ANY ({{challengeIds}}))
+              AND ({{query.Status is null}}
+                   OR COALESCE(head.status, root.content_json ->> 'status') = {{status}})
               AND ({{!hasPosition}}
-                   OR head.updated_at < {{positionUpdatedAt}}
-                   OR (head.updated_at = {{positionUpdatedAt}} AND root.id < {{positionId}}))
-            ORDER BY head.updated_at DESC, root.id DESC
+                   OR COALESCE(head.updated_at, root.sent_at) < {{positionUpdatedAt}}
+                   OR (COALESCE(head.updated_at, root.sent_at) = {{positionUpdatedAt}}
+                       AND root.id < {{positionId}}))
+            ORDER BY COALESCE(head.updated_at, root.sent_at) DESC, root.id DESC
             LIMIT {{limit}}
             """).AsNoTracking().ToArrayAsync(ct);
     }
@@ -674,76 +662,17 @@ public sealed class CompetitionQuestionStore(
         if (rootPayloads.Count == 0)
             return [];
 
-        Notification[] descendants;
-        if (!db.Database.IsRelational())
-        {
-            var all = await db.Notifications.AsNoTracking().ToArrayAsync(ct);
-            var includedIds = rootPayloads.Keys.ToHashSet();
-            var pending = true;
-            while (pending)
-            {
-                pending = false;
-                foreach (var notification in all)
-                {
-                    if (notification.ReplyToId is not { } parentId
-                        || !includedIds.Contains(parentId)
-                        || !includedIds.Add(notification.Id))
-                        continue;
-                    pending = true;
-                }
-            }
-            descendants = all
-                .Where(notification => !rootPayloads.ContainsKey(notification.Id)
-                    && includedIds.Contains(notification.Id))
-                .ToArray();
-        }
-        else
-        {
-            var rootIds = rootPayloads.Keys.ToArray();
-            descendants = await db.Notifications.FromSqlInterpolated($$"""
-                WITH RECURSIVE thread AS (
-                    SELECT child.*
-                    FROM notifications AS child
-                    WHERE child.reply_to_id = ANY ({{rootIds}})
-                    UNION ALL
-                    SELECT child.*
-                    FROM notifications AS child
-                    JOIN thread AS parent ON child.reply_to_id = parent.id
-                )
-                SELECT * FROM thread
-                """).AsNoTracking().ToArrayAsync(ct);
-        }
-
-        var rootByNode = rootPayloads.Keys.ToDictionary(id => id, id => id);
-        var byId = descendants.ToDictionary(notification => notification.Id);
-        Guid ResolveRoot(Notification notification)
-        {
-            if (rootByNode.TryGetValue(notification.Id, out var knownRoot))
-                return knownRoot;
-            var path = new List<Guid>();
-            var current = notification;
-            while (true)
-            {
-                path.Add(current.Id);
-                if (current.ReplyToId is not { } parentId)
-                    return Guid.Empty;
-                if (rootByNode.TryGetValue(parentId, out knownRoot))
-                {
-                    foreach (var id in path)
-                        rootByNode[id] = knownRoot;
-                    return knownRoot;
-                }
-                if (!byId.TryGetValue(parentId, out var parent))
-                    return Guid.Empty;
-                current = parent;
-            }
-        }
+        var rootIds = rootPayloads.Keys.ToArray();
+        var descendants = await db.Notifications.AsNoTracking()
+            .Where(notification => notification.ThreadRootId != null
+                && rootIds.Contains(notification.ThreadRootId.Value))
+            .ToArrayAsync(ct);
 
         var nodesByRoot = rootPayloads.Keys.ToDictionary(id => id, _ => new List<Notification>());
         foreach (var descendant in descendants)
         {
-            var rootId = ResolveRoot(descendant);
-            if (nodesByRoot.TryGetValue(rootId, out var nodes))
+            if (descendant.ThreadRootId is { } rootId
+                && nodesByRoot.TryGetValue(rootId, out var nodes))
                 nodes.Add(descendant);
         }
         return rootPayloads.Values
@@ -766,44 +695,11 @@ public sealed class CompetitionQuestionStore(
         QuestionRootPayload payload,
         CancellationToken ct)
     {
-        List<Notification> nodes;
-        if (!db.Database.IsRelational())
-        {
-            var all = await db.Notifications.AsNoTracking().ToListAsync(ct);
-            var ids = new HashSet<Guid> { root.Id };
-            var changed = true;
-            while (changed)
-            {
-                changed = false;
-                foreach (var item in all)
-                {
-                    if (item.ReplyToId is not { } parentId
-                        || !ids.Contains(parentId)
-                        || !ids.Add(item.Id))
-                        continue;
-                    changed = true;
-                }
-            }
-            nodes = all.Where(item => item.Id != root.Id && ids.Contains(item.Id))
-                .OrderBy(item => item.SentAt)
-                .ThenBy(item => item.Id)
-                .ToList();
-        }
-        else
-        {
-            nodes = await db.Notifications.FromSqlInterpolated($$"""
-                WITH RECURSIVE thread AS (
-                    SELECT n.* FROM notifications AS n WHERE n.reply_to_id = {{root.Id}}
-                    UNION ALL
-                    SELECT n.* FROM notifications AS n
-                    JOIN thread AS parent ON n.reply_to_id = parent.id
-                )
-                SELECT * FROM thread
-                """).AsNoTracking()
-                .OrderBy(notification => notification.SentAt)
-                .ThenBy(notification => notification.Id)
-                .ToListAsync(ct);
-        }
+        var nodes = await db.Notifications.AsNoTracking()
+            .Where(notification => notification.ThreadRootId == root.Id)
+            .OrderBy(notification => notification.SentAt)
+            .ThenBy(notification => notification.Id)
+            .ToListAsync(ct);
         return new(root, payload, nodes);
     }
 
@@ -833,35 +729,23 @@ public sealed class CompetitionQuestionStore(
         };
         var team = teamId.ToString();
         var rootsWithActiveHeads = await db.Notifications.FromSqlInterpolated($$"""
-            WITH RECURSIVE question_thread AS (
-                SELECT root.id AS root_id,
-                       root.id AS node_id,
-                       root.content_json ->> 'status' AS status,
-                       0 AS depth
-                FROM notifications AS root
-                WHERE root.kind = {{(short)NotificationKind.QuestionOpened}}
-                  AND root.target_type = {{(short)NotificationTargetType.CompetitionCollaborators}}
-                  AND root.target_id = {{competitionId}}
-                  AND root.content_json ->> 'teamId' = {{team}}
-                UNION ALL
-                SELECT parent.root_id,
-                       child.id,
-                       COALESCE(child.content_json ->> 'to', parent.status),
-                       parent.depth + 1
-                FROM notifications AS child
-                JOIN question_thread AS parent ON child.reply_to_id = parent.node_id
-            ),
-            question_head AS (
-                SELECT DISTINCT ON (root_id)
-                       root_id,
-                       status
-                FROM question_thread
-                ORDER BY root_id, depth DESC
-            )
             SELECT root.*
             FROM notifications AS root
-            JOIN question_head AS head ON head.root_id = root.id
-            WHERE head.status = ANY ({{active}})
+            LEFT JOIN LATERAL (
+                SELECT node.content_json ->> 'to' AS status
+                FROM notifications AS node
+                WHERE node.thread_root_id = root.id
+                  AND node.kind IN (
+                      {{(short)NotificationKind.Message}},
+                      {{(short)NotificationKind.QuestionStatusChanged}})
+                ORDER BY node.sent_at DESC, node.id DESC
+                LIMIT 1
+            ) AS head ON TRUE
+            WHERE root.kind = {{(short)NotificationKind.QuestionOpened}}
+              AND root.target_type = {{(short)NotificationTargetType.CompetitionCollaborators}}
+              AND root.target_id = {{competitionId}}
+              AND root.content_json ->> 'teamId' = {{team}}
+              AND COALESCE(head.status, root.content_json ->> 'status') = ANY ({{active}})
             """).AsNoTracking().ToArrayAsync(ct);
         return rootsWithActiveHeads.Length;
     }
@@ -1284,10 +1168,22 @@ public sealed class CompetitionQuestionStore(
             ? RootNotification.SentAt
             : Nodes[^1].SentAt;
 
-        public CompetitionQuestionStatus Status => Nodes.Count == 0
-            ? Root.Status
-            : Nodes[^1].Kind == NotificationKind.Message
-                ? JsonSerializer.Deserialize<QuestionMessagePayload>(Nodes[^1].ContentJson, JsonOptions)!.To
-                : JsonSerializer.Deserialize<QuestionStatusPayload>(Nodes[^1].ContentJson, JsonOptions)!.To;
+        public CompetitionQuestionStatus Status
+        {
+            get
+            {
+                var statusNode = Nodes.LastOrDefault(node => node.Kind is
+                    NotificationKind.Message or NotificationKind.QuestionStatusChanged);
+                if (statusNode is null)
+                    return Root.Status;
+                return statusNode.Kind == NotificationKind.Message
+                    ? JsonSerializer.Deserialize<QuestionMessagePayload>(
+                        statusNode.ContentJson,
+                        JsonOptions)!.To
+                    : JsonSerializer.Deserialize<QuestionStatusPayload>(
+                        statusNode.ContentJson,
+                        JsonOptions)!.To;
+            }
+        }
     }
 }
