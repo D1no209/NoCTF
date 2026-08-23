@@ -186,7 +186,6 @@ const hardDeleteReferenceLabels: Record<NoCtfapiEndpointsAdministrationCompetiti
   GameplayFact: '比赛事实',
   RuntimeInstance: '运行环境',
   PatchUpload: '补丁上传',
-  DataExport: '数据导出',
   Notification: '通知与咨询',
   PosterFile: '比赛海报',
   ActiveRuntimeResource: '活动运行环境资源',

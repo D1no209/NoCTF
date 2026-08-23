@@ -45,9 +45,6 @@ public static class MessageRouting
         Route<TeamBanCorrected>(options, WorkerQueue.Background);
         Route<DeliverCompetitionQuestionNotification>(options, WorkerQueue.Background);
         Route<CompetitionEventCommitted>(options, WorkerQueue.Background);
-        Route<GenerateDataExport>(options, WorkerQueue.Background);
-        Route<ExpireDataExport>(options, WorkerQueue.Background);
-        Route<PurgeDataExport>(options, WorkerQueue.Background);
         Route<ReconcileRunnerAssignments>(options, WorkerQueue.Control);
         Route<ReleaseRunnerCapacity>(options, WorkerQueue.Control);
         Route<BloodAwarded>(options, WorkerQueue.Background);

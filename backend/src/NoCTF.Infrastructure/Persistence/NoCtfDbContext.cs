@@ -9,7 +9,6 @@ using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Platform;
 using NoCTF.Domain.Challenges.Questions;
 using NoCTF.Domain.Competitions.Events;
-using NoCTF.Domain.DataExports;
 using NoCTF.Domain.Storage;
 using NoCTF.Domain.Gameplay;
 
@@ -31,7 +30,6 @@ public sealed class NoCtfDbContext(DbContextOptions<NoCtfDbContext> options) : D
     public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<GameplayFact> GameplayFacts => Set<GameplayFact>();
-    public DbSet<DataExport> DataExports => Set<DataExport>();
     public DbSet<StoredFile> Files => Set<StoredFile>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

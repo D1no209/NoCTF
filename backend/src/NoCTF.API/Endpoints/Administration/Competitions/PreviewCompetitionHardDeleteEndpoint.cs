@@ -16,7 +16,6 @@ public enum CompetitionHardDeleteReferenceCode
     GameplayFact,
     RuntimeInstance,
     PatchUpload,
-    DataExport,
     Notification,
     PosterFile,
     ActiveRuntimeResource

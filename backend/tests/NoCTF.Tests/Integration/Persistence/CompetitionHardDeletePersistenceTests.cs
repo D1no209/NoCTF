@@ -5,7 +5,6 @@ using NoCTF.Application.Competitions.Management;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Competitions.Events;
-using NoCTF.Domain.DataExports;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Notifications;
@@ -50,7 +49,6 @@ public sealed class CompetitionHardDeletePersistenceTests
             var eventId = Guid.CreateVersion7(now.AddTicks(4));
             var notificationId = Guid.CreateVersion7(now.AddTicks(5));
             var teamNotificationId = Guid.CreateVersion7(now.AddTicks(51));
-            var dataExportId = Guid.CreateVersion7(now.AddTicks(6));
             var challengeId = Guid.CreateVersion7(now.AddTicks(7));
             var competitionChallengeId = Guid.CreateVersion7(now.AddTicks(8));
             var teamId = Guid.CreateVersion7(now.AddTicks(9));
@@ -186,17 +184,6 @@ public sealed class CompetitionHardDeletePersistenceTests
                         RelatedId = teamId,
                         SentAt = now.AddTicks(1)
                     });
-                setup.DataExports.Add(new DataExport
-                {
-                    Id = dataExportId,
-                    Scope = DataExportScope.CompetitionArchive,
-                    CompetitionId = historicalCompetitionId,
-                    RequestedByUserId = ownerId,
-                    RequestedAt = now,
-                    Status = DataExportStatus.Failed,
-                    PurgeAt = now.AddDays(1),
-                    FailureCode = DataExportFailureCode.GenerationFailed
-                });
                 await setup.SaveChangesAsync(ct);
             }
 
@@ -243,9 +230,6 @@ public sealed class CompetitionHardDeletePersistenceTests
                             1),
                         new CompetitionHardDeleteReference(
                             CompetitionHardDeleteReferenceKind.PatchUpload,
-                            1),
-                        new CompetitionHardDeleteReference(
-                            CompetitionHardDeleteReferenceKind.DataExport,
                             1),
                         new CompetitionHardDeleteReference(
                             CompetitionHardDeleteReferenceKind.Notification,
@@ -324,9 +308,6 @@ public sealed class CompetitionHardDeletePersistenceTests
                     ct)).IsFalse();
                 await Assert.That(await verification.Notifications.AnyAsync(
                     item => item.Id == teamNotificationId,
-                    ct)).IsFalse();
-                await Assert.That(await verification.DataExports.AnyAsync(
-                    item => item.Id == dataExportId,
                     ct)).IsFalse();
                 var audit = await verification.Notifications.SingleAsync(item =>
                     item.Kind == NotificationKind.CompetitionForceDeleted,

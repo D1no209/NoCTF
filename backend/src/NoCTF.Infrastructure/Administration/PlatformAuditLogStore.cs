@@ -8,6 +8,7 @@ using NoCTF.Domain.Notifications;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Domain.Shared;
 using NoCTF.Application.Competitions.Management;
+using NoCTF.Application.Exports;
 
 namespace NoCTF.Infrastructure.Administration;
 
@@ -35,7 +36,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
         CompetitionEventKind.CheatIncidentDismissed,
         CompetitionEventKind.CheatIncidentSuperseded,
         CompetitionEventKind.CheatIncidentCorrected,
-        CompetitionEventKind.ProtectedCompetitionExportCreated,
+        CompetitionEventKind.CompetitionArchiveExported,
         CompetitionEventKind.TeamBanAppealUpheld,
         CompetitionEventKind.TeamBanAppealAccepted,
         CompetitionEventKind.TeamBanCorrectionPublished,
@@ -56,8 +57,10 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
         CancellationToken ct)
     {
         var items = new List<PlatformAuditView>(query.Limit * 2);
-        if (query.Kind is not PlatformAuditKind.UserAccountLifecycle
-            and not PlatformAuditKind.CompetitionAdministration)
+        if (query.Kind is null
+            or PlatformAuditKind.CompetitionLifecycle
+            or PlatformAuditKind.CompetitionLeaderboardVisibility
+            or PlatformAuditKind.CompetitionEvent)
         {
             var competitionEvents = db.CompetitionEvents.AsNoTracking()
                 .Where(item => item.ActorUserId != null
@@ -117,6 +120,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 item.PreviousLeaderboardVisibility,
                 item.LeaderboardVisibility,
                 null,
+                null,
                 item.Kind,
                 item.Level,
                 item.Visibility,
@@ -137,16 +141,20 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
 
         if (query.Kind is null
             or PlatformAuditKind.UserAccountLifecycle
+            or PlatformAuditKind.PlatformAdministration
             or PlatformAuditKind.CompetitionAdministration)
         {
             var auditFacts = db.Notifications.AsNoTracking().Where(notification =>
                 (notification.Kind == NotificationKind.UserAccountLifecycleChanged
-                    || notification.Kind == NotificationKind.CompetitionForceDeleted)
+                    || notification.Kind == NotificationKind.CompetitionForceDeleted
+                    || notification.Kind == NotificationKind.PlatformAuditExported)
                 && notification.TargetType == NotificationTargetType.PlatformAdministrators);
             auditFacts = query.Kind switch
             {
                 PlatformAuditKind.UserAccountLifecycle => auditFacts.Where(notification =>
                     notification.Kind == NotificationKind.UserAccountLifecycleChanged),
+                PlatformAuditKind.PlatformAdministration => auditFacts.Where(notification =>
+                    notification.Kind == NotificationKind.PlatformAuditExported),
                 PlatformAuditKind.CompetitionAdministration => auditFacts.Where(notification =>
                     notification.Kind == NotificationKind.CompetitionForceDeleted),
                 _ => auditFacts
@@ -163,8 +171,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                     && notification.SourceId == query.ActorId.Value);
             if (query.CompetitionId is Guid competitionId)
                 auditFacts = auditFacts.Where(notification =>
-                    notification.Kind == NotificationKind.CompetitionForceDeleted
-                    && notification.RelatedType == EntityReferenceKind.Competition
+                    notification.RelatedType == EntityReferenceKind.Competition
                     && notification.RelatedId == competitionId);
             if (query.BeforeOccurredAt is DateTimeOffset beforeOccurredAt
                 && query.BeforeId is Guid beforeId)
@@ -221,6 +228,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 FromLeaderboardVisibility: null,
                 ToLeaderboardVisibility: null,
                 UserAccountAction: null,
+                PlatformAdministrationAction: null,
                 CompetitionEventKind: null,
                 CompetitionEventLevel: CompetitionEventLevel.Warning,
                 CompetitionEventVisibility: CompetitionEventVisibility.Staff,
@@ -235,6 +243,41 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
                 GameplayFactResult: null,
                 SubjectDisplayName: deletionFact.CompetitionTitle,
                 Reason: deletionFact.Reason,
+                Automatic: false,
+                OccurredAt: notification.SentAt);
+        }
+        if (notification.Kind == NotificationKind.PlatformAuditExported)
+        {
+            var exportFact = JsonSerializer.Deserialize<PlatformAuditArchiveExportedFact>(
+                notification.ContentJson,
+                JsonOptions) ?? throw new InvalidOperationException(
+                $"Notification {notification.Id} has no platform audit-export payload.");
+            return new(
+                Id: notification.Id,
+                Kind: PlatformAuditKind.PlatformAdministration,
+                SubjectId: Notification.PlatformAdministratorsTargetId,
+                CompetitionId: exportFact.CompetitionId,
+                ActorId: notification.SourceId,
+                FromCompetitionStatus: null,
+                ToCompetitionStatus: null,
+                FromLeaderboardVisibility: null,
+                ToLeaderboardVisibility: null,
+                UserAccountAction: null,
+                PlatformAdministrationAction: PlatformAdministrationAction.AuditArchiveExported,
+                CompetitionEventKind: null,
+                CompetitionEventLevel: CompetitionEventLevel.Information,
+                CompetitionEventVisibility: CompetitionEventVisibility.Staff,
+                RelatedUserId: exportFact.ActorId,
+                TeamId: null,
+                CompetitionChallengeId: null,
+                RuntimeInstanceId: null,
+                GameplayFactId: null,
+                QuestionId: null,
+                GameplayFactKind: null,
+                GameplayFactState: null,
+                GameplayFactResult: null,
+                SubjectDisplayName: "Platform audit",
+                Reason: null,
                 Automatic: false,
                 OccurredAt: notification.SentAt);
         }
@@ -253,6 +296,7 @@ public sealed class PlatformAuditLogStore(NoCtfDbContext db) : IPlatformAuditLog
             FromLeaderboardVisibility: null,
             ToLeaderboardVisibility: null,
             UserAccountAction: fact.Action,
+            PlatformAdministrationAction: null,
             CompetitionEventKind: null,
             CompetitionEventLevel: null,
             CompetitionEventVisibility: null,

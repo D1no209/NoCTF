@@ -1,31 +1,23 @@
 <script setup lang="ts">
-import { Download, FilePlus2, RefreshCw } from '@lucide/vue'
+import { Download } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import {
-  adminCreatePlatformAuditDataExport,
-  adminDownloadDataExport,
-  adminListPlatformAuditDataExports,
+  adminExportPlatformAuditArchive,
   adminPlatformListAuditLogs,
 } from '~/api'
 import type {
-  NoCtfapiEndpointsAdministrationDataExportsDataExportResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse,
   NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
 } from '~/api'
 import { downloadSdkFile } from '~/utils/download'
 import { platformAuditActionText } from '~/utils/platform-audit'
-import { userFacingErrorMessage } from '~/utils/api-error'
 
 definePageMeta({ middleware: 'platform-admin' })
 
 type AuditLog = NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse
-type DataExport = NoCtfapiEndpointsAdministrationDataExportsDataExportResponse
 
 const KIND_LABELS: Record<string, string> = {
-  CompetitionLifecycle: '竞赛生命周期', UserAccountLifecycle: '账户生命周期', CompetitionAdministration: '竞赛管理', CompetitionLeaderboardVisibility: '榜单可见性', CompetitionEvent: '竞赛事件',
-}
-const EXPORT_STATUS: Record<string, { label: string; variant: 'secondary' | 'outline' | 'destructive' | 'default' }> = {
-  Queued: { label: '排队中', variant: 'outline' }, Processing: { label: '处理中', variant: 'secondary' }, Available: { label: '可下载', variant: 'default' }, Failed: { label: '失败', variant: 'destructive' }, Expired: { label: '已过期', variant: 'outline' },
+  CompetitionLifecycle: '竞赛生命周期', UserAccountLifecycle: '账户生命周期', PlatformAdministration: '平台管理', CompetitionAdministration: '竞赛管理', CompetitionLeaderboardVisibility: '榜单可见性', CompetitionEvent: '竞赛事件',
 }
 
 const kind = ref('all')
@@ -63,67 +55,39 @@ function applyFilters(): void {
   void loadMore()
 }
 
-// ---------- 数据导出 ----------
-const exports_ = ref<DataExport[]>([])
-const exportsLoading = ref(false)
-const exportsError = ref<string | null>(null)
-const creatingExport = ref(false)
-const downloadingId = ref<string | null>(null)
+const exportingArchive = ref(false)
 
-function exportFailureText(detail: string | null | undefined): string {
-  return userFacingErrorMessage(detail, translate("导出任务失败,请重试"))
-}
-
-async function loadExports(): Promise<void> {
-  exportsLoading.value = true
-  const { data, error } = await adminListPlatformAuditDataExports()
-  exportsLoading.value = false
-  if (error || !data) {
-    exportsError.value = parseApiError(error).message
-    return
-  }
-  exportsError.value = null
-  exports_.value = data.items ?? []
-}
-
-async function createExport(): Promise<void> {
-  creatingExport.value = true
-  const { error, response } = await adminCreatePlatformAuditDataExport()
-  creatingExport.value = false
-  if (error) {
-    toast.error(response?.status === 409 ? translate("已有进行中的导出任务") : parseApiError(error).message)
-    await loadExports()
-    return
-  }
-  toast.success(translate("导出任务已创建,完成后可下载"))
-  await loadExports()
-}
-
-async function downloadExport(item: DataExport): Promise<void> {
-  const dataExportId = item.id
-  if (!dataExportId) return
-  downloadingId.value = dataExportId
+async function exportArchive(): Promise<void> {
+  if (exportingArchive.value) return
+  exportingArchive.value = true
   try {
     await downloadSdkFile(
-      adminDownloadDataExport({
-        path: { dataExportId },
+      adminExportPlatformAuditArchive({
+        body: {
+          kind: kind.value === 'all'
+            ? null
+            : kind.value as NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol,
+          actorId: actorId.value.trim() || null,
+          competitionId: competitionId.value.trim() || null,
+          from: toIso(from.value),
+          to: toIso(to.value),
+        },
         parseAs: 'blob',
       }),
-      item.fileName ?? 'platform-audit-export.zip',
+      'platform-audit-archive.zip',
     )
-    toast.success(translate("导出文件已开始下载"))
+    toast.success(translate('审计归档已开始下载'))
   }
   catch (e) {
     toast.error(parseApiError(e).message)
   }
   finally {
-    downloadingId.value = null
+    exportingArchive.value = false
   }
 }
 
 onMounted(() => {
   void loadMore()
-  void loadExports()
 })
 </script>
 
@@ -142,6 +106,7 @@ onMounted(() => {
                 <SelectItem value="all">{{ $t('全部类型') }}</SelectItem>
                 <SelectItem value="CompetitionLifecycle">{{ $t('竞赛生命周期') }}</SelectItem>
                 <SelectItem value="UserAccountLifecycle">{{ $t('账户生命周期') }}</SelectItem>
+                <SelectItem value="PlatformAdministration">{{ $t('平台管理') }}</SelectItem>
                 <SelectItem value="CompetitionAdministration">{{ $t('竞赛管理') }}</SelectItem>
                 <SelectItem value="CompetitionLeaderboardVisibility">{{ $t('榜单可见性') }}</SelectItem>
                 <SelectItem value="CompetitionEvent">{{ $t('竞赛事件') }}</SelectItem>
@@ -228,73 +193,13 @@ onMounted(() => {
       <CardHeader class="flex flex-row items-center justify-between gap-4">
         <div>
           <CardTitle>{{ $t('审计数据导出') }}</CardTitle>
-          <CardDescription>{{ $t('导出全量平台审计数据,任务完成后可下载,文件有过期时间。') }}</CardDescription>
+          <CardDescription>{{ $t('按当前筛选条件同步生成审计归档并立即下载。') }}</CardDescription>
         </div>
-        <div class="flex items-center gap-2">
-          <Button variant="outline" :disabled="exportsLoading" @click="loadExports">
-            <Spinner v-if="exportsLoading" data-icon="inline-start" />
-            <RefreshCw v-else data-icon="inline-start" /> {{ $t('刷新') }} </Button>
-          <Button :disabled="creatingExport" @click="createExport">
-            <Spinner v-if="creatingExport" data-icon="inline-start" />
-            <FilePlus2 v-else data-icon="inline-start" /> {{ $t('新建导出') }} </Button>
-        </div>
+        <Button :disabled="exportingArchive" @click="exportArchive">
+          <Spinner v-if="exportingArchive" data-icon="inline-start" />
+          <Download v-else data-icon="inline-start" /> {{ $t('下载审计归档') }}
+        </Button>
       </CardHeader>
-      <CardContent>
-        <Alert v-if="exportsError" variant="destructive" class="mb-3">
-          <AlertDescription>{{ exportsError }}</AlertDescription>
-        </Alert>
-        <div v-if="exportsLoading && exports_.length === 0" class="flex flex-col gap-2">
-          <Skeleton v-for="i in 2" :key="i" class="h-10 w-full" />
-        </div>
-        <Empty v-else-if="!exportsError && exports_.length === 0" class="border border-dashed py-12">
-          <EmptyHeader>
-            <EmptyTitle>{{ $t('暂无导出任务') }}</EmptyTitle>
-          </EmptyHeader>
-        </Empty>
-        <Table v-else-if="exports_.length > 0">
-          <TableHeader>
-            <TableRow>
-              <TableHead>{{ $t('申请时间') }}</TableHead>
-              <TableHead>{{ $t('状态') }}</TableHead>
-              <TableHead>{{ $t('文件名') }}</TableHead>
-              <TableHead>{{ $t('过期时间') }}</TableHead>
-              <TableHead class="text-right">{{ $t('操作') }}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-for="item in exports_" :key="item.id">
-              <TableCell>
-                <AdminDateTime :value="item.requestedAt" />
-              </TableCell>
-              <TableCell>
-                <Badge :variant="EXPORT_STATUS[String(item.status)]?.variant ?? 'outline'">
-                  {{ EXPORT_STATUS[String(item.status)]?.label ? $t(EXPORT_STATUS[String(item.status)]!.label) : item.status }}
-                </Badge>
-                <p v-if="item.failureDetail" class="mt-1 text-xs text-destructive" :title="exportFailureText(item.failureDetail)">
-                  {{ exportFailureText(item.failureDetail) }}
-                </p>
-              </TableCell>
-              <TableCell class="max-w-56 truncate font-mono text-xs" :title="item.fileName ?? ''">
-                {{ item.fileName ?? '-' }}
-              </TableCell>
-              <TableCell>
-                <AdminDateTime :value="item.expiresAt" />
-              </TableCell>
-              <TableCell class="text-right">
-                <Button
-                  v-if="item.status === 'Available'"
-                  size="sm"
-                  variant="outline"
-                  :disabled="downloadingId === item.id"
-                  @click="downloadExport(item)"
-                >
-                  <Spinner v-if="downloadingId === item.id" data-icon="inline-start" />
-                  <Download v-else data-icon="inline-start" /> {{ $t('下载') }} </Button>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </CardContent>
     </Card>
   </div>
 </template>

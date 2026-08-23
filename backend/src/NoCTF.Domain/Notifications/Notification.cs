@@ -58,8 +58,7 @@ public enum NotificationKind : short
     TeamBanned,
     CheatIncidentDetected,
     TeamBanCorrected,
-    DataExportReady,
-    DataExportFailed,
+    PlatformAuditExported,
     UserAccountLifecycleChanged,
     CompetitionForceDeleted
 }

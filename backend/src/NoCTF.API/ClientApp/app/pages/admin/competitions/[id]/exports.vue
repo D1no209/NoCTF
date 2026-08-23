@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import {
-  adminCreateCompetitionDataExport,
-  adminDownloadDataExport,
+  adminExportCompetitionArchive,
   adminExportCompetitionEvents,
-  adminListCompetitionDataExports,
 } from '~/api'
-import type { NoCtfapiEndpointsAdministrationDataExportsDataExportResponse } from '~/api'
 import { useCompetitionAdmin } from '~/lib/admin-competition'
 import { downloadSdkFile } from '~/utils/download'
 import { userFacingErrorMessage } from '~/utils/api-error'
@@ -47,79 +44,40 @@ async function exportEvents() {
   }
 }
 
-// ---- Data exports ----
-const exports_ = ref<NoCtfapiEndpointsAdministrationDataExportsDataExportResponse[]>([])
-const loadingExports = ref(true)
-const exportsError = ref<string | null>(null)
 const includeProtectedFlags = ref(false)
 const exportReason = ref('')
-const creating = ref(false)
-const downloadingId = ref<string | null>(null)
+const exportingArchive = ref(false)
 
-function exportFailureText(detail: string | null | undefined): string {
-  return userFacingErrorMessage(detail, translate("导出任务失败,请重试"))
-}
-
-async function loadExports() {
-  loadingExports.value = true
-  const { data, error } = await adminListCompetitionDataExports({ path: { competitionId } })
-  if (error || !data) {
-    exportsError.value = parseApiError(error).message
+async function exportArchive() {
+  if (exportingArchive.value) return
+  const reason = exportReason.value.trim()
+  if (includeProtectedFlags.value && (reason.length < 8 || reason.length > 512)) {
+    toast.error(translate('包含受保护 Flag 时，请填写 8–512 个字符的导出原因'))
+    return
   }
-  else {
-    exportsError.value = null
-    exports_.value = data.items ?? []
-  }
-  loadingExports.value = false
-}
-
-async function createExport() {
-  creating.value = true
+  exportingArchive.value = true
   try {
-    const { error } = await adminCreateCompetitionDataExport({
-      path: { competitionId },
-      body: {
-        includeProtectedFlags: includeProtectedFlags.value,
-        reason: exportReason.value.trim() || null,
-      },
-    })
-    if (error) throw error
-    toast.success(translate("导出任务已创建,完成后可下载"))
+    await downloadSdkFile(
+      adminExportCompetitionArchive({
+        path: { competitionId },
+        body: {
+          includeProtectedFlags: includeProtectedFlags.value,
+          reason: reason || null,
+        },
+        parseAs: 'blob',
+      }),
+      `competition-${competitionId}-archive.zip`,
+    )
+    toast.success(translate('竞赛归档已开始下载'))
     exportReason.value = ''
-    await loadExports()
   }
   catch (e) {
     toast.error(parseApiError(e).message)
   }
   finally {
-    creating.value = false
+    exportingArchive.value = false
   }
 }
-
-async function downloadExport(item: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse) {
-  const dataExportId = item.id
-  if (!dataExportId) return
-  downloadingId.value = dataExportId
-  try {
-    await downloadSdkFile(
-      adminDownloadDataExport({
-        path: { dataExportId },
-        parseAs: 'blob',
-      }),
-      item.fileName ?? `export-${item.id}.zip`,
-    )
-  }
-  catch (e) {
-    toast.error(userFacingErrorMessage(e instanceof Error ? e.message : null, translate("下载失败")))
-  }
-  finally {
-    downloadingId.value = null
-  }
-}
-
-const hasActive = computed(() => exports_.value.some(e => e.status === 'Queued' || e.status === 'Processing'))
-
-onMounted(loadExports)
 </script>
 
 <template>
@@ -145,80 +103,23 @@ onMounted(loadExports)
 
     <Card>
       <CardHeader>
-        <CardTitle>{{ $t('数据导出') }}</CardTitle>
-        <CardDescription>{{ $t('创建竞赛数据归档导出任务,生成后可下载') }}</CardDescription>
+        <CardTitle>{{ $t('竞赛归档') }}</CardTitle>
+        <CardDescription>{{ $t('同步生成当前竞赛的数据归档并立即下载。') }}</CardDescription>
       </CardHeader>
       <CardContent class="flex flex-col gap-4">
         <div v-if="canWrite" class="flex flex-wrap items-end gap-3">
           <Field>
-            <FieldLabel for="ex-reason">{{ $t('导出原因(可选)') }}</FieldLabel>
+            <FieldLabel for="ex-reason">{{ includeProtectedFlags ? $t('导出原因') : $t('导出原因(可选)') }}</FieldLabel>
             <Input id="ex-reason" v-model="exportReason" class="w-72" :placeholder="$t('记入审计')" />
+            <FieldDescription v-if="includeProtectedFlags">{{ $t('包含受保护 Flag 时需填写 8–512 个字符。') }}</FieldDescription>
           </Field>
           <Field orientation="horizontal">
             <Checkbox id="ex-flags" v-model="includeProtectedFlags" />
             <FieldLabel for="ex-flags" class="font-normal">{{ $t('包含受保护的 Flag') }}</FieldLabel>
           </Field>
-          <Button :disabled="creating" @click="createExport">
-            <Spinner v-if="creating" data-icon="inline-start" /> {{ $t('创建导出任务') }} </Button>
+          <Button :disabled="exportingArchive" @click="exportArchive">
+            <Spinner v-if="exportingArchive" data-icon="inline-start" /> {{ $t('下载竞赛归档') }} </Button>
         </div>
-
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-medium">{{ $t('导出任务') }}</h3>
-          <Button variant="ghost" size="sm" @click="loadExports">
-            <Spinner v-if="loadingExports" data-icon="inline-start" /> {{ $t('刷新') }} </Button>
-        </div>
-        <Alert v-if="exportsError" variant="destructive">
-          <AlertDescription>{{ exportsError }}</AlertDescription>
-        </Alert>
-        <Alert v-if="hasActive">
-          <AlertDescription>{{ $t('有导出任务正在处理中,可稍后刷新查看进度') }}</AlertDescription>
-        </Alert>
-        <Skeleton v-if="loadingExports && exports_.length === 0" class="h-32 w-full" />
-        <Empty v-else-if="!exportsError && exports_.length === 0" class="border border-dashed py-12">
-          <EmptyHeader>
-            <EmptyTitle>{{ $t('暂无导出任务') }}</EmptyTitle>
-          </EmptyHeader>
-        </Empty>
-        <Table v-else-if="exports_.length > 0">
-          <TableHeader>
-            <TableRow>
-              <TableHead class="w-44">{{ $t('创建时间') }}</TableHead>
-              <TableHead class="w-24">{{ $t('状态') }}</TableHead>
-              <TableHead>{{ $t('含 Flag') }}</TableHead>
-              <TableHead>{{ $t('原因') }}</TableHead>
-              <TableHead>{{ $t('文件名') }}</TableHead>
-              <TableHead class="w-44">{{ $t('过期时间') }}</TableHead>
-              <TableHead class="w-28 text-right">{{ $t('操作') }}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-for="e in exports_" :key="e.id">
-              <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(e.requestedAt) }}</TableCell>
-              <TableCell>
-                  <Badge :variant="e.status === 'Available' ? 'default' : e.status === 'Failed' ? 'destructive' : 'secondary'">
-                  {{ enumLabel(DataExportStatusLabel, e.status) }}
-                </Badge>
-              </TableCell>
-              <TableCell>{{ e.includeProtectedFlags ? $t('是') : $t('否') }}</TableCell>
-              <TableCell class="max-w-40 truncate">{{ e.reason ?? '-' }}</TableCell>
-              <TableCell class="max-w-48 truncate font-mono text-xs">
-                {{ e.fileName ?? '-' }}
-                <span v-if="e.failureDetail" class="block text-destructive">{{ exportFailureText(e.failureDetail) }}</span>
-              </TableCell>
-              <TableCell class="font-mono tabular-nums">{{ adminFormatDateTime(e.expiresAt) }}</TableCell>
-              <TableCell class="text-right">
-                <Button
-                  v-if="e.status === 'Available'"
-                  variant="outline"
-                  size="sm"
-                  :disabled="downloadingId === e.id"
-                  @click="downloadExport(e)"
-                >
-                  <Spinner v-if="downloadingId === e.id" data-icon="inline-start" /> {{ $t('下载') }} </Button>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
       </CardContent>
     </Card>
   </div>

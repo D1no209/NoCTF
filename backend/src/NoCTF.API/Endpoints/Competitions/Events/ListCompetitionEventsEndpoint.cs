@@ -34,7 +34,7 @@ public enum CompetitionEventKindProtocol
     RuntimeStateChanged, RuntimeExtended, RuntimeReset, RuntimePortAllocated,
     ProtectedGameplayFactValueAccessed, CheatIncidentDetected,
     CheatIncidentConfirmed, CheatIncidentDismissed, CheatIncidentSuperseded,
-    CheatIncidentCorrected, ProtectedCompetitionExportCreated, TeamBanAppealSubmitted,
+    CheatIncidentCorrected, CompetitionArchiveExported, TeamBanAppealSubmitted,
     TeamBanAppealUpheld, TeamBanAppealAccepted, TeamBanCorrectionPublished,
     RuntimeForceTerminationRequested, RuntimeForceTerminationCompleted,
     RuntimeForceTerminationFailed, AnnouncementPublished, QuestionOpened,

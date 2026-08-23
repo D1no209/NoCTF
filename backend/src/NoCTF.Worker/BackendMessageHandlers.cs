@@ -57,8 +57,7 @@ public static class BackendMessageHandlers
             || await db.Competitions.AnyAsync(item => item.PosterFileId == file.Id, cancellationToken)
             || await db.PlatformSettings.AnyAsync(item => item.LogoFileId == file.Id, cancellationToken)
             || await db.Set<ChallengeAttachment>().AnyAsync(item => item.FileId == file.Id, cancellationToken)
-            || await db.PatchUploads.AnyAsync(item => item.FileId == file.Id, cancellationToken)
-            || await db.DataExports.AnyAsync(item => item.FileId == file.Id, cancellationToken);
+            || await db.PatchUploads.AnyAsync(item => item.FileId == file.Id, cancellationToken);
         if (referenced)
             return;
         await objects.DeleteObject(file.ObjectKey, cancellationToken);
