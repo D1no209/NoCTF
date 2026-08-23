@@ -84,10 +84,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             await Assert.That(async () =>
                     await cache.RefreshAsync(fixture.Competition.Id, cancellationToken))
                 .Throws<InvalidOperationException>();
-            await db.Entry(fixture.Competition).ReloadAsync(cancellationToken);
-
             await Assert.That(fence.ProjectionLockWasAvailable).IsTrue();
-            await Assert.That(fixture.Competition.LeaderboardDirty).IsTrue();
         });
     }
 
@@ -287,7 +284,6 @@ public sealed class LeaderboardProjectionPersistenceTests
             var owner = CreateUser(projectedAt);
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, projectedAt);
             fixture.Competition.StartAt = startedAt;
-            fixture.Competition.RunningSince = startedAt;
             fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(new AwdpConfiguration(
                 AwdpConfiguration.CurrentSchemaVersion,
                 1,
@@ -453,7 +449,6 @@ public sealed class LeaderboardProjectionPersistenceTests
             var owner = CreateUser(firstProjectionAt);
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, firstProjectionAt);
             fixture.Competition.StartAt = startedAt;
-            fixture.Competition.RunningSince = startedAt;
             fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(new AwdpConfiguration(
                 AwdpConfiguration.CurrentSchemaVersion,
                 60,
@@ -580,7 +575,6 @@ public sealed class LeaderboardProjectionPersistenceTests
             var owner = CreateUser(projectedAt);
             var fixture = CreateFixture(GameMode.Awd, 0, owner.Id, projectedAt);
             fixture.Competition.StartAt = startedAt;
-            fixture.Competition.RunningSince = startedAt;
             fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(
                 AwdConfiguration.Default with { ServiceHealthyPoints = 100 },
                 new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -694,7 +688,6 @@ public sealed class LeaderboardProjectionPersistenceTests
                     Id = Guid.CreateVersion7(registeredAt),
                     CompetitionId = competitionId,
                     Name = name,
-                    NormalizedName = name.ToUpperInvariant(),
                     CaptainId = captainId,
                     MemberIds = [captainId],
                     InvitationToken = Guid.NewGuid().ToString("N"),
@@ -757,14 +750,10 @@ public sealed class LeaderboardProjectionPersistenceTests
                     OwnerId = owner.Id,
                     Mode = GameMode.Awdp,
                     ConfigurationJson = configuration,
-                    ConfigurationUpdatedAt = now,
-                    TrackConfigurationUpdatedAt = now,
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
-                    RunningSince = now.AddHours(-1),
                     Status = CompetitionStatus.Running,
-                    LeaderboardDirty = false,
                     MaxConcurrentRuntimeInstancesPerTeam = 1,
                     CreatedAt = now,
                     UpdatedAt = now
@@ -1191,12 +1180,9 @@ public sealed class LeaderboardProjectionPersistenceTests
             OwnerId = ownerId,
             Mode = mode,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(mode),
-            ConfigurationUpdatedAt = start,
-            TrackConfigurationUpdatedAt = start,
             FlagDerivationSecret = new byte[32],
             StartAt = start,
             EndAt = projectedAt.AddHours(1),
-            RunningSince = start,
             Status = CompetitionStatus.Running,
             MaxConcurrentRuntimeInstancesPerTeam = 1,
             CreatedAt = start,
@@ -1230,7 +1216,6 @@ public sealed class LeaderboardProjectionPersistenceTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = $"{mode} team",
-            NormalizedName = $"{mode.ToString().ToUpperInvariant()} TEAM",
             CaptainId = ownerId,
             MemberIds = [ownerId],
             InvitationToken = $"{index:D2}".PadRight(32, 'a'),
@@ -1297,7 +1282,6 @@ public sealed class LeaderboardProjectionPersistenceTests
         UserName = "administrator",
         NormalizedUserName = "ADMINISTRATOR",
         Email = "administrator@example.test",
-        NormalizedEmail = "ADMINISTRATOR@EXAMPLE.TEST",
         PasswordHash = "test",
         Role = UserRole.Administrator,
         CreatedAt = now,

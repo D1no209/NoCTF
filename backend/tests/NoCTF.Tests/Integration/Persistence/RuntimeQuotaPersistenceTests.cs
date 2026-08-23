@@ -307,11 +307,9 @@ public sealed class RuntimeQuotaPersistenceTests
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Ctf),
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
-            RunningSince = now,
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         AddChallenge(db, ownerId, competitionId, challengeIds[0], "First", 1, now);
         AddChallenge(db, ownerId, competitionId, challengeIds[1], "Second", 2, now);
@@ -331,7 +329,6 @@ public sealed class RuntimeQuotaPersistenceTests
                 Id = teamId,
                 CompetitionId = competitionId,
                 Name = $"Quota Team {index}",
-                NormalizedName = $"QUOTA TEAM {index}",
                 CaptainId = userId,
                 MemberIds = [userId],
                 InvitationToken = index.ToString().PadLeft(32, 'a'),
@@ -414,7 +411,6 @@ public sealed class RuntimeQuotaPersistenceTests
         UserName = name,
         NormalizedUserName = name.ToUpperInvariant(),
         Email = $"{name}@example.test",
-        NormalizedEmail = $"{name.ToUpperInvariant()}@EXAMPLE.TEST",
         PasswordHash = "test",
         CreatedAt = now,
         UpdatedAt = now

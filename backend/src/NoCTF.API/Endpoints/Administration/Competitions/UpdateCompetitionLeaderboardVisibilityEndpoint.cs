@@ -14,8 +14,8 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 
 public sealed class UpdateCompetitionLeaderboardVisibilityRequest
 {
-    public LeaderboardVisibilityProtocol? Visibility { get; set; }
-    public DateTimeOffset? StartsAt { get; set; }
+    public DateTimeOffset? FrozenStartAt { get; set; }
+    public DateTimeOffset? HiddenStartAt { get; set; }
     public string? Reason { get; set; }
 }
 
@@ -24,7 +24,6 @@ public sealed class UpdateCompetitionLeaderboardVisibilityValidator
 {
     public UpdateCompetitionLeaderboardVisibilityValidator()
     {
-        RuleFor(request => request.Visibility).NotNull().IsInEnum();
         RuleFor(request => request.Reason).MaximumLength(500);
     }
 }
@@ -68,8 +67,8 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
         Description(builder => builder.WithName("AdminUpdateCompetitionLeaderboardVisibility"));
         Summary(summary =>
         {
-            summary.Summary = "Schedules or immediately applies leaderboard visibility.";
-            summary.Description = "Persists the exact Frozen cutoff snapshot when the restriction takes effect.";
+            summary.Summary = "Sets the independent frozen and hidden leaderboard start times.";
+            summary.Description = "The latest effective timestamp wins; hidden wins when timestamps are equal.";
         });
     }
 
@@ -87,8 +86,8 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
             return TypedResults.Forbid();
         var result = await update.ExecuteAsync(new(
             competitionId,
-            CompetitionProtocolMapper.ToDomain(request.Visibility!.Value),
-            request.StartsAt,
+            request.FrozenStartAt,
+            request.HiddenStartAt,
             user.UserId,
             request.Reason,
             DateTimeOffset.UtcNow), ct);

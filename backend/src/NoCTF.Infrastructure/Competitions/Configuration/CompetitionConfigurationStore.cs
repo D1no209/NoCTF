@@ -29,7 +29,7 @@ public sealed class CompetitionConfigurationStore(
                     .Select(challenge => new CompetitionChallengeConfigurationSnapshot(
                         challenge.Id, challenge.RulesJson))
                     .ToArray(),
-                competition.ConfigurationUpdatedAt))
+                competition.UpdatedAt))
             .SingleOrDefaultAsync(ct);
 
     public async Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
@@ -53,8 +53,7 @@ public sealed class CompetitionConfigurationStore(
                 .Where(x => x.Id == competitionId)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(x => x.ConfigurationJson, json)
-                    .SetProperty(x => x.LeaderboardDirty, true)
-                    .SetProperty(x => x.ConfigurationUpdatedAt, now), ct);
+                    .SetProperty(x => x.UpdatedAt, now), ct);
         }
         else
         {
@@ -65,8 +64,7 @@ public sealed class CompetitionConfigurationStore(
             if (tracked is not null)
             {
                 tracked.ConfigurationJson = json;
-                tracked.LeaderboardDirty = true;
-                tracked.ConfigurationUpdatedAt = now;
+                tracked.UpdatedAt = now;
             }
             changed = tracked is null ? 0 : 1;
         }

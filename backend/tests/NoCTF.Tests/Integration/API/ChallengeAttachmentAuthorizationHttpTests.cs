@@ -258,7 +258,6 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             UserName = "participant",
             NormalizedUserName = "PARTICIPANT",
             Email = "participant@example.test",
-            NormalizedEmail = "PARTICIPANT@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -274,8 +273,6 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
-            RunningSince = now.AddHours(-1),
-            ConfigurationUpdatedAt = now,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -284,7 +281,6 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = "participant-team",
-            NormalizedName = "PARTICIPANT-TEAM",
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = "12345678901234567890123456789012",

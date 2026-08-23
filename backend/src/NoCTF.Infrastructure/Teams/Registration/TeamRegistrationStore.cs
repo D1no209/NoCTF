@@ -65,11 +65,13 @@ public sealed class TeamRegistrationStore(
         }
         if (track.RequiresInvitationCode
             && !CompetitionTrackInvitationCode.Verify(
-                track.InvitationCodeHash,
+                track.InvitationCode,
                 command.TrackInvitationCode))
         {
             return new(null, TeamRegistrationFailure.TrackInvitationInvalid);
         }
+        if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == command.UserId, ct))
+            return new(null, TeamRegistrationFailure.TeamNameOrMembershipConflict);
         if (await db.Teams.AnyAsync(x => x.CompetitionId == command.CompetitionId
             && x.DeletedAt == null
             && x.MemberIds.Contains(command.UserId), ct))
@@ -81,7 +83,6 @@ public sealed class TeamRegistrationStore(
             CompetitionId = command.CompetitionId,
             TrackKey = track.Key,
             Name = name,
-            NormalizedName = name.ToUpperInvariant(),
             CaptainId = command.UserId,
             MemberIds = [command.UserId],
             InvitationToken = CreateInvitationToken(),
@@ -102,7 +103,6 @@ public sealed class TeamRegistrationStore(
             TeamId: team.Id,
             TeamRegistrationStatus: status,
             TrackKey: track.Key), ct);
-        competition.LeaderboardDirty = true;
         try
         {
             await db.SaveChangesAsync(ct);
@@ -338,7 +338,6 @@ public sealed class TeamRegistrationStore(
         if (entity is null) return new(null, TeamRegistrationFailure.TeamNotFound);
         if (entity.IsLocked) return new(null, TeamRegistrationFailure.TeamLocked);
         entity.Name = name;
-        entity.NormalizedName = name.ToUpperInvariant();
         await events.RecordAsync(new(
             entity.CompetitionId,
             CompetitionEventKind.TeamUpdated,

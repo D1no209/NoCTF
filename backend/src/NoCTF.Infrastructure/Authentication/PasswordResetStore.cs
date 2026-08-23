@@ -31,12 +31,12 @@ public sealed class PasswordResetStore(
             return PasswordResetRequestState.DeliveryNotConfigured;
         }
 
-        var normalizedEmail = email.Trim().ToUpperInvariant();
+        var canonicalEmail = EmailCanonicalizer.Canonicalize(email);
         var userId = await db.Users.AsNoTracking()
             .Where(user => user.Kind == UserKind.Human
                 && user.AccountStatus == UserAccountStatus.Active
                 && user.EmailVerifiedAt != null
-                && user.NormalizedEmail == normalizedEmail)
+                && user.Email == canonicalEmail)
             .Select(user => (Guid?)user.Id)
             .SingleOrDefaultAsync(ct);
         if (userId is null)
@@ -52,7 +52,7 @@ public sealed class PasswordResetStore(
             && user.Kind == UserKind.Human
             && user.AccountStatus == UserAccountStatus.Active
             && user.EmailVerifiedAt != null
-            && user.NormalizedEmail == normalizedEmail,
+            && user.Email == canonicalEmail,
             ct);
         if (!userExists)
             return PasswordResetRequestState.Ignored;

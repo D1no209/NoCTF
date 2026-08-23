@@ -827,7 +827,6 @@ public sealed class RuntimeReplacementCleanupFailureTests
             UserName = "owner",
             NormalizedUserName = "OWNER",
             Email = "owner@example.test",
-            NormalizedEmail = "OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -843,17 +842,14 @@ public sealed class RuntimeReplacementCleanupFailureTests
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             Status = CompetitionStatus.Running,
-            RunningSince = now.AddHours(-1),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Teams.Add(new Team
         {
             Id = teamId,
             CompetitionId = competitionId,
             Name = "Cleanup Team",
-            NormalizedName = "CLEANUP TEAM",
             CaptainId = ownerId,
             MemberIds = [ownerId],
             InvitationToken = "0123456789abcdef0123456789abcdef",

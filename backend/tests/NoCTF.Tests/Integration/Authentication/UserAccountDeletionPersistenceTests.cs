@@ -67,12 +67,6 @@ public sealed class UserAccountDeletionPersistenceTests
                 });
                 var challengeId = Guid.CreateVersion7(now.AddTicks(6));
                 var competitionChallengeId = Guid.CreateVersion7(now.AddTicks(7));
-                var frozenBundle = FrozenBundle(
-                    competitionId,
-                    competitionChallengeId,
-                    referencedUserId,
-                    "Player",
-                    now.AddHours(-1));
                 db.Competitions.Add(new Competition
                 {
                     Id = competitionId,
@@ -80,20 +74,13 @@ public sealed class UserAccountDeletionPersistenceTests
                     Title = "Historical competition",
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Finished,
-                    LeaderboardVisibility = CompetitionLeaderboardVisibility.Frozen,
-                    LeaderboardVisibilityStartsAt = now.AddHours(-1),
-                    LeaderboardVisibilityAppliedAt = now.AddHours(-1),
                     ConfigurationJson = "{}",
                     MaxTeamMembers = 5,
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-2),
                     EndAt = now.AddHours(-1),
                     CreatedAt = now.AddHours(-3),
-                    UpdatedAt = now,
-                    ConfigurationUpdatedAt = now,
-                    FrozenLeaderboardSnapshotJson = JsonSerializer.Serialize(
-                        frozenBundle,
-                        new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                    UpdatedAt = now
                 });
                 db.Challenges.Add(new Challenge
                 {
@@ -122,7 +109,6 @@ public sealed class UserAccountDeletionPersistenceTests
                     Id = teamId,
                     CompetitionId = competitionId,
                     Name = "Historical team",
-                    NormalizedName = "HISTORICAL TEAM",
                     CaptainId = referencedUserId,
                     MemberIds = [referencedUserId],
                     InvitationToken = new string('a', 32),
@@ -202,27 +188,12 @@ public sealed class UserAccountDeletionPersistenceTests
                 await Assert.That(anonymized.UserName)
                     .IsEqualTo($"anonymous-{referencedUserId:N}");
                 await Assert.That(anonymized.Email).IsEmpty();
-                await Assert.That(anonymized.IsEmailPublic).IsFalse();
                 await Assert.That(anonymized.PasswordHash).IsEmpty();
                 await Assert.That(anonymized.Role).IsEqualTo(UserRole.User);
                 await Assert.That(await db.Competitions.IgnoreQueryFilters().AnyAsync(
                     competition => competition.Id == competitionId
                         && competition.OwnerId == referencedUserId,
                     cancellationToken)).IsTrue();
-                var competition = await db.Competitions.IgnoreQueryFilters().SingleAsync(
-                    candidate => candidate.Id == competitionId,
-                    cancellationToken);
-                await Assert.That(competition.LeaderboardDirty).IsTrue();
-                var frozen = JsonSerializer.Deserialize<LeaderboardProjectionBundle>(
-                    competition.FrozenLeaderboardSnapshotJson!,
-                    new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
-                var anonymousName = $"anonymous-{referencedUserId:N}";
-                await Assert.That(frozen.Legacy.Entries.Single().Cells.Single().SolverName)
-                    .IsEqualTo(anonymousName);
-                await Assert.That(frozen.Scoreboard.Snapshot.Actors.Single().DisplayName)
-                    .IsEqualTo(anonymousName);
-                await Assert.That(frozen.Scoreboard.DetailActors.Single().DisplayName)
-                    .IsEqualTo(anonymousName);
                 await Assert.That(await db.Users.AnyAsync(
                     user => user.Id == unusedUserId,
                     cancellationToken)).IsFalse();
@@ -267,45 +238,13 @@ public sealed class UserAccountDeletionPersistenceTests
             UserName = userName,
             NormalizedUserName = userName.ToUpperInvariant(),
             Email = email,
-            NormalizedEmail = email.ToUpperInvariant(),
             PasswordHash = "password-hash",
             Kind = UserKind.Human,
             Role = role,
             AccountStatus = UserAccountStatus.Active,
-            IsEmailPublic = true,
             EmailVerifiedAt = now,
             CreatedAt = now,
             UpdatedAt = now
         };
 
-    private static LeaderboardProjectionBundle FrozenBundle(
-        Guid competitionId,
-        Guid competitionChallengeId,
-        Guid userId,
-        string userName,
-        DateTimeOffset generatedAt)
-    {
-        var teamId = Guid.CreateVersion7(generatedAt);
-        var legacy = new LeaderboardResponse(
-            competitionId,
-            generatedAt,
-            [new LeaderboardEntry(1, teamId, "Historical team", 25, 1, generatedAt)
-            {
-                Cells = [new(competitionChallengeId, 25, generatedAt, userName, null)]
-            }])
-        {
-            Visibility = CompetitionLeaderboardVisibility.Frozen,
-            DataScope = LeaderboardDataScope.Frozen,
-            DataAsOf = generatedAt
-        };
-        var actor = new ScoreboardActor(0, userId, userName);
-        var scoreboard = new ScoreboardProjection(
-            new ScoreboardChallengeCatalog(competitionId, 1, []),
-            new ScoreboardSchema(competitionId, GameMode.Ctf, 1, 1, [], []),
-            new ScoreboardSnapshot(competitionId, 1, 1, generatedAt, null, [actor], []))
-        {
-            DetailActors = [actor]
-        };
-        return new(legacy, scoreboard);
-    }
 }

@@ -106,10 +106,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             item => item.CompetitionId == competition.Id
                 && item.Kind == CompetitionEventKind.TeamRegistered,
             ct)).IsEqualTo(1);
-        await Assert.That(await verification.Competitions
-            .Where(item => item.Id == competition.Id)
-            .Select(item => item.LeaderboardDirty)
-            .SingleAsync(ct)).IsTrue();
     }
 
     private static async Task SameUserCreatesTwiceAsync(
@@ -274,10 +270,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         await Assert.That(memberIds).Contains(firstParticipant.Id);
         await Assert.That(memberIds).Contains(secondParticipant.Id);
         await Assert.That(memberIds.Length).IsEqualTo(3);
-        await Assert.That(await verification.Competitions
-            .Where(item => item.Id == competition.Id)
-            .Select(item => item.LeaderboardDirty)
-            .SingleAsync(ct)).IsTrue();
     }
 
     private static async Task<TeamCreateStoreResult> CreateAsync(
@@ -333,7 +325,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         UserName = name,
         NormalizedUserName = name.ToUpperInvariant(),
         Email = $"{name}@example.test",
-        NormalizedEmail = $"{name}@example.test".ToUpperInvariant(),
         PasswordHash = "unused",
         Kind = UserKind.Human,
         Role = UserRole.User,
@@ -355,7 +346,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         Title = title,
         Mode = GameMode.Ctf,
         Status = CompetitionStatus.Visible,
-        LeaderboardDirty = leaderboardDirty,
         ConfigurationJson = "{}",
         MaxTeamMembers = 5,
         FlagDerivationSecret = new byte[32],
@@ -363,7 +353,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         EndAt = now.AddHours(2),
         CreatedAt = now,
         UpdatedAt = now,
-        ConfigurationUpdatedAt = now
     };
 
     private static Team Team(
@@ -377,7 +366,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         Id = id,
         CompetitionId = competitionId,
         Name = name,
-        NormalizedName = name.ToUpperInvariant(),
         CaptainId = captainId,
         MemberIds = [captainId],
         InvitationToken = invitationToken,

@@ -136,7 +136,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 UserName = "future-player",
                 NormalizedUserName = "FUTURE-PLAYER",
                 Email = "future-player@example.test",
-                NormalizedEmail = "FUTURE-PLAYER@EXAMPLE.TEST",
                 PasswordHash = "test",
                 CreatedAt = fixture.Now.AddSeconds(2),
                 UpdatedAt = fixture.Now.AddSeconds(2)
@@ -146,7 +145,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                 Id = futureTeamId,
                 CompetitionId = fixture.CompetitionId,
                 Name = "Future",
-                NormalizedName = "FUTURE",
                 CaptainId = futureUserId,
                 MemberIds = [futureUserId],
                 InvitationToken = new string('b', 32),
@@ -233,7 +231,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
                     Id = teamId,
                     CompetitionId = fixture.CompetitionId,
                     Name = $"Fence {index}",
-                    NormalizedName = $"FENCE {index}",
                     CaptainId = fixture.UserId,
                     MemberIds = [fixture.UserId],
                     InvitationToken = teamId.ToString("N"),
@@ -356,7 +353,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             UserName = "player",
             NormalizedUserName = "PLAYER",
             Email = "player@example.test",
-            NormalizedEmail = "PLAYER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -373,7 +369,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now,
             ConfigurationJson = JsonSerializer.Serialize(
                 new CtfConfiguration(
                     CtfConfiguration.CurrentSchemaVersion,
@@ -387,7 +382,6 @@ public sealed class CtfPerTeamRuntimeFlagPersistenceTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = "Team",
-            NormalizedName = "TEAM",
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = new string('a', 32),

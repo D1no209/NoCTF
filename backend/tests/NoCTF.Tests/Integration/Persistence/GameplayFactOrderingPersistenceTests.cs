@@ -502,7 +502,6 @@ public sealed class GameplayFactOrderingPersistenceTests
                 Id = teamIds[index],
                 CompetitionId = competitionId,
                 Name = $"Fact Team {index}",
-                NormalizedName = $"FACT TEAM {index}",
                 CaptainId = memberIds[index],
                 MemberIds = [memberIds[index]],
                 InvitationToken = index.ToString().PadLeft(32, '0'),
@@ -519,7 +518,6 @@ public sealed class GameplayFactOrderingPersistenceTests
             ConfigurationJson = mode == GameMode.Awdp
                 ? """{"schemaVersion":4,"roundDurationSeconds":300,"break":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"fix":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"exploitSucceededPenalty":100,"serviceAbnormalPenalty":50,"requireBreakBeforeFix":false}"""
                 : """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
-            ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddMinutes(-5),
             EndAt = now.AddHours(1),
@@ -646,7 +644,6 @@ public sealed class GameplayFactOrderingPersistenceTests
             UserName = userName,
             NormalizedUserName = userName.ToUpperInvariant(),
             Email = $"{userName}@example.test",
-            NormalizedEmail = $"{userName.ToUpperInvariant()}@EXAMPLE.TEST",
             PasswordHash = "test",
             Kind = UserKind.Human,
             Role = role,

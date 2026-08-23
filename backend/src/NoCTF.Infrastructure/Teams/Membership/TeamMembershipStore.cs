@@ -42,6 +42,8 @@ public sealed class TeamMembershipStore(
             ct);
         if (team is null)
             return TeamMembershipFailure.TeamNotFound;
+        if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId, ct))
+            return TeamMembershipFailure.MemberNotFound;
         if (team.MemberIds.Contains(userId))
             return TeamMembershipFailure.UserAlreadyRegistered;
         if (await db.Teams.AnyAsync(
@@ -66,7 +68,6 @@ public sealed class TeamMembershipStore(
             ActorUserId: userId,
             RelatedUserId: userId,
             TeamId: team.Id), ct);
-        competition.LeaderboardDirty = true;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -146,7 +147,6 @@ public sealed class TeamMembershipStore(
             ActorUserId: actorId,
             RelatedUserId: targetUserId,
             TeamId: teamId), ct);
-        competition.LeaderboardDirty = true;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -187,7 +187,6 @@ public sealed class TeamMembershipStore(
             ActorUserId: userId,
             RelatedUserId: userId,
             TeamId: team.Id), ct);
-        competition.LeaderboardDirty = true;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -228,7 +227,6 @@ public sealed class TeamMembershipStore(
             ActorUserId: actorId,
             RelatedUserId: newCaptainId,
             TeamId: teamId), ct);
-        competition.LeaderboardDirty = true;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();

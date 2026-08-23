@@ -32,16 +32,6 @@ public sealed class OperationalMetricsCollector(
             var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
             var now = timeProvider.GetUtcNow();
 
-            var dirty = await db.Competitions
-                .AsNoTracking()
-                .Where(competition => competition.LeaderboardDirty)
-                .GroupBy(_ => 1)
-                .Select(group => new
-                {
-                    Count = group.LongCount(),
-                    OldestAt = group.Min(competition => competition.UpdatedAt)
-                })
-                .SingleOrDefaultAsync(cancellationToken);
             var waiting = await db.RuntimeInstances
                 .AsNoTracking()
                 .Where(runtime => runtime.State == RuntimeState.Queued)
@@ -54,8 +44,8 @@ public sealed class OperationalMetricsCollector(
                 .SingleOrDefaultAsync(cancellationToken);
 
             NoCtfTelemetry.UpdateOperationalSnapshot(
-                dirty?.Count ?? 0,
-                OldestAge(now, dirty?.OldestAt),
+                0,
+                TimeSpan.Zero,
                 waiting?.Count ?? 0,
                 OldestAge(now, waiting?.OldestAt));
         }

@@ -53,11 +53,10 @@ public sealed class UserProfilePersistenceTests
                     now,
                     cancellationToken);
                 var initialProfile = await users.GetProfileAsync(userId, cancellationToken);
-                await Assert.That(initialProfile!.IsEmailPublic).IsFalse();
+                await Assert.That(initialProfile).IsNotNull();
                 await users.UpdateProfileAsync(
                     userId,
                     "Persistent profile",
-                    true,
                     now.AddMinutes(1),
                     cancellationToken);
                 db.Files.Add(new StoredFile
@@ -90,7 +89,6 @@ public sealed class UserProfilePersistenceTests
                     file => file.Id == profile.AvatarFileId,
                     cancellationToken);
                 await Assert.That(storedFile.ObjectKey).IsEqualTo(avatarObjectKey);
-                await Assert.That(profile.IsEmailPublic).IsTrue();
             }
         });
     }

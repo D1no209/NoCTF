@@ -45,7 +45,6 @@ public sealed class ChallengeAttachmentPersistenceTests
                 UserName = "administrator",
                 NormalizedUserName = "ADMINISTRATOR",
                 Email = "administrator@example.test",
-                NormalizedEmail = "ADMINISTRATOR@EXAMPLE.TEST",
                 PasswordHash = "test",
                 Role = UserRole.Administrator,
                 CreatedAt = now,
@@ -124,7 +123,6 @@ public sealed class ChallengeAttachmentPersistenceTests
                 UserName = "batch-administrator",
                 NormalizedUserName = "BATCH-ADMINISTRATOR",
                 Email = "batch-administrator@example.test",
-                NormalizedEmail = "BATCH-ADMINISTRATOR@EXAMPLE.TEST",
                 PasswordHash = "test",
                 Role = UserRole.Administrator,
                 CreatedAt = now,
@@ -219,7 +217,6 @@ public sealed class ChallengeAttachmentPersistenceTests
                     UserName = $"participant-{index}",
                     NormalizedUserName = $"PARTICIPANT-{index}",
                     Email = $"participant-{index}@example.test",
-                    NormalizedEmail = $"PARTICIPANT-{index}@EXAMPLE.TEST",
                     PasswordHash = "test",
                     CreatedAt = now,
                     UpdatedAt = now
@@ -235,8 +232,6 @@ public sealed class ChallengeAttachmentPersistenceTests
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
-                    RunningSince = now.AddHours(-1),
-                    ConfigurationUpdatedAt = now,
                     CreatedAt = now,
                     UpdatedAt = now
                 });
@@ -245,7 +240,6 @@ public sealed class ChallengeAttachmentPersistenceTests
                     Id = id,
                     CompetitionId = competitionId,
                     Name = $"team-{index}",
-                    NormalizedName = $"TEAM-{index}",
                     CaptainId = users[index],
                     MemberIds = [users[index]],
                     InvitationToken = $"{index:D2}123456789012345678901234567890",

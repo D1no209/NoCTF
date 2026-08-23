@@ -90,7 +90,6 @@ public sealed class InternalResultStore(
                 GameplayFactResult: fact.Result,
                 RuntimeState: runtime.State,
                 RuntimeGeneration: runtime.Generation), ct);
-            context.Competition.LeaderboardDirty = true;
         }
         runtime.CheckerStatus = result.State;
         runtime.CheckerStatusUpdatedAt = appliedAt;
@@ -149,7 +148,6 @@ public sealed class InternalResultStore(
             fact.Result = decision.Result;
             fact.State = GameplayFactState.Completed;
             fact.FailureCode = decision.FailureCode;
-            context.Competition.LeaderboardDirty = true;
             await events.RecordAsync(new(
                 fact.CompetitionId,
                 CompetitionEventKind.ScoringRecorded,

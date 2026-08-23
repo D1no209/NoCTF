@@ -111,7 +111,6 @@ internal sealed class SwaggerAuthenticationStore : IUserAuthenticationStore
     public Task<UserProfile?> UpdateProfileAsync(
         Guid userId,
         string? description,
-        bool isEmailPublic,
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult<UserProfile?>(null);

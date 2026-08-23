@@ -68,10 +68,8 @@ public sealed class CompetitionManagementStore(
             CreatedAt = command.CreatedAt,
             UpdatedAt = command.CreatedAt,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(command.Mode),
-            ConfigurationUpdatedAt = command.CreatedAt,
             TrackConfigurationJson = CompetitionTrackConfiguration.Serialize(
                 CompetitionTrackConfiguration.DefaultFor(command.Mode)),
-            TrackConfigurationUpdatedAt = command.CreatedAt,
             FlagDerivationSecret = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)
         };
         db.Competitions.Add(competition);
@@ -222,7 +220,7 @@ public sealed class CompetitionManagementStore(
         query.Select(x => new CompetitionView(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt,
             x.Status, x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
             x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
-            x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt,
+            x.FrozenStartAt, x.HiddenStartAt,
             x.AllowTeamRegistrationWhileRunning,
             x.DeletedAt,
             x.MaxActiveQuestionsPerTeam,
@@ -234,7 +232,7 @@ public sealed class CompetitionManagementStore(
         new(x.Id, x.Title, x.Description, x.Mode, x.StartAt, x.EndAt, x.Status,
             x.TeamRegistrationAutoApprove, x.MaxTeamMembers,
             x.MaxConcurrentRuntimeInstancesPerTeam, x.OwnerId,
-            x.LeaderboardVisibility, x.LeaderboardVisibilityStartsAt,
+            x.FrozenStartAt, x.HiddenStartAt,
             x.AllowTeamRegistrationWhileRunning,
             x.DeletedAt,
             x.MaxActiveQuestionsPerTeam,

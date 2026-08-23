@@ -8,6 +8,7 @@ const competitionId = route.params.id as string
 const teams = ref<NoCtfapiEndpointsTeamsTeamResponse[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
 
 onMounted(async () => {
   const { data, error: err } = await listCompetitionTeamsEndpoint({ path: { competitionId } })
@@ -51,7 +52,7 @@ onMounted(async () => {
                 <AvatarFallback>{{ team.name?.slice(0, 2) ?? '?' }}</AvatarFallback>
               </Avatar>
               <div class="flex flex-col gap-1">
-                <CardTitle class="text-base">{{ team.name }}</CardTitle>
+                <CardTitle class="text-base">{{ teamDisplayName(team, teamDisplayNames) }}</CardTitle>
                 <div class="flex items-center gap-2">
                   <Badge
                     :variant="team.registrationStatus === 'Approved' ? 'default' : team.registrationStatus === 'Rejected' ? 'destructive' : 'secondary'"

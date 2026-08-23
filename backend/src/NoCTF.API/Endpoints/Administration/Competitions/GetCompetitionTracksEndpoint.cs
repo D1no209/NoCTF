@@ -31,10 +31,15 @@ public sealed class GetCompetitionTracksEndpoint(
         var competitionId = Route<Guid>("competitionId");
         if (!await authorizer.CanObserveAsync(user.UserId, competitionId, cancellationToken))
             return TypedResults.Forbid();
+        var includeInvitationCodes = await authorizer.CanModerateAsync(
+            user.UserId,
+            competitionId,
+            cancellationToken);
         var view = await get.ExecuteAsync(
             competitionId,
             user.UserId,
             includeInternal: true,
+            includeInvitationCodes,
             cancellationToken);
         return view is null
             ? TypedResults.NotFound()

@@ -19,6 +19,7 @@ public sealed class CompetitionTrackStore(
         Guid competitionId,
         Guid? viewerUserId,
         bool includeInternal,
+        bool includeInvitationCodes,
         CancellationToken cancellationToken)
     {
         var competition = await db.Competitions.AsNoTracking()
@@ -55,7 +56,7 @@ public sealed class CompetitionTrackStore(
             .Where(track => includeInternal
                 || !track.IsInternal && (track.IsPublicSelectable || track.VisibleOnLeaderboard)
                 || string.Equals(track.Key, viewerTrackKey, StringComparison.OrdinalIgnoreCase))
-            .Select(track => Map(track) with
+            .Select(track => Map(track, includeInvitationCodes) with
             {
                 IsViewerTrack = string.Equals(
                     track.Key,
@@ -98,17 +99,17 @@ public sealed class CompetitionTrackStore(
             competition.TrackConfigurationJson);
         var normalized = CompetitionTrackPolicy.Normalize(command.Tracks.Select(track =>
         {
-            var existingHash = currentConfiguration.Find(track.Key)?.InvitationCodeHash;
+            var existingCode = currentConfiguration.Find(track.Key)?.InvitationCode;
             var invitationUpdate = command.InvitationCodeUpdates?.FirstOrDefault(update =>
                 string.Equals(update.TrackKey, track.Key, StringComparison.OrdinalIgnoreCase));
-            var nextHash = track.IsInternal || !track.IsPublicSelectable
+            var nextCode = track.IsInternal || !track.IsPublicSelectable
                 ? null
                 : invitationUpdate?.ClearInvitationCode == true
                     ? null
                     : invitationUpdate?.InvitationCode is not null
-                        ? CompetitionTrackInvitationCode.Hash(invitationUpdate.InvitationCode)
-                        : existingHash;
-            return track with { InvitationCodeHash = nextHash };
+                        ? invitationUpdate.InvitationCode
+                        : existingCode;
+            return track with { InvitationCode = nextCode };
         }).ToArray());
         var nextKeys = normalized.Tracks.Select(track => track.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -128,12 +129,11 @@ public sealed class CompetitionTrackStore(
         {
             await transaction.CommitAsync(cancellationToken);
             return OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Success(
-                Map(competition, normalized));
+                Map(competition, normalized, includeInvitationCodes: true));
         }
 
         competition.TrackConfigurationJson = nextJson;
-        competition.TrackConfigurationUpdatedAt = command.UpdatedAt;
-        competition.LeaderboardDirty = true;
+        competition.UpdatedAt = command.UpdatedAt;
         await events.RecordAsync(new CompetitionEventDraft(
             competition.Id,
             CompetitionEventKind.TrackConfigurationUpdated,
@@ -145,7 +145,7 @@ public sealed class CompetitionTrackStore(
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return OperationResult<CompetitionTracksView, CompetitionTrackFailureCode>.Success(
-            Map(competition, normalized));
+            Map(competition, normalized, includeInvitationCodes: true));
     }
 
     public async Task<OperationResult<TeamTrackAssignmentView, CompetitionTrackFailureCode>> AssignAsync(
@@ -186,7 +186,6 @@ public sealed class CompetitionTrackStore(
 
         var previousTrackKey = team.TrackKey;
         team.TrackKey = track.Key;
-        competition.LeaderboardDirty = true;
         await events.RecordAsync(new CompetitionEventDraft(
             competition.Id,
             CompetitionEventKind.TeamTrackChanged,
@@ -206,14 +205,17 @@ public sealed class CompetitionTrackStore(
 
     private static CompetitionTracksView Map(
         Competition competition,
-        CompetitionTrackConfiguration configuration) => new(
+        CompetitionTrackConfiguration configuration,
+        bool includeInvitationCodes) => new(
         competition.Id,
         competition.Mode,
         competition.Status,
         CompetitionTrackPolicy.IsFrozen(competition.Status),
-        configuration.Tracks.Select(Map).ToArray());
+        configuration.Tracks.Select(track => Map(track, includeInvitationCodes)).ToArray());
 
-    private static CompetitionTrackView Map(CompetitionTrackDefinition track) => new(
+    private static CompetitionTrackView Map(
+        CompetitionTrackDefinition track,
+        bool includeInvitationCode) => new(
         track.Key,
         track.Name,
         track.IsDefault,
@@ -225,7 +227,8 @@ public sealed class CompetitionTrackStore(
         track.VisibleOnLeaderboard,
         track.AffectsCompetitiveResults,
         IsViewerTrack: false,
-        track.RequiresInvitationCode);
+        track.RequiresInvitationCode,
+        includeInvitationCode ? track.InvitationCode : null);
 
     private static OperationResult<CompetitionTracksView, CompetitionTrackFailureCode> Failure(
         CompetitionTrackFailureCode code,

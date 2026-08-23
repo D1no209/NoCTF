@@ -468,6 +468,7 @@ public sealed class GetLeaderboardEndpoint(
                 request.CompetitionId,
                 user.UserId == Guid.Empty ? null : user.UserId,
                 canObserve,
+                includeInvitationCodes: false,
                 cancellationToken);
             if (tracks is null)
                 return TypedResults.NotFound();

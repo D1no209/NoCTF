@@ -5,6 +5,7 @@ using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 
 namespace NoCTF.Infrastructure.Runtime.Targets;
 
@@ -26,8 +27,8 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
             {
                 item.Status,
                 item.ConfigurationJson,
-                item.AccumulatedRunningSeconds,
-                item.RunningSince
+                item.StartAt,
+                item.EndAt
             })
             .SingleOrDefaultAsync(ct);
         if (competition is null || competition.Status != CompetitionStatus.Running)
@@ -59,10 +60,14 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
         if (ownTeamId is null)
             return null;
 
-        var effectiveSeconds = competition.AccumulatedRunningSeconds +
-            (competition.RunningSince is null
-                ? 0
-                : Math.Max(0, (long)(now - competition.RunningSince.Value).TotalSeconds));
+        var effectiveRuntime = await CompetitionEffectiveRuntimeReader.ReadAsync(
+            db,
+            competitionId,
+            competition.StartAt,
+            competition.EndAt,
+            now,
+            ct);
+        var effectiveSeconds = Math.Max(0, (long)effectiveRuntime.Elapsed.TotalSeconds);
         var hardeningSeconds = ReadHardeningSeconds(competition.ConfigurationJson);
         var exposeAll = effectiveSeconds >= hardeningSeconds;
 

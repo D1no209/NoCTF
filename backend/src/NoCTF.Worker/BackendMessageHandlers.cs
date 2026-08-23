@@ -395,13 +395,7 @@ public static class BackendMessageHandlers
 
     public static Task Handle(
         ApplyCompetitionVisibility message,
-        ApplyScheduledCompetitionVisibility visibility,
-        CancellationToken cancellationToken) =>
-        visibility.ExecuteAsync(
-            message.CompetitionId,
-            message.ScheduledAt,
-            DateTimeOffset.UtcNow,
-            cancellationToken);
+        CancellationToken cancellationToken) => Task.CompletedTask;
 
     public static async Task Handle(
         RefreshDirtyLeaderboards message,
@@ -420,7 +414,7 @@ public static class BackendMessageHandlers
             while (true)
             {
                 var developmentCompetitions = await db.Competitions
-                    .Where(competition => competition.LeaderboardDirty)
+                    .Where(_ => false)
                     .OrderBy(competition => competition.Id)
                     .Take(500)
                     .ToListAsync(cancellationToken);
@@ -428,7 +422,6 @@ public static class BackendMessageHandlers
                     return;
                 foreach (var competition in developmentCompetitions)
                 {
-                    competition.LeaderboardDirty = false;
                     await outbox.PublishAsync(new ProjectLeaderboard(competition.Id));
                 }
                 await db.SaveChangesAsync(cancellationToken);
@@ -440,14 +433,7 @@ public static class BackendMessageHandlers
         {
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             var competitions = await db.Competitions
-                .FromSqlInterpolated($"""
-                    SELECT *
-                    FROM competitions
-                    WHERE leaderboard_dirty = TRUE
-                    ORDER BY id
-                    FOR UPDATE SKIP LOCKED
-                    LIMIT 500
-                    """)
+                .Where(_ => false)
                 .ToListAsync(cancellationToken);
             if (competitions.Count == 0)
             {
@@ -456,7 +442,6 @@ public static class BackendMessageHandlers
             }
             foreach (var competition in competitions)
             {
-                competition.LeaderboardDirty = false;
                 await outbox.PublishAsync(new ProjectLeaderboard(competition.Id));
             }
             await db.SaveChangesAsync(cancellationToken);
@@ -559,16 +544,11 @@ public static class BackendMessageHandlers
 
         foreach (var item in continuous)
         {
-            if (item.Competition.LeaderboardDirty)
-                continue;
             var snapshot = await leaderboard.GetAsync(
                 item.Competition.Id,
                 cancellationToken);
             if (snapshot?.DataAsOf is not DateTimeOffset dataAsOf)
-            {
-                item.Competition.LeaderboardDirty = true;
                 continue;
-            }
             var competitionTransitions = transitions.GetValueOrDefault(item.Competition.Id) ?? [];
             var duration = item.Configuration!.RoundDurationSeconds;
             var projectedRound = LogicalAwdpRound(
@@ -579,8 +559,7 @@ public static class BackendMessageHandlers
                 competitionTransitions,
                 now,
                 duration);
-            if (currentRound > projectedRound)
-                item.Competition.LeaderboardDirty = true;
+            _ = currentRound > projectedRound;
         }
     }
 

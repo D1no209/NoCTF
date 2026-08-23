@@ -19,7 +19,7 @@ public sealed class IdentityNormalizationPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Usernames_and_team_names_are_trimmed_and_case_insensitive(
+    public async Task Usernames_and_emails_are_canonical_while_team_names_may_repeat(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -44,10 +44,10 @@ public sealed class IdentityNormalizationPersistenceTests
 
             await using (var db = new NoCtfDbContext(options))
             {
-                await db.Database.MigrateAsync(cancellationToken);
+                await db.Database.EnsureCreatedAsync(cancellationToken);
                 var store = new AuthenticationStore(db, hasher);
                 var first = await new RegisterUser(store).ExecuteAsync(
-                    new("  Player_One  ", "player-one@example.test", "eight888", now),
+                    new("  Player_One  ", "  PLAYER-ONE@EXAMPLE.TEST  ", "eight888", now),
                     cancellationToken);
                 var second = await new RegisterUser(store).ExecuteAsync(
                     new("Player_Two", "player-two@example.test", "eight888", now.AddTicks(1)),
@@ -55,6 +55,7 @@ public sealed class IdentityNormalizationPersistenceTests
 
                 await Assert.That(first.Succeeded).IsTrue();
                 await Assert.That(first.Value!.Profile.UserName).IsEqualTo("Player_One");
+                await Assert.That(first.Value.Profile.Email).IsEqualTo("player-one@example.test");
                 await Assert.That(second.Succeeded).IsTrue();
                 firstUserId = first.Value.Profile.Id;
                 secondUserId = second.Value!.Profile.Id;
@@ -73,7 +74,6 @@ public sealed class IdentityNormalizationPersistenceTests
                     EndAt = now.AddHours(2),
                     CreatedAt = now,
                     UpdatedAt = now,
-                    ConfigurationUpdatedAt = now
                 });
                 await db.SaveChangesAsync(cancellationToken);
             }
@@ -88,6 +88,11 @@ public sealed class IdentityNormalizationPersistenceTests
 
                 await Assert.That(duplicate.FailureCode).IsEqualTo(RegisterUserFailureCode.UserNameConflict);
                 await Assert.That(login!.Id).IsEqualTo(firstUserId);
+
+                var duplicateEmail = await new RegisterUser(store).ExecuteAsync(
+                    new("Player_Three", " PLAYER-ONE@example.test ", "eight888", now.AddTicks(3)),
+                    cancellationToken);
+                await Assert.That(duplicateEmail.FailureCode).IsEqualTo(RegisterUserFailureCode.EmailConflict);
             }
 
             Guid competitionId;
@@ -107,12 +112,14 @@ public sealed class IdentityNormalizationPersistenceTests
             await using (var db = new NoCtfDbContext(options))
             {
                 var store = new TeamRegistrationStore(db, new NoopOutbox());
-                var duplicate = await new CreateTeam(store).ExecuteAsync(
+                var sameName = await new CreateTeam(store).ExecuteAsync(
                     new(competitionId, secondUserId, "alpha", now.AddTicks(1), "default"),
                     cancellationToken);
 
-                await Assert.That(duplicate.FailureCode)
-                    .IsEqualTo(TeamRegistrationFailure.TeamNameOrMembershipConflict);
+                await Assert.That(sameName.Succeeded).IsTrue();
+                await Assert.That(sameName.Value!.Name).IsEqualTo("alpha");
+                await Assert.That(sameName.Value.Id).IsNotEqualTo(Guid.Empty);
+                await Assert.That(await db.Teams.CountAsync(cancellationToken)).IsEqualTo(2);
             }
         });
     }

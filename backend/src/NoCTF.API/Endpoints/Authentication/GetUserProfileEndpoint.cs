@@ -1,7 +1,6 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
-using NoCTF.API.Security;
 using NoCTF.Application.Authentication.Account;
 
 namespace NoCTF.API.Endpoints.Authentication;
@@ -14,14 +13,11 @@ public sealed class GetUserProfileRequest
 public sealed record PublicUserProfileResponse(
     Guid UserId,
     string UserName,
-    string? Email,
     string? Description,
-    string? AvatarUrl,
-    bool IsEmailPublic);
+    string? AvatarUrl);
 
 public sealed class GetUserProfileEndpoint(
     GetPublicUserProfile getProfile,
-    IUserContext user,
     LinkGenerator links)
     : Endpoint<GetUserProfileRequest, Results<Ok<PublicUserProfileResponse>, NotFound>>
 {
@@ -37,11 +33,7 @@ public sealed class GetUserProfileEndpoint(
         GetUserProfileRequest request,
         CancellationToken ct)
     {
-        var profile = await getProfile.ExecuteAsync(
-            request.UserId,
-            user.UserId,
-            user.IsAdministrator,
-            ct);
+        var profile = await getProfile.ExecuteAsync(request.UserId, ct);
         if (profile is null)
             return TypedResults.NotFound();
 
@@ -53,9 +45,7 @@ public sealed class GetUserProfileEndpoint(
         return TypedResults.Ok(new PublicUserProfileResponse(
             profile.Id,
             profile.UserName,
-            profile.Email,
             profile.Description,
-            avatarUrl,
-            profile.IsEmailPublic));
+            avatarUrl));
     }
 }

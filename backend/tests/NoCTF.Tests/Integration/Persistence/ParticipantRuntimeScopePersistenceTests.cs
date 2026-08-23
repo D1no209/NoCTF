@@ -230,13 +230,11 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             Mode = GameMode.Awd,
             Status = CompetitionStatus.Running,
             ConfigurationJson = competitionConfiguration,
-            RunningSince = now.AddMinutes(-1),
             StartAt = now.AddHours(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now,
             DeletedAt = competitionDeletedAt
         });
         db.Challenges.Add(new Challenge
@@ -289,7 +287,6 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = name,
-            NormalizedName = name.ToUpperInvariant(),
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = Guid.NewGuid().ToString("N"),
@@ -323,7 +320,6 @@ public sealed class ParticipantRuntimeScopePersistenceTests
         UserName = name,
         NormalizedUserName = name.ToUpperInvariant(),
         Email = $"{name}@example.test",
-        NormalizedEmail = $"{name.ToUpperInvariant()}@EXAMPLE.TEST",
         PasswordHash = "test",
         CreatedAt = now,
         UpdatedAt = now

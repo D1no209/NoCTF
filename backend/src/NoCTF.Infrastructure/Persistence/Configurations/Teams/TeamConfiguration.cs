@@ -12,15 +12,12 @@ internal sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasKey(team => team.Id);
         builder.HasQueryFilter(team => team.DeletedAt == null);
         builder.Property(team => team.Name).HasMaxLength(128);
-        builder.Property(team => team.NormalizedName).HasMaxLength(128);
         builder.Property(team => team.TrackKey)
             .HasMaxLength(64)
             .HasDefaultValue(NoCTF.Domain.Competitions.CompetitionTrackConfiguration.DefaultTrackKey);
         builder.Property(team => team.MemberIds).HasColumnType("uuid[]");
         builder.Property(team => team.RegistrationStatus).HasConversion<short>();
         builder.Property(team => team.InvitationToken).HasMaxLength(32);
-        builder.HasIndex(team => new { team.CompetitionId, team.NormalizedName }).IsUnique()
-            .HasFilter("deleted_at IS NULL");
         builder.HasIndex(team => new { team.CompetitionId, team.RegistrationStatus });
         builder.HasIndex(team => new { team.CompetitionId, team.TrackKey });
         builder.HasIndex(team => team.InvitationToken).IsUnique();

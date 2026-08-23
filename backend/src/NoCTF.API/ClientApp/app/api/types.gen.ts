@@ -702,6 +702,7 @@ export type NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse = {
     affectsCompetitiveResults?: boolean;
     requiresInvitationCode?: boolean;
     isViewerTrack?: boolean;
+    invitationCode?: string | null;
 };
 
 export type NoCtfapiEndpointsCompetitionsEventsAccessCompetitionGameplayFactValueResponse = {
@@ -950,7 +951,6 @@ export type NoCtfapiEndpointsAuthenticationCurrentUserResponse = {
     emailVerified?: boolean;
     description?: string | null;
     avatarUrl?: string | null;
-    isEmailPublic?: boolean;
 };
 
 export type NoCtfapiEndpointsAuthenticationUserRoleProtocol = 'User' | 'Organizer' | 'Administrator';
@@ -960,10 +960,8 @@ export type NoCtfapiEndpointsAuthenticationUserKindProtocol = 'Human' | 'Bot';
 export type NoCtfapiEndpointsAuthenticationPublicUserProfileResponse = {
     userId?: string;
     userName?: string;
-    email?: string | null;
     description?: string | null;
     avatarUrl?: string | null;
-    isEmailPublic?: boolean;
 };
 
 export type NoCtfapiEndpointsAuthenticationGetUserProfileRequest = {
@@ -1019,7 +1017,6 @@ export type NoCtfapiEndpointsAuthenticationRequestPasswordResetRequest = {
 
 export type NoCtfapiEndpointsAuthenticationUpdateMyProfileRequest = {
     description?: string | null;
-    isEmailPublic: boolean;
 };
 
 export type NoCtfapiEndpointsAuthenticationAvatarUploadFailureResponse = {
@@ -1643,10 +1640,9 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionConfigurationR
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVisibilityResponse = {
     competitionId?: string;
-    configuredVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
     effectiveVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
-    startsAt?: string | null;
-    appliedAt?: string | null;
+    frozenStartAt?: string | null;
+    hiddenStartAt?: string | null;
 };
 
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionPermissionsResponse = {
@@ -1708,8 +1704,8 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionLeaderboardVis
 export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionVisibilityMutationCodeProtocol = 'Updated' | 'NotFound' | 'InvalidSchedule' | 'CompetitionFinished';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest = {
-    visibility: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol;
-    startsAt?: string | null;
+    frozenStartAt?: string | null;
+    hiddenStartAt?: string | null;
     reason?: string | null;
 };
 

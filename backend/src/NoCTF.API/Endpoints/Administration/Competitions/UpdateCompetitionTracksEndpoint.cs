@@ -103,6 +103,7 @@ public sealed class UpdateCompetitionTracksEndpoint(
             competitionId,
             user.UserId,
             includeInternal: true,
+            includeInvitationCodes: true,
             cancellationToken);
         if (current is null)
             return TypedResults.NotFound();

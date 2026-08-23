@@ -10,10 +10,9 @@ namespace NoCTF.API.Endpoints.Administration.Competitions;
 
 public sealed record CompetitionLeaderboardVisibilityResponse(
     Guid CompetitionId,
-    LeaderboardVisibilityProtocol ConfiguredVisibility,
     LeaderboardVisibilityProtocol EffectiveVisibility,
-    DateTimeOffset? StartsAt,
-    DateTimeOffset? AppliedAt);
+    DateTimeOffset? FrozenStartAt,
+    DateTimeOffset? HiddenStartAt);
 
 internal static class CompetitionLeaderboardVisibilityMapper
 {
@@ -21,10 +20,9 @@ internal static class CompetitionLeaderboardVisibilityMapper
         CompetitionVisibilityConfigurationView view) =>
         new(
             view.CompetitionId,
-            CompetitionProtocolMapper.ToProtocol(view.ConfiguredVisibility),
             CompetitionProtocolMapper.ToProtocol(view.EffectiveVisibility),
-            view.StartsAt,
-            view.AppliedAt);
+            view.FrozenStartAt,
+            view.HiddenStartAt);
 }
 
 public sealed class GetCompetitionLeaderboardVisibilityEndpoint(

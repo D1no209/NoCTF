@@ -65,7 +65,6 @@ public sealed class RefreshAccessTokenTests
         public Task<UserProfile?> GetProfileAsync(Guid userId, CancellationToken cancellationToken) =>
             Task.FromResult<UserProfile?>(null);
         public Task<UserProfile?> UpdateProfileAsync(Guid userId, string? description,
-            bool isEmailPublic,
             DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.FromResult<UserProfile?>(null);
         public Task<UserAvatarReplacement?> ReplaceAvatarAsync(Guid userId, Guid fileId,

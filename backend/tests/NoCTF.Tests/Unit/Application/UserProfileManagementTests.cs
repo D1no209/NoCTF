@@ -20,65 +20,37 @@ public sealed class UserProfileManagementTests
         users.UpdateProfileAsync(
                 UserId,
                 Arg.Any<string?>(),
-                Arg.Any<bool>(),
                 Now,
                 Arg.Any<CancellationToken>())
             .Returns(Profile(description: "profile"));
         var update = new UpdateCurrentUserProfile(users);
 
-        await update.ExecuteAsync(UserId, "  profile  ", true, Now);
-        await update.ExecuteAsync(UserId, "   ", false, Now);
+        await update.ExecuteAsync(UserId, "  profile  ", Now);
+        await update.ExecuteAsync(UserId, "   ", Now);
 
         await users.Received(1).UpdateProfileAsync(
             UserId,
             "profile",
-            true,
             Now,
             Arg.Any<CancellationToken>());
         await users.Received(1).UpdateProfileAsync(
             UserId,
             null,
-            false,
             Now,
             Arg.Any<CancellationToken>());
     }
 
     [Test]
-    [Arguments(false, false, false)]
-    [Arguments(true, false, true)]
-    [Arguments(false, true, true)]
-    public async Task Email_is_projected_only_for_the_owner_administrator_or_public_profile(
-        bool isAdministrator,
-        bool isEmailPublic,
-        bool shouldExposeEmail)
+    public async Task Public_profile_never_projects_email()
     {
         var users = Substitute.For<IUserAuthenticationStore>();
         users.GetProfileAsync(UserId, Arg.Any<CancellationToken>())
-            .Returns(Profile(isEmailPublic: isEmailPublic));
+            .Returns(Profile());
 
-        var profile = await new GetPublicUserProfile(users).ExecuteAsync(
-            UserId,
-            Guid.NewGuid(),
-            isAdministrator);
+        var profile = await new GetPublicUserProfile(users).ExecuteAsync(UserId);
 
         await Assert.That(profile).IsNotNull();
-        await Assert.That(profile!.Email is not null).IsEqualTo(shouldExposeEmail);
-        await Assert.That(profile.IsEmailPublic).IsEqualTo(isEmailPublic);
-    }
-
-    [Test]
-    public async Task Email_is_always_projected_for_the_profile_owner()
-    {
-        var users = Substitute.For<IUserAuthenticationStore>();
-        users.GetProfileAsync(UserId, Arg.Any<CancellationToken>())
-            .Returns(Profile(isEmailPublic: false));
-
-        var profile = await new GetPublicUserProfile(users).ExecuteAsync(
-            UserId,
-            UserId,
-            requesterIsAdministrator: false);
-
-        await Assert.That(profile!.Email).IsEqualTo("player@example.test");
+        await Assert.That(profile!.UserName).IsEqualTo("Player");
     }
 
     [Test]
@@ -242,8 +214,7 @@ public sealed class UserProfileManagementTests
 
     private static UserProfile Profile(
         string? description = null,
-        Guid? avatarFileId = null,
-        bool isEmailPublic = false) =>
+        Guid? avatarFileId = null) =>
         new(
             UserId,
             "Player",
@@ -252,6 +223,5 @@ public sealed class UserProfileManagementTests
             UserKind.Human,
             true,
             description,
-            avatarFileId,
-            isEmailPublic);
+            avatarFileId);
 }

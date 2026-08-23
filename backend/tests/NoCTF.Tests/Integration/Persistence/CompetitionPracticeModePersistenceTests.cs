@@ -114,10 +114,6 @@ public sealed class CompetitionPracticeModePersistenceTests
                 await Assert.That(await db.GameplayFacts.CountAsync(ct)).IsEqualTo(0);
                 await Assert.That(await db.CompetitionEvents.CountAsync(ct)).IsEqualTo(0);
                 await Assert.That(await db.Notifications.CountAsync(ct)).IsEqualTo(0);
-                await Assert.That(await db.Competitions
-                    .Select(item => item.LeaderboardDirty)
-                    .SingleAsync(ct)).IsFalse();
-
                 runtimeFlag.Flag = @"flag\{practice-[a-z-]+\}";
                 runtimeFlag.FlagSha256 = SHA256.HashData(Encoding.UTF8.GetBytes(runtimeFlag.Flag));
                 runtimeFlag.MatchKind = ChallengeFlagMatchKind.RegularExpression;
@@ -222,10 +218,8 @@ public sealed class CompetitionPracticeModePersistenceTests
             Mode = GameMode.Ctf,
             Status = CompetitionStatus.Finished,
             PracticeModeEnabled = true,
-            LeaderboardDirty = false,
             MaxConcurrentRuntimeInstancesPerTeam = 1,
             ConfigurationJson = """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":500,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
-            ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(-2),
             EndAt = now.AddHours(-1),
@@ -271,7 +265,6 @@ public sealed class CompetitionPracticeModePersistenceTests
             Id = teamId,
             CompetitionId = competitionId,
             Name = "Practice Team",
-            NormalizedName = "PRACTICE TEAM",
             CaptainId = userId,
             MemberIds = [userId],
             InvitationToken = "0123456789abcdefghijklmnopqrstuv",
@@ -316,7 +309,6 @@ public sealed class CompetitionPracticeModePersistenceTests
         UserName = name,
         NormalizedUserName = name.ToUpperInvariant(),
         Email = $"{name}@example.test",
-        NormalizedEmail = $"{name.ToUpperInvariant()}@EXAMPLE.TEST",
         PasswordHash = "test",
         CreatedAt = now,
         UpdatedAt = now

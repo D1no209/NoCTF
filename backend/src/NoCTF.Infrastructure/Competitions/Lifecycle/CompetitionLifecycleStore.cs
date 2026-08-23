@@ -100,18 +100,6 @@ public sealed class CompetitionLifecycleStore(
         var competition = await db.Competitions
             .SingleAsync(item => item.Id == competitionId, cancellationToken);
         var now = DateTimeOffset.UtcNow;
-        if (from == CompetitionStatus.Running && competition.RunningSince is { } runningSince)
-        {
-            competition.AccumulatedRunningSeconds = checked(
-                competition.AccumulatedRunningSeconds
-                + (long)Math.Floor((now - runningSince).TotalSeconds));
-            competition.RunningSince = null;
-        }
-        if (to == CompetitionStatus.Running)
-        {
-            competition.RunningSince = now.AddTicks(
-                -(now.Ticks % TimeSpan.TicksPerMicrosecond));
-        }
         if (competition.Mode == GameMode.Awd)
         {
             if (from == CompetitionStatus.Running && to == CompetitionStatus.Paused)
@@ -178,12 +166,11 @@ public sealed class CompetitionLifecycleStore(
             }
         }
         if (to == CompetitionStatus.Finished
-            && competition.LeaderboardVisibility != CompetitionLeaderboardVisibility.Normal)
+            && (competition.FrozenStartAt is not null || competition.HiddenStartAt is not null))
         {
             var effectiveVisibility = CompetitionLeaderboardVisibilityPolicy.EffectiveAt(
-                competition.Status,
-                competition.LeaderboardVisibility,
-                competition.LeaderboardVisibilityStartsAt,
+                competition.FrozenStartAt,
+                competition.HiddenStartAt,
                 now);
             if (effectiveVisibility != CompetitionLeaderboardVisibility.Normal)
             {
@@ -201,16 +188,17 @@ public sealed class CompetitionLifecycleStore(
                         schemaVersion = 1,
                         from = effectiveVisibility,
                         to = CompetitionLeaderboardVisibility.Normal,
-                        dataCutoffAt = now,
+                        frozenStartAt = (DateTimeOffset?)null,
+                        hiddenStartAt = (DateTimeOffset?)null,
+                        actorUserId = actorId,
+                        operatedAt = now,
                         automatic = true,
                         reason = "competition_finished"
                     })),
                     cancellationToken);
             }
-            competition.LeaderboardVisibility = CompetitionLeaderboardVisibility.Normal;
-            competition.LeaderboardVisibilityStartsAt = null;
-            competition.LeaderboardVisibilityAppliedAt = now;
-            competition.FrozenLeaderboardSnapshotJson = null;
+            competition.FrozenStartAt = null;
+            competition.HiddenStartAt = null;
         }
         competition.Status = to;
         competition.UpdatedAt = now;
@@ -231,10 +219,6 @@ public sealed class CompetitionLifecycleStore(
                 automatic,
                 reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim()
             })), cancellationToken);
-        await LeaderboardDirty.MarkAsync(
-            db,
-            competitionId,
-            cancellationToken);
         if (effects.HasFlag(CompetitionLifecycleEffects.ProvisionRuntimes))
             await outbox.PublishAsync(new ProvisionCompetitionRuntimes(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.CleanupRuntimes))
@@ -268,7 +252,7 @@ public sealed class CompetitionLifecycleStore(
                 await outbox.PublishAsync(new PollKohChallenge(
                     competitionId,
                     challengeId,
-                    competition.RunningSince!.Value,
+                    now,
                     now));
             }
         }

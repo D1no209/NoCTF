@@ -35,6 +35,9 @@ const tracks = ref<NoCtfapiEndpointsCompetitionsTracksCompetitionTrackResponse[]
 const selectedTeam = ref<NoCtfapiEndpointsTeamsTeamResponse | null>(null)
 const teamMembers = ref<NoCtfapiEndpointsAuthenticationPublicUserProfileResponse[]>([])
 const teamDetailLoading = ref(false)
+const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
+const displayTeamName = (team: NoCtfapiEndpointsTeamsTeamResponse) =>
+  teamDisplayName(team, teamDisplayNames.value)
 
 async function openTeamDetail(team: NoCtfapiEndpointsTeamsTeamResponse): Promise<void> {
   selectedTeam.value = team
@@ -267,7 +270,7 @@ onMounted(() => {
                 class="rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 @click="openTeamDetail(t)"
               >
-                {{ t.name }}
+                {{ displayTeamName(t) }}
               </button>
             </TableCell>
             <TableCell>
@@ -321,7 +324,7 @@ onMounted(() => {
       <SheetContent class="overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>{{ $t('队伍详情') }}</SheetTitle>
-          <SheetDescription>{{ selectedTeam?.name }}</SheetDescription>
+          <SheetDescription>{{ selectedTeam ? displayTeamName(selectedTeam) : '' }}</SheetDescription>
         </SheetHeader>
         <div v-if="selectedTeam" class="mt-6 flex flex-col gap-6">
           <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">
@@ -350,7 +353,6 @@ onMounted(() => {
                   <NuxtLink :to="`/users/${member.userId}`" class="font-medium hover:underline">
                     {{ member.userName }}
                   </NuxtLink>
-                  <p v-if="member.email" class="truncate text-xs text-muted-foreground">{{ member.email }}</p>
                 </div>
                 <Badge v-if="member.userId === selectedTeam.captainId" variant="secondary">{{ $t('队长') }}</Badge>
               </div>
@@ -378,7 +380,7 @@ onMounted(() => {
         <Card v-for="a in appeals" :key="a.banEventId">
           <CardHeader>
             <div class="flex items-center justify-between gap-2">
-              <CardTitle class="text-base">{{ a.teamName }}</CardTitle>
+              <CardTitle class="text-base">{{ teamDisplayName(a, teamDisplayNames) }}</CardTitle>
               <div class="flex items-center gap-1">
                 <Badge variant="outline">{{ enumLabel(TeamBanSourceLabel, a.source) }}</Badge>
                 <Badge v-if="a.appeal" :variant="a.appeal.status === 'Submitted' ? 'secondary' : a.appeal.status === 'Accepted' ? 'default' : 'destructive'">

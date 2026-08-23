@@ -478,15 +478,6 @@ public sealed class GameplayFactProcessor(
                 submission.Id,
                 submission.TeamId);
         }
-        if (previousGameplayFactResult != submission.Result
-            || previousFailureCode != submission.FailureCode)
-        {
-            await db.Competitions
-                .Where(competition => competition.Id == submission.CompetitionId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    competition => competition.LeaderboardDirty,
-                    true), cancellationToken);
-        }
         var bloodAward = previousGameplayFactResult == GameplayFactResult.Correct
             ? null
             : await TryCreateBloodAwardAsync(

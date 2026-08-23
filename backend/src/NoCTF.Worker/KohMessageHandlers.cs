@@ -38,8 +38,7 @@ public sealed class KohPollingHandler(
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || target.Competition.Mode != GameMode.Koh
-            || target.Competition.Status != CompetitionStatus.Running
-            || target.Competition.RunningSince != message.RunningSince)
+            || target.Competition.Status != CompetitionStatus.Running)
             return null;
 
         var settings = configurations.Get(
@@ -162,8 +161,7 @@ public sealed class KohObservationHandler(
             .SingleOrDefaultAsync(cancellationToken);
         if (target is null
             || target.Competition.Mode != GameMode.Koh
-            || target.Competition.Status != CompetitionStatus.Running
-            || target.Competition.RunningSince != message.RunningSince)
+            || target.Competition.Status != CompetitionStatus.Running)
             return;
 
         var settings = configurations.Get(
@@ -184,8 +182,6 @@ public sealed class KohObservationHandler(
             OccurredAt = message.ObservedAt,
             UpdatedAt = timeProvider.GetUtcNow()
         });
-        target.Competition.LeaderboardDirty = true;
-
         var nextDue = KohPollSchedule.NextDue(
             message.DueAt,
             timeProvider.GetUtcNow(),

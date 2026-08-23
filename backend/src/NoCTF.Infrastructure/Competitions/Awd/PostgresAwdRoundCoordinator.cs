@@ -11,6 +11,7 @@ using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.GameModes.Awd.Scheduling;
 using NoCTF.GameModes.Flags;
 using NoCTF.Infrastructure.Challenges;
+using NoCTF.Infrastructure.Competitions.Lifecycle;
 
 namespace NoCTF.Infrastructure.Competitions.Awd;
 
@@ -80,11 +81,17 @@ public sealed class PostgresAwdRoundCoordinator(
         var latest = await LoadLatestWindowAsync(message.CompetitionChallengeId, cancellationToken);
         if (latest.Conflict)
             return MessageExecutionOutcome.Conflict;
+        var effectiveRuntime = await CompetitionEffectiveRuntimeReader.ReadAsync(
+            db,
+            message.CompetitionId,
+            target.Competition.StartAt,
+            target.Competition.EndAt,
+            handledAt,
+            cancellationToken);
         if (!IsCurrentGenerationWindow(
                 message,
                 target.Competition.ConfigurationJson,
-                target.Competition.AccumulatedRunningSeconds,
-                target.Competition.RunningSince,
+                effectiveRuntime.Elapsed,
                 target.Competition.EndAt,
                 latest.Window,
                 handledAt))
@@ -185,16 +192,14 @@ public sealed class PostgresAwdRoundCoordinator(
             }
             await db.SaveChangesAsync(cancellationToken);
         }
-        var scheduledSuccessor = !ScheduleMatches(
-            target.Challenge,
-            message.Round.Round,
-            message.ValidUntil);
+        // The created round flags are the business fact. Scheduling state must not be
+        // persisted on CompetitionChallenge. A replay that observes a complete round
+        // therefore has no successor work to add; the original transaction committed
+        // the flags and successor message atomically through the EF outbox.
+        var scheduledSuccessor = missing.Length > 0
+            || existingFlags.Count == 0 && teamIds.Count == 0;
         if (scheduledSuccessor)
         {
-            SetScheduleFence(
-                target.Challenge,
-                message.Round.Round,
-                message.ValidUntil);
             if (message.ValidUntil < target.Competition.EndAt)
             {
                 await outbox.ScheduleAsync(
@@ -254,10 +259,13 @@ public sealed class PostgresAwdRoundCoordinator(
 
         var handledAt = timeProvider.GetUtcNow();
         var settings = configurations.Get(target.Competition.ConfigurationJson);
-        var effectiveRunningTime = CalculateEffectiveRunningTime(
-            target.Competition.AccumulatedRunningSeconds,
-            target.Competition.RunningSince,
-            handledAt);
+        var effectiveRunningTime = (await CompetitionEffectiveRuntimeReader.ReadAsync(
+            db,
+            message.CompetitionId,
+            target.Competition.StartAt,
+            target.Competition.EndAt,
+            handledAt,
+            cancellationToken)).Elapsed;
         var plan = AwdRoundScheduler.PlanCurrentRound(
             handledAt,
             target.Competition.EndAt,
@@ -274,29 +282,16 @@ public sealed class PostgresAwdRoundCoordinator(
                         - effectiveRunningTime);
                 if (dueAt < target.Competition.EndAt)
                 {
-                    var scheduled = await ScheduleAdvanceIfChangedAsync(
-                        target.Challenge,
-                        round: 0,
-                        dueAt,
-                        message);
-                    if (scheduled)
-                    {
-                        await db.SaveChangesAsync(cancellationToken);
-                        await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
-                    }
+                    await ScheduleAdvanceAsync(dueAt, message);
+                    await db.SaveChangesAsync(cancellationToken);
+                    await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
                 }
                 return MessageExecutionOutcome.DeferredSchedule;
             case AwdRoundPlanKind.Current:
                 var current = plan.Window!.Value;
                 if (current.ValidUntil >= target.Competition.EndAt)
                     return MessageExecutionOutcome.Idempotent;
-                var replacementScheduled = await ScheduleAdvanceIfChangedAsync(
-                    target.Challenge,
-                    current.Round,
-                    current.ValidUntil,
-                    message);
-                if (!replacementScheduled)
-                    return MessageExecutionOutcome.Idempotent;
+                await ScheduleAdvanceAsync(current.ValidUntil, message);
                 await db.SaveChangesAsync(cancellationToken);
                 await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
                 return MessageExecutionOutcome.DeferredSchedule;
@@ -367,17 +362,12 @@ public sealed class PostgresAwdRoundCoordinator(
     private bool IsCurrentGenerationWindow(
         GenerateAwdFlags message,
         string competitionConfigurationJson,
-        long accumulatedRunningSeconds,
-        DateTimeOffset? runningSince,
+        TimeSpan effectiveRunningTime,
         DateTimeOffset competitionEndAt,
         AwdPersistedRoundWindow? latest,
         DateTimeOffset handledAt)
     {
         var settings = configurations.Get(competitionConfigurationJson);
-        var effectiveRunningTime = CalculateEffectiveRunningTime(
-            accumulatedRunningSeconds,
-            runningSince,
-            handledAt);
         var plan = AwdRoundScheduler.PlanCurrentRound(
             handledAt,
             competitionEndAt,
@@ -397,17 +387,6 @@ public sealed class PostgresAwdRoundCoordinator(
             && window.ValidUntil == message.ValidUntil;
     }
 
-    private static TimeSpan CalculateEffectiveRunningTime(
-        long accumulatedRunningSeconds,
-        DateTimeOffset? runningSince,
-        DateTimeOffset now)
-    {
-        var effective = TimeSpan.FromSeconds(accumulatedRunningSeconds);
-        if (runningSince is DateTimeOffset startedAt && now > startedAt)
-            effective += now - startedAt;
-        return effective;
-    }
-
     private static string GenerateCandidate(
         PerTeamFlagTemplate template,
         PerTeamFlagContext context,
@@ -423,24 +402,12 @@ public sealed class PostgresAwdRoundCoordinator(
         throw new InvalidOperationException("Flag candidate loop did not return a value.");
     }
 
-    private async Task<bool> ScheduleAdvanceIfChangedAsync(
-        CompetitionChallenge challenge,
-        int round,
+    private async Task ScheduleAdvanceAsync(
         DateTimeOffset dueAt,
         AdvanceAwdRound message)
     {
         dueAt = ToPostgresTimestamp(dueAt);
-        if (ScheduleMatches(
-                challenge,
-                round,
-                dueAt))
-            return false;
-        SetScheduleFence(
-            challenge,
-            round,
-            dueAt);
         await outbox.ScheduleAsync(message with { At = dueAt }, dueAt);
-        return true;
     }
 
     private async Task CommitAndFlushIfOwnedAsync(
@@ -451,23 +418,6 @@ public sealed class PostgresAwdRoundCoordinator(
             return;
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
-    }
-
-    private static bool ScheduleMatches(
-        CompetitionChallenge challenge,
-        int round,
-        DateTimeOffset dueAt) =>
-        challenge.LastScheduledAwdRound == round
-        && challenge.AwdScheduleDueAt is { } scheduledAt
-        && ToPostgresTimestamp(scheduledAt) == ToPostgresTimestamp(dueAt);
-
-    private static void SetScheduleFence(
-        CompetitionChallenge challenge,
-        int round,
-        DateTimeOffset dueAt)
-    {
-        challenge.LastScheduledAwdRound = round;
-        challenge.AwdScheduleDueAt = ToPostgresTimestamp(dueAt);
     }
 
     private static AwdPersistedRoundWindow ToPostgresTimestamp(

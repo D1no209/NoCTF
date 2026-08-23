@@ -40,25 +40,22 @@ public sealed class FusionLeaderboardCache(
         (await GetPublishedBundleAsync(competitionId, ct))?.Scoreboard;
 
     public async Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken ct)
-    {
-        var payload = await db.Competitions.AsNoTracking()
-            .Where(competition => competition.Id == competitionId)
-            .Select(competition => competition.FrozenLeaderboardSnapshotJson)
-            .SingleOrDefaultAsync(ct);
-        return string.IsNullOrWhiteSpace(payload)
-            ? null
-            : JsonSerializer.Deserialize<LeaderboardProjectionBundle>(payload, JsonOptions)?.Legacy;
-    }
+        => (await GetFrozenBundleAsync(competitionId, ct))?.Legacy;
 
     public async Task<ScoreboardProjection?> GetFrozenScoreboardAsync(Guid competitionId, CancellationToken ct)
+        => (await GetFrozenBundleAsync(competitionId, ct))?.Scoreboard;
+
+    private async Task<LeaderboardProjectionBundle?> GetFrozenBundleAsync(
+        Guid competitionId,
+        CancellationToken ct)
     {
-        var payload = await db.Competitions.AsNoTracking()
+        var frozenAt = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId)
-            .Select(competition => competition.FrozenLeaderboardSnapshotJson)
+            .Select(competition => competition.FrozenStartAt)
             .SingleOrDefaultAsync(ct);
-        return string.IsNullOrWhiteSpace(payload)
+        return frozenAt is null
             ? null
-            : JsonSerializer.Deserialize<LeaderboardProjectionBundle>(payload, JsonOptions)?.Scoreboard;
+            : await ProjectBundleAsync(competitionId, null, frozenAt.Value, null, ct);
     }
 
     public async Task<LeaderboardResponse?> CreateAsync(
@@ -506,11 +503,6 @@ public sealed class FusionLeaderboardCache(
         {
             if (publicationPhase)
                 NoCtfTelemetry.RecordLeaderboardPublishFailure("projection");
-            db.ChangeTracker.Clear();
-            await db.Competitions
-                .Where(competition => competition.Id == competitionId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(competition => competition.LeaderboardDirty, true), CancellationToken.None);
             await cache.SetAsync(FailureKey(competitionId), DateTimeOffset.UtcNow, token: CancellationToken.None);
             throw;
         }
@@ -523,24 +515,8 @@ public sealed class FusionLeaderboardCache(
         }
     }
 
-    public async Task InvalidateAsync(Guid competitionId, CancellationToken ct)
-    {
-        if (db.Database.IsInMemory())
-        {
-            var competition = await db.Competitions.SingleOrDefaultAsync(
-                candidate => candidate.Id == competitionId, ct);
-            if (competition is not null)
-            {
-                competition.LeaderboardDirty = true;
-                await db.SaveChangesAsync(ct);
-            }
-            return;
-        }
-        _ = await db.Competitions
-            .Where(competition => competition.Id == competitionId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(competition => competition.LeaderboardDirty, true), ct);
-    }
+    public Task InvalidateAsync(Guid competitionId, CancellationToken ct) =>
+        cache.RemoveAsync(ProjectionKey(competitionId), token: ct).AsTask();
 
     public async Task<LeaderboardCacheStatus> GetStatusAsync(Guid competitionId, CancellationToken ct)
     {

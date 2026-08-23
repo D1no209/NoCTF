@@ -385,13 +385,11 @@ public sealed class AwdRuntimeProvisioningTests
             ConfigurationJson = JsonSerializer.Serialize(
                 AwdConfiguration.Default,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
-            RunningSince = now,
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Challenges.Add(new Challenge
         {
@@ -444,7 +442,6 @@ public sealed class AwdRuntimeProvisioningTests
         UserName = name,
         NormalizedUserName = name.ToUpperInvariant(),
         Email = $"{name}@example.test",
-        NormalizedEmail = $"{name.ToUpperInvariant()}@EXAMPLE.TEST",
         PasswordHash = "test",
         CreatedAt = now,
         UpdatedAt = now
@@ -461,7 +458,6 @@ public sealed class AwdRuntimeProvisioningTests
             Id = id,
             CompetitionId = competitionId,
             Name = name,
-            NormalizedName = name.ToUpperInvariant(),
             CaptainId = captainId,
             MemberIds = [captainId],
             InvitationToken = id.ToString("N"),

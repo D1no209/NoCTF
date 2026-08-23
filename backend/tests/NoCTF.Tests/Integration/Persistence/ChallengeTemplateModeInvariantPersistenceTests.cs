@@ -116,14 +116,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 """{"schemaVersion":1,"updated":true}""",
                 changedAt,
                 cancellationToken);
-            await using (var dirtyDb = new NoCtfDbContext(options))
-            {
-                var leaderboardDirty = await dirtyDb.Competitions.AsNoTracking()
-                    .Where(item => item.Id == fixture.CompetitionId)
-                    .Select(item => item.LeaderboardDirty)
-                    .SingleAsync(cancellationToken);
-                await Assert.That(leaderboardDirty).IsTrue();
-            }
             await using (var eventDb = new NoCtfDbContext(options))
             {
                 var descriptionEvents = await eventDb.CompetitionEvents.AsNoTracking()
@@ -553,7 +545,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             Title = title,
             Mode = GameMode.Ctf,
             ConfigurationJson = """{"schemaVersion":1}""",
-            ConfigurationUpdatedAt = now,
             FlagDerivationSecret = new byte[32],
             StartAt = now.AddHours(1),
             EndAt = now.AddHours(2),
@@ -589,7 +580,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             UserName = "mode-invariant-owner",
             NormalizedUserName = "MODE-INVARIANT-OWNER",
             Email = "mode-invariant-owner@example.test",
-            NormalizedEmail = "MODE-INVARIANT-OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             Kind = UserKind.Human,
             Role = UserRole.Organizer,

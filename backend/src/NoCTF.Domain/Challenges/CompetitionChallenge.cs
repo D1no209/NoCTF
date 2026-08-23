@@ -14,8 +14,6 @@ public sealed class CompetitionChallenge
     public int Order { get; set; }
     public bool IsPublished { get; set; }
     public string RulesJson { get; set; } = string.Empty;
-    public int LastScheduledAwdRound { get; set; }
-    public DateTimeOffset? AwdScheduleDueAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
     public List<CompetitionChallengeHint> Hints { get; set; } = [];

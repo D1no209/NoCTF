@@ -23,10 +23,9 @@ public sealed record CompetitionVisibilityConfigurationView(
     CompetitionStatus CompetitionStatus,
     DateTimeOffset CompetitionStartTime,
     DateTimeOffset CompetitionEndTime,
-    CompetitionLeaderboardVisibility ConfiguredVisibility,
     CompetitionLeaderboardVisibility EffectiveVisibility,
-    DateTimeOffset? StartsAt,
-    DateTimeOffset? AppliedAt);
+    DateTimeOffset? FrozenStartAt,
+    DateTimeOffset? HiddenStartAt);
 
 public enum CompetitionVisibilityMutationState
 {
@@ -45,8 +44,8 @@ public sealed record CompetitionVisibilityMutationResult(
 
 public sealed record UpdateCompetitionVisibilityCommand(
     Guid CompetitionId,
-    CompetitionLeaderboardVisibility Visibility,
-    DateTimeOffset? StartsAt,
+    DateTimeOffset? FrozenStartAt,
+    DateTimeOffset? HiddenStartAt,
     Guid ActorId,
     string? Reason,
     DateTimeOffset Now);
@@ -60,19 +59,15 @@ public static class CompetitionVisibilityRules
         UpdateCompetitionVisibilityCommand command)
     {
         if (status == CompetitionStatus.Finished
-            && command.Visibility != CompetitionLeaderboardVisibility.Normal)
+            && (command.FrozenStartAt is not null || command.HiddenStartAt is not null))
             return CompetitionVisibilityMutationState.CompetitionFinished;
-        if (command.Visibility == CompetitionLeaderboardVisibility.Normal)
-            return command.StartsAt is null
-                ? null
-                : CompetitionVisibilityMutationState.InvalidSchedule;
-        if (command.StartsAt is not { } startsAt)
-            return null;
-        return startsAt <= command.Now
-               || startsAt < competitionStartTime
-               || startsAt >= competitionEndTime
-            ? CompetitionVisibilityMutationState.InvalidSchedule
-            : null;
+
+        return new[] { command.FrozenStartAt, command.HiddenStartAt }
+            .Where(value => value is not null)
+            .Select(value => value!.Value)
+            .Any(startsAt => startsAt < competitionStartTime || startsAt >= competitionEndTime)
+                ? CompetitionVisibilityMutationState.InvalidSchedule
+                : null;
     }
 }
 
@@ -87,11 +82,6 @@ public interface ICompetitionVisibilityStore
         UpdateCompetitionVisibilityCommand command,
         CancellationToken cancellationToken);
 
-    Task ApplyScheduledAsync(
-        Guid competitionId,
-        DateTimeOffset scheduledAt,
-        DateTimeOffset now,
-        CancellationToken cancellationToken);
 }
 
 public sealed class GetCompetitionVisibility(ICompetitionVisibilityStore store)
@@ -125,18 +115,4 @@ public sealed class UpdateCompetitionVisibility(ICompetitionVisibilityStore stor
 
         return await store.UpdateAsync(command, cancellationToken);
     }
-}
-
-public sealed class ApplyScheduledCompetitionVisibility(ICompetitionVisibilityStore store)
-{
-    public Task ExecuteAsync(
-        Guid competitionId,
-        DateTimeOffset scheduledAt,
-        DateTimeOffset now,
-        CancellationToken cancellationToken = default) =>
-        store.ApplyScheduledAsync(
-            competitionId,
-            scheduledAt,
-            now,
-            cancellationToken);
 }

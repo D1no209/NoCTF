@@ -242,7 +242,6 @@ public sealed class PlatformUserAccountStatusPersistenceTests
             UserName = userName,
             NormalizedUserName = userName.ToUpperInvariant(),
             Email = $"{userName}@example.test",
-            NormalizedEmail = $"{userName.ToUpperInvariant()}@EXAMPLE.TEST",
             PasswordHash = "test",
             Kind = UserKind.Human,
             Role = role,

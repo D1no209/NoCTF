@@ -1212,7 +1212,7 @@ export const resendEmailVerificationEndpoint = <ThrowOnError extends boolean = f
 });
 
 /**
- * Updates the current user's profile and email visibility.
+ * Updates the current user's profile.
  */
 export const authenticationUpdateMyProfile = <ThrowOnError extends boolean = false>(options: Options<AuthenticationUpdateMyProfileData, ThrowOnError>): RequestResult<AuthenticationUpdateMyProfileResponses, AuthenticationUpdateMyProfileErrors, ThrowOnError> => (options.client ?? client).put<AuthenticationUpdateMyProfileResponses, AuthenticationUpdateMyProfileErrors, ThrowOnError>({
     security: [{
@@ -2460,9 +2460,9 @@ export const adminGetCompetitionLeaderboardVisibility = <ThrowOnError extends bo
 });
 
 /**
- * Schedules or immediately applies leaderboard visibility.
+ * Sets the independent frozen and hidden leaderboard start times.
  *
- * Persists the exact Frozen cutoff snapshot when the restriction takes effect.
+ * The latest effective timestamp wins; hidden wins when timestamps are equal.
  */
 export const adminUpdateCompetitionLeaderboardVisibility = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCompetitionLeaderboardVisibilityData, ThrowOnError>): RequestResult<AdminUpdateCompetitionLeaderboardVisibilityResponses, AdminUpdateCompetitionLeaderboardVisibilityErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateCompetitionLeaderboardVisibilityResponses, AdminUpdateCompetitionLeaderboardVisibilityErrors, ThrowOnError>({
     security: [{

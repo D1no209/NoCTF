@@ -12,19 +12,17 @@ const { user, fetchMe, logoutAll } = useAuth()
 
 // Profile tab
 const description = ref(user.value?.description ?? '')
-const isEmailPublic = ref(user.value?.isEmailPublic ?? false)
 const profilePending = ref(false)
 
 watch(user, (u) => {
   description.value = u?.description ?? ''
-  isEmailPublic.value = u?.isEmailPublic ?? false
 })
 
 async function saveProfile() {
   profilePending.value = true
   try {
     const { error } = await authenticationUpdateMyProfile({
-      body: { description: description.value || null, isEmailPublic: isEmailPublic.value },
+      body: { description: description.value || null },
     })
     if (error) throw parseApiError(error)
     await fetchMe()
@@ -158,10 +156,6 @@ async function changePassword() {
               <Field>
                 <FieldLabel for="description">{{ $t('个人简介') }}</FieldLabel>
                 <Textarea id="description" v-model="description" rows="4" :placeholder="$t('介绍一下自己(可选)')" />
-              </Field>
-              <Field orientation="horizontal">
-                <Switch id="isEmailPublic" v-model="isEmailPublic" />
-                <FieldLabel for="isEmailPublic">{{ $t('在个人资料页公开邮箱') }}</FieldLabel>
               </Field>
             </FieldGroup>
           </CardContent>

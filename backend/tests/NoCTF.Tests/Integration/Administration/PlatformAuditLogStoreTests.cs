@@ -52,7 +52,6 @@ public sealed class PlatformAuditLogStoreTests
                     Mode = GameMode.Ctf,
                     Status = CompetitionStatus.Running,
                     ConfigurationJson = "{}",
-                    ConfigurationUpdatedAt = now,
                     FlagDerivationSecret = new byte[32],
                     StartAt = now.AddHours(-1),
                     EndAt = now.AddHours(1),
@@ -199,7 +198,6 @@ public sealed class PlatformAuditLogStoreTests
             UserName = userName,
             NormalizedUserName = userName.ToUpperInvariant(),
             Email = $"{userName}@example.test",
-            NormalizedEmail = $"{userName}@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now

@@ -13,13 +13,12 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(user => user.UserName).HasMaxLength(64);
         builder.Property(user => user.NormalizedUserName).HasMaxLength(64);
         builder.Property(user => user.Email).HasMaxLength(320);
-        builder.Property(user => user.NormalizedEmail).HasMaxLength(320);
         builder.Property(user => user.Kind).HasConversion<short>();
         builder.Property(user => user.Role).HasConversion<short>();
         builder.Property(user => user.AccountStatus).HasConversion<short>();
         builder.HasIndex(user => user.NormalizedUserName).IsUnique();
-        builder.HasIndex(user => user.NormalizedEmail).IsUnique()
-            .HasFilter("normalized_email <> ''");
+        builder.HasIndex(user => user.Email).IsUnique()
+            .HasFilter("email <> ''");
         builder.HasOne(user => user.AvatarFile).WithMany()
             .HasForeignKey(user => user.AvatarFileId)
             .OnDelete(DeleteBehavior.Restrict);

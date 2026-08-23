@@ -1,5 +1,36 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 0—2
+
+- 当前分支：`codex/data-model-wolverine-simplification`；权威规范为
+  `docs/data-model-wolverine-simplification.md`。阶段 0 提交 `1a195f6c`，阶段 1 提交
+  `e264d49f`，阶段 2 为本节所在提交。未推送、未部署、未操作生产数据库或生产队列。
+- 阶段 0 已同步治理文档、保存 schema/契约/测试基线，并以 Wolverine `6.29.2` 对真实
+  PostgreSQL 完成最小 Spike：PostgreSQL transport、durable inbox/outbox、EF transactional
+  outbox、competing consumers、fan-out、`IdAndDestination` 与 Singular Agent 均有版本实证；
+  同时确认缺失 Sticky endpoint 会静默退化到 local queue，阶段 7 必须补启动 fail-fast。
+- 阶段 1 已删除持久化 Revision、ExpectedRevision、ConcurrencyToken、处理版本与相关 HTTP/
+  OpenAPI/SDK 伪乐观并发协议，保留 JWT Token、定义 schema、事件 payload 和外部协议的真实版本；
+  普通更新采用 last-write-wins，业务不变量继续使用 PostgreSQL 锁、稳定 UUID 和 durable inbox。
+- 阶段 2 已删除 canonical Email 双写与公开邮箱开关、队伍规范化名称/唯一约束、比赛配置时间、
+  Runtime 累加缓存、旧榜单可见性/冻结快照/Dirty 状态、AWD 下一轮调度列。新增两个榜单可见性
+  时间戳、生命周期事件派生有效运行时间，以及明文赛道邀请码的固定时间比较；邀请码只向
+  Owner/Manager/Platform Admin 的管理协议回显。公共用户资料不再含邮箱，重复队名以稳定
+  TeamId 前 8 位在同屏消歧。
+- 阶段 2 验证：Release solution build 0 warning/0 error；定向 Unit `27/27`、Architecture
+  `52/52`、真实 PostgreSQL/Testcontainers `5/5`；前端 `bun test` `274/274`、typecheck 和
+  production build 通过；OpenAPI/SDK 重新生成幂等，`git diff --check` 通过。
+- 当前 migration/snapshot 故意仍是旧基线；权威顺序要求阶段 10 才能通过 `dotnet ef` 删除并
+  重建单一 `InitialBaseline`，因此阶段 1—9 的完整旧 migration Integration 套件会出现预期
+  model drift，不得误报为通过，也不得手改 migration。当前模型的阶段性关系约束使用
+  `EnsureCreated` 的可丢弃 Testcontainers PostgreSQL 验证。
+- 数据切换风险：canonical Email 冲突必须人工处理；旧赛道邀请码哈希不可逆，需要 Owner/Manager
+  在切换前重设；旧冻结快照不迁移，切换后从 PostgreSQL 事实重建。任何一项责任人或转换方案
+  不成立，必须在阶段 10/11 暂停，不能以清库替代生产迁移。
+- 下一步从阶段 3 `Notifications/Questions` 线程化继续。恢复前先执行
+  `git status --short`、`git log --oneline -5`，再阅读
+  `docs/data-model-wolverine-stage2-core-privacy.md`；禁止跳到后续 migration 或调度阶段。
+
 ## 2026-08-23 Alpha.79 私有指标与平台监控入口
 
 - 平台管理的“运维”分组新增“监控”页面，只展示 API、实时连接、关键 Wolverine 队列、

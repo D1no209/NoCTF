@@ -88,7 +88,7 @@ public class TeamRegistrationTests
         var configuration = new CompetitionTrackConfiguration(1,
         [
             Track("formal", isDefault: true),
-            Track("invite", invitationCodeHash: CompetitionTrackInvitationCode.Hash("let-me-in"))
+            Track("invite", invitationCode: "let-me-in")
         ]);
         var policy = new TeamRegistrationPolicy(
             CompetitionStatus.Published,
@@ -163,7 +163,7 @@ public class TeamRegistrationTests
         bool isDefault = false,
         bool publicSelectable = true,
         bool isInternal = false,
-        string? invitationCodeHash = null) => new(
+        string? invitationCode = null) => new(
         key,
         key,
         isDefault,
@@ -174,5 +174,5 @@ public class TeamRegistrationTests
         AffectsDynamicChallengeScore: !isInternal,
         VisibleOnLeaderboard: !isInternal,
         AffectsCompetitiveResults: !isInternal,
-        InvitationCodeHash: invitationCodeHash);
+        InvitationCode: invitationCode);
 }

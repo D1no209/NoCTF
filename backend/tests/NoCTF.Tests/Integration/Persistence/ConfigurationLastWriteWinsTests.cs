@@ -94,7 +94,6 @@ public sealed class ConfigurationLastWriteWinsTests
             UserName = "owner",
             NormalizedUserName = "OWNER",
             Email = "owner@example.test",
-            NormalizedEmail = "OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -112,7 +111,6 @@ public sealed class ConfigurationLastWriteWinsTests
             Status = CompetitionStatus.Draft,
             CreatedAt = now,
             UpdatedAt = now,
-            ConfigurationUpdatedAt = now
         });
         db.Challenges.Add(new Challenge
         {

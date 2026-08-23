@@ -58,8 +58,7 @@ public sealed record CurrentUserResponse(
     UserKindProtocol Kind,
     bool EmailVerified,
     string? Description,
-    string? AvatarUrl,
-    bool IsEmailPublic);
+    string? AvatarUrl);
 
 internal static class CurrentUserMapping
 {
@@ -78,8 +77,7 @@ internal static class CurrentUserMapping
             IdentityProtocolMapper.ToProtocol(profile.Kind),
             profile.EmailVerified,
             profile.Description,
-            avatarUrl,
-            profile.IsEmailPublic);
+            avatarUrl);
     }
 
     public static string? AvatarUrl(

@@ -50,6 +50,9 @@ const teams = computed(() => {
     : all
 })
 const visibleTeams = computed(() => teams.value.slice(0, visibleTeamCount.value))
+const teamDisplayNames = computed(() => buildTeamDisplayNames(teams.value))
+const displayTeamName = (team: NoCtfapiEndpointsCompetitionsScoreboardTeamResponse) =>
+  teamDisplayName(team, teamDisplayNames.value)
 watch(teams, () => { visibleTeamCount.value = 50 })
 
 const columnGroups = computed(() => scoreboardChallengeColumnGroups(
@@ -100,7 +103,7 @@ function exportCsv(): void {
     }),
   ]
   const rows = teams.value.map(team => [
-    team.rank ?? '', team.teamName ?? '', team.totalScore ?? 0,
+    team.rank ?? '', displayTeamName(team), team.totalScore ?? 0,
     ...flatColumns.value.map((column) => {
       if (column.index === undefined) return ''
       const slot = scoreboardSlot(team, column.index)
@@ -363,7 +366,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
               <TableBody>
                 <TableRow v-for="team in visibleTeams" :key="team.teamId" :class="(team.rank ?? 99) <= 3 ? 'bg-primary/5' : ''">
                   <TableCell><Medal v-if="(team.rank ?? 99) <= 3" class="size-5" :class="medalRankClass[team.rank ?? 0]" /><span v-else class="font-mono tabular-nums">{{ team.rank ?? '—' }}</span></TableCell>
-                  <TableCell class="sticky left-0 z-10 border-r bg-card"><button type="button" class="rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看队伍 {team} 详情', { team: team.teamName ?? '' })" @click="openTeamDetail(team)">{{ team.teamName }}</button><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="ml-2">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></TableCell>
+                  <TableCell class="sticky left-0 z-10 border-r bg-card"><button type="button" class="rounded-sm font-medium underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看队伍 {team} 详情', { team: displayTeamName(team) })" @click="openTeamDetail(team)">{{ displayTeamName(team) }}</button><Badge v-if="team.rankingState !== 'Eligible'" variant="destructive" class="ml-2">{{ scoreboardRankingStateLabel(team.rankingState) }}</Badge></TableCell>
                   <TableCell class="text-right">
                     <button v-if="(team.globalAdjustmentCount ?? 0) > 0" type="button" class="w-full rounded-md px-2 py-1 text-right transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" @click="openAdjustments(team)">
                       <span class="block font-mono font-semibold tabular-nums">{{ team.totalScore ?? 0 }} pts</span>
@@ -373,7 +376,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
                   </TableCell>
                   <template v-for="group in columnGroups" :key="`${team.teamId}-${group.competitionChallengeId}`">
                     <TableCell v-for="column in group.columns" :key="column.index" class="border-l p-1 text-center">
-                      <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看 {team} 在 {challenge} {round} 的详情', { team: team.teamName ?? '', challenge: group.challenge?.title ?? $t('未知题目'), round: roundLabel(column) })" @click="openDetail(team, column)">
+                      <button v-if="column.index !== undefined && scoreboardSlot(team, column.index)" type="button" class="flex min-h-12 w-full items-center justify-center rounded-md px-1 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" :aria-label="$t('查看 {team} 在 {challenge} {round} 的详情', { team: displayTeamName(team), challenge: group.challenge?.title ?? $t('未知题目'), round: roundLabel(column) })" @click="openDetail(team, column)">
                         <ScoreboardSlotStatus :mode="board.schema.value.mode" :slot="scoreboardSlot(team, column.index!)!" />
                       </button>
                       <span v-else class="font-mono text-sm text-muted-foreground/60">-</span>
@@ -392,7 +395,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
 
     <Dialog v-model:open="detailOpen">
       <DialogScrollContent class="max-h-[85vh] sm:max-w-2xl">
-        <DialogHeader><DialogTitle>{{ detailTeam?.teamName }} · {{ board.challengesById.value.get(detailColumn?.competitionChallengeId ?? '')?.title ?? $t('未知题目') }} · {{ detailColumn ? roundLabel(detailColumn) : '' }}</DialogTitle><DialogDescription>{{ $t('分值与状态均来自服务端权威结算结果。') }}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{{ detailTeam ? displayTeamName(detailTeam) : '' }} · {{ board.challengesById.value.get(detailColumn?.competitionChallengeId ?? '')?.title ?? $t('未知题目') }} · {{ detailColumn ? roundLabel(detailColumn) : '' }}</DialogTitle><DialogDescription>{{ $t('分值与状态均来自服务端权威结算结果。') }}</DialogDescription></DialogHeader>
         <Alert v-if="detailError" variant="destructive"><AlertDescription>{{ detailError }}</AlertDescription></Alert>
         <div v-if="detailLoading" class="flex items-center justify-center py-10"><Spinner /></div>
         <template v-else-if="detail">
@@ -406,7 +409,7 @@ function adjustmentKind(entry: NoCtfapiEndpointsCompetitionsScoreboardAdjustment
 
     <Dialog v-model:open="adjustmentOpen">
       <DialogScrollContent class="max-h-[85vh] sm:max-w-xl">
-        <DialogHeader><DialogTitle>{{ adjustmentTeam?.teamName }} · {{ $t('全局调分') }}</DialogTitle><DialogDescription>{{ $t('完整调分记录均来自服务端权威事实。') }}</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{{ adjustmentTeam ? displayTeamName(adjustmentTeam) : '' }} · {{ $t('全局调分') }}</DialogTitle><DialogDescription>{{ $t('完整调分记录均来自服务端权威事实。') }}</DialogDescription></DialogHeader>
         <Alert v-if="adjustmentError" variant="destructive"><AlertDescription>{{ adjustmentError }}</AlertDescription></Alert>
         <div v-if="adjustmentLoading" class="flex items-center justify-center py-10"><Spinner /></div>
         <template v-else-if="adjustmentDetail">

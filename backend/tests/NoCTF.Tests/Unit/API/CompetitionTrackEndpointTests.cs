@@ -56,8 +56,21 @@ public sealed class CompetitionTrackEndpointTests
 
         await Assert.That(read.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That(store.LastIncludeInternal).IsTrue();
+        await Assert.That(store.LastIncludeInvitationCodes).IsFalse();
         await Assert.That(write.StatusCode).IsEqualTo(HttpStatusCode.Forbidden);
         await Assert.That(store.UpdateCalls).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Moderator_can_read_track_invitation_codes()
+    {
+        var store = new RecordingStore();
+        await using var app = await CreateApplicationAsync(store, Access.Moderator);
+        using var response = await app.GetTestClient().GetAsync(
+            $"/api/v1/admin/competitions/{CompetitionId}/tracks");
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(store.LastIncludeInvitationCodes).IsTrue();
     }
 
     [Test]
@@ -150,6 +163,7 @@ public sealed class CompetitionTrackEndpointTests
     private sealed class RecordingStore : ICompetitionTrackStore
     {
         public bool? LastIncludeInternal { get; private set; }
+        public bool? LastIncludeInvitationCodes { get; private set; }
         public int UpdateCalls { get; private set; }
         public int AssignCalls { get; private set; }
         public string? LastAssignedTrack { get; private set; }
@@ -158,9 +172,11 @@ public sealed class CompetitionTrackEndpointTests
             Guid competitionId,
             Guid? viewerUserId,
             bool includeInternal,
+            bool includeInvitationCodes,
             CancellationToken cancellationToken)
         {
             LastIncludeInternal = includeInternal;
+            LastIncludeInvitationCodes = includeInvitationCodes;
             return Task.FromResult<CompetitionTracksView?>(new(
                 CompetitionId,
                 GameMode.Ctf,

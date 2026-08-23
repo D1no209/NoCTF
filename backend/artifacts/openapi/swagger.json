@@ -4281,7 +4281,7 @@
         "tags": [
           "Auth"
         ],
-        "summary": "Updates the current user's profile and email visibility.",
+        "summary": "Updates the current user's profile.",
         "operationId": "Authentication_UpdateMyProfile",
         "requestBody": {
           "x-name": "UpdateMyProfileRequest",
@@ -9267,8 +9267,8 @@
         "tags": [
           "Admin"
         ],
-        "summary": "Schedules or immediately applies leaderboard visibility.",
-        "description": "Persists the exact Frozen cutoff snapshot when the restriction takes effect.",
+        "summary": "Sets the independent frozen and hidden leaderboard start times.",
+        "description": "The latest effective timestamp wins; hidden wins when timestamps are equal.",
         "operationId": "AdminUpdateCompetitionLeaderboardVisibility",
         "parameters": [
           {
@@ -15950,6 +15950,10 @@
           },
           "isViewerTrack": {
             "type": "boolean"
+          },
+          "invitationCode": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -17056,9 +17060,6 @@
           "avatarUrl": {
             "type": "string",
             "nullable": true
-          },
-          "isEmailPublic": {
-            "type": "boolean"
           }
         }
       },
@@ -17099,10 +17100,6 @@
           "userName": {
             "type": "string"
           },
-          "email": {
-            "type": "string",
-            "nullable": true
-          },
           "description": {
             "type": "string",
             "nullable": true
@@ -17110,9 +17107,6 @@
           "avatarUrl": {
             "type": "string",
             "nullable": true
-          },
-          "isEmailPublic": {
-            "type": "boolean"
           }
         }
       },
@@ -17283,19 +17277,12 @@
       "NoCTFAPIEndpointsAuthenticationUpdateMyProfileRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "isEmailPublic"
-        ],
         "properties": {
           "description": {
             "type": "string",
             "maxLength": 500,
             "minLength": 0,
             "nullable": true
-          },
-          "isEmailPublic": {
-            "type": "boolean",
-            "nullable": false
           }
         }
       },
@@ -19748,18 +19735,15 @@
             "type": "string",
             "format": "guid"
           },
-          "configuredVisibility": {
-            "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
-          },
           "effectiveVisibility": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
           },
-          "startsAt": {
+          "frozenStartAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
           },
-          "appliedAt": {
+          "hiddenStartAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -19979,19 +19963,13 @@
       "NoCTFAPIEndpointsAdministrationCompetitionsUpdateCompetitionLeaderboardVisibilityRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "visibility"
-        ],
         "properties": {
-          "visibility": {
-            "nullable": false,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsLeaderboardVisibilityProtocol"
-              }
-            ]
+          "frozenStartAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
-          "startsAt": {
+          "hiddenStartAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true

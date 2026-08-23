@@ -563,10 +563,8 @@ public sealed class CheatIncidentStore(
         return PlatformLogRedactor.Redact(sanitized, []);
     }
 
-    private Task MarkLeaderboardDirtyAsync(Guid competitionId, CancellationToken ct) =>
-        db.Competitions.Where(competition => competition.Id == competitionId)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(competition => competition.LeaderboardDirty, true), ct);
+    private static Task MarkLeaderboardDirtyAsync(Guid competitionId, CancellationToken ct) =>
+        Task.CompletedTask;
 
     private enum ResolutionOperation : short
     {

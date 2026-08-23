@@ -620,7 +620,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
             UserName = "owner",
             NormalizedUserName = "OWNER",
             Email = "owner@example.test",
-            NormalizedEmail = "OWNER@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -631,7 +630,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
             UserName = $"player-{index}",
             NormalizedUserName = $"PLAYER-{index}",
             Email = $"player-{index}@example.test",
-            NormalizedEmail = $"PLAYER-{index}@EXAMPLE.TEST",
             PasswordHash = "test",
             CreatedAt = now,
             UpdatedAt = now
@@ -644,7 +642,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
             Mode = GameMode.Awdp,
             Status = CompetitionStatus.Running,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
-            ConfigurationUpdatedAt = now,
             StartAt = now.AddMinutes(-1),
             EndAt = now.AddHours(1),
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
@@ -700,7 +697,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
             Id = id,
             CompetitionId = competitionId,
             Name = $"Team {index}",
-            NormalizedName = $"TEAM {index}",
             CaptainId = userIds[index],
             MemberIds = [userIds[index]],
             InvitationToken = id.ToString("N"),
