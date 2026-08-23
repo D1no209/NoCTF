@@ -1,3 +1,4 @@
+using FluentStorage.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -122,7 +123,7 @@ public sealed class RunnerAvailabilityOptionsTests
     }
 
     [Test]
-    public async Task Runner_does_not_receive_an_object_storage_adapter()
+    public async Task Runner_does_not_receive_the_platform_file_store()
     {
         using var services = BuildServices(new Dictionary<string, string?>
         {
@@ -140,7 +141,7 @@ public sealed class RunnerAvailabilityOptionsTests
             ["Storage:S3:Bucket"] = "noctf"
         });
 
-        var storage = services.GetService<IObjectStorage>();
+        var storage = services.GetService<IStore>();
 
         await Assert.That(storage).IsNull();
     }

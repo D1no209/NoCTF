@@ -1,7 +1,7 @@
+using FluentStorage.Storage;
 using NoCTF.Application.Administration.PlatformConfiguration;
 using NoCTF.Application.Storage;
 using NSubstitute;
-using System.Security.Cryptography;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -24,7 +24,7 @@ public sealed class PlatformConfigurationTests
                 null,
                 4,
                 now));
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var configuration = new ManagePlatformConfiguration(
             store,
             objects,
@@ -48,7 +48,7 @@ public sealed class PlatformConfigurationTests
     [Test]
     public async Task Logo_honors_the_configured_byte_limit_before_storage()
     {
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var configuration = new ManagePlatformConfiguration(
             Substitute.For<IPlatformConfigurationStore>(),
@@ -64,18 +64,18 @@ public sealed class PlatformConfigurationTests
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.State).IsEqualTo(PlatformLogoUpdateState.InvalidSize);
-        await objects.DidNotReceiveWithAnyArgs().PutAsync(
+        await objects.DidNotReceiveWithAnyArgs().SetObject(
             default!,
             default!,
             default!,
-            default!,
+            default,
             default);
     }
 
     [Test]
     public async Task Logo_replacement_rejects_mismatched_content_without_storage_write()
     {
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var configuration = new ManagePlatformConfiguration(
             Substitute.For<IPlatformConfigurationStore>(),
@@ -90,11 +90,11 @@ public sealed class PlatformConfigurationTests
             DateTimeOffset.UtcNow);
 
         await Assert.That(result.State).IsEqualTo(PlatformLogoUpdateState.InvalidFormat);
-        await objects.DidNotReceiveWithAnyArgs().PutAsync(
+        await objects.DidNotReceiveWithAnyArgs().SetObject(
             default!,
             default!,
             default!,
-            default!,
+            default,
             default);
     }
 
@@ -103,26 +103,20 @@ public sealed class PlatformConfigurationTests
     {
         var now = DateTimeOffset.UtcNow;
         var store = Substitute.For<IPlatformConfigurationStore>();
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
         Guid registeredFileId = default;
         Guid attachedFileId = default;
-        objects.PutAsync(
+        objects.SetObject(
                 Arg.Any<string>(),
-                "logo.png",
-                "image/png",
                 Arg.Any<Stream>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => new StoredObject(
-                call.ArgAt<string>(0),
-                "logo.png",
                 "image/png",
-                8,
-                Convert.ToHexString(SHA256.HashData(png))));
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
         registry.RegisterAsync(
-                Arg.Do<Guid>(value => registeredFileId = value),
-                Arg.Any<StoredObject>(),
+                Arg.Do<ManagedFileUpload>(value => registeredFileId = value.FileId),
                 now,
                 Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
@@ -157,6 +151,6 @@ public sealed class PlatformConfigurationTests
         await registry.DidNotReceiveWithAnyArgs().AbandonAsync(default, default);
     }
 
-    private static ManagedFileUploads Uploads(IObjectStorage objects) =>
+    private static ManagedFileUploads Uploads(IStore objects) =>
         new(Substitute.For<IManagedFileUploadRegistry>(), objects);
 }

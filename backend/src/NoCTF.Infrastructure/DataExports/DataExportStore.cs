@@ -1,4 +1,5 @@
 using System.Data;
+using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.DataExports;
 using NoCTF.Application.Messaging;
@@ -10,7 +11,7 @@ namespace NoCTF.Infrastructure.DataExports;
 
 public sealed class DataExportStore(
     NoCtfDbContext db,
-    IObjectStorage objectStorage,
+    IStore objectStorage,
     ITransactionalMessageOutbox outbox,
     TimeProvider timeProvider) : IDataExportStore
 {
@@ -175,9 +176,11 @@ public sealed class DataExportStore(
             return new(Failure: AccessDataExportFailure.NotReady);
         }
 
-        if (await objectStorage.InspectAsync(entity.File.ObjectKey, cancellationToken) is null)
+        if (!await objectStorage.ObjectExists(entity.File.ObjectKey, cancellationToken))
             return new(Failure: AccessDataExportFailure.ObjectMissing);
-        var content = await objectStorage.OpenReadAsync(entity.File.ObjectKey, cancellationToken);
+        var content = await objectStorage.OpenRead(entity.File.ObjectKey, cancellationToken);
+        if (content is null)
+            return new(Failure: AccessDataExportFailure.ObjectMissing);
         return new(new DataExportDownload(
             content,
             entity.File.FileName,

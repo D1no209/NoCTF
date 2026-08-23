@@ -73,9 +73,10 @@ services:
       Storage__Provider: S3
       Storage__S3__ServiceUrl: http://minio:9000
       Storage__S3__Bucket: noctf
+      Storage__S3__Region: us-east-1
       Storage__S3__ForcePathStyle: "true"
-      AWS_ACCESS_KEY_ID: ${NOCTF_E2E_MINIO_USER}
-      AWS_SECRET_ACCESS_KEY: ${NOCTF_E2E_MINIO_PASSWORD}
+      Storage__S3__AccessKey: ${NOCTF_E2E_MINIO_USER}
+      Storage__S3__SecretKey: ${NOCTF_E2E_MINIO_PASSWORD}
       EmailVerification__Enabled: "false"
     depends_on:
       postgres:

@@ -1,7 +1,7 @@
 using System.Formats.Tar;
 using System.IO.Compression;
-using System.Security.Cryptography;
 using System.Text;
+using FluentStorage.Storage;
 using NoCTF.Application.Storage;
 using NoCTF.Application.GameplayFacts.PatchUploads;
 
@@ -13,7 +13,7 @@ public sealed class CreatePatchUploadTests
     public async Task Oversized_archive_is_rejected_before_storage()
     {
         var store = new RejectingPatchUploadStore(maximumArchiveBytes: 1);
-        var objects = new RecordingObjectStorage();
+        var objects = new RecordingStore();
         var registry = new RecordingUploadRegistry();
         var useCase = new CreatePatchUpload(
             store,
@@ -32,14 +32,14 @@ public sealed class CreatePatchUploadTests
 
         await Assert.That(result.FailureCode).IsEqualTo(PatchUploadFailureCode.ArchiveTooLarge);
         await Assert.That(registry.RegisteredFileId).IsNull();
-        await Assert.That(objects.StoredObjectKey).IsNull();
+        await Assert.That(objects.ObjectKey).IsNull();
     }
 
     [Test]
     public async Task Rejected_database_save_deletes_the_new_object()
     {
         var store = new RejectingPatchUploadStore();
-        var objects = new RecordingObjectStorage();
+        var objects = new RecordingStore();
         var registry = new RecordingUploadRegistry();
         var useCase = new CreatePatchUpload(
             store,
@@ -66,7 +66,7 @@ public sealed class CreatePatchUploadTests
     public async Task Cleanup_failure_does_not_mask_the_database_rejection()
     {
         var store = new RejectingPatchUploadStore();
-        var objects = new RecordingObjectStorage();
+        var objects = new RecordingStore();
         var registry = new RecordingUploadRegistry(throwOnAbandon: true);
         var useCase = new CreatePatchUpload(
             store,
@@ -93,7 +93,7 @@ public sealed class CreatePatchUploadTests
     {
         var store = new RejectingPatchUploadStore(
             saveState: PatchUploadSaveState.DefenseTargetConsumed);
-        var objects = new RecordingObjectStorage();
+        var objects = new RecordingStore();
         var registry = new RecordingUploadRegistry();
         var useCase = new CreatePatchUpload(
             store,
@@ -121,7 +121,7 @@ public sealed class CreatePatchUploadTests
     {
         var store = new RejectingPatchUploadStore(
             saveState: PatchUploadSaveState.AchievementAlreadySucceeded);
-        var objects = new RecordingObjectStorage();
+        var objects = new RecordingStore();
         var registry = new RecordingUploadRegistry();
         var useCase = new CreatePatchUpload(
             store,
@@ -195,43 +195,20 @@ public sealed class CreatePatchUploadTests
                 saveState));
     }
 
-    private sealed class RecordingObjectStorage : IObjectStorage
+    private sealed class RecordingStore : StoreBase
     {
-        public string? StoredObjectKey { get; private set; }
+        public string? ObjectKey { get; private set; }
 
-        public Task<StoredObject?> InspectAsync(
+        public override async Task SetObject(
             string objectKey,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<StoredObject?>(null);
-
-        public Task<StoredObject> PutAsync(
-            string objectKey,
-            string fileName,
-            string contentType,
             Stream content,
-            CancellationToken cancellationToken)
+            string contentType,
+            bool append = false,
+            CancellationToken cancellationToken = default)
         {
-            StoredObjectKey = objectKey;
-            var position = content.Position;
-            var hash = Convert.ToHexString(SHA256.HashData(content));
-            var length = content.Position - position;
-            return Task.FromResult(new StoredObject(
-                objectKey,
-                fileName,
-                contentType,
-                length,
-                hash));
+            ObjectKey = objectKey;
+            await content.CopyToAsync(Stream.Null, cancellationToken);
         }
-
-        public Task<Stream> OpenReadAsync(
-            string objectKey,
-            CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task DeleteAsync(
-            string objectKey,
-            CancellationToken cancellationToken)
-            => Task.CompletedTask;
     }
 
     private sealed class RecordingUploadRegistry(bool throwOnAbandon = false)
@@ -241,12 +218,11 @@ public sealed class CreatePatchUploadTests
         public Guid? AbandonedFileId { get; private set; }
 
         public Task RegisterAsync(
-            Guid fileId,
-            StoredObject metadata,
+            ManagedFileUpload file,
             DateTimeOffset createdAt,
             CancellationToken cancellationToken)
         {
-            RegisteredFileId = fileId;
+            RegisteredFileId = file.FileId;
             return Task.CompletedTask;
         }
 

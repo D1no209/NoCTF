@@ -1,6 +1,8 @@
 using System.Text;
+using System.Security.Cryptography;
+using FluentStorage;
+using FluentStorage.Storage;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Storage;
@@ -47,8 +49,8 @@ public sealed class FileCleanupPersistenceTests
                     outbox,
                     NullLogger<ManagedFileUploadRegistry>.Instance);
                 await registry.RegisterAsync(
-                    fileId,
-                    new StoredObject(
+                    new ManagedFileUpload(
+                        fileId,
                         "attachments/leased",
                         "leased.txt",
                         "text/plain",
@@ -94,18 +96,18 @@ public sealed class FileCleanupPersistenceTests
 
             try
             {
-                var storage = new LocalObjectStorage(Configuration(storageRoot));
+                using var storage = StorageFactory.Disk(storageRoot);
                 var now = DateTimeOffset.Parse("2026-08-08T00:00:00Z");
                 var fileId = Guid.CreateVersion7(now);
                 var userId = Guid.CreateVersion7(now.AddMilliseconds(1));
                 const string objectKey = "shared/platform-identity.png";
                 await using var content = new MemoryStream(Encoding.UTF8.GetBytes("shared-file"));
-                var stored = await storage.PutAsync(
+                await storage.SetObject(
                     objectKey,
-                    "identity.png",
-                    "image/png",
                     content,
-                    cancellationToken);
+                    "image/png",
+                    cancellationToken: cancellationToken);
+                var contentBytes = Encoding.UTF8.GetBytes("shared-file");
 
                 await using (var db = new NoCtfDbContext(options))
                 {
@@ -113,11 +115,11 @@ public sealed class FileCleanupPersistenceTests
                     db.Files.Add(new StoredFile
                     {
                         Id = fileId,
-                        ObjectKey = stored.ObjectKey,
-                        FileName = stored.FileName,
-                        ContentType = stored.ContentType,
-                        ByteLength = stored.Length,
-                        Sha256 = Convert.FromHexString(stored.Sha256),
+                        ObjectKey = objectKey,
+                        FileName = "identity.png",
+                        ContentType = "image/png",
+                        ByteLength = contentBytes.LongLength,
+                        Sha256 = SHA256.HashData(contentBytes),
                         CreatedAt = now
                     });
                     db.Users.Add(new User
@@ -168,7 +170,7 @@ public sealed class FileCleanupPersistenceTests
                     await db.SaveChangesAsync(cancellationToken);
                 }
 
-                var failOnce = new FailOnceDeleteObjectStorage(storage);
+                var failOnce = new FailOnceDeleteStore(storage);
                 Func<Task> failedCleanup = () =>
                     HandleCleanupAsync(options, failOnce, fileId, cancellationToken);
                 await Assert.That(failedCleanup).Throws<IOException>();
@@ -186,9 +188,7 @@ public sealed class FileCleanupPersistenceTests
                         candidate => candidate.Id == fileId,
                         cancellationToken)).IsFalse();
                 }
-                await Assert.That(await storage.InspectAsync(
-                    objectKey,
-                    cancellationToken)).IsNull();
+                await Assert.That(await storage.ObjectExists(objectKey, cancellationToken)).IsFalse();
 
                 await HandleCleanupAsync(options, storage, fileId, cancellationToken);
             }
@@ -202,7 +202,7 @@ public sealed class FileCleanupPersistenceTests
 
     private static async Task HandleCleanupAsync(
         DbContextOptions<NoCtfDbContext> options,
-        IObjectStorage storage,
+        IStore storage,
         Guid fileId,
         CancellationToken cancellationToken)
     {
@@ -216,7 +216,7 @@ public sealed class FileCleanupPersistenceTests
 
     private static async Task AssertFileExistsAsync(
         DbContextOptions<NoCtfDbContext> options,
-        IObjectStorage storage,
+        IStore storage,
         Guid fileId,
         string objectKey,
         CancellationToken cancellationToken)
@@ -225,47 +225,16 @@ public sealed class FileCleanupPersistenceTests
         await Assert.That(await verify.Files.AnyAsync(
             candidate => candidate.Id == fileId,
             cancellationToken)).IsTrue();
-        await Assert.That(await storage.InspectAsync(
-            objectKey,
-            cancellationToken)).IsNotNull();
+        await Assert.That(await storage.ObjectExists(objectKey, cancellationToken)).IsTrue();
     }
 
-    private static IConfiguration Configuration(string storageRoot) =>
-        new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Storage:LocalRoot"] = storageRoot
-            })
-            .Build();
-
-    private sealed class FailOnceDeleteObjectStorage(IObjectStorage inner) : IObjectStorage
+    private sealed class FailOnceDeleteStore(IStore inner) : StoreBase
     {
         private bool failNextDelete = true;
 
-        public Task<StoredObject?> InspectAsync(
+        public override Task DeleteObject(
             string objectKey,
-            CancellationToken cancellationToken) =>
-            inner.InspectAsync(objectKey, cancellationToken);
-
-        public Task<StoredObject> PutAsync(
-            string objectKey,
-            string fileName,
-            string contentType,
-            Stream content,
-            CancellationToken cancellationToken) =>
-            inner.PutAsync(
-                objectKey,
-                fileName,
-                contentType,
-                content,
-                cancellationToken);
-
-        public Task<Stream> OpenReadAsync(
-            string objectKey,
-            CancellationToken cancellationToken) =>
-            inner.OpenReadAsync(objectKey, cancellationToken);
-
-        public Task DeleteAsync(string objectKey, CancellationToken cancellationToken)
+            CancellationToken cancellationToken = default)
         {
             if (failNextDelete)
             {
@@ -273,7 +242,7 @@ public sealed class FileCleanupPersistenceTests
                 throw new IOException("Simulated object storage deletion failure.");
             }
 
-            return inner.DeleteAsync(objectKey, cancellationToken);
+            return inner.DeleteObject(objectKey, cancellationToken);
         }
     }
 

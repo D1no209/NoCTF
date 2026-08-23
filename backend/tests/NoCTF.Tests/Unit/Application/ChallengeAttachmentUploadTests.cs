@@ -3,7 +3,7 @@ using NSubstitute;
 using NoCTF.Application.Challenges.Attachments;
 using NoCTF.Application.Common;
 using NoCTF.Application.Storage;
-using System.Security.Cryptography;
+using FluentStorage.Storage;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -15,7 +15,6 @@ public sealed class ChallengeAttachmentUploadTests
         Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid AttachmentId =
         Guid.Parse("33333333-3333-3333-3333-333333333333");
-    private static readonly string StoredObjectKey = $"attachments/{AttachmentId:N}";
 
     [Test]
     public async Task Added_attachment_keeps_the_stored_object()
@@ -51,7 +50,6 @@ public sealed class ChallengeAttachmentUploadTests
         await harness.Store.DidNotReceiveWithAnyArgs()
             .AttachmentIdExistsAsync(default, default);
         await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(
-            default,
             default!,
             default,
             default);
@@ -157,7 +155,6 @@ public sealed class ChallengeAttachmentUploadTests
         var exception = await Assert.That(action).Throws<OperationCanceledException>();
         await Assert.That(exception!.CancellationToken).IsEqualTo(cancellation.Token);
         await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(
-            default,
             default!,
             default,
             default);
@@ -233,7 +230,7 @@ public sealed class ChallengeAttachmentUploadTests
             DateTimeOffset.Parse("2026-08-14T00:00:00Z"));
 
         await Assert.That(result.FailureCode).IsEqualTo(ChallengeAttachmentFailureCode.DuplicateFlag);
-        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default, default!, default, default);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default!, default, default);
         await harness.Store.DidNotReceiveWithAnyArgs().AddRandomBatchAsync(
             default, default, default, default!, default!, default);
     }
@@ -259,7 +256,7 @@ public sealed class ChallengeAttachmentUploadTests
 
         await Assert.That(result.FailureCode)
             .IsEqualTo(ChallengeAttachmentFailureCode.InvalidVariantFileName);
-        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default, default!, default, default);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default!, default, default);
         await harness.Store.DidNotReceiveWithAnyArgs().AddRandomBatchAsync(
             default, default, default, default!, default!, default);
     }
@@ -283,7 +280,7 @@ public sealed class ChallengeAttachmentUploadTests
 
         await Assert.That(result.FailureCode)
             .IsEqualTo(ChallengeAttachmentFailureCode.InvalidFileName);
-        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default, default!, default, default);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default!, default, default);
         await harness.Store.DidNotReceiveWithAnyArgs().AddRandomBatchAsync(
             default, default, default, default!, default!, default);
     }
@@ -302,7 +299,7 @@ public sealed class ChallengeAttachmentUploadTests
             DateTimeOffset.Parse("2026-08-14T00:00:00Z"));
 
         await Assert.That(result.FailureCode).IsEqualTo(ChallengeAttachmentFailureCode.EmptyBatch);
-        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default, default!, default, default);
+        await harness.Registry.DidNotReceiveWithAnyArgs().RegisterAsync(default!, default, default);
     }
 
     [Test]
@@ -310,23 +307,18 @@ public sealed class ChallengeAttachmentUploadTests
     {
         var harness = CreateHarness();
         var puts = 0;
-        harness.Objects.PutAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
+        harness.Objects.SetObject(
                 Arg.Any<string>(),
                 Arg.Any<Stream>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 puts++;
                 return puts == 2
-                    ? Task.FromException<StoredObject>(new IOException("storage failed"))
-                    : Task.FromResult(new StoredObject(
-                        call.ArgAt<string>(0),
-                        call.ArgAt<string>(1),
-                        call.ArgAt<string>(2),
-                        1,
-                        Convert.ToHexString(SHA256.HashData([1]))));
+                    ? Task.FromException(new IOException("storage failed"))
+                    : Task.CompletedTask;
             });
         using var first = new MemoryStream([1]);
         using var second = new MemoryStream([2]);
@@ -354,7 +346,7 @@ public sealed class ChallengeAttachmentUploadTests
     private static Harness CreateHarness(bool canWrite = true)
     {
         var store = Substitute.For<IChallengeAttachmentStore>();
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         store.CanWriteAsync(
                 ChallengeId,
@@ -364,23 +356,17 @@ public sealed class ChallengeAttachmentUploadTests
             .Returns(Task.FromResult(canWrite));
         store.AttachmentIdExistsAsync(AttachmentId, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(false));
-        objects.PutAsync(
-                Arg.Any<string>(),
-                Arg.Any<string>(),
+        objects.SetObject(
                 Arg.Any<string>(),
                 Arg.Any<Stream>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
                 Arg.Any<CancellationToken>())
             .Returns(call =>
             {
                 using var copy = new MemoryStream();
-                call.ArgAt<Stream>(3).CopyTo(copy);
-                var bytes = copy.ToArray();
-                return Task.FromResult(new StoredObject(
-                    call.ArgAt<string>(0),
-                    call.ArgAt<string>(1),
-                    call.ArgAt<string>(2),
-                    bytes.Length,
-                    Convert.ToHexString(SHA256.HashData(bytes))));
+                call.ArgAt<Stream>(1).CopyTo(copy);
+                return Task.CompletedTask;
             });
         return new(
             store,
@@ -415,7 +401,7 @@ public sealed class ChallengeAttachmentUploadTests
 
     private sealed record Harness(
         IChallengeAttachmentStore Store,
-        IObjectStorage Objects,
+        IStore Objects,
         IManagedFileUploadRegistry Registry,
         ManageChallengeAttachments UseCase);
 

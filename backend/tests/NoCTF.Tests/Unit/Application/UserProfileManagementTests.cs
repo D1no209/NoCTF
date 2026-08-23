@@ -1,8 +1,8 @@
+using FluentStorage.Storage;
 using NSubstitute;
 using NoCTF.Application.Authentication.Account;
 using NoCTF.Application.Storage;
 using NoCTF.Domain.Identity;
-using System.Security.Cryptography;
 
 namespace NoCTF.Tests.Unit.Application;
 
@@ -85,7 +85,7 @@ public sealed class UserProfileManagementTests
     public async Task Avatar_honors_the_configured_byte_limit_before_decoding()
     {
         var users = Substitute.For<IUserAuthenticationStore>();
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var images = Substitute.For<IAvatarImageProcessor>();
         var replace = new ReplaceCurrentUserAvatar(
@@ -104,14 +104,14 @@ public sealed class UserProfileManagementTests
         await Assert.That(result.Failure).IsEqualTo(AvatarImageFailure.SizeInvalid);
         images.DidNotReceiveWithAnyArgs().Process(default);
         await objects.DidNotReceiveWithAnyArgs()
-            .PutAsync(default!, default!, default!, default!, default);
+            .SetObject(default!, default!, default!, default, default);
     }
 
     [Test]
     public async Task Avatar_rejects_content_when_signature_and_content_type_do_not_match()
     {
         var users = Substitute.For<IUserAuthenticationStore>();
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var images = Substitute.For<IAvatarImageProcessor>();
         images.Process(Arg.Any<ReadOnlyMemory<byte>>())
@@ -130,14 +130,14 @@ public sealed class UserProfileManagementTests
 
         await Assert.That(result.Failure).IsEqualTo(AvatarImageFailure.MalformedImage);
         await objects.DidNotReceiveWithAnyArgs()
-            .PutAsync(default!, default!, default!, default!, default);
+            .SetObject(default!, default!, default!, default, default);
     }
 
     [Test]
     public async Task Avatar_switches_to_the_new_file_reference()
     {
         var users = Substitute.For<IUserAuthenticationStore>();
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var images = Substitute.For<IAvatarImageProcessor>();
         var currentFileId = Guid.NewGuid();
@@ -150,21 +150,15 @@ public sealed class UserProfileManagementTests
                 "image/webp",
                 "webp",
                 "image/png")));
-        objects.PutAsync(
+        objects.SetObject(
                 Arg.Any<string>(),
-                "avatar.webp",
-                "image/webp",
                 Arg.Any<Stream>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => new StoredObject(
-                call.ArgAt<string>(0),
-                "avatar.webp",
                 "image/webp",
-                3,
-                Convert.ToHexString(SHA256.HashData(normalized))));
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
         registry.RegisterAsync(
-                Arg.Do<Guid>(value => registeredFileId = value),
-                Arg.Any<StoredObject>(),
+                Arg.Do<ManagedFileUpload>(value => registeredFileId = value.FileId),
                 Now,
                 Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
@@ -201,7 +195,7 @@ public sealed class UserProfileManagementTests
     public async Task Avatar_rejects_forged_file_metadata_after_successful_decode()
     {
         var users = Substitute.For<IUserAuthenticationStore>();
-        var objects = Substitute.For<IObjectStorage>();
+        var objects = Substitute.For<IStore>();
         var registry = Substitute.For<IManagedFileUploadRegistry>();
         var images = Substitute.For<IAvatarImageProcessor>();
         images.Process(Arg.Any<ReadOnlyMemory<byte>>())
@@ -224,7 +218,26 @@ public sealed class UserProfileManagementTests
         await Assert.That(result.Failure)
             .IsEqualTo(AvatarImageFailure.SourceMetadataMismatch);
         await objects.DidNotReceiveWithAnyArgs()
-            .PutAsync(default!, default!, default!, default!, default);
+            .SetObject(default!, default!, default!, default, default);
+    }
+
+    [Test]
+    public async Task Missing_avatar_object_is_reported_as_not_found()
+    {
+        var users = Substitute.For<IUserAuthenticationStore>();
+        var objects = Substitute.For<IStore>();
+        users.GetAvatarFileAsync(UserId, Arg.Any<CancellationToken>())
+            .Returns(new BusinessFileReference(
+                Guid.CreateVersion7(),
+                "users/missing/avatar",
+                "avatar.webp",
+                "image/webp"));
+        objects.OpenRead("users/missing/avatar", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<Stream>(null!));
+
+        var result = await new GetUserAvatar(users, objects).ExecuteAsync(UserId);
+
+        await Assert.That(result).IsNull();
     }
 
     private static UserProfile Profile(

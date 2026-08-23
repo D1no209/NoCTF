@@ -16,23 +16,22 @@ public sealed class ManagedFileUploadRegistry(
     private static readonly TimeSpan CleanupLease = TimeSpan.FromHours(24);
 
     public async Task RegisterAsync(
-        Guid fileId,
-        StoredObject metadata,
+        ManagedFileUpload file,
         DateTimeOffset createdAt,
         CancellationToken cancellationToken)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         db.Files.Add(new StoredFile
         {
-            Id = fileId,
-            ObjectKey = metadata.ObjectKey,
-            FileName = metadata.FileName,
-            ContentType = metadata.ContentType,
-            ByteLength = metadata.Length,
-            Sha256 = Convert.FromHexString(metadata.Sha256),
+            Id = file.FileId,
+            ObjectKey = file.ObjectKey,
+            FileName = file.FileName,
+            ContentType = file.ContentType,
+            ByteLength = file.ByteLength,
+            Sha256 = Convert.FromHexString(file.Sha256),
             CreatedAt = createdAt
         });
-        await outbox.ScheduleAsync(new CleanupFile(fileId), createdAt.Add(CleanupLease));
+        await outbox.ScheduleAsync(new CleanupFile(file.FileId), createdAt.Add(CleanupLease));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

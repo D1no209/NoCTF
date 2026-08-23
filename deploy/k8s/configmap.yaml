@@ -26,6 +26,7 @@ data:
   Storage__Provider: "S3"
   Storage__S3__ServiceUrl: "http://minio:9000"
   Storage__S3__Bucket: "noctf"
+  Storage__S3__Region: "us-east-1"
   Storage__S3__ForcePathStyle: "true"
   Storage__PublicBaseUrl: "https://minio.noctf.local"
   Runner__Provider: "Kubernetes"

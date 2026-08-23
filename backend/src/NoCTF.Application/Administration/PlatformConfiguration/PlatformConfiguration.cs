@@ -1,3 +1,4 @@
+using FluentStorage.Storage;
 using NoCTF.Application.Storage;
 
 namespace NoCTF.Application.Administration.PlatformConfiguration;
@@ -66,7 +67,7 @@ public sealed record PlatformLogoContent(Stream Content, string ContentType);
 
 public sealed class ManagePlatformConfiguration(
     IPlatformConfigurationStore settings,
-    IObjectStorage objects,
+    IStore objects,
     ManagedFileUploads uploads)
 {
     public Task<PlatformConfigurationView> GetAsync(CancellationToken ct = default) =>
@@ -174,13 +175,8 @@ public sealed class ManagePlatformConfiguration(
         if (file is null)
             return null;
 
-        var metadata = await objects.InspectAsync(file.ObjectKey, ct);
-        if (metadata is null)
-            return null;
-
-        return new(
-            await objects.OpenReadAsync(file.ObjectKey, ct),
-            file.ContentType);
+        var content = await objects.OpenRead(file.ObjectKey, ct);
+        return content is null ? null : new(content, file.ContentType);
     }
 
     private static RasterImage? DetectImage(ReadOnlySpan<byte> content)
