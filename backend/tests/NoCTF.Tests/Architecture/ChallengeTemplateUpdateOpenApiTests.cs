@@ -36,7 +36,6 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
                 .ToArray())
             .IsEquivalentTo([
                 "ResourceIdConflict",
-                "RevisionConflict",
                 "ActiveCompetitionModeConflict",
                 "OwnerIncludedInManagerSet",
                 "UserNotFound",
@@ -49,7 +48,7 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
     }
 
     [Test]
-    public async Task Update_requires_complete_revision_fenced_payload()
+    public async Task Update_requires_complete_last_write_wins_payload()
     {
         using var swagger = await ReadSwaggerAsync();
         var root = swagger.RootElement;
@@ -69,19 +68,15 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
                 "title",
                 "description",
                 "direction",
-                "definitionJson",
-                "expectedRevision"
+                "definitionJson"
             ]);
         await Assert.That(RequiredPropertyNames(request))
             .IsEquivalentTo([
                 "mode",
                 "visibility",
                 "title",
-                "direction",
-                "expectedRevision"
+                "direction"
             ]);
-        AssertNonNegativeInt32(
-            request.GetProperty("properties").GetProperty("expectedRevision"));
         await AssertNamedStringEnumAsync(
             root,
             request.GetProperty("properties").GetProperty("mode"),
@@ -132,17 +127,6 @@ public sealed class ChallengeTemplateUpdateOpenApiTests
             .EnumerateArray()
             .Select(property => property.GetString()!)
             .ToArray();
-
-    private static void AssertNonNegativeInt32(JsonElement schema)
-    {
-        if (schema.GetProperty("type").GetString() != "integer"
-            || schema.GetProperty("format").GetString() != "int32"
-            || schema.GetProperty("minimum").GetDouble() != 0)
-        {
-            throw new InvalidOperationException(
-                "ExpectedRevision must be a non-negative required Int32.");
-        }
-    }
 
     private static async Task AssertNamedStringEnumAsync(
         JsonElement root,

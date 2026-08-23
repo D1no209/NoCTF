@@ -38,8 +38,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         now,
                         managerIds: [managerId],
                         judgeIds: [judgeId],
-                        observerIds: [observerId],
-                        permissionRevision: 7),
+                        observerIds: [observerId]),
                     [
                         Human(ownerId, "snapshot-owner", UserRole.Organizer, true, now),
                         Human(
@@ -77,15 +76,13 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                     ownerId,
                     [managerId],
                     [judgeId],
-                    [observerId],
-                    7);
+                    [observerId]);
                 await AssertSnapshotAsync(
                     administrator.Snapshot!,
                     ownerId,
                     [managerId],
                     [judgeId],
-                    [observerId],
-                    7);
+                    [observerId]);
 
                 foreach (var actorId in new[]
                          {
@@ -273,7 +270,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Concurrent_full_replacements_accept_exactly_one_expected_revision(
+    public async Task Concurrent_full_replacements_use_last_write_wins_without_partial_state(
         CancellationToken cancellationToken)
     {
         await RunAsync(
@@ -287,11 +284,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                 var competitionId = Guid.CreateVersion7();
                 await SeedAsync(
                     options,
-                    Competition(
-                        competitionId,
-                        ownerId,
-                        now,
-                        permissionRevision: 5),
+                    Competition(competitionId, ownerId, now),
                     [
                         Human(ownerId, "revision-owner", UserRole.Organizer, true, now),
                         Human(
@@ -315,7 +308,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                     new UpdateCompetitionPermissionsCommand(
                         CompetitionId: competitionId,
                         ActorId: ownerId,
-                        ExpectedPermissionRevision: 5,
                         ManagerIds: [firstManagerId],
                         JudgeIds: [],
                         ObserverIds: []),
@@ -324,7 +316,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                     new UpdateCompetitionPermissionsCommand(
                         CompetitionId: competitionId,
                         ActorId: ownerId,
-                        ExpectedPermissionRevision: 5,
                         ManagerIds: [secondManagerId],
                         JudgeIds: [],
                         ObserverIds: []),
@@ -333,16 +324,12 @@ public sealed class CompetitionPermissionManagementPersistenceTests
 
                 await Assert.That(results.Count(result =>
                         result.State == CompetitionPermissionUpdateState.Updated))
-                    .IsEqualTo(1);
-                await Assert.That(results.Count(result =>
-                        result.State == CompetitionPermissionUpdateState.RevisionConflict))
-                    .IsEqualTo(1);
+                    .IsEqualTo(2);
                 await using var verifyDb = new NoCtfDbContext(options);
                 var persisted = await verifyDb.Competitions.AsNoTracking()
                     .SingleAsync(
                         competition => competition.Id == competitionId,
                         cancellationToken);
-                await Assert.That(persisted.PermissionRevision).IsEqualTo(6);
                 await Assert.That(
                         persisted.ManagerIds.SequenceEqual([firstManagerId])
                         || persisted.ManagerIds.SequenceEqual([secondManagerId]))
@@ -377,8 +364,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         competitionId,
                         ownerId,
                         originalUpdatedAt,
-                        managerIds: [existingManagerId],
-                        permissionRevision: 3),
+                        managerIds: [existingManagerId]),
                     [
                         Human(ownerId, "verification-owner", UserRole.Organizer, true, now),
                         Human(
@@ -407,7 +393,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         new UpdateCompetitionPermissionsCommand(
                             CompetitionId: competitionId,
                             ActorId: ownerId,
-                            ExpectedPermissionRevision: 3,
                             ManagerIds: [existingManagerId],
                             JudgeIds: [unverifiedUserId],
                             ObserverIds: []),
@@ -424,7 +409,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         new UpdateCompetitionPermissionsCommand(
                             CompetitionId: competitionId,
                             ActorId: ownerId,
-                            ExpectedPermissionRevision: 3,
                             ManagerIds: [existingManagerId],
                             JudgeIds: [],
                             ObserverIds: [unverifiedUserId]),
@@ -441,7 +425,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         new UpdateCompetitionPermissionsCommand(
                             CompetitionId: competitionId,
                             ActorId: ownerId,
-                            ExpectedPermissionRevision: 3,
                             ManagerIds: [existingManagerId],
                             JudgeIds: [],
                             ObserverIds: [notificationBotId]),
@@ -456,7 +439,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         new UpdateCompetitionPermissionsCommand(
                             CompetitionId: competitionId,
                             ActorId: ownerId,
-                            ExpectedPermissionRevision: 4,
                             ManagerIds: [existingManagerId],
                             JudgeIds: [notificationBotId],
                             ObserverIds: []),
@@ -477,7 +459,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                 await Assert.That(persisted.JudgeIds).IsEmpty();
                 await Assert.That(persisted.ObserverIds)
                     .IsEquivalentTo([notificationBotId]);
-                await Assert.That(persisted.PermissionRevision).IsEqualTo(4);
                 await Assert.That(persisted.UpdatedAt).IsNotEqualTo(originalUpdatedAt);
             },
             cancellationToken);
@@ -485,7 +466,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Owner_transfer_makes_an_in_flight_stale_permission_update_conflict(
+    public async Task Permission_update_committed_after_owner_transfer_wins_last(
         CancellationToken cancellationToken)
     {
         await RunAsync(
@@ -506,8 +487,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         previousOwnerId,
                         now,
                         managerIds: [existingManagerId],
-                        judgeIds: [newOwnerId],
-                        permissionRevision: 9),
+                        judgeIds: [newOwnerId]),
                     [
                         Human(
                             administratorId,
@@ -581,7 +561,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                     new UpdateCompetitionPermissionsCommand(
                         CompetitionId: competitionId,
                         ActorId: administratorId,
-                        ExpectedPermissionRevision: 9,
                         ManagerIds: [staleManagerId],
                         JudgeIds: [],
                         ObserverIds: []),
@@ -591,7 +570,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                 await Assert.That((await transferTask).State)
                     .IsEqualTo(CompetitionOwnerTransferState.Transferred);
                 await Assert.That((await staleUpdateTask).State)
-                    .IsEqualTo(CompetitionPermissionUpdateState.RevisionConflict);
+                    .IsEqualTo(CompetitionPermissionUpdateState.Updated);
                 await using var verifyDb = new NoCtfDbContext(options);
                 var persisted = await verifyDb.Competitions.AsNoTracking()
                     .SingleAsync(
@@ -599,11 +578,9 @@ public sealed class CompetitionPermissionManagementPersistenceTests
                         cancellationToken);
                 await Assert.That(persisted.OwnerId).IsEqualTo(newOwnerId);
                 await Assert.That(persisted.ManagerIds)
-                    .IsEquivalentTo([previousOwnerId, existingManagerId]);
-                await Assert.That(persisted.ManagerIds.Contains(staleManagerId)).IsFalse();
+                    .IsEquivalentTo([staleManagerId]);
                 await Assert.That(persisted.JudgeIds).IsEmpty();
                 await Assert.That(persisted.ObserverIds).IsEmpty();
-                await Assert.That(persisted.PermissionRevision).IsEqualTo(10);
             },
             cancellationToken);
     }
@@ -613,14 +590,12 @@ public sealed class CompetitionPermissionManagementPersistenceTests
         Guid ownerId,
         IReadOnlyList<Guid> managerIds,
         IReadOnlyList<Guid> judgeIds,
-        IReadOnlyList<Guid> observerIds,
-        int permissionRevision)
+        IReadOnlyList<Guid> observerIds)
     {
         await Assert.That(snapshot.OwnerId).IsEqualTo(ownerId);
         await Assert.That(snapshot.ManagerIds).IsEquivalentTo(managerIds);
         await Assert.That(snapshot.JudgeIds).IsEquivalentTo(judgeIds);
         await Assert.That(snapshot.ObserverIds).IsEquivalentTo(observerIds);
-        await Assert.That(snapshot.PermissionRevision).IsEqualTo(permissionRevision);
     }
 
     private static async Task AssertCandidatesAsync(
@@ -664,7 +639,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         db.Users.AddRange(users);
         db.Competitions.Add(competition);
         await db.SaveChangesAsync(cancellationToken);
@@ -716,8 +691,7 @@ public sealed class CompetitionPermissionManagementPersistenceTests
         DateTimeOffset now,
         Guid[]? managerIds = null,
         Guid[]? judgeIds = null,
-        Guid[]? observerIds = null,
-        int permissionRevision = 0) =>
+        Guid[]? observerIds = null) =>
         new()
         {
             Id = id,
@@ -725,7 +699,6 @@ public sealed class CompetitionPermissionManagementPersistenceTests
             ManagerIds = managerIds ?? [],
             JudgeIds = judgeIds ?? [],
             ObserverIds = observerIds ?? [],
-            PermissionRevision = permissionRevision,
             Title = $"Competition {id:N}",
             Mode = GameMode.Ctf,
             ConfigurationJson = """{"schemaVersion":1}""",

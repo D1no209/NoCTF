@@ -11,7 +11,6 @@ namespace NoCTF.API.Endpoints.Administration.Platform;
 public sealed class UploadPlatformLogoRequest
 {
     public IFormFile File { get; set; } = null!;
-    public long? ExpectedRevision { get; set; }
 }
 
 public sealed class UploadPlatformLogoValidator : Validator<UploadPlatformLogoRequest>
@@ -31,7 +30,6 @@ public sealed class UploadPlatformLogoValidator : Validator<UploadPlatformLogoRe
                 StringComparer.OrdinalIgnoreCase))
             .When(request => request.File is not null)
             .WithMessage("Logo must be a JPEG, PNG, or WebP image.");
-        RuleFor(request => request.ExpectedRevision).NotNull().GreaterThan(0);
     }
 }
 
@@ -57,7 +55,7 @@ public sealed class UploadPlatformLogoEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Replaces the public platform logo.";
-            summary.Description = "Stores a validated raster logo and advances the platform configuration revision.";
+            summary.Description = "Stores and applies a validated raster logo.";
         });
     }
 
@@ -82,7 +80,6 @@ public sealed class UploadPlatformLogoEndpoint(
             request.File.ContentType,
             content.ToArray(),
             uploadLimits.MaximumLogoBytes,
-            request.ExpectedRevision!.Value,
             DateTimeOffset.UtcNow,
             ct);
         return result.State switch
@@ -92,14 +89,6 @@ public sealed class UploadPlatformLogoEndpoint(
                     result.Configuration!,
                     links,
                     HttpContext)),
-            PlatformLogoUpdateState.RevisionConflict => TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Platform configuration changed.",
-                detail: "Reload the configuration before uploading the logo again.",
-                extensions: new Dictionary<string, object?>
-                {
-                    ["code"] = PlatformProblemCode.PlatformConfigurationConflict
-                }),
             PlatformLogoUpdateState.InvalidSize => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Logo size is invalid."),

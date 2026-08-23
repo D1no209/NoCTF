@@ -52,7 +52,6 @@ public sealed record ChallengeTemplateResponse(
     string? Description,
     string Direction,
     string DefinitionJson,
-    int Revision,
     DateTimeOffset? DeletedAt,
     int ActiveCompetitionReferenceCount,
     DateTimeOffset CreatedAt,
@@ -62,7 +61,6 @@ public sealed record ChallengeTemplateResponse(
 public enum ChallengeTemplateConflictCode
 {
     ResourceIdConflict,
-    RevisionConflict,
     ActiveCompetitionModeConflict,
     OwnerIncludedInManagerSet,
     UserNotFound,
@@ -82,8 +80,6 @@ internal static class ChallengeTemplateWriteResponseMapper
             {
                 ChallengeTemplateWriteState.ResourceIdConflict =>
                     ChallengeTemplateConflictCode.ResourceIdConflict,
-                ChallengeTemplateWriteState.RevisionConflict =>
-                    ChallengeTemplateConflictCode.RevisionConflict,
                 ChallengeTemplateWriteState.ActiveCompetitionModeConflict =>
                     ChallengeTemplateConflictCode.ActiveCompetitionModeConflict,
                 ChallengeTemplateWriteState.OwnerIncludedInManagerSet =>

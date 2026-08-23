@@ -94,7 +94,9 @@ public interface ICompetitionManagementStore
         CancellationToken cancellationToken);
     Task<CompetitionView?> FindAsync(Guid competitionId, bool includeDraft, CancellationToken cancellationToken);
     Task<IReadOnlyList<CompetitionView>> ListAsync(bool includeDraft, CancellationToken cancellationToken);
-    Task<CompetitionView?> UpdateAsync(UpdateCompetitionCommand command, CompetitionStatus expectedStatus, CancellationToken cancellationToken);
+    Task<CompetitionView?> UpdateAsync(
+        UpdateCompetitionCommand command,
+        CancellationToken cancellationToken);
     Task<bool> SoftDeleteAsync(Guid competitionId, CompetitionStatus expectedStatus, Guid actorId, DateTimeOffset deletedAt, CancellationToken cancellationToken);
 }
 
@@ -210,11 +212,11 @@ public sealed class UpdateCompetition(ICompetitionManagementStore store)
                     ? CompetitionManagementFailureCode.InvalidSchedule
                     : CompetitionManagementFailureCode.CompetitionConflict,
                 schedule.ErrorMessage!);
-        var updated = await store.UpdateAsync(command, current.Status, ct);
+        var updated = await store.UpdateAsync(command, ct);
         return updated is null
             ? OperationResult<CompetitionView, CompetitionManagementFailureCode>.Failure(
                 CompetitionManagementFailureCode.CompetitionConflict,
-                "Competition status changed concurrently.")
+                "Competition could not be updated in its current state.")
             : OperationResult<CompetitionView, CompetitionManagementFailureCode>.Success(updated);
     }
 }

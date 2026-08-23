@@ -7,16 +7,14 @@ public sealed record UpdateCompetitionPermissionsCommand(
     Guid ActorId,
     IReadOnlyList<Guid> ManagerIds,
     IReadOnlyList<Guid> JudgeIds,
-    IReadOnlyList<Guid> ObserverIds,
-    int ExpectedPermissionRevision);
+    IReadOnlyList<Guid> ObserverIds);
 
 public sealed record CompetitionPermissionSnapshot(
     Guid CompetitionId,
     Guid OwnerId,
     IReadOnlyList<Guid> ManagerIds,
     IReadOnlyList<Guid> JudgeIds,
-    IReadOnlyList<Guid> ObserverIds,
-    int PermissionRevision);
+    IReadOnlyList<Guid> ObserverIds);
 
 public enum CompetitionPermissionSnapshotState
 {
@@ -73,8 +71,7 @@ public enum CompetitionPermissionUpdateState
     OwnerIncluded,
     UserNotFound,
     RoleNotEligible,
-    EmailNotVerified,
-    RevisionConflict
+    EmailNotVerified
 }
 
 public sealed record CompetitionPermissionUpdateResult(

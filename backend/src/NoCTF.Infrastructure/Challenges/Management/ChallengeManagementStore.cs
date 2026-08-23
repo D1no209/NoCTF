@@ -43,33 +43,14 @@ public sealed class ChallengeManagementStore(
                 .AnyAsync(item => item.Id == requestedId, ct))
             return new(null, ChallengeMutationFailure.ResourceIdConflict);
 
-        var template = await db.Challenges.AsNoTracking()
-            .SingleOrDefaultAsync(challenge => challenge.Id == command.ChallengeId, ct);
-        if (template is null)
+        var template = await ChallengeTemplateCriticalSection.AcquireAsync(
+            db,
+            command.ChallengeId,
+            ct);
+        if (template is null || template.DeletedAt is not null)
             return new(null, ChallengeMutationFailure.TemplateNotFound);
         if (template.Mode != competitionMode)
             return new(null, ChallengeMutationFailure.TemplateModeMismatch);
-        var templateFence = await db.Challenges
-            .Where(challenge =>
-                challenge.Id == command.ChallengeId
-                && challenge.Mode == competitionMode
-                && challenge.Revision == template.Revision)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(
-                challenge => challenge.Revision,
-                challenge => challenge.Revision + 1), ct);
-        if (templateFence == 0)
-            return new(null, ChallengeMutationFailure.RevisionConflict);
-        template.Revision = checked(template.Revision + 1);
-        var trackedTemplate = db.ChangeTracker.Entries<Challenge>()
-            .SingleOrDefault(entry => entry.Entity.Id == template.Id);
-        if (trackedTemplate is not null)
-        {
-            var revision = trackedTemplate.Property(challenge => challenge.Revision);
-            revision.OriginalValue = template.Revision;
-            revision.CurrentValue = template.Revision;
-            revision.IsModified = false;
-        }
-
         var entity = new CompetitionChallenge
         {
             Id = command.CompetitionChallengeId ?? Guid.CreateVersion7(command.CreatedAt),
@@ -96,12 +77,6 @@ public sealed class ChallengeManagementStore(
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
             return new(Map(entity, template));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await transaction.RollbackAsync(ct);
-            db.ChangeTracker.Clear();
-            return new(null, ChallengeMutationFailure.RevisionConflict);
         }
         catch (DbUpdateException)
         {
@@ -160,16 +135,12 @@ public sealed class ChallengeManagementStore(
                 item.CompetitionId == command.CompetitionId, ct);
         if (entity is null)
             return new(null, ChallengeMutationFailure.ChallengeNotFound);
-        if (entity.Revision != command.ExpectedRevision)
-            return new(null, ChallengeMutationFailure.RevisionConflict);
-
         var wasPublished = entity.IsPublished;
         var becamePublished = !wasPublished && command.IsPublished;
         entity.BaseScore = command.BaseScore;
         entity.CustomTitle = command.CustomTitle;
         entity.Order = command.Order;
         entity.IsPublished = command.IsPublished;
-        entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = command.UpdatedAt;
         var eventKind = (wasPublished, command.IsPublished) switch
         {
@@ -199,20 +170,13 @@ public sealed class ChallengeManagementStore(
                     entity.Id,
                     entity.CustomTitle ?? publishedTemplate.Title,
                     publishedTemplate.Direction,
-                    command.UpdatedAt,
-                    entity.Revision));
+                    command.UpdatedAt));
             }
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
             var template = await db.Challenges.AsNoTracking()
                 .SingleAsync(challenge => challenge.Id == entity.ChallengeId, ct);
             return new(Map(entity, template));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await transaction.RollbackAsync(ct);
-            db.ChangeTracker.Clear();
-            return new(null, ChallengeMutationFailure.RevisionConflict);
         }
         catch (DbUpdateException)
         {
@@ -234,13 +198,11 @@ public sealed class ChallengeManagementStore(
     public Task<ChallengeMutationFailure?> SoftDeleteAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct) =>
         SetDeletedAsync(
             competitionId,
             competitionChallengeId,
-            expectedRevision,
             now,
             restore: false,
             ct);
@@ -248,13 +210,11 @@ public sealed class ChallengeManagementStore(
     public Task<ChallengeMutationFailure?> RestoreAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         DateTimeOffset now,
         CancellationToken ct) =>
         SetDeletedAsync(
             competitionId,
             competitionChallengeId,
-            expectedRevision,
             now,
             restore: true,
             ct);
@@ -262,7 +222,6 @@ public sealed class ChallengeManagementStore(
     private async Task<ChallengeMutationFailure?> SetDeletedAsync(
         Guid competitionId,
         Guid competitionChallengeId,
-        int expectedRevision,
         DateTimeOffset now,
         bool restore,
         CancellationToken ct)
@@ -277,8 +236,6 @@ public sealed class ChallengeManagementStore(
             item.CompetitionId == competitionId, ct);
         if (entity is null)
             return ChallengeMutationFailure.ChallengeNotFound;
-        if (entity.Revision != expectedRevision)
-            return ChallengeMutationFailure.RevisionConflict;
         if ((entity.DeletedAt is null) == restore)
             return ChallengeMutationFailure.LifecycleStateConflict;
         if (restore)
@@ -298,7 +255,6 @@ public sealed class ChallengeManagementStore(
         }
 
         entity.DeletedAt = restore ? null : now;
-        entity.Revision = checked(entity.Revision + 1);
         entity.UpdatedAt = now;
         await events.RecordAsync(new(
             entity.CompetitionId,
@@ -318,12 +274,6 @@ public sealed class ChallengeManagementStore(
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
             return null;
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            await transaction.RollbackAsync(ct);
-            db.ChangeTracker.Clear();
-            return ChallengeMutationFailure.RevisionConflict;
         }
         catch (DbUpdateException)
         {
@@ -378,7 +328,6 @@ public sealed class ChallengeManagementStore(
                 item.Instance.BaseScore,
                 item.Instance.Order,
                 item.Instance.IsPublished,
-                item.Instance.Revision,
                 item.Instance.DeletedAt,
                 item.Template.Mode,
                 item.Template.DefinitionJson,
@@ -398,7 +347,6 @@ public sealed class ChallengeManagementStore(
             instance.BaseScore,
             instance.Order,
             instance.IsPublished,
-            instance.Revision,
             instance.DeletedAt,
             runtimeTemplates.Get(template.Mode, template.DefinitionJson) is not null,
             template.CreatedAt,
@@ -416,7 +364,6 @@ public sealed class ChallengeManagementStore(
             projection.BaseScore,
             projection.Order,
             projection.IsPublished,
-            projection.Revision,
             projection.DeletedAt,
             runtimeTemplates.Get(projection.Mode, projection.DefinitionJson) is not null,
             projection.CreatedAt,
@@ -433,7 +380,6 @@ public sealed class ChallengeManagementStore(
         long BaseScore,
         int Order,
         bool IsPublished,
-        int Revision,
         DateTimeOffset? DeletedAt,
         GameMode Mode,
         string DefinitionJson,

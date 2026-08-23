@@ -47,9 +47,5 @@ public sealed class PlatformSettings
 
     public int EmailSmtpTimeoutSeconds { get; set; }
 
-    [ConcurrencyCheck]
-    public long Revision { get; set; }
-
-
     public DateTimeOffset UpdatedAt { get; set; }
 }

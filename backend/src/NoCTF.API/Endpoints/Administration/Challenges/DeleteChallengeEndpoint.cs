@@ -1,5 +1,4 @@
 using FastEndpoints;
-using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
@@ -12,16 +11,6 @@ public sealed class DeleteChallengeRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
-    [QueryParam]
-    public int ExpectedRevision { get; set; } = -1;
-}
-
-public sealed class DeleteChallengeValidator : Validator<DeleteChallengeRequest>
-{
-    public DeleteChallengeValidator()
-    {
-        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
-    }
 }
 
 public sealed class DeleteChallengeEndpoint(
@@ -45,7 +34,7 @@ public sealed class DeleteChallengeEndpoint(
         {
             summary.Summary = "Deletes a competition challenge.";
             summary.Description =
-                "Soft-deletes the competition link at the expected aggregate revision without changing the global challenge template.";
+                "Soft-deletes the competition link without changing the global challenge template.";
         });
     }
 
@@ -66,7 +55,6 @@ public sealed class DeleteChallengeEndpoint(
         var result = await delete.ExecuteAsync(
             competitionId,
             request.CompetitionChallengeId,
-            request.ExpectedRevision,
             DateTimeOffset.UtcNow,
             ct);
         return result switch
@@ -75,15 +63,9 @@ public sealed class DeleteChallengeEndpoint(
             ChallengeMutationFailure.CompetitionNotFound
                 or ChallengeMutationFailure.ChallengeNotFound =>
                 TypedResults.NotFound(),
-            ChallengeMutationFailure.RevisionConflict
-                or ChallengeMutationFailure.LifecycleStateConflict =>
+            ChallengeMutationFailure.LifecycleStateConflict =>
                 TypedResults.Conflict(
                     CompetitionChallengeConflictMapper.ToResponse(result.Value)),
-            ChallengeMutationFailure.InvalidRevision =>
-                TypedResults.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Challenge was not deleted.",
-                    detail: "ExpectedRevision is invalid."),
             _ => throw new InvalidOperationException(
                 $"Unsupported competition challenge delete failure: {result}.")
         };

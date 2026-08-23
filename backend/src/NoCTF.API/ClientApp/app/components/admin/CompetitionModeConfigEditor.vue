@@ -7,14 +7,11 @@ const props = withDefaults(defineProps<{
   mode: GameModeValue
   /** 服务器端当前配置 JSON。 */
   json?: string | null
-  /** 乐观并发修订版本(仅展示)。 */
-  revision?: number
   readonly?: boolean
   loading?: boolean
   saving?: boolean
 }>(), {
   json: null,
-  revision: 0,
   readonly: false,
   loading: false,
   saving: false,
@@ -91,7 +88,6 @@ function save() {
 <template>
   <div class="flex flex-col gap-3">
     <div class="flex items-center gap-2 text-xs text-muted-foreground">
-      <span>{{ $t('修订版本：{revision}', { revision }) }}</span>
       <span v-if="dirty">{{ $t('· 有未保存的修改') }}</span>
     </div>
     <Skeleton v-if="loading" class="h-64 w-full" />

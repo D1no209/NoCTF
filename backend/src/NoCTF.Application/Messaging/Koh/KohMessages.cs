@@ -5,8 +5,6 @@ namespace NoCTF.Application.Messaging;
 public sealed record PollKohChallenge(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
-    int CompetitionConfigurationRevision,
-    int CompetitionChallengeRevision,
     DateTimeOffset RunningSince,
     DateTimeOffset DueAt);
 
@@ -16,8 +14,6 @@ public sealed record RecordKohObservation(
     Guid? TeamId,
     GameplayFactResult? Result,
     GameplayFactFailureCode? FailureCode,
-    int CompetitionConfigurationRevision,
-    int CompetitionChallengeRevision,
     DateTimeOffset RunningSince,
     DateTimeOffset DueAt,
     DateTimeOffset ObservedAt);

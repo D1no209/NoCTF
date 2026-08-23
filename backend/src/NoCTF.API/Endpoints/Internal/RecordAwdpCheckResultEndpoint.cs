@@ -94,9 +94,6 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
                 $"gameplay-fact:{gameplayFactId:D}:runtime:{runtimeInstanceId:D}",
                 StringComparison.Ordinal) ||
             !int.TryParse(User.FindFirstValue("generation"), out var generation) ||
-            !long.TryParse(
-                User.FindFirstValue("runtime_processing_version"),
-                out var runtimeProcessingVersion) ||
             !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
             DateTimeOffset.UtcNow.ToUnixTimeSeconds() > deadline)
             return TypedResults.Unauthorized();
@@ -104,7 +101,6 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
             gameplayFactId,
             runtimeInstanceId,
             generation,
-            runtimeProcessingVersion,
             AwdpFixOutcomeMapper.ToDomain(request.Outcome),
             DateTimeOffset.UtcNow), ct);
         return disposition switch

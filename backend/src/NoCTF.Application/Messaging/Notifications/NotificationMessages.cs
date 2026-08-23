@@ -8,12 +8,9 @@ public sealed record CreateNotification(
     Guid? TeamId,
     Guid? UserId,
     NotificationKind Kind,
-    string Payload,
-    long ProcessingVersion);
+    string Payload);
 
-public sealed record DeliverNotification(
-    Guid NotificationId,
-    long ProcessingVersion);
+public sealed record DeliverNotification(Guid NotificationId);
 
 public sealed record BloodAwarded(
     Guid CompetitionId,
@@ -29,8 +26,7 @@ public sealed record ChallengePublished(
     Guid CompetitionChallengeId,
     string ChallengeTitle,
     string Direction,
-    DateTimeOffset PublishedAt,
-    int Revision);
+    DateTimeOffset PublishedAt);
 
 public sealed record PublishHintNotification(
     Guid CompetitionId,
@@ -38,8 +34,7 @@ public sealed record PublishHintNotification(
     Guid HintId,
     string ChallengeTitle,
     long Cost,
-    DateTimeOffset PublishedAt,
-    int PublicationRevision);
+    DateTimeOffset PublishedAt);
 
 public sealed record TeamBanned(
     Guid CompetitionId,
@@ -69,8 +64,7 @@ public sealed record DeliverCompetitionQuestionNotification(
     NotificationKind Kind,
     CompetitionQuestionNotificationEvent Event,
     string Title,
-    DateTimeOffset OccurredAt,
-    int Revision);
+    DateTimeOffset OccurredAt);
 
 public enum CompetitionQuestionNotificationEvent : short
 {

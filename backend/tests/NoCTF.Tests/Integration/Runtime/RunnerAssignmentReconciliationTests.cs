@@ -55,7 +55,6 @@ public sealed class RunnerAssignmentReconciliationTests
                     new RuntimeProvisioned(
                         fixture.RedispatchId,
                         7,
-                        1,
                         "runner-a",
                         RuntimeProvider.Docker,
                         "{\"resourceId\":\"unsafe-runtime\"}",
@@ -81,7 +80,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 .IsEqualTo("unsafe-runtime");
             var stop = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>().Single();
             await Assert.That(stop.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
-            await Assert.That(stop.ProcessingVersion).IsEqualTo(8);
         });
     }
 
@@ -147,14 +145,12 @@ public sealed class RunnerAssignmentReconciliationTests
                 await Assert.That(retained.RunnerId).IsEqualTo(runner);
                 await Assert.That(retained.RunnerAssignmentReleaseToken).IsNull();
                 await Assert.That(retained.RunnerUnavailableAt).IsEqualTo(fixture.Now);
-                await Assert.That(retained.ProcessingVersion).IsEqualTo(8);
             }
             await Assert.That(outbox.Published.OfType<ReleaseRunnerCapacity>()).IsEmpty();
             await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
             var cleanup = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>()
                 .Single(message => message.RuntimeInstanceId == fixture.RedispatchId);
             await Assert.That(cleanup.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
-            await Assert.That(cleanup.ProcessingVersion).IsEqualTo(8);
             await Assert.That(cleanup.RunnerId).IsEqualTo(runner);
             await Assert.That(await redisDatabase.KeyExistsAsync(
                 $"runner-claim:{fixture.RedispatchId:N}")).IsTrue();
@@ -306,7 +302,6 @@ public sealed class RunnerAssignmentReconciliationTests
                     instance => instance.Id == fixture.RetainReceiptId,
                     cancellationToken);
                 await Assert.That(waiting.State).IsEqualTo(RuntimeState.Stopping);
-                await Assert.That(waiting.ProcessingVersion).IsEqualTo(8);
             }
             await Assert.That(fencedOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
             await Assert.That(await redisDatabase.KeyExistsAsync(
@@ -352,7 +347,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 instance => instance.Id == fixture.RetainReceiptId,
                 cancellationToken);
             await Assert.That(stopped.State).IsEqualTo(RuntimeState.Stopped);
-            await Assert.That(stopped.ProcessingVersion).IsEqualTo(9);
         });
     }
 
@@ -718,7 +712,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 var outcome = await BackendMessageHandlers.ExecuteRunnerCapacityReleaseAsync(
                     new ReleaseRunnerCapacity(
                         fixture.RetainReceiptId,
-                        7,
                         "pool-a",
                         "runner-c",
                         receiptReleaseToken),
@@ -749,7 +742,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await Assert.That(provisioning.RunnerId).IsEqualTo("runner-a");
                 await Assert.That(provisioning.RunnerAssignmentReleaseToken).IsNull();
                 await Assert.That(provisioning.RunnerUnavailableAt).IsEqualTo(fixture.Now);
-                await Assert.That(provisioning.ProcessingVersion).IsEqualTo(8);
 
                 var pendingStop = await verify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(instance => instance.Id == fixture.CompleteStopId, cancellationToken);
@@ -757,7 +749,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await Assert.That(pendingStop.StoppedAt).IsNull();
                 await Assert.That(pendingStop.RunnerAssignmentReleaseToken).IsNull();
                 await Assert.That(pendingStop.RunnerUnavailableAt).IsEqualTo(fixture.Now);
-                await Assert.That(pendingStop.ProcessingVersion).IsEqualTo(8);
 
                 var retained = await verify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(instance => instance.Id == fixture.RetainReceiptId, cancellationToken);
@@ -773,7 +764,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await Assert.That(retained.FailureCode).IsNull();
                 await Assert.That(retained.RunnerUnavailableAt).IsEqualTo(fixture.Now);
                 await Assert.That(retained.RunnerAssignmentReleaseToken).IsNull();
-                await Assert.That(retained.ProcessingVersion).IsEqualTo(8);
             }
 
             await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
@@ -786,7 +776,6 @@ public sealed class RunnerAssignmentReconciliationTests
                     fixture.CompleteStopId,
                     fixture.RetainReceiptId
                 ]);
-            await Assert.That(cleanup.All(message => message.ProcessingVersion == 8)).IsTrue();
 
             await using (var retainedVerify = new NoCtfDbContext(options))
             {
@@ -795,14 +784,12 @@ public sealed class RunnerAssignmentReconciliationTests
                 await Assert.That(provisioning.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(provisioning.RunnerId).IsEqualTo("runner-a");
                 await Assert.That(provisioning.RunnerAssignmentReleaseToken).IsNull();
-                await Assert.That(provisioning.ProcessingVersion).IsEqualTo(8);
 
                 var waitingForOwner = await retainedVerify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(instance => instance.Id == fixture.CompleteStopId, cancellationToken);
                 await Assert.That(waitingForOwner.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(waitingForOwner.StoppedAt).IsNull();
                 await Assert.That(waitingForOwner.RunnerAssignmentReleaseToken).IsNull();
-                await Assert.That(waitingForOwner.ProcessingVersion).IsEqualTo(8);
             }
 
             await using (var duplicateDb = new NoCtfDbContext(options))
@@ -818,7 +805,6 @@ public sealed class RunnerAssignmentReconciliationTests
             await using var duplicateVerify = new NoCtfDbContext(options);
             var duplicateRetained = await duplicateVerify.RuntimeInstances.AsNoTracking()
                 .SingleAsync(instance => instance.Id == fixture.RetainReceiptId, cancellationToken);
-            await Assert.That(duplicateRetained.ProcessingVersion).IsEqualTo(8);
             await Assert.That(outbox.RunnerNodeMessages.OfType<StopContainerRuntime>().Count()).IsEqualTo(3);
         });
     }
@@ -852,7 +838,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
             await Assert.That(unchanged.State).IsEqualTo(RuntimeState.Provisioning);
             await Assert.That(unchanged.RunnerId).IsEqualTo("runner-a");
-            await Assert.That(unchanged.ProcessingVersion).IsEqualTo(7);
             await Assert.That(outbox.Published).IsEmpty();
             await Assert.That(outbox.RunnerNodeMessages).IsEmpty();
             var retry = outbox.Scheduled.Single();
@@ -892,7 +877,6 @@ public sealed class RunnerAssignmentReconciliationTests
                         RunnerId = "runner-page",
                         RunnerPool = "pool-a",
                         State = RuntimeState.Running,
-                        ProcessingVersion = 1,
                         ProviderReceiptJson = "{}",
                         CreatedAt = fixture.Now.AddMinutes(index + 10)
                     });
@@ -975,7 +959,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
             await Assert.That(unchanged.State).IsEqualTo(RuntimeState.Provisioning);
             await Assert.That(unchanged.RunnerId).IsEqualTo("runner-a");
-            await Assert.That(unchanged.ProcessingVersion).IsEqualTo(7);
         });
     }
 
@@ -998,12 +981,10 @@ public sealed class RunnerAssignmentReconciliationTests
                     instance => instance.Id == fixture.RedispatchId,
                     cancellationToken);
                 runtime.RunnerAssignmentReleaseToken = releaseToken;
-                runtime.ProcessingVersion = 8;
                 await prepare.SaveChangesAsync(cancellationToken);
             }
             var release = new ReleaseRunnerCapacity(
                 fixture.RedispatchId,
-                8,
                 "pool-a",
                 "runner-a",
                 releaseToken);
@@ -1016,7 +997,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 provider.GetRequiredService<IServiceScopeFactory>());
             var originalProvision = new ProvisionContainerRuntime(
                 fixture.RedispatchId,
-                7,
                 1,
                 "pool-a",
                 "runner-a",
@@ -1034,7 +1014,6 @@ public sealed class RunnerAssignmentReconciliationTests
                     cancellationToken);
                 old.State = RuntimeState.Stopping;
                 old.RunnerAssignmentReleaseToken = null;
-                old.ProcessingVersion = checked(old.ProcessingVersion + 1);
                 resetDb.RuntimeInstances.Add(new RuntimeInstance
                 {
                     Id = replacementId,
@@ -1060,7 +1039,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var stopDb = new NoCtfDbContext(options))
             {
                 await BackendMessageHandlers.Handle(
-                    new StopRuntime(fixture.RedispatchId, 9),
+                    new StopRuntime(fixture.RedispatchId),
                     stopDb,
                     continuationOutbox,
                     cancellationToken);
@@ -1084,7 +1063,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeProvisionCanceled(
                         fixture.RedispatchId,
-                        7,
                         1,
                         "pool-a",
                         "runner-a"),
@@ -1100,7 +1078,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 cancellationToken);
             await Assert.That(stopped.State).IsEqualTo(RuntimeState.Stopped);
             await Assert.That(stopped.RunnerAssignmentReleaseToken).IsNull();
-            await Assert.That(stopped.ProcessingVersion).IsEqualTo(10);
         });
     }
 
@@ -1152,7 +1129,6 @@ public sealed class RunnerAssignmentReconciliationTests
             }
             var stop = resetOutbox.Published.OfType<StopRuntime>().Single();
             await Assert.That(stop.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
-            await Assert.That(stop.ProcessingVersion).IsEqualTo(8);
             await Assert.That(resetOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
 
             var capacity = new ReconciliationCapacityGate(runnerId =>
@@ -1180,7 +1156,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await Assert.That(pending.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(pending.StoppedAt).IsNull();
                 await Assert.That(pending.RunnerAssignmentReleaseToken).IsNull();
-                await Assert.That(pending.ProcessingVersion).IsEqualTo(9);
             }
 
             const string lateReceipt = """{"resourceId":"late-offline"}""";
@@ -1189,7 +1164,6 @@ public sealed class RunnerAssignmentReconciliationTests
                     new RuntimeProvisioned(
                         fixture.RedispatchId,
                         7,
-                        1,
                         "runner-a",
                         RuntimeProvider.Docker,
                         lateReceipt,
@@ -1202,10 +1176,8 @@ public sealed class RunnerAssignmentReconciliationTests
 
             var typedStops = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>()
                 .Where(message => message.RuntimeInstanceId == fixture.RedispatchId)
-                .OrderBy(message => message.ProcessingVersion)
                 .ToArray();
-            await Assert.That(typedStops.Select(message => message.ProcessingVersion))
-                .IsEquivalentTo([9L, 10L]);
+            await Assert.That(typedStops).Count().IsEqualTo(2);
             await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
             await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
 
@@ -1213,7 +1185,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeStopped(
                         fixture.RedispatchId,
-                        10,
                         1,
                         "pool-a",
                         "runner-a"),
@@ -1230,7 +1201,6 @@ public sealed class RunnerAssignmentReconciliationTests
             await Assert.That(stopped.State).IsEqualTo(RuntimeState.Stopped);
             await Assert.That(stopped.StoppedAt).IsNotNull();
             await Assert.That(stopped.RunnerAssignmentReleaseToken).IsNull();
-            await Assert.That(stopped.ProcessingVersion).IsEqualTo(11);
             var replacement = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
                 instance => instance.Id == replacementId,
                 cancellationToken);
@@ -1264,7 +1234,6 @@ public sealed class RunnerAssignmentReconciliationTests
             }
             var failed = new RuntimeProvisionTerminated(
                 fixture.RetainReceiptId,
-                7,
                 1,
                 "pool-a",
                 "runner-c",
@@ -1286,7 +1255,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeProvisionFailed(
                         fixture.RedispatchId,
-                        7,
                         RuntimeFailureCode.ProviderRejected,
                         "runner-z"),
                     mismatchedFailureDb,
@@ -1305,7 +1273,6 @@ public sealed class RunnerAssignmentReconciliationTests
             }
             var cleanupStop = outbox.Published.OfType<StopRuntime>()
                 .Single(message => message.RuntimeInstanceId == fixture.RedispatchId);
-            await Assert.That(cleanupStop.ProcessingVersion).IsEqualTo(8);
 
             await using (var prepare = new NoCtfDbContext(options))
             {
@@ -1335,7 +1302,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 provider.GetRequiredService<IServiceScopeFactory>());
             var provisionMessage = new ProvisionContainerRuntime(
                 fixture.RedispatchId,
-                7,
                 1,
                 "pool-a",
                 "runner-a",
@@ -1348,7 +1314,7 @@ public sealed class RunnerAssignmentReconciliationTests
             await using (var stopDb = new NoCtfDbContext(options))
             {
                 await BackendMessageHandlers.Handle(
-                    new StopRuntime(fixture.RedispatchId, 8),
+                    new StopRuntime(fixture.RedispatchId),
                     stopDb,
                     outbox,
                     cancellationToken);
@@ -1359,7 +1325,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 var waiting = await stoppedTooEarly.RuntimeInstances.AsNoTracking()
                     .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
                 await Assert.That(waiting.State).IsEqualTo(RuntimeState.Stopping);
-                await Assert.That(waiting.ProcessingVersion).IsEqualTo(8);
                 await Assert.That(waiting.ProviderReceiptJson).IsNull();
                 await Assert.That(outbox.Published.OfType<DispatchRuntime>()).IsEmpty();
             }
@@ -1368,25 +1333,21 @@ public sealed class RunnerAssignmentReconciliationTests
             {
                 new RuntimeProvisionCanceled(
                     fixture.RedispatchId,
-                    6,
                     1,
                     "pool-a",
                     "runner-a"),
                 new RuntimeProvisionCanceled(
                     fixture.RedispatchId,
-                    7,
                     2,
                     "pool-a",
                     "runner-a"),
                 new RuntimeProvisionCanceled(
                     fixture.RedispatchId,
-                    7,
                     1,
                     "pool-b",
                     "runner-a"),
                 new RuntimeProvisionCanceled(
                     fixture.RedispatchId,
-                    7,
                     1,
                     "pool-a",
                     "runner-b")
@@ -1403,7 +1364,6 @@ public sealed class RunnerAssignmentReconciliationTests
 
             var canceled = new RuntimeProvisionCanceled(
                 fixture.RedispatchId,
-                7,
                 1,
                 "pool-a",
                 "runner-a");
@@ -1422,7 +1382,6 @@ public sealed class RunnerAssignmentReconciliationTests
 
             var terminated = new RuntimeProvisionTerminated(
                 fixture.CompleteStopId,
-                6,
                 1,
                 "pool-a",
                 "runner-b",
@@ -1444,21 +1403,18 @@ public sealed class RunnerAssignmentReconciliationTests
             var result = await verify.RuntimeInstances.AsNoTracking()
                 .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
             await Assert.That(result.State).IsEqualTo(RuntimeState.Stopped);
-            await Assert.That(result.ProcessingVersion).IsEqualTo(9);
             await Assert.That(result.ProviderReceiptJson).IsNull();
             var terminatedResult = await verify.RuntimeInstances.AsNoTracking()
                 .SingleAsync(
                     instance => instance.Id == fixture.CompleteStopId,
                     cancellationToken);
             await Assert.That(terminatedResult.State).IsEqualTo(RuntimeState.Stopped);
-            await Assert.That(terminatedResult.ProcessingVersion).IsEqualTo(8);
             await Assert.That(terminatedResult.FailureCode).IsNull();
             var failedResult = await verify.RuntimeInstances.AsNoTracking()
                 .SingleAsync(
                     instance => instance.Id == fixture.RetainReceiptId,
                     cancellationToken);
             await Assert.That(failedResult.State).IsEqualTo(RuntimeState.Failed);
-            await Assert.That(failedResult.ProcessingVersion).IsEqualTo(8);
             await Assert.That(failedResult.FailureCode)
                 .IsEqualTo(RuntimeFailureCode.ProviderRejected);
             await Assert.That(outbox.Published.OfType<DispatchRuntime>()
@@ -1486,7 +1442,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 new RuntimeProvisioned(
                     fixture.RedispatchId,
                     7,
-                    2,
                     "runner-a",
                     RuntimeProvider.Docker,
                     "{}",
@@ -1496,7 +1451,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 new RuntimeProvisioned(
                     fixture.RedispatchId,
                     7,
-                    1,
                     "runner-z",
                     RuntimeProvider.Docker,
                     "{}",
@@ -1506,7 +1460,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 new RuntimeProvisioned(
                     fixture.RedispatchId,
                     7,
-                    1,
                     "runner-a",
                     RuntimeProvider.Libvirt,
                     "{}",
@@ -1530,7 +1483,6 @@ public sealed class RunnerAssignmentReconciliationTests
                         instance => instance.Id == fixture.RedispatchId,
                         cancellationToken);
                 await Assert.That(unchanged.State).IsEqualTo(RuntimeState.Provisioning);
-                await Assert.That(unchanged.ProcessingVersion).IsEqualTo(7);
                 await Assert.That(unchanged.ProviderReceiptJson).IsNull();
             }
 
@@ -1567,7 +1519,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 provider.GetRequiredService<IServiceScopeFactory>());
             var provisionMessage = new ProvisionContainerRuntime(
                 fixture.RedispatchId,
-                7,
                 1,
                 "pool-a",
                 "runner-a",
@@ -1579,7 +1530,7 @@ public sealed class RunnerAssignmentReconciliationTests
 
             await using (var stopDb = new NoCtfDbContext(options))
                 await BackendMessageHandlers.Handle(
-                    new StopRuntime(fixture.RedispatchId, 8),
+                    new StopRuntime(fixture.RedispatchId),
                     stopDb,
                     outbox,
                     cancellationToken);
@@ -1590,7 +1541,6 @@ public sealed class RunnerAssignmentReconciliationTests
                     new RuntimeProvisioned(
                         fixture.RedispatchId,
                         7,
-                        1,
                         "runner-a",
                         RuntimeProvider.Docker,
                         lateReceipt,
@@ -1604,13 +1554,10 @@ public sealed class RunnerAssignmentReconciliationTests
             status = await reader.ReadProvisionStatusAsync(provisionMessage, cancellationToken);
             await Assert.That(status).IsEqualTo(RuntimeProvisionWorkStatus.AssignmentRetained);
             var typedStops = outbox.RunnerNodeMessages.OfType<StopContainerRuntime>()
-                .OrderBy(message => message.ProcessingVersion)
                 .ToArray();
-            await Assert.That(typedStops.Select(message => message.ProcessingVersion))
-                .IsEquivalentTo([8L, 9L]);
+            await Assert.That(typedStops).Count().IsEqualTo(2);
             var directStop = typedStops[^1];
             await Assert.That(directStop.RuntimeInstanceId).IsEqualTo(fixture.RedispatchId);
-            await Assert.That(directStop.ProcessingVersion).IsEqualTo(9);
             await Assert.That(directStop.Generation).IsEqualTo(1);
             await Assert.That(directStop.RunnerId).IsEqualTo("runner-a");
 
@@ -1618,7 +1565,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeProvisionCanceled(
                         fixture.RedispatchId,
-                        7,
                         1,
                         "pool-a",
                         "runner-a"),
@@ -1629,7 +1575,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeProvisionTerminated(
                         fixture.RedispatchId,
-                        7,
                         1,
                         "pool-a",
                         "runner-a",
@@ -1641,7 +1586,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeProvisionFailed(
                         fixture.RedispatchId,
-                        7,
                         RuntimeFailureCode.RunnerUnavailable,
                         "runner-a"),
                     staleFailureDb,
@@ -1652,7 +1596,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await RuntimeWriteBackHandler.Handle(
                     new RuntimeStopped(
                         fixture.RedispatchId,
-                        9,
                         1,
                         "pool-a",
                         "runner-a"),
@@ -1664,7 +1607,6 @@ public sealed class RunnerAssignmentReconciliationTests
             var result = await verify.RuntimeInstances.AsNoTracking()
                 .SingleAsync(instance => instance.Id == fixture.RedispatchId, cancellationToken);
             await Assert.That(result.State).IsEqualTo(RuntimeState.Stopped);
-            await Assert.That(result.ProcessingVersion).IsEqualTo(10);
             await Assert.That(JsonNode.DeepEquals(
                 JsonNode.Parse(result.ProviderReceiptJson!),
                 JsonNode.Parse(lateReceipt))).IsTrue();
@@ -2053,7 +1995,6 @@ public sealed class RunnerAssignmentReconciliationTests
             await Assert.That(cleaned.RunnerId).IsNull();
             await Assert.That(cleaned.RunnerAssignmentReleaseToken).IsNull();
             await Assert.That(cleaned.RunnerUnavailableAt).IsNull();
-            await Assert.That(cleaned.ProcessingVersion).IsEqualTo(8);
         });
     }
 
@@ -2145,7 +2086,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 await Assert.That(unchanged.RunnerAssignmentReleaseToken)
                     .IsEqualTo(releaseToken);
                 await Assert.That(unchanged.RunnerUnavailableAt).IsEqualTo(fixture.Now);
-                await Assert.That(unchanged.ProcessingVersion).IsEqualTo(7);
             }
 
             var capacity = new ReconciliationCapacityGate(_ => RunnerHeartbeatStatus.Online);
@@ -2187,7 +2127,6 @@ public sealed class RunnerAssignmentReconciliationTests
             await Assert.That(converged.RunnerId).IsNull();
             await Assert.That(converged.RunnerAssignmentReleaseToken).IsNull();
             await Assert.That(converged.RunnerUnavailableAt).IsNull();
-            await Assert.That(converged.ProcessingVersion).IsEqualTo(8);
         });
     }
 
@@ -2344,7 +2283,6 @@ public sealed class RunnerAssignmentReconciliationTests
                 RunnerId = $"runner-{(char)('a' + index)}",
                 RunnerPool = "pool-a",
                 State = states[index],
-                ProcessingVersion = 7,
                 ProviderReceiptJson = index == 2
                     ? JsonSerializer.Serialize(new ContainerReceipt(
                         runtimeIds[index],

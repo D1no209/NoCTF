@@ -415,7 +415,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
             OwnerId = userId,
             Mode = GameMode.Awdp,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp),
-            ConfigurationRevision = 1,
             ConfigurationUpdatedAt = now,
             FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
             StartAt = now.AddMinutes(-1),
@@ -432,7 +431,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
             Title = "Defense target",
             Visibility = ChallengeVisibility.Private,
             DefinitionJson = JsonSerializer.Serialize(definition, JsonOptions),
-            Revision = 1,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -445,7 +443,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
             IsPublished = true,
             RulesJson = new GameModeChallengeConfigurationCatalog()
                 .GetDefaultJson(GameMode.Awdp),
-            Revision = 1,
             UpdatedAt = now
         });
         db.Teams.Add(new Team
@@ -474,9 +471,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
             RunnerId = "attack-runner",
             State = RuntimeState.Running,
             ProviderReceiptJson = "{}",
-            SourceCompetitionConfigurationRevision = 1,
-            SourceCompetitionChallengeRevision = 1,
-            SourceChallengeDefinitionRevision = 1,
             CreatedAt = now,
             RunningAt = now,
             ExpiresAt = now.AddMinutes(15)

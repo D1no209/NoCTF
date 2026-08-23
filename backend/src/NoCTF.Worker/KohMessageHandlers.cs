@@ -81,8 +81,6 @@ public sealed class KohPollingHandler(
             decision.TeamId,
             decision.Result,
             decision.FailureCode,
-            target.Competition.ConfigurationRevision,
-            target.Challenge.Revision,
             message.RunningSince,
             message.DueAt,
             observedAt);
@@ -171,28 +169,22 @@ public sealed class KohObservationHandler(
         var settings = configurations.Get(
             target.Competition.ConfigurationJson,
             target.Challenge.RulesJson);
-        var currentRevision = target.Competition.ConfigurationRevision;
-        var currentChallengeRevision = target.Challenge.Revision;
-        if (currentRevision == message.CompetitionConfigurationRevision
-            && currentChallengeRevision == message.CompetitionChallengeRevision)
+        db.GameplayFacts.Add(new GameplayFact
         {
-            db.GameplayFacts.Add(new GameplayFact
-            {
-                Id = Guid.CreateVersion7(message.ObservedAt),
-                CompetitionId = message.CompetitionId,
-                CompetitionChallengeId = message.CompetitionChallengeId,
-                TeamId = message.TeamId,
-                Kind = GameplayFactKind.KohControlObservation,
-                State = message.Result is null
-                    ? GameplayFactState.PlatformFailed
-                    : GameplayFactState.Completed,
-                Result = message.Result,
-                FailureCode = message.FailureCode,
-                OccurredAt = message.ObservedAt,
-                UpdatedAt = timeProvider.GetUtcNow()
-            });
-            target.Competition.LeaderboardDirty = true;
-        }
+            Id = Guid.CreateVersion7(message.ObservedAt),
+            CompetitionId = message.CompetitionId,
+            CompetitionChallengeId = message.CompetitionChallengeId,
+            TeamId = message.TeamId,
+            Kind = GameplayFactKind.KohControlObservation,
+            State = message.Result is null
+                ? GameplayFactState.PlatformFailed
+                : GameplayFactState.Completed,
+            Result = message.Result,
+            FailureCode = message.FailureCode,
+            OccurredAt = message.ObservedAt,
+            UpdatedAt = timeProvider.GetUtcNow()
+        });
+        target.Competition.LeaderboardDirty = true;
 
         var nextDue = KohPollSchedule.NextDue(
             message.DueAt,
@@ -201,8 +193,6 @@ public sealed class KohObservationHandler(
         await outbox.ScheduleAsync(new PollKohChallenge(
             message.CompetitionId,
             message.CompetitionChallengeId,
-            currentRevision,
-            currentChallengeRevision,
             message.RunningSince,
             nextDue), nextDue);
         await db.SaveChangesAsync(cancellationToken);

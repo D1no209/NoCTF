@@ -14,11 +14,11 @@ using Testcontainers.PostgreSql;
 namespace NoCTF.Tests.Integration.Persistence;
 
 [Category("Integration")]
-public sealed class ConfigurationRevisionFenceTests
+public sealed class ConfigurationLastWriteWinsTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Cross_configuration_revision_changes_are_rejected_without_writes(
+    public async Task Cross_configuration_updates_apply_without_revision_fences(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -35,51 +35,18 @@ public sealed class ConfigurationRevisionFenceTests
                 .Options;
             var ids = await SeedAsync(options, cancellationToken);
 
-            CompetitionConfigurationView competitionSnapshot;
-            await using (var snapshotDb = new NoCtfDbContext(options))
-                competitionSnapshot = (await new CompetitionConfigurationStore(
-                    snapshotDb,
-                    new OpenApiTransactionalMessageOutbox())
-                    .FindAsync(ids.CompetitionId, cancellationToken))!;
-
-            await using (var mutationDb = new NoCtfDbContext(options))
-            {
-                await mutationDb.CompetitionChallenges
-                    .Where(challenge => challenge.Id == ids.CompetitionChallengeId)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(
-                        challenge => challenge.Revision, challenge => challenge.Revision + 1), cancellationToken);
-            }
-
             await using (var updateDb = new NoCtfDbContext(options))
             {
                 var result = await new CompetitionConfigurationStore(
                     updateDb,
                     new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,
-                    competitionSnapshot.Revision,
                     """{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":600,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
                     true,
-                    competitionSnapshot.ChallengeConfigurations.ToDictionary(
-                        challenge => challenge.Id, challenge => challenge.Revision),
                     DateTimeOffset.UtcNow,
                     cancellationToken);
-                await Assert.That(result.Failure).IsEqualTo(CompetitionConfigurationUpdateFailure.RevisionConflict);
-            }
-
-            ChallengeConfigurationView challengeSnapshot;
-            await using (var snapshotDb = new NoCtfDbContext(options))
-                challengeSnapshot = (await new ChallengeConfigurationStore(
-                    snapshotDb,
-                    new OpenApiTransactionalMessageOutbox())
-                    .FindAsync(ids.CompetitionId, ids.CompetitionChallengeId, cancellationToken))!;
-
-            await using (var mutationDb = new NoCtfDbContext(options))
-            {
-                await mutationDb.Competitions
-                    .Where(competition => competition.Id == ids.CompetitionId)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(
-                        competition => competition.ConfigurationRevision,
-                        competition => competition.ConfigurationRevision + 1), cancellationToken);
+                await Assert.That(result.Failure).IsNull();
+                await Assert.That(result.Configuration).IsNotNull();
             }
 
             await using (var updateDb = new NoCtfDbContext(options))
@@ -89,12 +56,11 @@ public sealed class ConfigurationRevisionFenceTests
                     new OpenApiTransactionalMessageOutbox()).TryUpdateAsync(
                     ids.CompetitionId,
                     ids.CompetitionChallengeId,
-                    challengeSnapshot.Revision,
-                    challengeSnapshot.CompetitionConfigurationRevision,
                     """{"schemaVersion":2,"scoreCurve":{"initialPoints":700,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}""",
                     DateTimeOffset.UtcNow,
                     cancellationToken);
-                await Assert.That(result.Failure).IsEqualTo(ChallengeConfigurationUpdateFailure.RevisionConflict);
+                await Assert.That(result.Failure).IsNull();
+                await Assert.That(result.Configuration).IsNotNull();
             }
 
             await using var verifyDb = new NoCtfDbContext(options);
@@ -102,12 +68,12 @@ public sealed class ConfigurationRevisionFenceTests
                 .SingleAsync(challenge => challenge.Id == ids.CompetitionChallengeId, cancellationToken);
             await Assert.That(JsonNode.DeepEquals(
                 JsonNode.Parse(persisted.RulesJson),
-                JsonNode.Parse("""{"schemaVersion":2}"""))).IsTrue();
+                JsonNode.Parse("""{"schemaVersion":2,"scoreCurve":{"initialPoints":700,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}"""))).IsTrue();
             var persistedCompetition = await verifyDb.Competitions.AsNoTracking()
                 .SingleAsync(competition => competition.Id == ids.CompetitionId, cancellationToken);
             await Assert.That(JsonNode.DeepEquals(
                 JsonNode.Parse(persistedCompetition.ConfigurationJson),
-                JsonNode.Parse("""{"schemaVersion":2}"""))).IsTrue();
+                JsonNode.Parse("""{"schemaVersion":2,"defaultScoreCurve":{"initialPoints":600,"minimumPoints":100,"decayTeamCount":10,"decayMode":2},"bloodRewards":[]}"""))).IsTrue();
         });
     }
 
@@ -116,7 +82,7 @@ public sealed class ConfigurationRevisionFenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7();
         var competitionId = Guid.CreateVersion7();

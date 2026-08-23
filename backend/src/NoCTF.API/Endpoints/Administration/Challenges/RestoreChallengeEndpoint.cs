@@ -1,5 +1,4 @@
 using FastEndpoints;
-using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Security;
@@ -12,16 +11,6 @@ public sealed class RestoreChallengeRequest
 {
     public Guid CompetitionId { get; set; }
     public Guid CompetitionChallengeId { get; set; }
-    [QueryParam]
-    public int ExpectedRevision { get; set; } = -1;
-}
-
-public sealed class RestoreChallengeValidator : Validator<RestoreChallengeRequest>
-{
-    public RestoreChallengeValidator()
-    {
-        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
-    }
 }
 
 public sealed class RestoreChallengeEndpoint(
@@ -45,7 +34,7 @@ public sealed class RestoreChallengeEndpoint(
         {
             summary.Summary = "Restores a deleted competition challenge.";
             summary.Description =
-                "Restores the competition link at the expected aggregate revision; the global template is not modified.";
+                "Restores the competition link; the global template is not modified.";
         });
     }
 
@@ -66,7 +55,6 @@ public sealed class RestoreChallengeEndpoint(
         var result = await restore.RestoreAsync(
             competitionId,
             request.CompetitionChallengeId,
-            request.ExpectedRevision,
             DateTimeOffset.UtcNow,
             ct);
         return result switch
@@ -75,19 +63,13 @@ public sealed class RestoreChallengeEndpoint(
             ChallengeMutationFailure.CompetitionNotFound
                 or ChallengeMutationFailure.ChallengeNotFound =>
                 TypedResults.NotFound(),
-            ChallengeMutationFailure.RevisionConflict
-                or ChallengeMutationFailure.LifecycleStateConflict
+            ChallengeMutationFailure.LifecycleStateConflict
                 or ChallengeMutationFailure.TemplateNotFound
                 or ChallengeMutationFailure.TemplateModeMismatch
                 or ChallengeMutationFailure.ChallengeOrderConflict
                 or ChallengeMutationFailure.ChallengeTemplateConflict =>
                 TypedResults.Conflict(
                     CompetitionChallengeConflictMapper.ToResponse(result.Value)),
-            ChallengeMutationFailure.InvalidRevision =>
-                TypedResults.Problem(
-                    statusCode: StatusCodes.Status400BadRequest,
-                    title: "Competition challenge was not restored.",
-                    detail: "ExpectedRevision is invalid."),
             _ => throw new InvalidOperationException(
                 $"Unsupported competition challenge restore failure: {result}.")
         };

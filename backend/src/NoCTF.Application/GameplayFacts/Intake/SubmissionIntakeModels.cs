@@ -8,8 +8,6 @@ public sealed record GameplayFactAdmissionSnapshot(
     Guid TeamId,
     Guid CompetitionChallengeId,
     GameMode Mode,
-    int CompetitionConfigurationRevision,
-    int ChallengeConfigurationRevision,
     string CompetitionConfigurationJson,
     string ChallengeConfigurationJson,
     int AcceptedFlagAttempts,
@@ -47,7 +45,7 @@ public enum GameplayFactAcceptanceState
     Created,
     AchievementAlreadySucceeded,
     AttemptsExhausted,
-    SnapshotChanged
+    AdmissionRejected
 }
 
 public sealed record GameplayFactAcceptanceResult(

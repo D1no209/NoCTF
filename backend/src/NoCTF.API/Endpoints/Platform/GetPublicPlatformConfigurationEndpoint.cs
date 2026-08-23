@@ -30,7 +30,7 @@ internal static class PublicPlatformConfigurationMapping
             return null;
 
         var path = links.GetPathByName(httpContext, "PlatformLogo_Get", values: null);
-        return path is null ? null : $"{path}?revision={configuration.Revision}";
+        return path is null ? null : $"{path}?v={configuration.LogoFileId.Value:N}";
     }
 }
 
@@ -47,7 +47,7 @@ public sealed class GetPublicPlatformConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Returns public platform branding.";
-            summary.Description = "Exposes the configured name, description, and revisioned logo URL.";
+            summary.Description = "Exposes the configured name, description, and cache-busted logo URL.";
         });
     }
 

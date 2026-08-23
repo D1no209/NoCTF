@@ -21,18 +21,15 @@ public enum SmtpSecurityModeProtocol
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<EmailVerificationConfigurationFailureCode>))]
 public enum EmailVerificationConfigurationFailureCode
 {
-    Invalid,
-    RevisionConflict
+    Invalid
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformProblemCode>))]
 public enum PlatformProblemCode
 {
-    EmailVerificationConfigurationConflict,
     SmtpPasswordInvalid,
     EmailDeliveryNotConfigured,
-    SmtpDeliveryFailed,
-    PlatformConfigurationConflict
+    SmtpDeliveryFailed
 }
 
 [Mapper]
@@ -61,7 +58,6 @@ public sealed class UpdateEmailVerificationConfigurationRequest
     public required string SmtpFromAddress { get; set; }
     public required string SmtpFromName { get; set; }
     public required int SmtpTimeoutSeconds { get; set; }
-    public required long ExpectedRevision { get; set; }
 }
 
 public sealed class UpdateEmailVerificationConfigurationValidator
@@ -81,7 +77,6 @@ public sealed class UpdateEmailVerificationConfigurationValidator
         RuleFor(request => request.SmtpFromAddress).MaximumLength(320);
         RuleFor(request => request.SmtpFromName).MaximumLength(100);
         RuleFor(request => request.SmtpTimeoutSeconds).InclusiveBetween(1, 120);
-        RuleFor(request => request.ExpectedRevision).GreaterThan(0);
     }
 }
 
@@ -100,7 +95,7 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
         {
             summary.Summary = "Updates email verification configuration.";
             summary.Description =
-                "Applies non-secret verification and SMTP settings with a revision fence.";
+                "Applies non-secret verification and SMTP settings.";
         });
     }
 
@@ -124,7 +119,6 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
             request.SmtpFromAddress,
             request.SmtpFromName,
             request.SmtpTimeoutSeconds,
-            request.ExpectedRevision,
             DateTimeOffset.UtcNow), ct);
         if (result.State == EmailVerificationConfigurationUpdateState.Invalid)
         {
@@ -137,18 +131,6 @@ public sealed class UpdateEmailVerificationConfigurationEndpoint(
                     ["errors"] = result.Errors.Select(error => error.ToString()).ToArray()
                 });
         }
-        if (result.State == EmailVerificationConfigurationUpdateState.RevisionConflict)
-        {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Email verification configuration changed.",
-                detail: "Reload the configuration and apply the changes again.",
-                extensions: new Dictionary<string, object?>
-                {
-                    ["code"] = EmailVerificationConfigurationFailureCode.RevisionConflict
-                });
-        }
-
         return TypedResults.Ok(EmailVerificationConfigurationMapping.ToResponse(
             result.Configuration!));
     }

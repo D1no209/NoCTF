@@ -16,8 +16,6 @@ public sealed class Challenge
     public string? Description { get; set; }
     public string Direction { get; set; } = "Uncategorized";
     public string DefinitionJson { get; set; } = string.Empty;
-    [ConcurrencyCheck]
-    public int Revision { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }

@@ -521,7 +521,6 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     CompetitionId = competitionId,
                     ChallengeId = challengeId,
                     IsPublished = true,
-                    Revision = 1,
                     RulesJson = "{}",
                     UpdatedAt = now,
                     Hints =
@@ -554,8 +553,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 hintId,
                 "Paid hint challenge",
                 25,
-                futureAt,
-                1);
+                futureAt);
             await CompetitionNotificationMessageHandlers.Handle(
                 futureMessage,
                 db,
@@ -566,7 +564,6 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                 .SingleAsync(candidate => candidate.Id == competitionChallengeId, ct);
             var hint = challenge.Hints.Single(candidate => candidate.Id == hintId);
             hint.PublishedAt = publishedAt;
-            challenge.Revision = 2;
             challenge.UpdatedAt = now.AddSeconds(1);
             await db.SaveChangesAsync(ct);
 
@@ -582,8 +579,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
                     deletedHintId,
                     "Paid hint challenge",
                     50,
-                    publishedAt,
-                    1),
+                    publishedAt),
                 db,
                 delivery,
                 ct);
@@ -592,7 +588,6 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             var currentMessage = futureMessage with
             {
                 PublishedAt = publishedAt,
-                PublicationRevision = 2
             };
             await CompetitionNotificationMessageHandlers.Handle(
                 currentMessage,

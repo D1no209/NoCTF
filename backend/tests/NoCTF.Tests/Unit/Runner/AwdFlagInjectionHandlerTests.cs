@@ -152,7 +152,6 @@ public sealed class AwdFlagInjectionHandlerTests
         Guid.Parse("22222222-2222-2222-2222-222222222222"),
         Guid.Parse("33333333-3333-3333-3333-333333333333"),
         4,
-        5,
         validUntil,
         "pool-a",
         "runner-a");

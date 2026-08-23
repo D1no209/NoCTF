@@ -59,7 +59,6 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
                 "ResourceIdConflict",
                 "ChallengeOrderConflict",
                 "ChallengeTemplateConflict",
-                "RevisionConflict",
                 "LifecycleStateConflict",
                 "ChallengeTemplateNotFound",
                 "ChallengeTemplateModeMismatch"
@@ -67,7 +66,7 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
     }
 
     [Test]
-    public async Task Update_body_requires_complete_revision_fenced_payload()
+    public async Task Update_body_requires_complete_last_write_wins_payload()
     {
         using var swagger = await ReadSwaggerAsync();
         var root = swagger.RootElement;
@@ -80,15 +79,13 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
                 .GetProperty("schema"));
 
         await Assert.That(PropertyNames(request))
-            .IsEquivalentTo(["customTitle", "baseScore", "order", "isPublished", "expectedRevision"]);
+            .IsEquivalentTo(["customTitle", "baseScore", "order", "isPublished"]);
         await Assert.That(RequiredPropertyNames(request))
-            .IsEquivalentTo(["customTitle", "baseScore", "order", "isPublished", "expectedRevision"]);
-        AssertNonNegativeInt32(
-            request.GetProperty("properties").GetProperty("expectedRevision"));
+            .IsEquivalentTo(["customTitle", "baseScore", "order", "isPublished"]);
     }
 
     [Test]
-    public async Task Delete_and_restore_require_non_negative_revision_query()
+    public async Task Delete_and_restore_only_bind_resource_path_parameters()
     {
         using var swagger = await ReadSwaggerAsync();
         var root = swagger.RootElement;
@@ -99,14 +96,10 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
             Operation(root, RestorePath, "post")
         })
         {
-            var parameter = operation.GetProperty("parameters")
+            await Assert.That(operation.GetProperty("parameters")
                 .EnumerateArray()
-                .Single(item =>
-                    item.GetProperty("name").GetString() == "expectedRevision"
-                    && item.GetProperty("in").GetString() == "query");
-
-            await Assert.That(parameter.GetProperty("required").GetBoolean()).IsTrue();
-            AssertNonNegativeInt32(parameter.GetProperty("schema"));
+                .All(item => item.GetProperty("in").GetString() == "path"))
+                .IsTrue();
         }
     }
 
@@ -153,17 +146,6 @@ public sealed class CompetitionChallengeLifecycleOpenApiTests
             .EnumerateArray()
             .Select(property => property.GetString()!)
             .ToArray();
-
-    private static void AssertNonNegativeInt32(JsonElement schema)
-    {
-        if (schema.GetProperty("type").GetString() != "integer"
-            || schema.GetProperty("format").GetString() != "int32"
-            || schema.GetProperty("minimum").GetDouble() != 0)
-        {
-            throw new InvalidOperationException(
-                "ExpectedRevision must be a non-negative required Int32.");
-        }
-    }
 
     private static async Task<JsonDocument> ReadSwaggerAsync()
     {

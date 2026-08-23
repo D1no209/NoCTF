@@ -12,7 +12,6 @@ public sealed record CompetitionConfigurationResponse(
     Guid CompetitionId,
     GameModeProtocol Mode,
     string Json,
-    int Revision,
     CompetitionStatusProtocol CompetitionStatus,
     DateTimeOffset UpdatedAt);
 
@@ -23,7 +22,6 @@ internal static class CompetitionConfigurationMapping
             view.CompetitionId,
             CompetitionProtocolMapper.ToProtocol(view.Mode),
             view.Json,
-            view.Revision,
             CompetitionProtocolMapper.ToProtocol(view.CompetitionStatus),
             view.UpdatedAt);
 }
@@ -43,7 +41,7 @@ public sealed class GetCompetitionConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Gets a competition's game-mode configuration.";
-            summary.Description = "Returns the versioned configuration JSON visible to competition administrators.";
+            summary.Description = "Returns the configuration JSON visible to competition administrators.";
         });
     }
 

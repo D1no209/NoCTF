@@ -1,5 +1,4 @@
 using FastEndpoints;
-using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Runtime;
@@ -9,24 +8,11 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Runtime;
 
-public sealed class TerminateRuntimeRequest
-{
-    public required long ExpectedProcessingVersion { get; set; }
-}
-
-public sealed class TerminateRuntimeValidator : Validator<TerminateRuntimeRequest>
-{
-    public TerminateRuntimeValidator()
-    {
-        RuleFor(request => request.ExpectedProcessingVersion).GreaterThanOrEqualTo(0);
-    }
-}
-
 public sealed class TerminateRuntimeEndpoint(
     ManageAdminRuntimes runtimes,
     ICompetitionModerationAuthorizer authorizer,
     IUserContext user)
-    : Endpoint<TerminateRuntimeRequest,
+    : EndpointWithoutRequest<
         Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>>
 {
     public override void Configure()
@@ -39,13 +25,12 @@ public sealed class TerminateRuntimeEndpoint(
         {
             summary.Summary = "Terminates an exact runtime instance.";
             summary.Description =
-                "Queues durable provider cleanup for the selected instance and rejects stale processing versions.";
+                "Queues durable provider cleanup for the selected instance.";
         });
     }
 
     public override async Task<
         Results<Accepted<RuntimeAcceptedResponse>, NotFound, ProblemHttpResult, ForbidHttpResult>> ExecuteAsync(
-        TerminateRuntimeRequest request,
         CancellationToken ct)
     {
         var competitionId = Route<Guid>("competitionId");
@@ -55,7 +40,6 @@ public sealed class TerminateRuntimeEndpoint(
         var result = await runtimes.TerminateAsync(
             competitionId,
             Route<Guid>("runtimeInstanceId"),
-            request.ExpectedProcessingVersion,
             user.UserId,
             DateTimeOffset.UtcNow,
             ct);
@@ -66,9 +50,7 @@ public sealed class TerminateRuntimeEndpoint(
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status409Conflict,
                 title: "Runtime termination was rejected.",
-                detail: result.Failure == RuntimeMutationFailure.Conflict
-                    ? "The runtime changed after it was loaded. Refresh and try again."
-                    : "The runtime is already terminal or has no provider resource to clean up.");
+                detail: "The runtime is already terminal or has no provider resource to clean up.");
         }
 
         var value = new RuntimeAcceptedResponse(

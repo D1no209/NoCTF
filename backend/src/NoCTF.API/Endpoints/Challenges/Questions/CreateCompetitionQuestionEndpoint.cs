@@ -44,7 +44,6 @@ public enum CompetitionQuestionFailureCode
     InvalidChallengeReference,
     TeamActiveQuestionLimitReached,
     ParticipantMessageLimitReached,
-    RevisionConflict,
     InvalidTransition,
     QuestionClosed
 }
@@ -77,7 +76,6 @@ internal static class CompetitionQuestionFailureMapper
                 CompetitionQuestionFailureCode.TeamActiveQuestionLimitReached,
             CompetitionQuestionFailure.ParticipantMessageLimitReached =>
                 CompetitionQuestionFailureCode.ParticipantMessageLimitReached,
-            CompetitionQuestionFailure.RevisionConflict => CompetitionQuestionFailureCode.RevisionConflict,
             CompetitionQuestionFailure.InvalidTransition => CompetitionQuestionFailureCode.InvalidTransition,
             CompetitionQuestionFailure.QuestionClosed => CompetitionQuestionFailureCode.QuestionClosed,
             _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, null)

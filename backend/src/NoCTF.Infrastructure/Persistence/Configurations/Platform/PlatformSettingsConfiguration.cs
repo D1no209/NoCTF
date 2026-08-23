@@ -33,7 +33,6 @@ internal sealed class PlatformSettingsConfiguration
             EmailSmtpFromAddress = string.Empty,
             EmailSmtpFromName = "NoCTF",
             EmailSmtpTimeoutSeconds = 30,
-            Revision = 1,
             UpdatedAt = DateTimeOffset.UnixEpoch
         });
         builder.Property(settings => settings.EmailSmtpSecurityMode).HasConversion<short>();

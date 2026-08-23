@@ -369,7 +369,7 @@ export const platformLogoGet = <ThrowOnError extends boolean = false>(options?: 
 /**
  * Returns public platform branding.
  *
- * Exposes the configured name, description, and revisioned logo URL.
+ * Exposes the configured name, description, and cache-busted logo URL.
  */
 export const platformConfigurationGet = <ThrowOnError extends boolean = false>(options?: Options<PlatformConfigurationGetData, ThrowOnError>): RequestResult<PlatformConfigurationGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<PlatformConfigurationGetResponses, unknown, ThrowOnError>({
     security: [{
@@ -1600,7 +1600,7 @@ export const adminStopTeamRuntime = <ThrowOnError extends boolean = false>(optio
 /**
  * Terminates an exact runtime instance.
  *
- * Queues durable provider cleanup for the selected instance and rejects stale processing versions.
+ * Queues durable provider cleanup for the selected instance.
  */
 export const adminTerminateRuntime = <ThrowOnError extends boolean = false>(options: Options<AdminTerminateRuntimeData, ThrowOnError>): RequestResult<AdminTerminateRuntimeResponses, AdminTerminateRuntimeErrors, ThrowOnError> => (options.client ?? client).post<AdminTerminateRuntimeResponses, AdminTerminateRuntimeErrors, ThrowOnError>({
     security: [{
@@ -1609,11 +1609,7 @@ export const adminTerminateRuntime = <ThrowOnError extends boolean = false>(opti
             type: 'http'
         }],
     url: '/api/v1/admin/competitions/{competitionId}/runtimes/{runtimeInstanceId}/terminate',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
+    ...options
 });
 
 /**
@@ -1717,7 +1713,7 @@ export const adminPlatformGetEmailVerificationConfiguration = <ThrowOnError exte
 /**
  * Updates email verification configuration.
  *
- * Applies non-secret verification and SMTP settings with a revision fence.
+ * Applies non-secret verification and SMTP settings.
  */
 export const adminPlatformUpdateEmailVerificationConfiguration = <ThrowOnError extends boolean = false>(options: Options<AdminPlatformUpdateEmailVerificationConfigurationData, ThrowOnError>): RequestResult<AdminPlatformUpdateEmailVerificationConfigurationResponses, AdminPlatformUpdateEmailVerificationConfigurationErrors, ThrowOnError> => (options.client ?? client).put<AdminPlatformUpdateEmailVerificationConfigurationResponses, AdminPlatformUpdateEmailVerificationConfigurationErrors, ThrowOnError>({
     security: [{
@@ -1736,7 +1732,7 @@ export const adminPlatformUpdateEmailVerificationConfiguration = <ThrowOnError e
 /**
  * Returns editable platform branding configuration.
  *
- * Returns public branding fields with their optimistic revision.
+ * Returns editable public branding fields.
  */
 export const adminPlatformGetConfiguration = <ThrowOnError extends boolean = false>(options?: Options<AdminPlatformGetConfigurationData, ThrowOnError>): RequestResult<AdminPlatformGetConfigurationResponses, AdminPlatformGetConfigurationErrors, ThrowOnError> => (options?.client ?? client).get<AdminPlatformGetConfigurationResponses, AdminPlatformGetConfigurationErrors, ThrowOnError>({
     security: [{
@@ -1751,7 +1747,7 @@ export const adminPlatformGetConfiguration = <ThrowOnError extends boolean = fal
 /**
  * Updates platform name and description.
  *
- * Applies public branding text with an optimistic revision fence.
+ * Applies the public branding text.
  */
 export const adminPlatformUpdateConfiguration = <ThrowOnError extends boolean = false>(options: Options<AdminPlatformUpdateConfigurationData, ThrowOnError>): RequestResult<AdminPlatformUpdateConfigurationResponses, AdminPlatformUpdateConfigurationErrors, ThrowOnError> => (options.client ?? client).put<AdminPlatformUpdateConfigurationResponses, AdminPlatformUpdateConfigurationErrors, ThrowOnError>({
     security: [{
@@ -2015,7 +2011,7 @@ export const adminPlatformUpdateUserRole = <ThrowOnError extends boolean = false
 /**
  * Replaces the public platform logo.
  *
- * Stores a validated raster logo and advances the platform configuration revision.
+ * Stores and applies a validated raster logo.
  */
 export const adminPlatformUploadLogo = <ThrowOnError extends boolean = false>(options: Options<AdminPlatformUploadLogoData, ThrowOnError>): RequestResult<AdminPlatformUploadLogoResponses, AdminPlatformUploadLogoErrors, ThrowOnError> => (options.client ?? client).post<AdminPlatformUploadLogoResponses, AdminPlatformUploadLogoErrors, ThrowOnError>({
     ...formDataBodySerializer,
@@ -2349,7 +2345,7 @@ export const adminGetCompetition = <ThrowOnError extends boolean = false>(option
 /**
  * Updates competition metadata.
  *
- * Updates mutable competition metadata using the current lifecycle state as the concurrency fence.
+ * Updates mutable competition metadata while preserving lifecycle constraints.
  */
 export const adminUpdateCompetition = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCompetitionData, ThrowOnError>): RequestResult<AdminUpdateCompetitionResponses, AdminUpdateCompetitionErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateCompetitionResponses, AdminUpdateCompetitionErrors, ThrowOnError>({
     security: [{
@@ -2417,7 +2413,7 @@ export const adminGenerateMissingFlags = <ThrowOnError extends boolean = false>(
 /**
  * Gets a competition's game-mode configuration.
  *
- * Returns the versioned configuration JSON visible to competition administrators.
+ * Returns the configuration JSON visible to competition administrators.
  */
 export const adminCompetitionConfigurationGet = <ThrowOnError extends boolean = false>(options: Options<AdminCompetitionConfigurationGetData, ThrowOnError>): RequestResult<AdminCompetitionConfigurationGetResponses, AdminCompetitionConfigurationGetErrors, ThrowOnError> => (options.client ?? client).get<AdminCompetitionConfigurationGetResponses, AdminCompetitionConfigurationGetErrors, ThrowOnError>({
     security: [{
@@ -2432,7 +2428,7 @@ export const adminCompetitionConfigurationGet = <ThrowOnError extends boolean = 
 /**
  * Updates a competition's game-mode configuration.
  *
- * Validates and replaces versioned configuration JSON using optimistic concurrency.
+ * Validates and replaces the competition configuration JSON.
  */
 export const adminCompetitionConfigurationUpdate = <ThrowOnError extends boolean = false>(options: Options<AdminCompetitionConfigurationUpdateData, ThrowOnError>): RequestResult<AdminCompetitionConfigurationUpdateResponses, AdminCompetitionConfigurationUpdateErrors, ThrowOnError> => (options.client ?? client).put<AdminCompetitionConfigurationUpdateResponses, AdminCompetitionConfigurationUpdateErrors, ThrowOnError>({
     security: [{
@@ -2451,7 +2447,7 @@ export const adminCompetitionConfigurationUpdate = <ThrowOnError extends boolean
 /**
  * Gets the scheduled and effective leaderboard visibility policy.
  *
- * Returns the revision-fenced Normal, Frozen, or Blackout configuration for a competition.
+ * Returns the Normal, Frozen, or Blackout configuration for a competition.
  */
 export const adminGetCompetitionLeaderboardVisibility = <ThrowOnError extends boolean = false>(options: Options<AdminGetCompetitionLeaderboardVisibilityData, ThrowOnError>): RequestResult<AdminGetCompetitionLeaderboardVisibilityResponses, AdminGetCompetitionLeaderboardVisibilityErrors, ThrowOnError> => (options.client ?? client).get<AdminGetCompetitionLeaderboardVisibilityResponses, AdminGetCompetitionLeaderboardVisibilityErrors, ThrowOnError>({
     security: [{
@@ -2466,7 +2462,7 @@ export const adminGetCompetitionLeaderboardVisibility = <ThrowOnError extends bo
 /**
  * Schedules or immediately applies leaderboard visibility.
  *
- * Uses a dedicated revision fence and persists the exact Frozen cutoff snapshot when the restriction takes effect.
+ * Persists the exact Frozen cutoff snapshot when the restriction takes effect.
  */
 export const adminUpdateCompetitionLeaderboardVisibility = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCompetitionLeaderboardVisibilityData, ThrowOnError>): RequestResult<AdminUpdateCompetitionLeaderboardVisibilityResponses, AdminUpdateCompetitionLeaderboardVisibilityErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateCompetitionLeaderboardVisibilityResponses, AdminUpdateCompetitionLeaderboardVisibilityErrors, ThrowOnError>({
     security: [{
@@ -2534,7 +2530,7 @@ export const adminCompetitionTracksGet = <ThrowOnError extends boolean = false>(
 /**
  * Updates competition tracks before the competition starts.
  *
- * Validates the complete track definition set and applies optimistic concurrency.
+ * Validates and applies the complete track definition set.
  */
 export const adminCompetitionTracksUpdate = <ThrowOnError extends boolean = false>(options: Options<AdminCompetitionTracksUpdateData, ThrowOnError>): RequestResult<AdminCompetitionTracksUpdateResponses, AdminCompetitionTracksUpdateErrors, ThrowOnError> => (options.client ?? client).put<AdminCompetitionTracksUpdateResponses, AdminCompetitionTracksUpdateErrors, ThrowOnError>({
     security: [{
@@ -2911,7 +2907,7 @@ export const adminCreateCompetitionChallengeHint = <ThrowOnError extends boolean
 /**
  * Deletes a competition challenge.
  *
- * Soft-deletes the competition link at the expected aggregate revision without changing the global challenge template.
+ * Soft-deletes the competition link without changing the global challenge template.
  */
 export const adminDeleteCompetitionChallenge = <ThrowOnError extends boolean = false>(options: Options<AdminDeleteCompetitionChallengeData, ThrowOnError>): RequestResult<AdminDeleteCompetitionChallengeResponses, AdminDeleteCompetitionChallengeErrors, ThrowOnError> => (options.client ?? client).delete<AdminDeleteCompetitionChallengeResponses, AdminDeleteCompetitionChallengeErrors, ThrowOnError>({
     security: [{
@@ -2941,7 +2937,7 @@ export const adminGetCompetitionChallenge = <ThrowOnError extends boolean = fals
 /**
  * Updates a competition challenge.
  *
- * Updates scoring, ordering, and publication state using optimistic concurrency.
+ * Updates scoring, ordering, and publication state.
  */
 export const adminUpdateCompetitionChallenge = <ThrowOnError extends boolean = false>(options: Options<AdminUpdateCompetitionChallengeData, ThrowOnError>): RequestResult<AdminUpdateCompetitionChallengeResponses, AdminUpdateCompetitionChallengeErrors, ThrowOnError> => (options.client ?? client).put<AdminUpdateCompetitionChallengeResponses, AdminUpdateCompetitionChallengeErrors, ThrowOnError>({
     security: [{
@@ -3058,7 +3054,7 @@ export const adminUpdateCompetitionChallengeHint = <ThrowOnError extends boolean
 /**
  * Gets a competition challenge's game-mode configuration.
  *
- * Returns the versioned challenge configuration JSON visible to competition administrators.
+ * Returns the challenge configuration JSON visible to competition administrators.
  */
 export const adminChallengeConfigurationGet = <ThrowOnError extends boolean = false>(options: Options<AdminChallengeConfigurationGetData, ThrowOnError>): RequestResult<AdminChallengeConfigurationGetResponses, AdminChallengeConfigurationGetErrors, ThrowOnError> => (options.client ?? client).get<AdminChallengeConfigurationGetResponses, AdminChallengeConfigurationGetErrors, ThrowOnError>({
     security: [{
@@ -3073,7 +3069,7 @@ export const adminChallengeConfigurationGet = <ThrowOnError extends boolean = fa
 /**
  * Updates a competition challenge's game-mode configuration.
  *
- * Validates and replaces versioned challenge configuration JSON using optimistic concurrency.
+ * Validates and replaces challenge configuration JSON.
  */
 export const adminChallengeConfigurationUpdate = <ThrowOnError extends boolean = false>(options: Options<AdminChallengeConfigurationUpdateData, ThrowOnError>): RequestResult<AdminChallengeConfigurationUpdateResponses, AdminChallengeConfigurationUpdateErrors, ThrowOnError> => (options.client ?? client).put<AdminChallengeConfigurationUpdateResponses, AdminChallengeConfigurationUpdateErrors, ThrowOnError>({
     security: [{
@@ -3092,7 +3088,7 @@ export const adminChallengeConfigurationUpdate = <ThrowOnError extends boolean =
 /**
  * Restores a deleted competition challenge.
  *
- * Restores the competition link at the expected aggregate revision; the global template is not modified.
+ * Restores the competition link; the global template is not modified.
  */
 export const adminRestoreCompetitionChallenge = <ThrowOnError extends boolean = false>(options: Options<AdminRestoreCompetitionChallengeData, ThrowOnError>): RequestResult<AdminRestoreCompetitionChallengeResponses, AdminRestoreCompetitionChallengeErrors, ThrowOnError> => (options.client ?? client).post<AdminRestoreCompetitionChallengeResponses, AdminRestoreCompetitionChallengeErrors, ThrowOnError>({
     security: [{

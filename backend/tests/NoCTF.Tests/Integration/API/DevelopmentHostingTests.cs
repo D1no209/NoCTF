@@ -82,7 +82,6 @@ public sealed class DevelopmentHostingTests
             await scope.ServiceProvider.GetRequiredService<IMessageBus>()
                 .InvokeAsync(new RuntimeProvisionFailed(
                     Guid.NewGuid(),
-                    1,
                     RuntimeFailureCode.RunnerUnavailable,
                     "local-development"), cancellationToken);
         }

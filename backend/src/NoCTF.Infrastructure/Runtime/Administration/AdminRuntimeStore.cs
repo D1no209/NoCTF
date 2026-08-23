@@ -82,7 +82,7 @@ public sealed class AdminRuntimeStore(
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
                 item.Purpose, item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
-                item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
+                item.State, item.FailureCode, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
                 item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
                 item.PublishedPorts
@@ -118,7 +118,7 @@ public sealed class AdminRuntimeStore(
             .Select(item => new RuntimeInstanceView(
                 item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
                 item.Purpose, item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
-                item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
+                item.State, item.FailureCode, item.Urls,
                 item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
                 item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
                 item.PublishedPorts
@@ -149,7 +149,6 @@ public sealed class AdminRuntimeStore(
     public async Task<RuntimeMutationResult> ForceTerminateAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
-        long expectedProcessingVersion,
         Guid actorUserId,
         string reason,
         DateTimeOffset now,
@@ -191,8 +190,6 @@ public sealed class AdminRuntimeStore(
             ct);
         if (instance is null)
             return new(null, RuntimeMutationFailure.NotFound);
-        if (instance.ProcessingVersion != expectedProcessingVersion)
-            return new(null, RuntimeMutationFailure.Conflict);
         var current = Map(instance, scope.StateChangedAt);
         if (!RuntimeForceTerminationPolicy.CanForceTerminate(current, now))
             return new(null, RuntimeMutationFailure.NotStuck);
@@ -203,10 +200,8 @@ public sealed class AdminRuntimeStore(
         instance.State = RuntimeState.Stopping;
         instance.FailureCode = null;
         instance.RunnerAssignmentReleaseToken = null;
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await outbox.PublishToRunnerNodeAsync(new ForceTerminateRuntime(
             instance.Id,
-            instance.ProcessingVersion,
             instance.Generation,
             instance.RuntimeProvider,
             instance.RunnerPool,
@@ -228,23 +223,15 @@ public sealed class AdminRuntimeStore(
             RuntimeCleanupResult: RuntimeCleanupResult.Pending,
             RuntimeGeneration: instance.Generation,
             Reason: reason), ct);
-        try
-        {
-            await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
-            return new(Map(instance, now));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return new(null, RuntimeMutationFailure.Conflict);
-        }
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(Map(instance, now));
     }
 
     public async Task<RuntimeMutationResult> TerminateAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
-        long expectedProcessingVersion,
         Guid actorUserId,
         DateTimeOffset now,
         CancellationToken ct)
@@ -275,8 +262,6 @@ public sealed class AdminRuntimeStore(
             ct);
         if (instance is null)
             return new(null, RuntimeMutationFailure.NotFound);
-        if (instance.ProcessingVersion != expectedProcessingVersion)
-            return new(null, RuntimeMutationFailure.Conflict);
         if (instance.State == RuntimeState.Stopping)
             return new(Map(instance));
         if (instance.State == RuntimeState.Stopped ||
@@ -285,7 +270,6 @@ public sealed class AdminRuntimeStore(
             return new(null, RuntimeMutationFailure.InvalidState);
         }
 
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         instance.RunnerAssignmentReleaseToken = null;
         if (instance.State == RuntimeState.Queued)
         {
@@ -296,14 +280,10 @@ public sealed class AdminRuntimeStore(
         {
             instance.State = RuntimeState.Stopping;
             instance.FailureCode = null;
-            await outbox.PublishAsync(new StopRuntime(
-                instance.Id,
-                instance.ProcessingVersion));
+            await outbox.PublishAsync(new StopRuntime(instance.Id));
         }
 
-        try
-        {
-            await events.RecordAsync(new(
+        await events.RecordAsync(new(
                 instance.CompetitionId,
                 CompetitionEventKind.RuntimeStateChanged,
                 CompetitionEventLevel.Warning,
@@ -317,15 +297,10 @@ public sealed class AdminRuntimeStore(
                 RuntimeInstanceId: instance.Id,
                 RuntimeState: instance.State,
                 RuntimeGeneration: instance.Generation), ct);
-            await db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-            await outbox.FlushOutgoingMessagesAsync();
-            return new(Map(instance));
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return new(null, RuntimeMutationFailure.Conflict);
-        }
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        await outbox.FlushOutgoingMessagesAsync();
+        return new(Map(instance));
     }
 
     public async Task<RuntimeMutationResult> MutateAsync(
@@ -456,10 +431,7 @@ public sealed class AdminRuntimeStore(
                 cleanupTarget.State = RuntimeState.Stopping;
                 cleanupTarget.FailureCode = null;
                 cleanupTarget.RunnerAssignmentReleaseToken = null;
-                cleanupTarget.ProcessingVersion = checked(cleanupTarget.ProcessingVersion + 1);
-                await outbox.PublishAsync(new StopRuntime(
-                    cleanupTarget.Id,
-                    cleanupTarget.ProcessingVersion));
+                await outbox.PublishAsync(new StopRuntime(cleanupTarget.Id));
                 await events.RecordAsync(new(
                     cleanupTarget.CompetitionId,
                     CompetitionEventKind.RuntimeStateChanged,
@@ -533,7 +505,7 @@ public sealed class AdminRuntimeStore(
             };
             db.RuntimeInstances.Add(entity);
             if (cleanupTarget is null)
-                await outbox.PublishAsync(new DispatchRuntime(entity.Id, entity.ProcessingVersion));
+                await outbox.PublishAsync(new DispatchRuntime(entity.Id));
         }
         else if (action == RuntimeAction.Stop)
         {
@@ -541,7 +513,6 @@ public sealed class AdminRuntimeStore(
                 return new(null, RuntimeMutationFailure.InvalidState);
             if (current.State == RuntimeState.Stopping)
                 return new(Map(current));
-            current.ProcessingVersion = checked(current.ProcessingVersion + 1);
             entity = current;
             if (scope.Competition.Mode == GameMode.Awdp)
                 await runtimeFlags.InvalidateGenerationAsync(current.Id, now, ct);
@@ -554,7 +525,7 @@ public sealed class AdminRuntimeStore(
             {
                 current.State = RuntimeState.Stopping;
                 current.RunnerAssignmentReleaseToken = null;
-                await outbox.PublishAsync(new StopRuntime(entity.Id, entity.ProcessingVersion));
+                await outbox.PublishAsync(new StopRuntime(entity.Id));
             }
         }
         else if (action == RuntimeAction.Extend)
@@ -566,7 +537,6 @@ public sealed class AdminRuntimeStore(
             if (remaining <= TimeSpan.Zero || remaining >= TimeSpan.FromMinutes(10))
                 return new(null, RuntimeMutationFailure.InvalidState);
             current.ExpiresAt = now.Add(extension.Value);
-            current.ProcessingVersion = checked(current.ProcessingVersion + 1);
             entity = current;
         }
         else
@@ -626,7 +596,7 @@ public sealed class AdminRuntimeStore(
         new(
             item.Id, item.CompetitionId, item.CompetitionChallengeId, item.TeamId,
             item.Purpose, item.Generation, item.RuntimeKind, item.RuntimeProvider, item.RunnerPool,
-            item.State, item.FailureCode, item.ProcessingVersion, item.Urls,
+            item.State, item.FailureCode, item.Urls,
             item.CreatedAt, item.RunningAt, item.ExpiresAt, item.StoppedAt,
             item.RunnerId, item.ProviderReceiptJson, item.ControlCheckUrl,
             item.PublishedPorts

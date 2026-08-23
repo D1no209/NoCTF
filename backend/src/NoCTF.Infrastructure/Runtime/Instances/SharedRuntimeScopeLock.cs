@@ -21,12 +21,12 @@ public sealed class SharedRuntimeCriticalSection(
         budget.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            var affected = await db.CompetitionChallenges.IgnoreQueryFilters()
-                .Where(challenge => challenge.Id == competitionChallengeId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    challenge => challenge.CriticalSectionVersion,
-                    challenge => challenge.CriticalSectionVersion + 1), budget.Token);
-            if (affected != 1)
+            var exists = await db.CompetitionChallenges
+                .FromSqlInterpolated($"SELECT * FROM competition_challenges WHERE id = {competitionChallengeId} FOR UPDATE")
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .AnyAsync(budget.Token);
+            if (!exists)
                 throw new DbUpdateConcurrencyException("The shared runtime scope no longer exists.");
             return NoopCriticalSectionLease.Instance;
         }

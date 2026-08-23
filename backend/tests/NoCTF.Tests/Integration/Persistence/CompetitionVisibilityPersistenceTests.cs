@@ -23,7 +23,7 @@ public sealed class CompetitionVisibilityPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Scheduled_freeze_is_revision_fenced_persisted_and_audited(
+    public async Task Scheduled_freeze_is_persisted_applied_once_and_audited(
         CancellationToken ct)
     {
         await RunAsync("noctf_visibility_freeze", async fixture =>
@@ -42,7 +42,6 @@ public sealed class CompetitionVisibilityPersistenceTests
                     fixture.CompetitionId,
                     CompetitionLeaderboardVisibility.Frozen,
                     startsAt,
-                    0,
                     fixture.HumanObserverId,
                     "freeze window",
                     fixture.Now), ct);
@@ -65,12 +64,12 @@ public sealed class CompetitionVisibilityPersistenceTests
                     new CompetitionEventStore(applyDb, outbox));
                 await store.ApplyScheduledAsync(
                     fixture.CompetitionId,
-                    expectedRevision: 1,
+                    startsAt,
                     startsAt.AddSeconds(1),
                     ct);
                 await store.ApplyScheduledAsync(
                     fixture.CompetitionId,
-                    expectedRevision: 1,
+                    startsAt,
                     startsAt.AddSeconds(2),
                     ct);
             }
@@ -175,7 +174,6 @@ public sealed class CompetitionVisibilityPersistenceTests
                 .IsEqualTo(CompetitionLeaderboardVisibility.Normal);
             await Assert.That(competition.LeaderboardVisibilityStartsAt).IsNull();
             await Assert.That(competition.FrozenLeaderboardSnapshotJson).IsNull();
-            await Assert.That(competition.LeaderboardVisibilityRevision).IsEqualTo(1);
             await Assert.That(auditPayload?.From)
                 .IsEqualTo(CompetitionLeaderboardVisibility.Frozen);
             await Assert.That(auditPayload?.To)

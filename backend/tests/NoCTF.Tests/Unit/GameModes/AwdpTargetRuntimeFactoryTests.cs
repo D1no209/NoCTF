@@ -24,9 +24,6 @@ public sealed class AwdpTargetRuntimeFactoryTests
             template,
             new RuntimePlacement(RuntimeProvider.Docker, "awdp"),
             generation: 2,
-            competitionConfigurationRevision: 3,
-            competitionChallengeRevision: 5,
-            challengeDefinitionRevision: 7,
             now: DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(target.Purpose).IsEqualTo(RuntimePurpose.AwdpTarget);
@@ -34,9 +31,6 @@ public sealed class AwdpTargetRuntimeFactoryTests
         await Assert.That(target.GameplayFactId).IsEqualTo(gameplayFactId);
         await Assert.That(target.TeamId).IsEqualTo(teamId);
         await Assert.That(target.Generation).IsEqualTo(2);
-        await Assert.That(target.SourceCompetitionConfigurationRevision).IsEqualTo(3);
-        await Assert.That(target.SourceCompetitionChallengeRevision).IsEqualTo(5);
-        await Assert.That(target.SourceChallengeDefinitionRevision).IsEqualTo(7);
         await Assert.That(target.RunnerPool).IsEqualTo("awdp");
         await Assert.That(target.State).IsEqualTo(RuntimeState.Queued);
         await Assert.That(target.ExpiresAt).IsNull();

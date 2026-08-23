@@ -103,7 +103,6 @@ public sealed class UserAccountDeletionPersistenceTests
                     Title = "Historical challenge",
                     Visibility = ChallengeVisibility.Private,
                     DefinitionJson = "{\"schemaVersion\":1}",
-                    Revision = 1,
                     CreatedAt = now,
                     UpdatedAt = now
                 });
@@ -115,7 +114,6 @@ public sealed class UserAccountDeletionPersistenceTests
                     BaseScore = 100,
                     IsPublished = true,
                     RulesJson = "{}",
-                    Revision = 1,
                     UpdatedAt = now
                 });
                 var teamId = Guid.CreateVersion7(now.AddTicks(8));

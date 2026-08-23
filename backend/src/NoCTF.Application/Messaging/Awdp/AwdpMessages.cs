@@ -8,7 +8,6 @@ public sealed record RunAwdpFixVerification(
     Guid PatchUploadId,
     Guid RuntimeInstanceId,
     int Generation,
-    long RuntimeProcessingVersion,
     DateTimeOffset Deadline,
     string RunnerPool,
     string RunnerId) : IRunnerNodeMessage;
@@ -16,7 +15,6 @@ public sealed record RunAwdpFixVerification(
 public sealed record CleanupAwdpTarget(
     Guid RuntimeInstanceId,
     int Generation,
-    long ProcessingVersion,
     string RunnerPool,
     string RunnerId) : IRunnerNodeMessage;
 
@@ -24,7 +22,6 @@ public sealed record CompleteAwdpFixRecovery(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
     int Generation,
-    long RecoveryProcessingVersion,
     string RunnerPool,
     string RunnerId,
     DateTimeOffset CleanedAt);
@@ -33,7 +30,6 @@ public sealed record ExpireAwdpFixVerification(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
     int Generation,
-    long RuntimeProcessingVersion,
     DateTimeOffset Deadline,
     string RunnerPool,
     string RunnerId);

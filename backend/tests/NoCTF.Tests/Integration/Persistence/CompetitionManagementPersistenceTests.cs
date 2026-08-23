@@ -42,7 +42,7 @@ public sealed class CompetitionManagementPersistenceTests
             var ownerId = Guid.CreateVersion7();
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             db.Users.Add(new User
             {
                 Id = ownerId,
@@ -117,7 +117,7 @@ public sealed class CompetitionManagementPersistenceTests
                 cacheServices.GetRequiredService<IFusionCacheProvider>());
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             db.Users.Add(new User
             {
                 Id = ownerId,
@@ -161,7 +161,6 @@ public sealed class CompetitionManagementPersistenceTests
                     result.MaxConcurrentRuntimeInstancesPerTeam,
                     ownerId,
                     now.AddMinutes(1)),
-                CompetitionStatus.Published,
                 cancellationToken);
             var refreshed = await store
                 .FindAsync(competitionId, includeDraft: false, cancellationToken);

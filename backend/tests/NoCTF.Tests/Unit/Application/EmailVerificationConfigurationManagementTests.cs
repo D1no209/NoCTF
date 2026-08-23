@@ -30,7 +30,7 @@ public sealed class EmailVerificationConfigurationManagementTests
         store.UpdateAsync(
                 Arg.Any<UpdateEmailVerificationConfigurationCommand>(),
                 Arg.Any<CancellationToken>())
-            .Returns(Configuration(passwordConfigured: false) with { Revision = 4 });
+            .Returns(Configuration(passwordConfigured: false));
         var manage = new ManageEmailVerificationConfiguration(store);
 
         var result = await manage.UpdateAsync(Command(enabled: true) with
@@ -49,12 +49,11 @@ public sealed class EmailVerificationConfigurationManagementTests
     public async Task Replacing_the_password_never_returns_the_secret()
     {
         var store = Substitute.For<IEmailVerificationConfigurationStore>();
-        store.ReplacePasswordAsync(3, "replacement-secret", Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-            .Returns(Configuration(passwordConfigured: true) with { Revision = 4 });
+        store.ReplacePasswordAsync("replacement-secret", Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(Configuration(passwordConfigured: true));
         var manage = new ManageEmailVerificationConfiguration(store);
 
         var result = await manage.ReplacePasswordAsync(
-            3,
             "replacement-secret",
             DateTimeOffset.UtcNow);
 
@@ -63,7 +62,6 @@ public sealed class EmailVerificationConfigurationManagementTests
         await Assert.That(typeof(EmailVerificationConfigurationView).GetProperty("SmtpPassword"))
             .IsNull();
         await store.Received(1).ReplacePasswordAsync(
-            3,
             "replacement-secret",
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
@@ -86,7 +84,6 @@ public sealed class EmailVerificationConfigurationManagementTests
             SmtpFromAddress: "no-reply@noctf.example",
             SmtpFromName: "NoCTF",
             SmtpTimeoutSeconds: 10,
-            Revision: 3,
             UpdatedAt: DateTimeOffset.UnixEpoch);
 
     private static UpdateEmailVerificationConfigurationCommand Command(bool enabled) =>
@@ -105,6 +102,5 @@ public sealed class EmailVerificationConfigurationManagementTests
             SmtpFromAddress: "no-reply@noctf.example",
             SmtpFromName: "NoCTF",
             SmtpTimeoutSeconds: 10,
-            ExpectedRevision: 3,
             Now: DateTimeOffset.UtcNow);
 }

@@ -193,7 +193,6 @@ public sealed class LeaderboardProjectionPersistenceTests
                 Title = "Hidden challenge",
                 Direction = "Pwn",
                 DefinitionJson = fixture.Challenge.DefinitionJson,
-                Revision = 1,
                 CreatedAt = projectedAt.AddMinutes(-20),
                 UpdatedAt = projectedAt.AddMinutes(-20)
             };
@@ -206,7 +205,6 @@ public sealed class LeaderboardProjectionPersistenceTests
                 Order = 2,
                 IsPublished = false,
                 RulesJson = fixture.CompetitionChallenge.RulesJson,
-                Revision = 1,
                 UpdatedAt = projectedAt.AddMinutes(-20)
             };
             var hiddenFact = new GameplayFact
@@ -759,7 +757,6 @@ public sealed class LeaderboardProjectionPersistenceTests
                     OwnerId = owner.Id,
                     Mode = GameMode.Awdp,
                     ConfigurationJson = configuration,
-                    ConfigurationRevision = 1,
                     ConfigurationUpdatedAt = now,
                     TrackConfigurationUpdatedAt = now,
                     FlagDerivationSecret = new byte[32],
@@ -1167,8 +1164,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 false,
                 challenge.RulesJson,
                 challenge.Order,
-                challenge.IsPublished,
-                challenge.Revision)],
+                challenge.IsPublished)],
             fixture.Competition.ConfigurationJson,
             fixture.Competition.StartAt,
             AwdRounds: rounds,
@@ -1195,7 +1191,6 @@ public sealed class LeaderboardProjectionPersistenceTests
             OwnerId = ownerId,
             Mode = mode,
             ConfigurationJson = GameModeDefaultConfiguration.GetCompetitionJson(mode),
-            ConfigurationRevision = 1,
             ConfigurationUpdatedAt = start,
             TrackConfigurationUpdatedAt = start,
             FlagDerivationSecret = new byte[32],
@@ -1216,7 +1211,6 @@ public sealed class LeaderboardProjectionPersistenceTests
             Title = $"{mode} challenge",
             Direction = "Pwn",
             DefinitionJson = rules,
-            Revision = 1,
             CreatedAt = start,
             UpdatedAt = start
         };
@@ -1229,7 +1223,6 @@ public sealed class LeaderboardProjectionPersistenceTests
             Order = 1,
             IsPublished = true,
             RulesJson = rules,
-            Revision = 1,
             UpdatedAt = start
         };
         var team = new Team

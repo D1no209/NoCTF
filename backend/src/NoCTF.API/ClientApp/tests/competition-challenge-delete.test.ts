@@ -22,7 +22,7 @@ describe('competition challenge deletion', () => {
     expect(deleteSection).not.toMatch(/<AlertDialogAction[\s\S]*?removeChallenge/)
   })
 
-  test('still calls the generated delete SDK with the selected revision', async () => {
+  test('calls the generated delete SDK without a stale-write token', async () => {
     const page = await Bun.file(
       new URL('../app/pages/admin/competitions/[id]/challenges/index.vue', import.meta.url),
     ).text()
@@ -31,7 +31,7 @@ describe('competition challenge deletion', () => {
 
     expect(deleteHandler).toContain('adminDeleteCompetitionChallenge')
     expect(deleteHandler).toContain('path: { competitionId, competitionChallengeId: target.id }')
-    expect(deleteHandler).toContain('query: { expectedRevision: target.revision ?? 0 }')
+    expect(deleteHandler).not.toContain('query:')
     expect(deleteHandler).toContain('toast.success(translate("题目已删除"))')
     expect(deleteHandler).toContain('deleteTarget.value = null')
   })

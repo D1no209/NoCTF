@@ -32,18 +32,16 @@ public sealed class PostgresAwdpFixExecutionFence(
             return AwdpFixExecutionFenceResult.Superseded(request);
 
         if (runtime!.State == RuntimeState.Running
-            && runtime.AwdpFixStage == AwdpFixStage.PatchApplying
-            && runtime.ProcessingVersion == request.RuntimeProcessingVersion)
+            && runtime.AwdpFixStage == AwdpFixStage.PatchApplying)
         {
             if (timeProvider.GetUtcNow() >= request.Deadline)
                 return AwdpFixExecutionFenceResult.Superseded(request);
 
-            runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
+            runtime.AwdpFixStage = AwdpFixStage.CheckerRunning;
             await outbox.ScheduleAsync(new ExpireAwdpFixVerification(
                 request.GameplayFactId,
                 runtime.Id,
                 runtime.Generation,
-                runtime.ProcessingVersion,
                 request.Deadline,
                 runtime.RunnerPool,
                 runtime.RunnerId!), request.Deadline);
@@ -54,18 +52,16 @@ public sealed class PostgresAwdpFixExecutionFence(
         }
 
         if (runtime.State == RuntimeState.Running
-            && runtime.ProcessingVersion == checked(request.RuntimeProcessingVersion + 1))
+            && runtime.AwdpFixStage == AwdpFixStage.CheckerRunning)
         {
             runtime.State = RuntimeState.Stopping;
             runtime.RunnerAssignmentReleaseToken = null;
-            runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return Result(AwdpFixExecutionFenceDisposition.Recover, runtime);
         }
 
-        if (runtime.State == RuntimeState.Stopping
-            && runtime.ProcessingVersion == checked(request.RuntimeProcessingVersion + 2))
+        if (runtime.State == RuntimeState.Stopping)
         {
             await transaction.CommitAsync(cancellationToken);
             return Result(AwdpFixExecutionFenceDisposition.Recover, runtime);
@@ -94,8 +90,7 @@ public sealed class PostgresAwdpFixExecutionFence(
                 GameplayFactId: not null
             }
             || runtime.GameplayFactId != request.GameplayFactId
-            || runtime.Generation != request.Generation
-            || runtime.ProcessingVersion != request.RuntimeProcessingVersion)
+            || runtime.Generation != request.Generation)
         {
             return false;
         }
@@ -146,7 +141,6 @@ public sealed class PostgresAwdpFixExecutionFence(
             disposition,
             runtime.Id,
             runtime.Generation,
-            runtime.ProcessingVersion,
             runtime.RuntimeProvider,
             runtime.ProviderReceiptJson,
             runtime.RunnerPool,

@@ -44,8 +44,7 @@ public sealed class ChallengeTemplateValidationHttpTests
             nameof(UpdateChallengeTemplateRequest.Mode),
             nameof(UpdateChallengeTemplateRequest.Visibility),
             nameof(UpdateChallengeTemplateRequest.Title),
-            nameof(UpdateChallengeTemplateRequest.Direction),
-            nameof(UpdateChallengeTemplateRequest.ExpectedRevision));
+            nameof(UpdateChallengeTemplateRequest.Direction));
 
         using var applicationResponse = await client.PutAsJsonAsync(route, new
         {
@@ -53,8 +52,7 @@ public sealed class ChallengeTemplateValidationHttpTests
             visibility = "Private",
             title = "Template",
             direction = "Web",
-            definitionJson = "not-json",
-            expectedRevision = 0
+            definitionJson = "not-json"
         });
         await AssertValidationProblemAsync(
             applicationResponse,

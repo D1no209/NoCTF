@@ -78,7 +78,6 @@ async function saveEdit() {
         baseScore: isAwdp.value ? 0 : editBaseScore.value,
         order: editOrder.value,
         isPublished: editPublished.value,
-        expectedRevision: challenge.value.revision ?? 0,
       },
     })
     if (error) throw error
@@ -86,7 +85,7 @@ async function saveEdit() {
     toast.success(translate("题目设置已保存"))
   }
   catch (e) {
-    toastWriteError(e, loadChallenge)
+    toastWriteError(e)
   }
   finally {
     savingEdit.value = false
@@ -120,14 +119,14 @@ async function saveConfig(json: string) {
   try {
     const { data, error } = await adminChallengeConfigurationUpdate({
       path: { competitionId, competitionChallengeId: ccId },
-      body: { json, expectedRevision: config.value.revision ?? 0 },
+      body: { json },
     })
     if (error) throw error
     config.value = data ?? config.value
     toast.success(translate("题目配置已保存"))
   }
   catch (e) {
-    toastWriteError(e, loadConfig)
+    toastWriteError(e)
   }
   finally {
     savingConfig.value = false
@@ -419,7 +418,6 @@ onMounted(() => {
           <Card>
             <CardHeader>
               <CardTitle>{{ $t('基本设置') }}</CardTitle>
-              <CardDescription>{{ $t('修订版本：{revision}', { revision: challenge.revision ?? 0 }) }}</CardDescription>
             </CardHeader>
             <CardContent>
               <form @submit.prevent="saveEdit">
@@ -470,7 +468,6 @@ onMounted(() => {
                 :mode="(config?.mode ?? competition?.mode ?? 'Ctf') as GameModeValue"
                 :json="config?.json"
                 :inherited-json="inheritedConfigJson"
-                :revision="config?.revision"
                 :readonly="!canWrite"
                 :loading="configLoading"
                 :saving="savingConfig"

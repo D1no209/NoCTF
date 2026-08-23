@@ -60,7 +60,6 @@ public sealed class RuntimeQuotaPersistenceTests
                 var result = await store.TerminateAsync(
                     fixture.CompetitionId,
                     runtimeInstanceId,
-                    expectedProcessingVersion: 0,
                     actorUserId,
                     fixture.Now,
                     cancellationToken);
@@ -68,11 +67,10 @@ public sealed class RuntimeQuotaPersistenceTests
                 await Assert.That(result.Failure).IsNull();
                 await Assert.That(result.Runtime!.Id).IsEqualTo(runtimeInstanceId);
                 await Assert.That(result.Runtime.State).IsEqualTo(RuntimeState.Stopping);
-                await Assert.That(result.Runtime.ProcessingVersion).IsEqualTo(1);
             }
 
             await Assert.That(outbox.Published.OfType<StopRuntime>().Single())
-                .IsEqualTo(new StopRuntime(runtimeInstanceId, 1));
+                .IsEqualTo(new StopRuntime(runtimeInstanceId));
             var recorded = events.Drafts.Single();
             await Assert.That(recorded.ActorUserId).IsEqualTo(actorUserId);
             await Assert.That(recorded.RuntimeInstanceId).IsEqualTo(runtimeInstanceId);
@@ -84,7 +82,6 @@ public sealed class RuntimeQuotaPersistenceTests
                 var stale = await CreateAdminStore(staleDb, staleOutbox).TerminateAsync(
                     fixture.CompetitionId,
                     runtimeInstanceId,
-                    expectedProcessingVersion: 0,
                     actorUserId,
                     fixture.Now.AddSeconds(1),
                     cancellationToken);
@@ -111,14 +108,12 @@ public sealed class RuntimeQuotaPersistenceTests
                     .ForceTerminateAsync(
                         fixture.CompetitionId,
                         runtimeInstanceId,
-                        expectedProcessingVersion: 1,
                         actorUserId,
                         "Runner cleanup exceeded the operation timeout.",
                         fixture.Now.Add(RuntimeForceTerminationPolicy.StuckThreshold),
                         cancellationToken);
 
                 await Assert.That(forced.Failure).IsNull();
-                await Assert.That(forced.Runtime!.ProcessingVersion).IsEqualTo(2);
             }
 
             var forceMessage = forceOutbox.Published.OfType<ForceTerminateRuntime>().Single();

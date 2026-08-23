@@ -37,14 +37,12 @@ public interface IAdminRuntimeStore
     Task<RuntimeMutationResult> TerminateAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
-        long expectedProcessingVersion,
         Guid actorUserId,
         DateTimeOffset now,
         CancellationToken cancellationToken);
     Task<RuntimeMutationResult> ForceTerminateAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
-        long expectedProcessingVersion,
         Guid actorUserId,
         string reason,
         DateTimeOffset now,
@@ -81,14 +79,12 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
     public Task<RuntimeMutationResult> TerminateAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
-        long expectedProcessingVersion,
         Guid actorUserId,
         DateTimeOffset now,
         CancellationToken ct = default) =>
         store.TerminateAsync(
             competitionId,
             runtimeInstanceId,
-            expectedProcessingVersion,
             actorUserId,
             now,
             ct);
@@ -96,7 +92,6 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
     public Task<RuntimeMutationResult> ForceTerminateAsync(
         Guid competitionId,
         Guid runtimeInstanceId,
-        long expectedProcessingVersion,
         Guid actorUserId,
         string reason,
         DateTimeOffset now,
@@ -107,7 +102,6 @@ public sealed class ManageAdminRuntimes(IAdminRuntimeStore store)
             ? store.ForceTerminateAsync(
                 competitionId,
                 runtimeInstanceId,
-                expectedProcessingVersion,
                 actorUserId,
                 normalizedReason,
                 now,

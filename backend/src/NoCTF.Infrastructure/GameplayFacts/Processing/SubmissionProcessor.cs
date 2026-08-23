@@ -150,11 +150,7 @@ public sealed class GameplayFactProcessor(
                 configuration.CompetitionChallenge,
                 DateTimeOffset.UtcNow,
                 cancellationToken);
-            return new(
-                special,
-                configuration.Competition.ConfigurationRevision,
-                configuration.CompetitionChallenge.Revision,
-                configuration.Challenge.Revision);
+            return new(special);
         }
         var maxAttempts = submission.Kind is GameplayFactKind.FlagAttempt or GameplayFactKind.BreakAttempt
             ? rules.MaxFlagAttempts
@@ -173,11 +169,7 @@ public sealed class GameplayFactProcessor(
                         && candidate.Id.CompareTo(submission.Id) <= 0))
                 .CountAsync(cancellationToken);
             if (acceptedPosition > maxAttempts)
-                return new(
-                    new(GameplayFactResult.AttemptsExhausted, null, submission.OccurredAt),
-                    configuration.Competition.ConfigurationRevision,
-                    configuration.CompetitionChallenge.Revision,
-                    configuration.Challenge.Revision);
+                return new(new(GameplayFactResult.AttemptsExhausted, null, submission.OccurredAt));
         }
 
         var priorSubmissions = await db.GameplayFacts.AsNoTracking()
@@ -242,11 +234,7 @@ public sealed class GameplayFactProcessor(
             configuration.Competition.StartAt,
             effectiveRunningTime,
             configuration.Challenge.DefinitionJson));
-        return new(
-            decision,
-            configuration.Competition.ConfigurationRevision,
-            configuration.CompetitionChallenge.Revision,
-            configuration.Challenge.Revision);
+        return new(decision);
     }
 
     private async Task<GameplayFactDecision> EvaluateSpecialAsync(
@@ -381,9 +369,7 @@ public sealed class GameplayFactProcessor(
                     specialScope.Competition.Status,
                     specialScope.Challenge,
                     now,
-                    cancellationToken),
-                CompetitionRevision = specialScope.Competition.ConfigurationRevision,
-                CompetitionChallengeRevision = specialScope.Challenge.Revision
+                    cancellationToken)
             };
         }
 
@@ -633,7 +619,6 @@ public sealed class GameplayFactProcessor(
             .ToListAsync(ct);
         foreach (var runtime in runtimes)
         {
-            runtime.ProcessingVersion = checked(runtime.ProcessingVersion + 1);
             if (runtime.State == RuntimeState.Queued)
             {
                 runtime.State = RuntimeState.Stopped;
@@ -643,9 +628,7 @@ public sealed class GameplayFactProcessor(
             {
                 runtime.State = RuntimeState.Stopping;
                 runtime.RunnerAssignmentReleaseToken = null;
-                await outbox.PublishAsync(new StopRuntime(
-                    runtime.Id,
-                    runtime.ProcessingVersion));
+                await outbox.PublishAsync(new StopRuntime(runtime.Id));
             }
 
             await events.RecordAsync(new(
@@ -805,11 +788,7 @@ public sealed class GameplayFactProcessor(
             evaluation.Decision.OccurredAt);
     }
 
-    private sealed record Evaluation(
-        GameplayFactDecision Decision,
-        int CompetitionRevision,
-        int CompetitionChallengeRevision,
-        int ChallengeDefinitionRevision);
+    private sealed record Evaluation(GameplayFactDecision Decision);
 
     private sealed record GameplayFactProcessingScope(
         Guid CompetitionId,

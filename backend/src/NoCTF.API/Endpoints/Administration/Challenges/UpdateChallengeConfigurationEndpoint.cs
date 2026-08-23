@@ -10,7 +10,6 @@ namespace NoCTF.API.Endpoints.Administration.Challenges;
 
 public sealed class UpdateChallengeConfigurationRequest
 {
-    public int ExpectedRevision { get; set; }
     public string Json { get; set; } = string.Empty;
 }
 
@@ -19,7 +18,6 @@ public sealed class UpdateChallengeConfigurationValidator
 {
     public UpdateChallengeConfigurationValidator()
     {
-        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
         RuleFor(request => request.Json).NotEmpty();
     }
 }
@@ -40,7 +38,7 @@ public sealed class UpdateChallengeConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Updates a competition challenge's game-mode configuration.";
-            summary.Description = "Validates and replaces versioned challenge configuration JSON using optimistic concurrency.";
+            summary.Description = "Validates and replaces challenge configuration JSON.";
         });
     }
 
@@ -56,7 +54,6 @@ public sealed class UpdateChallengeConfigurationEndpoint(
         var result = await update.ExecuteAsync(
             competitionId,
             Route<Guid>("competitionChallengeId"),
-            request.ExpectedRevision,
             request.Json,
             DateTimeOffset.UtcNow,
             ct);
@@ -64,7 +61,7 @@ public sealed class UpdateChallengeConfigurationEndpoint(
             return TypedResults.NotFound();
         if (!result.Succeeded)
         {
-            var status = result.FailureCode is ChallengeConfigurationFailureCode.ConfigurationConflict or ChallengeConfigurationFailureCode.ConfigurationLocked
+            var status = result.FailureCode is ChallengeConfigurationFailureCode.ConfigurationLocked
                 ? StatusCodes.Status409Conflict
                 : StatusCodes.Status400BadRequest;
             return TypedResults.Problem(

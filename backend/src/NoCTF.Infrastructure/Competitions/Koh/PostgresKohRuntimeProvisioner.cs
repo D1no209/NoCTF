@@ -126,7 +126,6 @@ public sealed class PostgresKohRuntimeProvisioner(
                 cleanupTarget.State = RuntimeState.Stopping;
                 cleanupTarget.FailureCode = null;
                 cleanupTarget.RunnerAssignmentReleaseToken = null;
-                cleanupTarget.ProcessingVersion = checked(cleanupTarget.ProcessingVersion + 1);
                 runtime = new RuntimeInstance
                 {
                     Id = Guid.CreateVersion7(createdAt),
@@ -144,8 +143,7 @@ public sealed class PostgresKohRuntimeProvisioner(
                 };
                 await RecordStateAsync(events, cleanupTarget, CompetitionEventLevel.Warning,
                     createdAt, cancellationToken);
-                await outbox.PublishAsync(new StopRuntime(
-                    cleanupTarget.Id, cleanupTarget.ProcessingVersion));
+                await outbox.PublishAsync(new StopRuntime(cleanupTarget.Id));
                 deferredCleanup = true;
             }
             else
@@ -164,7 +162,7 @@ public sealed class PostgresKohRuntimeProvisioner(
                     State = RuntimeState.Queued,
                     CreatedAt = createdAt
                 };
-                await outbox.PublishAsync(new DispatchRuntime(runtime.Id, runtime.ProcessingVersion));
+                await outbox.PublishAsync(new DispatchRuntime(runtime.Id));
             }
             db.RuntimeInstances.Add(runtime);
             await RecordCreatedAsync(events, runtime, createdAt, cancellationToken);

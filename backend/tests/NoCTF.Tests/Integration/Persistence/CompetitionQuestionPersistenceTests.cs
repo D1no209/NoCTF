@@ -43,7 +43,7 @@ public sealed class CompetitionQuestionPersistenceTests
             var ids = new TestIds();
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(ct);
+                await setup.Database.EnsureCreatedAsync(ct);
                 setup.Users.AddRange(
                     Human(ids.AdministratorId, "administrator", UserRole.Administrator, now),
                     Human(ids.OwnerId, "competition-owner", UserRole.Organizer, now),
@@ -166,7 +166,6 @@ public sealed class CompetitionQuestionPersistenceTests
                 created.Question.Id,
                 ids.AuthorId,
                 "Use the HTTP service port, not the internal metrics port.",
-                0,
                 now.AddSeconds(1)), ct);
             await Assert.That(replied.Question!.Status)
                 .IsEqualTo(CompetitionQuestionStatus.Replied);
@@ -190,7 +189,6 @@ public sealed class CompetitionQuestionPersistenceTests
                 created.Question.Id,
                 ids.AskerId,
                 CompetitionQuestionStatus.Resolved,
-                replied.Question.Revision,
                 now.AddSeconds(2)), ct);
             await Assert.That(resolved.Question!.Status)
                 .IsEqualTo(CompetitionQuestionStatus.Resolved);
@@ -201,7 +199,6 @@ public sealed class CompetitionQuestionPersistenceTests
                 created.Question.Id,
                 ids.AskerId,
                 "The same issue returns after a runtime reset.",
-                resolved.Question.Revision,
                 now.AddSeconds(3)), ct);
             await Assert.That(reopened.Question!.Status)
                 .IsEqualTo(CompetitionQuestionStatus.Pending);
@@ -212,7 +209,6 @@ public sealed class CompetitionQuestionPersistenceTests
                 created.Question.Id,
                 ids.ManagerId,
                 "After reset, wait for the replacement instance to become Ready.",
-                reopened.Question.Revision,
                 now.AddSeconds(4)), ct);
             db.ChangeTracker.Clear();
             var stillPrivate = await store.FindAsync(
@@ -223,30 +219,19 @@ public sealed class CompetitionQuestionPersistenceTests
             await Assert.That(stillPrivate).IsNull();
             db.ChangeTracker.Clear();
 
-            var stale = await store.ChangeStatusAsync(new(
-                ids.CompetitionId,
-                created.Question.Id,
-                ids.ManagerId,
-                CompetitionQuestionStatus.Closed,
-                secondReply.Question!.Revision - 1,
-                now.AddSeconds(6)), ct);
-            await Assert.That(stale.Failure)
-                .IsEqualTo(CompetitionQuestionFailure.RevisionConflict);
-            db.ChangeTracker.Clear();
             var closed = await store.ChangeStatusAsync(new(
                 ids.CompetitionId,
                 created.Question.Id,
                 ids.ManagerId,
                 CompetitionQuestionStatus.Closed,
-                secondReply.Question.Revision,
-                now.AddSeconds(7)), ct);
+                now.AddSeconds(6)), ct);
+            await Assert.That(closed.Failure).IsNull();
             db.ChangeTracker.Clear();
             var terminal = await store.AddMessageAsync(new(
                 ids.CompetitionId,
                 created.Question.Id,
                 ids.AskerId,
                 "This must not be accepted.",
-                closed.Question!.Revision,
                 now.AddSeconds(8)), ct);
             await Assert.That(terminal.Failure)
                 .IsEqualTo(CompetitionQuestionFailure.QuestionClosed);

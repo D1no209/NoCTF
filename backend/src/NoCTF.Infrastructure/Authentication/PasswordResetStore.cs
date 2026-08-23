@@ -194,11 +194,15 @@ public sealed class PasswordResetStore(
 
     private async Task AcquireUserLockAsync(Guid userId, CancellationToken ct)
     {
-        var user = await db.Users.SingleOrDefaultAsync(
-            candidate => candidate.Id == userId,
-            ct);
-        if (user is not null)
-            user.ConcurrencyVersion = checked(user.ConcurrencyVersion + 1);
+        if (!db.Database.IsRelational())
+        {
+            _ = await db.Users.SingleOrDefaultAsync(candidate => candidate.Id == userId, ct);
+            return;
+        }
+
+        _ = await db.Users
+            .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
+            .SingleOrDefaultAsync(ct);
     }
 
     private static byte[] HashToken(string token) =>

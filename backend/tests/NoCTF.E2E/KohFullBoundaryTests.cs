@@ -50,7 +50,6 @@ public sealed class KohFullBoundaryTests
             $"/api/v1/admin/competitions/{competitionId}/configuration",
             new
             {
-                expectedRevision = 0,
                 json = JsonSerializer.Serialize(new
                 {
                     schemaVersion = 1,
@@ -84,26 +83,24 @@ public sealed class KohFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
-        var challengeRevision = challenge.GetProperty("revision").GetInt32();
         var configuration = JsonSerializer.Serialize(new
         {
             schemaVersion = 1,
             pollIntervalSeconds = 2,
             controlPointsPerInterval = 10
         }, JsonOptions);
-        var configured = await SendJsonAsync(
+        await SendJsonAsync(
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration",
-            new { expectedRevision = challengeRevision, json = configuration },
+            new { json = configuration },
             HttpStatusCode.OK,
             cancellationToken);
-        challengeRevision = configured.GetProperty("revision").GetInt32();
         await SendJsonAsync(
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, baseScore = 0, order = 0, isPublished = true, expectedRevision = challengeRevision },
+            new { customTitle = (string?)null, baseScore = 0, order = 0, isPublished = true },
             HttpStatusCode.OK,
             cancellationToken);
 

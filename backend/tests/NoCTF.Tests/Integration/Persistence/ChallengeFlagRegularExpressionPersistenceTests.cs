@@ -136,7 +136,6 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
                 null,
                 "Web",
                 dynamicDefinition,
-                0,
                 now.AddMinutes(1)), ct);
 
             await Assert.That(blocked.State)
@@ -178,7 +177,6 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
                 null,
                 "Web",
                 dynamicDefinition,
-                0,
                 now.AddMinutes(3)), ct);
             await using var restoreDb = new NoCtfDbContext(options);
             var restored = await new ManageChallengeFlags(new ChallengeFlagManagementStore(restoreDb)).RestoreAsync(

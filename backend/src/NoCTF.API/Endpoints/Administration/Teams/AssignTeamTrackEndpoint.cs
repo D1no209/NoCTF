@@ -8,22 +8,18 @@ using NoCTF.Application.Teams.Moderation;
 
 namespace NoCTF.API.Endpoints.Administration.Teams;
 
-public sealed record AssignTeamTrackRequest(
-    string TrackKey,
-    long ExpectedTeamVersion);
+public sealed record AssignTeamTrackRequest(string TrackKey);
 
 public sealed record AssignTeamTrackResponse(
     Guid CompetitionId,
     Guid TeamId,
-    string TrackKey,
-    long TeamVersion);
+    string TrackKey);
 
 public sealed class AssignTeamTrackValidator : Validator<AssignTeamTrackRequest>
 {
     public AssignTeamTrackValidator()
     {
         RuleFor(request => request.TrackKey).NotEmpty().MaximumLength(64);
-        RuleFor(request => request.ExpectedTeamVersion).GreaterThanOrEqualTo(0);
     }
 }
 
@@ -66,7 +62,6 @@ public sealed class AssignTeamTrackEndpoint(
             competitionId,
             teamId,
             request.TrackKey,
-            request.ExpectedTeamVersion,
             user.UserId,
             DateTimeOffset.UtcNow), cancellationToken);
         if (result.FailureCode is CompetitionTrackFailureCode.CompetitionNotFound
@@ -79,7 +74,6 @@ public sealed class AssignTeamTrackEndpoint(
         return TypedResults.Ok(new AssignTeamTrackResponse(
             result.Value!.CompetitionId,
             result.Value.TeamId,
-            result.Value.TrackKey,
-            result.Value.TeamVersion));
+            result.Value.TrackKey));
     }
 }

@@ -66,8 +66,6 @@ internal static class GameplayFactAdmissionPersistence
             scope.Team.Id,
             competitionChallengeId,
             scope.Competition.Mode,
-            scope.Competition.ConfigurationRevision,
-            scope.CompetitionChallenge.Revision,
             scope.Competition.ConfigurationJson,
             scope.CompetitionChallenge.RulesJson,
             attempts.GetValueOrDefault(GameplayFactKind.FlagAttempt)
@@ -94,8 +92,6 @@ internal static class GameplayFactAdmissionPersistence
         && current.CompetitionId == expected.CompetitionId
         && current.TeamId == expected.TeamId
         && current.CompetitionChallengeId == expected.CompetitionChallengeId
-        && current.CompetitionConfigurationRevision == expected.CompetitionConfigurationRevision
-        && current.ChallengeConfigurationRevision == expected.ChallengeConfigurationRevision
         && current.CompetitionStatus == expected.CompetitionStatus
         && current.CompetitionDeleted == expected.CompetitionDeleted
         && current.ChallengeDeleted == expected.ChallengeDeleted

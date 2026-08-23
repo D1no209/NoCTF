@@ -54,18 +54,11 @@ async function save(): Promise<void> {
     body: {
       name: name.value.trim(),
       description: description.value.trim() || null,
-      expectedRevision: configuration.value.revision ?? 0,
     },
   })
   saving.value = false
   if (error) {
-    if (isRevisionConflict(error)) {
-      toast.error(translate("配置已被他人修改,请刷新后重试"))
-      await load()
-    }
-    else {
-      toast.error(parseApiError(error).message)
-    }
+    toast.error(parseApiError(error).message)
     return
   }
   configuration.value = data ?? configuration.value
@@ -80,17 +73,11 @@ async function uploadLogo(event: Event): Promise<void> {
   if (!file || !configuration.value) return
   logoUploading.value = true
   const { data, error } = await adminPlatformUploadLogo({
-    body: { file, expectedRevision: configuration.value.revision ?? 0 },
+    body: { file },
   })
   logoUploading.value = false
   if (error) {
-    if (isRevisionConflict(error)) {
-      toast.error(translate("配置已被他人修改,请刷新后重试"))
-      await load()
-    }
-    else {
-      toast.error(parseApiError(error).message)
-    }
+    toast.error(parseApiError(error).message)
     return
   }
   if (data) {
@@ -143,7 +130,7 @@ onMounted(() => {
       <Card>
         <CardHeader>
           <CardTitle>{{ $t('平台配置') }}</CardTitle>
-          <CardDescription>{{ $t('平台名称、描述与 Logo（修订版本 {revision}）', { revision: configuration?.revision ?? 0 }) }}</CardDescription>
+          <CardDescription>{{ $t('平台名称、描述与 Logo') }}</CardDescription>
         </CardHeader>
         <CardContent>
           <form @submit.prevent="save">

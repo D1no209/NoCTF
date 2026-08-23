@@ -43,7 +43,6 @@ public sealed class RuntimeProviderHandler(
                     cancellationToken);
             return new RuntimeProvisionFailed(
                 message.RuntimeInstanceId,
-                message.ProcessingVersion,
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
@@ -80,7 +79,6 @@ public sealed class RuntimeProviderHandler(
             if (expanded is not null)
                 return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
-                    message.ProcessingVersion,
                     message.Generation,
                     runnerOptions.Value.Id,
                     receipt.Provider,
@@ -271,7 +269,6 @@ public sealed class RuntimeProviderHandler(
                     cancellationToken);
             return new RuntimeProvisionFailed(
                 message.RuntimeInstanceId,
-                message.ProcessingVersion,
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
@@ -309,7 +306,6 @@ public sealed class RuntimeProviderHandler(
                 if (expanded is not null)
                     return new RuntimeProvisioned(
                         message.RuntimeInstanceId,
-                        message.ProcessingVersion,
                         message.Generation,
                         runnerOptions.Value.Id,
                         receipt.Provider,
@@ -414,7 +410,6 @@ public sealed class RuntimeProviderHandler(
                     cancellationToken);
             return new RuntimeProvisionFailed(
                 message.RuntimeInstanceId,
-                message.ProcessingVersion,
                 RuntimeFailureCode.RunnerUnavailable,
                 message.RunnerId);
         }
@@ -442,7 +437,6 @@ public sealed class RuntimeProviderHandler(
             if (expanded is not null)
                 return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
-                    message.ProcessingVersion,
                     message.Generation,
                     runnerOptions.Value.Id,
                     receipt.Provider,
@@ -550,7 +544,6 @@ public sealed class RuntimeProviderHandler(
         await ReleaseCapacityOrThrowAsync(message, cancellationToken);
         return new RuntimeProvisionTerminated(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
             message.RunnerId,
@@ -569,7 +562,6 @@ public sealed class RuntimeProviderHandler(
         await ReleaseCapacityOrThrowAsync(message, cancellationToken);
         return new RuntimeProvisionCanceled(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             message.Generation,
             message.RunnerPool,
             message.RunnerId);
@@ -602,7 +594,6 @@ public sealed class RuntimeProviderHandler(
         RuntimeStopWork? work) =>
         new(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             work is { Generation: > 0 } ? work.Generation : message.Generation,
             message.RunnerPool,
             message.RunnerId);
@@ -612,7 +603,6 @@ public sealed class RuntimeProviderHandler(
         RuntimeStopWork? work) =>
         new(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             work is { Generation: > 0 } ? work.Generation : message.Generation,
             message.RunnerPool,
             message.RunnerId,
@@ -623,7 +613,6 @@ public sealed class RuntimeProviderHandler(
         DateTimeOffset completedAt) =>
         new(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             message.Generation,
             message.RunnerId,
             message.ActorUserId,
@@ -638,7 +627,6 @@ public sealed class RuntimeProviderHandler(
         RuntimeCleanupResult result) =>
         new(
             message.RuntimeInstanceId,
-            message.ProcessingVersion,
             message.Generation,
             message.RunnerId,
             message.ActorUserId,
@@ -731,15 +719,13 @@ public static class RuntimeWriteBackHandler
             await ReplacePublishedPortsAsync(
                 instance, message, events, DateTimeOffset.UtcNow, cancellationToken);
             instance.RunnerAssignmentReleaseToken = null;
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
         }
-        if (instance.ProcessingVersion != message.ProcessingVersion
-            || instance.State != RuntimeState.Provisioning
+        if (instance.State != RuntimeState.Provisioning
             || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
             || instance.RuntimeProvider != message.Provider)
@@ -755,7 +741,6 @@ public static class RuntimeWriteBackHandler
             instance.ParticipantUrlIndexes = [];
             instance.ControlCheckUrl = null;
             instance.State = RuntimeState.Stopping;
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await RecordRuntimeStateAsync(
@@ -780,7 +765,6 @@ public static class RuntimeWriteBackHandler
         instance.State = RuntimeState.Running;
         instance.RunningAt = runningAt;
         instance.ExpiresAt = message.ExpiresAt;
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await ActivateAwdpAttackFlagAsync(db, instance, runningAt, cancellationToken);
         await ReplacePublishedPortsAsync(
             instance, message, events, runningAt, cancellationToken);
@@ -809,7 +793,6 @@ public static class RuntimeWriteBackHandler
                 instance.CompetitionChallengeId,
                 currentAwdFlag.Id,
                 instance.Generation,
-                instance.ProcessingVersion,
                 currentAwdFlag.ValidUntil!.Value,
                 instance.RunnerPool,
                 instance.RunnerId));
@@ -835,7 +818,6 @@ public static class RuntimeWriteBackHandler
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || instance.ProcessingVersion != message.ProcessingVersion
             || instance.State != RuntimeState.Provisioning
             || !string.Equals(
                 instance.RunnerId,
@@ -864,15 +846,13 @@ public static class RuntimeWriteBackHandler
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || message.ProvisionProcessingVersion == long.MaxValue
             || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
             || instance.ProviderReceiptJson is not null)
             return;
 
-        if (instance.State == RuntimeState.Provisioning
-            && instance.ProcessingVersion == message.ProvisionProcessingVersion)
+        if (instance.State == RuntimeState.Provisioning)
         {
             await PersistProvisionFailureAsync(
                 instance,
@@ -884,22 +864,18 @@ public static class RuntimeWriteBackHandler
             return;
         }
         if (instance.State != RuntimeState.Stopping
-            || instance.ProcessingVersion <= message.ProvisionProcessingVersion
             || instance.RunnerAssignmentReleaseToken is not null)
             return;
 
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                 && candidate.State == RuntimeState.Queued,
             cancellationToken);
         if (replacement is not null)
-            await outbox.PublishAsync(new DispatchRuntime(
-                replacement.Id,
-                replacement.ProcessingVersion));
+            await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -920,7 +896,6 @@ public static class RuntimeWriteBackHandler
     {
         instance.State = RuntimeState.Failed;
         instance.FailureCode = failureCode;
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
         if (instance.Purpose == RuntimePurpose.AwdpTarget
             && instance.GameplayFactId is Guid gameplayFactId)
@@ -961,7 +936,6 @@ public static class RuntimeWriteBackHandler
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || instance.ProcessingVersion != message.ProcessingVersion
             || instance.State != RuntimeState.Stopping
             || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
@@ -970,14 +944,13 @@ public static class RuntimeWriteBackHandler
 
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                 && candidate.State == RuntimeState.Queued,
             cancellationToken);
         if (replacement is not null)
-            await outbox.PublishAsync(new DispatchRuntime(replacement.Id, replacement.ProcessingVersion));
+            await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -1000,7 +973,6 @@ public static class RuntimeWriteBackHandler
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || instance.ProcessingVersion != message.ProcessingVersion
             || instance.State != RuntimeState.Stopping
             || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
@@ -1008,7 +980,6 @@ public static class RuntimeWriteBackHandler
 
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = message.CompletedAt;
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
@@ -1016,9 +987,7 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         if (replacement is not null)
         {
-            await outbox.PublishAsync(new DispatchRuntime(
-                replacement.Id,
-                replacement.ProcessingVersion));
+            await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
         }
         await events.RecordAsync(new(
             instance.CompetitionId,
@@ -1050,7 +1019,6 @@ public static class RuntimeWriteBackHandler
                 candidate => candidate.Id == message.RuntimeInstanceId,
                 cancellationToken);
         if (instance is null
-            || instance.ProcessingVersion != message.ProcessingVersion
             || instance.State != RuntimeState.Stopping
             || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
@@ -1084,7 +1052,6 @@ public static class RuntimeWriteBackHandler
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || instance.ProcessingVersion != message.ProcessingVersion
             || instance.State != RuntimeState.Stopping
             || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
@@ -1093,7 +1060,6 @@ public static class RuntimeWriteBackHandler
 
         instance.State = RuntimeState.Failed;
         instance.FailureCode = message.FailureCode;
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
@@ -1103,7 +1069,6 @@ public static class RuntimeWriteBackHandler
         {
             replacement.State = RuntimeState.Failed;
             replacement.FailureCode = message.FailureCode;
-            replacement.ProcessingVersion = checked(replacement.ProcessingVersion + 1);
             await RecordRuntimeStateAsync(
                 events,
                 replacement,
@@ -1132,9 +1097,7 @@ public static class RuntimeWriteBackHandler
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || message.ProvisionProcessingVersion == long.MaxValue
             || instance.State != RuntimeState.Stopping
-            || instance.ProcessingVersion <= message.ProvisionProcessingVersion
             || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
@@ -1144,16 +1107,13 @@ public static class RuntimeWriteBackHandler
 
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
-        instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
         var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
             candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
                 && candidate.State == RuntimeState.Queued,
             cancellationToken);
         if (replacement is not null)
-            await outbox.PublishAsync(new DispatchRuntime(
-                replacement.Id,
-                replacement.ProcessingVersion));
+            await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -1239,9 +1199,7 @@ public static class RuntimeWriteBackHandler
     private static bool IsLateProvisionSuccessAwaitingCleanup(
         RuntimeInstance instance,
         RuntimeProvisioned message) =>
-        message.ProcessingVersion < long.MaxValue
-        && instance.State == RuntimeState.Stopping
-        && instance.ProcessingVersion > message.ProcessingVersion
+        instance.State == RuntimeState.Stopping
         && instance.Generation == message.Generation
         && instance.ProviderReceiptJson is null
         && instance.RunnerAssignmentReleaseToken is null
@@ -1308,21 +1266,18 @@ public static class RuntimeWriteBackHandler
             RuntimeKind.Container => outbox.PublishToRunnerNodeAsync(
                 new StopContainerRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
                 new StopComposeRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     runnerId)),
             RuntimeKind.OvaVm => outbox.PublishToRunnerNodeAsync(
                 new StopOvaRuntime(
                     instance.Id,
-                    instance.ProcessingVersion,
                     instance.Generation,
                     instance.RunnerPool,
                     runnerId)),

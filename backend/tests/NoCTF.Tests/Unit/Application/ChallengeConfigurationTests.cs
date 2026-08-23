@@ -20,7 +20,6 @@ public class ChallengeConfigurationTests
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
             store.Current.CompetitionChallengeId,
-            0,
             ValidJson,
             DateTimeOffset.UtcNow);
 
@@ -39,7 +38,6 @@ public class ChallengeConfigurationTests
         var result = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
             store.Current.CompetitionChallengeId,
-            0,
             "{}",
             DateTimeOffset.UtcNow);
 
@@ -48,21 +46,27 @@ public class ChallengeConfigurationTests
     }
 
     [Test]
-    public async Task UpdateChallengeConfiguration_RevisionChanged_ReturnsConflict()
+    public async Task UpdateChallengeConfiguration_RepeatedWritesUseLastValue()
     {
-        var store = new Store(View(CompetitionStatus.Published)) { Conflict = true };
+        var store = new Store(View(CompetitionStatus.Published));
         var useCase = new UpdateChallengeConfiguration(
             store,
             new Catalog());
 
-        var result = await useCase.ExecuteAsync(
+        var first = await useCase.ExecuteAsync(
             store.Current!.CompetitionId,
             store.Current.CompetitionChallengeId,
-            4,
             ValidJson,
             DateTimeOffset.UtcNow);
+        var second = await useCase.ExecuteAsync(
+            store.Current!.CompetitionId,
+            store.Current.CompetitionChallengeId,
+            "{\"schemaVersion\":1,\"flagPrefix\":\"latest\"}",
+            DateTimeOffset.UtcNow.AddSeconds(1));
 
-        await Assert.That(result.FailureCode).IsEqualTo(ChallengeConfigurationFailureCode.ConfigurationConflict);
+        await Assert.That(first.Succeeded).IsTrue();
+        await Assert.That(second.Succeeded).IsTrue();
+        await Assert.That(store.Current!.Json).Contains("latest");
     }
 
     [Test]
@@ -75,7 +79,6 @@ public class ChallengeConfigurationTests
         var result = await useCase.ExecuteAsync(
             current.CompetitionId,
             current.CompetitionChallengeId,
-            current.Revision,
             ValidJson,
             DateTimeOffset.UtcNow);
 
@@ -91,16 +94,13 @@ public class ChallengeConfigurationTests
         GameMode.Ctf,
         ValidJson,
         ValidJson,
-        0,
-        4,
         status,
         2,
         DateTimeOffset.UtcNow);
 
     private sealed class Store(ChallengeConfigurationView? current) : IChallengeConfigurationStore
     {
-        public ChallengeConfigurationView? Current { get; } = current;
-        public bool Conflict { get; init; }
+        public ChallengeConfigurationView? Current { get; private set; } = current;
         public int UpdateCalls { get; private set; }
 
         public Task<ChallengeConfigurationView?> FindAsync(
@@ -111,16 +111,17 @@ public class ChallengeConfigurationTests
         public Task<ChallengeConfigurationUpdateResult> TryUpdateAsync(
             Guid competitionId,
             Guid challengeId,
-            int expectedRevision,
-            int expectedCompetitionConfigurationRevision,
             string json,
             DateTimeOffset updatedAt,
             CancellationToken cancellationToken)
         {
             UpdateCalls++;
-            return Task.FromResult(Conflict || Current is null
-                ? new ChallengeConfigurationUpdateResult(null, ChallengeConfigurationUpdateFailure.RevisionConflict)
-                : new ChallengeConfigurationUpdateResult(Current with { Json = json, Revision = expectedRevision + 1, UpdatedAt = updatedAt }));
+            Current = Current is null
+                ? null
+                : Current with { Json = json, UpdatedAt = updatedAt };
+            return Task.FromResult(Current is null
+                ? new ChallengeConfigurationUpdateResult(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound)
+                : new ChallengeConfigurationUpdateResult(Current));
         }
     }
 

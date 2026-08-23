@@ -64,7 +64,7 @@ describe('competition track pages', () => {
     expect(admin).toContain('需要填写邀请码')
     expect(admin).toContain('error.value = competitionTrackErrorMessage')
     expect(teams).toContain('adminTeamTrackAssign')
-    expect(teams).toContain('expectedTeamVersion: team.concurrencyVersion ?? 0')
+    expect(teams).toContain('body: { trackKey }')
     expect(teams).not.toContain('tracksFrozen.value || team.trackKey === trackKey')
   })
 

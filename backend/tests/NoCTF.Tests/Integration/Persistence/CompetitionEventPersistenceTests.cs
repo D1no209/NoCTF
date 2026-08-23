@@ -40,7 +40,7 @@ public sealed class CompetitionEventPersistenceTests
             var ids = new TestIds();
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(ct);
+                await setup.Database.EnsureCreatedAsync(ct);
                 setup.Users.AddRange(
                     Human(ids.AdministratorId, "administrator", UserRole.Administrator, now),
                     Human(ids.OwnerId, "owner", UserRole.Organizer, now),

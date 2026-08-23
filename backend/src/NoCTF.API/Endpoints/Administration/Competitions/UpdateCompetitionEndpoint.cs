@@ -54,7 +54,7 @@ public sealed class UpdateCompetitionEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Updates competition metadata.";
-            summary.Description = "Updates mutable competition metadata using the current lifecycle state as the concurrency fence.";
+            summary.Description = "Updates mutable competition metadata while preserving lifecycle constraints.";
         });
     }
 

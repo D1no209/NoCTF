@@ -75,9 +75,6 @@ public sealed class RuntimeInstance
     public RuntimePurpose Purpose { get; set; }
     public Guid? GameplayFactId { get; set; }
     public AwdpFixStage? AwdpFixStage { get; set; }
-    public int SourceCompetitionConfigurationRevision { get; set; }
-    public int SourceCompetitionChallengeRevision { get; set; }
-    public int SourceChallengeDefinitionRevision { get; set; }
     public int Generation { get; set; }
     public RuntimeKind RuntimeKind { get; set; }
     public RuntimeProvider RuntimeProvider { get; set; }
@@ -89,7 +86,6 @@ public sealed class RuntimeInstance
     public RuntimeState State { get; set; }
     public RuntimeFailureCode? FailureCode { get; set; }
     public DateTimeOffset? RunnerUnavailableAt { get; set; }
-    public long ProcessingVersion { get; set; }
     public Guid? ReplacesRuntimeInstanceId { get; set; }
     public string? ProviderReceiptJson { get; set; }
     public string[] Urls { get; set; } = [];

@@ -165,7 +165,6 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     cleanupTarget.State = RuntimeState.Stopping;
                     cleanupTarget.FailureCode = null;
                     cleanupTarget.RunnerAssignmentReleaseToken = null;
-                    cleanupTarget.ProcessingVersion = checked(cleanupTarget.ProcessingVersion + 1);
                     var replacement = new RuntimeInstance
                     {
                         Id = Guid.CreateVersion7(createdAt),
@@ -186,8 +185,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     await RecordCreatedAsync(events, replacement, createdAt, cancellationToken);
                     await RecordStateAsync(events, cleanupTarget, CompetitionEventLevel.Warning,
                         createdAt, cancellationToken);
-                    await outbox.PublishAsync(new StopRuntime(
-                        cleanupTarget.Id, cleanupTarget.ProcessingVersion));
+                    await outbox.PublishAsync(new StopRuntime(cleanupTarget.Id));
                 }
                 await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
@@ -222,7 +220,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
                 continue;
             foreach (var runtime in created)
             {
-                await outbox.PublishAsync(new DispatchRuntime(runtime.Id, runtime.ProcessingVersion));
+                await outbox.PublishAsync(new DispatchRuntime(runtime.Id));
                 await RecordCreatedAsync(events, runtime, createdAt, cancellationToken);
             }
             await db.SaveChangesAsync(cancellationToken);

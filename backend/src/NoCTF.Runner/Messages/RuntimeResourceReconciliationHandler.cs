@@ -86,7 +86,6 @@ public sealed class RuntimeResourceReconciliationHandler(
             instance.RunnerId = null;
             instance.RunnerAssignmentReleaseToken = null;
             instance.RunnerUnavailableAt = null;
-            instance.ProcessingVersion = checked(instance.ProcessingVersion + 1);
             await db.SaveChangesAsync(cancellationToken);
         }
 

@@ -96,7 +96,6 @@ public sealed record RuntimeResponse(
     RuntimeProviderProtocol Provider,
     RuntimeStateProtocol State,
     RuntimeFailureCodeProtocol? FailureCode,
-    long ProcessingVersion,
     IReadOnlyList<string> Urls,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
@@ -122,7 +121,6 @@ internal static class RuntimeEndpointMapping
             view.FailureCode is null
                 ? null
                 : RuntimeProtocolMapper.ToProtocol(view.FailureCode.Value),
-            view.ProcessingVersion,
             view.State == RuntimeState.Running ? view.Urls : [],
             view.CreatedAt,
             view.RunningAt,

@@ -83,8 +83,7 @@ public sealed class CompetitionVisibilityTests
             CompetitionLeaderboardVisibility.Normal,
             CompetitionLeaderboardVisibility.Normal,
             null,
-            null,
-            3);
+            null);
 
     private static UpdateCompetitionVisibilityCommand Command(
         DateTimeOffset now,
@@ -93,7 +92,6 @@ public sealed class CompetitionVisibilityTests
             Guid.CreateVersion7(),
             CompetitionLeaderboardVisibility.Frozen,
             startsAt,
-            3,
             Guid.CreateVersion7(),
             null,
             now);
@@ -121,7 +119,7 @@ public sealed class CompetitionVisibilityTests
 
         public Task ApplyScheduledAsync(
             Guid competitionId,
-            int expectedRevision,
+            DateTimeOffset scheduledAt,
             DateTimeOffset now,
             CancellationToken cancellationToken) => Task.CompletedTask;
     }

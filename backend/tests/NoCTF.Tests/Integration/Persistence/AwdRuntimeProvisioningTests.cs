@@ -191,7 +191,6 @@ public sealed class AwdRuntimeProvisioningTests
                     RunnerAssignmentReleaseToken = Guid.CreateVersion7(),
                     State = RuntimeState.Failed,
                     FailureCode = RuntimeFailureCode.ProviderUnavailable,
-                    ProcessingVersion = initialVersions[teamId],
                     ProviderReceiptJson = JsonSerializer.Serialize(new { teamId }),
                     CreatedAt = fixture.Now
                 });
@@ -225,8 +224,6 @@ public sealed class AwdRuntimeProvisioningTests
                 await Assert.That(old.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(old.FailureCode).IsNull();
                 await Assert.That(old.RunnerAssignmentReleaseToken).IsNull();
-                await Assert.That(old.ProcessingVersion)
-                    .IsEqualTo(checked(initialVersions[teamId] + 1));
                 await Assert.That(replacement.State).IsEqualTo(RuntimeState.Queued);
                 await Assert.That(replacement.ReplacesRuntimeInstanceId).IsEqualTo(old.Id);
             }
@@ -247,7 +244,6 @@ public sealed class AwdRuntimeProvisioningTests
             await RuntimeWriteBackHandler.Handle(
                 new RuntimeStopped(
                     acknowledgedOld.Id,
-                    acknowledgedOld.ProcessingVersion,
                     acknowledgedOld.Generation,
                     acknowledgedOld.RunnerPool,
                     acknowledgedOld.RunnerId!),
@@ -257,7 +253,6 @@ public sealed class AwdRuntimeProvisioningTests
             await RuntimeWriteBackHandler.Handle(
                 new RuntimeStopFailed(
                     failedOld.Id,
-                    failedOld.ProcessingVersion,
                     failedOld.Generation,
                     failedOld.RunnerPool,
                     failedOld.RunnerId!,
@@ -275,9 +270,6 @@ public sealed class AwdRuntimeProvisioningTests
                 .ToListAsync(cancellationToken);
             await Assert.That(failedPair.All(runtime => runtime.State == RuntimeState.Failed
                 && runtime.FailureCode == RuntimeFailureCode.CleanupFailed)).IsTrue();
-            var failedVersionBeforeRetry = failedPair.Single(runtime => runtime.Id == failedOld.Id)
-                .ProcessingVersion;
-
             var retryOutbox = new RecordingOutbox();
             var retry = await new PostgresAwdRuntimeProvisioner(
                 db,
@@ -300,8 +292,6 @@ public sealed class AwdRuntimeProvisioningTests
             await Assert.That(retriedOld.State).IsEqualTo(RuntimeState.Stopping);
             await Assert.That(retriedOld.FailureCode).IsNull();
             await Assert.That(retriedOld.RunnerAssignmentReleaseToken).IsNull();
-            await Assert.That(retriedOld.ProcessingVersion)
-                .IsEqualTo(checked(failedVersionBeforeRetry + 1));
             await Assert.That(retriedReplacement.State).IsEqualTo(RuntimeState.Queued);
             await Assert.That(retriedReplacement.ReplacesRuntimeInstanceId).IsEqualTo(failedOld.Id);
             await Assert.That(retryOutbox.Published.OfType<StopRuntime>()
@@ -429,7 +419,6 @@ public sealed class AwdRuntimeProvisioningTests
             CompetitionId = competitionId,
             ChallengeId = challengeId,
             IsPublished = true,
-            Revision = 3,
             RulesJson = JsonSerializer.Serialize(
                 new AwdChallengeConfiguration(
                     AwdChallengeConfiguration.CurrentSchemaVersion),

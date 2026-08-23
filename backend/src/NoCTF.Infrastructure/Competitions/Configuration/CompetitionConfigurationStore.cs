@@ -18,7 +18,6 @@ public sealed class CompetitionConfigurationStore(
                 competition.Id,
                 competition.Mode,
                 competition.ConfigurationJson,
-                competition.ConfigurationRevision,
                 competition.Status,
                 db.Teams.Count(team => team.CompetitionId == competition.Id
                     && team.RegistrationStatus == TeamRegistrationStatus.Approved
@@ -28,17 +27,15 @@ public sealed class CompetitionConfigurationStore(
                     .Where(challenge => challenge.CompetitionId == competition.Id && challenge.DeletedAt == null)
                     .OrderBy(challenge => challenge.Id)
                     .Select(challenge => new CompetitionChallengeConfigurationSnapshot(
-                        challenge.Id, challenge.Revision, challenge.RulesJson))
+                        challenge.Id, challenge.RulesJson))
                     .ToArray(),
                 competition.ConfigurationUpdatedAt))
             .SingleOrDefaultAsync(ct);
 
     public async Task<CompetitionConfigurationUpdateResult> TryUpdateAsync(
         Guid competitionId,
-        int expectedRevision,
         string json,
         bool allowWhileRunning,
-        IReadOnlyDictionary<Guid, int> expectedChallengeRevisions,
         DateTimeOffset now,
         CancellationToken ct)
     {
@@ -49,42 +46,31 @@ public sealed class CompetitionConfigurationStore(
             .Where(competition => competition.Id == competitionId)
             .Select(competition => competition.Mode)
             .SingleAsync(ct);
-        var currentChallengeRevisions = await db.CompetitionChallenges.AsNoTracking()
-            .Where(challenge => challenge.CompetitionId == competitionId && challenge.DeletedAt == null)
-            .Select(challenge => new { challenge.Id, challenge.Revision })
-            .ToListAsync(ct);
-        if (currentChallengeRevisions.Count != expectedChallengeRevisions.Count
-            || currentChallengeRevisions.Any(challenge =>
-                !expectedChallengeRevisions.TryGetValue(challenge.Id, out var revision)
-                || revision != challenge.Revision))
-            return new(null, CompetitionConfigurationUpdateFailure.RevisionConflict);
         int changed;
         if (db.Database.IsRelational())
         {
             changed = await db.Competitions
-                .Where(x => x.Id == competitionId && x.ConfigurationRevision == expectedRevision)
+                .Where(x => x.Id == competitionId)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(x => x.ConfigurationJson, json)
-                    .SetProperty(x => x.ConfigurationRevision, expectedRevision + 1)
                     .SetProperty(x => x.LeaderboardDirty, true)
                     .SetProperty(x => x.ConfigurationUpdatedAt, now), ct);
         }
         else
         {
             // EF Core InMemory does not support ExecuteUpdateAsync; apply the same
-            // optimistic-concurrency update through the change tracker.
+            // last-write-wins update through the change tracker.
             var tracked = await db.Competitions.SingleOrDefaultAsync(
-                x => x.Id == competitionId && x.ConfigurationRevision == expectedRevision, ct);
+                x => x.Id == competitionId, ct);
             if (tracked is not null)
             {
                 tracked.ConfigurationJson = json;
-                tracked.ConfigurationRevision = expectedRevision + 1;
                 tracked.LeaderboardDirty = true;
                 tracked.ConfigurationUpdatedAt = now;
             }
             changed = tracked is null ? 0 : 1;
         }
-        if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.RevisionConflict);
+        if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
         if (mode == GameMode.Awd && status == CompetitionStatus.Running)
         {
             if (db.Database.IsRelational())
@@ -116,16 +102,14 @@ public sealed class CompetitionConfigurationStore(
                 .Where(challenge => challenge.CompetitionId == competitionId
                     && challenge.IsPublished
                     && challenge.DeletedAt == null)
-                .Select(challenge => new { challenge.Id, challenge.Revision })
+                .Select(challenge => challenge.Id)
                 .ToListAsync(ct);
-            foreach (var challenge in challenges)
+            foreach (var challengeId in challenges)
             {
                 await outbox.PublishAsync(new AdvanceAwdRound(
                     competitionId,
-                    challenge.Id,
-                    now,
-                    checked(expectedRevision + 1),
-                    challenge.Revision));
+                    challengeId,
+                    now));
             }
         }
         if (!db.Database.IsRelational())

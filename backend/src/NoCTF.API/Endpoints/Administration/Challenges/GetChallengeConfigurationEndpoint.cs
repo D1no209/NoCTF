@@ -13,7 +13,6 @@ public sealed record ChallengeConfigurationResponse(
     Guid CompetitionChallengeId,
     GameModeProtocol Mode,
     string Json,
-    int Revision,
     CompetitionStatusProtocol CompetitionStatus,
     DateTimeOffset UpdatedAt);
 
@@ -25,7 +24,6 @@ internal static class ChallengeConfigurationMapping
             view.CompetitionChallengeId,
             CompetitionProtocolMapper.ToProtocol(view.Mode),
             view.Json,
-            view.Revision,
             CompetitionProtocolMapper.ToProtocol(view.CompetitionStatus),
             view.UpdatedAt);
 }
@@ -45,7 +43,7 @@ public sealed class GetChallengeConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Gets a competition challenge's game-mode configuration.";
-            summary.Description = "Returns the versioned challenge configuration JSON visible to competition administrators.";
+            summary.Description = "Returns the challenge configuration JSON visible to competition administrators.";
         });
     }
 

@@ -13,8 +13,7 @@ public sealed record CompetitionLeaderboardVisibilityResponse(
     LeaderboardVisibilityProtocol ConfiguredVisibility,
     LeaderboardVisibilityProtocol EffectiveVisibility,
     DateTimeOffset? StartsAt,
-    DateTimeOffset? AppliedAt,
-    int Revision);
+    DateTimeOffset? AppliedAt);
 
 internal static class CompetitionLeaderboardVisibilityMapper
 {
@@ -25,8 +24,7 @@ internal static class CompetitionLeaderboardVisibilityMapper
             CompetitionProtocolMapper.ToProtocol(view.ConfiguredVisibility),
             CompetitionProtocolMapper.ToProtocol(view.EffectiveVisibility),
             view.StartsAt,
-            view.AppliedAt,
-            view.Revision);
+            view.AppliedAt);
 }
 
 public sealed class GetCompetitionLeaderboardVisibilityEndpoint(
@@ -46,7 +44,7 @@ public sealed class GetCompetitionLeaderboardVisibilityEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Gets the scheduled and effective leaderboard visibility policy.";
-            summary.Description = "Returns the revision-fenced Normal, Frozen, or Blackout configuration for a competition.";
+            summary.Description = "Returns the Normal, Frozen, or Blackout configuration for a competition.";
         });
     }
 

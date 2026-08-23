@@ -7,7 +7,8 @@
 
 - 工作分支：`codex/data-model-wolverine-simplification`
 - 基线提交：`8e366fbda160e24d5142d54f1151bf0024950dc1`
-- 当前阶段：阶段 0（治理、基线与 Wolverine 6.29.2 Spike）
+- 已完成：阶段 0、阶段 1
+- 当前阶段：阶段 2（核心实体和隐私模型）
 - 推送、部署、生产数据库和生产队列操作：未授权
 
 ## 强制阶段顺序

@@ -29,7 +29,6 @@ public sealed class AwdpFixVerificationRecoveryTests
         reader.ClaimAsync(message, Arg.Any<CancellationToken>()).Returns(new AwdpFixWorkClaim(
             AwdpFixExecutionFenceDisposition.Execute,
             new(
-                11,
                 new(
                     new Uri("https://api.example/fix"),
                     "archive-token",
@@ -82,7 +81,6 @@ public sealed class AwdpFixVerificationRecoveryTests
         await handler.Handle(message, CancellationToken.None);
 
         var result = outbox.Messages.OfType<AwdpFixResult>().Single();
-        await Assert.That(result.RuntimeProcessingVersion).IsEqualTo(11);
         await Assert.That(result.Outcome).IsEqualTo(AwdpFixOutcome.PlatformFailed);
     }
 
@@ -95,7 +93,6 @@ public sealed class AwdpFixVerificationRecoveryTests
         reader.ClaimAsync(message, Arg.Any<CancellationToken>()).Returns(new AwdpFixWorkClaim(
             AwdpFixExecutionFenceDisposition.Execute,
             new(
-                11,
                 new(
                     new Uri("https://api.example/fix"),
                     "archive-token",
@@ -197,7 +194,6 @@ public sealed class AwdpFixVerificationRecoveryTests
         await Assert.That(completion.GameplayFactId).IsEqualTo(context.Message.GameplayFactId);
         await Assert.That(completion.RuntimeInstanceId)
             .IsEqualTo(context.Message.RuntimeInstanceId);
-        await Assert.That(completion.RecoveryProcessingVersion).IsEqualTo(12);
     }
 
     [Test]
@@ -247,7 +243,6 @@ public sealed class AwdpFixVerificationRecoveryTests
                 message.GameplayFactId,
                 message.RuntimeInstanceId,
                 message.Generation,
-                12,
                 RuntimeProvider.Docker,
                 withReceipt
                     ? JsonSerializer.Serialize(new ContainerReceipt(
@@ -307,7 +302,6 @@ public sealed class AwdpFixVerificationRecoveryTests
             Guid.CreateVersion7(),
             Guid.CreateVersion7(),
             3,
-            10,
             DateTimeOffset.UtcNow.AddMinutes(5),
             "tests",
             "runner-1");

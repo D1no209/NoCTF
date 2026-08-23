@@ -47,7 +47,6 @@ public sealed class AwdFlagInjectionWorkReader(
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
                 && runtime.Generation == message.Generation
-                && runtime.ProcessingVersion == message.ProcessingVersion
                 && runtime.State == RuntimeState.Running
                 && runtime.RunnerPool == message.RunnerPool
                 && runtime.RunnerId == message.RunnerId
@@ -209,7 +208,6 @@ public sealed class AwdFlagInjectionHandler(
             message.RuntimeInstanceId,
             message.ChallengeFlagId,
             message.Generation,
-            message.ProcessingVersion,
             now));
         await outbox.FlushOutgoingMessagesAsync();
         return MessageExecutionOutcome.Applied;

@@ -69,8 +69,6 @@ public static class ServiceRegistration
                 settings.SchemaSettings.ResolveExternalXmlDocumentation = false;
                 settings.DocumentProcessors.Add(
                     new AwdpFixResultOutcomeDocumentProcessor());
-                settings.OperationProcessors.Add(
-                    new CompetitionChallengeRevisionOperationProcessor());
                 settings.AddAuth("Bearer", new OpenApiSecurityScheme
                 {
                     Type = OpenApiSecuritySchemeType.Http,

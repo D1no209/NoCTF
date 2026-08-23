@@ -13,7 +13,6 @@ public sealed record PlatformConfigurationView(
     string Name,
     string? Description,
     Guid? LogoFileId,
-    long Revision,
     DateTimeOffset UpdatedAt);
 
 public sealed record PlatformLogoReplacement(
@@ -24,16 +23,14 @@ public interface IPlatformConfigurationStore
 {
     Task<PlatformConfigurationView> GetAsync(CancellationToken cancellationToken);
 
-    Task<PlatformConfigurationView?> UpdateAsync(
+    Task<PlatformConfigurationView> UpdateAsync(
         string name,
         string? description,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
-    Task<PlatformLogoReplacement?> ReplaceLogoAsync(
+    Task<PlatformLogoReplacement> ReplaceLogoAsync(
         Guid fileId,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
@@ -43,7 +40,6 @@ public interface IPlatformConfigurationStore
 public enum PlatformConfigurationUpdateState
 {
     Updated,
-    RevisionConflict,
     InvalidInput
 }
 
@@ -54,7 +50,6 @@ public sealed record PlatformConfigurationUpdateResult(
 public enum PlatformLogoUpdateState
 {
     Updated,
-    RevisionConflict,
     InvalidSize,
     InvalidFormat
 }
@@ -76,7 +71,6 @@ public sealed class ManagePlatformConfiguration(
     public async Task<PlatformConfigurationUpdateResult> UpdateAsync(
         string name,
         string? description,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
@@ -91,19 +85,15 @@ public sealed class ManagePlatformConfiguration(
         var updated = await settings.UpdateAsync(
             normalizedName,
             normalizedDescription,
-            expectedRevision,
             now,
             ct);
-        return updated is null
-            ? new(PlatformConfigurationUpdateState.RevisionConflict)
-            : new(PlatformConfigurationUpdateState.Updated, updated);
+        return new(PlatformConfigurationUpdateState.Updated, updated);
     }
 
     public async Task<PlatformLogoUpdateResult> ReplaceLogoAsync(
         string fileName,
         string contentType,
         ReadOnlyMemory<byte> content,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default)
         => await ReplaceLogoAsync(
@@ -111,7 +101,6 @@ public sealed class ManagePlatformConfiguration(
             contentType,
             content,
             FileUploadLimits.Default.MaximumLogoBytes,
-            expectedRevision,
             now,
             ct);
 
@@ -120,7 +109,6 @@ public sealed class ManagePlatformConfiguration(
         string contentType,
         ReadOnlyMemory<byte> content,
         long maximumBytes,
-        long expectedRevision,
         DateTimeOffset now,
         CancellationToken ct = default)
     {
@@ -147,16 +135,15 @@ public sealed class ManagePlatformConfiguration(
                 ct);
         }
 
-        PlatformLogoReplacement? replacement;
+        PlatformLogoReplacement replacement;
         var attached = false;
         try
         {
             replacement = await settings.ReplaceLogoAsync(
                 uploaded.FileId,
-                expectedRevision,
                 now,
                 ct);
-            attached = replacement is not null;
+            attached = true;
         }
         finally
         {
@@ -164,9 +151,7 @@ public sealed class ManagePlatformConfiguration(
                 await uploads.AbandonAsync(uploaded.FileId);
         }
 
-        return replacement is null
-            ? new(PlatformLogoUpdateState.RevisionConflict)
-            : new(PlatformLogoUpdateState.Updated, replacement.Configuration);
+        return new(PlatformLogoUpdateState.Updated, replacement.Configuration);
     }
 
     public async Task<PlatformLogoContent?> GetLogoAsync(CancellationToken ct = default)

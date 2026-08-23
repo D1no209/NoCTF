@@ -65,7 +65,6 @@ public sealed class ChallengeTemplateDefaultDefinitionTests
             null,
             "Pwn",
             " ",
-            0,
             DateTimeOffset.UtcNow));
 
         await Assert.That(result.Succeeded).IsTrue();

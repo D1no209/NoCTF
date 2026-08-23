@@ -52,13 +52,11 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     "Original description",
                     "Web",
                     """{ "schemaVersion": 1 }""",
-                    0,
                     changedAt),
                 cancellationToken);
             await Assert.That(unchanged.State)
                 .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
-            await Assert.That(unchanged.Template!.Revision).IsEqualTo(0);
-            await Assert.That(unchanged.Template.UpdatedAt).IsEqualTo(fixture.Now);
+            await Assert.That(unchanged.Template!.UpdatedAt).IsEqualTo(fixture.Now);
             await AssertTemplateAsync(
                 options,
                 fixture.ChallengeId,
@@ -68,7 +66,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 "Original description",
                 "Web",
                 """{"schemaVersion":1}""",
-                0,
                 fixture.Now,
                 cancellationToken);
 
@@ -79,7 +76,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     fixture.OwnerId,
                     GameMode.Awd,
                     "Blocked title",
-                    0,
                     changedAt),
                 cancellationToken);
             await Assert.That(blocked.State)
@@ -94,23 +90,8 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 "Original description",
                 "Web",
                 """{"schemaVersion":1}""",
-                0,
                 fixture.Now,
                 cancellationToken);
-
-            var stale = await UpdateAsync(
-                options,
-                Command(
-                    fixture.ChallengeId,
-                    fixture.OwnerId,
-                    GameMode.Awd,
-                    "Stale title",
-                    1,
-                    changedAt),
-                cancellationToken);
-            await Assert.That(stale.State)
-                .IsEqualTo(ChallengeTemplateWriteState.RevisionConflict);
-            await Assert.That(stale.Template).IsNull();
 
             var metadata = await UpdateWithEventsAsync(
                 options,
@@ -119,13 +100,11 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     fixture.OwnerId,
                     GameMode.Ctf,
                     "Updated title",
-                    0,
                     changedAt),
                 cancellationToken);
             await Assert.That(metadata.State)
                 .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
-            await Assert.That(metadata.Template!.Revision).IsEqualTo(1);
-            await Assert.That(metadata.Template.Mode).IsEqualTo(GameMode.Ctf);
+            await Assert.That(metadata.Template!.Mode).IsEqualTo(GameMode.Ctf);
             await AssertTemplateAsync(
                 options,
                 fixture.ChallengeId,
@@ -135,7 +114,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 "Updated description",
                 "Pwn",
                 """{"schemaVersion":1,"updated":true}""",
-                1,
                 changedAt,
                 cancellationToken);
             await using (var dirtyDb = new NoCtfDbContext(options))
@@ -163,7 +141,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 var failure = await CreateManagementStore(deleteDb).SoftDeleteAsync(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    0,
                     changedAt.AddSeconds(1),
                     cancellationToken);
                 await Assert.That(failure).IsNull();
@@ -176,20 +153,17 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     fixture.OwnerId,
                     GameMode.Awd,
                     "AWD title",
-                    1,
                     changedAt.AddSeconds(2)),
                 cancellationToken);
             await Assert.That(changedMode.State)
                 .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
-            await Assert.That(changedMode.Template!.Revision).IsEqualTo(2);
-            await Assert.That(changedMode.Template.Mode).IsEqualTo(GameMode.Awd);
+            await Assert.That(changedMode.Template!.Mode).IsEqualTo(GameMode.Awd);
 
             await using (var mismatchDb = new NoCtfDbContext(options))
             {
                 var failure = await CreateManagementStore(mismatchDb).RestoreAsync(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    1,
                     changedAt.AddSeconds(3),
                     cancellationToken);
                 await Assert.That(failure)
@@ -198,7 +172,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             await AssertCompetitionChallengeAsync(
                 options,
                 fixture.CompetitionChallengeId,
-                revision: 1,
                 isDeleted: true,
                 cancellationToken);
 
@@ -209,19 +182,17 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     fixture.OwnerId,
                     GameMode.Ctf,
                     "Restored CTF title",
-                    2,
                     changedAt.AddSeconds(4)),
                 cancellationToken);
             await Assert.That(restoredMode.State)
                 .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
-            await Assert.That(restoredMode.Template!.Revision).IsEqualTo(3);
+            await Assert.That(restoredMode.Template!.Mode).IsEqualTo(GameMode.Ctf);
 
             await using (var restoreDb = new NoCtfDbContext(options))
             {
                 var failure = await CreateManagementStore(restoreDb).RestoreAsync(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    1,
                     changedAt.AddSeconds(5),
                     cancellationToken);
                 await Assert.That(failure).IsNull();
@@ -229,7 +200,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             await AssertCompetitionChallengeAsync(
                 options,
                 fixture.CompetitionChallengeId,
-                revision: 2,
                 isDeleted: false,
                 cancellationToken);
 
@@ -240,7 +210,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                     fixture.OwnerId,
                     GameMode.Awd,
                     "Blocked by deleted parent",
-                    0,
                     changedAt.AddSeconds(6)),
                 cancellationToken);
             await Assert.That(deletedParentBlocked.State)
@@ -254,7 +223,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 "Original description",
                 "Web",
                 """{"schemaVersion":1}""",
-                0,
                 fixture.Now,
                 cancellationToken);
 
@@ -320,7 +288,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 fixture.OwnerId,
                 GameMode.Awd,
                 "Concurrent AWD title",
-                0,
                 now),
             cancellationToken);
 
@@ -328,7 +295,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
 
         await Assert.That((await createTask).Failure).IsNull();
         await Assert.That((await updateTask).State)
-            .IsEqualTo(ChallengeTemplateWriteState.RevisionConflict);
+            .IsEqualTo(ChallengeTemplateWriteState.ActiveCompetitionModeConflict);
         await AssertTemplateAsync(
             options,
             fixture.ConcurrentChallengeId,
@@ -338,7 +305,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             "Original description",
             "Web",
             """{"schemaVersion":1}""",
-            1,
             fixture.Now,
             cancellationToken);
         await using var verifyDb = new NoCtfDbContext(options);
@@ -387,7 +353,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
                 fixture.OwnerId,
                 GameMode.Awd,
                 "Update-first AWD title",
-                0,
                 now),
             cancellationToken);
         await WaitForPostgresSleepAsync(observerDb, cancellationToken);
@@ -407,7 +372,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         await Assert.That((await updateTask).State)
             .IsEqualTo(ChallengeTemplateWriteState.Succeeded);
         await Assert.That((await createTask).Failure)
-            .IsEqualTo(ChallengeMutationFailure.RevisionConflict);
+            .IsEqualTo(ChallengeMutationFailure.TemplateModeMismatch);
         await AssertTemplateAsync(
             options,
             fixture.UpdateFirstChallengeId,
@@ -417,7 +382,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             "Updated description",
             "Pwn",
             """{"schemaVersion":1,"updated":true}""",
-            1,
             now,
             cancellationToken);
         await using var verifyDb = new NoCtfDbContext(options);
@@ -434,7 +398,7 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var current = DateTimeOffset.UtcNow;
         var now = current.AddTicks(-(current.Ticks % 10));
         var ownerId = Guid.CreateVersion7(now);
@@ -563,7 +527,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         Guid ownerId,
         GameMode mode,
         string title,
-        int expectedRevision,
         DateTimeOffset updatedAt) =>
         new(
             challengeId,
@@ -575,7 +538,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             "Updated description",
             "Pwn",
             """{"schemaVersion":1,"updated":true}""",
-            expectedRevision,
             updatedAt);
 
     private static Competition Competition(
@@ -645,7 +607,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         string expectedDescription,
         string expectedDirection,
         string expectedDefinitionJson,
-        int expectedRevision,
         DateTimeOffset expectedUpdatedAt,
         CancellationToken cancellationToken)
     {
@@ -660,14 +621,12 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
         await Assert.That(JsonNode.DeepEquals(
             JsonNode.Parse(challenge.DefinitionJson),
             JsonNode.Parse(expectedDefinitionJson))).IsTrue();
-        await Assert.That(challenge.Revision).IsEqualTo(expectedRevision);
         await Assert.That(challenge.UpdatedAt).IsEqualTo(expectedUpdatedAt);
     }
 
     private static async Task AssertCompetitionChallengeAsync(
         DbContextOptions<NoCtfDbContext> options,
         Guid competitionChallengeId,
-        int revision,
         bool isDeleted,
         CancellationToken cancellationToken)
     {
@@ -678,7 +637,6 @@ public sealed class ChallengeTemplateModeInvariantPersistenceTests
             .SingleAsync(
                 item => item.Id == competitionChallengeId,
                 cancellationToken);
-        await Assert.That(competitionChallenge.Revision).IsEqualTo(revision);
         await Assert.That(competitionChallenge.DeletedAt is not null)
             .IsEqualTo(isDeleted);
     }

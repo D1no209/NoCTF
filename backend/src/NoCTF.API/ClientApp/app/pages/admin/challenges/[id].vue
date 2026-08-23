@@ -143,18 +143,11 @@ async function save(): Promise<void> {
       direction: form.direction.trim(),
       description: form.description.trim() || null,
       definitionJson: normalizedDefinition,
-      expectedRevision: template.value.revision ?? 0,
     },
   })
   saving.value = false
   if (error) {
-    if (isRevisionConflict(error)) {
-      toast.error(translate("模板已被他人修改,请刷新后重试"))
-      await loadTemplate()
-    }
-    else {
-      toast.error(challengeTemplateWriteErrorMessage(error))
-    }
+    toast.error(challengeTemplateWriteErrorMessage(error))
     return
   }
   if (data) {
@@ -472,8 +465,6 @@ function parseUserIds(text: string): string[] {
 function conflictMessage(error: unknown): string {
   const code = parseApiError(error).code
   switch (code) {
-    case 'RevisionConflict':
-      return translate("模板已被他人修改,请刷新后重试")
     case 'OwnerIncludedInManagerSet':
       return translate("负责人不能同时出现在管理员集合中")
     case 'UserNotFound':
@@ -494,13 +485,11 @@ async function savePermissions(): Promise<void> {
     path: { challengeId },
     body: {
       managerIds: parseUserIds(managersText.value),
-      expectedRevision: template.value.revision ?? 0,
     },
   })
   permissionsSaving.value = false
   if (error) {
     toast.error(conflictMessage(error))
-    if (isRevisionConflict(error)) await loadTemplate()
     return
   }
   if (data) template.value = data
@@ -514,13 +503,11 @@ async function transferOwner(): Promise<void> {
     path: { challengeId },
     body: {
       ownerId: newOwnerId.value.trim(),
-      expectedRevision: template.value.revision ?? 0,
     },
   })
   transferring.value = false
   if (error) {
     toast.error(conflictMessage(error))
-    if (isRevisionConflict(error)) await loadTemplate()
     return
   }
   transferOpen.value = false
@@ -661,7 +648,6 @@ onMounted(() => {
                       <Textarea id="edit-description" v-model="form.description" rows="8" :disabled="isDeleted" />
                     </Field>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                      <span>{{ $t('修订版本 {revision}', { revision: template.revision ?? 0 }) }}</span>
                       <span>{{ $t('创建') }} <AdminDateTime :value="template.createdAt" /></span>
                       <span>{{ $t('更新') }} <AdminDateTime :value="template.updatedAt" /></span>
                       <span v-if="template.deletedAt">{{ $t('删除') }} <AdminDateTime :value="template.deletedAt" /></span>

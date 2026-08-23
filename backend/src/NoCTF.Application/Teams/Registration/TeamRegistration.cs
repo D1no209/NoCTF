@@ -23,8 +23,7 @@ public sealed record TeamView(
     bool IsBanned,
     DateTimeOffset RegisteredAt,
     string TrackKey = CompetitionTrackConfiguration.DefaultTrackKey,
-    string TrackName = "Default",
-    long ConcurrencyVersion = 0);
+    string TrackName = "Default");
 public sealed record TeamRegistrationPolicy(
     CompetitionStatus Status,
     bool AutoApprove,

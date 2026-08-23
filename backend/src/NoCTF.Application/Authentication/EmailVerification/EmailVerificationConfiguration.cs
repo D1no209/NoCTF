@@ -19,7 +19,6 @@ public sealed record EmailVerificationConfigurationView(
     string SmtpFromAddress,
     string SmtpFromName,
     int SmtpTimeoutSeconds,
-    long Revision,
     DateTimeOffset UpdatedAt);
 
 public sealed record UpdateEmailVerificationConfigurationCommand(
@@ -37,13 +36,11 @@ public sealed record UpdateEmailVerificationConfigurationCommand(
     string SmtpFromAddress,
     string SmtpFromName,
     int SmtpTimeoutSeconds,
-    long ExpectedRevision,
     DateTimeOffset Now);
 
 public enum EmailVerificationConfigurationUpdateState
 {
     Updated,
-    RevisionConflict,
     Invalid
 }
 
@@ -80,11 +77,10 @@ public sealed record EmailVerificationConfigurationMutationResult(
 public interface IEmailVerificationConfigurationStore
 {
     Task<EmailVerificationConfigurationView> GetAsync(CancellationToken cancellationToken);
-    Task<EmailVerificationConfigurationView?> UpdateAsync(
+    Task<EmailVerificationConfigurationView> UpdateAsync(
         UpdateEmailVerificationConfigurationCommand command,
         CancellationToken cancellationToken);
-    Task<EmailVerificationConfigurationView?> ReplacePasswordAsync(
-        long expectedRevision,
+    Task<EmailVerificationConfigurationView> ReplacePasswordAsync(
         string password,
         DateTimeOffset now,
         CancellationToken cancellationToken);
@@ -111,13 +107,10 @@ public sealed class ManageEmailVerificationConfiguration(
         }
 
         var updated = await store.UpdateAsync(command, ct);
-        return updated is null
-            ? new(EmailVerificationConfigurationUpdateState.RevisionConflict)
-            : new(EmailVerificationConfigurationUpdateState.Updated, updated);
+        return new(EmailVerificationConfigurationUpdateState.Updated, updated);
     }
 
     public async Task<EmailVerificationConfigurationMutationResult> ReplacePasswordAsync(
-        long expectedRevision,
         string password,
         DateTimeOffset now,
         CancellationToken ct = default)
@@ -129,10 +122,8 @@ public sealed class ManageEmailVerificationConfiguration(
                 ValidationErrors: [EmailVerificationConfigurationError.SmtpPasswordInvalid]);
         }
 
-        var updated = await store.ReplacePasswordAsync(expectedRevision, password, now, ct);
-        return updated is null
-            ? new(EmailVerificationConfigurationUpdateState.RevisionConflict)
-            : new(EmailVerificationConfigurationUpdateState.Updated, updated);
+        var updated = await store.ReplacePasswordAsync(password, now, ct);
+        return new(EmailVerificationConfigurationUpdateState.Updated, updated);
     }
 
     private static IReadOnlyList<EmailVerificationConfigurationError> Validate(

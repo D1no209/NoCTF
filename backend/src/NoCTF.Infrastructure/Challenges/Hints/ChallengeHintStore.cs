@@ -98,7 +98,6 @@ public sealed class ChallengeHintStore(
         hint.Content = command.Content;
         hint.Cost = command.Cost;
         hint.PublishedAt = command.PublishedAt;
-        challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = command.Now;
         try
         {
@@ -140,8 +139,7 @@ public sealed class ChallengeHintStore(
         if (hint is null)
             return false;
         hint.HiddenAt = now;
-        challenge!.Revision = checked(challenge.Revision + 1);
-        challenge.UpdatedAt = now;
+        challenge!.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
@@ -169,8 +167,7 @@ public sealed class ChallengeHintStore(
         if (hint is null)
             return false;
         hint.HiddenAt = null;
-        challenge!.Revision = checked(challenge.Revision + 1);
-        challenge.UpdatedAt = now;
+        challenge!.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await QueueHintPublicationAsync(
@@ -284,8 +281,7 @@ public sealed class ChallengeHintStore(
             hint.Id,
             challengeTitle,
             hint.Cost,
-            publishedAt,
-            challenge.Revision);
+            publishedAt);
         if (publishedAt <= now)
             await outbox.PublishAsync(message);
         else

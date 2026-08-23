@@ -26,7 +26,7 @@ Nuxt 4 SPA(`ssr: false`),Bun 管理依赖,TypeScript strict,Vue 用 `<script set
 - 路由级多分区导航(竞赛工作区、竞赛管理、平台管理)一律用 `AppWorkspaceNav` 图标侧边栏,禁止再用 Tabs/横排幽灵按钮做路由导航;Tabs 仅用于单页内的内容切换(如账户页、题目详情页)。
 - 分页一律签名 keyset cursor +「加载更多」(useCursorPagination),不要页码;改筛选必须 `reset()`。
 - 异步操作(提交/runtime/重判等)返回 202 时用 usePolling 轮询 statusUrl;SignalR 推送只做失效重取,REST 为事实源。开发环境下两个 Hub 强制走 SSE/长轮询(`import.meta.dev` 分支):Vite ws 代理转发 SignalR WebSocket 会被重置并引发 Nuxt 崩溃重启循环,生产直连后端不受影响。
-- 管理端写操作不携带 expectedRevision/Revision 并发协议；可变记录采用 last-write-wins。409 只按生成 SDK 的强类型业务失败码展示，不得统一翻译为修订冲突。
+- 管理端写操作不携带持久化修订并发字段；可变记录采用 last-write-wins。409 只按生成 SDK 的强类型业务失败码展示，不得统一翻译为修订冲突。
 - shadcn 规则:表单 FieldGroup+Field;Dialog/Sheet 必带 Title;语义色类(禁原始色值);gap-* 不用 space-*;size-*;条件类 `cn()`;空态 Empty、提示 Alert、骨架 Skeleton、状态 Badge;按钮加载态 Spinner+data-icon+disabled;图标用 `@lucide/vue`。
 - 开发环境会话恢复依赖后端 `appsettings.Development.json` 的 `Authentication:RefreshAllowedOrigins` 包含前端源(已配 127.0.0.1/localhost:3000-3001);新增端口要同步加。
 - 组件 style preset 为 `reka-vega`(components.json),正文 Inter;新增/更新组件统一 `bunx --bun shadcn-vue@latest add <name>`,apply/init preset 会重写 `main.css` 配色变量,之后需回合下方品牌色定制。

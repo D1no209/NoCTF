@@ -99,8 +99,7 @@ public sealed class ChallengeAudienceEndpointTests
                 GameMode.Ctf,
                 CompetitionStatus.Running,
                 CompetitionLeaderboardVisibility.Normal,
-                LeaderboardDataScope.Live,
-                0));
+                LeaderboardDataScope.Live));
     }
 
     private sealed class EmptyKohAccess : IKohChallengeAccessReader
@@ -126,7 +125,6 @@ public sealed class ChallengeAudienceEndpointTests
             500,
             1,
             true,
-            0,
             null,
             false,
             DateTimeOffset.UtcNow,
@@ -152,8 +150,8 @@ public sealed class ChallengeAudienceEndpointTests
         public Task<ChallengeCompetitionContext?> GetCompetitionAsync(Guid competitionId, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ChallengeMutationResult> CreateAsync(CreateCompetitionChallengeCommand command, string configurationJson, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<ChallengeMutationResult> UpdateAsync(UpdateCompetitionChallengeCommand command, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ChallengeMutationFailure?> SoftDeleteAsync(Guid competitionId, Guid competitionChallengeId, int expectedRevision, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<ChallengeMutationFailure?> RestoreAsync(Guid competitionId, Guid competitionChallengeId, int expectedRevision, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ChallengeMutationFailure?> SoftDeleteAsync(Guid competitionId, Guid competitionChallengeId, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ChallengeMutationFailure?> RestoreAsync(Guid competitionId, Guid competitionChallengeId, DateTimeOffset now, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 
     private sealed class ActorUserContext : IUserContext

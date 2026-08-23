@@ -104,7 +104,6 @@ public sealed class ChallengeAttachmentStore(
             FileId = fileId,
             CreatedAt = now
         });
-        challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         try
         {
@@ -195,7 +194,6 @@ public sealed class ChallengeAttachmentStore(
             SpecificationId = entry.AttachmentId,
             CreatedAt = entry.CreatedAt
         }));
-        challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = entries.Max(entry => entry.CreatedAt);
         try
         {
@@ -235,7 +233,6 @@ public sealed class ChallengeAttachmentStore(
             .ToArrayAsync(ct);
         foreach (var candidate in linkedCandidates)
             candidate.DeletedAt = now;
-        challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -271,7 +268,6 @@ public sealed class ChallengeAttachmentStore(
             .ToArrayAsync(ct);
         foreach (var candidate in linkedCandidates)
             candidate.DeletedAt = null;
-        challenge.Revision = checked(challenge.Revision + 1);
         challenge.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
@@ -460,10 +456,9 @@ public sealed class ChallengeAttachmentStore(
         bool isAdministrator,
         CancellationToken ct)
     {
-        var challenge = await db.Challenges
-            .FromSqlInterpolated($"SELECT * FROM challenges WHERE id = {challengeId} FOR UPDATE")
-            .SingleOrDefaultAsync(ct);
+        var challenge = await ChallengeTemplateCriticalSection.AcquireAsync(db, challengeId, ct);
         return challenge is not null
+            && challenge.DeletedAt is null
             && (isAdministrator
                 || challenge.OwnerId == actorId
                 || challenge.ManagerIds.Contains(actorId))
@@ -479,12 +474,12 @@ public sealed class ChallengeAttachmentStore(
         budget.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            var affected = await db.CompetitionChallenges
-                .Where(challenge => challenge.Id == competitionChallengeId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    challenge => challenge.CriticalSectionVersion,
-                    challenge => challenge.CriticalSectionVersion + 1), budget.Token);
-            if (affected != 1)
+            var exists = await db.CompetitionChallenges
+                .FromSqlInterpolated($"SELECT * FROM competition_challenges WHERE id = {competitionChallengeId} FOR UPDATE")
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .AnyAsync(budget.Token);
+            if (!exists)
                 throw new DbUpdateConcurrencyException("The attachment assignment scope no longer exists.");
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)

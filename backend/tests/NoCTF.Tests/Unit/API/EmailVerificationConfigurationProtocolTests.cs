@@ -24,8 +24,7 @@ public sealed class EmailVerificationConfigurationProtocolTests
             SmtpUserName = string.Empty,
             SmtpFromAddress = "no-reply@noctf.test",
             SmtpFromName = "NoCTF",
-            SmtpTimeoutSeconds = 10,
-            ExpectedRevision = 1
+            SmtpTimeoutSeconds = 10
         };
 
         var serializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);

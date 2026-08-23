@@ -369,7 +369,7 @@ public sealed class NormalizedScoreboardProjectionTests
     public async Task Challenge_catalog_revision_covers_effective_title_and_direction()
     {
         var competitionId = Guid.NewGuid();
-        var original = Challenge(1, "Web") with { Revision = 7 };
+        var original = Challenge(1, "Web");
         var renamed = original with { Title = "Renamed", Direction = "Pwn" };
         var before = engine.ProjectScoreboard(new(
             competitionId,
@@ -695,8 +695,7 @@ public sealed class NormalizedScoreboardProjectionTests
             false,
             json,
             order,
-            true,
-            1);
+            true);
 
     private static LeaderboardGameplayFact Fact(
         Guid teamId,

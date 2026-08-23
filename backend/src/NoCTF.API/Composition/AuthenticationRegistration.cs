@@ -87,7 +87,6 @@ public static class AuthenticationRegistration
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("generation")
                 .RequireClaim("checker_sequence")
-                .RequireClaim("processing_version")
                 .RequireClaim("deadline"));
             options.AddPolicy("AwdpFixResult", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)
@@ -98,7 +97,6 @@ public static class AuthenticationRegistration
                 .RequireClaim("gameplay_fact_id")
                 .RequireClaim("runtime_instance_id")
                 .RequireClaim("generation")
-                .RequireClaim("runtime_processing_version")
                 .RequireClaim("deadline"));
             options.AddPolicy("FixArchiveRead", policy => policy
                 .AddAuthenticationSchemes(InternalScheme)

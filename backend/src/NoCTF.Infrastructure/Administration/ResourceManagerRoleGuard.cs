@@ -41,11 +41,17 @@ internal static class ResourceManagerRoleGuard
     {
         foreach (var userId in userIds.Distinct().Order())
         {
-            var user = await db.Users.SingleOrDefaultAsync(
-                candidate => candidate.Id == userId,
-                cancellationToken);
-            if (user is not null)
-                user.ConcurrencyVersion = checked(user.ConcurrencyVersion + 1);
+            if (!db.Database.IsRelational())
+            {
+                _ = await db.Users.SingleOrDefaultAsync(
+                    candidate => candidate.Id == userId,
+                    cancellationToken);
+                continue;
+            }
+
+            _ = await db.Users
+                .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
+                .SingleOrDefaultAsync(cancellationToken);
         }
     }
 }

@@ -12,7 +12,6 @@ function readConflictCode(error: unknown): NoCtfapiEndpointsAdministrationChalle
     case 'ChallengeTemplateConflict':
     case 'ChallengeOrderConflict':
     case 'ResourceIdConflict':
-    case 'RevisionConflict':
     case 'LifecycleStateConflict':
     case 'ChallengeTemplateNotFound':
     case 'ChallengeTemplateModeMismatch':
@@ -33,8 +32,6 @@ export function competitionChallengeConflictMessage(error: unknown): string | un
       return translate('该顺序已被其他题目占用,请更换顺序。')
     case 'ResourceIdConflict':
       return translate('题目资源标识冲突,请重新添加。')
-    case 'RevisionConflict':
-      return translate('题目已被其他人修改,请刷新后重试。')
     default:
       return undefined
   }

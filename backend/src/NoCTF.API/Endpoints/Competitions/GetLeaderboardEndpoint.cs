@@ -487,7 +487,7 @@ public sealed class GetLeaderboardEndpoint(
         if (visibility.DataScope == LeaderboardDataScope.Frozen)
         {
             await messages.ApplyCompetitionVisibilityAsync(
-                request.CompetitionId, visibility.VisibilityRevision, cancellationToken);
+                request.CompetitionId, DateTimeOffset.UtcNow, cancellationToken);
             return Processing(request.CompetitionId);
         }
         var status = await leaderboard.GetStatusAsync(request.CompetitionId, cancellationToken);

@@ -36,7 +36,7 @@ public sealed class ResourceManagerRolePersistenceTests
             var secondAdministratorId = Guid.CreateVersion7();
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(cancellationToken);
+                await setup.Database.EnsureCreatedAsync(cancellationToken);
                 setup.Users.AddRange(
                     User(firstAdministratorId, "first-admin", UserRole.Administrator, now),
                     User(secondAdministratorId, "second-admin", UserRole.Administrator, now));
@@ -106,7 +106,7 @@ public sealed class ResourceManagerRolePersistenceTests
                 cancellationToken);
             var options = Options(postgres);
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var administratorId = Guid.CreateVersion7();
@@ -278,7 +278,7 @@ public sealed class ResourceManagerRolePersistenceTests
                 cancellationToken);
             var options = Options(postgres);
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var administratorId = Guid.CreateVersion7();
@@ -340,8 +340,7 @@ public sealed class ResourceManagerRolePersistenceTests
                     administratorId,
                     [ordinaryUserId],
                     [],
-                    [],
-                    0),
+                    []),
                 cancellationToken);
             await Assert.That(rejectedManager.State)
                 .IsEqualTo(CompetitionPermissionUpdateState.RoleNotEligible);
@@ -353,8 +352,7 @@ public sealed class ResourceManagerRolePersistenceTests
                     administratorId,
                     [organizerId],
                     [ordinaryUserId],
-                    [],
-                    0),
+                    []),
                 cancellationToken);
             await Assert.That(acceptedJudge.State)
                 .IsEqualTo(CompetitionPermissionUpdateState.Updated);
@@ -375,7 +373,6 @@ public sealed class ResourceManagerRolePersistenceTests
                 administratorId,
                 true,
                 [ordinaryUserId],
-                0,
                 now.AddMinutes(1),
                 cancellationToken);
             await Assert.That(challengePermission.State)
@@ -385,7 +382,6 @@ public sealed class ResourceManagerRolePersistenceTests
                 administratorId,
                 true,
                 [missingUserId],
-                0,
                 now.AddMinutes(1),
                 cancellationToken);
             await Assert.That(missingManager.State)
@@ -396,7 +392,6 @@ public sealed class ResourceManagerRolePersistenceTests
                 administratorId,
                 true,
                 ordinaryUserId,
-                0,
                 now.AddMinutes(1),
                 cancellationToken);
             await Assert.That(challengeTransfer.State)
@@ -406,7 +401,6 @@ public sealed class ResourceManagerRolePersistenceTests
                 administratorId,
                 true,
                 missingUserId,
-                0,
                 now.AddMinutes(1),
                 cancellationToken);
             await Assert.That(missingOwner.State)
@@ -426,7 +420,6 @@ public sealed class ResourceManagerRolePersistenceTests
                 .IsEquivalentTo([ordinaryUserId]);
             await Assert.That(persistedChallenge.OwnerId).IsEqualTo(administratorId);
             await Assert.That(persistedChallenge.ManagerIds).IsEmpty();
-            await Assert.That(persistedChallenge.Revision).IsEqualTo(0);
         });
     }
 
@@ -442,7 +435,7 @@ public sealed class ResourceManagerRolePersistenceTests
                 cancellationToken);
             var options = Options(postgres);
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var administratorId = Guid.CreateVersion7();
@@ -499,15 +492,14 @@ public sealed class ResourceManagerRolePersistenceTests
                     administratorId,
                     [targetId],
                     [],
-                    [],
-                    0),
+                    []),
                 cancellationToken);
             await Task.WhenAll(downgradeTask, assignmentTask);
 
             await Assert.That((await downgradeTask).State)
                 .IsEqualTo(UpdatePlatformRoleState.Updated);
             await Assert.That((await assignmentTask).State)
-                .IsEqualTo(CompetitionPermissionUpdateState.RevisionConflict);
+                .IsEqualTo(CompetitionPermissionUpdateState.RoleNotEligible);
             db.ChangeTracker.Clear();
             await Assert.That((await db.Users.AsNoTracking()
                     .SingleAsync(user => user.Id == targetId, cancellationToken)).Role)
@@ -564,8 +556,7 @@ public sealed class ResourceManagerRolePersistenceTests
                         administratorId,
                         [targetId],
                         [],
-                        [],
-                        0),
+                        []),
                     cancellationToken);
             await WaitForPostgresSleepAsync(db, cancellationToken);
             var downgradeSecondTask = new PlatformAdministrationStore(
@@ -588,25 +579,15 @@ public sealed class ResourceManagerRolePersistenceTests
                 .SingleAsync(
                     competition => competition.Id == competitionId,
                     cancellationToken);
-            if (assignmentFirst.State == CompetitionPermissionUpdateState.Updated)
-            {
-                await Assert.That(blockedDowngrade.State)
-                    .IsEqualTo(UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments);
-                await Assert.That(blockedDowngrade.Blockers!.CompetitionIds)
-                    .IsEquivalentTo([competitionId]);
-                await Assert.That(finalUser.Role).IsEqualTo(UserRole.Organizer);
-                await Assert.That(finalCompetition.ManagerIds)
-                    .IsEquivalentTo([targetId]);
-            }
-            else
-            {
-                await Assert.That(assignmentFirst.State)
-                    .IsEqualTo(CompetitionPermissionUpdateState.RevisionConflict);
-                await Assert.That(blockedDowngrade.State)
-                    .IsEqualTo(UpdatePlatformRoleState.Updated);
-                await Assert.That(finalUser.Role).IsEqualTo(UserRole.User);
-                await Assert.That(finalCompetition.ManagerIds).IsEmpty();
-            }
+            await Assert.That(assignmentFirst.State)
+                .IsEqualTo(CompetitionPermissionUpdateState.Updated);
+            await Assert.That(blockedDowngrade.State)
+                .IsEqualTo(UpdatePlatformRoleState.ActiveOwnerOrManagerAssignments);
+            await Assert.That(blockedDowngrade.Blockers!.CompetitionIds)
+                .IsEquivalentTo([competitionId]);
+            await Assert.That(finalUser.Role).IsEqualTo(UserRole.Organizer);
+            await Assert.That(finalCompetition.ManagerIds)
+                .IsEquivalentTo([targetId]);
         });
     }
 

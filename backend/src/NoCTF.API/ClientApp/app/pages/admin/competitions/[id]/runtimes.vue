@@ -210,13 +210,12 @@ function canTerminate(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResp
 
 async function submitTermination() {
   const rt = terminateDialog.value
-  if (!rt?.id || rt.processingVersion === undefined || rt.processingVersion === null) return
+  if (!rt?.id) return
   const token = beginRuntimeOperation(rt, 'terminate')
   if (!token) return
   try {
     const { data, error } = await adminTerminateRuntime({
       path: { competitionId, runtimeInstanceId: rt.id },
-      body: { expectedProcessingVersion: rt.processingVersion },
     })
     if (!runtimeOperations.isActive(token)) return
     if (error) throw error
@@ -247,15 +246,13 @@ function openForceTermination(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRun
 async function submitForceTermination() {
   const rt = forceTerminateDialog.value
   const reason = forceTerminateReason.value.trim()
-  if (!rt?.id || rt.processingVersion === undefined || rt.processingVersion === null
-    || reason.length < 8 || !forceTerminateConfirmed.value) return
+  if (!rt?.id || reason.length < 8 || !forceTerminateConfirmed.value) return
   const token = beginRuntimeOperation(rt, 'force-terminate')
   if (!token) return
   try {
     const { data, error } = await adminForceTerminateRuntime({
       path: { competitionId, runtimeInstanceId: rt.id },
       body: {
-        expectedProcessingVersion: rt.processingVersion,
         reason,
       },
     })

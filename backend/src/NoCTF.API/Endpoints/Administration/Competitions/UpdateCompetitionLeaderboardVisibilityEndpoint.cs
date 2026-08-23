@@ -16,7 +16,6 @@ public sealed class UpdateCompetitionLeaderboardVisibilityRequest
 {
     public LeaderboardVisibilityProtocol? Visibility { get; set; }
     public DateTimeOffset? StartsAt { get; set; }
-    public int? ExpectedRevision { get; set; }
     public string? Reason { get; set; }
 }
 
@@ -26,7 +25,6 @@ public sealed class UpdateCompetitionLeaderboardVisibilityValidator
     public UpdateCompetitionLeaderboardVisibilityValidator()
     {
         RuleFor(request => request.Visibility).NotNull().IsInEnum();
-        RuleFor(request => request.ExpectedRevision).NotNull().GreaterThanOrEqualTo(0);
         RuleFor(request => request.Reason).MaximumLength(500);
     }
 }
@@ -36,7 +34,6 @@ public enum CompetitionVisibilityMutationCodeProtocol
 {
     Updated,
     NotFound,
-    RevisionConflict,
     InvalidSchedule,
     CompetitionFinished
 }
@@ -72,7 +69,7 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Schedules or immediately applies leaderboard visibility.";
-            summary.Description = "Uses a dedicated revision fence and persists the exact Frozen cutoff snapshot when the restriction takes effect.";
+            summary.Description = "Persists the exact Frozen cutoff snapshot when the restriction takes effect.";
         });
     }
 
@@ -92,7 +89,6 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
             competitionId,
             CompetitionProtocolMapper.ToDomain(request.Visibility!.Value),
             request.StartsAt,
-            request.ExpectedRevision!.Value,
             user.UserId,
             request.Reason,
             DateTimeOffset.UtcNow), ct);
@@ -110,8 +106,7 @@ public sealed class UpdateCompetitionLeaderboardVisibilityEndpoint(
                 {
                     ["code"] = CompetitionVisibilityMutationMapper.ToProtocol(result.State)
                 }),
-            CompetitionVisibilityMutationState.RevisionConflict
-                or CompetitionVisibilityMutationState.CompetitionFinished => TypedResults.Conflict(
+            CompetitionVisibilityMutationState.CompetitionFinished => TypedResults.Conflict(
                     new CompetitionLeaderboardVisibilityFailureResponse(
                         CompetitionVisibilityMutationMapper.ToProtocol(result.State),
                         current)),

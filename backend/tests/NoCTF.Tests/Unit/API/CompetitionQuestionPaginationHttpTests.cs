@@ -145,7 +145,6 @@ public sealed class CompetitionQuestionPaginationHttpTests
                 SmtpFromAddress: string.Empty,
                 SmtpFromName: string.Empty,
                 SmtpTimeoutSeconds: 30,
-                Revision: 0,
                 UpdatedAt: DateTimeOffset.UnixEpoch));
         builder.Services.AddSingleton(emailVerification);
 

@@ -10,7 +10,6 @@ namespace NoCTF.API.Endpoints.Administration.ChallengeBank;
 public sealed class UpdateChallengeTemplatePermissionsRequest
 {
     public Guid[] ManagerIds { get; set; } = [];
-    public int ExpectedRevision { get; set; }
 }
 
 public sealed class UpdateChallengeTemplatePermissionsValidator
@@ -18,7 +17,6 @@ public sealed class UpdateChallengeTemplatePermissionsValidator
 {
     public UpdateChallengeTemplatePermissionsValidator()
     {
-        RuleFor(request => request.ExpectedRevision).GreaterThanOrEqualTo(0);
         RuleForEach(request => request.ManagerIds).NotEmpty();
     }
 }
@@ -59,7 +57,6 @@ public sealed class UpdateChallengeTemplatePermissionsEndpoint(
             user.UserId,
             user.IsAdministrator,
             request.ManagerIds,
-            request.ExpectedRevision,
             DateTimeOffset.UtcNow,
             ct);
         return result.State switch
@@ -71,8 +68,7 @@ public sealed class UpdateChallengeTemplatePermissionsEndpoint(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Challenge template permissions were not updated.",
                 detail: result.Detail),
-            ChallengeTemplateWriteState.RevisionConflict
-                or ChallengeTemplateWriteState.OwnerIncludedInManagerSet
+            ChallengeTemplateWriteState.OwnerIncludedInManagerSet
                 or ChallengeTemplateWriteState.UserNotFound
                 or ChallengeTemplateWriteState.RoleNotEligible =>
                 TypedResults.Conflict(

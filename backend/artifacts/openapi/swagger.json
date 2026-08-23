@@ -1312,7 +1312,7 @@
           "Platform"
         ],
         "summary": "Returns public platform branding.",
-        "description": "Exposes the configured name, description, and revisioned logo URL.",
+        "description": "Exposes the configured name, description, and cache-busted logo URL.",
         "operationId": "PlatformConfiguration_Get",
         "responses": {
           "200": {
@@ -5945,7 +5945,7 @@
           "Admin"
         ],
         "summary": "Terminates an exact runtime instance.",
-        "description": "Queues durable provider cleanup for the selected instance and rejects stale processing versions.",
+        "description": "Queues durable provider cleanup for the selected instance.",
         "operationId": "AdminTerminateRuntime",
         "parameters": [
           {
@@ -5965,19 +5965,6 @@
             }
           }
         ],
-        "requestBody": {
-          "x-name": "TerminateRuntimeRequest",
-          "description": "",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsAdministrationRuntimeTerminateRuntimeRequest"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
         "responses": {
           "202": {
             "description": "Accepted",
@@ -5985,16 +5972,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeAcceptedResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
                 }
               }
             }
@@ -6462,7 +6439,7 @@
           "Admin"
         ],
         "summary": "Updates email verification configuration.",
-        "description": "Applies non-secret verification and SMTP settings with a revision fence.",
+        "description": "Applies non-secret verification and SMTP settings.",
         "operationId": "AdminPlatformUpdateEmailVerificationConfiguration",
         "requestBody": {
           "x-name": "UpdateEmailVerificationConfigurationRequest",
@@ -6520,7 +6497,7 @@
           "Admin"
         ],
         "summary": "Returns editable platform branding configuration.",
-        "description": "Returns public branding fields with their optimistic revision.",
+        "description": "Returns editable public branding fields.",
         "operationId": "AdminPlatformGetConfiguration",
         "responses": {
           "200": {
@@ -6553,7 +6530,7 @@
           "Admin"
         ],
         "summary": "Updates platform name and description.",
-        "description": "Applies public branding text with an optimistic revision fence.",
+        "description": "Applies the public branding text.",
         "operationId": "AdminPlatformUpdateConfiguration",
         "requestBody": {
           "x-name": "UpdatePlatformConfigurationRequest",
@@ -7597,7 +7574,7 @@
           "Admin"
         ],
         "summary": "Replaces the public platform logo.",
-        "description": "Stores a validated raster logo and advances the platform configuration revision.",
+        "description": "Stores and applies a validated raster logo.",
         "operationId": "AdminPlatformUploadLogo",
         "requestBody": {
           "x-name": "UploadPlatformLogoRequest",
@@ -8879,7 +8856,7 @@
           "Admin"
         ],
         "summary": "Updates competition metadata.",
-        "description": "Updates mutable competition metadata using the current lifecycle state as the concurrency fence.",
+        "description": "Updates mutable competition metadata while preserving lifecycle constraints.",
         "operationId": "AdminUpdateCompetition",
         "parameters": [
           {
@@ -9124,7 +9101,7 @@
           "Admin"
         ],
         "summary": "Gets a competition's game-mode configuration.",
-        "description": "Returns the versioned configuration JSON visible to competition administrators.",
+        "description": "Returns the configuration JSON visible to competition administrators.",
         "operationId": "AdminCompetitionConfiguration_Get",
         "parameters": [
           {
@@ -9168,7 +9145,7 @@
           "Admin"
         ],
         "summary": "Updates a competition's game-mode configuration.",
-        "description": "Validates and replaces versioned configuration JSON using optimistic concurrency.",
+        "description": "Validates and replaces the competition configuration JSON.",
         "operationId": "AdminCompetitionConfiguration_Update",
         "parameters": [
           {
@@ -9247,7 +9224,7 @@
           "Admin"
         ],
         "summary": "Gets the scheduled and effective leaderboard visibility policy.",
-        "description": "Returns the revision-fenced Normal, Frozen, or Blackout configuration for a competition.",
+        "description": "Returns the Normal, Frozen, or Blackout configuration for a competition.",
         "operationId": "AdminGetCompetitionLeaderboardVisibility",
         "parameters": [
           {
@@ -9291,7 +9268,7 @@
           "Admin"
         ],
         "summary": "Schedules or immediately applies leaderboard visibility.",
-        "description": "Uses a dedicated revision fence and persists the exact Frozen cutoff snapshot when the restriction takes effect.",
+        "description": "Persists the exact Frozen cutoff snapshot when the restriction takes effect.",
         "operationId": "AdminUpdateCompetitionLeaderboardVisibility",
         "parameters": [
           {
@@ -9531,7 +9508,7 @@
           "Admin"
         ],
         "summary": "Updates competition tracks before the competition starts.",
-        "description": "Validates the complete track definition set and applies optimistic concurrency.",
+        "description": "Validates and applies the complete track definition set.",
         "operationId": "AdminCompetitionTracks_Update",
         "parameters": [
           {
@@ -10992,7 +10969,7 @@
           "Admin"
         ],
         "summary": "Deletes a competition challenge.",
-        "description": "Soft-deletes the competition link at the expected aggregate revision without changing the global challenge template.",
+        "description": "Soft-deletes the competition link without changing the global challenge template.",
         "operationId": "AdminDeleteCompetitionChallenge",
         "parameters": [
           {
@@ -11011,17 +10988,6 @@
             "schema": {
               "type": "string",
               "format": "guid"
-            }
-          },
-          {
-            "name": "expectedRevision",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0.0,
-              "nullable": false
             }
           }
         ],
@@ -11047,16 +11013,6 @@
           },
           "403": {
             "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -11132,7 +11088,7 @@
           "Admin"
         ],
         "summary": "Updates a competition challenge.",
-        "description": "Updates scoring, ordering, and publication state using optimistic concurrency.",
+        "description": "Updates scoring, ordering, and publication state.",
         "operationId": "AdminUpdateCompetitionChallenge",
         "parameters": [
           {
@@ -11657,7 +11613,7 @@
           "Admin"
         ],
         "summary": "Gets a competition challenge's game-mode configuration.",
-        "description": "Returns the versioned challenge configuration JSON visible to competition administrators.",
+        "description": "Returns the challenge configuration JSON visible to competition administrators.",
         "operationId": "AdminChallengeConfiguration_Get",
         "parameters": [
           {
@@ -11709,7 +11665,7 @@
           "Admin"
         ],
         "summary": "Updates a competition challenge's game-mode configuration.",
-        "description": "Validates and replaces versioned challenge configuration JSON using optimistic concurrency.",
+        "description": "Validates and replaces challenge configuration JSON.",
         "operationId": "AdminChallengeConfiguration_Update",
         "parameters": [
           {
@@ -11796,7 +11752,7 @@
           "Admin"
         ],
         "summary": "Restores a deleted competition challenge.",
-        "description": "Restores the competition link at the expected aggregate revision; the global template is not modified.",
+        "description": "Restores the competition link; the global template is not modified.",
         "operationId": "AdminRestoreCompetitionChallenge",
         "parameters": [
           {
@@ -11815,17 +11771,6 @@
             "schema": {
               "type": "string",
               "format": "guid"
-            }
-          },
-          {
-            "name": "expectedRevision",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "minimum": 0.0,
-              "nullable": false
             }
           }
         ],
@@ -11851,16 +11796,6 @@
           },
           "403": {
             "description": "Forbidden"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MicrosoftAspNetCoreMvcValidationProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -13244,10 +13179,6 @@
           "registeredAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "concurrencyVersion": {
-            "type": "integer",
-            "format": "int64"
           }
         }
       },
@@ -13717,10 +13648,6 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol"
               }
             ]
-          },
-          "processingVersion": {
-            "type": "integer",
-            "format": "int64"
           },
           "urls": {
             "type": "array",
@@ -15973,10 +15900,6 @@
           "mode": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsGameModeProtocol"
           },
-          "revision": {
-            "type": "integer",
-            "format": "int32"
-          },
           "isFrozen": {
             "type": "boolean"
           },
@@ -16510,10 +16433,6 @@
           "isPublished": {
             "type": "boolean"
           },
-          "revision": {
-            "type": "integer",
-            "format": "int32"
-          },
           "deletedAt": {
             "type": "string",
             "format": "date-time",
@@ -16730,10 +16649,6 @@
             "type": "integer",
             "format": "int32"
           },
-          "revision": {
-            "type": "integer",
-            "format": "int32"
-          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -16921,7 +16836,6 @@
           "InvalidChallengeReference",
           "TeamActiveQuestionLimitReached",
           "ParticipantMessageLimitReached",
-          "RevisionConflict",
           "InvalidTransition",
           "QuestionClosed"
         ],
@@ -16933,7 +16847,6 @@
           "InvalidChallengeReference",
           "TeamActiveQuestionLimitReached",
           "ParticipantMessageLimitReached",
-          "RevisionConflict",
           "InvalidTransition",
           "QuestionClosed"
         ]
@@ -16942,20 +16855,13 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "body",
-          "expectedRevision"
+          "body"
         ],
         "properties": {
           "body": {
             "type": "string",
             "maxLength": 4000,
             "minLength": 4,
-            "nullable": false
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0,
             "nullable": false
           }
         }
@@ -16964,8 +16870,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "status",
-          "expectedRevision"
+          "status"
         ],
         "properties": {
           "status": {
@@ -16975,12 +16880,6 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsChallengesQuestionsCompetitionQuestionStatusCode"
               }
             ]
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0,
-            "nullable": false
           }
         }
       },
@@ -17485,10 +17384,6 @@
           },
           "trackKey": {
             "type": "string"
-          },
-          "teamVersion": {
-            "type": "integer",
-            "format": "int64"
           }
         }
       },
@@ -17544,11 +17439,6 @@
             "maxLength": 64,
             "minLength": 0,
             "nullable": false
-          },
-          "expectedTeamVersion": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0
           }
         }
       },
@@ -17694,15 +17584,9 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "expectedProcessingVersion",
           "reason"
         ],
         "properties": {
-          "expectedProcessingVersion": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0
-          },
           "reason": {
             "type": "string",
             "maxLength": 512,
@@ -17771,10 +17655,6 @@
                 "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeFailureCodeProtocol"
               }
             ]
-          },
-          "processingVersion": {
-            "type": "integer",
-            "format": "int64"
           },
           "urls": {
             "type": "array",
@@ -17882,20 +17762,6 @@
       "NoCTFAPIEndpointsAdministrationRuntimeListAdminRuntimesRequest": {
         "type": "object",
         "additionalProperties": false
-      },
-      "NoCTFAPIEndpointsAdministrationRuntimeTerminateRuntimeRequest": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "expectedProcessingVersion"
-        ],
-        "properties": {
-          "expectedProcessingVersion": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0
-          }
-        }
       },
       "NoCTFAPIEndpointsAdministrationPlatformPlatformUserResponse": {
         "type": "object",
@@ -18275,10 +18141,6 @@
             "type": "integer",
             "format": "int32"
           },
-          "revision": {
-            "type": "integer",
-            "format": "int64"
-          },
           "updatedAt": {
             "type": "string",
             "format": "date-time"
@@ -18313,10 +18175,6 @@
           "logoUrl": {
             "type": "string",
             "nullable": true
-          },
-          "revision": {
-            "type": "integer",
-            "format": "int64"
           },
           "updatedAt": {
             "type": "string",
@@ -18837,8 +18695,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "password",
-          "expectedRevision"
+          "password"
         ],
         "properties": {
           "password": {
@@ -18846,12 +18703,6 @@
             "maxLength": 1024,
             "minLength": 0,
             "nullable": false
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0,
-            "exclusiveMinimum": true
           }
         }
       },
@@ -18872,8 +18723,7 @@
           "smtpUserName",
           "smtpFromAddress",
           "smtpFromName",
-          "smtpTimeoutSeconds",
-          "expectedRevision"
+          "smtpTimeoutSeconds"
         ],
         "properties": {
           "enabled": {
@@ -18949,12 +18799,6 @@
             "format": "int32",
             "maximum": 120.0,
             "minimum": 1.0
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0,
-            "exclusiveMinimum": true
           }
         }
       },
@@ -18962,8 +18806,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "name",
-          "expectedRevision"
+          "name"
         ],
         "properties": {
           "name": {
@@ -18977,12 +18820,6 @@
             "maxLength": 500,
             "minLength": 0,
             "nullable": true
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0,
-            "exclusiveMinimum": true
           }
         }
       },
@@ -19114,21 +18951,13 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "file",
-          "expectedRevision"
+          "file"
         ],
         "properties": {
           "file": {
             "type": "string",
             "format": "binary",
             "nullable": false
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 0.0,
-            "nullable": false,
-            "exclusiveMinimum": true
           }
         }
       },
@@ -19644,16 +19473,14 @@
           "OwnerIncluded",
           "UserNotFound",
           "RoleNotEligible",
-          "EmailNotVerified",
-          "RevisionConflict"
+          "EmailNotVerified"
         ],
         "enum": [
           "RolesOverlap",
           "OwnerIncluded",
           "UserNotFound",
           "RoleNotEligible",
-          "EmailNotVerified",
-          "RevisionConflict"
+          "EmailNotVerified"
         ]
       },
       "NoCTFAPIEndpointsAdministrationCompetitionsCreateCompetitionRequest": {
@@ -19904,10 +19731,6 @@
           "json": {
             "type": "string"
           },
-          "revision": {
-            "type": "integer",
-            "format": "int32"
-          },
           "competitionStatus": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
           },
@@ -19940,10 +19763,6 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
-          },
-          "revision": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
@@ -19979,10 +19798,6 @@
               "type": "string",
               "format": "guid"
             }
-          },
-          "permissionRevision": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
@@ -20058,11 +19873,6 @@
           "json"
         ],
         "properties": {
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0
-          },
           "json": {
             "type": "string",
             "minLength": 1,
@@ -20156,14 +19966,12 @@
         "x-enumNames": [
           "Updated",
           "NotFound",
-          "RevisionConflict",
           "InvalidSchedule",
           "CompetitionFinished"
         ],
         "enum": [
           "Updated",
           "NotFound",
-          "RevisionConflict",
           "InvalidSchedule",
           "CompetitionFinished"
         ]
@@ -20172,8 +19980,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "visibility",
-          "expectedRevision"
+          "visibility"
         ],
         "properties": {
           "visibility": {
@@ -20189,12 +19996,6 @@
             "format": "date-time",
             "nullable": true
           },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0,
-            "nullable": false
-          },
           "reason": {
             "type": "string",
             "maxLength": 500,
@@ -20207,7 +20008,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "expectedPermissionRevision",
           "managerIds",
           "judgeIds",
           "observerIds"
@@ -20239,11 +20039,6 @@
               "type": "string",
               "format": "guid"
             }
-          },
-          "expectedPermissionRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0
           }
         }
       },
@@ -20254,11 +20049,6 @@
           "tracks"
         ],
         "properties": {
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0
-          },
           "tracks": {
             "type": "array",
             "nullable": false,
@@ -20699,7 +20489,6 @@
           "ResourceIdConflict",
           "ChallengeOrderConflict",
           "ChallengeTemplateConflict",
-          "RevisionConflict",
           "LifecycleStateConflict",
           "ChallengeTemplateNotFound",
           "ChallengeTemplateModeMismatch"
@@ -20708,7 +20497,6 @@
           "ResourceIdConflict",
           "ChallengeOrderConflict",
           "ChallengeTemplateConflict",
-          "RevisionConflict",
           "LifecycleStateConflict",
           "ChallengeTemplateNotFound",
           "ChallengeTemplateModeMismatch"
@@ -20999,10 +20787,6 @@
           "json": {
             "type": "string"
           },
-          "revision": {
-            "type": "integer",
-            "format": "int32"
-          },
           "competitionStatus": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsCompetitionsCompetitionStatusProtocol"
           },
@@ -21074,11 +20858,6 @@
           "json"
         ],
         "properties": {
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0
-          },
           "json": {
             "type": "string",
             "minLength": 1,
@@ -21093,8 +20872,7 @@
           "customTitle",
           "baseScore",
           "order",
-          "isPublished",
-          "expectedRevision"
+          "isPublished"
         ],
         "properties": {
           "customTitle": {
@@ -21117,12 +20895,6 @@
           },
           "isPublished": {
             "type": "boolean",
-            "nullable": false
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0,
             "nullable": false
           }
         }
@@ -21164,10 +20936,6 @@
           },
           "definitionJson": {
             "type": "string"
-          },
-          "revision": {
-            "type": "integer",
-            "format": "int32"
           },
           "deletedAt": {
             "type": "string",
@@ -21225,7 +20993,6 @@
         "description": "",
         "x-enumNames": [
           "ResourceIdConflict",
-          "RevisionConflict",
           "ActiveCompetitionModeConflict",
           "OwnerIncludedInManagerSet",
           "UserNotFound",
@@ -21233,7 +21000,6 @@
         ],
         "enum": [
           "ResourceIdConflict",
-          "RevisionConflict",
           "ActiveCompetitionModeConflict",
           "OwnerIncludedInManagerSet",
           "UserNotFound",
@@ -21324,11 +21090,6 @@
             "format": "guid",
             "minLength": 1,
             "nullable": false
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0
           }
         }
       },
@@ -21339,8 +21100,7 @@
           "mode",
           "visibility",
           "title",
-          "direction",
-          "expectedRevision"
+          "direction"
         ],
         "properties": {
           "mode": {
@@ -21377,12 +21137,6 @@
           },
           "definitionJson": {
             "type": "string"
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0,
-            "nullable": false
           }
         }
       },
@@ -21401,11 +21155,6 @@
               "type": "string",
               "format": "guid"
             }
-          },
-          "expectedRevision": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0.0
           }
         }
       },

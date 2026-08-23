@@ -11,7 +11,6 @@ public sealed class UpdatePlatformConfigurationRequest
 {
     public required string Name { get; set; }
     public string? Description { get; set; }
-    public required long ExpectedRevision { get; set; }
 }
 
 public sealed class UpdatePlatformConfigurationValidator
@@ -24,7 +23,6 @@ public sealed class UpdatePlatformConfigurationValidator
             .MaximumLength(PlatformConfigurationRules.MaximumNameLength);
         RuleFor(request => request.Description)
             .MaximumLength(PlatformConfigurationRules.MaximumDescriptionLength);
-        RuleFor(request => request.ExpectedRevision).GreaterThan(0);
     }
 }
 
@@ -43,7 +41,7 @@ public sealed class UpdatePlatformConfigurationEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Updates platform name and description.";
-            summary.Description = "Applies public branding text with an optimistic revision fence.";
+            summary.Description = "Applies the public branding text.";
         });
     }
 
@@ -55,7 +53,6 @@ public sealed class UpdatePlatformConfigurationEndpoint(
         var result = await configuration.UpdateAsync(
             request.Name,
             request.Description,
-            request.ExpectedRevision,
             DateTimeOffset.UtcNow,
             ct);
         return result.State switch
@@ -65,14 +62,6 @@ public sealed class UpdatePlatformConfigurationEndpoint(
                     result.Configuration!,
                     links,
                     HttpContext)),
-            PlatformConfigurationUpdateState.RevisionConflict => TypedResults.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                title: "Platform configuration changed.",
-                detail: "Reload the configuration and apply the changes again.",
-                extensions: new Dictionary<string, object?>
-                {
-                    ["code"] = PlatformProblemCode.PlatformConfigurationConflict
-                }),
             PlatformConfigurationUpdateState.InvalidInput => TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "Platform configuration is invalid."),

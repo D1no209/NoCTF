@@ -80,7 +80,7 @@ public sealed class AwdpFullBoundaryTests
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/configuration",
-            new { expectedRevision = 0, json = competitionConfigurationJson },
+            new { json = competitionConfigurationJson },
             HttpStatusCode.OK,
             cancellationToken);
 
@@ -108,7 +108,6 @@ public sealed class AwdpFullBoundaryTests
             HttpStatusCode.Created,
             cancellationToken);
         var competitionChallengeId = challenge.GetProperty("id").GetGuid();
-        var challengeRevision = challenge.GetProperty("revision").GetInt32();
 
         var challengeConfigurationJson = JsonSerializer.Serialize(new
         {
@@ -124,19 +123,18 @@ public sealed class AwdpFullBoundaryTests
                 leetLiteralText = false
             }
         }, JsonOptions);
-        var updatedConfiguration = await SendJsonAsync(
+        await SendJsonAsync(
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}/configuration",
-            new { expectedRevision = challengeRevision, json = challengeConfigurationJson },
+            new { json = challengeConfigurationJson },
             HttpStatusCode.OK,
             cancellationToken);
-        challengeRevision = updatedConfiguration.GetProperty("revision").GetInt32();
         await SendJsonAsync(
             admin,
             HttpMethod.Put,
             $"/api/v1/admin/competitions/{competitionId}/challenges/{competitionChallengeId}",
-            new { customTitle = (string?)null, baseScore = 0, order = 0, isPublished = true, expectedRevision = challengeRevision },
+            new { customTitle = (string?)null, baseScore = 0, order = 0, isPublished = true },
             HttpStatusCode.OK,
             cancellationToken);
 

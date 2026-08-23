@@ -17,7 +17,6 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
             .Where(candidate => candidate.Id == message.RuntimeInstanceId)
             .Select(candidate => new
             {
-                candidate.ProcessingVersion,
                 candidate.Generation,
                 candidate.State,
                 candidate.RunnerPool,
@@ -31,12 +30,9 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
             || !string.Equals(assignment.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return RuntimeProvisionWorkStatus.AssignmentAbsent;
         if (assignment.Generation == message.Generation
-            && assignment.ProcessingVersion == message.ProcessingVersion
             && assignment.State == RuntimeState.Provisioning)
             return RuntimeProvisionWorkStatus.Current;
         if (assignment.Generation == message.Generation
-            && message.ProcessingVersion < long.MaxValue
-            && assignment.ProcessingVersion > message.ProcessingVersion
             && assignment.State == RuntimeState.Stopping
             && assignment.RunnerAssignmentReleaseToken == null
             && assignment.ProviderReceiptJson == null)
@@ -50,13 +46,9 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
     {
         await using var scope = scopes.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-        // Pre-fence durable stop messages deserialize Generation as zero. The immutable instance id,
-        // processing version and original owner still fence the lookup; the returned work supplies
-        // the persisted generation for identity cleanup and the fenced acknowledgement.
         return await db.RuntimeInstances.AsNoTracking()
             .Where(candidate => candidate.Id == message.RuntimeInstanceId
-                && candidate.ProcessingVersion == message.ProcessingVersion
-                && (message.Generation == 0 || candidate.Generation == message.Generation)
+                && candidate.Generation == message.Generation
                 && candidate.State == RuntimeState.Stopping
                 && candidate.RunnerPool == message.RunnerPool
                 && candidate.RunnerId == message.RunnerId)

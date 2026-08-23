@@ -82,7 +82,7 @@ public sealed class GameplayFactIntakeStore(
         if (!GameplayFactAdmissionPersistence.Matches(snapshot, current)
             || current!.CompetitionStatus != CompetitionStatus.Running)
             return received.Select(_ => new GameplayFactAcceptanceResult(
-                GameplayFactAcceptanceState.SnapshotChanged)).ToArray();
+                GameplayFactAcceptanceState.AdmissionRejected)).ToArray();
         if (maxAttempts is > 0
             && checked(current.AcceptedFlagAttempts + received.Count) > maxAttempts)
             return received.Select(_ => new GameplayFactAcceptanceResult(
@@ -160,7 +160,7 @@ public sealed class GameplayFactIntakeStore(
                 && item.CompetitionId == received.CompetitionId
                 && item.MemberIds.Contains(received.UserId), cancellationToken);
         if (!valid)
-            return new(GameplayFactAcceptanceState.SnapshotChanged);
+            return new(GameplayFactAcceptanceState.AdmissionRejected);
         var entity = new GameplayFact
         {
             Id = received.GameplayFactId,
@@ -197,7 +197,7 @@ public sealed class GameplayFactIntakeStore(
                 item.Id == received.TeamId
                 && item.CompetitionId == received.CompetitionId, cancellationToken);
         if (!valid)
-            return new(GameplayFactAcceptanceState.SnapshotChanged);
+            return new(GameplayFactAcceptanceState.AdmissionRejected);
         var entity = new GameplayFact
         {
             Id = received.GameplayFactId,

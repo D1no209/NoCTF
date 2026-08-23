@@ -26,11 +26,11 @@ public sealed class GameplayFactAttemptCriticalSection(
         budget.CancelAfter(TimeSpan.FromSeconds(2));
         try
         {
-            var affected = await db.Teams.Where(team => team.Id == teamId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(
-                    team => team.CriticalSectionVersion,
-                    team => team.CriticalSectionVersion + 1), budget.Token);
-            if (affected != 1)
+            var exists = await db.Teams
+                .FromSqlInterpolated($"SELECT * FROM teams WHERE id = {teamId} FOR UPDATE")
+                .AsNoTracking()
+                .AnyAsync(budget.Token);
+            if (!exists)
                 throw new DbUpdateConcurrencyException("The submission team no longer exists.");
             return NoopCriticalSectionLease.Instance;
         }

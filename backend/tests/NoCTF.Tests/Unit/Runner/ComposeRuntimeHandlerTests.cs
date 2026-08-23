@@ -135,8 +135,6 @@ public sealed class ComposeRuntimeHandlerTests
         await Assert.That(result).IsTypeOf<RuntimeProvisionCanceled>();
         var canceled = (RuntimeProvisionCanceled)result;
         await Assert.That(canceled.RuntimeInstanceId).IsEqualTo(message.RuntimeInstanceId);
-        await Assert.That(canceled.ProvisionProcessingVersion)
-            .IsEqualTo(message.ProcessingVersion);
         await Assert.That(canceled.Generation).IsEqualTo(message.Generation);
         await Assert.That(canceled.RunnerPool).IsEqualTo(message.RunnerPool);
         await Assert.That(canceled.RunnerId).IsEqualTo(message.RunnerId);
@@ -237,7 +235,6 @@ public sealed class ComposeRuntimeHandlerTests
                     RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
-            8,
             3,
             "default",
             "runner-a");
@@ -269,7 +266,6 @@ public sealed class ComposeRuntimeHandlerTests
                     RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
-            8,
             3,
             "default",
             "runner-a");
@@ -309,7 +305,6 @@ public sealed class ComposeRuntimeHandlerTests
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         return new(
             runtimeInstanceId,
-            8,
             3,
             "default",
             "runner-a",
