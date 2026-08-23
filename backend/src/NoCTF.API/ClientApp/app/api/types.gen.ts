@@ -224,9 +224,9 @@ export type NoCtfDomainNotificationsNotificationSourceType = 0 | 1 | 2 | 3 | 4;
 
 export type NoCtfDomainNotificationsNotificationTargetType = 0 | 1 | 2 | 3 | 4;
 
-export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'Message' | 'CompetitionAnnouncement' | 'QuestionOpened' | 'QuestionStatusChanged' | 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'GameplayFactAdjudicated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'DataExportReady' | 'DataExportFailed' | 'UserAccountLifecycleChanged' | 'CompetitionForceDeleted';
+export type NoCtfapiEndpointsNotificationsNotificationKindProtocol = 'Message' | 'CompetitionAnnouncement' | 'QuestionOpened' | 'QuestionStatusChanged' | 'CompetitionLifecycleChanged' | 'TeamRegistrationChanged' | 'GameplayFactAdjudicated' | 'RuntimeStateChanged' | 'StartGateFailed' | 'ManagementFailure' | 'BloodAwarded' | 'ChallengePublished' | 'HintPublished' | 'TeamBanned' | 'CheatIncidentDetected' | 'TeamBanCorrected' | 'PlatformAuditExported' | 'UserAccountLifecycleChanged' | 'CompetitionForceDeleted';
 
-export type NoCtfDomainSharedEntityReferenceKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export type NoCtfDomainSharedEntityReferenceKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 export type NoCtfapiEndpointsNotificationsListNotificationsRequest = {
     [key: string]: never;
@@ -717,7 +717,7 @@ export type NoCtfapiEndpointsCompetitionsEventsExportCompetitionEventsRequest = 
     [key: string]: never;
 };
 
-export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'ProtectedCompetitionExportCreated' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved';
+export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol = 'CompetitionCreated' | 'CompetitionUpdated' | 'CompetitionDeleted' | 'CompetitionLifecycleChanged' | 'LeaderboardVisibilityChanged' | 'ChallengeCreated' | 'ChallengeUpdated' | 'ChallengePublished' | 'ChallengeUnpublished' | 'ChallengeDeleted' | 'HintPublished' | 'HintUnlocked' | 'TeamRegistered' | 'TeamRegistrationChanged' | 'TeamUpdated' | 'TeamDeleted' | 'TeamMemberJoined' | 'TeamMemberRemoved' | 'TeamCaptainTransferred' | 'TeamBanned' | 'TeamUnbanned' | 'GameplayFactReceived' | 'GameplayFactAdjudicated' | 'ScoringRecorded' | 'FirstBloodAwarded' | 'SecondBloodAwarded' | 'ThirdBloodAwarded' | 'RuntimeCreated' | 'RuntimeStateChanged' | 'RuntimeExtended' | 'RuntimeReset' | 'RuntimePortAllocated' | 'ProtectedGameplayFactValueAccessed' | 'CheatIncidentDetected' | 'CheatIncidentConfirmed' | 'CheatIncidentDismissed' | 'CheatIncidentSuperseded' | 'CheatIncidentCorrected' | 'CompetitionArchiveExported' | 'TeamBanAppealSubmitted' | 'TeamBanAppealUpheld' | 'TeamBanAppealAccepted' | 'TeamBanCorrectionPublished' | 'RuntimeForceTerminationRequested' | 'RuntimeForceTerminationCompleted' | 'RuntimeForceTerminationFailed' | 'AnnouncementPublished' | 'QuestionOpened' | 'QuestionReplied' | 'QuestionStatusChanged' | 'ChallengeDescriptionUpdated' | 'TrackConfigurationUpdated' | 'TeamTrackChanged' | 'AwdpBreakAttempted' | 'AwdpFixAttempted' | 'AwdpBreakResolved' | 'AwdpFixResolved';
 
 export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol = 'Information' | 'Warning' | 'Error';
 
@@ -1323,6 +1323,7 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     fromLeaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol | null;
     toLeaderboardVisibility?: NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol | null;
     userAccountAction?: NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol | null;
+    platformAdministrationAction?: NoCtfapiEndpointsAdministrationPlatformPlatformAdministrationActionProtocol | null;
     competitionEventKind?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventKindProtocol | null;
     competitionEventLevel?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventLevelProtocol | null;
     competitionEventVisibility?: NoCtfapiEndpointsCompetitionsEventsCompetitionEventVisibilityProtocol | null;
@@ -1341,9 +1342,11 @@ export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditLogResponse = {
     occurredAt?: string;
 };
 
-export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = 'CompetitionLifecycle' | 'UserAccountLifecycle' | 'CompetitionAdministration' | 'CompetitionLeaderboardVisibility' | 'CompetitionEvent';
+export type NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol = 'CompetitionLifecycle' | 'UserAccountLifecycle' | 'PlatformAdministration' | 'CompetitionAdministration' | 'CompetitionLeaderboardVisibility' | 'CompetitionEvent';
 
 export type NoCtfapiEndpointsAdministrationPlatformUserAccountLifecycleActionProtocol = 'Activated' | 'Banned' | 'Disabled' | 'EmailVerified' | 'EmailUnverified' | 'Anonymized' | 'PhysicallyDeleted';
+
+export type NoCtfapiEndpointsAdministrationPlatformPlatformAdministrationActionProtocol = 'AuditArchiveExported';
 
 export type NoCtfapiEndpointsAdministrationPlatformListPlatformAuditLogsRequest = {
     [key: string]: never;
@@ -1523,42 +1526,6 @@ export type NoCtfapiEndpointsAdministrationGameplayFactsRejudgeGameplayFactRespo
     cutoff?: string;
 };
 
-export type NoCtfapiEndpointsAdministrationDataExportsDataExportResponse = {
-    id?: string;
-    scope?: NoCtfapiEndpointsAdministrationDataExportsDataExportScopeProtocol;
-    competitionId?: string | null;
-    requestedByUserId?: string;
-    requestedAt?: string;
-    includeProtectedFlags?: boolean;
-    reason?: string | null;
-    status?: NoCtfapiEndpointsAdministrationDataExportsDataExportStatusProtocol;
-    startedAt?: string | null;
-    completedAt?: string | null;
-    expiresAt?: string | null;
-    fileId?: string | null;
-    fileName?: string | null;
-    contentType?: string | null;
-    byteLength?: number | null;
-    sha256?: string | null;
-    failureCode?: NoCtfapiEndpointsAdministrationDataExportsDataExportFailureCodeProtocol | null;
-    failureDetail?: string | null;
-};
-
-export type NoCtfapiEndpointsAdministrationDataExportsDataExportScopeProtocol = 'CompetitionArchive' | 'PlatformAudit';
-
-export type NoCtfapiEndpointsAdministrationDataExportsDataExportStatusProtocol = 'Queued' | 'Processing' | 'Available' | 'Failed' | 'Expired';
-
-export type NoCtfapiEndpointsAdministrationDataExportsDataExportFailureCodeProtocol = 'SubjectNotFound' | 'SizeLimitExceeded' | 'GenerationFailed' | 'ObjectStorageFailed';
-
-export type NoCtfapiEndpointsAdministrationDataExportsCreateCompetitionDataExportRequest = {
-    includeProtectedFlags?: boolean;
-    reason?: string | null;
-};
-
-export type NoCtfapiEndpointsAdministrationDataExportsDataExportListResponse = {
-    items?: Array<NoCtfapiEndpointsAdministrationDataExportsDataExportResponse>;
-};
-
 export type NoCtfapiEndpointsAdministrationCompetitionsCreateCompetitionAnnouncementRequest = {
     title: string;
     body: string;
@@ -1611,7 +1578,7 @@ export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteRefe
     count?: number;
 };
 
-export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'DataExport' | 'Notification' | 'PosterFile' | 'ActiveRuntimeResource';
+export type NoCtfapiEndpointsAdministrationCompetitionsCompetitionHardDeleteReferenceCode = 'HistoricalEvent' | 'Team' | 'CompetitionChallenge' | 'GameplayFact' | 'RuntimeInstance' | 'PatchUpload' | 'Notification' | 'PosterFile' | 'ActiveRuntimeResource';
 
 export type NoCtfapiEndpointsAdministrationCompetitionsForceDeleteCompetitionRequest = {
     confirmationTitle: string;
@@ -2056,6 +2023,19 @@ export type NoCtfapiEndpointsAdministrationChallengeBankRandomAttachmentBatchFai
 export type NoCtfapiEndpointsAdministrationChallengeBankUploadRandomChallengeAttachmentBatchRequest = {
     downloadFileName: string;
     files: Array<Blob | File>;
+};
+
+export type NoCtfapiEndpointsAdministrationArchivesExportCompetitionArchiveRequest = {
+    includeProtectedFlags?: boolean;
+    reason?: string | null;
+};
+
+export type NoCtfapiEndpointsAdministrationArchivesExportPlatformAuditArchiveRequest = {
+    kind?: NoCtfapiEndpointsAdministrationPlatformPlatformAuditKindProtocol | null;
+    competitionId?: string | null;
+    actorId?: string | null;
+    from?: string | null;
+    to?: string | null;
 };
 
 export type HealthEndpointData = {
@@ -6481,160 +6461,6 @@ export type AdminRejudgeGameplayFactsResponses = {
 
 export type AdminRejudgeGameplayFactsResponse = AdminRejudgeGameplayFactsResponses[keyof AdminRejudgeGameplayFactsResponses];
 
-export type AdminListCompetitionDataExportsData = {
-    body?: never;
-    path: {
-        competitionId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/competitions/{competitionId}/data-exports';
-};
-
-export type AdminListCompetitionDataExportsErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
-export type AdminListCompetitionDataExportsResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationDataExportsDataExportListResponse;
-};
-
-export type AdminListCompetitionDataExportsResponse = AdminListCompetitionDataExportsResponses[keyof AdminListCompetitionDataExportsResponses];
-
-export type AdminCreateCompetitionDataExportData = {
-    body: NoCtfapiEndpointsAdministrationDataExportsCreateCompetitionDataExportRequest;
-    path: {
-        competitionId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/competitions/{competitionId}/data-exports';
-};
-
-export type AdminCreateCompetitionDataExportErrors = {
-    /**
-     * Bad Request
-     */
-    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-    409: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse;
-};
-
-export type AdminCreateCompetitionDataExportError = AdminCreateCompetitionDataExportErrors[keyof AdminCreateCompetitionDataExportErrors];
-
-export type AdminCreateCompetitionDataExportResponses = {
-    /**
-     * Accepted
-     */
-    202: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse;
-};
-
-export type AdminCreateCompetitionDataExportResponse = AdminCreateCompetitionDataExportResponses[keyof AdminCreateCompetitionDataExportResponses];
-
-export type AdminListPlatformAuditDataExportsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/admin/platform/audit-logs/data-exports';
-};
-
-export type AdminListPlatformAuditDataExportsErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-};
-
-export type AdminListPlatformAuditDataExportsResponses = {
-    /**
-     * Success
-     */
-    200: NoCtfapiEndpointsAdministrationDataExportsDataExportListResponse;
-};
-
-export type AdminListPlatformAuditDataExportsResponse = AdminListPlatformAuditDataExportsResponses[keyof AdminListPlatformAuditDataExportsResponses];
-
-export type AdminCreatePlatformAuditDataExportData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/admin/platform/audit-logs/data-exports';
-};
-
-export type AdminCreatePlatformAuditDataExportErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    409: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse;
-};
-
-export type AdminCreatePlatformAuditDataExportError = AdminCreatePlatformAuditDataExportErrors[keyof AdminCreatePlatformAuditDataExportErrors];
-
-export type AdminCreatePlatformAuditDataExportResponses = {
-    /**
-     * Accepted
-     */
-    202: NoCtfapiEndpointsAdministrationDataExportsDataExportResponse;
-};
-
-export type AdminCreatePlatformAuditDataExportResponse = AdminCreatePlatformAuditDataExportResponses[keyof AdminCreatePlatformAuditDataExportResponses];
-
-export type AdminDownloadDataExportData = {
-    body?: never;
-    path: {
-        dataExportId: string;
-    };
-    query?: never;
-    url: '/api/v1/admin/data-exports/{dataExportId}/download';
-};
-
-export type AdminDownloadDataExportErrors = {
-    /**
-     * Unauthorized
-     */
-    401: unknown;
-    /**
-     * Forbidden
-     */
-    403: unknown;
-    /**
-     * Not Found
-     */
-    404: unknown;
-};
-
 export type AdminCompetitionPosterClearData = {
     body?: never;
     path: {
@@ -9358,3 +9184,57 @@ export type AdminChallengeBankUploadRandomAttachmentBatchResponses = {
 };
 
 export type AdminChallengeBankUploadRandomAttachmentBatchResponse = AdminChallengeBankUploadRandomAttachmentBatchResponses[keyof AdminChallengeBankUploadRandomAttachmentBatchResponses];
+
+export type AdminExportCompetitionArchiveData = {
+    body: NoCtfapiEndpointsAdministrationArchivesExportCompetitionArchiveRequest;
+    path: {
+        competitionId: string;
+    };
+    query?: never;
+    url: '/api/v1/admin/competitions/{competitionId}/data-export';
+};
+
+export type AdminExportCompetitionArchiveErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type AdminExportCompetitionArchiveError = AdminExportCompetitionArchiveErrors[keyof AdminExportCompetitionArchiveErrors];
+
+export type AdminExportPlatformAuditArchiveData = {
+    body: NoCtfapiEndpointsAdministrationArchivesExportPlatformAuditArchiveRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/admin/platform/audit-logs/data-export';
+};
+
+export type AdminExportPlatformAuditArchiveErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Unauthorized
+     */
+    401: unknown;
+    /**
+     * Forbidden
+     */
+    403: unknown;
+};
+
+export type AdminExportPlatformAuditArchiveError = AdminExportPlatformAuditArchiveErrors[keyof AdminExportPlatformAuditArchiveErrors];

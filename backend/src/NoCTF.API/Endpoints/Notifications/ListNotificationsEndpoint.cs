@@ -33,8 +33,7 @@ public enum NotificationKindProtocol
     TeamBanned,
     CheatIncidentDetected,
     TeamBanCorrected,
-    DataExportReady,
-    DataExportFailed,
+    PlatformAuditExported,
     UserAccountLifecycleChanged,
     CompetitionForceDeleted
 }

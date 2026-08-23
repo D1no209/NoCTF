@@ -460,12 +460,6 @@ public sealed class AdminCompetitionStore(
                 ct));
         AddReference(
             references,
-            CompetitionHardDeleteReferenceKind.DataExport,
-            await db.DataExports.CountAsync(
-                item => item.CompetitionId == competitionId,
-                ct));
-        AddReference(
-            references,
             CompetitionHardDeleteReferenceKind.Notification,
             await db.Notifications.CountAsync(
                 item =>
@@ -487,10 +481,6 @@ public sealed class AdminCompetitionStore(
                         && db.RuntimeInstances.Any(runtime =>
                             runtime.CompetitionId == competitionId
                             && runtime.Id == item.RelatedId))
-                    || (item.RelatedType == EntityReferenceKind.DataExport
-                        && db.DataExports.Any(export =>
-                            export.CompetitionId == competitionId
-                            && export.Id == item.RelatedId))
                     || (item.RelatedType == EntityReferenceKind.CompetitionEvent
                         && db.CompetitionEvents.Any(@event =>
                             @event.CompetitionId == competitionId
@@ -554,10 +544,6 @@ public sealed class AdminCompetitionStore(
             .Where(item => item.CompetitionId == competitionId)
             .Select(item => item.FileId)
             .ToArrayAsync(ct));
-        ids.AddRange(await db.DataExports
-            .Where(item => item.CompetitionId == competitionId && item.FileId != null)
-            .Select(item => item.FileId!.Value)
-            .ToArrayAsync(ct));
         return ids.Distinct().ToArray();
     }
 
@@ -576,7 +562,6 @@ public sealed class AdminCompetitionStore(
                     OR (related_type = {(short)EntityReferenceKind.CompetitionChallenge} AND related_id IN (SELECT id FROM competition_challenges WHERE competition_id = {competitionId}))
                     OR (related_type = {(short)EntityReferenceKind.GameplayFact} AND related_id IN (SELECT id FROM gameplay_facts WHERE competition_id = {competitionId}))
                     OR (related_type = {(short)EntityReferenceKind.RuntimeInstance} AND related_id IN (SELECT id FROM runtime_instances WHERE competition_id = {competitionId}))
-                    OR (related_type = {(short)EntityReferenceKind.DataExport} AND related_id IN (SELECT id FROM data_exports WHERE competition_id = {competitionId}))
                     OR (related_type = {(short)EntityReferenceKind.CompetitionEvent} AND related_id IN (SELECT id FROM competition_events WHERE competition_id = {competitionId}))
                     OR (source_type = {(short)NotificationSourceType.Competition} AND source_id = {competitionId})
                     OR (source_type = {(short)NotificationSourceType.Team} AND source_id IN (SELECT id FROM teams WHERE competition_id = {competitionId}))
@@ -600,8 +585,6 @@ public sealed class AdminCompetitionStore(
             $"DELETE FROM patch_uploads WHERE competition_id = {competitionId}", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM competition_events WHERE competition_id = {competitionId}", ct);
-        await db.Database.ExecuteSqlInterpolatedAsync(
-            $"DELETE FROM data_exports WHERE competition_id = {competitionId}", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM competition_challenges WHERE competition_id = {competitionId}", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(

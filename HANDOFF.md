@@ -1,5 +1,32 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 4
+
+- 当前分支：`codex/data-model-wolverine-simplification`；阶段 4 父提交为
+  `2dcdc59a`，本节随阶段 4 功能提交交付。未推送、未部署、未操作生产数据库、生产队列、
+  对象存储或生产数据。
+- 已全链删除 `DataExport` 领域实体、枚举、DbSet、配置、Store、Processor、Application 用例、
+  Wolverine 消息/Handler、异步列表/状态/下载 API、通知类型、实体引用、硬删除引用及前端轮询。
+  仅保留 `POST /admin/competitions/{competitionId}/data-export` 与
+  `POST /admin/platform/audit-logs/data-export` 两个强类型同步 ZIP 端点。
+- 新导出在请求内以 PostgreSQL `RepeatableRead` 读取一致快照，先完成范围和受保护 Flag 鉴权，
+  再写入受控临时 ZIP；设置总记录数、压缩后字节数、单记录序列化内存和执行时间上限。客户端
+  取消立即传播；失败和超限返回稳定枚举失败码，不创建 `File`、业务导出记录、通知任务或后台消息，
+  临时文件在失败时删除、成功流关闭时 `DeleteOnClose` 删除。
+- 普通比赛导出对 Flag 明文做脱敏；明文只允许人类平台管理员并要求 8—512 字符理由。成功比赛导出
+  写工作人员可见 `CompetitionArchiveExported` 事件，成功平台审计导出写强类型
+  `PlatformAuditExported` 管理审计事实；两者都不记录导出内容或明文 Flag。
+- OpenAPI 与 TypeScript SDK 已由工具重新生成并二次校验哈希一致；前端删除任务列表和轮询，改为
+  直接调用生成 SDK 下载，保留 protected-Flag 理由输入、loading、防重复和失败表单状态。
+- 验证：Release build 0 warning/0 error；真实 PostgreSQL 同步归档 3/3、Application 用例 3/3、
+  当前关系模型 15 表守卫 1/1、Architecture/OpenAPI 路由守卫均通过；ClientApp 275/275、
+  typecheck、production build 通过；`git diff --check` 通过。测试覆盖成功 ZIP、脱敏、权限、
+  Forbidden、NotFound、取消、记录/压缩字节/时间/内存超限、审计和无临时/业务残留。
+- migration/snapshot 仍故意保留旧基线，因阶段 10 独占 EF CLI 基线重建；旧 migration 中仍可看到
+  历史 `DataExport`，不得提前手改。恢复时先阅读
+  `docs/data-model-wolverine-stage4-streaming-exports.md`，运行其中命令；下一步只能进入阶段 5
+  Runtime 最小模型与节点直投。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 0—3
 
 - 当前分支：`codex/data-model-wolverine-simplification`；权威规范为

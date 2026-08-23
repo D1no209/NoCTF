@@ -10,7 +10,6 @@ public enum EntityReferenceKind : short
     ChallengeHint,
     GameplayFact,
     RuntimeInstance,
-    DataExport,
     File,
     CompetitionEvent,
     Notification,

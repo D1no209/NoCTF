@@ -2,7 +2,6 @@ import { toast } from 'vue-sonner'
 import type {
   NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol,
   NoCtfapiEndpointsAdministrationCheatIncidentsCheatIncidentStatusProtocol,
-  NoCtfapiEndpointsAdministrationDataExportsDataExportStatusProtocol,
   NoCtfapiEndpointsCompetitionsCompetitionStatusProtocol,
   NoCtfapiEndpointsCompetitionsGameModeProtocol,
   NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol,
@@ -74,10 +73,6 @@ export const CheatIncidentStatusLabel = {
 export const LeaderboardVisibilityLabel = {
   Normal: '正常', Frozen: '冻结', Blackout: '遮蔽',
 } satisfies Record<NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol, string>
-
-export const DataExportStatusLabel = {
-  Queued: '排队中', Processing: '处理中', Available: '可下载', Failed: '失败', Expired: '已过期',
-} satisfies Record<NoCtfapiEndpointsAdministrationDataExportsDataExportStatusProtocol, string>
 
 export const SpecificationKindLabel = {
   Attachment: '附件', AwdRound: 'AWD 轮次', RuntimeDefinition: '运行时定义', RuntimeGeneration: 'Runtime 代际', Hint: '提示',

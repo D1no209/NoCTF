@@ -31,9 +31,9 @@ describe('generated SDK file downloads', () => {
     const challenge = await Bun.file(new URL(pagePaths[3]!, import.meta.url)).text()
 
     expect(logs).toContain('adminPlatformExportLogs({')
-    expect(audit).toContain('adminDownloadDataExport({')
+    expect(audit).toContain('adminExportPlatformAuditArchive({')
     expect(exportsPage).toContain('adminExportCompetitionEvents({')
-    expect(exportsPage).toContain('adminDownloadDataExport({')
+    expect(exportsPage).toContain('adminExportCompetitionArchive({')
     expect(challenge).toContain('downloadChallengeAttachmentEndpoint({')
     expect(challenge).toContain('downloadRandomChallengeAttachmentEndpoint({')
   })

@@ -39,7 +39,6 @@ public static class WorkerRole
         options.Discovery.IncludeType(typeof(BackendMessageHandlers));
         options.Discovery.IncludeType(typeof(CompetitionNotificationMessageHandlers));
         options.Discovery.IncludeType(typeof(CompetitionEventMessageHandlers));
-        options.Discovery.IncludeType(typeof(DataExportMessageHandlers));
         options.Durability.Mode = DurabilityMode.Balanced;
         options.Durability.CheckAssignmentPeriod = TimeSpan.FromSeconds(1);
         options.Durability.FirstHealthCheckExecution = TimeSpan.FromSeconds(1);

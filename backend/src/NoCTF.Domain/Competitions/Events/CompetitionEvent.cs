@@ -45,7 +45,7 @@ public enum CompetitionEventKind : short
     CheatIncidentDismissed,
     CheatIncidentSuperseded,
     CheatIncidentCorrected,
-    ProtectedCompetitionExportCreated,
+    CompetitionArchiveExported,
     TeamBanAppealSubmitted,
     TeamBanAppealUpheld,
     TeamBanAppealAccepted,

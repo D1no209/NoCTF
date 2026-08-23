@@ -59,7 +59,7 @@ const EVENT_ACTION_LABELS: Partial<Record<NoCtfapiEndpointsCompetitionsEventsCom
   CheatIncidentDismissed: '驳回作弊事件',
   CheatIncidentSuperseded: '取代作弊事件处置',
   CheatIncidentCorrected: '纠正作弊事件处置',
-  ProtectedCompetitionExportCreated: '创建受保护竞赛导出',
+  CompetitionArchiveExported: '导出竞赛归档',
   TeamBanAppealUpheld: '维持队伍封禁',
   TeamBanAppealAccepted: '通过队伍申诉',
   TeamBanCorrectionPublished: '发布队伍封禁纠正',
@@ -116,6 +116,12 @@ export function platformAuditActionText(log: AuditLog): string {
 
   if (log.kind === 'CompetitionAdministration') {
     return withReason('强制级联删除竞赛', log.reason)
+  }
+
+  if (log.kind === 'PlatformAdministration') {
+    return log.platformAdministrationAction === 'AuditArchiveExported'
+      ? translate('导出平台审计归档')
+      : translate('执行平台管理操作')
   }
 
   const action = log.competitionEventKind ? EVENT_ACTION_LABELS[log.competitionEventKind] : null

@@ -17,7 +17,6 @@ public sealed class DataModelSchemaTests
         "competition_challenges",
         "competition_events",
         "competitions",
-        "data_exports",
         "files",
         "gameplay_facts",
         "notifications",
@@ -30,7 +29,7 @@ public sealed class DataModelSchemaTests
 
     [Test]
     [Category("Integration")]
-    public async Task Initial_baseline_contains_exactly_the_sixteen_business_tables(
+    public async Task Current_model_contains_exactly_the_fifteen_business_tables(
         CancellationToken ct)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -46,8 +45,11 @@ public sealed class DataModelSchemaTests
                 .UseNpgsql(postgres.GetConnectionString())
                 .UseSnakeCaseNamingConvention()
                 .Options;
+            // Stage 10 owns the EF-generated InitialBaseline. Until then, validate
+            // the current model directly without treating the legacy migration chain
+            // as the target schema.
             await using (var db = new NoCtfDbContext(options))
-                await db.Database.MigrateAsync(ct);
+                await db.Database.EnsureCreatedAsync(ct);
 
             await using var connection = new NpgsqlConnection(postgres.GetConnectionString());
             await connection.OpenAsync(ct);

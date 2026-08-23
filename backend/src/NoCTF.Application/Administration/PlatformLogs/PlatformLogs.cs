@@ -89,9 +89,15 @@ public enum PlatformAuditKind : short
 {
     CompetitionLifecycle,
     UserAccountLifecycle,
+    PlatformAdministration,
     CompetitionAdministration,
     CompetitionLeaderboardVisibility,
     CompetitionEvent
+}
+
+public enum PlatformAdministrationAction : short
+{
+    AuditArchiveExported
 }
 
 public sealed record PlatformAuditView(
@@ -105,6 +111,7 @@ public sealed record PlatformAuditView(
     CompetitionLeaderboardVisibility? FromLeaderboardVisibility,
     CompetitionLeaderboardVisibility? ToLeaderboardVisibility,
     UserAccountLifecycleAction? UserAccountAction,
+    PlatformAdministrationAction? PlatformAdministrationAction,
     CompetitionEventKind? CompetitionEventKind,
     CompetitionEventLevel? CompetitionEventLevel,
     CompetitionEventVisibility? CompetitionEventVisibility,

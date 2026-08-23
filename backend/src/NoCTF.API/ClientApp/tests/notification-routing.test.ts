@@ -74,7 +74,7 @@ describe('notificationTargetPath', () => {
   })
 
   test('keeps notification-only kinds out of competition event filters', () => {
-    for (const kind of ['StartGateFailed', 'ManagementFailure', 'DataExportReady', 'DataExportFailed'] as const) {
+    for (const kind of ['StartGateFailed', 'ManagementFailure', 'PlatformAuditExported'] as const) {
       const path = notificationTargetPath(notification(kind, 'competition-1'))
       expect(path).toBe('/notifications?notification=notification-1')
       expect(path).not.toContain('/events?kind=')

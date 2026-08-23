@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using NoCTF.Domain.DataExports;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Tests.Architecture;
@@ -21,18 +20,6 @@ public sealed class PersistenceModelTests
             .ToArray();
 
         await Assert.That(concurrencyProperties).IsEmpty();
-    }
-
-    [Test]
-    public async Task Active_data_export_slot_has_a_unique_index()
-    {
-        await using var db = CreateDb();
-        var entity = db.Model.FindEntityType(typeof(DataExport))!;
-        var index = entity.GetIndexes().Single(candidate =>
-            candidate.Properties.Select(property => property.Name).SequenceEqual(
-                ["RequestedByUserId", "Scope", "ActiveSlot"]));
-
-        await Assert.That(index.IsUnique).IsTrue();
     }
 
     private static NoCtfDbContext CreateDb() => new(

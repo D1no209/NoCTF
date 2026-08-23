@@ -13,7 +13,7 @@ using NoCTF.Infrastructure.Scoring;
 using NoCTF.Infrastructure.Storage;
 using NoCTF.Infrastructure.GameplayFacts;
 using NoCTF.Infrastructure.Teams;
-using NoCTF.Infrastructure.DataExports;
+using NoCTF.Infrastructure.Exports;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Observability;
 
@@ -55,7 +55,7 @@ public static class ServiceRegistration
         services.AddNoCtfCompetitions(development);
         services.AddNoCtfAuthentication();
         services.AddNoCtfAdministration(configuration, exporting, development);
-        services.AddNoCtfDataExports();
+        services.AddNoCtfSynchronousArchives();
         if (!exporting)
             services.AddHostedService<OperationalMetricsCollector>();
 

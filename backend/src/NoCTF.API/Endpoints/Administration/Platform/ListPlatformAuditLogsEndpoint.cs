@@ -23,9 +23,16 @@ public enum PlatformAuditKindProtocol
 {
     CompetitionLifecycle,
     UserAccountLifecycle,
+    PlatformAdministration,
     CompetitionAdministration,
     CompetitionLeaderboardVisibility,
     CompetitionEvent
+}
+
+[JsonConverter(typeof(StrictPascalCaseEnumConverter<PlatformAdministrationActionProtocol>))]
+public enum PlatformAdministrationActionProtocol
+{
+    AuditArchiveExported
 }
 
 [JsonConverter(typeof(StrictPascalCaseEnumConverter<UserAccountLifecycleActionProtocol>))]
@@ -46,6 +53,7 @@ internal static partial class PlatformAuditProtocolMapper
     [MapEnum(EnumMappingStrategy.ByName)] public static partial PlatformAuditKindProtocol ToProtocol(PlatformAuditKind value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial PlatformAuditKind ToDomain(PlatformAuditKindProtocol value);
     [MapEnum(EnumMappingStrategy.ByName)] public static partial UserAccountLifecycleActionProtocol ToProtocol(UserAccountLifecycleAction value);
+    [MapEnum(EnumMappingStrategy.ByName)] public static partial PlatformAdministrationActionProtocol ToProtocol(PlatformAdministrationAction value);
 }
 
 public sealed class ListPlatformAuditLogsRequest
@@ -92,6 +100,7 @@ public sealed record PlatformAuditLogResponse(
     LeaderboardVisibilityProtocol? FromLeaderboardVisibility,
     LeaderboardVisibilityProtocol? ToLeaderboardVisibility,
     UserAccountLifecycleActionProtocol? UserAccountAction,
+    PlatformAdministrationActionProtocol? PlatformAdministrationAction,
     CompetitionEventKindProtocol? CompetitionEventKind,
     CompetitionEventLevelProtocol? CompetitionEventLevel,
     CompetitionEventVisibilityProtocol? CompetitionEventVisibility,
@@ -170,6 +179,7 @@ public sealed class ListPlatformAuditLogsEndpoint(
                 view.FromLeaderboardVisibility is null ? null : CompetitionProtocolMapper.ToProtocol(view.FromLeaderboardVisibility.Value),
                 view.ToLeaderboardVisibility is null ? null : CompetitionProtocolMapper.ToProtocol(view.ToLeaderboardVisibility.Value),
                 view.UserAccountAction is null ? null : PlatformAuditProtocolMapper.ToProtocol(view.UserAccountAction.Value),
+                view.PlatformAdministrationAction is null ? null : PlatformAuditProtocolMapper.ToProtocol(view.PlatformAdministrationAction.Value),
                 view.CompetitionEventKind is null ? null : CompetitionEventProtocolMapper.ToProtocol(view.CompetitionEventKind.Value),
                 view.CompetitionEventLevel is null ? null : CompetitionEventProtocolMapper.ToProtocol(view.CompetitionEventLevel.Value),
                 view.CompetitionEventVisibility is null ? null : CompetitionEventProtocolMapper.ToProtocol(view.CompetitionEventVisibility.Value),

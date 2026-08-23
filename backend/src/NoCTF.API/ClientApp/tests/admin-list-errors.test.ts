@@ -30,14 +30,15 @@ describe('admin list error presentation', () => {
     expect(source).toContain('v-else-if="appeals.length > 0"')
   })
 
-  test('competition exports preserve the previous result and expose refresh failures', async () => {
+  test('competition archives download directly and preserve the form on failure', async () => {
     const source = await pageSource('admin/competitions/[id]/exports.vue')
 
-    expect(source).toContain('exportsError.value = parseApiError(error).message')
-    expect(source).toContain('exports_.value = data.items ?? []')
-    expect(source).toContain('<Alert v-if="exportsError" variant="destructive">')
-    expect(source).toContain('!exportsError && exports_.length === 0')
-    expect(source).toContain('v-else-if="exports_.length > 0"')
+    expect(source).toContain('adminExportCompetitionArchive({')
+    expect(source).toContain('if (exportingArchive.value) return')
+    expect(source).toContain('exportReason.value = \'\'')
+    expect(source).toContain('toast.error(parseApiError(e).message)')
+    const catchBody = source.slice(source.indexOf('catch (e)'), source.indexOf('finally'))
+    expect(catchBody).not.toContain('exportReason.value = \'\'')
   })
 
   test('challenge flags and hints keep loaded rows visible beside load failures', async () => {
@@ -54,11 +55,12 @@ describe('admin list error presentation', () => {
     expect(source).toContain('v-else-if="hints.length > 0"')
   })
 
-  test('platform audit exports do not turn an initial failure into no tasks', async () => {
+  test('platform audit archives download directly without an asynchronous task list', async () => {
     const source = await pageSource('admin/platform/audit.vue')
 
-    expect(source).toContain('exportsError.value = parseApiError(error).message')
-    expect(source).toContain('<Alert v-if="exportsError" variant="destructive"')
-    expect(source).toContain('!exportsError && exports_.length === 0')
+    expect(source).toContain('adminExportPlatformAuditArchive({')
+    expect(source).toContain('if (exportingArchive.value) return')
+    expect(source).toContain('toast.error(parseApiError(e).message)')
+    expect(source).not.toContain('exports_.value')
   })
 })

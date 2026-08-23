@@ -10,7 +10,7 @@
 4. [`PLAN.md`](PLAN.md)
 5. [`NoCTF-backend-handoff-2026-07-24.md`](NoCTF-backend-handoff-2026-07-24.md)
 
-## 当前阶段：阶段 2
+## 当前阶段：阶段 5
 
 - [x] 建立独立分支并记录 main 基线。
 - [x] 完整阅读项目规范、权威规范、现有 schema、OpenAPI、SDK 和 Wolverine 拓扑。
@@ -33,10 +33,33 @@
 
 ## 阶段 2：核心实体和隐私模型
 
-- [ ] 建立 User、Competition、Team、Challenge 字段和隐私边界基线。
-- [ ] 完成核心实体最小模型收敛，不新增业务表。
-- [ ] 以真实 PostgreSQL 验证唯一约束、邮箱 canonicalization 和隐私读取边界。
-- [ ] 更新 HANDOFF 并创建阶段 2 独立提交。
+- [x] 建立 User、Competition、Team、Challenge 字段和隐私边界基线。
+- [x] 完成核心实体最小模型收敛，不新增业务表。
+- [x] 以真实 PostgreSQL 验证唯一约束和隐私读取边界。
+- [x] 更新 HANDOFF 并创建阶段 2 独立提交。
+
+## 阶段 3：Notifications/Questions 线程化
+
+- [x] 使用 `ThreadRootId` 作为稳定线程成员边界。
+- [x] 保留 `ReplyToId` 作为可选回复上下文，不参与线程归属。
+- [x] 验证并发 append、稳定排序、状态计算、隐私和 append-only 根保护。
+- [x] 更新契约、SDK、前端、HANDOFF 并创建阶段 3 独立提交。
+
+## 阶段 4：同步流式导出并删除 DataExport
+
+- [x] 删除 DataExport Domain/Application/Infrastructure/Worker/API 和消息链。
+- [x] 保留并实现两个同步、可取消、有界 ZIP 流端点。
+- [x] 验证权限、受保护 Flag、审计、NotFound、取消和四类资源上限。
+- [x] 删除前端任务轮询并通过生成 SDK 直接下载。
+- [x] 更新 OpenAPI、SDK、文档、HANDOFF 并创建阶段 4 独立提交。
+
+## 阶段 5：Runtime 最小模型与节点直投
+
+- [ ] 建立 Runtime 字段、消息、Runner 路由和测试基线。
+- [ ] 删除冗余 Runtime 调度状态并把 Reset 改为新 UUID。
+- [ ] 按具体 Runner Sticky PostgreSQL endpoint 直投并移除 pool queue 消费。
+- [ ] 验证 URL 读取过滤、receipt Checker 目标、幂等和清理。
+- [ ] 更新契约、SDK、前端、HANDOFF 并创建阶段 5 独立提交。
 
 ## 后续阶段
 
