@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using AsyncKeyedLock;
 using System.Security.Cryptography;
 
 namespace NoCTF.Runtime.Libvirt;
@@ -7,8 +7,9 @@ public sealed class OvaArtifactCache(
     HttpClient httpClient,
     LibvirtRuntimeOptions options)
 {
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> digestLocks =
-        new(StringComparer.Ordinal);
+    private readonly AsyncKeyedLocker<string> digestLocks = new(
+        o => o.PoolSize = 20,
+        StringComparer.Ordinal);
 
     public async Task<string> ResolveAsync(
         Uri source,
@@ -21,9 +22,7 @@ public sealed class OvaArtifactCache(
             throw new InvalidOperationException("OVA SHA-256 digest is invalid.");
 
         var digest = expectedSha256.ToLowerInvariant();
-        var digestLock = digestLocks.GetOrAdd(digest, _ => new SemaphoreSlim(1, 1));
-        await digestLock.WaitAsync(cancellationToken);
-        try
+        using (await digestLocks.LockAsync(digest, cancellationToken))
         {
             Directory.CreateDirectory(options.CacheDirectory);
             var cachedPath = Path.Combine(options.CacheDirectory, $"{digest}.ova");
@@ -59,10 +58,6 @@ public sealed class OvaArtifactCache(
                 if (File.Exists(temporaryPath))
                     File.Delete(temporaryPath);
             }
-        }
-        finally
-        {
-            digestLock.Release();
         }
     }
 

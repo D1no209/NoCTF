@@ -1,5 +1,6 @@
-using System.Diagnostics;
 using System.Text.Json;
+using CliWrap;
+using CliWrap.Buffered;
 using NoCTF.Application.Runtime.Configuration;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Runtime;
@@ -172,47 +173,26 @@ public sealed class DockerComposeRuntime(
         CancellationToken cancellationToken,
         params string[] arguments)
     {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = dockerExecutable,
-                WorkingDirectory = directory,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
-        process.StartInfo.ArgumentList.Add("compose");
-        process.StartInfo.ArgumentList.Add("-p");
-        process.StartInfo.ArgumentList.Add(project);
-        process.StartInfo.ArgumentList.Add("-f");
-        process.StartInfo.ArgumentList.Add(Path.Combine(directory, "compose.yaml"));
-        process.StartInfo.ArgumentList.Add(command);
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-        process.Start();
-        var standardOutput = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var standardError = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None);
-            throw;
-        }
-        var output = await standardOutput;
-        var error = await standardError;
-        if (process.ExitCode != 0)
+        string[] commandArguments =
+        [
+            "compose",
+            "-p",
+            project,
+            "-f",
+            Path.Combine(directory, "compose.yaml"),
+            command,
+            .. arguments
+        ];
+        var result = await Cli.Wrap(dockerExecutable)
+            .WithWorkingDirectory(directory)
+            .WithArguments(commandArguments)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+        if (result.ExitCode != 0)
             throw new ComposeCommandFailedException(
-                process.ExitCode,
-                error);
-        return output;
+                result.ExitCode,
+                result.StandardError);
+        return result.StandardOutput;
     }
 
     private string ResolveOwnedDirectory(string directory)

@@ -4,17 +4,20 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
-public sealed class TeamRuntimeQuota(LocalCriticalSectionRegistry localLeases)
+public sealed class TeamRuntimeQuota(
+    AsyncKeyedLock.AsyncKeyedLocker<string> localLeases)
 {
-    public async ValueTask<IAsyncDisposable> AcquireLockAsync(
+    public async ValueTask<IDisposable> AcquireLockAsync(
         NoCtfDbContext db,
         Guid competitionId,
         Guid teamId,
         CancellationToken cancellationToken)
     {
         if (!db.Database.IsRelational())
-            return await localLeases.AcquireAsync(
-                "team-runtime-quota", $"{competitionId:N}:{teamId:N}", cancellationToken);
+            return await localLeases.LockOrNullAsync(
+                    $"team-runtime-quota:{competitionId:N}:{teamId:N}",
+                    TimeSpan.FromSeconds(2), cancellationToken)
+                ?? throw new FeatureCriticalSectionTimeoutException("team-runtime-quota");
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         budget.CancelAfter(TimeSpan.FromSeconds(2));

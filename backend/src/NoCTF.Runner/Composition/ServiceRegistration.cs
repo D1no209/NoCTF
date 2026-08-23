@@ -17,6 +17,8 @@ using NoCTF.Infrastructure.Authentication;
 using NoCTF.Infrastructure.Runtime.Capacity;
 using NoCTF.Runtime.Kubernetes.Networking;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 using StackExchange.Redis;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Caching;
@@ -42,61 +44,22 @@ public static class ServiceRegistration
         services.AddScoped<IAwdpFixExecutionFence, PostgresAwdpFixExecutionFence>();
         services.AddNoCtfLocalComputationCaching(configuration);
         services.AddHttpClient();
-        services.AddHttpClient(AwdpFixArchiveDownloader.ClientName)
+        services.AddHttpClient(
+                AwdpFixArchiveDownloader.ClientName,
+                client => client.Timeout = Timeout.InfiniteTimeSpan)
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
             {
                 AllowAutoRedirect = false
+            })
+            .AddResilienceHandler("awdp-archive", pipeline =>
+            {
+                var retry = CreateGetRetry(maxRetryAttempts: 2);
+                pipeline.AddRetry(retry);
             });
         var configuredProvider = configuration["Runner:Provider"];
-        var provider = Enum.TryParse<RuntimeProvider>(
-            configuredProvider,
-            ignoreCase: true,
-            out var parsedProvider)
-            ? parsedProvider
-            : (RuntimeProvider?)null;
-        services.AddOptions<RunnerAvailabilityOptions>()
-            .Configure(options =>
-            {
-                options.RunnerId = configuration["Runner:Id"] ?? string.Empty;
-                options.RunnerPool = configuration["Runner:Pool"] ?? string.Empty;
-                options.Provider = provider;
-                options.MemoryBytes = ReadLongOrZero(configuration, "Runner:Capacity:MemoryBytes");
-                options.NanoCpus = ReadLongOrZero(configuration, "Runner:Capacity:NanoCpus");
-                options.PidsLimit = ReadLongOrZero(configuration, "Runner:Capacity:PidsLimit");
-                options.HeartbeatIntervalSeconds = ReadIntOrZero(
-                    configuration,
-                    "Runner:Heartbeat:IntervalSeconds");
-                options.HeartbeatTtlSeconds = ReadIntOrZero(
-                    configuration,
-                    "Runner:Heartbeat:TtlSeconds");
-                options.ProviderFailureHoldSeconds = ReadPositiveIntOrDefault(
-                    configuration,
-                    "Runner:ProviderFailureHoldSeconds",
-                    120);
-            })
-            .Validate(
-                options => !string.IsNullOrWhiteSpace(options.RunnerId)
-                    && options.RunnerId.Length <= 128,
-                "Runner:Id must contain 1..128 characters.")
-            .Validate(
-                options => !string.IsNullOrWhiteSpace(options.RunnerPool)
-                    && options.RunnerPool.Length <= 256,
-                "Runner:Pool must contain 1..256 characters.")
-            .Validate(
-                options => options.Provider is not null,
-                "Runner:Provider must be Docker, Kubernetes, or Libvirt.")
-            .Validate(
-                options => options.MemoryBytes > 0
-                    && options.NanoCpus > 0
-                    && options.PidsLimit > 0,
-                "Runner capacity values must be positive integers.")
-            .Validate(
-                options => options.HeartbeatIntervalSeconds > 0
-                    && options.HeartbeatTtlSeconds > options.HeartbeatIntervalSeconds,
-                "Runner heartbeat TTL must be greater than its positive interval.")
-            .Validate(
-                options => options.ProviderFailureHoldSeconds > 0,
-                "Runner provider failure hold must be a positive number of seconds.")
+        services.AddSingleton<IValidateOptions<RunnerOptions>, RunnerOptionsValidator>();
+        services.AddOptions<RunnerOptions>()
+            .Bind(configuration.GetSection(RunnerOptions.SectionName))
             .ValidateOnStart();
         if (!development)
         {
@@ -129,18 +92,16 @@ public static class ServiceRegistration
             configuration["Runtime:Docker:CallbackContainer"] ?? string.Empty,
             configuration["Runtime:Docker:CallbackContainerLabelKey"] ?? "noctf.io/internal-role",
             configuration["Runtime:Docker:CallbackContainerLabelValue"] ?? "scoring-callback-gateway",
-            ReadPositiveLongOrDefault(
-                configuration,
-                "Runtime:Docker:RuntimeLogMaxSizeBytes",
-                10_485_760),
-            ReadPositiveIntOrDefault(
-                configuration,
-                "Runtime:Docker:RuntimeLogMaxFiles",
-                3),
-            ReadPositiveIntOrDefault(
-                configuration,
-                "Runtime:Docker:OneShotOutputLimitBytesPerStream",
-                1_048_576));
+            configuration.GetValue<long?>("Runtime:Docker:RuntimeLogMaxSizeBytes")
+                ?? 10_485_760,
+            configuration.GetValue<int?>("Runtime:Docker:RuntimeLogMaxFiles") ?? 3,
+            configuration.GetValue<int?>("Runtime:Docker:OneShotOutputLimitBytesPerStream")
+                ?? 1_048_576);
+        if (options.RuntimeLogMaxSizeBytes <= 0
+            || options.RuntimeLogMaxFiles <= 0
+            || options.OneShotOutputLimitBytesPerStream <= 0)
+            throw new InvalidOperationException(
+                "Docker Runtime limits must be configured as positive integers.");
         services.AddSingleton(options);
         services.AddSingleton<DockerContainerLifecycle>();
         services.AddSingleton<DockerComposeRuntime>();
@@ -157,19 +118,19 @@ public static class ServiceRegistration
             configuration["Runtime:Kubernetes:CallbackPodLabelKey"] ?? "noctf.io/internal-role",
             configuration["Runtime:Kubernetes:CallbackPodLabelValue"] ?? "awdp-callback",
             isKubernetesPool
-                ? ReadRequiredPositiveLong(configuration, "Runtime:Kubernetes:PodPidsLimit")
+                ? configuration.GetValue<long>("Runtime:Kubernetes:PodPidsLimit")
                 : 0,
             isKubernetesPool
-                ? ReadRequiredString(configuration, "Runtime:Kubernetes:ClusterDomain")
+                ? configuration["Runtime:Kubernetes:ClusterDomain"] ?? string.Empty
                 : string.Empty,
             isKubernetesPool
                 ? KubernetesEgressPolicy.ValidateClusterDnsServiceAddress(
-                    ReadRequiredString(
-                        configuration,
-                        "Runtime:Kubernetes:ClusterDnsServiceAddress"))
+                    configuration["Runtime:Kubernetes:ClusterDnsServiceAddress"]
+                        ?? string.Empty)
                 : string.Empty,
             isKubernetesPool
-                && ReadRequiredTrue(configuration, "Runtime:Kubernetes:NetworkPolicyRequired"),
+                && configuration.GetValue<bool>(
+                    "Runtime:Kubernetes:NetworkPolicyRequired"),
             isKubernetesPool
                 ? KubernetesEgressPolicy.ValidateAndNormalizeProtectedCidrs(
                     configuration.GetSection("Runtime:Kubernetes:ProtectedCidrs")
@@ -177,15 +138,26 @@ public static class ServiceRegistration
                         .Select(section => section.Value ?? string.Empty))
                 : null,
             isKubernetesPool
-                ? ReadRequiredString(
-                    configuration,
-                    "Runtime:Kubernetes:CallbackNamespaceLabelKey")
+                ? configuration["Runtime:Kubernetes:CallbackNamespaceLabelKey"]
+                    ?? string.Empty
                 : "kubernetes.io/metadata.name",
             isKubernetesPool
-                ? ReadRequiredString(
-                    configuration,
-                    "Runtime:Kubernetes:CallbackNamespaceLabelValue")
+                ? configuration["Runtime:Kubernetes:CallbackNamespaceLabelValue"]
+                    ?? string.Empty
                 : "noctf"));
+        if (isKubernetesPool
+            && (configuration.GetValue<long>("Runtime:Kubernetes:PodPidsLimit") <= 0
+                || string.IsNullOrWhiteSpace(configuration["Runtime:Kubernetes:ClusterDomain"])
+                || string.IsNullOrWhiteSpace(
+                    configuration["Runtime:Kubernetes:ClusterDnsServiceAddress"])
+                || !configuration.GetValue<bool>(
+                    "Runtime:Kubernetes:NetworkPolicyRequired")
+                || string.IsNullOrWhiteSpace(
+                    configuration["Runtime:Kubernetes:CallbackNamespaceLabelKey"])
+                || string.IsNullOrWhiteSpace(
+                    configuration["Runtime:Kubernetes:CallbackNamespaceLabelValue"])))
+            throw new InvalidOperationException(
+                "The active Kubernetes Runtime requires positive PIDs, cluster DNS, network policy, and callback namespace settings.");
         services.AddSingleton<IKubernetes>(_ =>
             new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig()));
         if (isKubernetesPool)
@@ -204,15 +176,17 @@ public static class ServiceRegistration
         if (isLibvirtPool || hasLibvirtConfiguration)
         {
             services.AddSingleton(new LibvirtRuntimeOptions(
-                ReadRequiredString(configuration, "Runtime:Libvirt:CacheDirectory"),
-                ReadRequiredString(configuration, "Runtime:Libvirt:WorkDirectory"),
-                ReadRequiredString(configuration, "Runtime:Libvirt:PoolRoutedNetworkCidr"),
-                ReadRequiredString(configuration, "Runtime:Libvirt:NodeRoutedNetworkCidr"),
-                ReadRequiredPositiveInt(
-                    configuration,
+                configuration["Runtime:Libvirt:CacheDirectory"] ?? string.Empty,
+                configuration["Runtime:Libvirt:WorkDirectory"] ?? string.Empty,
+                configuration["Runtime:Libvirt:PoolRoutedNetworkCidr"] ?? string.Empty,
+                configuration["Runtime:Libvirt:NodeRoutedNetworkCidr"] ?? string.Empty,
+                configuration.GetValue<int>(
                     "Runtime:Libvirt:RuntimeSubnetPrefixLength")));
             services.AddSingleton<ILibvirtProcessAdapter, LibvirtProcessAdapter>();
-            services.AddHttpClient<OvaArtifactCache>();
+            services.AddHttpClient<OvaArtifactCache>(client =>
+                    client.Timeout = Timeout.InfiniteTimeSpan)
+                .AddResilienceHandler("ova-artifact", pipeline =>
+                    pipeline.AddRetry(CreateGetRetry(maxRetryAttempts: 2)));
             services.AddSingleton<LibvirtRoutedNetworkManager>();
             services.AddSingleton<LibvirtApplianceLifecycle>();
             services.AddSingleton<IOvaRuntime>(provider =>
@@ -266,110 +240,17 @@ public static class ServiceRegistration
                 "RunnerScoring:CallbackBaseUrl must be configured as an absolute HTTP(S) URI.");
     }
 
-    private static long ReadRequiredPositiveLong(
-        IConfiguration configuration,
-        string key)
+    private static HttpRetryStrategyOptions CreateGetRetry(int maxRetryAttempts)
     {
-        var value = configuration[key];
-        if (!long.TryParse(
-                value,
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var parsed)
-            || parsed <= 0)
-            throw new InvalidOperationException(
-                $"{key} must be configured as a positive integer.");
-        return parsed;
+        var retry = new HttpRetryStrategyOptions
+        {
+            MaxRetryAttempts = maxRetryAttempts,
+            Delay = TimeSpan.FromMilliseconds(100),
+            BackoffType = DelayBackoffType.Exponential,
+            UseJitter = true
+        };
+        retry.DisableForUnsafeHttpMethods();
+        return retry;
     }
 
-    private static long ReadPositiveLongOrDefault(
-        IConfiguration configuration,
-        string key,
-        long defaultValue)
-    {
-        var value = configuration[key];
-        if (string.IsNullOrWhiteSpace(value))
-            return defaultValue;
-        if (!long.TryParse(
-                value,
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var parsed)
-            || parsed <= 0)
-            throw new InvalidOperationException(
-                $"{key} must be configured as a positive integer.");
-        return parsed;
-    }
-
-    private static int ReadRequiredPositiveInt(
-        IConfiguration configuration,
-        string key)
-    {
-        var value = configuration[key];
-        if (!int.TryParse(
-                value,
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var parsed)
-            || parsed <= 0)
-            throw new InvalidOperationException(
-                $"{key} must be configured as a positive integer.");
-        return parsed;
-    }
-
-    private static int ReadPositiveIntOrDefault(
-        IConfiguration configuration,
-        string key,
-        int defaultValue)
-    {
-        var value = configuration[key];
-        if (string.IsNullOrWhiteSpace(value))
-            return defaultValue;
-        if (!int.TryParse(
-                value,
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var parsed)
-            || parsed <= 0)
-            throw new InvalidOperationException(
-                $"{key} must be configured as a positive integer.");
-        return parsed;
-    }
-
-    private static string ReadRequiredString(
-        IConfiguration configuration,
-        string key)
-    {
-        var value = configuration[key];
-        if (string.IsNullOrWhiteSpace(value))
-            throw new InvalidOperationException($"{key} must be configured.");
-        return value;
-    }
-
-    private static bool ReadRequiredTrue(
-        IConfiguration configuration,
-        string key)
-    {
-        if (!bool.TryParse(configuration[key], out var value) || !value)
-            throw new InvalidOperationException($"{key} must be configured as true.");
-        return true;
-    }
-
-    private static long ReadLongOrZero(IConfiguration configuration, string key) =>
-        long.TryParse(
-            configuration[key],
-            System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture,
-            out var value)
-            ? value
-            : 0;
-
-    private static int ReadIntOrZero(IConfiguration configuration, string key) =>
-        int.TryParse(
-            configuration[key],
-            System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture,
-            out var value)
-            ? value
-            : 0;
 }

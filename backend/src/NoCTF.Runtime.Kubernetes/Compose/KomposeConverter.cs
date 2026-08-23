@@ -1,4 +1,5 @@
-using System.Diagnostics;
+using CliWrap;
+using CliWrap.Buffered;
 
 namespace NoCTF.Runtime.Kubernetes.Compose;
 
@@ -87,40 +88,15 @@ public sealed class KomposeConverter(
         CancellationToken cancellationToken,
         params string[] arguments)
     {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = executable,
-                WorkingDirectory = directory ?? workDirectory,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
-        foreach (var argument in arguments)
-            process.StartInfo.ArgumentList.Add(argument);
-        process.Start();
-        var output = process.StandardOutput.ReadToEndAsync(CancellationToken.None);
-        var error = process.StandardError.ReadToEndAsync(CancellationToken.None);
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(CancellationToken.None);
-            throw;
-        }
-
-        var result = new CommandResult(await output, await error);
-        if (process.ExitCode != 0)
+        var result = await Cli.Wrap(executable)
+            .WithWorkingDirectory(directory ?? workDirectory)
+            .WithArguments(arguments)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+        if (result.ExitCode != 0)
             throw new InvalidOperationException(
-                $"Kompose exited with code {process.ExitCode}: {result.Error}");
-        return result;
+                $"Kompose exited with code {result.ExitCode}: {result.StandardError}");
+        return new(result.StandardOutput, result.StandardError);
     }
 
     private static bool ContainsVersion(string output, string error, string requiredVersion)

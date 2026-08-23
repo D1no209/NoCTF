@@ -31,7 +31,7 @@ public sealed class AwdFlagInjectionHandlerTests
             new StubReader(work),
             new StubExecutor(new(17, false)),
             outbox,
-            RunnerConfiguration(),
+            RunnerConfiguration().ToRunnerOptions(),
             new FixedTimeProvider(now));
         var message = CreateMessage(now.AddMinutes(1));
 
@@ -53,7 +53,7 @@ public sealed class AwdFlagInjectionHandlerTests
             new StubReader(CreateWork()),
             new StubExecutor(new(-1, true)),
             outbox,
-            RunnerConfiguration(),
+            RunnerConfiguration().ToRunnerOptions(),
             new FixedTimeProvider(now));
 
         var outcome = await handler.ExecuteAsync(
@@ -107,7 +107,7 @@ public sealed class AwdFlagInjectionHandlerTests
             new StubReader(CreateWork()),
             executor,
             outbox,
-            RunnerConfiguration(),
+            RunnerConfiguration().ToRunnerOptions(),
             new FixedTimeProvider(now));
 
         await handler.ExecuteAsync(CreateMessage(now), CancellationToken.None);
@@ -127,7 +127,7 @@ public sealed class AwdFlagInjectionHandlerTests
             new StubReader(CreateWork()),
             new CallbackExecutor(() => clock.UtcNow = deadline),
             outbox,
-            RunnerConfiguration(),
+            RunnerConfiguration().ToRunnerOptions(),
             clock);
 
         await handler.ExecuteAsync(CreateMessage(deadline), CancellationToken.None);

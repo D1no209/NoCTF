@@ -36,8 +36,9 @@ public sealed class RuntimeInstanceStore(
             placementPolicy,
             runtimeFlags,
             outbox,
-            new TeamRuntimeQuota(new LocalCriticalSectionRegistry()),
-            eventRecorder) { }
+            new TeamRuntimeQuota(new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            eventRecorder)
+    { }
 
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -97,7 +98,7 @@ public sealed class RuntimeInstanceStore(
         var includesLegacyAwdpPurpose = scope.Mode == GameMode.Awdp
             && purpose == RuntimePurpose.AwdpAttack;
 
-        await using var quotaLease = await runtimeQuota.AcquireLockAsync(
+        using var quotaLease = await runtimeQuota.AcquireLockAsync(
             db,
             command.CompetitionId,
             scope.TeamId,

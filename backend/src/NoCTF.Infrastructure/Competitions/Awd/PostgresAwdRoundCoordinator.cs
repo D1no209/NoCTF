@@ -31,7 +31,9 @@ public sealed class PostgresAwdRoundCoordinator(
             configurations,
             outbox,
             timeProvider,
-            new TeamChallengeCriticalSection(new LocalCriticalSectionRegistry())) { }
+            new TeamChallengeCriticalSection(
+                new AsyncKeyedLock.AsyncKeyedLocker<string>()))
+    { }
 
     public async Task<MessageExecutionOutcome> GenerateFlagsAsync(
         GenerateAwdFlags message,
@@ -142,7 +144,7 @@ public sealed class PostgresAwdRoundCoordinator(
         var candidates = existingFlags.Select(flag => flag.Flag).ToHashSet(StringComparer.Ordinal);
         foreach (var teamId in missing)
         {
-            await using var teamLease = await teamChallengeCriticalSection.AcquireAsync(
+            using var teamLease = await teamChallengeCriticalSection.AcquireAsync(
                 db,
                 teamId,
                 message.CompetitionChallengeId,

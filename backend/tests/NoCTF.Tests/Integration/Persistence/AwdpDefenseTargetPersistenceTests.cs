@@ -160,7 +160,8 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var intake = new GameplayFactIntakeStore(
                 attemptDb,
                 attemptOutbox,
-                new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()));
+                new GameplayFactAttemptCriticalSection(
+                    new AsyncKeyedLock.AsyncKeyedLocker<string>()));
             var staleAdmission = await intake.LoadAdmissionAsync(
                 fixture.CompetitionId,
                 fixture.CompetitionChallengeId,
@@ -173,7 +174,8 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var patchStore = new PatchUploadStore(
                 patchDb,
                 patchOutbox,
-                new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()),
+                new GameplayFactAttemptCriticalSection(
+                    new AsyncKeyedLock.AsyncKeyedLocker<string>()),
                 new FileReferenceLock(),
                 NullLogger<PatchUploadStore>.Instance,
                 new CompetitionEventStore(patchDb, patchOutbox));
@@ -268,7 +270,8 @@ public sealed class AwdpDefenseTargetPersistenceTests
         var store = new PatchUploadStore(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()),
+            new GameplayFactAttemptCriticalSection(
+                new AsyncKeyedLock.AsyncKeyedLocker<string>()),
             new FileReferenceLock(),
             NullLogger<PatchUploadStore>.Instance,
             new CompetitionEventStore(db, outbox));

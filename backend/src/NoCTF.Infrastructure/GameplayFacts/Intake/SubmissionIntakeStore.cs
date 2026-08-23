@@ -23,8 +23,10 @@ public sealed class GameplayFactIntakeStore(
         : this(
             db,
             outbox,
-            new GameplayFactAttemptCriticalSection(new LocalCriticalSectionRegistry()),
-            eventRecorder) { }
+            new GameplayFactAttemptCriticalSection(
+                new AsyncKeyedLock.AsyncKeyedLocker<string>()),
+            eventRecorder)
+    { }
 
     private readonly ICompetitionEventRecorder events =
         eventRecorder ?? NullCompetitionEventRecorder.Instance;
@@ -58,7 +60,7 @@ public sealed class GameplayFactIntakeStore(
             return [];
         await using var transaction = await db.Database.BeginTransactionAsync(
             IsolationLevel.ReadCommitted, cancellationToken);
-        await using var attemptLease = await attemptCriticalSection.AcquireAsync(
+        using var attemptLease = await attemptCriticalSection.AcquireAsync(
             db,
             received[0].TeamId,
             received[0].CompetitionChallengeId,

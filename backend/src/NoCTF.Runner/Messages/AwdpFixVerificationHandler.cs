@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NoCTF.Application.Authentication;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
@@ -373,7 +374,7 @@ public sealed class AwdpFixVerificationHandler(
     IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
     IRunnerCapacityGate capacity,
     ITransactionalMessageOutbox outbox,
-    IConfiguration configuration,
+    IOptions<RunnerOptions> runnerOptions,
     ILogger<AwdpFixVerificationHandler> logger)
 {
     public async Task Handle(
@@ -382,9 +383,8 @@ public sealed class AwdpFixVerificationHandler(
     {
         RunnerNodeAssignmentGuard.Validate(
             message,
-            configuration["Runner:Pool"] ?? "default",
-            configuration["Runner:Id"]
-                ?? throw new InvalidOperationException("Runner:Id is required."));
+            runnerOptions.Value.Pool,
+            runnerOptions.Value.Id);
         var claim = await reader.ClaimAsync(message, cancellationToken);
         if (claim.Disposition == AwdpFixExecutionFenceDisposition.Recover)
         {

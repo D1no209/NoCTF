@@ -3,16 +3,19 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Runtime.Instances;
 
-public sealed class SharedRuntimeCriticalSection(LocalCriticalSectionRegistry localLeases)
+public sealed class SharedRuntimeCriticalSection(
+    AsyncKeyedLock.AsyncKeyedLocker<string> localLeases)
 {
-    public async ValueTask<IAsyncDisposable> AcquireAsync(
+    public async ValueTask<IDisposable> AcquireAsync(
         NoCtfDbContext db,
         Guid competitionChallengeId,
         CancellationToken cancellationToken)
     {
         if (!db.Database.IsRelational())
-            return await localLeases.AcquireAsync(
-                "shared-runtime", $"{competitionChallengeId:N}", cancellationToken);
+            return await localLeases.LockOrNullAsync(
+                    $"shared-runtime:{competitionChallengeId:N}",
+                    TimeSpan.FromSeconds(2), cancellationToken)
+                ?? throw new FeatureCriticalSectionTimeoutException("shared-runtime");
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         budget.CancelAfter(TimeSpan.FromSeconds(2));

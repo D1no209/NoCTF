@@ -4,9 +4,10 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.GameplayFacts.Intake;
 
-public sealed class GameplayFactAttemptCriticalSection(LocalCriticalSectionRegistry localLeases)
+public sealed class GameplayFactAttemptCriticalSection(
+    AsyncKeyedLock.AsyncKeyedLocker<string> localLeases)
 {
-    public async ValueTask<IAsyncDisposable> AcquireAsync(
+    public async ValueTask<IDisposable> AcquireAsync(
         NoCtfDbContext db,
         Guid teamId,
         Guid competitionChallengeId,
@@ -15,10 +16,10 @@ public sealed class GameplayFactAttemptCriticalSection(LocalCriticalSectionRegis
     {
         if (!db.Database.IsRelational())
         {
-            return await localLeases.AcquireAsync(
-                "submission-attempt",
-                $"{teamId:N}:{competitionChallengeId:N}:{(short)kind}",
-                cancellationToken);
+            return await localLeases.LockOrNullAsync(
+                    $"submission-attempt:{teamId:N}:{competitionChallengeId:N}:{(short)kind}",
+                    TimeSpan.FromSeconds(2), cancellationToken)
+                ?? throw new FeatureCriticalSectionTimeoutException("submission-attempt");
         }
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

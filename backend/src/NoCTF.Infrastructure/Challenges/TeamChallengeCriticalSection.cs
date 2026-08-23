@@ -3,9 +3,10 @@ using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Infrastructure.Challenges;
 
-public sealed class TeamChallengeCriticalSection(LocalCriticalSectionRegistry localLeases)
+public sealed class TeamChallengeCriticalSection(
+    AsyncKeyedLock.AsyncKeyedLocker<string> localLeases)
 {
-    public async ValueTask<IAsyncDisposable> AcquireAsync(
+    public async ValueTask<IDisposable> AcquireAsync(
         NoCtfDbContext db,
         Guid teamId,
         Guid competitionChallengeId,
@@ -13,10 +14,10 @@ public sealed class TeamChallengeCriticalSection(LocalCriticalSectionRegistry lo
     {
         if (!db.Database.IsRelational())
         {
-            return await localLeases.AcquireAsync(
-                "team-challenge",
-                $"{teamId:N}:{competitionChallengeId:N}",
-                cancellationToken);
+            return await localLeases.LockOrNullAsync(
+                    $"team-challenge:{teamId:N}:{competitionChallengeId:N}",
+                    TimeSpan.FromSeconds(2), cancellationToken)
+                ?? throw new FeatureCriticalSectionTimeoutException("team-challenge");
         }
 
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

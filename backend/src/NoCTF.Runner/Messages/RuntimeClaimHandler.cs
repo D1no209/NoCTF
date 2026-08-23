@@ -5,6 +5,9 @@ using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Infrastructure.Persistence;
+using Microsoft.Extensions.Options;
+using NoCTF.Runner.Composition;
+using NoCTF.Runtime.Kubernetes.Configuration;
 
 namespace NoCTF.Runner.Messages;
 
@@ -12,7 +15,8 @@ public sealed class RuntimeClaimHandler(
     NoCtfDbContext db,
     IRunnerCapacityGate capacity,
     ITransactionalMessageOutbox outbox,
-    IConfiguration configuration)
+    IOptions<RunnerOptions> configuredRunner,
+    KubernetesRuntimeOptions kubernetesOptions)
 {
     private static readonly TimeSpan CapacityRetryDelay = TimeSpan.FromSeconds(5);
 
@@ -104,29 +108,14 @@ public sealed class RuntimeClaimHandler(
     {
         if (provider != RuntimeProvider.Kubernetes)
             return configured;
-        var podPidsLimit = ReadPositiveLong(
-            "Runtime:Kubernetes:PodPidsLimit",
-            defaultValue: null);
+        var podPidsLimit = kubernetesOptions.PodPidsLimit;
+        if (podPidsLimit <= 0)
+            throw new InvalidOperationException(
+                "Runtime:Kubernetes:PodPidsLimit must be configured as a positive integer.");
         return configured with
         {
             PidsLimit = checked(podPidsLimit * podCount)
         };
-    }
-
-    private long ReadPositiveLong(string key, long? defaultValue)
-    {
-        var text = configuration[key];
-        if (string.IsNullOrWhiteSpace(text) && defaultValue is long fallback)
-            return fallback;
-        if (!long.TryParse(
-                text,
-                System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var parsed)
-            || parsed <= 0)
-            throw new InvalidOperationException(
-                $"{key} must be configured as a positive integer.");
-        return parsed;
     }
 
     private async Task<MessageExecutionOutcome> ExecuteAsync(
@@ -139,7 +128,7 @@ public sealed class RuntimeClaimHandler(
         Func<long, string, ValueTask> publishProvision,
         CancellationToken cancellationToken)
     {
-        var configuredPool = configuration["Runner:Pool"] ?? "default";
+        var configuredPool = configuredRunner.Value.Pool;
         if (!string.Equals(runnerPool, configuredPool, StringComparison.Ordinal)
             || RunnerQueueName.FromPool(runnerPool) != RunnerQueueName.FromPool(configuredPool))
         {
@@ -147,8 +136,7 @@ public sealed class RuntimeClaimHandler(
                 "Runtime claim was delivered to the wrong Runner pool.");
         }
 
-        var runnerId = configuration["Runner:Id"]
-            ?? throw new InvalidOperationException("Runner:Id is required.");
+        var runnerId = configuredRunner.Value.Id;
         var instance = await db.RuntimeInstances.AsNoTracking().SingleOrDefaultAsync(
             candidate => candidate.Id == runtimeInstanceId,
             cancellationToken);

@@ -270,7 +270,7 @@ public sealed class RunnerAssignmentReconciliationTests
             var handler = new RuntimeProviderHandler(
                 new UnusedRuntimeProviderCatalog(),
                 [reconciler],
-                configuration,
+                configuration.ToRunnerOptions(),
                 capacity,
                 workReader);
 
@@ -431,7 +431,7 @@ public sealed class RunnerAssignmentReconciliationTests
             var runner = new RuntimeProviderHandler(
                 new UnusedRuntimeProviderCatalog(),
                 [reconciler],
-                configuration,
+                configuration.ToRunnerOptions(),
                 capacity,
                 workReader);
             var acknowledgement = (RuntimeStopped)await runner.Handle(
@@ -572,7 +572,7 @@ public sealed class RunnerAssignmentReconciliationTests
                     RuntimeProvider.Docker,
                     [],
                     failCleanup: true)],
-                configuration,
+                configuration.ToRunnerOptions(),
                 capacity,
                 workReader);
             var failure = (RuntimeStopFailed)await failedHandler.Handle(
@@ -660,7 +660,7 @@ public sealed class RunnerAssignmentReconciliationTests
             var successHandler = new RuntimeProviderHandler(
                 new UnusedRuntimeProviderCatalog(),
                 [successfulReconciler],
-                configuration,
+                configuration.ToRunnerOptions(),
                 capacity,
                 workReader);
             var acknowledgement = (RuntimeStopped)await successHandler.Handle(
@@ -1826,7 +1826,7 @@ public sealed class RunnerAssignmentReconciliationTests
             var handler = new RuntimeResourceReconciliationHandler(
                 db,
                 [provider],
-                configuration,
+                configuration.ToRunnerOptions(),
                 capacity);
 
             await handler.Handle(
@@ -1924,7 +1924,7 @@ public sealed class RunnerAssignmentReconciliationTests
                     var handler = new RuntimeResourceReconciliationHandler(
                         runnerADb,
                         [reconciler],
-                        RunnerConfiguration("runner-a"),
+                        RunnerConfiguration("runner-a").ToRunnerOptions(),
                         capacity);
                     await handler.Handle(
                         new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now),
@@ -1941,7 +1941,7 @@ public sealed class RunnerAssignmentReconciliationTests
                     var handler = new RuntimeResourceReconciliationHandler(
                         runnerBDb,
                         [reconciler],
-                        RunnerConfiguration("runner-b", "pool-b"),
+                        RunnerConfiguration("runner-b", "pool-b").ToRunnerOptions(),
                         capacity);
                     await handler.Handle(
                         new ReconcileRuntimeResources("pool-b", "runner-b", fixture.Now),
@@ -2014,7 +2014,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 var handler = new RuntimeResourceReconciliationHandler(
                     db,
                     [reconciler],
-                    configuration,
+                    configuration.ToRunnerOptions(),
                     capacity,
                     providers);
                 Func<Task> action = () => handler.Handle(message, cancellationToken);
@@ -2025,7 +2025,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 var handler = new RuntimeResourceReconciliationHandler(
                     replayDb,
                     [reconciler],
-                    configuration,
+                    configuration.ToRunnerOptions(),
                     capacity,
                     providers);
                 Func<Task> action = () => handler.Handle(message, cancellationToken);
@@ -2102,7 +2102,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 var handler = new RuntimeResourceReconciliationHandler(
                     cleanupDb,
                     [cleanupFailure],
-                    configuration,
+                    configuration.ToRunnerOptions(),
                     cleanupCapacity,
                     new RecordingReceiptProviderCatalog(failingReceiptResources));
                 Func<Task> action = () => handler.Handle(
@@ -2123,7 +2123,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 var handler = new RuntimeResourceReconciliationHandler(
                     mismatchDb,
                     [reconciler],
-                    configuration,
+                    configuration.ToRunnerOptions(),
                     mismatchedCapacity,
                     providers);
                 Func<Task> action = () => handler.Handle(
@@ -2155,7 +2155,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 var handler = new RuntimeResourceReconciliationHandler(
                     convergeDb,
                     [reconciler],
-                    configuration,
+                    configuration.ToRunnerOptions(),
                     capacity,
                     providers);
                 await handler.Handle(message, cancellationToken);
@@ -2165,7 +2165,7 @@ public sealed class RunnerAssignmentReconciliationTests
                 var handler = new RuntimeResourceReconciliationHandler(
                     replayDb,
                     [reconciler],
-                    configuration,
+                    configuration.ToRunnerOptions(),
                     capacity,
                     providers);
                 await handler.Handle(message, cancellationToken);

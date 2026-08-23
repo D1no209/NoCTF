@@ -62,16 +62,22 @@ public sealed class RunnerAvailabilityPublisherTests
                     new HashEntry("pidsLimit", 1)
                 ]);
             var registry = new RedisRunnerAvailabilityRegistry(redis);
-            var availabilityOptions = Options.Create(new RunnerAvailabilityOptions
+            var availabilityOptions = Options.Create(new RunnerOptions
             {
-                RunnerId = "runner-a",
-                RunnerPool = "pool-a",
+                Id = "runner-a",
+                Pool = "pool-a",
                 Provider = RuntimeProvider.Docker,
-                MemoryBytes = 1024,
-                NanoCpus = 100,
-                PidsLimit = 10,
-                HeartbeatIntervalSeconds = 1,
-                HeartbeatTtlSeconds = 10,
+                Capacity = new()
+                {
+                    MemoryBytes = 1024,
+                    NanoCpus = 100,
+                    PidsLimit = 10
+                },
+                Heartbeat = new()
+                {
+                    IntervalSeconds = 1,
+                    TtlSeconds = 10
+                },
                 ProviderFailureHoldSeconds = 120
             });
             var providerHealth = new RunnerProviderHealthState(
@@ -83,6 +89,7 @@ public sealed class RunnerAvailabilityPublisherTests
                 registry,
                 availabilityOptions,
                 NullLogger<RunnerAvailabilityPublisher>.Instance,
+                TimeProvider.System,
                 providerHealth);
 
             var blocked = await publisher.PublishOnceAsync(cancellationToken);
@@ -109,7 +116,7 @@ public sealed class RunnerAvailabilityPublisherTests
                 var handler = new RuntimeResourceReconciliationHandler(
                     cleanupDb,
                     [reconciler],
-                    configuration,
+                    configuration.ToRunnerOptions(),
                     new RedisRunnerCapacityGate(redis),
                     new RecordingReceiptProviderCatalog(receiptResources));
                 await handler.Handle(

@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NoCTF.Application.Administration.PlatformLogs;
@@ -6,6 +5,7 @@ using NoCTF.Application.Authentication.EmailVerification;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Hosting;
+using NoCTF.Hosting.Messaging;
 using Wolverine;
 using Wolverine.ErrorHandling;
 using Wolverine.Postgresql;
@@ -47,15 +47,19 @@ public static class WorkerRole
         options.Durability.ScheduledJobPollingTime = TimeSpan.FromSeconds(1);
         options.Durability.DurabilityMetricsEnabled = true;
         options.Durability.UpdateMetricsPeriod = TimeSpan.FromSeconds(5);
-        options.Policies.OnException<TimeoutException>()
-            .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
-        options.Policies.OnException<System.Net.Http.HttpRequestException>()
-            .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
-        options.Policies.OnException<EmailVerificationDeliveryException>()
-            .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
-        options.Policies.OnException<Npgsql.NpgsqlException>()
-            .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(15), TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
-        options.Policies.OnException<DbUpdateConcurrencyException>().RetryTimes(5);
+        options.ConfigureNoCtfInfrastructureRetries();
+        options.Policies.OnException<EmailVerificationDeliveryException>(
+                exception => exception.Failure is
+                    EmailVerificationDeliveryFailure.ConnectionFailed
+                    or EmailVerificationDeliveryFailure.TimedOut
+                    or EmailVerificationDeliveryFailure.TransportFailed)
+            .ScheduleRetry(ScheduledEmailRetryDelays)
+            .WithFullJitter();
+        options.Policies.OnException<EmailVerificationDeliveryException>(
+                exception => exception.Failure is
+                    EmailVerificationDeliveryFailure.AuthenticationFailed
+                    or EmailVerificationDeliveryFailure.MessageRejected)
+            .MoveToErrorQueue();
         if (!durable)
             return;
 
@@ -66,4 +70,14 @@ public static class WorkerRole
                 .UseDurableInbox();
         }
     }
+
+    private static readonly TimeSpan[] ScheduledEmailRetryDelays =
+    [
+        TimeSpan.FromSeconds(1),
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(15),
+        TimeSpan.FromMinutes(1),
+        TimeSpan.FromMinutes(5)
+    ];
+
 }

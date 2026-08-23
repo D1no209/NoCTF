@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 using NoCTF.Application.Competitions.Awd;
 using NoCTF.Application.Competitions.Configuration;
 using NoCTF.Application.Competitions.Koh;
@@ -47,6 +49,18 @@ internal static class CompetitionInfrastructure
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
                 AllowAutoRedirect = false
+            })
+            .AddResilienceHandler("koh-observe", pipeline =>
+            {
+                var retry = new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 1,
+                    Delay = TimeSpan.FromMilliseconds(100),
+                    BackoffType = DelayBackoffType.Constant,
+                    UseJitter = true
+                };
+                retry.DisableForUnsafeHttpMethods();
+                pipeline.AddRetry(retry);
             });
         services.AddTransient<IKohControlClient, HttpKohControlClient>();
         services.AddSingleton(TimeProvider.System);

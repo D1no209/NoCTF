@@ -1,4 +1,5 @@
-using System.Diagnostics;
+using CliWrap;
+using CliWrap.Buffered;
 
 namespace NoCTF.Runtime.Libvirt;
 
@@ -31,35 +32,13 @@ public sealed class LibvirtProcessAdapter : ILibvirtProcessAdapter
         if (!AllowedExecutables.Contains(executable))
             throw new InvalidOperationException(
                 $"Executable '{executable}' is not allowed by the Libvirt process adapter.");
-        var startInfo = new ProcessStartInfo(executable)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException($"Unable to start {executable}.");
-        var standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var standardError = process.StandardError.ReadToEndAsync(cancellationToken);
-        try
-        {
-            await process.WaitForExitAsync(cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited)
-                process.Kill(entireProcessTree: true);
-            throw;
-        }
+        var result = await Cli.Wrap(executable)
+            .WithArguments(arguments)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
         return new LibvirtProcessResult(
-            process.ExitCode,
-            await standardOutput,
-            await standardError);
+            result.ExitCode,
+            result.StandardOutput,
+            result.StandardError);
     }
 }

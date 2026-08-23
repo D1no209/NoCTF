@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 using NoCTF.Application.Administration;
 using NoCTF.Application.Administration.Monitoring;
 using NoCTF.Application.Administration.PlatformConfiguration;
@@ -69,11 +71,25 @@ internal static class AdministrationInfrastructure
                         client =>
                         {
                             client.BaseAddress = NormalizeBaseUri(prometheusUri);
-                            client.Timeout = TimeSpan.FromSeconds(5);
+                            client.Timeout = Timeout.InfiniteTimeSpan;
                         })
                     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
                     {
                         AllowAutoRedirect = false
+                    })
+                    .AddStandardResilienceHandler(options =>
+                    {
+                        options.Retry.MaxRetryAttempts = 2;
+                        options.Retry.Delay = TimeSpan.FromMilliseconds(100);
+                        options.Retry.BackoffType = DelayBackoffType.Exponential;
+                        options.Retry.UseJitter = true;
+                        options.Retry.DisableForUnsafeHttpMethods();
+                        options.CircuitBreaker.FailureRatio = 0.5;
+                        options.CircuitBreaker.MinimumThroughput = 4;
+                        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(10);
+                        options.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(5);
+                        options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(2);
+                        options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(5);
                     });
                 services.AddSingleton<IPlatformMonitoringReader,
                     PrometheusPlatformMonitoringReader>();
