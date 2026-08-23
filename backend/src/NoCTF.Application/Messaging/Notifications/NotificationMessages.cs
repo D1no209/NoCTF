@@ -58,7 +58,7 @@ public sealed record TeamBanCorrected(
 
 public sealed record DeliverCompetitionQuestionNotification(
     Guid CompetitionId,
-    Guid QuestionId,
+    Guid ThreadRootId,
     Guid? EntryId,
     Guid[] RecipientUserIds,
     NotificationKind Kind,

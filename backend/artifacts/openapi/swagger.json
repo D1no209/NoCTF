@@ -1479,7 +1479,7 @@
           "Notifications"
         ],
         "summary": "Read an authorized notification thread.",
-        "description": "Returns the immutable linear notification chain in chronological order.",
+        "description": "Returns the immutable notification thread in stable chronological order.",
         "operationId": "ReadNotificationThreadEndpoint",
         "parameters": [
           {
@@ -3432,7 +3432,7 @@
         ]
       }
     },
-    "/api/v1/competitions/{competitionId}/questions/{questionId}/messages": {
+    "/api/v1/competitions/{competitionId}/questions/{threadRootId}/messages": {
       "post": {
         "tags": [
           "Competitions"
@@ -3450,7 +3450,7 @@
             }
           },
           {
-            "name": "questionId",
+            "name": "threadRootId",
             "in": "path",
             "required": true,
             "schema": {
@@ -3519,7 +3519,7 @@
         ]
       }
     },
-    "/api/v1/competitions/{competitionId}/questions/{questionId}/status": {
+    "/api/v1/competitions/{competitionId}/questions/{threadRootId}/status": {
       "put": {
         "tags": [
           "Competitions"
@@ -3537,7 +3537,7 @@
             }
           },
           {
-            "name": "questionId",
+            "name": "threadRootId",
             "in": "path",
             "required": true,
             "schema": {
@@ -3796,7 +3796,7 @@
         ]
       }
     },
-    "/api/v1/competitions/{competitionId}/questions/{questionId}": {
+    "/api/v1/competitions/{competitionId}/questions/{threadRootId}": {
       "get": {
         "tags": [
           "Competitions"
@@ -3814,7 +3814,7 @@
             }
           },
           {
-            "name": "questionId",
+            "name": "threadRootId",
             "in": "path",
             "required": true,
             "schema": {
@@ -13852,6 +13852,11 @@
             "format": "guid",
             "nullable": true
           },
+          "threadRootId": {
+            "type": "string",
+            "format": "guid",
+            "nullable": true
+          },
           "replyToId": {
             "type": "string",
             "format": "guid",
@@ -16585,7 +16590,7 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": {
+          "threadRootId": {
             "type": "string",
             "format": "guid"
           },

@@ -36,7 +36,7 @@ public sealed class AddCompetitionQuestionMessageEndpoint(
 {
     public override void Configure()
     {
-        Post("/competitions/{competitionId}/questions/{questionId}/messages");
+        Post("/competitions/{competitionId}/questions/{threadRootId}/messages");
         AuthSchemes("Bearer");
         Description(builder => builder
             .WithName("AddCompetitionQuestionMessage")
@@ -61,7 +61,7 @@ public sealed class AddCompetitionQuestionMessageEndpoint(
             return TypedResults.Forbid();
         var result = await add.ExecuteAsync(new(
             Route<Guid>("competitionId"),
-            Route<Guid>("questionId"),
+            Route<Guid>("threadRootId"),
             user.UserId,
             request.Body,
             DateTimeOffset.UtcNow), ct);

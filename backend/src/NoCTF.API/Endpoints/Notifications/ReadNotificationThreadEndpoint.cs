@@ -18,7 +18,7 @@ public sealed class ReadNotificationThreadEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Read an authorized notification thread.";
-            summary.Description = "Returns the immutable linear notification chain in chronological order.";
+            summary.Description = "Returns the immutable notification thread in stable chronological order.";
         });
     }
 
@@ -41,6 +41,7 @@ public sealed class ReadNotificationThreadEndpoint(
             JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
             item.RelatedType,
             item.RelatedId,
+            item.ThreadRootId,
             item.ReplyToId,
             item.SentAt,
             item.SourceDisplayName)).ToArray();

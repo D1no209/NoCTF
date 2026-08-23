@@ -141,7 +141,7 @@ async function submitCreate() {
     createBody.value = ''
     createError.value = null
     upsertQuestion(data)
-    await select(data.id!)
+    await select(data.threadRootId!)
   }
   catch (error) {
     createError.value = competitionQuestionErrorMessage(error, translate("提交咨询失败"))
@@ -166,7 +166,9 @@ const detailRequests = createLatestRequestGuard()
 
 function applyDetailQuestion(question: Question, markAsRead = true) {
   const currentDetail = detail.value
-  const current = currentDetail && currentDetail.id === question.id ? [currentDetail] : []
+  const current = currentDetail && currentDetail.threadRootId === question.threadRootId
+    ? [currentDetail]
+    : []
   const fresh = mergeCompetitionQuestions(current, [question])[0] ?? question
   detail.value = fresh
   upsertQuestion(fresh)
@@ -182,7 +184,7 @@ async function select(id: string, syncRoute = true) {
     void router.replace({ query: { ...route.query, question: id } })
   }
   try {
-    const { data, error } = await getCompetitionQuestion({ path: { competitionId, questionId: id } })
+    const { data, error } = await getCompetitionQuestion({ path: { competitionId, threadRootId: id } })
     if (!detailRequests.isCurrent(request) || selectedId.value !== id) return
     if (error || !data) {
       toast.error(parseApiError(error, translate("加载咨询详情失败")).message)
@@ -211,7 +213,7 @@ const refreshSelectedDetail = createTrailingRefresh(async () => {
   if (!questionId) return
 
   try {
-    const { data, error } = await getCompetitionQuestion({ path: { competitionId, questionId } })
+    const { data, error } = await getCompetitionQuestion({ path: { competitionId, threadRootId: questionId } })
     if (error || !data || selectedId.value !== questionId) return
     applyDetailQuestion(data, document.visibilityState === 'visible')
   }
@@ -255,7 +257,7 @@ async function submitReply() {
   replyPending.value = true
   try {
     const { data, error } = await addCompetitionQuestionMessage({
-      path: { competitionId, questionId: detail.value.id! },
+      path: { competitionId, threadRootId: detail.value.threadRootId! },
       body: { body: reply.value.trim() },
     })
     if (error || !data) {
@@ -284,7 +286,7 @@ async function changeStatus(status: 'Resolved' | 'Closed') {
   statusPending.value = true
   try {
     const { data, error } = await changeCompetitionQuestionStatus({
-      path: { competitionId, questionId: detail.value.id! },
+      path: { competitionId, threadRootId: detail.value.threadRootId! },
       body: { status },
     })
     if (error || !data) {
@@ -412,12 +414,12 @@ const participantLimitReached = computed(() =>
         </EmptyHeader>
       </Empty>
       <ul v-else-if="questions.length" class="flex flex-col gap-2">
-        <li v-for="q in questions" :key="q.id">
+        <li v-for="q in questions" :key="q.threadRootId">
           <button
             type="button"
             class="w-full rounded-md border px-3 py-2 text-left transition-colors hover:border-primary/50"
-            :class="selectedId === q.id ? 'border-primary' : ''"
-            @click="select(q.id!)"
+            :class="selectedId === q.threadRootId ? 'border-primary' : ''"
+            @click="select(q.threadRootId!)"
           >
             <div class="flex items-center justify-between gap-2">
               <span class="min-w-0 truncate text-sm font-medium">{{ q.title }}</span>

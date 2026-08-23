@@ -34,10 +34,20 @@ describe('notificationTargetPath', () => {
   })
 
   test('routes question activity to the matching consultation and reads its root thread', () => {
-    const item = notification('Message', 'competition-1', { questionId: 'question-1' })
+    const item = notification('Message', 'competition-1', { threadRootId: 'question-1' })
     expect(notificationTargetPath(item))
       .toBe('/competitions/competition-1/questions?question=question-1')
     expect(notificationThreadRootId(item)).toBe('question-1')
+  })
+
+  test('uses the generated thread root as the canonical consultation identity', () => {
+    const item = {
+      ...notification('Message', 'competition-1'),
+      threadRootId: 'thread-root',
+    }
+    expect(notificationTargetPath(item))
+      .toBe('/competitions/competition-1/questions?question=thread-root')
+    expect(notificationThreadRootId(item)).toBe('thread-root')
   })
 
   test('routes an immutable question root using its related competition metadata', () => {

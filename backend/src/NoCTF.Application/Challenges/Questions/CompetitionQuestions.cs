@@ -58,7 +58,7 @@ public sealed record CompetitionQuestionEntryView(
     DateTimeOffset CreatedAt);
 
 public sealed record CompetitionQuestionView(
-    Guid Id,
+    Guid ThreadRootId,
     Guid CompetitionId,
     Guid? CompetitionChallengeId,
     Guid? TeamId,

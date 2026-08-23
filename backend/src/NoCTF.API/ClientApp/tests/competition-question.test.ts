@@ -66,7 +66,7 @@ describe('competition question presentation state', () => {
 describe('competition question cursor collection', () => {
   const baseTime = Date.parse('2026-08-11T12:00:00.000Z')
   const question = (index: number): Question => ({
-    id: `00000000-0000-0000-0000-${index.toString().padStart(12, '0')}`,
+    threadRootId: `00000000-0000-0000-0000-${index.toString().padStart(12, '0')}`,
     title: `Question ${index}`,
     updatedAt: new Date(baseTime - index * 1000).toISOString(),
   })
@@ -80,12 +80,13 @@ describe('competition question cursor collection', () => {
     }
 
     expect(visible).toHaveLength(175)
-    expect(new Set(visible.map(item => item.id)).size).toBe(175)
-    expect(new Set(visible.map(item => item.id))).toEqual(new Set(serverItems.map(item => item.id)))
+    expect(new Set(visible.map(item => item.threadRootId)).size).toBe(175)
+    expect(new Set(visible.map(item => item.threadRootId)))
+      .toEqual(new Set(serverItems.map(item => item.threadRootId)))
 
     const created: Question = {
       ...question(999),
-      id: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      threadRootId: 'ffffffff-ffff-ffff-ffff-ffffffffffff',
       title: 'Created during refresh',
       updatedAt: new Date(baseTime + 1000).toISOString(),
     }
@@ -97,12 +98,12 @@ describe('competition question cursor collection', () => {
     visible = mergeCompetitionQuestions(visible, [created, replied, ...serverItems.slice(0, 50)])
 
     expect(visible).toHaveLength(176)
-    expect(new Set(visible.map(item => item.id)).size).toBe(176)
-    expect(visible[0]?.id).toBe(replied.id)
-    expect(visible.find(item => item.id === replied.id)?.title).toBe('Updated by reply')
+    expect(new Set(visible.map(item => item.threadRootId)).size).toBe(176)
+    expect(visible[0]?.threadRootId).toBe(replied.threadRootId)
+    expect(visible.find(item => item.threadRootId === replied.threadRootId)?.title).toBe('Updated by reply')
 
     visible = mergeCompetitionQuestions(visible, [serverItems[160]!])
-    expect(visible.find(item => item.id === replied.id)?.title).toBe('Updated by reply')
+    expect(visible.find(item => item.threadRootId === replied.threadRootId)?.title).toBe('Updated by reply')
   })
 
   test('passes each signed cursor through all four pages of a 175 root result', async () => {
@@ -124,7 +125,7 @@ describe('competition question cursor collection', () => {
 
     expect(cursors).toEqual([null, 'cursor-50', 'cursor-100', 'cursor-150'])
     expect(pagination.items.value).toHaveLength(175)
-    expect(new Set(pagination.items.value.map(item => item.id)).size).toBe(175)
+    expect(new Set(pagination.items.value.map(item => item.threadRootId)).size).toBe(175)
   })
 })
 

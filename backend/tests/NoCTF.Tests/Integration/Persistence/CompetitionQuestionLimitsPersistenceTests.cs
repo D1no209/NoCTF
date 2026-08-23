@@ -81,7 +81,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 "题目环境启动后无法连接公开端口。",
                 3), ct);
             await Assert.That(challenge.Failure).IsNull();
-            var questionId = challenge.Question!.Id;
+            var questionId = challenge.Question!.ThreadRootId;
 
             await Assert.That((await store.FindAsync(
                 fixture.CompetitionId,
@@ -105,7 +105,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 ct)).IsNull();
             await Assert.That(await store.FindAsync(
                 fixture.CompetitionId,
-                platform.Question!.Id,
+                platform.Question!.ThreadRootId,
                 fixture.ChallengeOwnerId,
                 ct)).IsNull();
             var authorList = await store.ListAsync(new(
@@ -115,7 +115,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                 null,
                 null,
                 20), ct);
-            await Assert.That(authorList.Items.Select(item => item.Id))
+            await Assert.That(authorList.Items.Select(item => item.ThreadRootId))
                 .IsEquivalentTo([questionId]);
             await Assert.That((await store.ListAsync(new(
                 fixture.CompetitionId,
@@ -208,7 +208,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
 
             var resolved = await store.ChangeStatusAsync(new(
                 fixture.CompetitionId,
-                questions[0].Id,
+                questions[0].ThreadRootId,
                 fixture.ManagerId,
                 CompetitionQuestionStatus.Resolved,
                 fixture.Now.AddMinutes(20)), ct);
@@ -216,7 +216,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             db.ChangeTracker.Clear();
             var closed = await store.ChangeStatusAsync(new(
                 fixture.CompetitionId,
-                questions[1].Id,
+                questions[1].ThreadRootId,
                 fixture.ManagerId,
                 CompetitionQuestionStatus.Closed,
                 fixture.Now.AddMinutes(21)), ct);
@@ -239,7 +239,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
 
             var blockedReopen = await store.AddMessageAsync(new(
                 fixture.CompetitionId,
-                resolved.Question!.Id,
+                resolved.Question!.ThreadRootId,
                 fixture.MemberTwoId,
                 "重新追问会再次占用一个活跃咨询名额。",
                 fixture.Now.AddMinutes(40)), ct);
@@ -248,7 +248,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
 
             var released = await store.ChangeStatusAsync(new(
                 fixture.CompetitionId,
-                questions[2].Id,
+                questions[2].ThreadRootId,
                 fixture.ManagerId,
                 CompetitionQuestionStatus.Closed,
                 fixture.Now.AddMinutes(41)), ct);
@@ -256,7 +256,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             db.ChangeTracker.Clear();
             var reopened = await store.AddMessageAsync(new(
                 fixture.CompetitionId,
-                resolved.Question.Id,
+                resolved.Question.ThreadRootId,
                 fixture.MemberTwoId,
                 "现在已有空余活跃名额，允许继续追问。",
                 fixture.Now.AddMinutes(42)), ct);
@@ -265,7 +265,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
 
             var thirdParticipantMessage = await store.AddMessageAsync(new(
                 fixture.CompetitionId,
-                reopened.Question!.Id,
+                reopened.Question!.ThreadRootId,
                 fixture.MemberOneId,
                 "这是工作人员回复前的第三条队伍消息。",
                 fixture.Now.AddMinutes(43)), ct);
@@ -273,7 +273,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             db.ChangeTracker.Clear();
             var fourthParticipantMessage = await store.AddMessageAsync(new(
                 fixture.CompetitionId,
-                thirdParticipantMessage.Question!.Id,
+                thirdParticipantMessage.Question!.ThreadRootId,
                 fixture.MemberTwoId,
                 "第四条消息必须等待工作人员回复。",
                 fixture.Now.AddMinutes(44)), ct);
@@ -283,7 +283,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
 
             var handlerReply = await store.AddMessageAsync(new(
                 fixture.CompetitionId,
-                thirdParticipantMessage.Question.Id,
+                thirdParticipantMessage.Question.ThreadRootId,
                 fixture.ManagerId,
                 "工作人员回复后，队伍连续发送额度已经重置。",
                 fixture.Now.AddMinutes(45)), ct);
@@ -291,7 +291,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
             db.ChangeTracker.Clear();
             var afterReset = await store.AddMessageAsync(new(
                 fixture.CompetitionId,
-                handlerReply.Question!.Id,
+                handlerReply.Question!.ThreadRootId,
                 fixture.MemberTwoId,
                 "额度重置后允许继续补充消息。",
                 fixture.Now.AddMinutes(46)), ct);
@@ -388,6 +388,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                         actorRole = CompetitionQuestionParticipantRole.CompetitionManager
                     }, jsonOptions),
                     SentAt = sentAt.AddSeconds(1),
+                    ThreadRootId = root.Id,
                     ReplyToId = root.Id
                 });
             }
@@ -489,6 +490,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
                             actorRole = CompetitionQuestionParticipantRole.CompetitionManager
                         }, jsonOptions),
                         SentAt = sentAt.AddSeconds(1),
+                        ThreadRootId = root.Id,
                         ReplyToId = root.Id
                     });
                 }
@@ -530,12 +532,12 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
 
         var managerItems = await ReadAllAsync(fixture.ManagerId);
         await Assert.That(managerItems.Length).IsEqualTo(180);
-        await Assert.That(managerItems.Select(item => item.Id).Distinct().Count())
+        await Assert.That(managerItems.Select(item => item.ThreadRootId).Distinct().Count())
             .IsEqualTo(180);
         await Assert.That(managerItems.Zip(managerItems.Skip(1)).All(pair =>
             pair.First.UpdatedAt > pair.Second.UpdatedAt
             || pair.First.UpdatedAt == pair.Second.UpdatedAt
-            && pair.First.Id.CompareTo(pair.Second.Id) > 0)).IsTrue();
+            && pair.First.ThreadRootId.CompareTo(pair.Second.ThreadRootId) > 0)).IsTrue();
 
         var participantItems = await ReadAllAsync(fixture.MemberOneId);
         await Assert.That(participantItems.Length).IsEqualTo(160);

@@ -77,24 +77,24 @@ export function mergeCompetitionQuestions(
   current: readonly CompetitionQuestion[],
   incoming: readonly CompetitionQuestion[],
 ): CompetitionQuestion[] {
-  const byId = new Map<string, CompetitionQuestion>()
-  const withoutId: CompetitionQuestion[] = []
+  const byThreadRootId = new Map<string, CompetitionQuestion>()
+  const withoutThreadRootId: CompetitionQuestion[] = []
 
   for (const question of [...current, ...incoming]) {
-    if (!question.id) {
-      withoutId.push(question)
+    if (!question.threadRootId) {
+      withoutThreadRootId.push(question)
       continue
     }
 
-    const existing = byId.get(question.id)
+    const existing = byThreadRootId.get(question.threadRootId)
     if (!existing || isFresherQuestion(question, existing))
-      byId.set(question.id, question)
+      byThreadRootId.set(question.threadRootId, question)
   }
 
-  return [...byId.values(), ...withoutId].sort((left, right) => {
+  return [...byThreadRootId.values(), ...withoutThreadRootId].sort((left, right) => {
     const timeDelta = questionTimestamp(right) - questionTimestamp(left)
     if (timeDelta !== 0) return timeDelta
-    return (right.id ?? '').localeCompare(left.id ?? '')
+    return (right.threadRootId ?? '').localeCompare(left.threadRootId ?? '')
   })
 }
 

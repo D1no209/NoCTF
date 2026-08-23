@@ -32,7 +32,7 @@ public sealed class ChangeCompetitionQuestionStatusEndpoint(
 {
     public override void Configure()
     {
-        Put("/competitions/{competitionId}/questions/{questionId}/status");
+        Put("/competitions/{competitionId}/questions/{threadRootId}/status");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("ChangeCompetitionQuestionStatus"));
         Summary(summary =>
@@ -55,7 +55,7 @@ public sealed class ChangeCompetitionQuestionStatusEndpoint(
             return TypedResults.Forbid();
         var result = await change.ExecuteAsync(new(
             Route<Guid>("competitionId"),
-            Route<Guid>("questionId"),
+            Route<Guid>("threadRootId"),
             user.UserId,
             CompetitionQuestionResponseMapper.ToDomain(request.Status!.Value),
             DateTimeOffset.UtcNow), ct);

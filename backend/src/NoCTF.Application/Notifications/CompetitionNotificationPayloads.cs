@@ -50,7 +50,7 @@ public sealed record TeamBanCorrectedPayload(
 
 public sealed record CompetitionQuestionActivityPayload(
     Guid CompetitionId,
-    Guid QuestionId,
+    Guid ThreadRootId,
     Guid? EntryId,
     CompetitionQuestionNotificationEvent Event,
     string Title,

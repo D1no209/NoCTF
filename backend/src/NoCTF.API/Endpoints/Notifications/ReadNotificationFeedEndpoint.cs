@@ -102,6 +102,7 @@ public sealed class ReadNotificationFeedEndpoint(
                 JsonSerializer.Deserialize<JsonElement>(item.ContentJson),
                 item.RelatedType,
                 item.RelatedId,
+                item.ThreadRootId,
                 item.ReplyToId,
                 item.SentAt,
                 item.SourceDisplayName)).ToArray(),

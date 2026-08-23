@@ -173,7 +173,8 @@ public sealed class NotificationReaderPersistenceTests
                     ContentJson = """{"schemaVersion":1,"body":"current handler reply"}""",
                     RelatedType = EntityReferenceKind.Competition,
                     RelatedId = ids.CompetitionId,
-                    ReplyToId = ids.OwnerReplyId,
+                    ThreadRootId = ids.RootId,
+                    ReplyToId = ids.RootId,
                     SentAt = now.AddSeconds(4)
                 });
                 await append.SaveChangesAsync(cancellationToken);
@@ -287,6 +288,7 @@ public sealed class NotificationReaderPersistenceTests
                 ContentJson = """{"schemaVersion":1,"body":"former handler reply"}""",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = ids.CompetitionId,
+                ThreadRootId = ids.RootId,
                 ReplyToId = ids.RootId,
                 SentAt = now.AddSeconds(2)
             },
@@ -301,7 +303,8 @@ public sealed class NotificationReaderPersistenceTests
                 ContentJson = """{"schemaVersion":1,"body":"owner reply"}""",
                 RelatedType = EntityReferenceKind.Competition,
                 RelatedId = ids.CompetitionId,
-                ReplyToId = ids.FormerReplyId,
+                ThreadRootId = ids.RootId,
+                ReplyToId = ids.RootId,
                 SentAt = now.AddSeconds(3)
             },
             new Notification

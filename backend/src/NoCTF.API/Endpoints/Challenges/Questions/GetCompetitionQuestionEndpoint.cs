@@ -62,7 +62,7 @@ public sealed record CompetitionQuestionEntryResponse(
     DateTimeOffset CreatedAt);
 
 public sealed record CompetitionQuestionResponse(
-    Guid Id,
+    Guid ThreadRootId,
     Guid CompetitionId,
     Guid? CompetitionChallengeId,
     Guid? TeamId,
@@ -94,7 +94,7 @@ internal static class CompetitionQuestionResponseMapper
         var asker = source.Access == CompetitionQuestionAccess.Asker;
         var handler = source.Access == CompetitionQuestionAccess.Handler;
         return new(
-            source.Id,
+            source.ThreadRootId,
             source.CompetitionId,
             source.CompetitionChallengeId,
             source.TeamId,
@@ -162,7 +162,7 @@ public sealed class GetCompetitionQuestionEndpoint(
 {
     public override void Configure()
     {
-        Get("/competitions/{competitionId}/questions/{questionId}");
+        Get("/competitions/{competitionId}/questions/{threadRootId}");
         AuthSchemes("Bearer");
         Description(builder => builder.WithName("GetCompetitionQuestion"));
         Summary(summary =>
@@ -179,7 +179,7 @@ public sealed class GetCompetitionQuestionEndpoint(
             return TypedResults.Forbid();
         var question = await get.ExecuteAsync(
             Route<Guid>("competitionId"),
-            Route<Guid>("questionId"),
+            Route<Guid>("threadRootId"),
             user.UserId,
             ct);
         return question is null

@@ -24,6 +24,165 @@ public sealed class CompetitionQuestionPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
+    public async Task Thread_root_preserves_concurrent_replies_stable_order_privacy_and_append_only_history(
+        CancellationToken ct)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_question_threads")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(ct);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            var competitionId = Guid.CreateVersion7();
+            var ownerId = Guid.CreateVersion7();
+            var managerId = Guid.CreateVersion7();
+            var askerId = Guid.CreateVersion7();
+            var otherParticipantId = Guid.CreateVersion7();
+            var askerTeamId = Guid.CreateVersion7();
+            var otherTeamId = Guid.CreateVersion7();
+            await using (var setup = new NoCtfDbContext(options))
+            {
+                await setup.Database.EnsureCreatedAsync(ct);
+                setup.Users.AddRange(
+                    Human(ownerId, "thread-owner", UserRole.Organizer, now),
+                    Human(managerId, "thread-manager", UserRole.Organizer, now),
+                    Human(askerId, "thread-asker", UserRole.User, now),
+                    Human(otherParticipantId, "thread-outsider", UserRole.User, now));
+                setup.Competitions.Add(new Competition
+                {
+                    Id = competitionId,
+                    OwnerId = ownerId,
+                    ManagerIds = [managerId],
+                    Title = "Question thread competition",
+                    Mode = GameMode.Ctf,
+                    ConfigurationJson = """{"schemaVersion":1}""",
+                    FlagDerivationSecret = new byte[32],
+                    StartAt = now.AddMinutes(-10),
+                    EndAt = now.AddHours(1),
+                    Status = CompetitionStatus.Running,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+                setup.Teams.AddRange(
+                    ApprovedTeam(askerTeamId, competitionId, "Thread asker", askerId, now),
+                    ApprovedTeam(otherTeamId, competitionId, "Thread outsider", otherParticipantId, now));
+                await setup.SaveChangesAsync(ct);
+            }
+
+            Guid threadRootId;
+            await using (var createDb = new NoCtfDbContext(options))
+            {
+                var createOutbox = new RecordingOutbox();
+                var createStore = new CompetitionQuestionStore(
+                    createDb,
+                    createOutbox,
+                    new CompetitionEventStore(createDb, createOutbox),
+                    NullLogger<CompetitionQuestionStore>.Instance);
+                var created = await createStore.CreateAsync(new(
+                    competitionId,
+                    CompetitionQuestionSubject.Platform,
+                    null,
+                    null,
+                    askerId,
+                    "Concurrent question",
+                    "Both authorized handlers must be able to reply.",
+                    now), ct);
+                await Assert.That(created.Failure).IsNull();
+                threadRootId = created.Question!.ThreadRootId;
+            }
+
+            async Task<CompetitionQuestionMutationResult> ReplyAsync(
+                Guid actorId,
+                string body)
+            {
+                await using var replyDb = new NoCtfDbContext(options);
+                var replyOutbox = new RecordingOutbox();
+                var replyStore = new CompetitionQuestionStore(
+                    replyDb,
+                    replyOutbox,
+                    new CompetitionEventStore(replyDb, replyOutbox),
+                    NullLogger<CompetitionQuestionStore>.Instance);
+                return await replyStore.AddMessageAsync(new(
+                    competitionId,
+                    threadRootId,
+                    actorId,
+                    body,
+                    now.AddSeconds(1)), ct);
+            }
+
+            var concurrentReplies = await Task.WhenAll(
+                ReplyAsync(ownerId, "Owner reply at the shared timestamp."),
+                ReplyAsync(managerId, "Manager reply at the shared timestamp."));
+            await Assert.That(concurrentReplies.All(result => result.Failure is null)).IsTrue();
+
+            await using (var verify = new NoCtfDbContext(options))
+            {
+                var root = await verify.Notifications.AsNoTracking()
+                    .SingleAsync(notification => notification.Id == threadRootId, ct);
+                var nodes = await verify.Notifications.AsNoTracking()
+                    .Where(notification => notification.ThreadRootId == threadRootId)
+                    .OrderBy(notification => notification.SentAt)
+                    .ThenBy(notification => notification.Id)
+                    .ToArrayAsync(ct);
+                await Assert.That(root.ThreadRootId).IsNull();
+                await Assert.That(root.ReplyToId).IsNull();
+                await Assert.That(nodes).Count().IsEqualTo(2);
+                await Assert.That(nodes.All(node =>
+                    node.ThreadRootId == threadRootId
+                    && node.ReplyToId == threadRootId)).IsTrue();
+
+                var viewOutbox = new RecordingOutbox();
+                var viewStore = new CompetitionQuestionStore(
+                    verify,
+                    viewOutbox,
+                    new CompetitionEventStore(verify, viewOutbox),
+                    NullLogger<CompetitionQuestionStore>.Instance);
+                var view = await viewStore.FindAsync(
+                    competitionId,
+                    threadRootId,
+                    askerId,
+                    ct);
+                await Assert.That(view).IsNotNull();
+                await Assert.That(view!.Status).IsEqualTo(CompetitionQuestionStatus.Replied);
+                await Assert.That(string.Join(",", view.Entries
+                    .Where(entry => entry.Id != threadRootId)
+                    .Select(entry => entry.Id)))
+                    .IsEqualTo(string.Join(",", nodes.Select(node => node.Id)));
+                await Assert.That(await viewStore.FindAsync(
+                    competitionId,
+                    threadRootId,
+                    otherParticipantId,
+                    ct)).IsNull();
+            }
+
+            await using (var deleteAttempt = new NoCtfDbContext(options))
+            {
+                var root = await deleteAttempt.Notifications.SingleAsync(
+                    notification => notification.Id == threadRootId,
+                    ct);
+                deleteAttempt.Notifications.Remove(root);
+                Func<Task> action = async () => await deleteAttempt.SaveChangesAsync(ct);
+                await Assert.That(action).Throws<InvalidOperationException>();
+            }
+
+            await using var finalVerification = new NoCtfDbContext(options);
+            await Assert.That(await finalVerification.Notifications.AsNoTracking()
+                .AnyAsync(notification => notification.Id == threadRootId, ct)).IsTrue();
+            await Assert.That(await finalVerification.Notifications.AsNoTracking()
+                .CountAsync(notification => notification.ThreadRootId == threadRootId, ct))
+                .IsEqualTo(2);
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Private_dialogue_enforces_roles_audits_and_private_notification_delivery(
         CancellationToken ct)
     {
@@ -136,22 +295,22 @@ public sealed class CompetitionQuestionPersistenceTests
 
             var observerView = await store.FindAsync(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.ObserverId,
                 ct);
             var administratorView = await store.FindAsync(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.AdministratorId,
                 ct);
             var authorView = await store.FindAsync(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.AuthorId,
                 ct);
             var hiddenView = await store.FindAsync(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.OtherParticipantId,
                 ct);
             await Assert.That(observerView!.Access).IsEqualTo(CompetitionQuestionAccess.Observer);
@@ -162,7 +321,7 @@ public sealed class CompetitionQuestionPersistenceTests
 
             var replied = await store.AddMessageAsync(new(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.AuthorId,
                 "Use the HTTP service port, not the internal metrics port.",
                 now.AddSeconds(1)), ct);
@@ -185,7 +344,7 @@ public sealed class CompetitionQuestionPersistenceTests
 
             var resolved = await store.ChangeStatusAsync(new(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.AskerId,
                 CompetitionQuestionStatus.Resolved,
                 now.AddSeconds(2)), ct);
@@ -195,7 +354,7 @@ public sealed class CompetitionQuestionPersistenceTests
 
             var reopened = await store.AddMessageAsync(new(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.AskerId,
                 "The same issue returns after a runtime reset.",
                 now.AddSeconds(3)), ct);
@@ -205,14 +364,14 @@ public sealed class CompetitionQuestionPersistenceTests
 
             var secondReply = await store.AddMessageAsync(new(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.ManagerId,
                 "After reset, wait for the replacement instance to become Ready.",
                 now.AddSeconds(4)), ct);
             db.ChangeTracker.Clear();
             var stillPrivate = await store.FindAsync(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.OtherParticipantId,
                 ct);
             await Assert.That(stillPrivate).IsNull();
@@ -220,7 +379,7 @@ public sealed class CompetitionQuestionPersistenceTests
 
             var closed = await store.ChangeStatusAsync(new(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.ManagerId,
                 CompetitionQuestionStatus.Closed,
                 now.AddSeconds(6)), ct);
@@ -228,7 +387,7 @@ public sealed class CompetitionQuestionPersistenceTests
             db.ChangeTracker.Clear();
             var terminal = await store.AddMessageAsync(new(
                 ids.CompetitionId,
-                created.Question.Id,
+                created.Question.ThreadRootId,
                 ids.AskerId,
                 "This must not be accepted.",
                 now.AddSeconds(8)), ct);
