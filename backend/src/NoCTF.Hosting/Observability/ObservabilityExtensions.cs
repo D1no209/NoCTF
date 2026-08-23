@@ -28,6 +28,7 @@ public static class ObservabilityExtensions
             .WithMetrics(metrics => metrics
                 .AddMeter(NoCtfTelemetry.MeterName)
                 .AddMeter("Wolverine*")
+                .AddMeter("Npgsql")
                 .AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
                 .AddRuntimeInstrumentation()
@@ -87,7 +88,10 @@ public static class ObservabilityExtensions
                     route,
                     outcome,
                     Stopwatch.GetElapsedTime(started).TotalSeconds);
-                if (TryClassifyRuntimeOperation(route, out var operation))
+                if (TryClassifyRuntimeOperation(
+                        context.Request.Method,
+                        route,
+                        out var operation))
                     NoCtfTelemetry.RecordRuntimeOperation(operation, outcome);
             }
         });
@@ -95,28 +99,59 @@ public static class ObservabilityExtensions
         return app;
     }
 
-    private static bool TryClassifyRuntimeOperation(string route, out string operation)
+    internal static bool TryClassifyRuntimeOperation(
+        string method,
+        string route,
+        out string operation)
     {
-        if (route.Contains("flag", StringComparison.OrdinalIgnoreCase))
+        if (!HttpMethods.IsPost(method))
+        {
+            operation = string.Empty;
+            return false;
+        }
+
+        if (route.EndsWith("/flag-submissions", StringComparison.OrdinalIgnoreCase)
+            || route.EndsWith("/practice-flag", StringComparison.OrdinalIgnoreCase)
+            || route.EndsWith("/awdp-break-flag-judgement", StringComparison.OrdinalIgnoreCase))
         {
             operation = "flag";
             return true;
         }
-        if (route.Contains("patch", StringComparison.OrdinalIgnoreCase)
-            || route.Contains("fix", StringComparison.OrdinalIgnoreCase))
+        if (route.EndsWith("/awdp-defense-targets", StringComparison.OrdinalIgnoreCase))
         {
-            operation = "fix";
+            operation = "fix_request";
             return true;
         }
-        if (route.Contains("runtime", StringComparison.OrdinalIgnoreCase))
+        if (route.Contains("/awdp-defense-targets/", StringComparison.OrdinalIgnoreCase)
+            && route.EndsWith("/fix", StringComparison.OrdinalIgnoreCase))
         {
-            operation = "runtime";
+            operation = "fix_upload";
+            return true;
+        }
+
+        var runtimeAction = RuntimeActions.FirstOrDefault(action =>
+            route.EndsWith(action.Suffix, StringComparison.OrdinalIgnoreCase));
+        if (runtimeAction is not null)
+        {
+            operation = runtimeAction.Operation;
             return true;
         }
 
         operation = string.Empty;
         return false;
     }
+
+    private static readonly RuntimeAction[] RuntimeActions =
+    [
+        new("/runtime/start", "runtime_start"),
+        new("/runtime/stop", "runtime_stop"),
+        new("/runtime/reset", "runtime_reset"),
+        new("/runtime/extend", "runtime_extend"),
+        new("/force-terminate", "runtime_force_terminate"),
+        new("/terminate", "runtime_terminate")
+    ];
+
+    private sealed record RuntimeAction(string Suffix, string Operation);
 }
 
 file static class ThisAssemblyVersion

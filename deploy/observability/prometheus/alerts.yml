@@ -51,11 +51,18 @@ groups:
           summary: "NoCTF Redis 操作 P99 超过 50ms"
 
       - alert: NoCtfRunnerCapacityLow
-        expr: min by (pool) (noctf_runner_capacity_available_ratio) < 0.15
+        expr: min by (pool) (sum by (pool, resource) (noctf_runner_capacity_available{role="runner"}) / clamp_min(sum by (pool, resource) (noctf_runner_capacity_total{role="runner"}), 1)) < 0.15
         for: 2m
         labels: { severity: critical }
         annotations:
           summary: "Runner 资源池剩余容量低于 15%"
+
+      - alert: NoCtfRunnerUnavailable
+        expr: up{job="noctf",role="runner"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: "Runner 指标端点不可用"
 
       - alert: NoCtfDiskSpaceLow
         expr: min by (instance) (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 0.15

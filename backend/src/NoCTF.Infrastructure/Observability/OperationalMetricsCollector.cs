@@ -35,19 +35,29 @@ public sealed class OperationalMetricsCollector(
             var dirty = await db.Competitions
                 .AsNoTracking()
                 .Where(competition => competition.LeaderboardDirty)
-                .Select(competition => competition.UpdatedAt)
-                .ToArrayAsync(cancellationToken);
+                .GroupBy(_ => 1)
+                .Select(group => new
+                {
+                    Count = group.LongCount(),
+                    OldestAt = group.Min(competition => competition.UpdatedAt)
+                })
+                .SingleOrDefaultAsync(cancellationToken);
             var waiting = await db.RuntimeInstances
                 .AsNoTracking()
                 .Where(runtime => runtime.State == RuntimeState.Queued)
-                .Select(runtime => runtime.CreatedAt)
-                .ToArrayAsync(cancellationToken);
+                .GroupBy(_ => 1)
+                .Select(group => new
+                {
+                    Count = group.LongCount(),
+                    OldestAt = group.Min(runtime => runtime.CreatedAt)
+                })
+                .SingleOrDefaultAsync(cancellationToken);
 
             NoCtfTelemetry.UpdateOperationalSnapshot(
-                dirty.LongLength,
-                OldestAge(now, dirty),
-                waiting.LongLength,
-                OldestAge(now, waiting));
+                dirty?.Count ?? 0,
+                OldestAge(now, dirty?.OldestAt),
+                waiting?.Count ?? 0,
+                OldestAge(now, waiting?.OldestAt));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -58,10 +68,10 @@ public sealed class OperationalMetricsCollector(
         }
     }
 
-    private static TimeSpan OldestAge(DateTimeOffset now, IReadOnlyCollection<DateTimeOffset> values)
+    private static TimeSpan OldestAge(DateTimeOffset now, DateTimeOffset? oldestAt)
     {
-        if (values.Count == 0) return TimeSpan.Zero;
-        var age = now - values.Min();
+        if (oldestAt is null) return TimeSpan.Zero;
+        var age = now - oldestAt.Value;
         return age > TimeSpan.Zero ? age : TimeSpan.Zero;
     }
 }
