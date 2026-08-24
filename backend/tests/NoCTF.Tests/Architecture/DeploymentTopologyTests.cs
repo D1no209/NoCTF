@@ -346,6 +346,8 @@ public sealed class DeploymentTopologyTests
             System.Text.RegularExpressions.Regex.IsMatch(
                 line,
                 "^FROM [^ ]+@sha256:[a-f0-9]{64} AS [^ ]+$"))).IsTrue();
+        await Assert.That(dockerfile).Contains(
+            "FROM docker.m.daocloud.io/oven/bun:1.3.14@sha256:");
         await Assert.That(dockerfile).Contains("sha256sum -c -");
         await Assert.That(dockerfile).Contains("KOMPOSE_SHA256=");
         await Assert.That(dockerfile).Contains("--retry-all-errors");
@@ -394,6 +396,11 @@ public sealed class DeploymentTopologyTests
             "image: quay.io/prometheus/node-exporter:v1.12.1");
         await Assert.That(deployScript).Contains(
             "NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5");
+        await Assert.That(deployScript).Contains("NOCTF_BUILD_ATTEMPTS:-3");
+        await Assert.That(deployScript).Contains("Docker registry request failed transiently.");
+        await Assert.That(ci).Contains("cached_kompose=");
+        await Assert.That(ci).Contains(
+            "Reused the verified Kompose asset from the current server release.");
         await Assert.That(deployScript).Contains(
             "ensure_build_space\nif ! pull_observability_images; then\n    exit 1\nfi\nbackup_database");
         await Assert.That(deployScript).Contains("--pull never");
