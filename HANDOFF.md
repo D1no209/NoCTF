@@ -1,5 +1,27 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 9
+
+- 当前分支：`codex/data-model-wolverine-simplification`；阶段 9 父提交为 `5d2dc1df`。
+  本节随阶段 9 功能提交交付。未推送、未部署，未操作生产数据库、生产队列、对象存储或生产数据。
+- 排行榜已删除 `LeaderboardDirty`、15 秒扫描与临时 refresh tick，改为已提交比赛事件驱动：
+  leaderboard Sticky PostgreSQL Handler 立即写 Redis tombstone fence 并删除缓存，在 Wolverine leader
+  进程内按比赛 fixed 500ms 合并；同一 leader 的 Singular Agent 只 durable 派发
+  `ProjectLeaderboard`，projection competing consumer 从 PostgreSQL 全量重建并发布。
+- cache miss 使用比赛级 keyed lock 从 PostgreSQL 同步重建；Redis/Fusion 丢失可恢复。失效时递增的
+  tombstone fence 阻止已经在途的旧投影晚到恢复过时缓存。leader 在内存合并窗内退出时不补跑 tick，
+  因缓存已失效，后续读取或业务事件会恢复投影。
+- `noctf-events-leaderboard` 必须是 pinned-to-leader durable PostgreSQL listener；缺失 Sticky、退化
+  `local://`、scope 错误、重复 Handler 或全局 separated behavior 均 fail closed。监控已由 dirty scan
+  指标切换为 invalidation、merge、cache miss、projection 与 publish failure 低基数指标。
+- 验证：Release build 0 warning/0 error；合并窗 4/4；真实 Redis fencing 4/4；真实 PostgreSQL/Redis
+  投影 9/9；真实 PostgreSQL/Wolverine fan-out 3/3；双 Worker durable 合并派发/failover 1/1；拓扑
+  8/8；监控 3/3；前端 275/275、typecheck/build 通过；`git diff --check` 无 whitespace error。
+  完整证据见 `docs/data-model-wolverine-stage9-leaderboard.md`。
+- OpenAPI/生成 SDK 在阶段 11 统一刷新，当前 `wwwroot/openapi/v1.json` 中旧 dirty 监控 enum 是待生成
+  产物，不允许手改。下一步只能进入阶段 10：先保存旧 schema 与生产备份/转换/切换/回滚方案，再仅用
+  EF CLI 在可丢弃开发数据库上移除旧 migration 并生成单一 `InitialBaseline`，验证最终 15 张业务表。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 8
 
 - 当前分支：`codex/data-model-wolverine-simplification`；阶段 8 父提交为 `55e26af4`。

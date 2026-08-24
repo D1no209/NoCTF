@@ -192,7 +192,6 @@ public sealed class TeamRegistrationStore(
                 TeamRegistrationStatus: status,
                 TrackKey: team.TrackKey), ct);
             await db.SaveChangesAsync(ct);
-            await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         }
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -244,7 +243,6 @@ public sealed class TeamRegistrationStore(
                 TeamId: teamId,
                 TeamRegistrationStatus: TeamRegistrationStatus.Pending), ct);
             await db.SaveChangesAsync(ct);
-            await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         }
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -349,7 +347,6 @@ public sealed class TeamRegistrationStore(
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardDirty.MarkAsync(db, command.CompetitionId, ct);
             await transaction.CommitAsync(ct);
             await outbox.FlushOutgoingMessagesAsync();
         }
@@ -378,7 +375,6 @@ public sealed class TeamRegistrationStore(
             TeamId: teamId,
             TeamRegistrationStatus: entity.RegistrationStatus), ct);
         await db.SaveChangesAsync(ct);
-        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return null;

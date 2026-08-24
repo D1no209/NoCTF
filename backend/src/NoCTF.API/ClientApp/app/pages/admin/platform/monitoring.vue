@@ -33,14 +33,16 @@ const METRIC = {
   criticalQueueOldestSeconds: 5,
   runtimeWaitingCount: 6,
   runtimeOldestWaitingSeconds: 7,
-  leaderboardDirtyCount: 8,
-  leaderboardDirtyOldestSeconds: 9,
-  runnerOnlineCount: 10,
-  runnerMinimumAvailablePercent: 11,
-  postgreSqlConnectionUsagePercent: 12,
-  redisP99Milliseconds: 13,
-  diskAvailablePercent: 14,
-} as const satisfies Record<string, MetricKind>
+  leaderboardInvalidationsPerSecond: 8,
+  leaderboardMergeDispatchesPerSecond: 9,
+  leaderboardCacheMissRebuildsPerSecond: 10,
+  leaderboardProjectionP95Milliseconds: 11,
+  runnerOnlineCount: 12,
+  runnerMinimumAvailablePercent: 13,
+  postgreSqlConnectionUsagePercent: 14,
+  redisP99Milliseconds: 15,
+  diskAvailablePercent: 16,
+} as const
 
 const UNIT = {
   count: 0,
@@ -50,14 +52,21 @@ const UNIT = {
   percent: 4,
 } as const satisfies Record<string, MonitoringUnit>
 
-const GROUPS: Array<{ title: string; kinds: MetricKind[] }> = [
+const GROUPS: Array<{ title: string; kinds: number[] }> = [
   {
     title: 'API 与实时连接',
     kinds: [METRIC.apiRequestsPerSecond, METRIC.apiP95Milliseconds, METRIC.apiServerErrorPercent, METRIC.signalRConnections],
   },
   {
     title: '队列与投影',
-    kinds: [METRIC.criticalQueueDepth, METRIC.criticalQueueOldestSeconds, METRIC.leaderboardDirtyCount, METRIC.leaderboardDirtyOldestSeconds],
+    kinds: [
+      METRIC.criticalQueueDepth,
+      METRIC.criticalQueueOldestSeconds,
+      METRIC.leaderboardInvalidationsPerSecond,
+      METRIC.leaderboardMergeDispatchesPerSecond,
+      METRIC.leaderboardCacheMissRebuildsPerSecond,
+      METRIC.leaderboardProjectionP95Milliseconds,
+    ],
   },
   {
     title: '运行环境与 Runner',
@@ -69,7 +78,7 @@ const GROUPS: Array<{ title: string; kinds: MetricKind[] }> = [
   },
 ]
 
-const METRIC_LABELS: Record<MetricKind, string> = {
+const METRIC_LABELS: Record<number, string> = {
   [METRIC.apiRequestsPerSecond]: 'API 请求速率',
   [METRIC.apiP95Milliseconds]: 'API P95 延迟',
   [METRIC.apiServerErrorPercent]: 'API 5xx 比例',
@@ -78,8 +87,10 @@ const METRIC_LABELS: Record<MetricKind, string> = {
   [METRIC.criticalQueueOldestSeconds]: '最旧关键消息等待',
   [METRIC.runtimeWaitingCount]: '等待中的 Runtime',
   [METRIC.runtimeOldestWaitingSeconds]: '最长 Runtime 等待',
-  [METRIC.leaderboardDirtyCount]: '待投影排行榜',
-  [METRIC.leaderboardDirtyOldestSeconds]: '最老排行榜脏标记',
+  [METRIC.leaderboardInvalidationsPerSecond]: '排行榜缓存失效速率',
+  [METRIC.leaderboardMergeDispatchesPerSecond]: '排行榜合并投影速率',
+  [METRIC.leaderboardCacheMissRebuildsPerSecond]: '排行榜缓存缺失重建速率',
+  [METRIC.leaderboardProjectionP95Milliseconds]: '排行榜投影 P95 延迟',
   [METRIC.runnerOnlineCount]: '在线 Runner',
   [METRIC.runnerMinimumAvailablePercent]: 'Runner 最低可用容量',
   [METRIC.postgreSqlConnectionUsagePercent]: 'PostgreSQL 连接使用率',
@@ -106,8 +117,12 @@ function statusVariant(status: MonitoringStatus | undefined): 'default' | 'secon
   return 'outline'
 }
 
-function metricByKind(kind: MetricKind): MonitoringMetric | undefined {
+function metricByKind(kind: number): MonitoringMetric | undefined {
   return snapshot.value?.metrics?.find(metric => metric.kind === kind)
+}
+
+function metricLabel(kind: number): string {
+  return METRIC_LABELS[kind] ?? '未知指标'
 }
 
 function formatMetric(metric: MonitoringMetric | undefined): string {
@@ -217,7 +232,7 @@ onUnmounted(() => {
             class="flex min-h-20 items-center justify-between gap-3 border-b py-3"
           >
             <div class="min-w-0">
-              <p class="text-sm text-muted-foreground">{{ $t(METRIC_LABELS[kind]) }}</p>
+              <p class="text-sm text-muted-foreground">{{ $t(metricLabel(kind)) }}</p>
               <p class="mt-1 font-mono text-xl font-semibold tabular-nums">
                 {{ formatMetric(metricByKind(kind)) }}
               </p>

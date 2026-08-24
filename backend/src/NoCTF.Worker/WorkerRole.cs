@@ -27,6 +27,7 @@ public static class WorkerRole
             $"{Environment.MachineName}:{Environment.ProcessId}"));
         services.AddSingleton<IClusterSchedulerStatusStore, RedisClusterSchedulerStatusStore>();
         services.AddScoped<IClusterScheduleSource, PostgresClusterScheduleSource>();
+        services.AddSingleton<LeaderboardProjectionMergeQueue>();
         services.AddHostedService<ClusterLeadershipStatusReporter>();
         services.AddSingleton<IReadinessDependency, ClusterSchedulingReadinessDependency>();
         services.AddSingularAgent<MaintenanceTickAgent>();
@@ -105,6 +106,7 @@ public static class WorkerRole
         {
             options.ListenToPostgresqlQueue(CompetitionEventFanoutQueueNames.Leaderboard)
                 .Named(CompetitionEventFanoutQueueNames.Leaderboard)
+                .ListenOnlyAtLeader()
                 .MaximumParallelMessages(WorkerQueues.GetConcurrency(
                     configuration,
                     WorkerQueue.Projection))

@@ -8,7 +8,7 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class WolverineBackendMessagePublisherTests
 {
     [Test]
-    public async Task Rebuild_competition_requests_dirty_leaderboard_refresh()
+    public async Task Rebuild_competition_requests_direct_leaderboard_projection()
     {
         var bus = Substitute.For<IMessageBus>();
         var publisher = new WolverineBackendMessagePublisher(bus);
@@ -18,9 +18,9 @@ public sealed class WolverineBackendMessagePublisherTests
 
         var messages = bus.ReceivedCalls()
             .SelectMany(call => call.GetArguments())
-            .OfType<RefreshDirtyLeaderboards>()
+            .OfType<ProjectLeaderboard>()
             .ToList();
         await Assert.That(messages).Count().IsEqualTo(1);
-        await Assert.That(messages[0].TriggeredAt).IsGreaterThan(DateTimeOffset.MinValue);
+        await Assert.That(messages[0].CompetitionId).IsEqualTo(competitionId);
     }
 }

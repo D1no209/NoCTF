@@ -224,7 +224,6 @@ public sealed class PatchUploadStore(
             : 900;
         var deadline = uploadedAt.AddSeconds(ttlSeconds);
         target.ExpiresAt = deadline;
-        await LeaderboardDirty.MarkAsync(db, scope.CompetitionId, ct);
         await outbox.PublishAsync(new GameplayFactStateChanged(fact.Id, fact.State));
         await outbox.PublishToRunnerNodeAsync(new RunAwdpFixVerification(
             fact.Id,

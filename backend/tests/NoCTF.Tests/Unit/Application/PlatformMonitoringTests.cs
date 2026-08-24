@@ -72,6 +72,8 @@ public sealed class PlatformMonitoringTests
             runtimeOldestWaitingSeconds,
             0,
             0,
+            0,
+            0,
             2,
             0.75,
             0.45,

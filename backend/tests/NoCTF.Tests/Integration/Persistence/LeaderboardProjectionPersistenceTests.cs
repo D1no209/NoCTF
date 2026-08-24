@@ -28,7 +28,9 @@ using NoCTF.Infrastructure.Teams.Moderation;
 using NoCTF.Worker;
 using Npgsql;
 using NSubstitute;
+using StackExchange.Redis;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
 using ZiggyCreatures.Caching.Fusion;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -36,6 +38,85 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class LeaderboardProjectionPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Concurrent_cache_misses_and_complete_cache_loss_rebuild_from_PostgreSQL_once(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_projection_cache_loss")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await using var redisContainer = new RedisBuilder(
+                "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await Task.WhenAll(
+                postgres.StartAsync(cancellationToken),
+                redisContainer.StartAsync(cancellationToken));
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(
+                redisContainer.GetConnectionString());
+
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.UtcNow;
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+            var owner = CreateUser(now);
+            var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
+            db.Users.Add(owner);
+            db.Competitions.Add(fixture.Competition);
+            db.Challenges.Add(fixture.Challenge);
+            db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
+            db.Teams.Add(fixture.Team);
+            db.GameplayFacts.AddRange(fixture.Facts);
+            await db.SaveChangesAsync(cancellationToken);
+
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.Leaderboards)
+                .Services
+                .BuildServiceProvider();
+            var cacheProvider = cacheServices.GetRequiredService<IFusionCacheProvider>();
+            var publisher = Substitute.For<ILeaderboardRefreshPublisher>();
+            var cache = new FusionLeaderboardCache(
+                db,
+                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                publisher,
+                cacheProvider,
+                new RedisLeaderboardPublicationFence(redis),
+                new LeaderboardProjectionKeyedLock());
+
+            var initialReads = await Task.WhenAll(
+                Enumerable.Range(0, 8)
+                    .Select(_ => cache.GetScoreboardAsync(
+                        fixture.Competition.Id,
+                        cancellationToken)));
+
+            await Assert.That(initialReads.All(item => item is not null)).IsTrue();
+            await publisher.Received(1).PublishAsync(
+                Arg.Any<ScoreboardProjection>(),
+                Arg.Any<CancellationToken>());
+
+            await redis.GetDatabase().ExecuteAsync("FLUSHDB");
+            await cacheProvider.GetCache(NoCtfCacheNames.Leaderboards).RemoveAsync(
+                $"projection:v2:{fixture.Competition.Id:N}",
+                token: cancellationToken);
+
+            var rebuilt = await cache.GetScoreboardAsync(
+                fixture.Competition.Id,
+                cancellationToken);
+
+            await Assert.That(rebuilt).IsNotNull();
+            await Assert.That(rebuilt!.Snapshot.Teams).IsNotEmpty();
+            await publisher.Received(2).PublishAsync(
+                Arg.Any<ScoreboardProjection>(),
+                Arg.Any<CancellationToken>());
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Publication_runs_after_projection_lock_release_and_failure_requeues_projection(
@@ -721,68 +802,6 @@ public sealed class LeaderboardProjectionPersistenceTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Awdp_round_refresh_traverses_every_running_competition(
-        CancellationToken cancellationToken)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
-                .WithDatabase("noctf_awdp_round_refresh")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .Build();
-            await postgres.StartAsync(cancellationToken);
-
-            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
-                .UseNpgsql(postgres.GetConnectionString())
-                .UseSnakeCaseNamingConvention()
-                .Options;
-            var now = DateTimeOffset.UtcNow;
-            await using var db = new NoCtfDbContext(options);
-            await db.Database.EnsureCreatedAsync(cancellationToken);
-            var owner = CreateUser(now);
-            var configuration = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp);
-            var competitions = Enumerable.Range(0, 501)
-                .Select(index => new Competition
-                {
-                    Id = Guid.CreateVersion7(now.AddTicks(index + 1)),
-                    Title = $"AWDP round refresh {index}",
-                    OwnerId = owner.Id,
-                    Mode = GameMode.Awdp,
-                    ConfigurationJson = configuration,
-                    FlagDerivationSecret = new byte[32],
-                    StartAt = now.AddHours(-1),
-                    EndAt = now.AddHours(1),
-                    Status = CompetitionStatus.Running,
-                    MaxConcurrentRuntimeInstancesPerTeam = 1,
-                    CreatedAt = now,
-                    UpdatedAt = now
-                })
-                .ToArray();
-            db.Users.Add(owner);
-            db.Competitions.AddRange(competitions);
-            await db.SaveChangesAsync(cancellationToken);
-            db.ChangeTracker.Clear();
-
-            var outbox = new RecordingOutbox();
-            var cache = Substitute.For<ILeaderboardCache>();
-            cache.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-                .Returns(Task.FromResult<LeaderboardResponse?>(null));
-
-            await BackendMessageHandlers.Handle(
-                new RefreshDirtyLeaderboards(now),
-                db,
-                outbox,
-                cache,
-                cancellationToken);
-
-            await Assert.That(outbox.ProjectLeaderboardMessages.Select(message => message.CompetitionId))
-                .IsEquivalentTo(competitions.Select(competition => competition.Id));
-        });
-    }
-
-    [Test]
-    [Timeout(300_000)]
     public async Task Awdp_ban_and_unban_reproject_the_authoritative_cache(
         CancellationToken cancellationToken)
     {
@@ -863,7 +882,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 "integration regression",
                 now.AddMinutes(1)), cancellationToken);
             await Assert.That(ban.Succeeded).IsTrue();
-            await ReprojectDirtyAsync(db, outbox, cache, now.AddMinutes(1), cancellationToken);
+            await ProjectLeaderboardAsync(db, cache, cancellationToken);
 
             var banned = await cache.GetScoreboardAsync(fixture.Competition.Id, cancellationToken);
             var bannedTeam = banned!.Snapshot.Teams.Single(team => team.TeamId == fixture.Team.Id);
@@ -879,7 +898,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 null,
                 now.AddMinutes(2)), cancellationToken);
             await Assert.That(unban.Succeeded).IsTrue();
-            await ReprojectDirtyAsync(db, outbox, cache, now.AddMinutes(2), cancellationToken);
+            await ProjectLeaderboardAsync(db, cache, cancellationToken);
 
             var restored = await cache.GetScoreboardAsync(fixture.Competition.Id, cancellationToken);
             var restoredTeam = restored!.Snapshot.Teams.Single(team => team.TeamId == fixture.Team.Id);
@@ -1307,23 +1326,13 @@ public sealed class LeaderboardProjectionPersistenceTests
             UpdatedAt = occurredAt
         };
 
-    private static async Task ReprojectDirtyAsync(
+    private static async Task ProjectLeaderboardAsync(
         NoCtfDbContext db,
-        RecordingOutbox outbox,
         ILeaderboardCache cache,
-        DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        outbox.ProjectLeaderboardMessages.Clear();
         await BackendMessageHandlers.Handle(
-            new RefreshDirtyLeaderboards(now),
-            db,
-            outbox,
-            cache,
-            cancellationToken);
-        await Assert.That(outbox.ProjectLeaderboardMessages).HasSingleItem();
-        await BackendMessageHandlers.Handle(
-            outbox.ProjectLeaderboardMessages[0],
+            new ProjectLeaderboard(db.Competitions.Select(item => item.Id).Single()),
             cache,
             cancellationToken);
     }
@@ -1477,5 +1486,10 @@ public sealed class LeaderboardProjectionPersistenceTests
             Guid ignoredCompetitionId,
             long fence,
             CancellationToken cancellationToken) => Task.FromResult(false);
+
+        public Task InvalidateAsync(
+            Guid ignoredCompetitionId,
+            long minimumFence,
+            CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

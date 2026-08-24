@@ -19,7 +19,6 @@ public static class MessageRouting
         options.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
         Route<GameplayFactStateChanged>(options, WorkerQueue.Gameplay);
-        Route<RefreshDirtyLeaderboards>(options, WorkerQueue.Projection);
         Route<ProjectLeaderboard>(options, WorkerQueue.Projection);
         Route<ApplyCompetitionVisibility>(options, WorkerQueue.Control);
         Route<CleanupCompetitionRuntimes>(options, WorkerQueue.Control);

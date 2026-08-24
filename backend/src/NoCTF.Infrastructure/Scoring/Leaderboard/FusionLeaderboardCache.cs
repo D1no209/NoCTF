@@ -21,7 +21,8 @@ public sealed class FusionLeaderboardCache(
     ILeaderboardProjectionEngine projectionEngine,
     ILeaderboardRefreshPublisher publisher,
     IFusionCacheProvider caches,
-    ILeaderboardPublicationFence? publicationFence = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
+    ILeaderboardPublicationFence? publicationFence = null,
+    LeaderboardProjectionKeyedLock? projectionKeyedLock = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
     private sealed record LifecyclePayload(
         int SchemaVersion,
@@ -32,12 +33,13 @@ public sealed class FusionLeaderboardCache(
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
+    private readonly LeaderboardProjectionKeyedLock keyedLock = projectionKeyedLock ?? new();
 
     public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct) =>
-        (await GetPublishedBundleAsync(competitionId, ct))?.Legacy;
+        (await GetOrRebuildPublishedBundleAsync(competitionId, ct))?.Legacy;
 
     public async Task<ScoreboardProjection?> GetScoreboardAsync(Guid competitionId, CancellationToken ct) =>
-        (await GetPublishedBundleAsync(competitionId, ct))?.Scoreboard;
+        (await GetOrRebuildPublishedBundleAsync(competitionId, ct))?.Scoreboard;
 
     public async Task<LeaderboardResponse?> GetFrozenAsync(Guid competitionId, CancellationToken ct)
         => (await GetFrozenBundleAsync(competitionId, ct))?.Legacy;
@@ -515,8 +517,30 @@ public sealed class FusionLeaderboardCache(
         }
     }
 
-    public Task InvalidateAsync(Guid competitionId, CancellationToken ct) =>
-        cache.RemoveAsync(ProjectionKey(competitionId), token: ct).AsTask();
+    public async Task InvalidateAsync(Guid competitionId, CancellationToken ct)
+    {
+        var outcome = "success";
+        try
+        {
+            if (publicationFence is not null)
+            {
+                await publicationFence.InvalidateAsync(
+                    competitionId,
+                    DateTimeOffset.UtcNow.UtcTicks,
+                    ct);
+            }
+            await cache.RemoveAsync(ProjectionKey(competitionId), token: ct);
+        }
+        catch
+        {
+            outcome = "failure";
+            throw;
+        }
+        finally
+        {
+            NoCtfTelemetry.RecordLeaderboardInvalidation(outcome);
+        }
+    }
 
     public async Task<LeaderboardCacheStatus> GetStatusAsync(Guid competitionId, CancellationToken ct)
     {
@@ -527,6 +551,38 @@ public sealed class FusionLeaderboardCache(
 
     private static string ProjectionKey(Guid competitionId) => $"projection:v2:{competitionId:N}";
     private static string FailureKey(Guid competitionId) => $"leaderboard:{competitionId:N}:last-failure";
+
+    private async Task<LeaderboardProjectionBundle?> GetOrRebuildPublishedBundleAsync(
+        Guid competitionId,
+        CancellationToken ct)
+    {
+        var published = await GetPublishedBundleAsync(competitionId, ct);
+        if (published is not null)
+            return published;
+
+        using var projectionLock = await keyedLock.EnterAsync(competitionId, ct);
+        published = await GetPublishedBundleAsync(competitionId, ct);
+        if (published is not null)
+            return published;
+
+        try
+        {
+            await RefreshAsync(competitionId, ct);
+            published = await GetPublishedBundleAsync(competitionId, ct);
+            NoCtfTelemetry.RecordLeaderboardCacheMissRebuild(
+                published is null ? "not_found" : "success");
+            return published;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            NoCtfTelemetry.RecordLeaderboardCacheMissRebuild("failure");
+            return null;
+        }
+    }
 
     private async Task<LeaderboardProjectionBundle?> GetPublishedBundleAsync(
         Guid competitionId,

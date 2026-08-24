@@ -3,6 +3,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Hosting;
 using NoCTF.Worker;
 using Wolverine;
+using Wolverine.Configuration;
 
 namespace NoCTF.Tests.Unit.Worker;
 
@@ -116,6 +117,15 @@ public sealed class WorkerRoleTests
         var action = () => WorkerMessageTopologyStartupValidator.ValidateFanoutRouting(
             [CompetitionEventFanoutQueueNames.Realtime],
             $"{endpoint}{Environment.NewLine}local://{CompetitionEventFanoutQueueNames.Realtime}");
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task Leaderboard_fanout_rejects_listener_not_pinned_to_leader()
+    {
+        var action = () => WorkerMessageTopologyStartupValidator.ValidateLeaderboardListenerScope(
+            ListenerScope.Exclusive);
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }

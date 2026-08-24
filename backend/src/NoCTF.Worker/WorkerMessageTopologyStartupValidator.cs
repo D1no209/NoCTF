@@ -64,6 +64,23 @@ public sealed class WorkerMessageTopologyStartupValidator(
                 throw new InvalidOperationException(
                     $"Fan-out endpoint '{queueName}' must be a durable PostgreSQL listener.");
             }
+
+            if (string.Equals(
+                    queueName,
+                    CompetitionEventFanoutQueueNames.Leaderboard,
+                    StringComparison.Ordinal))
+            {
+                ValidateLeaderboardListenerScope(endpoint.ListenerScope);
+            }
+        }
+    }
+
+    internal static void ValidateLeaderboardListenerScope(ListenerScope listenerScope)
+    {
+        if (listenerScope != ListenerScope.PinnedToLeader)
+        {
+            throw new InvalidOperationException(
+                "Leaderboard fan-out must be pinned to the Wolverine leader so its process-local merge queue is owned by the active Singular Agent.");
         }
     }
 

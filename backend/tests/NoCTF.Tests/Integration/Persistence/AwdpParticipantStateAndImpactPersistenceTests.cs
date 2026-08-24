@@ -71,65 +71,6 @@ public sealed class AwdpParticipantStatePersistenceTests
         });
     }
 
-    [Test]
-    [Timeout(300_000)]
-    public async Task Maintenance_projects_only_when_the_logical_round_advances(
-        CancellationToken cancellationToken)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = await StartPostgresAsync(cancellationToken);
-            var options = Options(postgres);
-            var now = DateTimeOffset.UtcNow;
-            var competitionId = await SeedDueLeaderboardAsync(options, now, cancellationToken);
-            var cache = new MutableLeaderboardCache(
-                competitionId,
-                now.AddSeconds(-65));
-            var outbox = new RecordingOutbox();
-
-            await using (var db = new NoCtfDbContext(options))
-            {
-                await BackendMessageHandlers.Handle(
-                    new RefreshDirtyLeaderboards(now),
-                    db,
-                    outbox,
-                    cache,
-                    cancellationToken);
-            }
-
-            await Assert.That(outbox.ProjectedCompetitionIds)
-                .IsEquivalentTo([competitionId]);
-
-            await using (var db = new NoCtfDbContext(options))
-            {
-                var competition = await db.Competitions.SingleAsync(
-                    item => item.Id == competitionId,
-                    cancellationToken);
-                competition.Status = CompetitionStatus.Paused;
-                AddLifecycle(
-                    db,
-                    competitionId,
-                    CompetitionStatus.Running,
-                    CompetitionStatus.Paused,
-                    now);
-                await db.SaveChangesAsync(cancellationToken);
-            }
-
-            cache.DataAsOf = now;
-            await using (var db = new NoCtfDbContext(options))
-            {
-                await BackendMessageHandlers.Handle(
-                    new RefreshDirtyLeaderboards(now.AddMinutes(5)),
-                    db,
-                    outbox,
-                    cache,
-                    cancellationToken);
-            }
-
-            await Assert.That(outbox.ProjectedCompetitionIds.Count).IsEqualTo(1);
-        });
-    }
-
     private static async Task<ParticipantFixture> SeedParticipantStateAsync(
         DbContextOptions<NoCtfDbContext> options,
         DateTimeOffset now,
@@ -249,41 +190,6 @@ public sealed class AwdpParticipantStatePersistenceTests
             fixFactId);
     }
 
-    private static async Task<Guid> SeedDueLeaderboardAsync(
-        DbContextOptions<NoCtfDbContext> options,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        await using var db = new NoCtfDbContext(options);
-        await db.Database.EnsureCreatedAsync(cancellationToken);
-        var ownerId = Guid.CreateVersion7(now);
-        var competitionId = Guid.CreateVersion7(now.AddMilliseconds(1));
-        db.Users.Add(User(ownerId, "round-owner", now));
-        db.Competitions.Add(new Competition
-        {
-            Id = competitionId,
-            Title = "AWDP round maintenance",
-            OwnerId = ownerId,
-            Mode = GameMode.Awdp,
-            Status = CompetitionStatus.Running,
-            ConfigurationJson = RoundConfiguration(60),
-            StartAt = now.AddMinutes(-10),
-            EndAt = now.AddHours(1),
-            FlagDerivationSecret = RandomNumberGenerator.GetBytes(32),
-            MaxConcurrentRuntimeInstancesPerTeam = 2,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        AddLifecycle(
-            db,
-            competitionId,
-            CompetitionStatus.Visible,
-            CompetitionStatus.Running,
-            now.AddSeconds(-125));
-        await db.SaveChangesAsync(cancellationToken);
-        return competitionId;
-    }
-
     private static User User(Guid id, string name, DateTimeOffset now) => new()
     {
         Id = id,
@@ -377,58 +283,6 @@ public sealed class AwdpParticipantStatePersistenceTests
             .UseNpgsql(postgres.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
-
-    private sealed class MutableLeaderboardCache(
-        Guid competitionId,
-        DateTimeOffset dataAsOf) : ILeaderboardCache
-    {
-        public DateTimeOffset DataAsOf { get; set; } = dataAsOf;
-
-        public Task<LeaderboardResponse?> GetAsync(
-            Guid requestedCompetitionId,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (requestedCompetitionId != competitionId)
-                throw new InvalidOperationException("Unexpected competition leaderboard lookup.");
-            return Task.FromResult<LeaderboardResponse?>(new(
-                competitionId,
-                DataAsOf,
-                [])
-            {
-                DataAsOf = DataAsOf
-            });
-        }
-
-        public Task RefreshAsync(Guid requestedCompetitionId, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
-
-        public Task InvalidateAsync(Guid requestedCompetitionId, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
-    }
-
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
-    {
-        public List<Guid> ProjectedCompetitionIds { get; } = [];
-
-        public ValueTask PublishAsync<T>(T message)
-        {
-            if (message is ProjectLeaderboard projection)
-                ProjectedCompetitionIds.Add(projection.CompetitionId);
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            ValueTask.CompletedTask;
-
-        public ValueTask PublishToRunnerNodeAsync<T>(T message)
-            where T : IRunnerNodeMessage => ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerNodeMessage => ValueTask.CompletedTask;
-
-        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
-    }
 
     private sealed record ParticipantFixture(
         Guid UserId,

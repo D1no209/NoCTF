@@ -94,4 +94,40 @@ public sealed class RedisLeaderboardPublicationFenceTests
             await Assert.That(await fence.GetAsync(competitionId, cancellationToken)).IsNull();
         });
     }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Invalidation_tombstone_rejects_an_inflight_stale_projection(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var container = new RedisBuilder(
+                "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await container.StartAsync(cancellationToken);
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(
+                container.GetConnectionString());
+            var fence = new RedisLeaderboardPublicationFence(redis);
+            var competitionId = Guid.CreateVersion7();
+            var stale = await fence.IssueAsync(competitionId, 100, cancellationToken);
+
+            await fence.InvalidateAsync(competitionId, 101, cancellationToken);
+            var staleAccepted = await fence.TryCommitAsync(
+                competitionId,
+                stale,
+                "stale",
+                cancellationToken);
+            var current = await fence.IssueAsync(competitionId, 101, cancellationToken);
+            var currentAccepted = await fence.TryCommitAsync(
+                competitionId,
+                current,
+                "current",
+                cancellationToken);
+
+            await Assert.That(staleAccepted).IsFalse();
+            await Assert.That(currentAccepted).IsTrue();
+            await Assert.That(await fence.GetAsync(competitionId, cancellationToken))
+                .IsEqualTo(new LeaderboardFencedPayload(current, "current"));
+        });
+    }
 }

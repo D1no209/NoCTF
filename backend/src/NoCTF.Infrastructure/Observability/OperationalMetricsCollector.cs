@@ -44,8 +44,6 @@ public sealed class OperationalMetricsCollector(
                 .SingleOrDefaultAsync(cancellationToken);
 
             NoCtfTelemetry.UpdateOperationalSnapshot(
-                0,
-                TimeSpan.Zero,
                 waiting?.Count ?? 0,
                 OldestAge(now, waiting?.OldestAt));
         }

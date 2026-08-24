@@ -194,7 +194,8 @@ public sealed class NoCtfWolverineTopologyTests
                 .UseDurableInbox();
             options.ListenToPostgresqlQueue(CompetitionEventFanoutQueueNames.Leaderboard)
                 .Named(CompetitionEventFanoutQueueNames.Leaderboard)
-                .UseDurableInbox();
+                .UseDurableInbox()
+                .ListenOnlyAtLeader();
         });
         return builder.Build();
     }
