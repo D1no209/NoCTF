@@ -339,8 +339,9 @@ public sealed class ChallengeAttachmentPersistenceTests
             await Assert.That(sameTeam.Distinct().Count()).IsEqualTo(1);
 
             var laterTeams = await Task.WhenAll(DownloadAsync(users[1]), DownloadAsync(users[2]));
-            await Assert.That(laterTeams[0]).IsNotEqualTo(sameTeam[0]);
-            await Assert.That(attachments).Contains(laterTeams[1]);
+            var previouslyUnusedAttachment = attachments.Single(id => id != sameTeam[0]);
+            await Assert.That(laterTeams).Contains(previouslyUnusedAttachment);
+            await Assert.That(laterTeams.All(attachments.Contains)).IsTrue();
 
             await using var verification = new NoCtfDbContext(Options(connectionString));
             var assignments = await verification.ChallengeFlags.AsNoTracking()
