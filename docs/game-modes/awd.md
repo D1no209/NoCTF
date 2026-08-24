@@ -124,18 +124,16 @@ body: { state: Up | Down }
 
 JWT audience/permission/resource claims 固定。一次 Checker 执行可以多次调用，后一次状态覆盖前一次。服务端接收成功时间为 OccurredAt；恰好等于 RoundEnd 的变化从下一轮生效。
 
-数据库只写状态变化：
+每次 Checker 执行都预先创建一条独立 GameplayFact：
 
 ```text
-Up + Up: no event
-Up + Down: AwdServiceStatus/Result.Wrong
-Down + Down: no event
-Down + Up: AwdServiceStatus/Result.Correct
+Up: AwdServiceTransition/Result.ServiceUp
+Down: AwdServiceTransition/Result.ServiceDown
 ```
 
-正常退出且无 callback 为 `Unknown`；异常退出为 `CheckerAbnormalExit`；超时为 `CheckerTimedOut`。这些是 Checker 诊断状态，不由退出码推断服务 Up/Down，也不直接产生服务分。只有 Checker 主动回报的 Up/Down 参与服务状态计分。
+正常退出且无 callback 为 `Unknown`；异常退出为 `CheckerAbnormalExit`；超时为 `CheckerTimedOut`。异常与超时会把本次预创建事实收敛为 `ServiceDown / CheckerPlatformError`，不会留下永久 Processing 事实。
 
-每个完整轮次只看 `OccurredAt < RoundEnd` 的最新状态：Up `+ServiceHealthyPoints`，Down `-ServiceUnhealthyPenalty`。不按在线时长比例；状态跨轮持续；禁用 Checker 时两项为 0/无事件。
+每个完整轮次只看 `OccurredAt < RoundEnd` 且 `(OccurredAt, Id)` 最大的已完成状态：Up `+ServiceHealthyPoints`，Down `-ServiceUnhealthyPenalty`。不按在线时长比例；状态跨轮持续；禁用 Checker 时两项为 0/无事件。
 
 ## 排名
 

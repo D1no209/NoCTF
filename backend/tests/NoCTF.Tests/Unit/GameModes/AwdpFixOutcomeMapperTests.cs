@@ -9,13 +9,13 @@ public sealed class AwdpFixOutcomeMapperTests
     [Test]
     [Arguments(AwdpFixOutcome.DefenseSucceeded, GameplayFactResult.Correct, null)]
     [Arguments(AwdpFixOutcome.ExploitSucceeded, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpExploitSucceeded)]
-    [Arguments(AwdpFixOutcome.ServiceAbnormal, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceAbnormal)]
-    [Arguments(AwdpFixOutcome.PatchFailed, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchFailed)]
-    [Arguments(AwdpFixOutcome.PatchTimeout, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchTimeout)]
-    [Arguments(AwdpFixOutcome.PlatformFailed, null, GameplayFactFailureCode.CheckerPlatformError)]
+    [Arguments(AwdpFixOutcome.ServiceAbnormal, GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpServiceAbnormal)]
+    [Arguments(AwdpFixOutcome.PatchFailed, GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpPatchFailed)]
+    [Arguments(AwdpFixOutcome.PatchTimeout, GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpPatchTimeout)]
+    [Arguments(AwdpFixOutcome.PlatformFailed, GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpPlatformFailed)]
     public async Task Typed_outcome_maps_to_one_domain_decision(
         AwdpFixOutcome outcome,
-        GameplayFactResult? result,
+        GameplayFactResult result,
         GameplayFactFailureCode? failureCode)
     {
         var decision = AwdpFixOutcomeMapper.Map(outcome);

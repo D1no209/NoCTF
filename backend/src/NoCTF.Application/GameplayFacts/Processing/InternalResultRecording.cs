@@ -30,18 +30,12 @@ public sealed record AwdCheckResult(
             occurredAt);
 }
 
-public static class AwdServiceStateTransition
+public static class AwdCheckerOutcomeMapper
 {
-    public static GameplayFactResult? ToGameplayFactResult(
-        AwdServiceState current,
-        AwdServiceState received) =>
-        current == received
-            ? null
-            : received == AwdServiceState.Up
-                ? GameplayFactResult.ServiceUp
-                : received == AwdServiceState.Down
-                    ? GameplayFactResult.ServiceDown
-                    : null;
+    public static GameplayFactResult ToGameplayFactResult(AwdServiceState state) =>
+        state == AwdServiceState.Up
+            ? GameplayFactResult.ServiceUp
+            : GameplayFactResult.ServiceDown;
 }
 
 public sealed record AwdpFixResult(

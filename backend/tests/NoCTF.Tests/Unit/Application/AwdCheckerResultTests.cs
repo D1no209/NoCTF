@@ -25,17 +25,15 @@ public sealed class AwdCheckerResultTests
     }
 
     [Test]
-    [Arguments(AwdServiceState.Up, AwdServiceState.Up, null)]
-    [Arguments(AwdServiceState.Up, AwdServiceState.Down, GameplayFactResult.ServiceDown)]
-    [Arguments(AwdServiceState.Down, AwdServiceState.Down, null)]
-    [Arguments(AwdServiceState.Down, AwdServiceState.Up, GameplayFactResult.ServiceUp)]
-    [Arguments(AwdServiceState.Up, AwdServiceState.CheckerAbnormalExit, null)]
-    public async Task Only_service_state_changes_produce_scoring_facts(
-        AwdServiceState current,
-        AwdServiceState received,
-        GameplayFactResult? expected)
+    [Arguments(AwdServiceState.Up, GameplayFactResult.ServiceUp)]
+    [Arguments(AwdServiceState.Down, GameplayFactResult.ServiceDown)]
+    [Arguments(AwdServiceState.CheckerAbnormalExit, GameplayFactResult.ServiceDown)]
+    [Arguments(AwdServiceState.CheckerTimedOut, GameplayFactResult.ServiceDown)]
+    public async Task Every_checker_execution_maps_to_an_authoritative_result(
+        AwdServiceState state,
+        GameplayFactResult expected)
     {
-        var result = AwdServiceStateTransition.ToGameplayFactResult(current, received);
+        var result = AwdCheckerOutcomeMapper.ToGameplayFactResult(state);
 
         await Assert.That(result).IsEqualTo(expected);
     }

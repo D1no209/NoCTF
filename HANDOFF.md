@@ -1,5 +1,29 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 6
+
+- 当前分支：`codex/data-model-wolverine-simplification`；阶段 6 父提交为 `851fc689`。
+  本节随阶段 6 功能提交交付。未推送、未部署、未操作生产数据库、生产队列、对象存储或生产数据。
+- GameplayFact 现在是 AWD Checker 与 AWDP Fix 的唯一权威结果事实。每次 AWD Checker 执行预创建
+  独立事实，健康、不健康和回调超时均按同一个 FactId 幂等收敛为 `Completed`；服务当前状态从最新
+  `(OccurredAt, Id)` 的已完成事实派生，不再依赖“只有 Up/Down 变化才记录”的旧转换语义。
+- AWDP 六类 Fix outcome 已固定映射：DefenseSucceeded 为 Correct，ExploitSucceeded 为 Wrong，
+  ServiceAbnormal、PatchFailed、PatchTimeout、PlatformFailed 为 Rejected，且全部收敛到 Completed。
+  新增 schemaVersion 1 的强类型 `AwdpFixResolved` Payload，只包含事实、Patch、Runtime、队伍、题目、
+  outcome、稳定失败码和时间，不写入 Flag、Patch 内容、凭据或 Runner stderr。
+- AWDP Checker 回调只接受当前三个业务枚举值，删除旧协议别名；排行榜只读取合法已完成 GameplayFact。
+  `AwdpPlatformFailed` 追加在失败码枚举末尾，避免改变当前阶段数据库里已有枚举整数含义。
+- 验证：Release build 0 warning/0 error；非 Integration TUnit 896/896；阶段单元 9/9；真实
+  PostgreSQL/Wolverine 定向 2/2、transactional outbox 10/10；ClientApp 275/275、2029 assertions，
+  typecheck/build 通过；OpenAPI/SDK 双次生成哈希一致；`git diff --check` 通过。
+- 全量 TUnit 共 1074 项：1068 通过、4 失败、2 跳过。4 项仍断言阶段 8/9 才删除的 scheduled
+  successor、AWDP 全表轮询和 `LeaderboardDirty` 扫描/即时投影旧语义；2 项因未配置真实
+  Kubernetes/Libvirt。当前 EF model drift 是阶段 10 单一 InitialBaseline 前的预期状态，未手改
+  migration/snapshot。精确证据与恢复边界见 `docs/data-model-wolverine-stage6-gameplay-facts.md`。
+- 下一步只能进入阶段 7 Wolverine competing consumers 与显式 fan-out：必须复用阶段 0 对
+  Wolverine 6.29.2 的真实 Spike 结论，补 Sticky endpoint fail-fast，并保持 EF transactional outbox、
+  durable inbox 和每条独立队列的重试/死信语义；不得提前修改 Singular Agent 或排行榜投影。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 5
 
 - 当前分支：`codex/data-model-wolverine-simplification`；阶段 5 父提交为 `f3767f58`。

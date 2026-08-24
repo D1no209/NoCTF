@@ -3,7 +3,7 @@ using NoCTF.Domain.Gameplay;
 namespace NoCTF.GameModes.Awdp.Scoring;
 
 public sealed record AwdpFixDecision(
-    GameplayFactResult? Result,
+    GameplayFactResult Result,
     GameplayFactFailureCode? FailureCode);
 
 public static class AwdpFixOutcomeMapper
@@ -14,13 +14,13 @@ public static class AwdpFixOutcomeMapper
         AwdpFixOutcome.ExploitSucceeded =>
             new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpExploitSucceeded),
         AwdpFixOutcome.ServiceAbnormal =>
-            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceAbnormal),
+            new(GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpServiceAbnormal),
         AwdpFixOutcome.PatchFailed =>
-            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchFailed),
+            new(GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpPatchFailed),
         AwdpFixOutcome.PatchTimeout =>
-            new(GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpPatchTimeout),
+            new(GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpPatchTimeout),
         AwdpFixOutcome.PlatformFailed =>
-            new(null, GameplayFactFailureCode.CheckerPlatformError),
+            new(GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpPlatformFailed),
         _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null)
     };
 }

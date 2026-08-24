@@ -25,9 +25,10 @@ public sealed class InternalResultStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts.SingleOrDefaultAsync(
-            item => item.Id == result.GameplayFactId,
-            ct);
+        var fact = await db.GameplayFacts
+            .FromSqlInterpolated(
+                $"SELECT * FROM gameplay_facts WHERE id = {result.GameplayFactId} FOR UPDATE")
+            .SingleOrDefaultAsync(ct);
         if (fact is null)
             return InternalResultDisposition.NotFound;
         var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
@@ -57,15 +58,13 @@ public sealed class InternalResultStore(
             || fact.CompetitionChallengeId != runtime.CompetitionChallengeId
             || fact.TeamId != runtime.TeamId)
             return InternalResultDisposition.NotFound;
-        var scoringResult = result.State switch
-        {
-            AwdServiceState.Up => GameplayFactResult.ServiceUp,
-            AwdServiceState.Down => GameplayFactResult.ServiceDown,
-            _ => GameplayFactResult.ServiceDown
-        };
+        var scoringResult = AwdCheckerOutcomeMapper.ToGameplayFactResult(result.State);
         fact.State = GameplayFactState.Completed;
         fact.Result = scoringResult;
-        fact.FailureCode = null;
+        fact.FailureCode = result.State is AwdServiceState.CheckerAbnormalExit
+            or AwdServiceState.CheckerTimedOut
+                ? GameplayFactFailureCode.CheckerPlatformError
+                : null;
         fact.UpdatedAt = appliedAt;
         await events.RecordAsync(new(
             runtime.CompetitionId,
@@ -94,8 +93,10 @@ public sealed class InternalResultStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var fact = await db.GameplayFacts.SingleOrDefaultAsync(
-            item => item.Id == result.GameplayFactId, ct);
+        var fact = await db.GameplayFacts
+            .FromSqlInterpolated(
+                $"SELECT * FROM gameplay_facts WHERE id = {result.GameplayFactId} FOR UPDATE")
+            .SingleOrDefaultAsync(ct);
         if (fact is null)
             return InternalResultDisposition.NotFound;
         var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
@@ -120,61 +121,27 @@ public sealed class InternalResultStore(
                 challenge => challenge.Id,
                 (scope, _) => new { scope.Challenge, scope.Competition })
             .SingleAsync(ct);
-        if (context.Competition.Mode != GameMode.Awdp || fact.Kind != GameplayFactKind.FixAttempt)
+        if (context.Competition.Mode != GameMode.Awdp
+            || fact.Kind != GameplayFactKind.FixAttempt
+            || fact.ReferenceKind != GameplayFactReferenceKind.PatchUpload
+            || fact.ReferenceId is null
+            || fact.TeamId is null)
             return InternalResultDisposition.NotFound;
         var decision = AwdpFixOutcomeMapper.Map(result.Outcome);
-        if (decision.Result is null)
-        {
-            fact.State = GameplayFactState.PlatformFailed;
-            fact.FailureCode = decision.FailureCode
-                ?? GameplayFactFailureCode.CheckerPlatformError;
-        }
-        else
-        {
-            fact.Result = decision.Result;
-            fact.State = GameplayFactState.Completed;
-            fact.FailureCode = decision.FailureCode;
-            await events.RecordAsync(new(
-                fact.CompetitionId,
-                CompetitionEventKind.ScoringRecorded,
-                CompetitionEventLevel.Information,
-                CompetitionEventVisibility.Team,
-                result.OccurredAt,
-                TeamId: fact.TeamId,
-                CompetitionChallengeId: fact.CompetitionChallengeId,
-                RuntimeInstanceId: runtime.Id,
-                GameplayFactId: fact.Id,
-                GameplayFactKind: fact.Kind,
-                GameplayFactState: fact.State,
-                GameplayFactResult: fact.Result), ct);
-        }
-        fact.UpdatedAt = DateTimeOffset.UtcNow;
+        var resolvedAt = ToPostgresPrecision(result.OccurredAt);
+        fact.Result = decision.Result;
+        fact.State = GameplayFactState.Completed;
+        fact.FailureCode = decision.FailureCode;
+        fact.UpdatedAt = resolvedAt;
         runtime.State = RuntimeState.Stopping;
         await events.RecordAsync(new(
             fact.CompetitionId,
-            CompetitionEventKind.GameplayFactAdjudicated,
-            fact.State == GameplayFactState.PlatformFailed
+            CompetitionEventKind.ScoringRecorded,
+            result.Outcome == AwdpFixOutcome.PlatformFailed
                 ? CompetitionEventLevel.Error
                 : CompetitionEventLevel.Information,
             CompetitionEventVisibility.Team,
-            result.OccurredAt,
-            ActorUserId: fact.ActorUserId,
-            TeamId: fact.TeamId,
-            CompetitionChallengeId: fact.CompetitionChallengeId,
-            RuntimeInstanceId: runtime.Id,
-            GameplayFactId: fact.Id,
-            GameplayFactKind: fact.Kind,
-            GameplayFactState: fact.State,
-            GameplayFactResult: decision.Result,
-            RuntimeState: runtime.State), ct);
-        await events.RecordAsync(new(
-            fact.CompetitionId,
-            CompetitionEventKind.AwdpFixResolved,
-            fact.State == GameplayFactState.PlatformFailed
-                ? CompetitionEventLevel.Error
-                : CompetitionEventLevel.Information,
-            CompetitionEventVisibility.Public,
-            result.OccurredAt,
+            resolvedAt,
             TeamId: fact.TeamId,
             CompetitionChallengeId: fact.CompetitionChallengeId,
             RuntimeInstanceId: runtime.Id,
@@ -183,11 +150,53 @@ public sealed class InternalResultStore(
             GameplayFactState: fact.State,
             GameplayFactResult: fact.Result), ct);
         await events.RecordAsync(new(
+            fact.CompetitionId,
+            CompetitionEventKind.GameplayFactAdjudicated,
+            result.Outcome == AwdpFixOutcome.PlatformFailed
+                ? CompetitionEventLevel.Error
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            resolvedAt,
+            ActorUserId: fact.ActorUserId,
+            TeamId: fact.TeamId,
+            CompetitionChallengeId: fact.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            GameplayFactId: fact.Id,
+            GameplayFactKind: fact.Kind,
+            GameplayFactState: fact.State,
+            GameplayFactResult: fact.Result,
+            RuntimeState: runtime.State), ct);
+        var payload = AwdpFixResolvedEventPayload.Create(
+            fact.Id,
+            fact.ReferenceId.Value,
+            runtime.Id,
+            fact.TeamId.Value,
+            fact.CompetitionChallengeId,
+            result.Outcome,
+            fact.FailureCode,
+            resolvedAt);
+        await events.RecordAsync(new(
+            fact.CompetitionId,
+            CompetitionEventKind.AwdpFixResolved,
+            result.Outcome == AwdpFixOutcome.PlatformFailed
+                ? CompetitionEventLevel.Error
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Public,
+            resolvedAt,
+            TeamId: fact.TeamId,
+            CompetitionChallengeId: fact.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            GameplayFactId: fact.Id,
+            GameplayFactKind: fact.Kind,
+            GameplayFactState: fact.State,
+            GameplayFactResult: fact.Result,
+            PayloadJson: payload.Serialize()), ct);
+        await events.RecordAsync(new(
             runtime.CompetitionId,
             CompetitionEventKind.RuntimeStateChanged,
             CompetitionEventLevel.Information,
             CompetitionEventVisibility.Team,
-            result.OccurredAt,
+            resolvedAt,
             TeamId: runtime.TeamId,
             CompetitionChallengeId: runtime.CompetitionChallengeId,
             RuntimeInstanceId: runtime.Id,

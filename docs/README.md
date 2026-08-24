@@ -8,6 +8,7 @@
    - [阶段 0 基线](data-model-wolverine-stage0-baseline.md)
    - [Wolverine 6.29.2 Spike](wolverine-6.29.2-spike.md)
    - [生产切换与回滚 Runbook](data-model-wolverine-cutover.md)
+   - [阶段 6：GameplayFact 与 AWDP 强类型结果](data-model-wolverine-stage6-gameplay-facts.md)
 2. [产品与领域模型](product-domain.md)
 3. [系统架构](architecture.md)
 4. [进程、消息与并发](processes-messaging.md)

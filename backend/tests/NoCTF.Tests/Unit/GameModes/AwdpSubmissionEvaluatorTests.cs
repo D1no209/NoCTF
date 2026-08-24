@@ -229,24 +229,23 @@ public sealed class AwdpGameplayFactEvaluatorTests
             Fact(
                 GameplayFactKind.FixAttempt,
                 startedAt.AddSeconds(170),
-                GameplayFactResult.Wrong,
+                GameplayFactResult.Rejected,
                 GameplayFactFailureCode.AwdpServiceAbnormal),
             Fact(
                 GameplayFactKind.FixAttempt,
                 startedAt.AddSeconds(180),
-                GameplayFactResult.Wrong,
+                GameplayFactResult.Rejected,
                 GameplayFactFailureCode.AwdpPatchFailed),
             Fact(
                 GameplayFactKind.FixAttempt,
                 startedAt.AddSeconds(190),
-                GameplayFactResult.Wrong,
+                GameplayFactResult.Rejected,
                 GameplayFactFailureCode.AwdpPatchTimeout),
             Fact(
                 GameplayFactKind.FixAttempt,
                 startedAt.AddSeconds(200),
-                null,
-                GameplayFactFailureCode.CheckerPlatformError,
-                GameplayFactState.PlatformFailed)
+                GameplayFactResult.Rejected,
+                GameplayFactFailureCode.AwdpPlatformFailed)
         };
         var configuration = JsonSerializer.Serialize(
             new AwdpConfiguration(

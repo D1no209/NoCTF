@@ -15,7 +15,7 @@ Pending/Queued -> Processing -> Completed
 
 Flag 与 Break 保存原文 `Value` 和 32-byte SHA-256。Fix、Hint、AWD Round 通过同时为空或同时存在的 `(ReferenceKind, ReferenceId)` 关联；多态目标由 Application/Infrastructure 在事务内验证。
 
-ManualAdjustment 由管理员创建即为 Completed/Applied，Value 是非零 canonical signed Int32。AWD 服务只在 Up/Down 变化时创建事实；KoH 每次完成的轮询都创建事实，Producer/Timeout/Ambiguous 记为 PlatformFailed。
+ManualAdjustment 由管理员创建即为 Completed/Applied，Value 是非零 canonical signed Int32。AWD 每次 Checker 执行先创建独立事实，健康和不健康分别收敛为 ServiceUp/ServiceDown；当前状态取 `(OccurredAt, Id)` 最大的已完成事实。KoH 每次完成的轮询都创建事实，Producer/Timeout/Ambiguous 记为 PlatformFailed。
 
 ## 接入与尝试
 

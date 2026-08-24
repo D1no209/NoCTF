@@ -1025,7 +1025,7 @@ internal static class NormalizedScoreboardProjection
                 => checked(configuration.FlagWrongPenalty * fact.Multiplicity),
             (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpExploitSucceeded)
                 => checked(configuration.ExploitSucceededPenalty * fact.Multiplicity),
-            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong, GameplayFactFailureCode.AwdpServiceAbnormal)
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Rejected, GameplayFactFailureCode.AwdpServiceAbnormal)
                 => checked(configuration.ServiceAbnormalPenalty * fact.Multiplicity),
             _ => 0
         };

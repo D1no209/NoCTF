@@ -1897,6 +1897,7 @@ export const englishMessages: Record<string, string> = {
   "存储访问超时": "Storage access timed out",
   "存储不可用": "Storage is unavailable",
   "Checker 平台错误": "Checker platform error",
+  "AWDP 平台错误": "AWDP platform error",
   "不能攻击本队": "Cannot attack your own team",
   "重复攻击": "Duplicate attack",
   "重复达成": "Duplicate achievement",
