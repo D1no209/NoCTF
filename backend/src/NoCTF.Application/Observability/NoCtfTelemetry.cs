@@ -43,6 +43,18 @@ public static class NoCtfTelemetry
         "noctf.leaderboard.projection.teams", unit: "{team}");
     private static readonly Counter<long> LeaderboardPublishFailures = Meter.CreateCounter<long>(
         "noctf.leaderboard.publish.failures", unit: "{failure}");
+    private static readonly Counter<long> SchedulerTakeovers = Meter.CreateCounter<long>(
+        "noctf.scheduler.takeovers", unit: "{takeover}");
+    private static readonly Histogram<double> SchedulerRebuildDuration = Meter.CreateHistogram<double>(
+        "noctf.scheduler.rebuild.duration", unit: "s");
+    private static readonly Histogram<long> SchedulerEntries = Meter.CreateHistogram<long>(
+        "noctf.scheduler.rebuild.entries", unit: "{entry}");
+    private static readonly Histogram<double> SchedulerDispatchLateness = Meter.CreateHistogram<double>(
+        "noctf.scheduler.dispatch.lateness", unit: "s");
+    private static readonly Counter<long> SchedulerDispatches = Meter.CreateCounter<long>(
+        "noctf.scheduler.dispatches", unit: "{message}");
+    private static readonly Counter<long> SchedulerSkippedTicks = Meter.CreateCounter<long>(
+        "noctf.scheduler.skipped_ticks", unit: "{tick}");
     private static long _dirtyCompetitionCount;
     private static long _oldestDirtyAgeSeconds;
     private static long _waitingRuntimeCount;
@@ -146,6 +158,35 @@ public static class NoCtfTelemetry
 
     public static void RecordLeaderboardPublishFailure(string endpoint) =>
         LeaderboardPublishFailures.Add(1, new TagList { { "endpoint", endpoint } });
+
+    public static void RecordSchedulerTakeover() => SchedulerTakeovers.Add(1);
+
+    public static void RecordSchedulerRebuild(
+        string outcome,
+        double elapsedSeconds,
+        int entryCount)
+    {
+        var tags = new TagList { { "outcome", outcome } };
+        SchedulerRebuildDuration.Record(elapsedSeconds, tags);
+        SchedulerEntries.Record(Math.Max(0, entryCount), tags);
+    }
+
+    public static void RecordSchedulerDispatch(
+        string kind,
+        string outcome,
+        double latenessSeconds)
+    {
+        var tags = new TagList { { "kind", kind }, { "outcome", outcome } };
+        SchedulerDispatches.Add(1, tags);
+        SchedulerDispatchLateness.Record(Math.Max(0, latenessSeconds), tags);
+    }
+
+    public static void RecordSchedulerSkippedTicks(string kind, long count)
+    {
+        if (count <= 0)
+            return;
+        SchedulerSkippedTicks.Add(count, new TagList { { "kind", kind } });
+    }
 
     public static void UpdateOperationalSnapshot(
         long dirtyCompetitionCount,

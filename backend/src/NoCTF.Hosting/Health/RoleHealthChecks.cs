@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -17,6 +19,8 @@ public interface IReadinessDependency
     string Name { get; }
     bool FailureIsCritical { get; }
     Task CheckAsync(CancellationToken cancellationToken);
+    IReadOnlyDictionary<string, object> Describe() =>
+        new Dictionary<string, object>();
 }
 
 public sealed class RoleReadinessHealthCheck(
@@ -33,9 +37,14 @@ public sealed class RoleReadinessHealthCheck(
             .Select(result => result.Name)
             .Order(StringComparer.Ordinal)
             .ToArray();
+        var data = results
+            .SelectMany(result => result.Data.Select(item =>
+                new KeyValuePair<string, object>($"{result.Name}.{item.Key}", item.Value)))
+            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
         if (critical.Length > 0)
             return HealthCheckResult.Unhealthy(
-                $"Required dependencies unavailable: {string.Join(", ", critical)}.");
+                $"Required dependencies unavailable: {string.Join(", ", critical)}.",
+                data: data);
 
         var degraded = results
             .Where(result => !result.Succeeded)
@@ -44,8 +53,9 @@ public sealed class RoleReadinessHealthCheck(
             .ToArray();
         return degraded.Length > 0
             ? HealthCheckResult.Degraded(
-                $"Optional dependencies unavailable: {string.Join(", ", degraded)}.")
-            : HealthCheckResult.Healthy();
+                $"Optional dependencies unavailable: {string.Join(", ", degraded)}.",
+                data: data)
+            : HealthCheckResult.Healthy(data: data);
     }
 
     private static async Task<DependencyResult> CheckAsync(
@@ -55,18 +65,27 @@ public sealed class RoleReadinessHealthCheck(
         try
         {
             await dependency.CheckAsync(cancellationToken);
-            return new(dependency.Name, dependency.FailureIsCritical, true);
+            return new(
+                dependency.Name,
+                dependency.FailureIsCritical,
+                true,
+                dependency.Describe());
         }
         catch
         {
-            return new(dependency.Name, dependency.FailureIsCritical, false);
+            return new(
+                dependency.Name,
+                dependency.FailureIsCritical,
+                false,
+                dependency.Describe());
         }
     }
 
     private sealed record DependencyResult(
         string Name,
         bool FailureIsCritical,
-        bool Succeeded);
+        bool Succeeded,
+        IReadOnlyDictionary<string, object> Data);
 }
 
 public sealed class PostgreSqlReadinessDependency(string connectionString)
@@ -174,8 +193,25 @@ public static class RoleHealthCheckRegistration
         });
         endpoints.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
-            Predicate = registration => registration.Tags.Contains("ready")
+            Predicate = registration => registration.Tags.Contains("ready"),
+            ResponseWriter = WriteReadinessAsync
         });
         return endpoints;
+    }
+
+    private static Task WriteReadinessAsync(
+        Microsoft.AspNetCore.Http.HttpContext context,
+        HealthReport report)
+    {
+        context.Response.ContentType = "application/json";
+        var data = report.Entries
+            .SelectMany(entry => entry.Value.Data.Select(item =>
+                new KeyValuePair<string, object?>(item.Key, item.Value)))
+            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+        return context.Response.WriteAsync(JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            data
+        }));
     }
 }

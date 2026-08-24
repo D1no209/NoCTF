@@ -98,6 +98,7 @@ public sealed class KohPollingHandler(
             observedAt,
             cancellationToken);
         return new(
+            message.GameplayFactId,
             message.CompetitionId,
             message.CompetitionChallengeId,
             decision.TeamId,
@@ -192,7 +193,6 @@ public sealed class KohPollingHandler(
 public sealed class KohObservationHandler(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
-    IKohProducerConfigurationCatalog configurations,
     TimeProvider timeProvider)
 {
     public async Task Handle(
@@ -216,12 +216,13 @@ public sealed class KohObservationHandler(
             || target.Competition.Status != CompetitionStatus.Running)
             return;
 
-        var settings = configurations.Get(
-            target.Competition.ConfigurationJson,
-            target.Challenge.RulesJson);
+        if (await db.GameplayFacts.AsNoTracking()
+            .AnyAsync(fact => fact.Id == message.GameplayFactId, cancellationToken))
+            return;
+
         db.GameplayFacts.Add(new GameplayFact
         {
-            Id = Guid.CreateVersion7(message.ObservedAt),
+            Id = message.GameplayFactId,
             CompetitionId = message.CompetitionId,
             CompetitionChallengeId = message.CompetitionChallengeId,
             TeamId = message.TeamId,
@@ -234,15 +235,8 @@ public sealed class KohObservationHandler(
             OccurredAt = message.ObservedAt,
             UpdatedAt = timeProvider.GetUtcNow()
         });
-        var nextDue = KohPollSchedule.NextDue(
-            message.DueAt,
-            timeProvider.GetUtcNow(),
-            TimeSpan.FromSeconds(settings.PollIntervalSeconds));
-        await outbox.ScheduleAsync(new PollKohChallenge(
-            message.CompetitionId,
-            message.CompetitionChallengeId,
-            message.RunningSince,
-            nextDue), nextDue);
+        // The cluster Singular Agent derives the next poll from this observation.
+        // Do not persist recursive scheduled messages as a second scheduler.
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();

@@ -859,12 +859,12 @@ Prometheus 标签只能使用 queue、message、outcome、mode、provider 等有
 
 任务：
 
-- [ ] 实现/重构自定义 Agent/AgentFamily；
-- [ ] 迁移 AWD Round、AWD Checker、KoH Poll、lifecycle tick；
-- [ ] 删除旧 Scheduled Message next-run 与业务调度字段；
-- [ ] Agent 只派发 durable message；
-- [ ] 故障转移时从当前状态重建；
-- [ ] 增加不补跑行为与指标。
+- [x] 实现/重构自定义 Agent/AgentFamily；
+- [x] 迁移 AWD Round、AWD Checker、KoH Poll、lifecycle tick；
+- [x] 删除旧 Scheduled Message next-run 与业务调度字段；
+- [x] Agent 只派发 durable message；
+- [x] 故障转移时从当前状态重建；
+- [x] 增加不补跑行为与指标。
 
 退出门禁：
 
@@ -873,6 +873,8 @@ Prometheus 标签只能使用 queue、message、outcome、mode、provider 等有
 - 停机窗口没有补跑洪峰；
 - 恢复后从当前轮次继续；
 - Agent 不直接执行重活。
+
+实施证据见 [阶段 8：Singular Agent 周期调度](data-model-wolverine-stage8-singular-agent.md)。
 
 ### 阶段 9：排行榜事件驱动投影
 

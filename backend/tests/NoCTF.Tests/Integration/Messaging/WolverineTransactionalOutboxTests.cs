@@ -1017,6 +1017,10 @@ public sealed class WolverineTransactionalOutboxTests
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Services.AddSingleton(new MaintenanceHostIdentity(hostId));
+        builder.Services.AddSingleton(new ClusterSchedulerNodeIdentity(hostId));
+        builder.Services.AddSingleton<ClusterSchedulingState>();
+        builder.Services.AddSingleton<IClusterSchedulerStatusStore, InMemorySchedulerStatusStore>();
+        builder.Services.AddScoped<IClusterScheduleSource, EmptyClusterScheduleSource>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingularAgent<MaintenanceTickAgent>();
         builder.UseWolverine(options =>
@@ -1287,6 +1291,60 @@ public static class MaintenanceTickObservation
 }
 
 public sealed record MaintenanceHostIdentity(string Value);
+
+public sealed class EmptyClusterScheduleSource : IClusterScheduleSource
+{
+    public Task<IReadOnlyList<ClusterScheduleEntry>> RebuildAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ClusterScheduleEntry>>([]);
+}
+
+public sealed class InMemorySchedulerStatusStore : IClusterSchedulerStatusStore
+{
+    private ClusterSchedulerStatus? scheduler;
+    private ClusterLeaderStatus? leader;
+
+    public Task TakeOverAsync(
+        ClusterSchedulerStatus status,
+        CancellationToken cancellationToken)
+    {
+        scheduler = status;
+        return Task.CompletedTask;
+    }
+
+    public Task RenewAsync(
+        ClusterSchedulerStatus status,
+        CancellationToken cancellationToken)
+    {
+        if (scheduler != status)
+            throw new InvalidOperationException("Scheduler ownership changed.");
+        return Task.CompletedTask;
+    }
+
+    public Task ReleaseAsync(
+        ClusterSchedulerStatus status,
+        CancellationToken cancellationToken)
+    {
+        if (scheduler == status)
+            scheduler = null;
+        return Task.CompletedTask;
+    }
+
+    public Task<ClusterSchedulerStatus?> ReadAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(scheduler);
+
+    public Task ReportLeaderAsync(
+        ClusterLeaderStatus status,
+        CancellationToken cancellationToken)
+    {
+        leader = status;
+        return Task.CompletedTask;
+    }
+
+    public Task<ClusterLeaderStatus?> ReadLeaderAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(leader);
+}
 
 public sealed class MaintenanceTickProbeHandler
 {
