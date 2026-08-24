@@ -4,52 +4,29 @@ using NoCTF.Domain.Runtime;
 
 namespace NoCTF.Runner.Messages;
 
-public sealed record ExpandedRuntimeUrls(
-    IReadOnlyList<string> Urls,
-    IReadOnlyList<int> ParticipantUrlIndexes,
-    string? ControlCheckUrl,
-    string? AwdCheckerTargetHost);
+public sealed record ExpandedRuntimeUrls(IReadOnlyList<string> Urls);
 
 public static class RuntimeUrlExpander
 {
     public static ExpandedRuntimeUrls ExpandContainer(
         ContainerReceipt receipt,
-        IReadOnlyList<RuntimeUrlBinding>? bindings,
-        RuntimeUrlBinding? controlCheckBinding,
-        RuntimeInternalEndpointBinding? awdCheckerTargetBinding = null)
+        IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
         var urls = new List<string>();
-        var participantIndexes = new List<int>();
         foreach (var binding in bindings ?? [])
         {
             var url = ExpandPublicContainerBinding(receipt, binding);
-            if (binding.Exposure == RuntimeExposure.Participants)
-                participantIndexes.Add(urls.Count);
             urls.Add(url);
         }
-
-        var controlCheckUrl = controlCheckBinding is null
-            ? null
-            : ExpandInternalContainerBinding(receipt, controlCheckBinding);
-        var awdCheckerTargetHost = awdCheckerTargetBinding is null
-            ? null
-            : RequireHost(receipt.InternalHost);
-        return new(
-            urls,
-            participantIndexes,
-            controlCheckUrl,
-            awdCheckerTargetHost);
+        return new(urls);
     }
 
     public static ExpandedRuntimeUrls ExpandCompose(
         ComposeReceipt receipt,
         ComposeStatus status,
-        IReadOnlyList<RuntimeUrlBinding>? bindings,
-        RuntimeUrlBinding? controlCheckBinding,
-        RuntimeInternalEndpointBinding? awdCheckerTargetBinding = null)
+        IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
         var urls = new List<string>();
-        var participantIndexes = new List<int>();
         foreach (var binding in bindings ?? [])
         {
             var service = FindComposeService(status, binding);
@@ -61,59 +38,23 @@ public static class RuntimeUrlExpander
                 throw new InvalidOperationException(
                     "Compose URL binding has no dynamic public port.");
             var url = ExpandAccessUrl(binding.UrlTemplate, receipt.PublicHost, publicPort);
-            if (binding.Exposure == RuntimeExposure.Participants)
-                participantIndexes.Add(urls.Count);
             urls.Add(url);
         }
-
-        string? controlCheckUrl = null;
-        if (controlCheckBinding is not null)
-        {
-            var service = FindComposeService(status, controlCheckBinding);
-            var containerPort = controlCheckBinding.ContainerPort
-                ?? throw new InvalidOperationException(
-                    "Compose control URL binding requires ContainerPort.");
-            controlCheckUrl = Expand(
-                controlCheckBinding.UrlTemplate,
-                service.InternalHost,
-                containerPort);
-        }
-        string? awdCheckerTargetHost = null;
-        if (awdCheckerTargetBinding is not null)
-        {
-            var service = FindComposeService(status, awdCheckerTargetBinding.ServiceName);
-            awdCheckerTargetHost = RequireHost(service.InternalHost);
-        }
-        return new(
-            urls,
-            participantIndexes,
-            controlCheckUrl,
-            awdCheckerTargetHost);
+        return new(urls);
     }
 
     public static ExpandedRuntimeUrls ExpandOva(
         OvaRuntimeReceipt receipt,
-        IReadOnlyList<RuntimeUrlBinding>? bindings,
-        RuntimeUrlBinding? controlCheckBinding)
+        IReadOnlyList<RuntimeUrlBinding>? bindings)
     {
         var urls = new List<string>();
-        var participantIndexes = new List<int>();
         foreach (var binding in bindings ?? [])
         {
             var machine = FindOvaVirtualMachine(receipt, binding);
             var url = ExpandOvaBinding(machine, binding, requireAccessScheme: true);
-            if (binding.Exposure == RuntimeExposure.Participants)
-                participantIndexes.Add(urls.Count);
             urls.Add(url);
         }
-
-        var controlCheckUrl = controlCheckBinding is null
-            ? null
-            : ExpandOvaBinding(
-                FindOvaVirtualMachine(receipt, controlCheckBinding),
-                controlCheckBinding,
-                requireAccessScheme: false);
-        return new(urls, participantIndexes, controlCheckUrl, null);
+        return new(urls);
     }
 
     private static ComposeServiceStatus FindComposeService(
@@ -130,19 +71,6 @@ public static class RuntimeUrlExpander
                        StringComparison.Ordinal))
                ?? throw new InvalidOperationException(
                    $"Compose service '{binding.ServiceName}' was not found.");
-    }
-
-    private static ComposeServiceStatus FindComposeService(
-        ComposeStatus status,
-        string? serviceName)
-    {
-        if (string.IsNullOrWhiteSpace(serviceName))
-            throw new InvalidOperationException(
-                "Compose internal endpoint requires ServiceName.");
-        return status.Services.SingleOrDefault(service =>
-                   string.Equals(service.Name, serviceName, StringComparison.Ordinal))
-               ?? throw new InvalidOperationException(
-                   $"Compose service '{serviceName}' was not found.");
     }
 
     private static OvaVirtualMachineReceipt FindOvaVirtualMachine(
@@ -203,18 +131,6 @@ public static class RuntimeUrlExpander
             publicPort);
     }
 
-    private static string ExpandInternalContainerBinding(
-        ContainerReceipt receipt,
-        RuntimeUrlBinding binding)
-    {
-        var containerPort = binding.ContainerPort
-            ?? throw new InvalidOperationException("Control URL binding requires ContainerPort.");
-        return Expand(
-            binding.UrlTemplate,
-            receipt.InternalHost,
-            containerPort);
-    }
-
     private static string Expand(string template, string? host, int port)
     {
         if (string.IsNullOrWhiteSpace(host))
@@ -239,9 +155,4 @@ public static class RuntimeUrlExpander
             : throw new InvalidOperationException(
                 "Runtime URL binding uses an unsupported access URL scheme.");
 
-    private static string RequireHost(string? host) =>
-        !string.IsNullOrWhiteSpace(host)
-            ? host
-            : throw new InvalidOperationException(
-                "Runtime receipt does not contain the required internal host.");
 }

@@ -29,5 +29,5 @@ public enum SpecificationKind : short
     AwdRound,
     RuntimeDefinition,
     Hint,
-    RuntimeGeneration
+    RuntimeInstance
 }

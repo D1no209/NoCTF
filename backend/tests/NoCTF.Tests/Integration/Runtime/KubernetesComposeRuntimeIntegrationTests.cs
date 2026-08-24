@@ -275,7 +275,6 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             "attacker",
             namespaceName,
             "node.test",
-            1,
             DateTimeOffset.UtcNow);
         var crossRuntime = await runtime.ExecAsync(
             attackerReceipt,
@@ -340,7 +339,6 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             "public",
             namespaceName,
             "node.test",
-            1,
             DateTimeOffset.UtcNow);
         var publicIngress = await runtime.ExecAsync(
             publicClientReceipt,
@@ -375,7 +373,6 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             TimeSpan.FromMinutes(5),
             OperationTimeout: TimeSpan.FromMinutes(2),
             NetworkIsolation: ContainerNetworkIsolation.Isolated,
-            Generation: 1,
             RuntimeInstanceId: containerOperationId);
         _ = await IsolatedContainerProvisioner.ProvisionAsync(
             containerLifecycle,
@@ -385,19 +382,19 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             cancellationToken);
         var managed = await reconciler.ListManagedAsync(cancellationToken);
         await Assert.That(managed)
-            .Contains(new RuntimeResourceIdentity(operationId, 1));
+            .Contains(new RuntimeResourceIdentity(operationId));
         await Assert.That(managed)
-            .Contains(new RuntimeResourceIdentity(internetOperationId, 1));
+            .Contains(new RuntimeResourceIdentity(internetOperationId));
         await Assert.That(managed)
-            .Contains(new RuntimeResourceIdentity(containerOperationId, 1));
+            .Contains(new RuntimeResourceIdentity(containerOperationId));
         await reconciler.DestroyByIdentityAsync(
-            new(operationId, 1),
+            new(operationId),
             cancellationToken);
         await reconciler.DestroyByIdentityAsync(
-            new(internetOperationId, 1),
+            new(internetOperationId),
             cancellationToken);
         await reconciler.DestroyByIdentityAsync(
-            new(containerOperationId, 1),
+            new(containerOperationId),
             cancellationToken);
         await AssertRuntimeResourcesDeletedAsync(
             client,
@@ -423,8 +420,7 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
         CancellationToken cancellationToken)
     {
         var selector = $"noctf.io/managed=true,"
-            + $"noctf.io/runtime-instance-id={operationId:D},"
-            + "noctf.io/generation=1";
+            + $"noctf.io/runtime-instance-id={operationId:D}";
         var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(
             namespaceName,
             labelSelector: selector,
@@ -506,7 +502,6 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             "ipv6-control",
             namespaceName,
             "node.test",
-            1,
             DateTimeOffset.UtcNow);
         var allowedControl = await runtime.ExecAsync(
             controlReceipt,
@@ -579,7 +574,6 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             "baseline",
             options.Namespace,
             options.PublicHost,
-            1,
             DateTimeOffset.UtcNow);
         using var convergence = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken);
@@ -696,15 +690,12 @@ public sealed class KubernetesComposeRuntimeIntegrationTests
             ["noctf.io/managed"] = "true",
             ["noctf.io/job-kind"] = "persistent-runtime",
             ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
-            ["noctf.io/generation"] = generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture),
             [KubernetesComposeManifestPolicy.ComposeServiceLabel] = serviceName
         };
 
     private static ComposeRequest Request(Guid operationId) => new(
         operationId,
         RuntimeProvider.Kubernetes,
-        1,
         $"it-{operationId:N}",
         """
         services:

@@ -47,7 +47,9 @@ public sealed class ParticipantRuntimeScopePersistenceTests
                 new FixedRuntimePlacementPolicy(),
                 new UnexpectedRuntimeFlagStore(),
                 new NoopOutbox());
-            var targets = new RuntimeTargetReader(db);
+            var targets = new RuntimeTargetReader(
+                db,
+                new ChallengeRuntimeTemplateCatalog());
             var observations = new List<InvalidScopeObservation>();
             foreach (var scope in fixture.InvalidScopes)
             {
@@ -118,15 +120,24 @@ public sealed class ParticipantRuntimeScopePersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.Parse("2026-07-31T12:00:00Z");
         var challengeDefinition = JsonSerializer.Serialize(
             new AwdChallengeConfiguration(
                 AwdChallengeConfiguration.CurrentSchemaVersion,
                 Runtime: new ChallengeRuntimeTemplate(
                     RuntimeAllocation.PerTeam,
-                    new ContainerRuntimeDefinition("scope-test:latest"),
+                    new ContainerRuntimeDefinition(
+                        "scope-test:latest",
+                        PortMappings: new Dictionary<int, int> { [31337] = 0 }),
                     new RuntimeResourceLimits(67_108_864, 100_000_000, 64),
+                    UrlBindings:
+                    [
+                        new RuntimeUrlBinding(
+                            "tcp://{HOST}:{PORT}",
+                            RuntimeExposure.Participants,
+                            ContainerPort: 31337)
+                    ],
                     FlagSource: RuntimeFlagSource.AwdRotation),
                 FlagInjection: new AwdFlagInjectionConfiguration(
                     "printf '%s' '${FLAG}' > /dev/shm/flag")),
@@ -301,13 +312,10 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             CompetitionChallengeId = runtime.CompetitionChallengeId,
             TeamId = teamId,
             Purpose = RuntimePurpose.Player,
-            Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
-            RunnerPool = "scope-tests",
             State = RuntimeState.Running,
             Urls = [runtime.Url],
-            ParticipantUrlIndexes = [0],
             CreatedAt = now.AddMinutes(-1),
             RunningAt = now.AddSeconds(-30)
         });
@@ -359,7 +367,7 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("AWD runtime reset must not request a CTF flag.");
 
-        public Task<string> EnsureGenerationAsync(
+        public Task<string> EnsureRuntimeInstanceAsync(
             Guid competitionId,
             Guid competitionChallengeId,
             Guid teamId,
@@ -368,7 +376,7 @@ public sealed class ParticipantRuntimeScopePersistenceTests
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("AWD runtime reset must not request an AWDP flag.");
 
-        public Task InvalidateGenerationAsync(
+        public Task InvalidateRuntimeInstanceAsync(
             Guid runtimeInstanceId,
             DateTimeOffset now,
             CancellationToken cancellationToken) =>
@@ -379,14 +387,6 @@ public sealed class ParticipantRuntimeScopePersistenceTests
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(
-            T message,
-            DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage =>
             ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : IRunnerNodeMessage =>

@@ -9,10 +9,10 @@ public static class RunnerNodeAssignmentGuard
         string configuredPool,
         string configuredRunnerId)
     {
-        if (!string.Equals(message.RunnerPool, configuredPool, StringComparison.Ordinal)
-            || !string.Equals(message.RunnerId, configuredRunnerId, StringComparison.Ordinal)
-            || RunnerNodeQueueName.FromAssignment(message.RunnerPool, message.RunnerId)
-                != RunnerNodeQueueName.FromAssignment(configuredPool, configuredRunnerId))
+        _ = configuredPool;
+        if (!string.Equals(message.RunnerId, configuredRunnerId, StringComparison.Ordinal)
+            || RunnerNodeQueueName.FromRunnerId(message.RunnerId)
+                != RunnerNodeQueueName.FromRunnerId(configuredRunnerId))
         {
             throw new InvalidOperationException(
                 "Runner work was delivered to a node that does not own the assignment.");

@@ -1,14 +1,18 @@
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Koh;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
 using NoCTF.Infrastructure.Persistence;
+using NoCTF.Infrastructure.Runtime.Targets;
 
 namespace NoCTF.Infrastructure.Competitions.Koh;
 
-public sealed class PostgresKohChallengeAccessReader(NoCtfDbContext db)
+public sealed class PostgresKohChallengeAccessReader(
+    NoCtfDbContext db,
+    IChallengeRuntimeTemplateCatalog runtimeTemplates)
     : IKohChallengeAccessReader
 {
     public async Task<KohChallengeAccessView?> FindAsync(
@@ -30,7 +34,7 @@ public sealed class PostgresKohChallengeAccessReader(NoCtfDbContext db)
         if (teamId is null)
             return null;
 
-        var flag = await db.Competitions.AsNoTracking()
+        var challenge = await db.Competitions.AsNoTracking()
             .Where(competition => competition.Id == competitionId
                 && competition.Mode == GameMode.Koh
                 && competition.Status == CompetitionStatus.Running
@@ -42,16 +46,28 @@ public sealed class PostgresKohChallengeAccessReader(NoCtfDbContext db)
                         && challenge.DeletedAt == null),
                 competition => competition.Id,
                 challenge => challenge.CompetitionId,
-                (competition, challenge) => challenge.Id)
+                (competition, challenge) => new { competition.Mode, Challenge = challenge })
             .Join(
-                db.ChallengeFlags.AsNoTracking()
-                    .Where(candidate => candidate.TeamId == teamId
-                        && candidate.SpecificationKind == SpecificationKind.RuntimeDefinition
-                        && candidate.SpecificationId == competitionChallengeId
-                        && candidate.DeletedAt == null),
-                challengeId => (Guid?)challengeId,
-                candidate => candidate.CompetitionChallengeId,
-                (challengeId, candidate) => candidate.Flag)
+                db.Challenges.AsNoTracking().Where(template => template.DeletedAt == null),
+                item => item.Challenge.ChallengeId,
+                template => template.Id,
+                (item, template) => new
+                {
+                    item.Mode,
+                    CompetitionChallengeId = item.Challenge.Id,
+                    template.DefinitionJson
+                })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (challenge is null)
+            return null;
+
+        var flag = await db.ChallengeFlags.AsNoTracking()
+            .Where(candidate => candidate.TeamId == teamId
+                && candidate.SpecificationKind == SpecificationKind.RuntimeDefinition
+                && candidate.SpecificationId == competitionChallengeId
+                && candidate.DeletedAt == null)
+            .Where(candidate => candidate.CompetitionChallengeId == challenge.CompetitionChallengeId)
+            .Select(candidate => candidate.Flag)
             .SingleOrDefaultAsync(cancellationToken);
         if (flag is null)
             return null;
@@ -61,19 +77,17 @@ public sealed class PostgresKohChallengeAccessReader(NoCtfDbContext db)
                 && instance.CompetitionChallengeId == competitionChallengeId
                 && instance.TeamId == null
                 && instance.State == RuntimeState.Running)
-            .OrderByDescending(instance => instance.Generation)
-            .Select(instance => new
-            {
-                instance.Urls,
-                instance.ParticipantUrlIndexes
-            })
+            .OrderByDescending(instance => instance.CreatedAt)
+            .ThenByDescending(instance => instance.Id)
+            .Select(instance => instance.Urls)
             .FirstOrDefaultAsync(cancellationToken);
         var urls = runtime is null
             ? []
-            : runtime.ParticipantUrlIndexes
-                .Where(index => index >= 0 && index < runtime.Urls.Length)
-                .Select(index => runtime.Urls[index])
-                .ToArray();
+            : RuntimeParticipantUrlProjection.Filter(
+                runtimeTemplates,
+                challenge.Mode,
+                challenge.DefinitionJson,
+                runtime);
         return new(flag, urls);
     }
 }

@@ -88,8 +88,7 @@ public sealed class RunnerAvailabilityPublisher(
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         var hasActiveAssignments = await db.RuntimeInstances.AsNoTracking()
             .AnyAsync(
-                instance => instance.RunnerPool == options.Pool
-                    && instance.RunnerId == options.Id
+                instance => instance.RunnerId == options.Id
                     && instance.RuntimeProvider == options.Provider!.Value
                     && (instance.State == RuntimeState.Provisioning
                         || instance.State == RuntimeState.Running

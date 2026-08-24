@@ -78,7 +78,6 @@ public sealed class AwdFlagInjectionHandlerTests
             "project",
             "namespace",
             "localhost",
-            1,
             DateTimeOffset.UtcNow);
         var work = CreateWork() with
         {
@@ -151,9 +150,7 @@ public sealed class AwdFlagInjectionHandlerTests
         Guid.Parse("11111111-1111-1111-1111-111111111111"),
         Guid.Parse("22222222-2222-2222-2222-222222222222"),
         Guid.Parse("33333333-3333-3333-3333-333333333333"),
-        4,
         validUntil,
-        "pool-a",
         "runner-a");
 
     private static IConfiguration RunnerConfiguration() => new ConfigurationBuilder()
@@ -215,9 +212,6 @@ public sealed class AwdFlagInjectionHandlerTests
             return ValueTask.CompletedTask;
         }
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) => ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage => ValueTask.CompletedTask;
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
             where T : IRunnerNodeMessage

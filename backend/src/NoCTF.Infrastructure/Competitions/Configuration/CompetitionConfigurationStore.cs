@@ -71,31 +71,6 @@ public sealed class CompetitionConfigurationStore(
         if (changed != 1) return new(null, CompetitionConfigurationUpdateFailure.CompetitionNotFound);
         if (mode == GameMode.Awd && status == CompetitionStatus.Running)
         {
-            if (db.Database.IsRelational())
-            {
-                await db.RuntimeInstances
-                    .Where(runtime => runtime.CompetitionId == competitionId
-                        && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(runtime => runtime.CheckerSequence, runtime => runtime.CheckerSequence + 1)
-                        .SetProperty(runtime => runtime.LastAppliedCheckerSequence, runtime => runtime.CheckerSequence + 1)
-                        .SetProperty(runtime => runtime.CheckerDeadlineAt, (DateTimeOffset?)null)
-                        .SetProperty(runtime => runtime.NextCheckerDueAt, now), ct);
-            }
-            else
-            {
-                var runtimes = await db.RuntimeInstances
-                    .Where(runtime => runtime.CompetitionId == competitionId
-                        && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
-                    .ToListAsync(ct);
-                foreach (var runtime in runtimes)
-                {
-                    runtime.CheckerSequence += 1;
-                    runtime.LastAppliedCheckerSequence = runtime.CheckerSequence;
-                    runtime.CheckerDeadlineAt = null;
-                    runtime.NextCheckerDueAt = now;
-                }
-            }
             var challenges = await db.CompetitionChallenges.AsNoTracking()
                 .Where(challenge => challenge.CompetitionId == competitionId
                     && challenge.IsPublished

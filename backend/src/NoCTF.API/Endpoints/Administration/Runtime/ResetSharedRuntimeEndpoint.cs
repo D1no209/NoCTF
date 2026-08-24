@@ -23,7 +23,7 @@ public sealed class ResetSharedRuntimeEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Queues a KoH shared runtime replacement.";
-            summary.Description = "Replaces the shared hill through the normal generation-fenced runtime state machine.";
+            summary.Description = "Stops the current shared runtime and creates a replacement with a new UUID.";
         });
     }
 

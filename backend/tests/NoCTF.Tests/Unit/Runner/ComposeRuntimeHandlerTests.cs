@@ -28,7 +28,6 @@ public sealed class ComposeRuntimeHandlerTests
         await Assert.That(provisioned.Provider).IsEqualTo(RuntimeProvider.Docker);
         await Assert.That(provisioned.Urls)
             .IsEquivalentTo(["http://runner.example:32000/play"]);
-        await Assert.That(provisioned.ParticipantUrlIndexes).IsEquivalentTo([0]);
         await Assert.That(runtime.UpCount).IsEqualTo(1);
         await Assert.That(runtime.DownCount).IsEqualTo(0);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
@@ -66,9 +65,7 @@ public sealed class ComposeRuntimeHandlerTests
         await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
         await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(
-                message.RuntimeInstanceId,
-                message.Generation)]);
+            .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
@@ -108,9 +105,7 @@ public sealed class ComposeRuntimeHandlerTests
         await Assert.That(exception!.Message).IsEqualTo("cleanup failed");
         await Assert.That(runtime.UpCount).IsEqualTo(1);
         await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(
-                message.RuntimeInstanceId,
-                message.Generation)]);
+            .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
     }
 
@@ -135,14 +130,10 @@ public sealed class ComposeRuntimeHandlerTests
         await Assert.That(result).IsTypeOf<RuntimeProvisionCanceled>();
         var canceled = (RuntimeProvisionCanceled)result;
         await Assert.That(canceled.RuntimeInstanceId).IsEqualTo(message.RuntimeInstanceId);
-        await Assert.That(canceled.Generation).IsEqualTo(message.Generation);
-        await Assert.That(canceled.RunnerPool).IsEqualTo(message.RunnerPool);
         await Assert.That(canceled.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(runtime.UpCount).IsEqualTo(0);
         await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(
-                message.RuntimeInstanceId,
-                message.Generation)]);
+            .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
         await Assert.That(operations.Count).IsEqualTo(2);
@@ -192,9 +183,7 @@ public sealed class ComposeRuntimeHandlerTests
         await Assert.That(action).Throws<InvalidOperationException>();
         await Assert.That(runtime.UpCount).IsEqualTo(0);
         await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(
-                message.RuntimeInstanceId,
-                message.Generation)]);
+            .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
@@ -231,12 +220,9 @@ public sealed class ComposeRuntimeHandlerTests
                 new(
                     RuntimeProvider.Docker,
                     System.Text.Json.JsonSerializer.Serialize(receipt),
-                    receipt.Generation,
                     RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
-            3,
-            "default",
             "runner-a");
 
         var result = await handler.Handle(message, CancellationToken.None);
@@ -262,12 +248,9 @@ public sealed class ComposeRuntimeHandlerTests
                 new(
                     RuntimeProvider.Docker,
                     System.Text.Json.JsonSerializer.Serialize(receipt),
-                    receipt.Generation,
                     RuntimeKind.Compose)));
         var message = new StopComposeRuntime(
             receipt.OperationId,
-            3,
-            "default",
             "runner-a");
 
         var result = await handler.Handle(message, CancellationToken.None);
@@ -305,13 +288,10 @@ public sealed class ComposeRuntimeHandlerTests
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         return new(
             runtimeInstanceId,
-            3,
-            "default",
             "runner-a",
             new ComposeRequest(
                 runtimeInstanceId,
                 RuntimeProvider.Docker,
-                3,
                 "noctf-runtime",
                 "services:\n  web:\n    image: challenge:v1",
                 new Dictionary<string, string>(),
@@ -342,7 +322,7 @@ public sealed class ComposeRuntimeHandlerTests
             CancellationToken cancellationToken)
         {
             UpCount++;
-            return Task.FromResult(CreateReceipt(request.OperationId, request.Generation));
+            return Task.FromResult(CreateReceipt(request.OperationId));
         }
 
         public Task DownAsync(
@@ -381,15 +361,13 @@ public sealed class ComposeRuntimeHandlerTests
             throw new NotSupportedException();
 
         public ComposeReceipt CreateReceipt(
-            Guid? operationId = null,
-            int generation = 3) =>
+            Guid? operationId = null) =>
             new(
                 operationId ?? Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 RuntimeProvider.Docker,
                 "noctf-runtime",
                 "/tmp/noctf-runtime",
                 "runner.example",
-                generation,
                 DateTimeOffset.UtcNow);
     }
 

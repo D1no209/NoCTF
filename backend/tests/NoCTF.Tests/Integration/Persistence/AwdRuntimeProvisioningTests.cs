@@ -54,10 +54,8 @@ public sealed class AwdRuntimeProvisioningTests
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = stoppingTeamId,
                 Purpose = RuntimePurpose.Player,
-                Generation = 1,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
-                RunnerPool = "awd-tests",
                 State = RuntimeState.Stopping,
                 CreatedAt = fixture.Now
             };
@@ -183,12 +181,9 @@ public sealed class AwdRuntimeProvisioningTests
                     CompetitionChallengeId = fixture.CompetitionChallengeId,
                     TeamId = teamId,
                     Purpose = RuntimePurpose.Player,
-                    Generation = 1,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
-                    RunnerPool = "awd-tests",
                     RunnerId = $"runner-{teamId:N}",
-                    RunnerAssignmentReleaseToken = Guid.CreateVersion7(),
                     State = RuntimeState.Failed,
                     FailureCode = RuntimeFailureCode.ProviderUnavailable,
                     ProviderReceiptJson = JsonSerializer.Serialize(new { teamId }),
@@ -212,40 +207,34 @@ public sealed class AwdRuntimeProvisioningTests
             db.ChangeTracker.Clear();
             var firstPass = await db.RuntimeInstances.AsNoTracking()
                 .OrderBy(runtime => runtime.TeamId)
-                .ThenBy(runtime => runtime.Generation)
+                .ThenBy(runtime => runtime.CreatedAt)
+                .ThenBy(runtime => runtime.Id)
                 .ToListAsync(cancellationToken);
             await Assert.That(firstPass.Count).IsEqualTo(4);
             foreach (var teamId in fixture.ActiveTeamIds)
             {
                 var old = firstPass.Single(runtime => runtime.TeamId == teamId
-                    && runtime.Generation == 1);
+                    && runtime.ProviderReceiptJson != null);
                 var replacement = firstPass.Single(runtime => runtime.TeamId == teamId
-                    && runtime.Generation == 2);
+                    && runtime.ProviderReceiptJson == null);
                 await Assert.That(old.State).IsEqualTo(RuntimeState.Stopping);
                 await Assert.That(old.FailureCode).IsNull();
-                await Assert.That(old.RunnerAssignmentReleaseToken).IsNull();
                 await Assert.That(replacement.State).IsEqualTo(RuntimeState.Queued);
-                await Assert.That(replacement.ReplacesRuntimeInstanceId).IsEqualTo(old.Id);
+                await Assert.That(replacement.Id).IsNotEqualTo(old.Id);
             }
             await Assert.That(firstOutbox.Published.OfType<StopRuntime>().Count()).IsEqualTo(2);
-            await Assert.That(firstOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            await Assert.That(firstOutbox.Published.OfType<DispatchRuntime>().Count()).IsEqualTo(2);
 
             var acknowledgedTeamId = fixture.ActiveTeamIds[0];
             var failedTeamId = fixture.ActiveTeamIds[1];
             var acknowledgedOld = firstPass.Single(runtime => runtime.TeamId == acknowledgedTeamId
-                && runtime.Generation == 1);
-            var acknowledgedReplacement = firstPass.Single(runtime => runtime.TeamId == acknowledgedTeamId
-                && runtime.Generation == 2);
+                && runtime.ProviderReceiptJson != null);
             var failedOld = firstPass.Single(runtime => runtime.TeamId == failedTeamId
-                && runtime.Generation == 1);
-            var failedReplacement = firstPass.Single(runtime => runtime.TeamId == failedTeamId
-                && runtime.Generation == 2);
+                && runtime.ProviderReceiptJson != null);
             var acknowledgementOutbox = new RecordingOutbox();
             await RuntimeWriteBackHandler.Handle(
                 new RuntimeStopped(
                     acknowledgedOld.Id,
-                    acknowledgedOld.Generation,
-                    acknowledgedOld.RunnerPool,
                     acknowledgedOld.RunnerId!),
                 db,
                 acknowledgementOutbox,
@@ -253,51 +242,23 @@ public sealed class AwdRuntimeProvisioningTests
             await RuntimeWriteBackHandler.Handle(
                 new RuntimeStopFailed(
                     failedOld.Id,
-                    failedOld.Generation,
-                    failedOld.RunnerPool,
                     failedOld.RunnerId!,
                     RuntimeFailureCode.CleanupFailed),
                 db,
                 cancellationToken);
 
-            await Assert.That(acknowledgementOutbox.Published.OfType<DispatchRuntime>()
-                    .Select(message => message.RuntimeInstanceId))
-                .IsEquivalentTo([acknowledgedReplacement.Id]);
+            await Assert.That(acknowledgementOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
             db.ChangeTracker.Clear();
-            var failedPair = await db.RuntimeInstances.AsNoTracking()
-                .Where(runtime => runtime.Id == failedOld.Id
-                    || runtime.Id == failedReplacement.Id)
-                .ToListAsync(cancellationToken);
-            await Assert.That(failedPair.All(runtime => runtime.State == RuntimeState.Failed
-                && runtime.FailureCode == RuntimeFailureCode.CleanupFailed)).IsTrue();
-            var retryOutbox = new RecordingOutbox();
-            var retry = await new PostgresAwdRuntimeProvisioner(
-                db,
-                new ChallengeRuntimeTemplateCatalog(),
-                new FixedRuntimePlacementPolicy(runnerPool: "awd-tests"),
-                retryOutbox,
-                TimeProvider.System).EnsureAsync(
-                    fixture.CompetitionId,
-                    cancellationToken);
-
-            await Assert.That(retry).IsEqualTo(AwdRuntimeProvisioningOutcome.DeferredCleanup);
-            db.ChangeTracker.Clear();
-            var retriedOld = await db.RuntimeInstances.AsNoTracking().SingleAsync(
+            var acknowledgedStored = await db.RuntimeInstances.AsNoTracking().SingleAsync(
+                runtime => runtime.Id == acknowledgedOld.Id,
+                cancellationToken);
+            var failedStored = await db.RuntimeInstances.AsNoTracking().SingleAsync(
                 runtime => runtime.Id == failedOld.Id,
                 cancellationToken);
-            var retriedReplacement = await db.RuntimeInstances.AsNoTracking().SingleAsync(
-                runtime => runtime.TeamId == failedTeamId
-                    && runtime.Generation == 3,
-                cancellationToken);
-            await Assert.That(retriedOld.State).IsEqualTo(RuntimeState.Stopping);
-            await Assert.That(retriedOld.FailureCode).IsNull();
-            await Assert.That(retriedOld.RunnerAssignmentReleaseToken).IsNull();
-            await Assert.That(retriedReplacement.State).IsEqualTo(RuntimeState.Queued);
-            await Assert.That(retriedReplacement.ReplacesRuntimeInstanceId).IsEqualTo(failedOld.Id);
-            await Assert.That(retryOutbox.Published.OfType<StopRuntime>()
-                    .Select(message => message.RuntimeInstanceId))
-                .IsEquivalentTo([failedOld.Id]);
-            await Assert.That(retryOutbox.Published.OfType<DispatchRuntime>()).IsEmpty();
+            await Assert.That(acknowledgedStored.State).IsEqualTo(RuntimeState.Stopped);
+            await Assert.That(failedStored.State).IsEqualTo(RuntimeState.Failed);
+            await Assert.That(failedStored.FailureCode)
+                .IsEqualTo(RuntimeFailureCode.CleanupFailed);
         });
     }
 
@@ -343,11 +304,9 @@ public sealed class AwdRuntimeProvisioningTests
             await Assert.That(runtimes.Count).IsEqualTo(2);
             await Assert.That(runtimes.Select(runtime => runtime.TeamId!.Value).ToHashSet()
                 .SetEquals(fixture.ActiveTeamIds)).IsTrue();
-            await Assert.That(runtimes.All(runtime => runtime.Generation == 1
-                && runtime.State == RuntimeState.Queued
+            await Assert.That(runtimes.All(runtime => runtime.State == RuntimeState.Queued
                 && runtime.RuntimeProvider == RuntimeProvider.Docker
-                && runtime.RuntimeKind == RuntimeKind.Container
-                && runtime.RunnerPool == "awd-tests")).IsTrue();
+                && runtime.RuntimeKind == RuntimeKind.Container)).IsTrue();
             var dispatches = outbox.Published.OfType<DispatchRuntime>().ToArray();
             await Assert.That(dispatches.Length).IsEqualTo(2);
             await Assert.That(dispatches.Select(dispatch => dispatch.RuntimeInstanceId).ToHashSet()
@@ -360,7 +319,7 @@ public sealed class AwdRuntimeProvisioningTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7();
         var blueUserId = Guid.CreateVersion7();
@@ -485,12 +444,6 @@ public sealed class AwdRuntimeProvisioningTests
 
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
             ValueTask.CompletedTask;

@@ -4,7 +4,6 @@ namespace NoCTF.Application.Runtime.Provisioning;
 
 public sealed record OvaRuntimeRequest(
     Guid OperationId,
-    int Generation,
     Uri OvaSource,
     string Sha256,
     string NetworkName,
@@ -22,15 +21,12 @@ public sealed record OvaVirtualMachineReceipt(
 public sealed record OvaRuntimeReceipt(
     Guid OperationId,
     RuntimeProvider Provider,
-    int Generation,
     string NetworkId,
     string NetworkCidr,
     IReadOnlyList<OvaVirtualMachineReceipt> VirtualMachines,
     DateTimeOffset CreatedAt);
 
-public readonly record struct OvaManagedRuntimeResource(
-    Guid OperationId,
-    int Generation);
+public readonly record struct OvaManagedRuntimeResource(Guid OperationId);
 
 public interface IOvaRuntime
 {

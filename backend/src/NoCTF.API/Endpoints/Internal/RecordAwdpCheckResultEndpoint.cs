@@ -93,14 +93,12 @@ public sealed class RecordAwdpCheckResultEndpoint(RecordInternalResult record)
                 User.FindFirstValue("resource"),
                 $"gameplay-fact:{gameplayFactId:D}:runtime:{runtimeInstanceId:D}",
                 StringComparison.Ordinal) ||
-            !int.TryParse(User.FindFirstValue("generation"), out var generation) ||
             !long.TryParse(User.FindFirstValue("deadline"), out var deadline) ||
             DateTimeOffset.UtcNow.ToUnixTimeSeconds() > deadline)
             return TypedResults.Unauthorized();
         var disposition = await record.AwdpAsync(AwdpFixResult.Create(
             gameplayFactId,
             runtimeInstanceId,
-            generation,
             AwdpFixOutcomeMapper.ToDomain(request.Outcome),
             DateTimeOffset.UtcNow), ct);
         return disposition switch

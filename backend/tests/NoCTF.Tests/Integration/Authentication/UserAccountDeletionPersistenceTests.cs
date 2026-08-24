@@ -46,7 +46,7 @@ public sealed class UserAccountDeletionPersistenceTests
 
             await using (var db = new NoCtfDbContext(options))
             {
-                await db.Database.MigrateAsync(cancellationToken);
+                await db.Database.EnsureCreatedAsync(cancellationToken);
                 db.Users.AddRange(
                     User(actorId, "Admin", "admin@example.test", UserRole.Administrator, now),
                     User(referencedUserId, "Player", "player@example.test", UserRole.User, now),

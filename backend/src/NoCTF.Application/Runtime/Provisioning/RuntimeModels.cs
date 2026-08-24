@@ -154,7 +154,6 @@ public sealed record ContainerRequest(
     ContainerNetworkIsolation NetworkIsolation = ContainerNetworkIsolation.Shared,
     IReadOnlyList<int>? InternalPorts = null,
     bool AllowInternalCallback = false,
-    int Generation = 0,
     Guid? RuntimeInstanceId = null,
     IReadOnlyList<RuntimeUrlBinding>? UrlBindings = null,
     RuntimeUrlBinding? ControlCheckUrlBinding = null,
@@ -181,8 +180,7 @@ public sealed record ContainerReceipt(
     string? PublicHost,
     string? InternalHost,
     string? NetworkId = null,
-    Guid? RuntimeInstanceId = null,
-    int Generation = 0);
+    Guid? RuntimeInstanceId = null);
 
 public sealed record OneShotResult(
     string ResourceId,
@@ -227,9 +225,7 @@ public interface IContainerSandboxLifecycle
         CancellationToken cancellationToken);
 }
 
-public readonly record struct RuntimeResourceIdentity(
-    Guid RuntimeInstanceId,
-    int Generation);
+public readonly record struct RuntimeResourceIdentity(Guid RuntimeInstanceId);
 
 public sealed record ContainerNetworkPolicyRequest(
     RuntimeResourceIdentity Identity,

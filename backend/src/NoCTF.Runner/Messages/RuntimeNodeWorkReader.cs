@@ -17,24 +17,17 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
             .Where(candidate => candidate.Id == message.RuntimeInstanceId)
             .Select(candidate => new
             {
-                candidate.Generation,
                 candidate.State,
-                candidate.RunnerPool,
                 candidate.RunnerId,
-                candidate.RunnerAssignmentReleaseToken,
                 candidate.ProviderReceiptJson
             })
             .SingleOrDefaultAsync(cancellationToken);
         if (assignment is null
-            || !string.Equals(assignment.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(assignment.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return RuntimeProvisionWorkStatus.AssignmentAbsent;
-        if (assignment.Generation == message.Generation
-            && assignment.State == RuntimeState.Provisioning)
+        if (assignment.State == RuntimeState.Provisioning)
             return RuntimeProvisionWorkStatus.Current;
-        if (assignment.Generation == message.Generation
-            && assignment.State == RuntimeState.Stopping
-            && assignment.RunnerAssignmentReleaseToken == null
+        if (assignment.State == RuntimeState.Stopping
             && assignment.ProviderReceiptJson == null)
             return RuntimeProvisionWorkStatus.StopRequested;
         return RuntimeProvisionWorkStatus.AssignmentRetained;
@@ -48,14 +41,11 @@ public sealed class RuntimeNodeWorkReader(IServiceScopeFactory scopes) : IRuntim
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         return await db.RuntimeInstances.AsNoTracking()
             .Where(candidate => candidate.Id == message.RuntimeInstanceId
-                && candidate.Generation == message.Generation
                 && candidate.State == RuntimeState.Stopping
-                && candidate.RunnerPool == message.RunnerPool
                 && candidate.RunnerId == message.RunnerId)
             .Select(candidate => new RuntimeStopWork(
                 candidate.RuntimeProvider,
                 candidate.ProviderReceiptJson,
-                candidate.Generation,
                 candidate.RuntimeKind))
             .SingleOrDefaultAsync(cancellationToken);
     }

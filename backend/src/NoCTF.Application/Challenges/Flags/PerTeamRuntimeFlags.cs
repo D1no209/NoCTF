@@ -12,7 +12,7 @@ public interface IPerTeamRuntimeFlagStore
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
-    Task<string> EnsureGenerationAsync(
+    Task<string> EnsureRuntimeInstanceAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid teamId,
@@ -20,7 +20,7 @@ public interface IPerTeamRuntimeFlagStore
         DateTimeOffset now,
         CancellationToken cancellationToken);
 
-    Task InvalidateGenerationAsync(
+    Task InvalidateRuntimeInstanceAsync(
         Guid runtimeInstanceId,
         DateTimeOffset now,
         CancellationToken cancellationToken);

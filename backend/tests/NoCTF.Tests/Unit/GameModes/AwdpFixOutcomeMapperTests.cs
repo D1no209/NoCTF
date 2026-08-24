@@ -30,7 +30,6 @@ public sealed class AwdpFixOutcomeMapperTests
         var result = AwdpFixResult.Create(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             Guid.Parse("22222222-2222-2222-2222-222222222222"),
-            generation: 3,
             AwdpFixOutcome.ServiceAbnormal,
             DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 

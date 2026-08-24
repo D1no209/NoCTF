@@ -56,7 +56,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .Options;
             var now = DateTimeOffset.UtcNow;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(now);
             var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
             db.Users.Add(owner);
@@ -110,7 +110,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .Options;
             var now = DateTimeOffset.UtcNow;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(now);
             var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, now);
             var fact = fixture.Facts[0];
@@ -176,7 +176,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .Options;
             var projectedAt = DateTimeOffset.UtcNow;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(projectedAt);
             var fixture = CreateFixture(GameMode.Ctf, 0, owner.Id, projectedAt);
             var visibleFact = fixture.Facts[0];
@@ -280,7 +280,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             var projectedAt = DateTimeOffset.UtcNow;
             var startedAt = projectedAt.AddDays(-30);
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(projectedAt);
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, projectedAt);
             fixture.Competition.StartAt = startedAt;
@@ -445,7 +445,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             var firstProjectionAt = DateTimeOffset.UtcNow;
             var startedAt = firstProjectionAt.AddSeconds(-90);
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(firstProjectionAt);
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, firstProjectionAt);
             fixture.Competition.StartAt = startedAt;
@@ -571,7 +571,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             var projectedAt = DateTimeOffset.UtcNow;
             var startedAt = projectedAt.AddHours(-2);
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(projectedAt);
             var fixture = CreateFixture(GameMode.Awd, 0, owner.Id, projectedAt);
             fixture.Competition.StartAt = startedAt;
@@ -739,7 +739,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .Options;
             var now = DateTimeOffset.UtcNow;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(now);
             var configuration = GameModeDefaultConfiguration.GetCompetitionJson(GameMode.Awdp);
             var competitions = Enumerable.Range(0, 501)
@@ -801,7 +801,7 @@ public sealed class LeaderboardProjectionPersistenceTests
                 .Options;
             var now = DateTimeOffset.UtcNow;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(now);
             var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, now);
             var scoredFact = fixture.Facts[0];
@@ -913,7 +913,7 @@ public sealed class LeaderboardProjectionPersistenceTests
             var projectedAt = DateTimeOffset.UtcNow;
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var owner = CreateUser(projectedAt);
             db.Users.Add(owner);
 
@@ -1341,12 +1341,6 @@ public sealed class LeaderboardProjectionPersistenceTests
 
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;

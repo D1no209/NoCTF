@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net;
 using k8s;
 using k8s.Autorest;
@@ -54,7 +53,7 @@ public sealed class KubernetesRuntimeResourceReconciler(
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken)
     {
-        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+        if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(identity));
         var selector = IdentitySelector(identity);
         var failures = new List<Exception>();
@@ -203,8 +202,7 @@ public sealed class KubernetesRuntimeResourceReconciler(
 
     private static string IdentitySelector(RuntimeResourceIdentity identity) =>
         $"{ManagedRuntimeSelector()},"
-        + $"noctf.io/runtime-instance-id={identity.RuntimeInstanceId:D},"
-        + $"noctf.io/generation={identity.Generation.ToString(CultureInfo.InvariantCulture)}";
+        + $"noctf.io/runtime-instance-id={identity.RuntimeInstanceId:D}";
 
     private static bool HasIdentity(
         IDictionary<string, string>? labels,
@@ -221,16 +219,9 @@ public sealed class KubernetesRuntimeResourceReconciler(
             || !string.Equals(managed, "true", StringComparison.Ordinal)
             || !labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
             || !Guid.TryParse(runtimeText, out var runtimeId)
-            || runtimeId == Guid.Empty
-            || !labels.TryGetValue("noctf.io/generation", out var generationText)
-            || !int.TryParse(
-                generationText,
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var generation)
-            || generation <= 0)
+            || runtimeId == Guid.Empty)
             return false;
-        identity = new(runtimeId, generation);
+        identity = new(runtimeId);
         return true;
     }
 }

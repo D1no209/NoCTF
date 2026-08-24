@@ -95,33 +95,6 @@ public sealed class ChallengeConfigurationStore(
             && status == CompetitionStatus.Running
             && published.Value)
         {
-            if (db.Database.IsRelational())
-            {
-                await db.RuntimeInstances
-                    .Where(runtime => runtime.CompetitionId == competitionId
-                        && runtime.CompetitionChallengeId == challengeId
-                        && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(runtime => runtime.CheckerSequence, runtime => runtime.CheckerSequence + 1)
-                        .SetProperty(runtime => runtime.LastAppliedCheckerSequence, runtime => runtime.CheckerSequence + 1)
-                        .SetProperty(runtime => runtime.CheckerDeadlineAt, (DateTimeOffset?)null)
-                        .SetProperty(runtime => runtime.NextCheckerDueAt, updatedAt), ct);
-            }
-            else
-            {
-                var runtimes = await db.RuntimeInstances
-                    .Where(runtime => runtime.CompetitionId == competitionId
-                        && runtime.CompetitionChallengeId == challengeId
-                        && runtime.State == NoCTF.Domain.Runtime.RuntimeState.Running)
-                    .ToListAsync(ct);
-                foreach (var runtime in runtimes)
-                {
-                    runtime.CheckerSequence += 1;
-                    runtime.LastAppliedCheckerSequence = runtime.CheckerSequence;
-                    runtime.CheckerDeadlineAt = null;
-                    runtime.NextCheckerDueAt = updatedAt;
-                }
-            }
             await outbox.PublishAsync(new AdvanceAwdRound(
                 competitionId,
                 challengeId,

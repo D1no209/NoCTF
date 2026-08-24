@@ -246,15 +246,13 @@ public sealed class DockerContainerLifecycleTests
                     {
                         ["noctf.io/managed"] = "true",
                         ["noctf.io/job-kind"] = "persistent-runtime",
-                        ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
-                        ["noctf.io/generation"] = "1"
+                        ["noctf.io/runtime-instance-id"] = operationId.ToString("D")
                     },
                     new Dictionary<int, int> { [8080] = 0 },
                     new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
                     new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                     TimeSpan.FromMinutes(5),
                     NetworkIsolation: ContainerNetworkIsolation.Isolated,
-                    Generation: 1,
                     RuntimeInstanceId: operationId);
 
                 receipt = await IsolatedContainerProvisioner.ProvisionAsync(
@@ -295,11 +293,11 @@ public sealed class DockerContainerLifecycleTests
                     .DoesNotContain(platformNetworkName);
 
                 await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
-                    .Contains(new RuntimeResourceIdentity(operationId, 1));
+                    .Contains(new RuntimeResourceIdentity(operationId));
                 var targetId = receipt.ResourceId;
                 var networkId = receipt.NetworkId!;
                 await reconciler.DestroyByIdentityAsync(
-                    new(operationId, 1),
+                    new(operationId),
                     cancellationToken);
                 receipt = null;
                 await Assert.That(await lifecycle.GetAsync(
@@ -344,7 +342,7 @@ public sealed class DockerContainerLifecycleTests
             await dockerProbe.StartAsync(cancellationToken);
             using var lifecycle = CreateLifecycle();
             var runtimeId = Guid.NewGuid();
-            var identity = new RuntimeResourceIdentity(runtimeId, 1);
+            var identity = new RuntimeResourceIdentity(runtimeId);
             ContainerReceipt? receipt = null;
 
             try
@@ -362,7 +360,6 @@ public sealed class DockerContainerLifecycleTests
                     DateTimeOffset.UtcNow,
                     cancellationToken);
                 await Assert.That(receipt.RuntimeInstanceId).IsEqualTo(runtimeId);
-                await Assert.That(receipt.Generation).IsEqualTo(1);
                 await Assert.That(receipt.NetworkId).IsNotNull();
 
                 await RuntimeReceiptCleanup.CleanupContainerAsync(
@@ -418,7 +415,6 @@ public sealed class DockerContainerLifecycleTests
                 .Build();
             await image.StartAsync(cancellationToken);
             var runtimeId = Guid.NewGuid();
-            const int generation = 1;
             var networkName = $"noctf-awdp-reconcile-{runtimeId:N}";
             var containerName = $"noctf-awdp-reconcile-target-{runtimeId:N}";
             using var docker = new DockerClientBuilder()
@@ -428,8 +424,7 @@ public sealed class DockerContainerLifecycleTests
             {
                 ["noctf.io/managed"] = "true",
                 ["noctf.io/job-kind"] = "awdp-verification",
-                ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D"),
-                ["noctf.io/generation"] = generation.ToString()
+                ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D")
             };
             var network = await docker.Networks.CreateNetworkAsync(
                 new NetworksCreateParameters
@@ -461,7 +456,7 @@ public sealed class DockerContainerLifecycleTests
                 new DockerComposeRuntime(options, workDirectory: composeWorkRoot));
             try
             {
-                var identity = new RuntimeResourceIdentity(runtimeId, generation);
+                var identity = new RuntimeResourceIdentity(runtimeId);
                 await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
                     .Contains(identity);
 
@@ -550,7 +545,6 @@ public sealed class DockerContainerLifecycleTests
                             new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                             TimeSpan.FromMinutes(5),
                             NetworkName: platformNetworkName,
-                            Generation: 1,
                             RuntimeInstanceId: operationId),
                         cancellationToken));
 
@@ -565,8 +559,7 @@ public sealed class DockerContainerLifecycleTests
                         [new RuntimeUrlBinding(
                             "http://{HOST}:{PORT}/",
                             RuntimeExposure.OwnerOnly,
-                            ContainerPort: 8080)],
-                        null);
+                            ContainerPort: 8080)]);
                     await Assert.That(expanded.Urls.Single())
                         .IsEqualTo($"http://127.0.0.1:{receipt.PortMappings[8080]}/");
                     var response = await GetEventuallyAsync(
@@ -616,8 +609,7 @@ public sealed class DockerContainerLifecycleTests
             {
                 ["noctf.io/managed"] = "true",
                 ["noctf.io/job-kind"] = "persistent-runtime",
-                ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
-                ["noctf.io/generation"] = "1"
+                ["noctf.io/runtime-instance-id"] = operationId.ToString("D")
             };
             var request = new ContainerRequest(
                 operationId,
@@ -631,7 +623,6 @@ public sealed class DockerContainerLifecycleTests
                 new ContainerSecurityPolicy(true, false, false, ["ALL"], []),
                 TimeSpan.FromMinutes(5),
                 NetworkName: platformNetworkName,
-                Generation: 1,
                 RuntimeInstanceId: operationId);
             ContainerReceipt? receipt = null;
             try
@@ -649,20 +640,6 @@ public sealed class DockerContainerLifecycleTests
                         },
                         cancellationToken);
                 await Assert.That(changedPort).Throws<ArgumentOutOfRangeException>();
-
-                var generationTwoLabels = labels.ToDictionary(
-                    pair => pair.Key,
-                    pair => pair.Value);
-                generationTwoLabels["noctf.io/generation"] = "2";
-                Func<Task> changedGeneration = async () =>
-                    _ = await lifecycle.EnsureRunningAsync(
-                        request with
-                        {
-                            Labels = generationTwoLabels,
-                            Generation = 2
-                        },
-                        cancellationToken);
-                await Assert.That(changedGeneration).Throws<InvalidOperationException>();
 
                 var existing = await docker.Containers.InspectContainerAsync(
                     receipt.ResourceId,
@@ -851,8 +828,7 @@ public sealed class DockerContainerLifecycleTests
                 {
                     ["noctf.io/managed"] = "true",
                     ["noctf.io/job-kind"] = "persistent-runtime",
-                    ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D"),
-                    ["noctf.io/generation"] = "1"
+                    ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D")
                 },
                 new Dictionary<int, int>(),
                 new RuntimeResourceLimits(128 * 1024 * 1024, 100_000_000, 64),
@@ -860,7 +836,6 @@ public sealed class DockerContainerLifecycleTests
                 TimeSpan.FromMinutes(5),
                 NetworkIsolation: ContainerNetworkIsolation.Isolated,
                 InternalPorts: [8080],
-                Generation: 1,
                 RuntimeInstanceId: runtimeId);
             ContainerReceipt? targetReceipt = null;
             try
@@ -891,7 +866,6 @@ public sealed class DockerContainerLifecycleTests
                         ["noctf.io/managed"] = "true",
                         ["noctf.io/job-kind"] = "awd-checker",
                         ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D"),
-                        ["noctf.io/generation"] = "1",
                         ["noctf.io/purpose"] = "awd-checker"
                     },
                     new Dictionary<int, int>(),
@@ -900,14 +874,13 @@ public sealed class DockerContainerLifecycleTests
                     TimeSpan.FromMinutes(1),
                     OperationTimeout: TimeSpan.FromSeconds(30),
                     AllowInternalCallback: true,
-                    Generation: 1,
                     RuntimeInstanceId: runtimeId,
                     NetworkPurpose: ContainerNetworkPurpose.AwdChecker);
 
                 var result = await lifecycle.RunAttachedAsync(
                     checkerRequest,
                     new AttachedContainerRuntimeTarget(
-                        new RuntimeResourceIdentity(runtimeId, 1),
+                        new RuntimeResourceIdentity(runtimeId),
                         targetReceipt),
                     cancellationToken);
 
@@ -1001,7 +974,7 @@ public sealed class DockerContainerLifecycleTests
 
     private static ContainerNetworkPolicyRequest SandboxRequest(Guid operationId) =>
         new(
-            new RuntimeResourceIdentity(operationId, 1),
+            new RuntimeResourceIdentity(operationId),
             ContainerNetworkPurpose.AwdpVerification,
             RuntimeEgressPolicy.Isolated,
             [],
@@ -1026,7 +999,6 @@ public sealed class DockerContainerLifecycleTests
         TimeSpan.FromMinutes(1),
         NetworkName: networkName,
         AllowInternalCallback: true,
-        Generation: 1,
         NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
 
     private static ContainerReceipt Receipt(string resourceId) => new(

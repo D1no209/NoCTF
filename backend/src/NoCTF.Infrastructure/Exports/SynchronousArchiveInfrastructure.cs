@@ -356,9 +356,6 @@ public sealed class PostgresSynchronousArchiveGenerator(
                     item.RunnerId,
                     item.State,
                     item.FailureCode,
-                    ProviderReceiptJson = command.IncludeProtectedFlags
-                        ? item.ProviderReceiptJson
-                        : null,
                     item.CreatedAt,
                     item.RunningAt,
                     item.ExpiresAt,

@@ -40,19 +40,16 @@ public sealed class RuntimeResourceReconciliationHandler(
 
         var failedAssignments = await db.RuntimeInstances
             .Where(instance => instance.State == RuntimeState.Failed
-                && (instance.ProviderReceiptJson != null
-                    || instance.FailureCode == RuntimeFailureCode.CleanupFailed)
                 && instance.RuntimeProvider == configuredProvider
-                && instance.RunnerPool == message.RunnerPool
                 && instance.RunnerId == message.RunnerId)
             .OrderBy(instance => instance.Id)
             .ToListAsync(cancellationToken);
         var failedIdentities = failedAssignments
-            .Select(instance => new RuntimeResourceIdentity(instance.Id, instance.Generation))
+            .Select(instance => new RuntimeResourceIdentity(instance.Id))
             .ToHashSet();
         foreach (var instance in failedAssignments)
         {
-            var identity = new RuntimeResourceIdentity(instance.Id, instance.Generation);
+            var identity = new RuntimeResourceIdentity(instance.Id);
             if (instance.ProviderReceiptJson is { } providerReceiptJson)
             {
                 var catalog = providers
@@ -84,8 +81,6 @@ public sealed class RuntimeResourceReconciliationHandler(
 
             instance.ProviderReceiptJson = null;
             instance.RunnerId = null;
-            instance.RunnerAssignmentReleaseToken = null;
-            instance.RunnerUnavailableAt = null;
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -99,10 +94,8 @@ public sealed class RuntimeResourceReconciliationHandler(
                 .Where(instance => runtimeIds.Contains(instance.Id))
                 .Select(instance => new RuntimeResourceAssignment(
                     instance.Id,
-                    instance.Generation,
                     instance.RuntimeProvider,
                     instance.State,
-                    instance.RunnerPool,
                     instance.RunnerId))
                 .ToDictionaryAsync(instance => instance.Id, cancellationToken);
 
@@ -113,28 +106,23 @@ public sealed class RuntimeResourceReconciliationHandler(
                 continue;
             assignments.TryGetValue(resource.RuntimeInstanceId, out var assignment);
             var matchesAssignment = assignment is not null
-                && assignment.Generation == resource.Generation
-                && assignment.RuntimeProvider == configuredProvider;
+                && assignment.RuntimeProvider == configuredProvider
+                && string.Equals(
+                    assignment.RunnerId,
+                    message.RunnerId,
+                    StringComparison.Ordinal);
             var hasActiveAssignment = matchesAssignment
                 && assignment!.State is RuntimeState.Provisioning
                     or RuntimeState.Running
                     or RuntimeState.Stopping;
-            var belongsToAnotherRunner = matchesAssignment
-                && assignment!.RunnerId is not null
-                && !string.Equals(
-                    assignment.RunnerId,
-                    message.RunnerId,
-                    StringComparison.Ordinal);
-            if (hasActiveAssignment || belongsToAnotherRunner)
+            if (hasActiveAssignment)
                 continue;
             try
             {
                 await reconciler.DestroyByIdentityAsync(resource, cancellationToken);
                 if (CanReleaseOrphanCapacity(
                         assignment,
-                        resource,
                         configuredProvider,
-                        message.RunnerPool,
                         message.RunnerId))
                 {
                     var release = await capacity.ReleaseAsync(
@@ -163,9 +151,7 @@ public sealed class RuntimeResourceReconciliationHandler(
 
     private static bool CanReleaseOrphanCapacity(
         RuntimeResourceAssignment? assignment,
-        RuntimeResourceIdentity resource,
         RuntimeProvider configuredProvider,
-        string runnerPool,
         string runnerId)
     {
         if (assignment is null)
@@ -175,17 +161,13 @@ public sealed class RuntimeResourceReconciliationHandler(
             or RuntimeState.Stopping)
             return false;
         return assignment.RuntimeProvider == configuredProvider
-            && assignment.Generation == resource.Generation
-            && string.Equals(assignment.RunnerPool, runnerPool, StringComparison.Ordinal)
             && (assignment.RunnerId is null
                 || string.Equals(assignment.RunnerId, runnerId, StringComparison.Ordinal));
     }
 
     private sealed record RuntimeResourceAssignment(
         Guid Id,
-        int Generation,
         RuntimeProvider RuntimeProvider,
         RuntimeState State,
-        string RunnerPool,
         string? RunnerId);
 }

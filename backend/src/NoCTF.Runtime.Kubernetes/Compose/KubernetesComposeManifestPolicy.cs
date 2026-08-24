@@ -95,8 +95,7 @@ public static class KubernetesComposeManifestPolicy
         var runtimeSelector = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["noctf.io/managed"] = "true",
-            ["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D"),
-            ["noctf.io/generation"] = request.Generation.ToString(CultureInfo.InvariantCulture)
+            ["noctf.io/runtime-instance-id"] = request.OperationId.ToString("D")
         };
         var publicPorts = (request.UrlBindings ?? [])
             .GroupBy(binding => binding.ServiceName!, StringComparer.Ordinal)

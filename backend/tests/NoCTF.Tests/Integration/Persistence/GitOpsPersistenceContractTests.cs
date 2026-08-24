@@ -47,7 +47,7 @@ public sealed class GitOpsPersistenceContractTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var administratorId = Guid.CreateVersion7(now);

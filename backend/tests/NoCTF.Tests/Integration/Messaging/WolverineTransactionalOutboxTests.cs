@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using NoCTF.Application.Competitions.Lifecycle;
 using NoCTF.Application.Messaging;
@@ -125,8 +126,6 @@ public sealed class WolverineTransactionalOutboxTests
                 var message = new CompleteAwdpFixRecovery(
                     Guid.NewGuid(),
                     Guid.NewGuid(),
-                    3,
-                    "test-pool",
                     "test-runner",
                     DateTimeOffset.UtcNow);
                 var observation = AwdpReplayProbeObservation.Expect(message.GameplayFactId);
@@ -417,7 +416,7 @@ public sealed class WolverineTransactionalOutboxTests
             {
                 await using var scope = migrateHost.Services.CreateAsyncScope();
                 await scope.ServiceProvider.GetRequiredService<NoCtfDbContext>()
-                    .Database.MigrateAsync(cancellationToken);
+                    .Database.EnsureCreatedAsync(cancellationToken);
             }
 
             var firstObservation = LifecycleTickObservation.Expect(2);
@@ -481,7 +480,7 @@ public sealed class WolverineTransactionalOutboxTests
             await using (var scope = host.Services.CreateAsyncScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-                await db.Database.MigrateAsync(cancellationToken);
+                await db.Database.EnsureCreatedAsync(cancellationToken);
                 var now = DateTimeOffset.UtcNow;
                 var ownerId = Guid.CreateVersion7();
                 db.Users.Add(new User
@@ -554,21 +553,23 @@ public sealed class WolverineTransactionalOutboxTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Awd_round_fact_node_injection_and_replay_share_real_wolverine_durability(
+    public async Task Awd_round_fact_and_node_injection_share_real_wolverine_durability(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
         {
             await using var postgres = CreatePostgres();
             await postgres.StartAsync(cancellationToken);
-            using var host = BuildHost(postgres.GetConnectionString());
             var now = DateTimeOffset.UtcNow;
+            using var host = BuildHost(
+                postgres.GetConnectionString(),
+                timeProvider: new FakeTimeProvider(now));
             Guid competitionId;
             Guid competitionChallengeId;
             await using (var scope = host.Services.CreateAsyncScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-                await db.Database.MigrateAsync(cancellationToken);
+                await db.Database.EnsureCreatedAsync(cancellationToken);
                 var ownerId = Guid.CreateVersion7();
                 competitionId = Guid.CreateVersion7();
                 var challengeId = Guid.CreateVersion7();
@@ -649,10 +650,8 @@ public sealed class WolverineTransactionalOutboxTests
                     CompetitionId = competitionId,
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,
-                    Generation = 1,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
-                    RunnerPool = "test-pool",
                     RunnerId = "test-runner",
                     State = RuntimeState.Running,
                     ProviderReceiptJson = "{}",
@@ -671,7 +670,6 @@ public sealed class WolverineTransactionalOutboxTests
                     competitionChallengeId,
                     now);
                 var bus = host.Services.GetRequiredService<IMessageBus>();
-                await bus.SendAsync(message);
                 await bus.SendAsync(message);
                 await Assert.That(await observed.WaitAsync(
                     TimeSpan.FromSeconds(30),
@@ -809,7 +807,7 @@ public sealed class WolverineTransactionalOutboxTests
         var now = fixture.Now;
         await using var scope = host.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var ownerId = Guid.CreateVersion7();
         var competitionId = Guid.CreateVersion7();
         var challengeId = Guid.CreateVersion7();
@@ -896,11 +894,8 @@ public sealed class WolverineTransactionalOutboxTests
             TeamId = teamId,
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = fixture.GameplayFactId,
-            AwdpFixStage = AwdpFixStage.PatchApplying,
-            Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
-            RunnerPool = "test-pool",
             RunnerId = "test-runner",
             State = RuntimeState.Running,
             ProviderReceiptJson = "{}",
@@ -914,14 +909,15 @@ public sealed class WolverineTransactionalOutboxTests
     private static IHost BuildHost(
         string connectionString,
         string envelopeSchema = "wolverine_test",
-        AwdpFixExecutionFixture? awdpFixExecution = null)
+        AwdpFixExecutionFixture? awdpFixExecution = null,
+        TimeProvider? timeProvider = null)
     {
         var builder = Host.CreateApplicationBuilder();
         if (awdpFixExecution is not null)
         {
             builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Runner:Pool"] = awdpFixExecution.Message.RunnerPool,
+                ["Runner:Pool"] = "test-pool",
                 ["Runner:Id"] = awdpFixExecution.Message.RunnerId
             });
             builder.Services.AddSingleton<IAwdpFixWorkReader>(awdpFixExecution.WorkReader);
@@ -935,12 +931,6 @@ public sealed class WolverineTransactionalOutboxTests
                 awdpFixExecution.HttpClientFactory));
             builder.Services.AddSingleton<FixArchivePreparer>();
             builder.Services.AddSingleton(Substitute.For<IRunnerCapacityGate>());
-            var executionFence = Substitute.For<IAwdpFixExecutionFence>();
-            executionFence.TryAdvanceStageAsync(
-                    Arg.Any<AwdpFixStageTransitionRequest>(),
-                    Arg.Any<CancellationToken>())
-                .Returns(true);
-            builder.Services.AddSingleton(executionFence);
         }
         builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
             options => options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
@@ -952,9 +942,10 @@ public sealed class WolverineTransactionalOutboxTests
         builder.Services.AddSingleton<IAwdRoundConfigurationCatalog, AwdRoundConfigurationCatalog>();
         builder.Services.AddSingleton<KohProducerConfigurationCatalog>();
         builder.Services.AddSingleton<IKohControlClient, UnusedKohControlClient>();
-        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(timeProvider ?? TimeProvider.System);
         builder.UseWolverine(options =>
         {
+            options.Discovery.DisableConventionalDiscovery();
             options.Discovery.IncludeType<OutboxBusinessProbeHandler>();
             options.Discovery.IncludeType<ObserveOutboxBusinessProbeHandler>();
             options.Discovery.IncludeType<ScheduledOutboxProbeHandler>();
@@ -983,7 +974,7 @@ public sealed class WolverineTransactionalOutboxTests
             options.ListenToPostgresqlQueue("outbox-probe").UseDurableInbox();
             options.ListenToPostgresqlQueue(
                 NoCTF.Application.Runtime.Instances.RunnerNodeQueueName
-                    .FromAssignment("test-pool", "test-runner").Value)
+                    .FromRunnerId("test-runner").Value)
                 .UseDurableInbox();
             options.PublishMessage<WriteOutboxBusinessProbe>()
                 .ToPostgresqlQueue("outbox-probe");
@@ -1003,8 +994,6 @@ public sealed class WolverineTransactionalOutboxTests
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<ProjectLeaderboard>()
                 .ToPostgresqlQueue("outbox-probe");
-            options.PublishMessage<ProjectLeaderboard>()
-                .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<AdvanceAwdRound>()
                 .ToPostgresqlQueue("outbox-probe");
             options.PublishMessage<GenerateAwdFlags>()
@@ -1017,7 +1006,7 @@ public sealed class WolverineTransactionalOutboxTests
                 options.PublishMessage<RunAwdpFixVerification>()
                     .ToPostgresqlQueue(
                         NoCTF.Application.Runtime.Instances.RunnerNodeQueueName
-                            .FromAssignment("test-pool", "test-runner").Value);
+                            .FromRunnerId("test-runner").Value);
         });
         return builder.Build();
     }
@@ -1109,9 +1098,7 @@ public sealed class WolverineTransactionalOutboxTests
                 competitionChallengeId,
                 patchUploadId,
                 runtimeInstanceId,
-                5,
                 now.AddMinutes(5),
-                "test-pool",
                 "test-runner");
             var archiveBytes = CreateFixArchive();
             var work = new AwdpFixWork(
@@ -1130,14 +1117,12 @@ public sealed class WolverineTransactionalOutboxTests
                     null,
                     "awdp-target",
                     "awdp-network",
-                    runtimeInstanceId,
-                    1),
+                    runtimeInstanceId),
                 "fix.sh",
                 ["/bin/sh", "/noctf/fix/fix.sh"],
                 TimeSpan.FromMinutes(1),
                 new(
                     runtimeInstanceId,
-                    1,
                     RuntimeProvider.Docker,
                     "checker:test",
                     [],

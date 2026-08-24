@@ -32,7 +32,7 @@ public sealed class LastAdministratorConcurrencyPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using (var migrationDb = new NoCtfDbContext(options))
-                await migrationDb.Database.MigrateAsync(cancellationToken);
+                await migrationDb.Database.EnsureCreatedAsync(cancellationToken);
 
             await DowngradeAndHardDeleteAsync(
                 options,

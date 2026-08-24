@@ -19,9 +19,7 @@ public sealed record InjectAwdFlag(
     Guid RuntimeInstanceId,
     Guid CompetitionChallengeId,
     Guid ChallengeFlagId,
-    int Generation,
     DateTimeOffset ValidUntil,
-    string RunnerPool,
     string RunnerId,
     int FailedAttempts = 0) : IRunnerNodeMessage;
 
@@ -30,17 +28,14 @@ public sealed record AwdFlagInjectionFailed(
     Guid CompetitionChallengeId,
     Guid RuntimeInstanceId,
     Guid ChallengeFlagId,
-    int Generation,
     DateTimeOffset OccurredAt);
 
 public sealed record RunAwdChecker(
     Guid RuntimeInstanceId,
     Guid CompetitionChallengeId,
-    int Generation,
-    long CheckerSequence,
-    DateTimeOffset Deadline,
-    string RunnerPool,
-    string RunnerId) : IRunnerNodeMessage;
+    Guid GameplayFactId,
+    string RunnerId,
+    DateTimeOffset Deadline) : IRunnerNodeMessage;
 
 public sealed record DispatchAwdCheckers(
     DateTimeOffset At,
@@ -50,6 +45,5 @@ public sealed record AwdCheckerCallbackMissing(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid RuntimeInstanceId,
-    int Generation,
-    long CheckerSequence,
+    Guid GameplayFactId,
     DateTimeOffset OccurredAt);

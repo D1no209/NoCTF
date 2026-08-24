@@ -19,7 +19,6 @@ public sealed class ListAdminRuntimesRequest
     [QueryParam] public Guid? TeamId { get; set; }
     [QueryParam] public RuntimeKindProtocol? RuntimeKind { get; set; }
     [QueryParam] public RuntimeProviderProtocol? Provider { get; set; }
-    [QueryParam] public string? RunnerPool { get; set; }
     [QueryParam] public string? RunnerId { get; set; }
     [QueryParam] public RuntimeStateProtocol? State { get; set; }
     [QueryParam] public DateTimeOffset? ExpiresBefore { get; set; }
@@ -47,16 +46,12 @@ public sealed record AdminRuntimeResponse(
     Guid? SourceTeamId,
     string? SourceTeamName,
     RuntimePurposeProtocol Purpose,
-    int Generation,
     RuntimeKindProtocol RuntimeKind,
     RuntimeProviderProtocol Provider,
-    string RunnerPool,
     string? RunnerId,
     RuntimeStateProtocol State,
     RuntimeFailureCodeProtocol? FailureCode,
     IReadOnlyList<string> Urls,
-    string? ProviderReceiptJson,
-    string? ControlCheckUrl,
     IReadOnlyList<RuntimePublishedPortView> PublishedPorts,
     DateTimeOffset CreatedAt,
     DateTimeOffset? RunningAt,
@@ -78,15 +73,12 @@ internal static class AdminRuntimeMapping
             view.Id, view.CompetitionId, view.CompetitionChallengeId, view.TeamId,
             view.SourceTeamId, view.SourceTeamName,
             RuntimeProtocolMapper.ToProtocol(view.Purpose),
-            view.Generation,
             RuntimeProtocolMapper.ToProtocol(view.RuntimeKind),
             RuntimeProtocolMapper.ToProtocol(view.Provider),
-            view.RunnerPool,
             view.RunnerId,
             RuntimeProtocolMapper.ToProtocol(view.State),
             view.FailureCode is null ? null : RuntimeProtocolMapper.ToProtocol(view.FailureCode.Value),
-            view.Urls, view.ProviderReceiptJson, view.ControlCheckUrl,
-            view.PublishedPorts ?? [], view.CreatedAt,
+            view.Urls, view.PublishedPorts ?? [], view.CreatedAt,
             view.RunningAt, view.ExpiresAt, view.StoppedAt,
             availableAt,
             availableAt is { } value && value <= DateTimeOffset.UtcNow);
@@ -124,7 +116,7 @@ public sealed class ListAdminRuntimesEndpoint(
             return TypedResults.Forbid();
         var filterKey = string.Join(
             '|', request.CompetitionChallengeId, request.TeamId, request.RuntimeKind,
-            request.Provider, request.RunnerPool, request.RunnerId, request.State,
+            request.Provider, request.RunnerId, request.State,
             request.ExpiresBefore?.ToString("O", CultureInfo.InvariantCulture),
             request.HostPort);
         if (!cursors.TryDecode(request.Cursor, CursorEndpoint, filterKey, out var position))
@@ -133,7 +125,6 @@ public sealed class ListAdminRuntimesEndpoint(
                 competitionId, request.CompetitionChallengeId, request.TeamId,
                 request.RuntimeKind is null ? null : RuntimeProtocolMapper.ToDomain(request.RuntimeKind.Value),
                 request.Provider is null ? null : RuntimeProtocolMapper.ToDomain(request.Provider.Value),
-                request.RunnerPool,
                 request.RunnerId,
                 request.State is null ? null : RuntimeProtocolMapper.ToDomain(request.State.Value),
                 request.ExpiresBefore,

@@ -1556,7 +1556,7 @@
           "Api"
         ],
         "summary": "Updates the status reported by an AWD checker.",
-        "description": "Each accepted update replaces the runtime's previous checker status. Runtime identity and generation come from the internal JWT.",
+        "description": "Records the result of one independently persisted AWD checker execution. Runtime and gameplay-fact identities come from the internal JWT.",
         "operationId": "RecordAwdCheckResultEndpoint",
         "requestBody": {
           "x-name": "RecordAwdCheckResultRequest",
@@ -1690,7 +1690,7 @@
           "Competitions"
         ],
         "summary": "Gets the current team's AWDP attack and defense state.",
-        "description": "Returns the current attack Runtime, Break activation, one-shot Fix stage and defense activation.",
+        "description": "Returns the current attack Runtime, Break activation, one-shot Fix progress and defense activation.",
         "operationId": "GetAwdpParticipantStateEndpoint",
         "parameters": [
           {
@@ -5433,14 +5433,6 @@
             }
           },
           {
-            "name": "runnerPool",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "nullable": true
-            }
-          },
-          {
             "name": "runnerId",
             "in": "query",
             "schema": {
@@ -5537,7 +5529,7 @@
           "Admin"
         ],
         "summary": "Queues a KoH shared runtime replacement.",
-        "description": "Replaces the shared hill through the normal generation-fenced runtime state machine.",
+        "description": "Stops the current shared runtime and creates a replacement with a new UUID.",
         "operationId": "AdminResetSharedRuntime",
         "parameters": [
           {
@@ -5601,7 +5593,7 @@
           "Admin"
         ],
         "summary": "Queues an atomic team runtime replacement.",
-        "description": "Uses the same generation and replacement invariants as the player runtime API.",
+        "description": "Stops the current runtime and creates a new runtime with a new UUID.",
         "operationId": "AdminResetTeamRuntime",
         "parameters": [
           {
@@ -13498,10 +13490,6 @@
             "format": "guid",
             "nullable": true
           },
-          "generation": {
-            "type": "integer",
-            "format": "int32"
-          },
           "runtimeKind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeKindProtocol"
           },
@@ -13604,8 +13592,7 @@
           "ProvisionTimeout",
           "ProviderRejected",
           "CleanupFailed",
-          "UrlExpansionFailed",
-          "PublishedPortRangeExhausted"
+          "UrlExpansionFailed"
         ],
         "enum": [
           "InvalidConfiguration",
@@ -13614,8 +13601,7 @@
           "ProvisionTimeout",
           "ProviderRejected",
           "CleanupFailed",
-          "UrlExpansionFailed",
-          "PublishedPortRangeExhausted"
+          "UrlExpansionFailed"
         ]
       },
       "NoCTFAPIEndpointsRuntimeRuntimeTargetListResponse": {
@@ -14282,14 +14268,6 @@
               }
             ]
           },
-          "stage": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/NoCTFAPIEndpointsGameplayFactsAwdpFixStageProtocol"
-              }
-            ]
-          },
           "targetCreatedAt": {
             "type": "string",
             "format": "date-time",
@@ -14311,24 +14289,6 @@
             "nullable": true
           }
         }
-      },
-      "NoCTFAPIEndpointsGameplayFactsAwdpFixStageProtocol": {
-        "type": "string",
-        "description": "",
-        "x-enumNames": [
-          "TargetProvisioning",
-          "AwaitingPatch",
-          "PatchApplying",
-          "CheckerRunning",
-          "Completed"
-        ],
-        "enum": [
-          "TargetProvisioning",
-          "AwaitingPatch",
-          "PatchApplying",
-          "CheckerRunning",
-          "Completed"
-        ]
       },
       "NoCTFAPIEndpointsGameplayFactsGetGameplayFactStatusRequest": {
         "type": "object",
@@ -16186,11 +16146,6 @@
               }
             ]
           },
-          "runtimeGeneration": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true
-          },
           "hostPort": {
             "type": "integer",
             "format": "int32",
@@ -17486,18 +17441,11 @@
           "purpose": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimePurposeProtocol"
           },
-          "generation": {
-            "type": "integer",
-            "format": "int32"
-          },
           "runtimeKind": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeKindProtocol"
           },
           "provider": {
             "$ref": "#/components/schemas/NoCTFAPIEndpointsRuntimeRuntimeProviderProtocol"
-          },
-          "runnerPool": {
-            "type": "string"
           },
           "runnerId": {
             "type": "string",
@@ -17519,14 +17467,6 @@
             "items": {
               "type": "string"
             }
-          },
-          "providerReceiptJson": {
-            "type": "string",
-            "nullable": true
-          },
-          "controlCheckUrl": {
-            "type": "string",
-            "nullable": true
           },
           "publishedPorts": {
             "type": "array",
@@ -17594,10 +17534,6 @@
           "hostPort": {
             "type": "integer",
             "format": "int32"
-          },
-          "allocatedAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -20333,14 +20269,14 @@
           "AwdRound",
           "RuntimeDefinition",
           "Hint",
-          "RuntimeGeneration"
+          "RuntimeInstance"
         ],
         "enum": [
           "Attachment",
           "AwdRound",
           "RuntimeDefinition",
           "Hint",
-          "RuntimeGeneration"
+          "RuntimeInstance"
         ]
       },
       "NoCTFAPIEndpointsAdministrationChallengeBankChallengeFlagFailureResponse": {

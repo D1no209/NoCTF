@@ -46,9 +46,7 @@ public sealed class AwdFlagInjectionWorkReader(
         var target = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
-                && runtime.Generation == message.Generation
                 && runtime.State == RuntimeState.Running
-                && runtime.RunnerPool == message.RunnerPool
                 && runtime.RunnerId == message.RunnerId
                 && runtime.ProviderReceiptJson != null)
             .Join(
@@ -207,7 +205,6 @@ public sealed class AwdFlagInjectionHandler(
             message.CompetitionChallengeId,
             message.RuntimeInstanceId,
             message.ChallengeFlagId,
-            message.Generation,
             now));
         await outbox.FlushOutgoingMessagesAsync();
         return MessageExecutionOutcome.Applied;

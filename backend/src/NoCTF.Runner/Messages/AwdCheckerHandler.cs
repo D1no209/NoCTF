@@ -19,10 +19,9 @@ namespace NoCTF.Runner.Messages;
 
 public sealed record AwdCheckerWork(
     Guid RuntimeInstanceId,
-    long CheckerSequence,
+    Guid GameplayFactId,
     RuntimeProvider Provider,
     RuntimeKind RuntimeKind,
-    int Generation,
     string ProviderReceiptJson,
     string TargetHost,
     string Image,
@@ -57,6 +56,7 @@ public sealed class AwdCheckerWorkReader(
     IServiceScopeFactory scopes,
     AwdCheckerConfigurationCatalog configurations,
     IRunnerScoringTokenIssuer tokens,
+    IRuntimeProviderCatalog providers,
     IConfiguration configuration,
     TimeProvider timeProvider) : IAwdCheckerWorkReader
 {
@@ -69,13 +69,8 @@ public sealed class AwdCheckerWorkReader(
         var target = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.Id == message.RuntimeInstanceId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
-                && runtime.Generation == message.Generation
-                && runtime.CheckerSequence == message.CheckerSequence
-                && runtime.CheckerDeadlineAt == message.Deadline
                 && runtime.State == RuntimeState.Running
-                && runtime.RunnerPool == message.RunnerPool
                 && runtime.RunnerId == message.RunnerId
-                && runtime.AwdCheckerTargetHost != null
                 && runtime.ProviderReceiptJson != null)
             .Join(
                 db.CompetitionChallenges.AsNoTracking(),
@@ -120,8 +115,17 @@ public sealed class AwdCheckerWorkReader(
             target.ChallengeRules,
             target.ChallengeDefinition);
         if (settings.Checker is not { } checker
-            || string.IsNullOrWhiteSpace(target.Runtime.AwdCheckerTargetHost)
             || target.Runtime.RuntimeKind is not (RuntimeKind.Container or RuntimeKind.Compose))
+            return null;
+        var targetHost = await ResolveTargetHostAsync(
+            target.Runtime.RuntimeKind,
+            target.Runtime.RuntimeProvider,
+            target.Runtime.ProviderReceiptJson!,
+            target.Runtime.Id,
+            AwdConfigurationUpgrader.ParseChallenge(target.ChallengeDefinition).Checker?.TargetServiceName,
+            providers,
+            cancellationToken);
+        if (targetHost is null)
             return null;
         var callbackBase = configuration["RunnerScoring:CallbackBaseUrl"];
         if (!Uri.TryCreate(callbackBase, UriKind.Absolute, out var baseUri)
@@ -143,18 +147,16 @@ public sealed class AwdCheckerWorkReader(
         var token = tokens.IssueAwdChecker(new(
             message.RunnerId,
             message.RuntimeInstanceId,
-            message.Generation,
-            message.CheckerSequence,
+            message.GameplayFactId,
             message.Deadline,
             issuedAt));
         return new(
             message.RuntimeInstanceId,
-            message.CheckerSequence,
+            message.GameplayFactId,
             target.Runtime.RuntimeProvider,
             target.Runtime.RuntimeKind,
-            target.Runtime.Generation,
             target.Runtime.ProviderReceiptJson!,
-            target.Runtime.AwdCheckerTargetHost,
+            targetHost,
             checker.Image,
             checker.Command ?? [],
             checker.Environment ?? new Dictionary<string, string>(),
@@ -164,6 +166,49 @@ public sealed class AwdCheckerWorkReader(
             TimeSpan.FromSeconds(checker.TimeoutSeconds) < remaining
                 ? TimeSpan.FromSeconds(checker.TimeoutSeconds)
                 : remaining);
+    }
+
+    private static async Task<string?> ResolveTargetHostAsync(
+        RuntimeKind kind,
+        RuntimeProvider provider,
+        string providerReceiptJson,
+        Guid runtimeInstanceId,
+        string? targetServiceName,
+        IRuntimeProviderCatalog providers,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (kind == RuntimeKind.Container)
+            {
+                var receipt = JsonSerializer.Deserialize<ContainerReceipt>(providerReceiptJson);
+                return receipt is not null
+                    && receipt.Provider == provider
+                    && receipt.RuntimeInstanceId == runtimeInstanceId
+                    ? receipt.InternalHost
+                    : null;
+            }
+
+            var composeReceipt = JsonSerializer.Deserialize<ComposeReceipt>(providerReceiptJson);
+            if (composeReceipt is null
+                || composeReceipt.Provider != provider
+                || composeReceipt.OperationId != runtimeInstanceId)
+                return null;
+            var status = await providers.Compose(provider).GetStatusAsync(
+                composeReceipt,
+                cancellationToken);
+            if (status is null)
+                return null;
+            return status.Services.SingleOrDefault(service =>
+                string.Equals(service.Name, targetServiceName, StringComparison.Ordinal))?.InternalHost
+                ?? (targetServiceName is null && status.Services.Count == 1
+                    ? status.Services[0].InternalHost
+                    : null);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }
 
@@ -183,7 +228,7 @@ public sealed class AwdCheckerExecutor(
             ["NOCTF_CALLBACK_TOKEN"] = work.CallbackToken
         };
         var request = new ContainerRequest(
-            CreateOperationId(work.RuntimeInstanceId, work.CheckerSequence),
+            CreateOperationId(work.RuntimeInstanceId, work.GameplayFactId),
             work.Provider,
             work.Image,
             work.Command,
@@ -195,7 +240,6 @@ public sealed class AwdCheckerExecutor(
             work.Timeout,
             OperationTimeout: work.Timeout,
             AllowInternalCallback: true,
-            Generation: work.Generation,
             RuntimeInstanceId: work.RuntimeInstanceId,
             NetworkPurpose: ContainerNetworkPurpose.AwdChecker);
         var target = CreateTarget(work);
@@ -246,7 +290,7 @@ public sealed class AwdCheckerExecutor(
     {
         try
         {
-            var identity = new RuntimeResourceIdentity(work.RuntimeInstanceId, work.Generation);
+            var identity = new RuntimeResourceIdentity(work.RuntimeInstanceId);
             return work.RuntimeKind switch
             {
                 RuntimeKind.Container => CreateContainerTarget(work, identity),
@@ -268,7 +312,6 @@ public sealed class AwdCheckerExecutor(
         return receipt is not null
             && receipt.Provider == work.Provider
             && receipt.RuntimeInstanceId == identity.RuntimeInstanceId
-            && receipt.Generation == identity.Generation
             && !string.IsNullOrWhiteSpace(receipt.NetworkId)
                 ? new(identity, receipt)
                 : null;
@@ -282,17 +325,16 @@ public sealed class AwdCheckerExecutor(
         return receipt is not null
             && receipt.Provider == work.Provider
             && receipt.OperationId == identity.RuntimeInstanceId
-            && receipt.Generation == identity.Generation
             && !string.IsNullOrWhiteSpace(work.TargetHost)
                 ? new(identity, receipt, work.TargetHost)
                 : null;
     }
 
-    private static Guid CreateOperationId(Guid runtimeInstanceId, long checkerSequence)
+    private static Guid CreateOperationId(Guid runtimeInstanceId, Guid gameplayFactId)
     {
-        Span<byte> input = stackalloc byte[24];
+        Span<byte> input = stackalloc byte[32];
         runtimeInstanceId.TryWriteBytes(input[..16]);
-        BinaryPrimitives.WriteInt64BigEndian(input[16..], checkerSequence);
+        gameplayFactId.TryWriteBytes(input[16..]);
         Span<byte> hash = stackalloc byte[32];
         SHA256.HashData(input, hash);
         return new Guid(hash[..16]);

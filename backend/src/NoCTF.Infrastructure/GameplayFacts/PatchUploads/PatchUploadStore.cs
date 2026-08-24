@@ -153,7 +153,6 @@ public sealed class PatchUploadStore(
             return new(PatchUploadSaveState.DefenseTargetConsumed);
         }
         if (target.State != RuntimeState.Running
-            || target.AwdpFixStage != AwdpFixStage.AwaitingPatch
             || target.RunnerId is null
             || target.ExpiresAt is not { } expiresAt
             || expiresAt <= uploadedAt)
@@ -220,7 +219,6 @@ public sealed class PatchUploadStore(
         };
         db.GameplayFacts.Add(fact);
         target.GameplayFactId = fact.Id;
-        target.AwdpFixStage = AwdpFixStage.PatchApplying;
         var ttlSeconds = configuration.Runtime.TtlSeconds is > 0
             ? configuration.Runtime.TtlSeconds.Value
             : 900;
@@ -233,16 +231,12 @@ public sealed class PatchUploadStore(
             fact.CompetitionChallengeId,
             patchUploadId,
             target.Id,
-            target.Generation,
             deadline,
-            target.RunnerPool,
             target.RunnerId));
         await outbox.ScheduleAsync(new ExpireAwdpFixVerification(
             fact.Id,
             target.Id,
-            target.Generation,
             deadline,
-            target.RunnerPool,
             target.RunnerId), deadline);
         await events.RecordAsync(new(
             fact.CompetitionId,
@@ -257,8 +251,7 @@ public sealed class PatchUploadStore(
             GameplayFactId: fact.Id,
             GameplayFactKind: fact.Kind,
             GameplayFactState: fact.State,
-            RuntimeState: target.State,
-            RuntimeGeneration: target.Generation), ct);
+            RuntimeState: target.State), ct);
         await events.RecordAsync(new(
             fact.CompetitionId,
             CompetitionEventKind.AwdpFixAttempted,

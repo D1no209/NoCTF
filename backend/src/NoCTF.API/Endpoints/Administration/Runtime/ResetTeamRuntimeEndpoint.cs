@@ -23,7 +23,7 @@ public sealed class ResetTeamRuntimeEndpoint(
         Summary(summary =>
         {
             summary.Summary = "Queues an atomic team runtime replacement.";
-            summary.Description = "Uses the same generation and replacement invariants as the player runtime API.";
+            summary.Description = "Stops the current runtime and creates a new runtime with a new UUID.";
         });
     }
 

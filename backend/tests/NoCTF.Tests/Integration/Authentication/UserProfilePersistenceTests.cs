@@ -42,7 +42,7 @@ public sealed class UserProfilePersistenceTests
 
             await using (var db = new NoCtfDbContext(options))
             {
-                await db.Database.MigrateAsync(cancellationToken);
+                await db.Database.EnsureCreatedAsync(cancellationToken);
                 var users = new AuthenticationStore(db, hasher);
                 await users.CreateAsync(
                     userId,
@@ -118,7 +118,7 @@ public sealed class UserProfilePersistenceTests
             var userId = Guid.CreateVersion7(now);
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var users = new AuthenticationStore(db, hasher);
             await users.CreateAsync(
                 userId,

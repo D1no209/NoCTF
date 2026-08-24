@@ -28,7 +28,6 @@ public sealed class OvaRuntimeHandlerTests
         await Assert.That(provisioned.Provider).IsEqualTo(RuntimeProvider.Libvirt);
         await Assert.That(provisioned.Urls)
             .IsEquivalentTo(["http://10.90.0.2:8080/play"]);
-        await Assert.That(provisioned.ParticipantUrlIndexes).IsEquivalentTo([0]);
         await Assert.That(runtime.ImportCount).IsEqualTo(1);
         await Assert.That(runtime.DestroyCount).IsEqualTo(0);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEmpty();
@@ -67,9 +66,7 @@ public sealed class OvaRuntimeHandlerTests
         await Assert.That(((RuntimeProvisionTerminated)result).FailureCode)
             .IsEqualTo(RuntimeFailureCode.UrlExpansionFailed);
         await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(
-                message.RuntimeInstanceId,
-                message.Generation)]);
+            .IsEquivalentTo([new RuntimeResourceIdentity(message.RuntimeInstanceId)]);
         await Assert.That(capacity.ReleasedRuntimeIds)
             .IsEquivalentTo([message.RuntimeInstanceId]);
     }
@@ -90,8 +87,6 @@ public sealed class OvaRuntimeHandlerTests
                     System.Text.Json.JsonSerializer.Serialize(receipt))));
         var message = new StopOvaRuntime(
             receipt.OperationId,
-            3,
-            "default",
             "runner-a");
 
         var result = await handler.Handle(message, CancellationToken.None);
@@ -119,8 +114,6 @@ public sealed class OvaRuntimeHandlerTests
                     System.Text.Json.JsonSerializer.Serialize(receipt))));
         var message = new StopOvaRuntime(
             receipt.OperationId,
-            3,
-            "default",
             "runner-a");
 
         var result = await handler.Handle(message, CancellationToken.None);
@@ -158,15 +151,12 @@ public sealed class OvaRuntimeHandlerTests
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         return new(
             runtimeInstanceId,
-            3,
-            "default",
             "runner-a",
             new OvaRuntimeRequest(
                 runtimeInstanceId,
-                3,
                 new Uri("file:///var/lib/noctf/challenge.ova"),
                 new string('a', 64),
-                $"noctf-{runtimeInstanceId:N}-3",
+                $"noctf-{runtimeInstanceId:N}",
                 new(268_435_456, 2_000_000_000, 256),
                 TimeSpan.FromHours(1),
                 TimeSpan.FromMinutes(2),
@@ -189,7 +179,7 @@ public sealed class OvaRuntimeHandlerTests
             CancellationToken cancellationToken)
         {
             ImportCount++;
-            return Task.FromResult(CreateReceipt(request.OperationId, request.Generation));
+            return Task.FromResult(CreateReceipt(request.OperationId));
         }
 
         public Task DestroyAsync(
@@ -210,12 +200,10 @@ public sealed class OvaRuntimeHandlerTests
             Task.CompletedTask;
 
         public OvaRuntimeReceipt CreateReceipt(
-            Guid? operationId = null,
-            int generation = 3) =>
+            Guid? operationId = null) =>
             new(
                 operationId ?? Guid.Parse("11111111-1111-1111-1111-111111111111"),
                 RuntimeProvider.Libvirt,
-                generation,
                 "noctf-network",
                 "10.90.0.0/28",
                 [

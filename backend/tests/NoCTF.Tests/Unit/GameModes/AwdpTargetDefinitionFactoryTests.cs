@@ -16,7 +16,6 @@ public sealed class AwdpTargetDefinitionFactoryTests
 
         var definition = AwdpTargetDefinitionFactory.Create(
             operationId,
-            generation: 3,
             template,
             RuntimeProvider.Docker,
             now: DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
@@ -27,7 +26,8 @@ public sealed class AwdpTargetDefinitionFactoryTests
         await Assert.That(definition.PortMappings).IsEmpty();
         await Assert.That(definition.Labels["noctf.io/purpose"]).IsEqualTo("awdp-target");
         await Assert.That(definition.Labels["noctf.io/managed"]).IsEqualTo("true");
-        await Assert.That(definition.Labels["noctf.io/generation"]).IsEqualTo("3");
+        await Assert.That(definition.Labels["noctf.io/runtime-instance-id"])
+            .IsEqualTo(operationId.ToString("D"));
         await Assert.That(definition.Labels.ContainsKey("noctf.io/expires-at")).IsFalse();
         await Assert.That(definition.Security.NoNewPrivileges).IsFalse();
         await Assert.That(definition.Security.ReadonlyRootfs).IsFalse();
@@ -49,7 +49,6 @@ public sealed class AwdpTargetDefinitionFactoryTests
 
         var definition = AwdpTargetDefinitionFactory.Create(
             Guid.NewGuid(),
-            generation: 1,
             template,
             RuntimeProvider.Docker,
             DateTimeOffset.UtcNow);
@@ -81,7 +80,7 @@ public sealed class AwdpTargetDefinitionFactoryTests
             definition);
 
         var action = () => AwdpTargetDefinitionFactory.Create(
-            Guid.NewGuid(), 1, template, RuntimeProvider.Docker, DateTimeOffset.UtcNow);
+            Guid.NewGuid(), template, RuntimeProvider.Docker, DateTimeOffset.UtcNow);
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }

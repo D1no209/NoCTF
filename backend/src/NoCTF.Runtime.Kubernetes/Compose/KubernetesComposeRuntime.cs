@@ -1,7 +1,6 @@
 using k8s;
 using k8s.Autorest;
 using k8s.Models;
-using System.Globalization;
 using System.Net;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
@@ -20,7 +19,6 @@ public sealed class KubernetesComposeRuntime(
 {
     private const string ManagedLabel = "noctf.io/managed";
     private const string RuntimeIdLabel = "noctf.io/runtime-instance-id";
-    private const string GenerationLabel = "noctf.io/generation";
     private const string ExternalReasonExitCode = "ExitCode";
 
     public async Task<ComposeReceipt> UpAsync(
@@ -72,7 +70,6 @@ public sealed class KubernetesComposeRuntime(
             request.ProjectName,
             options.Namespace,
             options.PublicHost,
-            request.Generation,
             DateTimeOffset.UtcNow);
     }
 
@@ -81,7 +78,7 @@ public sealed class KubernetesComposeRuntime(
         CancellationToken cancellationToken)
     {
         ValidateReceipt(receipt);
-        var selector = OwnershipSelector(receipt.OperationId, receipt.Generation);
+        var selector = OwnershipSelector(receipt.OperationId);
         var failures = new List<Exception>();
         string[] deploymentNames = [];
         string[] serviceNames = [];
@@ -175,7 +172,7 @@ public sealed class KubernetesComposeRuntime(
         CancellationToken cancellationToken)
     {
         ValidateReceipt(receipt);
-        var selector = OwnershipSelector(receipt.OperationId, receipt.Generation);
+        var selector = OwnershipSelector(receipt.OperationId);
         var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(
             options.Namespace,
             labelSelector: selector,
@@ -235,7 +232,7 @@ public sealed class KubernetesComposeRuntime(
         CancellationToken cancellationToken)
     {
         ValidateReceipt(receipt);
-        var selector = $"{OwnershipSelector(receipt.OperationId, receipt.Generation)},"
+        var selector = $"{OwnershipSelector(receipt.OperationId)},"
             + $"{KubernetesComposeManifestPolicy.ComposeServiceLabel}={serviceName}";
         var pods = await client.CoreV1.ListNamespacedPodAsync(
             options.Namespace,
@@ -351,7 +348,7 @@ public sealed class KubernetesComposeRuntime(
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(request.OperationTimeout);
-        var selector = OwnershipSelector(request.OperationId, request.Generation);
+        var selector = OwnershipSelector(request.OperationId);
         try
         {
             while (true)
@@ -583,11 +580,7 @@ public sealed class KubernetesComposeRuntime(
         string name)
     {
         if (!HasLabel(labels, ManagedLabel, "true")
-            || !HasLabel(labels, RuntimeIdLabel, request.OperationId.ToString("D"))
-            || !HasLabel(
-                labels,
-                GenerationLabel,
-                request.Generation.ToString(CultureInfo.InvariantCulture)))
+            || !HasLabel(labels, RuntimeIdLabel, request.OperationId.ToString("D")))
             throw new InvalidOperationException(
                 $"{kind} '{name}' has a different ownership identity.");
     }
@@ -600,9 +593,8 @@ public sealed class KubernetesComposeRuntime(
                 "Compose receipt does not belong to this Kubernetes Runner Pool.");
     }
 
-    private static string OwnershipSelector(Guid operationId, int generation) =>
-        $"{ManagedLabel}=true,{RuntimeIdLabel}={operationId:D},"
-        + $"{GenerationLabel}={generation.ToString(CultureInfo.InvariantCulture)}";
+    private static string OwnershipSelector(Guid operationId) =>
+        $"{ManagedLabel}=true,{RuntimeIdLabel}={operationId:D}";
 
     private static bool HasLabel(
         IDictionary<string, string>? labels,

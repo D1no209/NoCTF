@@ -514,8 +514,7 @@ public sealed class AdminCompetitionStore(
                     || item.State == RuntimeState.Stopping
                     || item.State == RuntimeState.Failed
                     && (item.ProviderReceiptJson != null
-                        || item.RunnerId != null
-                        || item.RunnerAssignmentReleaseToken != null)), ct));
+                        || item.RunnerId != null)), ct));
         return new(
             competitionId,
             title,

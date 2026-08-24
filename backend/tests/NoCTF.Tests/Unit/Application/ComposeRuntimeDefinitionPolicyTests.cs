@@ -107,7 +107,6 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         var request = new ComposeRequest(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             RuntimeProvider.Docker,
-            3,
             "noctf-runtime",
             """
             services:
@@ -132,8 +131,7 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
             },
             new Dictionary<string, string>
             {
-                ["noctf.io/managed"] = "true",
-                ["noctf.io/generation"] = "3"
+                ["noctf.io/managed"] = "true"
             },
             new Dictionary<string, RuntimeResourceLimits>
             {
@@ -203,7 +201,6 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         var request = new ComposeRequest(
             Guid.NewGuid(),
             RuntimeProvider.Docker,
-            1,
             "noctf-runtime",
             "services:\n  web:\n    image: registry.example/web:v1",
             new Dictionary<string, string>(),
@@ -229,7 +226,6 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         var request = new ComposeRequest(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             RuntimeProvider.Kubernetes,
-            3,
             "noctf-runtime",
             """
             services:
@@ -280,7 +276,6 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         var request = new ComposeRequest(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             RuntimeProvider.Docker,
-            1,
             "noctf-runtime",
             """
             services:
@@ -459,7 +454,6 @@ public sealed class ComposeRuntimeDefinitionPolicyTests
         new(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
             RuntimeProvider.Kubernetes,
-            3,
             "noctf-runtime",
             composeYaml,
             new Dictionary<string, string>(),

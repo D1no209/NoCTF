@@ -8,8 +8,9 @@ namespace NoCTF.Worker.Runtime;
 
 public static class RuntimeClaimFactory
 {
-    public static IRunnerPoolMessage Create(
+    public static IRuntimeProvisionMessage Create(
         RuntimeInstance instance,
+        string runnerId,
         GameMode mode,
         ChallengeRuntimeTemplate template,
         string challengeConfigurationJson,
@@ -29,10 +30,9 @@ public static class RuntimeClaimFactory
         {
             ContainerRuntimeDefinition definition
                 when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
-                new ClaimContainerRuntime(
+                new ProvisionContainerRuntime(
                     instance.Id,
-                    instance.Generation,
-                    instance.RunnerPool,
+                    runnerId,
                     new ContainerRequest(
                         instance.Id,
                         instance.RuntimeProvider,
@@ -48,7 +48,6 @@ public static class RuntimeClaimFactory
                         NetworkIsolation: ContainerNetworkIsolation.Isolated,
                         InternalPorts: InternalPorts(mode, template, definition),
                         AllowInternalCallback: mode == GameMode.Koh,
-                        Generation: instance.Generation,
                         RuntimeInstanceId: instance.Id,
                         UrlBindings: template.UrlBindings,
                         ControlCheckUrlBinding: mode == GameMode.Koh
@@ -58,14 +57,12 @@ public static class RuntimeClaimFactory
                         EgressPolicy: definition.EgressPolicy)),
             ComposeRuntimeDefinition definition
                 when instance.RuntimeProvider is RuntimeProvider.Docker or RuntimeProvider.Kubernetes =>
-                new ClaimComposeRuntime(
+                new ProvisionComposeRuntime(
                     instance.Id,
-                    instance.Generation,
-                    instance.RunnerPool,
+                    runnerId,
                     new ComposeRequest(
                         instance.Id,
                         instance.RuntimeProvider,
-                        instance.Generation,
                         ResourceName(instance),
                         definition.ComposeYaml,
                         definition.Environment ?? new Dictionary<string, string>(),
@@ -80,13 +77,11 @@ public static class RuntimeClaimFactory
                         ServiceEnvironment(definition, fixedFlag),
                         definition.EgressPolicy)),
             OvaRuntimeDefinition definition when instance.RuntimeProvider == RuntimeProvider.Libvirt =>
-                new ClaimOvaRuntime(
+                new ProvisionOvaRuntime(
                     instance.Id,
-                    instance.Generation,
-                    instance.RunnerPool,
+                    runnerId,
                     new OvaRuntimeRequest(
                         instance.Id,
-                        instance.Generation,
                         ParseOvaSource(definition.OvaSourceUrl),
                         definition.Sha256.ToLowerInvariant(),
                         ResourceName(instance),
@@ -216,7 +211,7 @@ public static class RuntimeClaimFactory
     }
 
     private static string ResourceName(RuntimeInstance instance) =>
-        $"noctf-{instance.Id:N}-{instance.Generation}";
+        $"noctf-{instance.Id:N}";
 
     private static IReadOnlyDictionary<string, string> MergeLabels(
         IReadOnlyDictionary<string, string>? configured,
@@ -231,8 +226,6 @@ public static class RuntimeClaimFactory
         labels["noctf.io/competition-id"] = instance.CompetitionId.ToString("D");
         labels["noctf.io/competition-challenge-id"] =
             instance.CompetitionChallengeId.ToString("D");
-        labels["noctf.io/generation"] = instance.Generation.ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
         if (instance.TeamId is Guid teamId)
             labels["noctf.io/team-id"] = teamId.ToString("D");
         return labels;

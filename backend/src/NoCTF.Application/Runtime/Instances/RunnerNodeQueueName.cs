@@ -15,13 +15,11 @@ public readonly record struct RunnerNodeQueueName
 
     public string Value { get; }
 
-    public static RunnerNodeQueueName FromAssignment(string runnerPool, string runnerId)
+    public static RunnerNodeQueueName FromRunnerId(string runnerId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(runnerPool);
         ArgumentException.ThrowIfNullOrWhiteSpace(runnerId);
 
-        var identity = string.Concat(runnerPool, "\0", runnerId);
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(identity));
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(runnerId));
         var base64Url = Convert.ToBase64String(hash)
             .TrimEnd('=')
             .Replace('+', '-')

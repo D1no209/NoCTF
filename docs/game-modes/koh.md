@@ -8,7 +8,7 @@ Competition 提供 `PollIntervalSeconds > 0` 与 `ControlPointsPerInterval >= 0`
 
 每个已发布 CompetitionChallenge 有一个平台管理的共享 Hill Runtime，所有队攻击同一目标；不建 PerTeam Runtime、不接受 Submission。Running 自动启动，Paused 保持资源但停轮询，Finished 回收。
 
-Hill 可使用 Container/Compose/OVA Runtime。公开 URL 与专用 `ControlCheckUrlBinding` 分开；Runner 展开后把后者作为单个受保护 URL 存到 RuntimeInstance.ControlCheckUrl，不依赖公开 urls 数组下标，永不返回玩家。
+Hill 可使用 Container/Compose/OVA Runtime。公开 URL 与专用 `ControlCheckUrlBinding` 分开；Runner 在执行 Checker 时从 Provider Receipt 与最新题目定义解析受保护 Control URL，不把 URL 或数组下标持久化到 RuntimeInstance，也不向玩家返回。
 
 ## Control Flag
 

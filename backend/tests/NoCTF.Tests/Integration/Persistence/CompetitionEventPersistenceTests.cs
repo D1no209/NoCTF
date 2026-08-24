@@ -460,14 +460,6 @@ public sealed class CompetitionEventPersistenceTests
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
 
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>
             ValueTask.CompletedTask;

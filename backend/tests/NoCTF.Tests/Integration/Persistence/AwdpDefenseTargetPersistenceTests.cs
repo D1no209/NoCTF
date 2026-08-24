@@ -72,7 +72,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 runtime.ProviderReceiptJson = "{}";
                 runtime.RunningAt = fixture.Now;
                 runtime.ExpiresAt = fixture.Now.AddMinutes(15);
-                runtime.AwdpFixStage = AwdpFixStage.AwaitingPatch;
                 await provisioned.SaveChangesAsync(cancellationToken);
             }
 
@@ -124,7 +123,7 @@ public sealed class AwdpDefenseTargetPersistenceTests
             var target = await verification.RuntimeInstances.AsNoTracking()
                 .SingleAsync(item => item.Id == runtimeId, cancellationToken);
             await Assert.That(target.GameplayFactId).IsNotNull();
-            await Assert.That(target.AwdpFixStage).IsEqualTo(AwdpFixStage.PatchApplying);
+            await Assert.That(target.State).IsEqualTo(RuntimeState.Running);
         });
     }
 
@@ -151,7 +150,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
                 runtime.ProviderReceiptJson = "{}";
                 runtime.RunningAt = fixture.Now;
                 runtime.ExpiresAt = fixture.Now.AddMinutes(15);
-                runtime.AwdpFixStage = AwdpFixStage.AwaitingPatch;
                 await provisioned.SaveChangesAsync(cancellationToken);
             }
 
@@ -461,10 +459,8 @@ public sealed class AwdpDefenseTargetPersistenceTests
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
             Purpose = RuntimePurpose.Player,
-            Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
-            RunnerPool = "test-pool",
             RunnerId = "attack-runner",
             State = RuntimeState.Running,
             ProviderReceiptJson = "{}",
@@ -499,9 +495,6 @@ public sealed class AwdpDefenseTargetPersistenceTests
         public ConcurrentQueue<object> Messages { get; } = [];
         public ValueTask PublishAsync<T>(T message) => Add(message);
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) => Add(message);
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage => Add(message);
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => Add(message);
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage => Add(message);
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
             where T : IRunnerNodeMessage => Add(message);

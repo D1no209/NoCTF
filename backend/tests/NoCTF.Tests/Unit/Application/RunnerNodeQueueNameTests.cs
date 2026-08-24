@@ -5,33 +5,31 @@ namespace NoCTF.Tests.Unit.Application;
 public sealed class RunnerNodeQueueNameTests
 {
     [Test]
-    public async Task FromAssignment_UsesPoolAndRunnerIdentity()
+    public async Task FromRunnerId_UsesConcreteRunnerIdentity()
     {
-        var queue = RunnerNodeQueueName.FromAssignment("primary", "runner-a");
+        var queue = RunnerNodeQueueName.FromRunnerId("runner-a");
 
-        await Assert.That(queue.Value)
-            .IsEqualTo("noctf-runner-node-2crk1lgfilmyvht6f9hy52");
+        await Assert.That(queue.Value).StartsWith("noctf-runner-node-");
+        await Assert.That(queue).IsEqualTo(RunnerNodeQueueName.FromRunnerId("runner-a"));
     }
 
     [Test]
-    public async Task FromAssignment_DistinguishesPoolAndRunnerBoundaries()
+    public async Task FromRunnerId_DistinguishesRunnerBoundaries()
     {
-        var first = RunnerNodeQueueName.FromAssignment("ab", "c");
-        var second = RunnerNodeQueueName.FromAssignment("a", "bc");
-        var otherRunner = RunnerNodeQueueName.FromAssignment("ab", "runner-b");
+        var first = RunnerNodeQueueName.FromRunnerId("c");
+        var second = RunnerNodeQueueName.FromRunnerId("bc");
+        var otherRunner = RunnerNodeQueueName.FromRunnerId("runner-b");
 
         await Assert.That(first).IsNotEqualTo(second);
         await Assert.That(first).IsNotEqualTo(otherRunner);
     }
 
     [Test]
-    [Arguments(null, "runner-a")]
-    [Arguments("", "runner-a")]
-    [Arguments("primary", null)]
-    [Arguments("primary", "")]
-    public async Task FromAssignment_RejectsMissingOriginalIdentity(string? pool, string? runnerId)
+    [Arguments(null)]
+    [Arguments("")]
+    public async Task FromRunnerId_RejectsMissingRunnerIdentity(string? runnerId)
     {
-        await Assert.That(() => RunnerNodeQueueName.FromAssignment(pool!, runnerId!))
+        await Assert.That(() => RunnerNodeQueueName.FromRunnerId(runnerId!))
             .Throws<ArgumentException>();
     }
 }

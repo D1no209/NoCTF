@@ -30,7 +30,7 @@ public sealed class AdministratorBootstrapperTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var hasher = new PasswordHasher<User>(Options.Create(new PasswordHasherOptions
             {
                 IterationCount = 10_000

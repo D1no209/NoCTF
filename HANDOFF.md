@@ -1,5 +1,32 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 5
+
+- 当前分支：`codex/data-model-wolverine-simplification`；阶段 5 父提交为 `f3767f58`。
+  本节随阶段 5 功能提交交付。未推送、未部署、未操作生产数据库、生产队列、对象存储或生产数据。
+- Runtime 已缩减为资源与生命周期事实：删除 AWDP Fix stage、generation/replacement、runner pool、
+  assignment release/unavailable、参与者 URL index、control/checker URL、Checker 状态/sequence/deadline、
+  PublishedPort 分配时间等冗余列。Reset 现在创建全新 Runtime UUID，旧行作为历史保留并停止。
+- 删除 pool Claim 消息、`IRunnerPoolMessage`、pool queue 命名与 Runner Claim Handler。Worker 从
+  Redis Runner Registry/Capacity 选择具体节点，在业务事务中写入 `RunnerId` 并通过 EF transactional
+  outbox 直投 `runner-node-{runnerId}` Sticky endpoint；Runner 只监听自己的 node queue。
+- 节点消息不再携带 generation/pool。相同 MessageId 由 Wolverine durable inbox 幂等；不同 Envelope
+  采用 last-completer-wins。资源停止和清理只以 RuntimeId、RunnerId、provider 与真实 Provider Receipt
+  为依据；无 Receipt 但残留 RunnerId 的失败实例会先由节点确认资源不存在，再释放容量和分配。
+- AWD Checker 回调改用预创建的 GameplayFactId；Runtime 参与者 URL 按读取时最新题目定义过滤，
+  管理 API/OpenAPI/SDK/前端不再暴露 generation、pool、receipt 和 checker/control 内部字段。
+- 验证：Release build 0 warning/0 error；非 Integration TUnit 896/896；ClientApp 275/275、typecheck、
+  production build；OpenAPI/SDK 双次生成哈希一致；`git diff --check` 通过。真实 PostgreSQL/Redis
+  定向测试覆盖 Reset 新 UUID、多 Runner 节点直投、不同 Envelope 完成顺序、URL 最新定义过滤、
+  Receipt 清理及无 Receipt 失联容量释放。
+- 完整 Integration 共 177 项：171 通过、4 失败、2 跳过。2 项只因未配置真实 Kubernetes/Libvirt；
+  4 项均断言阶段 8/9 将删除的旧 AWDP 全表轮询、`LeaderboardDirty` 扫描/即时重投影和 Wolverine
+  scheduled successor，未将其误报为阶段 5 回归或伪造通过。阶段 6 不得修改这些后续阶段测试。
+- migration/snapshot 仍保留旧基线；阶段性 Integration 使用 `EnsureCreated` 验证当前关系模型，阶段 10
+  必须恢复 migration/model-drift 门禁并只通过 EF CLI 生成单一 InitialBaseline。恢复时先阅读
+  `docs/data-model-wolverine-stage5-runtime-routing.md`，确认工作区和最新提交，再只进入阶段 6
+  GameplayFact 与 AWDP 强类型结果闭环。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 4
 
 - 当前分支：`codex/data-model-wolverine-simplification`；阶段 4 父提交为

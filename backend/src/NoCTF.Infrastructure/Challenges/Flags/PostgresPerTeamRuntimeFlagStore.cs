@@ -87,7 +87,7 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
         return flag;
     }
 
-    public async Task<string> EnsureGenerationAsync(
+    public async Task<string> EnsureRuntimeInstanceAsync(
         Guid competitionId,
         Guid competitionChallengeId,
         Guid teamId,
@@ -103,7 +103,7 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
         var existing = await db.ChallengeFlags.SingleOrDefaultAsync(
             flag => flag.CompetitionChallengeId == competitionChallengeId
                 && flag.TeamId == teamId
-                && flag.SpecificationKind == SpecificationKind.RuntimeGeneration
+                && flag.SpecificationKind == SpecificationKind.RuntimeInstance
                 && flag.SpecificationId == runtimeInstanceId,
             cancellationToken);
         if (existing is not null)
@@ -166,20 +166,20 @@ public sealed class PostgresPerTeamRuntimeFlagStore(
             Flag = flag,
             FlagSha256 = ManageChallengeFlags.Hash(flag),
             MatchKind = ChallengeFlagMatchKind.Exact,
-            SpecificationKind = SpecificationKind.RuntimeGeneration,
+            SpecificationKind = SpecificationKind.RuntimeInstance,
             SpecificationId = runtimeInstanceId,
             CreatedAt = now
         });
         return flag;
     }
 
-    public async Task InvalidateGenerationAsync(
+    public async Task InvalidateRuntimeInstanceAsync(
         Guid runtimeInstanceId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
-            candidate => candidate.SpecificationKind == SpecificationKind.RuntimeGeneration
+            candidate => candidate.SpecificationKind == SpecificationKind.RuntimeInstance
                 && candidate.SpecificationId == runtimeInstanceId,
             cancellationToken);
         if (flag is not null && (flag.ValidUntil is null || flag.ValidUntil > now))

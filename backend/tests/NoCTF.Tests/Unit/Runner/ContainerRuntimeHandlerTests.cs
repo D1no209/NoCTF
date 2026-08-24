@@ -30,8 +30,6 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new ProvisionContainerRuntime(
             runtimeInstanceId,
-            Generation: 3,
-            RunnerPool: "default",
             RunnerId: "runner-a",
             Definition: new ContainerRequest(
                 runtimeInstanceId,
@@ -52,7 +50,7 @@ public sealed class ContainerRuntimeHandlerTests
             .IsEqualTo(RuntimeFailureCode.InvalidConfiguration);
         await Assert.That(lifecycle.EnsureRunningCalls).IsEqualTo(1);
         await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId)]);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
     }
 
@@ -74,30 +72,22 @@ public sealed class ContainerRuntimeHandlerTests
             "runner.example",
             "container-1",
             "network-1",
-            runtimeInstanceId,
-            3);
+            runtimeInstanceId);
         var handler = CreateHandler(
             lifecycle,
             sandbox,
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                System.Text.Json.JsonSerializer.Serialize(receipt),
-                Generation: 3)),
+                System.Text.Json.JsonSerializer.Serialize(receipt))),
             reconciler);
-        var message = new StopContainerRuntime(
-            runtimeInstanceId,
-            3,
-            "default",
-            "runner-a");
+        var message = new StopContainerRuntime(runtimeInstanceId, "runner-a");
 
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
         await Assert.That(result).IsNotTypeOf<RuntimeStopped>();
         var failure = (RuntimeStopFailed)result;
-        await Assert.That(failure.Generation).IsEqualTo(message.Generation);
-        await Assert.That(failure.RunnerPool).IsEqualTo(message.RunnerPool);
         await Assert.That(failure.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(lifecycle.Destroyed).IsEquivalentTo([receipt]);
         await Assert.That(sandbox.DeletedNetworks).IsEquivalentTo(["network-1"]);
@@ -132,8 +122,6 @@ public sealed class ContainerRuntimeHandlerTests
             providerHealth: health);
         var message = new ProvisionContainerRuntime(
             runtimeInstanceId,
-            Generation: 3,
-            RunnerPool: "default",
             RunnerId: "runner-a",
             Definition: new ContainerRequest(
                 runtimeInstanceId,
@@ -156,7 +144,7 @@ public sealed class ContainerRuntimeHandlerTests
     }
 
     [Test]
-    public async Task Stop_rejects_a_receipt_for_another_generation_without_deleting_resources()
+    public async Task Stop_rejects_a_receipt_for_another_runtime_without_deleting_resources()
     {
         var runtimeInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var receipt = new ContainerReceipt(
@@ -168,8 +156,7 @@ public sealed class ContainerRuntimeHandlerTests
             null,
             "container-1",
             "network-1",
-            runtimeInstanceId,
-            Generation: 2);
+            Guid.Parse("22222222-2222-2222-2222-222222222222"));
         var lifecycle = new RecordingContainerLifecycle();
         var sandbox = new RecordingSandboxLifecycle();
         var capacity = new RecordingCapacity(RunnerCapacityReleaseOutcome.Released);
@@ -179,11 +166,10 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                System.Text.Json.JsonSerializer.Serialize(receipt),
-                Generation: 3)));
+                System.Text.Json.JsonSerializer.Serialize(receipt))));
 
         var result = await handler.Handle(
-            new StopContainerRuntime(runtimeInstanceId, 3, "default", "runner-a"),
+            new StopContainerRuntime(runtimeInstanceId, "runner-a"),
             CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopFailed>();
@@ -204,24 +190,17 @@ public sealed class ContainerRuntimeHandlerTests
             capacity,
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
-                ProviderReceiptJson: null,
-                Generation: 3)),
+                ProviderReceiptJson: null)),
             reconciler);
-        var message = new StopContainerRuntime(
-            runtimeInstanceId,
-            3,
-            "default",
-            "runner-a");
+        var message = new StopContainerRuntime(runtimeInstanceId, "runner-a");
 
         var result = await handler.Handle(message, CancellationToken.None);
 
         await Assert.That(result).IsTypeOf<RuntimeStopped>();
         var acknowledgement = (RuntimeStopped)result;
-        await Assert.That(acknowledgement.Generation).IsEqualTo(message.Generation);
-        await Assert.That(acknowledgement.RunnerPool).IsEqualTo(message.RunnerPool);
         await Assert.That(acknowledgement.RunnerId).IsEqualTo(message.RunnerId);
         await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId)]);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
     }
 
@@ -240,8 +219,7 @@ public sealed class ContainerRuntimeHandlerTests
             null,
             "container-1",
             "network-1",
-            runtimeInstanceId,
-            Generation: 3);
+            runtimeInstanceId);
         var handler = CreateHandler(
             new RecordingContainerLifecycle(),
             new RecordingSandboxLifecycle(),
@@ -249,14 +227,11 @@ public sealed class ContainerRuntimeHandlerTests
             new FixedWorkReader(new(
                 RuntimeProvider.Docker,
                 System.Text.Json.JsonSerializer.Serialize(receipt),
-                Generation: 3,
                 RuntimeKind.Container)),
             reconciler);
         var message = new ForceTerminateRuntime(
             runtimeInstanceId,
-            3,
             RuntimeProvider.Docker,
-            "default",
             "runner-a",
             Guid.NewGuid(),
             "The runtime exceeded the cleanup timeout.",
@@ -285,9 +260,7 @@ public sealed class ContainerRuntimeHandlerTests
             reconciler);
         var message = new ForceTerminateRuntime(
             runtimeInstanceId,
-            3,
             RuntimeProvider.Docker,
-            "default",
             "runner-a",
             Guid.NewGuid(),
             "Retry an idempotent force-termination request.",
@@ -297,7 +270,7 @@ public sealed class ContainerRuntimeHandlerTests
 
         await Assert.That(result).IsTypeOf<RuntimeForceTerminated>();
         await Assert.That(reconciler.Destroyed)
-            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId, 3)]);
+            .IsEquivalentTo([new RuntimeResourceIdentity(runtimeInstanceId)]);
         await Assert.That(capacity.ReleasedRuntimeIds).IsEquivalentTo([runtimeInstanceId]);
     }
 

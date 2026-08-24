@@ -54,8 +54,7 @@ public enum RuntimeFailureCodeProtocol
     ProvisionTimeout,
     ProviderRejected,
     CleanupFailed,
-    UrlExpansionFailed,
-    PublishedPortRangeExhausted
+    UrlExpansionFailed
 }
 
 [Mapper]
@@ -91,7 +90,6 @@ public sealed record RuntimeResponse(
     Guid CompetitionId,
     Guid CompetitionChallengeId,
     Guid? TeamId,
-    int Generation,
     RuntimeKindProtocol RuntimeKind,
     RuntimeProviderProtocol Provider,
     RuntimeStateProtocol State,
@@ -114,7 +112,6 @@ internal static class RuntimeEndpointMapping
             view.CompetitionId,
             view.CompetitionChallengeId,
             view.TeamId,
-            view.Generation,
             RuntimeProtocolMapper.ToProtocol(view.RuntimeKind),
             RuntimeProtocolMapper.ToProtocol(view.Provider),
             RuntimeProtocolMapper.ToProtocol(view.State),

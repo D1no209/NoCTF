@@ -132,8 +132,6 @@ public sealed class PostgresAwdRoundCoordinator(
             {
                 TeamId = instance.TeamId!.Value,
                 instance.Id,
-                instance.Generation,
-                instance.RunnerPool,
                 RunnerId = instance.RunnerId!
             })
             .ToListAsync(cancellationToken);
@@ -185,9 +183,7 @@ public sealed class PostgresAwdRoundCoordinator(
                     runtime.Id,
                     message.CompetitionChallengeId,
                     flagId,
-                    runtime.Generation,
                     message.ValidUntil,
-                    runtime.RunnerPool,
                     runtime.RunnerId));
             }
             await db.SaveChangesAsync(cancellationToken);

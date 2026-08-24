@@ -1,8 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Koh;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
@@ -17,6 +20,7 @@ public sealed class KohPollingHandler(
     NoCtfDbContext db,
     IKohControlClient client,
     IKohProducerConfigurationCatalog configurations,
+    IChallengeRuntimeTemplateCatalog runtimeTemplates,
     TimeProvider timeProvider)
 {
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
@@ -45,20 +49,39 @@ public sealed class KohPollingHandler(
             target.Competition.ConfigurationJson,
             target.Challenge.RulesJson);
         var timeout = TimeSpan.FromSeconds(Math.Min(settings.PollIntervalSeconds, 30));
-        var controlUrls = await db.RuntimeInstances.AsNoTracking()
+        var runtime = await db.RuntimeInstances.AsNoTracking()
             .Where(runtime => runtime.CompetitionId == message.CompetitionId
                 && runtime.CompetitionChallengeId == message.CompetitionChallengeId
                 && runtime.TeamId == null
                 && runtime.State == RuntimeState.Running
-                && runtime.ControlCheckUrl != null)
-            .OrderByDescending(runtime => runtime.Generation)
-            .Select(runtime => runtime.ControlCheckUrl!)
-            .Take(2)
-            .ToArrayAsync(cancellationToken);
+                && runtime.ProviderReceiptJson != null)
+            .Join(
+                db.CompetitionChallenges.AsNoTracking(),
+                instance => instance.CompetitionChallengeId,
+                challenge => challenge.Id,
+                (instance, challenge) => new { instance, challenge.ChallengeId })
+            .Join(
+                db.Challenges.AsNoTracking(),
+                pair => pair.ChallengeId,
+                challenge => challenge.Id,
+                (pair, challenge) => new
+                {
+                    Runtime = pair.instance,
+                    challenge.DefinitionJson
+                })
+            .OrderByDescending(item => item.Runtime.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        var controlUrl = runtime is null
+            ? null
+            : ResolveControlUrl(
+                runtimeTemplates,
+                runtime.DefinitionJson,
+                runtime.Runtime.RuntimeKind,
+                runtime.Runtime.RuntimeProvider,
+                runtime.Runtime.ProviderReceiptJson!);
 
         KohControlResponse response;
-        if (controlUrls.Length != 1
-            || !Uri.TryCreate(controlUrls[0], UriKind.Absolute, out var controlUrl)
+        if (controlUrl is null
             || controlUrl.Scheme is not ("http" or "https"))
         {
             response = KohControlResponse.Unavailable();
@@ -83,6 +106,35 @@ public sealed class KohPollingHandler(
             message.RunningSince,
             message.DueAt,
             observedAt);
+    }
+
+    private static Uri? ResolveControlUrl(
+        IChallengeRuntimeTemplateCatalog templates,
+        string definitionJson,
+        RuntimeKind runtimeKind,
+        RuntimeProvider provider,
+        string providerReceiptJson)
+    {
+        var binding = templates.Get(GameMode.Koh, definitionJson)?.ControlCheckUrlBinding;
+        if (binding is null || runtimeKind != RuntimeKind.Container)
+            return null;
+        try
+        {
+            var receipt = JsonSerializer.Deserialize<ContainerReceipt>(providerReceiptJson);
+            if (receipt is null
+                || receipt.Provider != provider
+                || string.IsNullOrWhiteSpace(receipt.InternalHost)
+                || binding.ContainerPort is not int port)
+                return null;
+            var expanded = binding.UrlTemplate
+                .Replace("{HOST}", receipt.InternalHost, StringComparison.Ordinal)
+                .Replace("{PORT}", port.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
+            return Uri.TryCreate(expanded, UriKind.Absolute, out var uri) ? uri : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private async Task<KohDecision> DecideAsync(

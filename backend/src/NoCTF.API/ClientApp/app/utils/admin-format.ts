@@ -75,7 +75,7 @@ export const LeaderboardVisibilityLabel = {
 } satisfies Record<NoCtfapiEndpointsCompetitionsLeaderboardVisibilityProtocol, string>
 
 export const SpecificationKindLabel = {
-  Attachment: '附件', AwdRound: 'AWD 轮次', RuntimeDefinition: '运行时定义', RuntimeGeneration: 'Runtime 代际', Hint: '提示',
+  Attachment: '附件', AwdRound: 'AWD 轮次', RuntimeDefinition: '运行时定义', RuntimeInstance: 'Runtime 实例', Hint: '提示',
 } satisfies Record<NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol, string>
 
 export function enumLabel<T extends string>(

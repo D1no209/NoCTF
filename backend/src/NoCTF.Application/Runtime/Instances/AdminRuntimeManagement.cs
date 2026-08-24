@@ -8,7 +8,6 @@ public sealed record AdminRuntimeFilter(
     Guid? TeamId,
     RuntimeKind? RuntimeKind,
     RuntimeProvider? Provider,
-    string? RunnerPool,
     string? RunnerId,
     RuntimeState? State,
     DateTimeOffset? ExpiresBefore,

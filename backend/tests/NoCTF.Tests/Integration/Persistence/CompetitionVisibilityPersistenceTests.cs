@@ -248,11 +248,6 @@ public sealed class CompetitionVisibilityPersistenceTests
             Scheduled.Add((message!, scheduledAt));
             return ValueTask.CompletedTask;
         }
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
-            throw new NotSupportedException();
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => throw new NotSupportedException();
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
             throw new NotSupportedException();
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)

@@ -163,7 +163,6 @@ export type NoCtfapiEndpointsRuntimeRuntimeResponse = {
     competitionId?: string;
     competitionChallengeId?: string;
     teamId?: string | null;
-    generation?: number;
     runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol;
     provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol;
     state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
@@ -181,7 +180,7 @@ export type NoCtfapiEndpointsRuntimeRuntimeProviderProtocol = 'Docker' | 'Kubern
 
 export type NoCtfapiEndpointsRuntimeRuntimeStateProtocol = 'Queued' | 'Provisioning' | 'Running' | 'Stopping' | 'Stopped' | 'Failed';
 
-export type NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol = 'InvalidConfiguration' | 'RunnerUnavailable' | 'ProviderUnavailable' | 'ProvisionTimeout' | 'ProviderRejected' | 'CleanupFailed' | 'UrlExpansionFailed' | 'PublishedPortRangeExhausted';
+export type NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol = 'InvalidConfiguration' | 'RunnerUnavailable' | 'ProviderUnavailable' | 'ProvisionTimeout' | 'ProviderRejected' | 'CleanupFailed' | 'UrlExpansionFailed';
 
 export type NoCtfapiEndpointsRuntimeRuntimeTargetListResponse = {
     items?: Array<NoCtfapiEndpointsRuntimeRuntimeTargetResponse>;
@@ -306,14 +305,11 @@ export type NoCtfapiEndpointsGameplayFactsAwdpDefenseProgressResponse = {
     state?: NoCtfapiEndpointsGameplayFactsGameplayFactStateProtocol | null;
     result?: NoCtfapiEndpointsGameplayFactsGameplayFactResultProtocol | null;
     failureCode?: NoCtfapiEndpointsGameplayFactsGameplayFactFailureCodeProtocol | null;
-    stage?: NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol | null;
     targetCreatedAt?: string | null;
     targetExpiresAt?: string | null;
     targetStoppedAt?: string | null;
     updatedAt?: string | null;
 };
-
-export type NoCtfapiEndpointsGameplayFactsAwdpFixStageProtocol = 'TargetProvisioning' | 'AwaitingPatch' | 'PatchApplying' | 'CheckerRunning' | 'Completed';
 
 export type NoCtfapiEndpointsGameplayFactsGetGameplayFactStatusRequest = {
     [key: string]: never;
@@ -760,7 +756,6 @@ export type NoCtfapiEndpointsCompetitionsEventsCompetitionEventResponse = {
     runtimeState?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
     runtimeCleanupResult?: NoCtfapiEndpointsCompetitionsEventsRuntimeCleanupResultProtocol | null;
     questionStatus?: NoCtfapiEndpointsCompetitionsEventsCompetitionQuestionStatusProtocol | null;
-    runtimeGeneration?: number | null;
     hostPort?: number | null;
     reason?: string | null;
     trackKey?: string | null;
@@ -1117,16 +1112,12 @@ export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResponse = {
     sourceTeamId?: string | null;
     sourceTeamName?: string | null;
     purpose?: NoCtfapiEndpointsRuntimeRuntimePurposeProtocol;
-    generation?: number;
     runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol;
     provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol;
-    runnerPool?: string;
     runnerId?: string | null;
     state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol;
     failureCode?: NoCtfapiEndpointsRuntimeRuntimeFailureCodeProtocol | null;
     urls?: Array<string>;
-    providerReceiptJson?: string | null;
-    controlCheckUrl?: string | null;
     publishedPorts?: Array<NoCtfApplicationRuntimeInstancesRuntimePublishedPortView>;
     createdAt?: string;
     runningAt?: string | null;
@@ -1142,7 +1133,6 @@ export type NoCtfApplicationRuntimeInstancesRuntimePublishedPortView = {
     serviceName?: string | null;
     containerPort?: number;
     hostPort?: number;
-    allocatedAt?: string;
 };
 
 export type NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeListResponse = {
@@ -1838,7 +1828,7 @@ export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagResponse = 
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagMatchKindProtocol = 'Exact' | 'RegularExpression';
 
-export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeGeneration';
+export type NoCtfapiEndpointsAdministrationChallengeBankSpecificationKindProtocol = 'Attachment' | 'AwdRound' | 'RuntimeDefinition' | 'Hint' | 'RuntimeInstance';
 
 export type NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureResponse = {
     code?: NoCtfapiEndpointsAdministrationChallengeBankChallengeFlagFailureCodeProtocol;
@@ -5046,7 +5036,6 @@ export type AdminListRuntimesData = {
         teamId?: string | null;
         runtimeKind?: NoCtfapiEndpointsRuntimeRuntimeKindProtocol | null;
         provider?: NoCtfapiEndpointsRuntimeRuntimeProviderProtocol | null;
-        runnerPool?: string | null;
         runnerId?: string | null;
         state?: NoCtfapiEndpointsRuntimeRuntimeStateProtocol | null;
         expiresBefore?: string | null;

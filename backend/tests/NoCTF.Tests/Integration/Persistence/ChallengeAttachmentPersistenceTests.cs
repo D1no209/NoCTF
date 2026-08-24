@@ -116,7 +116,7 @@ public sealed class ChallengeAttachmentPersistenceTests
             var exactFlags = new[] { "flag{batch-one}.zip", "flag{batch-two}.zip" };
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             db.Users.Add(new User
             {
                 Id = administratorId,
@@ -210,7 +210,7 @@ public sealed class ChallengeAttachmentPersistenceTests
 
             await using (var seed = new NoCtfDbContext(options))
             {
-                await seed.Database.MigrateAsync(cancellationToken);
+                await seed.Database.EnsureCreatedAsync(cancellationToken);
                 seed.Users.AddRange(users.Select((id, index) => new User
                 {
                     Id = id,

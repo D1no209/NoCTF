@@ -14,31 +14,16 @@ public sealed class WolverineTransactionalMessageOutbox(
     public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
         outbox.ScheduleAsync(message, scheduledAt);
 
-    public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage
-    {
-        var queue = RunnerQueueName.FromPool(message.RunnerPool);
-        return outbox.EndpointFor(ToPostgresqlQueueUri(queue.Value)).SendAsync(message);
-    }
-
-    public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-        where T : IRunnerPoolMessage
-    {
-        var queue = RunnerQueueName.FromPool(message.RunnerPool);
-        return outbox.EndpointFor(ToPostgresqlQueueUri(queue.Value)).SendAsync(
-            message,
-            new DeliveryOptions { ScheduledTime = scheduledAt });
-    }
-
     public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage
     {
-        var queue = RunnerNodeQueueName.FromAssignment(message.RunnerPool, message.RunnerId);
+        var queue = RunnerNodeQueueName.FromRunnerId(message.RunnerId);
         return outbox.EndpointFor(ToPostgresqlQueueUri(queue.Value)).SendAsync(message);
     }
 
     public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
         where T : IRunnerNodeMessage
     {
-        var queue = RunnerNodeQueueName.FromAssignment(message.RunnerPool, message.RunnerId);
+        var queue = RunnerNodeQueueName.FromRunnerId(message.RunnerId);
         return outbox.EndpointFor(ToPostgresqlQueueUri(queue.Value)).SendAsync(
             message,
             new DeliveryOptions { ScheduledTime = scheduledAt });
@@ -61,10 +46,6 @@ public sealed class OpenApiTransactionalMessageOutbox : ITransactionalMessageOut
     public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
     public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
         ValueTask.CompletedTask;
-    public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
-        ValueTask.CompletedTask;
-    public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-        where T : IRunnerPoolMessage => ValueTask.CompletedTask;
     public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
         ValueTask.CompletedTask;
     public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
@@ -88,12 +69,6 @@ public sealed class DevelopmentTransactionalMessageOutbox(IMessageBus bus)
         pending.Add(() => bus.ScheduleAsync(message, scheduledAt));
         return ValueTask.CompletedTask;
     }
-
-    public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
-        PublishAsync(message);
-
-    public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-        where T : IRunnerPoolMessage => ScheduleAsync(message, scheduledAt);
 
     public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
         PublishAsync(message);

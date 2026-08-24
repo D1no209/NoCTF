@@ -39,7 +39,7 @@ public sealed class TeamMutationConcurrencyPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using (var migrationDb = new NoCtfDbContext(options))
-                await migrationDb.Database.MigrateAsync(cancellationToken);
+                await migrationDb.Database.EnsureCreatedAsync(cancellationToken);
 
             await RefreshWhileCreatingAsync(options, cancellationToken);
             await SameUserCreatesTwiceAsync(options, cancellationToken);
@@ -402,10 +402,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)

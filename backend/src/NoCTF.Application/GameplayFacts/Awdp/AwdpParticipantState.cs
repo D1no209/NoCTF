@@ -18,7 +18,6 @@ public sealed record AwdpDefenseProgressView(
     NoCTF.Domain.Gameplay.GameplayFactState? State,
     NoCTF.Domain.Gameplay.GameplayFactResult? Result,
     NoCTF.Domain.Gameplay.GameplayFactFailureCode? FailureCode,
-    AwdpFixStage? Stage,
     DateTimeOffset? TargetCreatedAt,
     DateTimeOffset? TargetExpiresAt,
     DateTimeOffset? TargetStoppedAt,

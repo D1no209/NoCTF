@@ -65,7 +65,7 @@ API 的业务写入与 Wolverine Outbox 在同一个 EF Core/PostgreSQL 事务�
 
 ## Runner Pool
 
-平台部署配置 RunnerId、一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。同 Pool 多节点竞争同一 durable queue。节点通过 Redis TTL heartbeat 发布容量。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RunnerPool、RuntimeProvider、ProviderReceiptJson 与展开 URL。
+平台部署配置一个活动 RuntimeProvider（Docker 或 Kubernetes）与 RunnerPool；Challenge/Competition 不引用 Provider 或 RunnerPool。节点通过 Redis TTL heartbeat 发布容量，Worker 从 Registry 原子选择具体 RunnerId，并将 durable 命令直接投递到该节点的 `runner-node-{runnerId}` PostgreSQL queue。RuntimeInstance 只持久化本次调度实际使用的 RunnerId、RuntimeProvider、ProviderReceiptJson 与展开 URL，不保存 pool 路由状态。
 
 每次心跳同时维护 `runner-pool:{pool}:candidates` 有序集合。候选分数采用内存、CPU 与 PID
 三者中最高的已用比例，并加入不超过 `1e-6` 的随机扰动避免同分节点长期固定成为首选。

@@ -579,7 +579,7 @@ public sealed class KubernetesContainerLifecycleTests
         var name = $"noctf-{request.OperationId:N}";
         var foreignService = ExistingService(request, name, "dns", "ClusterIP");
         foreignService.Spec.ClusterIP = "10.96.0.42";
-        foreignService.Metadata.Labels["noctf.io/generation"] = "2";
+        foreignService.Metadata.Labels["noctf.io/runtime-instance-id"] = Guid.NewGuid().ToString("D");
         core.ReadNamespacedServiceWithHttpMessagesAsync(
                 Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool?>(),
                 Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>?>(),
@@ -819,7 +819,7 @@ public sealed class KubernetesContainerLifecycleTests
         internalService.Spec.ClusterIP = "10.96.0.42";
         var publicService = ExistingService(request, name, "public", "NodePort");
         publicService.Metadata.Name = $"{name}-public";
-        publicService.Metadata.Labels["noctf.io/generation"] = "2";
+        publicService.Metadata.Labels["noctf.io/runtime-instance-id"] = Guid.NewGuid().ToString("D");
         publicService.Spec.Ports = publicService.Spec.Ports
             .Where(port => port.Port == 8080)
             .ToList();
@@ -935,7 +935,6 @@ public sealed class KubernetesContainerLifecycleTests
                                 ["noctf.io/managed"] = "true",
                                 ["noctf.io/runtime-instance-id"] =
                                     "019be6f7-882e-7cae-9389-898a98fbfe22",
-                                ["noctf.io/generation"] = "3",
                                 ["noctf.io/network-purpose"] = "awdp-verification"
                             }
                         }
@@ -955,7 +954,7 @@ public sealed class KubernetesContainerLifecycleTests
         Func<Task> action = () => lifecycle.CreateIsolatedNetworkAsync(
             new ContainerNetworkPolicyRequest(
                 new RuntimeResourceIdentity(
-                    Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3),
+                    Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22")),
                 ContainerNetworkPurpose.AwdpVerification,
                 RuntimeEgressPolicy.Isolated,
                 [],
@@ -996,14 +995,14 @@ public sealed class KubernetesContainerLifecycleTests
         var name = await lifecycle.CreateIsolatedNetworkAsync(
             new ContainerNetworkPolicyRequest(
                 new RuntimeResourceIdentity(
-                    Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22"), 3),
+                    Guid.Parse("019be6f7-882e-7cae-9389-898a98fbfe22")),
                 ContainerNetworkPurpose.PersistentRuntime,
                 RuntimeEgressPolicy.InternetOnly,
                 [8080]),
             CancellationToken.None);
 
         await Assert.That(name)
-            .IsEqualTo("noctf-rt-019be6f7882e7cae9389898a98fbfe22-3");
+            .IsEqualTo("noctf-rt-019be6f7882e7cae9389898a98fbfe22");
         await Assert.That(createdPolicy).IsNotNull();
         await Assert.That(createdPolicy!.Metadata.Labels.ContainsKey("noctf.io/expires-at"))
             .IsFalse();
@@ -1059,16 +1058,14 @@ public sealed class KubernetesContainerLifecycleTests
             {
                 ["noctf.io/managed"] = "true",
                 ["noctf.io/job-kind"] = "persistent-runtime",
-                ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D"),
-                ["noctf.io/generation"] = "3"
+                ["noctf.io/runtime-instance-id"] = runtimeId.ToString("D")
             },
             new Dictionary<int, int> { [8080] = hostPort },
             new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 64),
             new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
             TimeSpan.FromHours(1),
-            NetworkName: "noctf-rt-019be6f7882e7cae9389898a98fbfe22-3",
+            NetworkName: "noctf-rt-019be6f7882e7cae9389898a98fbfe22",
             InternalPorts: [9090],
-            Generation: 3,
             RuntimeInstanceId: runtimeId);
     }
 
@@ -1087,9 +1084,7 @@ public sealed class KubernetesContainerLifecycleTests
             ["noctf.io/managed"] = "true",
             ["noctf.io/job-kind"] = "persistent-runtime",
             ["noctf.io/runtime-instance-id"] =
-                (request.RuntimeInstanceId ?? request.OperationId).ToString("D"),
-            ["noctf.io/generation"] = request.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture)
+                (request.RuntimeInstanceId ?? request.OperationId).ToString("D")
         };
         return new V1Service
         {
@@ -1130,8 +1125,6 @@ public sealed class KubernetesContainerLifecycleTests
         };
         labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
             ?? request.OperationId).ToString("D");
-        labels["noctf.io/generation"] = request.Generation.ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
         return new V1Pod
         {
             Metadata = new V1ObjectMeta
@@ -1156,8 +1149,6 @@ public sealed class KubernetesContainerLifecycleTests
         labels["noctf.io/managed"] = "true";
         labels["noctf.io/job-kind"] = "awdp-verification";
         labels["noctf.io/runtime-instance-id"] = runtimeId.ToString("D");
-        labels["noctf.io/generation"] = request.Generation.ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
         return new V1NetworkPolicy
         {
             Metadata = new V1ObjectMeta
@@ -1276,7 +1267,6 @@ public sealed class KubernetesContainerLifecycleTests
         TimeSpan.FromMinutes(1),
         NetworkName: "sandbox-a",
         AllowInternalCallback: true,
-        Generation: 3,
         NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
 
     private static HttpOperationException NotFound() => new("not found")

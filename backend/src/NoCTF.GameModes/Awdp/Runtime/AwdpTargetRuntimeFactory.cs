@@ -13,14 +13,11 @@ public static class AwdpTargetRuntimeFactory
         Guid runtimeInstanceId,
         ChallengeRuntimeTemplate template,
         RuntimePlacement placement,
-        int generation,
         DateTimeOffset now)
     {
         if (template.Definition is not ContainerRuntimeDefinition)
             throw new InvalidOperationException(
                 "AWDP disposable targets require a Docker or Kubernetes Container runtime.");
-        if (generation < 1)
-            throw new ArgumentOutOfRangeException(nameof(generation));
         return new RuntimeInstance
         {
             Id = runtimeInstanceId,
@@ -29,11 +26,8 @@ public static class AwdpTargetRuntimeFactory
             TeamId = teamId,
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = gameplayFactId,
-            AwdpFixStage = AwdpFixStage.TargetProvisioning,
-            Generation = generation,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = placement.Provider,
-            RunnerPool = placement.RunnerPool,
             State = RuntimeState.Queued,
             CreatedAt = now
         };

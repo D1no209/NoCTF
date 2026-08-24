@@ -25,22 +25,19 @@ public sealed class InternalResultStore(
         CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var fact = await db.GameplayFacts.SingleOrDefaultAsync(
+            item => item.Id == result.GameplayFactId,
+            ct);
+        if (fact is null)
+            return InternalResultDisposition.NotFound;
         var runtime = await db.RuntimeInstances.SingleOrDefaultAsync(
             item => item.Id == result.RuntimeInstanceId,
             ct);
         if (runtime is null)
             return InternalResultDisposition.NotFound;
-        if (runtime.Generation != result.Generation)
-            return InternalResultDisposition.Superseded;
-        if (runtime.CheckerSequence < result.CheckerSequence)
-            return InternalResultDisposition.Conflict;
-        if (runtime.CheckerSequence > result.CheckerSequence)
-            return InternalResultDisposition.Superseded;
-        if (runtime.LastAppliedCheckerSequence >= result.CheckerSequence)
+        if (fact.State is GameplayFactState.Completed or GameplayFactState.PlatformFailed)
             return InternalResultDisposition.Duplicate;
-        var appliedAt = NextAppliedAt(
-            result.OccurredAt,
-            runtime.CheckerStatusUpdatedAt);
+        var appliedAt = ToPostgresPrecision(result.OccurredAt);
 
         var context = await db.CompetitionChallenges
             .Where(challenge => challenge.Id == runtime.CompetitionChallengeId)
@@ -53,48 +50,39 @@ public sealed class InternalResultStore(
                     Competition = competition
                 })
             .SingleAsync(ct);
-        if (context.Competition.Mode != GameMode.Awd || runtime.TeamId is null)
+        if (context.Competition.Mode != GameMode.Awd
+            || runtime.TeamId is null
+            || fact.Kind != GameplayFactKind.AwdServiceTransition
+            || fact.CompetitionId != runtime.CompetitionId
+            || fact.CompetitionChallengeId != runtime.CompetitionChallengeId
+            || fact.TeamId != runtime.TeamId)
             return InternalResultDisposition.NotFound;
-        var transitionResult = AwdServiceStateTransition.ToGameplayFactResult(
-            runtime.CheckerStatus,
-            result.State);
-        if (transitionResult is GameplayFactResult scoringResult)
+        var scoringResult = result.State switch
         {
-            var fact = new GameplayFact
-            {
-                Id = Guid.CreateVersion7(appliedAt),
-                CompetitionId = runtime.CompetitionId,
-                CompetitionChallengeId = runtime.CompetitionChallengeId,
-                TeamId = runtime.TeamId,
-                Kind = GameplayFactKind.AwdServiceTransition,
-                State = GameplayFactState.Completed,
-                Result = scoringResult,
-                OccurredAt = appliedAt,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-            db.GameplayFacts.Add(fact);
-            await events.RecordAsync(new(
-                runtime.CompetitionId,
-                CompetitionEventKind.ScoringRecorded,
-                scoringResult == GameplayFactResult.Wrong
-                    ? CompetitionEventLevel.Warning
-                    : CompetitionEventLevel.Information,
-                CompetitionEventVisibility.Team,
-                appliedAt,
-                TeamId: runtime.TeamId,
-                CompetitionChallengeId: runtime.CompetitionChallengeId,
-                RuntimeInstanceId: runtime.Id,
-                GameplayFactId: fact.Id,
-                GameplayFactKind: fact.Kind,
-                GameplayFactState: fact.State,
-                GameplayFactResult: fact.Result,
-                RuntimeState: runtime.State,
-                RuntimeGeneration: runtime.Generation), ct);
-        }
-        runtime.CheckerStatus = result.State;
-        runtime.CheckerStatusUpdatedAt = appliedAt;
-        runtime.LastAppliedCheckerSequence = result.CheckerSequence;
-        runtime.CheckerDeadlineAt = null;
+            AwdServiceState.Up => GameplayFactResult.ServiceUp,
+            AwdServiceState.Down => GameplayFactResult.ServiceDown,
+            _ => GameplayFactResult.ServiceDown
+        };
+        fact.State = GameplayFactState.Completed;
+        fact.Result = scoringResult;
+        fact.FailureCode = null;
+        fact.UpdatedAt = appliedAt;
+        await events.RecordAsync(new(
+            runtime.CompetitionId,
+            CompetitionEventKind.ScoringRecorded,
+            scoringResult == GameplayFactResult.ServiceDown
+                ? CompetitionEventLevel.Warning
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Team,
+            appliedAt,
+            TeamId: fact.TeamId,
+            CompetitionChallengeId: fact.CompetitionChallengeId,
+            RuntimeInstanceId: runtime.Id,
+            GameplayFactId: fact.Id,
+            GameplayFactKind: GameplayFactKind.AwdServiceTransition,
+            GameplayFactState: fact.State,
+            GameplayFactResult: fact.Result,
+            RuntimeState: runtime.State), ct);
         await db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
@@ -117,8 +105,6 @@ public sealed class InternalResultStore(
             || runtime.Purpose != RuntimePurpose.AwdpTarget
             || runtime.GameplayFactId != fact.Id)
             return InternalResultDisposition.NotFound;
-        if (runtime.Generation != result.Generation)
-            return InternalResultDisposition.Superseded;
         if (fact.State is GameplayFactState.Completed or GameplayFactState.PlatformFailed)
             return InternalResultDisposition.Duplicate;
         var context = await db.CompetitionChallenges
@@ -160,13 +146,10 @@ public sealed class InternalResultStore(
                 GameplayFactId: fact.Id,
                 GameplayFactKind: fact.Kind,
                 GameplayFactState: fact.State,
-                GameplayFactResult: fact.Result,
-                RuntimeGeneration: runtime.Generation), ct);
+                GameplayFactResult: fact.Result), ct);
         }
         fact.UpdatedAt = DateTimeOffset.UtcNow;
-        runtime.AwdpFixStage = AwdpFixStage.Completed;
         runtime.State = RuntimeState.Stopping;
-        runtime.RunnerAssignmentReleaseToken = null;
         await events.RecordAsync(new(
             fact.CompetitionId,
             CompetitionEventKind.GameplayFactAdjudicated,
@@ -183,8 +166,7 @@ public sealed class InternalResultStore(
             GameplayFactKind: fact.Kind,
             GameplayFactState: fact.State,
             GameplayFactResult: decision.Result,
-            RuntimeState: runtime.State,
-            RuntimeGeneration: runtime.Generation), ct);
+            RuntimeState: runtime.State), ct);
         await events.RecordAsync(new(
             fact.CompetitionId,
             CompetitionEventKind.AwdpFixResolved,
@@ -199,8 +181,7 @@ public sealed class InternalResultStore(
             GameplayFactId: fact.Id,
             GameplayFactKind: fact.Kind,
             GameplayFactState: fact.State,
-            GameplayFactResult: fact.Result,
-            RuntimeGeneration: runtime.Generation), ct);
+            GameplayFactResult: fact.Result), ct);
         await events.RecordAsync(new(
             runtime.CompetitionId,
             CompetitionEventKind.RuntimeStateChanged,
@@ -211,12 +192,9 @@ public sealed class InternalResultStore(
             CompetitionChallengeId: runtime.CompetitionChallengeId,
             RuntimeInstanceId: runtime.Id,
             GameplayFactId: fact.Id,
-            RuntimeState: RuntimeState.Stopping,
-            RuntimeGeneration: runtime.Generation), ct);
+            RuntimeState: RuntimeState.Stopping), ct);
         await outbox.PublishToRunnerNodeAsync(new StopContainerRuntime(
             runtime.Id,
-            runtime.Generation,
-            runtime.RunnerPool,
             runtime.RunnerId
                 ?? throw new InvalidOperationException("AWDP target has no owning Runner.")));
         await QueueNextAwdpFixAttemptAsync(fact, ct);
@@ -243,19 +221,6 @@ public sealed class InternalResultStore(
             .FirstOrDefaultAsync(ct);
         if (nextGameplayFactId is Guid id)
             await outbox.PublishAsync(new EvaluateGameplayFact(id));
-    }
-
-    private static DateTimeOffset NextAppliedAt(
-        DateTimeOffset receivedAt,
-        DateTimeOffset? previousAppliedAt)
-    {
-        var candidate = ToPostgresPrecision(receivedAt);
-        if (previousAppliedAt is not { } previous)
-            return candidate;
-        previous = ToPostgresPrecision(previous);
-        return candidate > previous
-            ? candidate
-            : previous.AddTicks(TimeSpan.TicksPerMicrosecond);
     }
 
     private static DateTimeOffset ToPostgresPrecision(DateTimeOffset value) =>

@@ -20,7 +20,7 @@ public sealed partial class LibvirtApplianceLifecycle(
         CancellationToken cancellationToken)
     {
         ValidateRequest(request);
-        var runtimeDirectory = RuntimeDirectory(request.OperationId, request.Generation);
+        var runtimeDirectory = RuntimeDirectory(request.OperationId);
         var extractionDirectory = Path.Combine(runtimeDirectory, "ova");
         RecreateExtractionDirectory(extractionDirectory);
 
@@ -45,7 +45,6 @@ public sealed partial class LibvirtApplianceLifecycle(
                     "OVA contains more virtual machines than the Runtime identity or subnet can address.");
             network = await networks.EnsureAsync(
                 request.OperationId,
-                request.Generation,
                 request.NetworkName,
                 cancellationToken);
 
@@ -53,7 +52,7 @@ public sealed partial class LibvirtApplianceLifecycle(
             for (var index = 0; index < plans.Count; index++)
             {
                 var plan = plans[index];
-                var domainName = DomainName(request.OperationId, request.Generation, index);
+                var domainName = DomainName(request.OperationId, index);
                 await EnsureDomainAsync(
                     domainName,
                     plan,
@@ -83,7 +82,6 @@ public sealed partial class LibvirtApplianceLifecycle(
             return new(
                 request.OperationId,
                 RuntimeProvider.Libvirt,
-                request.Generation,
                 request.NetworkName,
                 network.Subnet.ToString(),
                 machines,
@@ -96,14 +94,13 @@ public sealed partial class LibvirtApplianceLifecycle(
                 ? []
                 : plans.Select((plan, index) => new OvaVirtualMachineReceipt(
                         plan.VmId,
-                        DomainName(request.OperationId, request.Generation, index),
+                        DomainName(request.OperationId, index),
                         string.Empty))
                     .ToArray();
             try
             {
                 await CleanupPartialImportAsync(
                     request.OperationId,
-                    request.Generation,
                     request.NetworkName,
                     provisionalMachines,
                     cleanup.Token);
@@ -124,19 +121,19 @@ public sealed partial class LibvirtApplianceLifecycle(
     {
         if (receipt.Provider != RuntimeProvider.Libvirt)
             throw new InvalidOperationException("OVA receipt is not owned by Libvirt.");
-        var expectedNetwork = NetworkName(receipt.OperationId, receipt.Generation);
+        var expectedNetwork = NetworkName(receipt.OperationId);
         if (!string.Equals(receipt.NetworkId, expectedNetwork, StringComparison.Ordinal)
             || receipt.VirtualMachines.Select((machine, index) =>
                     string.Equals(
                         machine.ResourceId,
-                        DomainName(receipt.OperationId, receipt.Generation, index),
+                        DomainName(receipt.OperationId, index),
                         StringComparison.Ordinal))
                 .Any(matches => !matches))
             throw new InvalidOperationException(
                 "OVA receipt does not match its stable Runtime resource identity.");
         await DestroyDomainsAsync(receipt.VirtualMachines, cancellationToken);
         await networks.DestroyAsync(receipt.NetworkId, cancellationToken);
-        DeleteDirectoryIfPresent(RuntimeDirectory(receipt.OperationId, receipt.Generation));
+        DeleteDirectoryIfPresent(RuntimeDirectory(receipt.OperationId));
     }
 
     public async Task<IReadOnlyList<OvaManagedRuntimeResource>> ListManagedAsync(
@@ -165,16 +162,14 @@ public sealed partial class LibvirtApplianceLifecycle(
                     identities.Add(identity);
             }
         }
-        return identities.OrderBy(identity => identity.OperationId)
-            .ThenBy(identity => identity.Generation)
-            .ToArray();
+        return identities.OrderBy(identity => identity.OperationId).ToArray();
     }
 
     public async Task DestroyByIdentityAsync(
         OvaManagedRuntimeResource identity,
         CancellationToken cancellationToken)
     {
-        if (identity.OperationId == Guid.Empty || identity.Generation < 0)
+        if (identity.OperationId == Guid.Empty)
             throw new InvalidOperationException("OVA managed resource identity is invalid.");
         var domains = (await ListDomainNamesAsync(cancellationToken))
             .Where(name => TryParseResourceName(name, expectDomain: true, out var parsed)
@@ -184,10 +179,9 @@ public sealed partial class LibvirtApplianceLifecycle(
             .ToArray();
         await DestroyDomainsAsync(domains, cancellationToken);
         await networks.DestroyAsync(
-            NetworkName(identity.OperationId, identity.Generation),
+            NetworkName(identity.OperationId),
             cancellationToken);
-        DeleteDirectoryIfPresent(
-            RuntimeDirectory(identity.OperationId, identity.Generation));
+        DeleteDirectoryIfPresent(RuntimeDirectory(identity.OperationId));
     }
 
     private async Task EnsureDomainAsync(
@@ -308,7 +302,6 @@ public sealed partial class LibvirtApplianceLifecycle(
 
     private async Task CleanupPartialImportAsync(
         Guid operationId,
-        int generation,
         string networkName,
         IReadOnlyList<OvaVirtualMachineReceipt> machines,
         CancellationToken cancellationToken)
@@ -336,7 +329,7 @@ public sealed partial class LibvirtApplianceLifecycle(
             throw new InvalidOperationException(
                 "Partial Libvirt appliance cleanup failed.",
                 cleanupFailure);
-        DeleteDirectoryIfPresent(RuntimeDirectory(operationId, generation));
+        DeleteDirectoryIfPresent(RuntimeDirectory(operationId));
     }
 
     private async Task DestroyDomainsAsync(
@@ -386,14 +379,14 @@ public sealed partial class LibvirtApplianceLifecycle(
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private string RuntimeDirectory(Guid operationId, int generation) =>
-        Path.Combine(options.WorkDirectory, $"{operationId:N}-{generation}");
+    private string RuntimeDirectory(Guid operationId) =>
+        Path.Combine(options.WorkDirectory, $"{operationId:N}");
 
-    private static string DomainName(Guid operationId, int generation, int index) =>
-        $"noctf-{operationId:N}-{generation}-{index:D3}";
+    private static string DomainName(Guid operationId, int index) =>
+        $"noctf-{operationId:N}-{index:D3}";
 
-    private static string NetworkName(Guid operationId, int generation) =>
-        $"noctf-{operationId:N}-{generation}";
+    private static string NetworkName(Guid operationId) =>
+        $"noctf-{operationId:N}";
 
     private static void ValidateRequest(OvaRuntimeRequest request)
     {
@@ -406,7 +399,7 @@ public sealed partial class LibvirtApplianceLifecycle(
             throw new InvalidOperationException("OVA SHA-256 digest is invalid.");
         if (!string.Equals(
                 request.NetworkName,
-                NetworkName(request.OperationId, request.Generation),
+                NetworkName(request.OperationId),
                 StringComparison.Ordinal))
             throw new InvalidOperationException(
                 "OVA network name does not match its stable Runtime resource identity.");
@@ -435,14 +428,9 @@ public sealed partial class LibvirtApplianceLifecycle(
         var match = ManagedResourceNameRegex().Match(name);
         if (!match.Success || match.Groups["index"].Success != expectDomain)
             return false;
-        if (!Guid.TryParseExact(match.Groups["id"].Value, "N", out var operationId)
-            || !int.TryParse(
-                match.Groups["generation"].Value,
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var generation))
+        if (!Guid.TryParseExact(match.Groups["id"].Value, "N", out var operationId))
             return false;
-        identity = new(operationId, generation);
+        identity = new(operationId);
         return true;
     }
 
@@ -455,7 +443,7 @@ public sealed partial class LibvirtApplianceLifecycle(
     private static partial Regex Ipv4AddressRegex();
 
     [GeneratedRegex(
-        @"\Anoctf-(?<id>[0-9a-f]{32})-(?<generation>0|[1-9][0-9]*)(?:-(?<index>[0-9]{3}))?\z",
+        @"\Anoctf-(?<id>[0-9a-f]{32})(?:-(?<index>[0-9]{3}))?\z",
         RegexOptions.CultureInvariant)]
     private static partial Regex ManagedResourceNameRegex();
 }

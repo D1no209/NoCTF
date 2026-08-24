@@ -59,7 +59,7 @@ public sealed class CompetitionHardDeletePersistenceTests
 
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(ct);
+                await setup.Database.EnsureCreatedAsync(ct);
                 setup.Users.Add(User(ownerId, now));
                 setup.Files.AddRange(
                     File(posterFileId, "poster.png", "image/png", now),
@@ -128,10 +128,8 @@ public sealed class CompetitionHardDeletePersistenceTests
                     CompetitionChallengeId = competitionChallengeId,
                     TeamId = teamId,
                     Purpose = RuntimePurpose.Player,
-                    Generation = 1,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
-                    RunnerPool = "test",
                     State = RuntimeState.Stopped,
                     CreatedAt = now,
                     StoppedAt = now
@@ -360,7 +358,7 @@ public sealed class CompetitionHardDeletePersistenceTests
             var eventId = Guid.CreateVersion7(now.AddTicks(2));
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(ct);
+                await setup.Database.EnsureCreatedAsync(ct);
                 setup.Users.Add(User(ownerId, now));
                 setup.Competitions.Add(Competition(
                     competitionId,
@@ -432,7 +430,7 @@ public sealed class CompetitionHardDeletePersistenceTests
             var now = DateTimeOffset.UtcNow;
             var ownerId = Guid.CreateVersion7(now);
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(ct);
+            await db.Database.EnsureCreatedAsync(ct);
             db.Users.Add(User(ownerId, now));
             await db.SaveChangesAsync(ct);
             var outbox = new RecordingOutbox();
@@ -567,12 +565,6 @@ public sealed class CompetitionHardDeletePersistenceTests
             return ValueTask.CompletedTask;
         }
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
             ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>

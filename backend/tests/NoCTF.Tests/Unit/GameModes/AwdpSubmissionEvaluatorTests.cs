@@ -84,7 +84,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 TeamId = submission.TeamId,
                 Flag = flag,
                 FlagSha256 = submission.ValueSha256,
-                SpecificationKind = SpecificationKind.RuntimeGeneration,
+                SpecificationKind = SpecificationKind.RuntimeInstance,
                 SpecificationId = Guid.NewGuid(),
                 ValidStart = receivedAt.AddSeconds(-1),
                 CreatedAt = receivedAt
@@ -132,7 +132,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 TeamId = submission.TeamId,
                 Flag = flag,
                 FlagSha256 = submission.ValueSha256,
-                SpecificationKind = SpecificationKind.RuntimeGeneration,
+                SpecificationKind = SpecificationKind.RuntimeInstance,
                 SpecificationId = Guid.NewGuid(),
                 ValidStart = null,
                 ValidUntil = null,
@@ -183,7 +183,7 @@ public sealed class AwdpGameplayFactEvaluatorTests
                 TeamId = ownerTeamId,
                 Flag = flag,
                 FlagSha256 = submission.ValueSha256,
-                SpecificationKind = SpecificationKind.RuntimeGeneration,
+                SpecificationKind = SpecificationKind.RuntimeInstance,
                 SpecificationId = Guid.NewGuid(),
                 ValidStart = receivedAt.AddSeconds(-1),
                 CreatedAt = receivedAt

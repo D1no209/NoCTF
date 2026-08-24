@@ -138,8 +138,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
                     ? "target"
                     : containerName,
-                RuntimeInstanceId: request.RuntimeInstanceId,
-                Generation: request.Generation);
+                RuntimeInstanceId: request.RuntimeInstanceId);
         }
         catch
         {
@@ -160,8 +159,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     await DeleteCallbackNetworkAsync(
                         request.OperationId,
                         new RuntimeResourceIdentity(
-                            request.RuntimeInstanceId ?? request.OperationId,
-                            request.Generation),
+                            request.RuntimeInstanceId ?? request.OperationId),
                         cleanupSource.Token);
                 }
                 catch
@@ -239,8 +237,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             ReadPublishedPorts(existing, request.PortMappings.Keys),
             options.PublicHost,
             resourceName,
-            RuntimeInstanceId: request.RuntimeInstanceId,
-            Generation: request.Generation);
+            RuntimeInstanceId: request.RuntimeInstanceId);
     }
 
     private async Task<ImageInspectResponse> EnsureImageAvailableAsync(
@@ -302,13 +299,11 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         }
         try
         {
-            if (receipt.Generation > 0)
-                await DeleteCallbackNetworkAsync(
-                    receipt.OperationId,
-                    new RuntimeResourceIdentity(
-                        receipt.RuntimeInstanceId ?? receipt.OperationId,
-                        receipt.Generation),
-                    cancellationToken);
+            await DeleteCallbackNetworkAsync(
+                receipt.OperationId,
+                new RuntimeResourceIdentity(
+                    receipt.RuntimeInstanceId ?? receipt.OperationId),
+                cancellationToken);
         }
         catch (Exception exception)
         {
@@ -422,8 +417,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         CancellationToken cancellationToken)
     {
         var identity = request.Identity;
-        if (identity.RuntimeInstanceId == Guid.Empty
-            || identity.Generation <= 0)
+        if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(request));
         if (!Enum.IsDefined(request.Purpose)
             || !Enum.IsDefined(request.EgressPolicy)
@@ -437,7 +431,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 "Docker container runtimes do not support InternetOnly egress.");
         var name = request.Purpose == ContainerNetworkPurpose.AwdpVerification
             ? $"noctf-awdp-{identity.RuntimeInstanceId:N}"
-            : $"noctf-rt-{identity.RuntimeInstanceId:N}-{identity.Generation}";
+            : $"noctf-rt-{identity.RuntimeInstanceId:N}";
         var purpose = request.Purpose == ContainerNetworkPurpose.AwdpVerification
             ? "awdp-verification"
             : "persistent-runtime";
@@ -588,7 +582,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         var receipt = target.Receipt;
         if (receipt.Provider != RuntimeProvider.Docker
             || receipt.RuntimeInstanceId != target.Identity.RuntimeInstanceId
-            || receipt.Generation != target.Identity.Generation
             || string.IsNullOrWhiteSpace(receipt.NetworkId))
             throw new InvalidOperationException(
                 "The attached Container receipt has a different ownership identity.");
@@ -609,7 +602,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         var receipt = target.Receipt;
         if (receipt.Provider != RuntimeProvider.Docker
             || receipt.OperationId != target.Identity.RuntimeInstanceId
-            || receipt.Generation != target.Identity.Generation
             || string.IsNullOrWhiteSpace(receipt.ProjectName)
             || string.IsNullOrWhiteSpace(target.ServiceName))
             throw new InvalidOperationException(
@@ -668,8 +660,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         string checkerContainerId,
         CancellationToken cancellationToken)
     {
-        if (request.Generation <= 0)
-            throw new InvalidOperationException("A scoring checker requires a positive Runtime generation.");
         Uri? callback = null;
         if (request.NetworkPurpose != ContainerNetworkPurpose.PersistentRuntime
             && (!request.Environment.TryGetValue("NOCTF_CALLBACK_URL", out var callbackText)
@@ -695,9 +685,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                     ["noctf.io/managed"] = "true",
                     ["noctf.io/job-kind"] = JobKind(request.NetworkPurpose),
                     ["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
-                        ?? request.OperationId).ToString("D"),
-                    ["noctf.io/generation"] = request.Generation.ToString(
-                        System.Globalization.CultureInfo.InvariantCulture)
+                        ?? request.OperationId).ToString("D")
                 }
             }, cancellationToken);
             network = await client.Networks.InspectNetworkAsync(networkName, cancellationToken);
@@ -707,8 +695,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             || !network.Labels.TryGetValue("noctf.io/network-purpose", out var purpose)
             || !string.Equals(purpose, CallbackNetworkPurpose(request), StringComparison.Ordinal)
             || !HasResourceIdentity(network.Labels, new RuntimeResourceIdentity(
-                request.RuntimeInstanceId ?? request.OperationId,
-                request.Generation)))
+                request.RuntimeInstanceId ?? request.OperationId)))
             throw new InvalidOperationException("The checker callback network is not an internal managed network.");
 
         foreach (var callbackContainerId in callbackContainers)
@@ -883,8 +870,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         ContainerRequest request)
     {
         var identity = new RuntimeResourceIdentity(
-            request.RuntimeInstanceId ?? request.OperationId,
-            request.Generation);
+            request.RuntimeInstanceId ?? request.OperationId);
         if (!HasResourceIdentity(container.Config?.Labels, identity)
             || !HasJobKind(container.Config?.Labels, JobKind(request.NetworkPurpose))
             || !HasPublishedPortBindings(container.NetworkSettings?.Ports, request.PortMappings))
@@ -996,7 +982,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             {
                 NetworkName = networkId,
                 AllowInternalCallback = true,
-                Generation = target.Identity.Generation,
                 RuntimeInstanceId = target.Identity.RuntimeInstanceId,
                 NetworkPurpose = ContainerNetworkPurpose.AwdChecker
             },
@@ -1013,8 +998,6 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
             labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
                 ?? request.OperationId).ToString("D");
-            labels["noctf.io/generation"] = request.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture);
         }
         return labels;
     }
@@ -1053,11 +1036,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
         && string.Equals(managed, "true", StringComparison.Ordinal)
         && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
         && Guid.TryParse(runtimeText, out var runtimeId)
-        && runtimeId == identity.RuntimeInstanceId
-        && labels.TryGetValue("noctf.io/generation", out var generationText)
-        && int.TryParse(generationText, System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out var generation)
-        && generation == identity.Generation;
+        && runtimeId == identity.RuntimeInstanceId;
 
     private static bool HasJobKind(
         IDictionary<string, string>? labels,
@@ -1088,9 +1067,7 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             ["noctf.io/network-purpose"] = purpose,
             ["noctf.io/managed"] = "true",
             ["noctf.io/runtime-instance-id"] =
-                request.Identity.RuntimeInstanceId.ToString("D"),
-            ["noctf.io/generation"] = request.Identity.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture)
+                request.Identity.RuntimeInstanceId.ToString("D")
         };
         return labels;
     }

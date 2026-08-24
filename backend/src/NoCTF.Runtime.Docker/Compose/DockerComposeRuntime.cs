@@ -39,7 +39,6 @@ public sealed class DockerComposeRuntime(
             directory,
             new DockerComposeRuntimeMetadata(
                 request.OperationId,
-                request.Generation,
                 request.ProjectName),
             cancellationToken);
         await File.WriteAllTextAsync(
@@ -75,7 +74,6 @@ public sealed class DockerComposeRuntime(
             request.ProjectName,
             directory,
             options.PublicHost,
-            request.Generation,
             DateTimeOffset.UtcNow);
     }
 
@@ -242,7 +240,7 @@ public sealed class DockerComposeRuntime(
             cancellationToken.ThrowIfCancellationRequested();
             var metadata = await TryReadRuntimeMetadataAsync(directory, cancellationToken);
             if (metadata is not null)
-                identities.Add(new(metadata.OperationId, metadata.Generation));
+                identities.Add(new(metadata.OperationId));
         }
         return identities.Distinct().ToArray();
     }
@@ -251,7 +249,7 @@ public sealed class DockerComposeRuntime(
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken)
     {
-        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+        if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(identity));
         if (!Directory.Exists(workDirectory))
             return;
@@ -260,8 +258,7 @@ public sealed class DockerComposeRuntime(
             cancellationToken.ThrowIfCancellationRequested();
             var metadata = await TryReadRuntimeMetadataAsync(directory, cancellationToken);
             if (metadata is null
-                || metadata.OperationId != identity.RuntimeInstanceId
-                || metadata.Generation != identity.Generation)
+                || metadata.OperationId != identity.RuntimeInstanceId)
                 continue;
             var composePath = Path.Combine(directory, "compose.yaml");
             if (File.Exists(composePath))
@@ -331,7 +328,7 @@ public sealed class DockerComposeRuntime(
             var metadata = JsonSerializer.Deserialize<DockerComposeRuntimeMetadata>(
                 json,
                 JsonOptions);
-            return metadata is { OperationId: var operationId, Generation: > 0 }
+            return metadata is { OperationId: var operationId }
                 && operationId != Guid.Empty
                 && !string.IsNullOrWhiteSpace(metadata.ProjectName)
                     ? metadata
@@ -353,7 +350,6 @@ public sealed class DockerComposeRuntime(
     private sealed record MappedPublishedPort(int TargetPort, int PublishedPort);
     private sealed record DockerComposeRuntimeMetadata(
         Guid OperationId,
-        int Generation,
         string ProjectName);
 }
 

@@ -47,15 +47,12 @@ const targetCreating = computed(() => {
 })
 const canUpload = computed(() =>
   props.defense?.runtimeState === 'Running'
-  && props.defense.stage === 'AwaitingPatch'
   && !props.defense.gameplayFactId,
 )
 const validating = computed(() =>
   props.defense?.state === 'Pending'
   || props.defense?.state === 'Queued'
   || props.defense?.state === 'Processing'
-  || props.defense?.stage === 'PatchApplying'
-  || props.defense?.stage === 'CheckerRunning',
 )
 const recycling = computed(() => props.defense?.runtimeState === 'Stopping')
 const targetFailed = computed(() => props.defense?.runtimeState === 'Failed')

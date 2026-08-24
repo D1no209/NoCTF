@@ -35,8 +35,7 @@ public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
             new("permission", "awd:check-result:write"),
             new("resource", $"runtime:{request.RuntimeInstanceId:D}"),
             new("runtime_instance_id", request.RuntimeInstanceId.ToString("D")),
-            new("generation", request.Generation.ToString(), ClaimValueTypes.Integer32),
-            new("checker_sequence", request.CheckerSequence.ToString(), ClaimValueTypes.Integer64),
+            new("gameplay_fact_id", request.GameplayFactId.ToString("D")),
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);
 
@@ -47,7 +46,6 @@ public sealed class RunnerScoringTokenIssuer(IConfiguration configuration)
             new("resource", $"gameplay-fact:{request.GameplayFactId:D}:runtime:{request.RuntimeInstanceId:D}"),
             new("gameplay_fact_id", request.GameplayFactId.ToString("D")),
             new("runtime_instance_id", request.RuntimeInstanceId.ToString("D")),
-            new("generation", request.Generation.ToString(), ClaimValueTypes.Integer32),
             new("deadline", request.Deadline.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
         ]);
 

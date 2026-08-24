@@ -46,17 +46,10 @@ public static class MessageRouting
         Route<DeliverCompetitionQuestionNotification>(options, WorkerQueue.Background);
         Route<CompetitionEventCommitted>(options, WorkerQueue.Background);
         Route<ReconcileRunnerAssignments>(options, WorkerQueue.Control);
-        Route<ReleaseRunnerCapacity>(options, WorkerQueue.Control);
         Route<BloodAwarded>(options, WorkerQueue.Background);
         Route<AwdpFixResult>(options, WorkerQueue.Gameplay);
         Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control);
         Route<ExpireAwdpFixVerification>(options, WorkerQueue.Control);
-
-        if (!roles.Has(HostRole.Runner))
-            return;
-        var runnerPool = configuration["Runner:Pool"] ?? "default";
-        var poolQueueName = RunnerQueueName.FromPool(runnerPool);
-        options.PublishMessage<ClaimContainerRuntime>().ToPostgresqlQueue(poolQueueName.Value);
     }
 
     private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue) =>

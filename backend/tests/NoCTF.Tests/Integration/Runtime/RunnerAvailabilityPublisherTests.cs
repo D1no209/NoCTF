@@ -61,6 +61,14 @@ public sealed class RunnerAvailabilityPublisherTests
                     new HashEntry("nanoCpus", 10),
                     new HashEntry("pidsLimit", 1)
                 ]);
+            await database.HashSetAsync(
+                $"runner-claim:{fixture.FailedWithoutReceiptRuntimeInstanceId:N}",
+                [
+                    new HashEntry("runnerId", "runner-a"),
+                    new HashEntry("memoryBytes", 128),
+                    new HashEntry("nanoCpus", 10),
+                    new HashEntry("pidsLimit", 1)
+                ]);
             var registry = new RedisRunnerAvailabilityRegistry(redis);
             var availabilityOptions = Options.Create(new RunnerOptions
             {
@@ -120,15 +128,21 @@ public sealed class RunnerAvailabilityPublisherTests
                     new RedisRunnerCapacityGate(redis),
                     new RecordingReceiptProviderCatalog(receiptResources));
                 await handler.Handle(
-                    new ReconcileRuntimeResources("pool-a", "runner-a", fixture.Now),
+                    new ReconcileRuntimeResources("runner-a", fixture.Now),
                     cancellationToken);
             }
 
-            await Assert.That(reconciler.Destroyed).IsEmpty();
+            await Assert.That(reconciler.Destroyed)
+                .IsEquivalentTo([
+                    new RuntimeResourceIdentity(
+                        fixture.FailedWithoutReceiptRuntimeInstanceId)
+                ]);
             await Assert.That(receiptResources.DestroyedContainerIds)
                 .IsEquivalentTo([$"container-{fixture.RuntimeInstanceId:N}"]);
             await Assert.That(await database.KeyExistsAsync(
                 $"runner-claim:{fixture.RuntimeInstanceId:N}")).IsFalse();
+            await Assert.That(await database.KeyExistsAsync(
+                $"runner-claim:{fixture.FailedWithoutReceiptRuntimeInstanceId:N}")).IsFalse();
             await Assert.That(await database.HashExistsAsync(
                 "runner:runner-a:capacity",
                 "registrationSchema")).IsFalse();
@@ -143,8 +157,18 @@ public sealed class RunnerAvailabilityPublisherTests
                     .IsEqualTo(RuntimeFailureCode.CleanupFailed);
                 await Assert.That(cleaned.ProviderReceiptJson).IsNull();
                 await Assert.That(cleaned.RunnerId).IsNull();
-                await Assert.That(cleaned.RunnerAssignmentReleaseToken).IsNull();
-                await Assert.That(cleaned.RunnerUnavailableAt).IsNull();
+
+                var cleanedWithoutReceipt = await cleanupVerify.RuntimeInstances.AsNoTracking()
+                    .SingleAsync(
+                        instance => instance.Id
+                            == fixture.FailedWithoutReceiptRuntimeInstanceId,
+                        cancellationToken);
+                await Assert.That(cleanedWithoutReceipt.State)
+                    .IsEqualTo(RuntimeState.Failed);
+                await Assert.That(cleanedWithoutReceipt.FailureCode)
+                    .IsEqualTo(RuntimeFailureCode.InvalidConfiguration);
+                await Assert.That(cleanedWithoutReceipt.ProviderReceiptJson).IsNull();
+                await Assert.That(cleanedWithoutReceipt.RunnerId).IsNull();
 
                 var otherProvider = await cleanupVerify.RuntimeInstances.AsNoTracking()
                     .SingleAsync(
@@ -185,7 +209,9 @@ public sealed class RunnerAvailabilityPublisherTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        // Stages 1-9 intentionally evolve the model before stage 10 replaces the
+        // migration history with the new InitialBaseline.
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var observedAt = DateTimeOffset.UtcNow;
         var now = observedAt.AddTicks(
             -(observedAt.Ticks % TimeSpan.TicksPerMicrosecond));
@@ -194,6 +220,7 @@ public sealed class RunnerAvailabilityPublisherTests
         var challengeId = Guid.CreateVersion7();
         var competitionChallengeId = Guid.CreateVersion7();
         var runtimeInstanceId = Guid.CreateVersion7();
+        var failedWithoutReceiptRuntimeInstanceId = Guid.CreateVersion7();
         var otherProviderRuntimeInstanceId = Guid.CreateVersion7();
         db.Users.Add(new User
         {
@@ -243,13 +270,9 @@ public sealed class RunnerAvailabilityPublisherTests
                 Id = runtimeInstanceId,
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
-                Generation = 1,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
-                RunnerPool = "pool-a",
                 RunnerId = "runner-a",
-                RunnerAssignmentReleaseToken = Guid.CreateVersion7(),
-                RunnerUnavailableAt = now,
                 State = RuntimeState.Failed,
                 FailureCode = RuntimeFailureCode.CleanupFailed,
                 ProviderReceiptJson = JsonSerializer.Serialize(new ContainerReceipt(
@@ -261,19 +284,28 @@ public sealed class RunnerAvailabilityPublisherTests
                     null,
                     $"container-{runtimeInstanceId:N}",
                     $"network-{runtimeInstanceId:N}",
-                    runtimeInstanceId,
-                    Generation: 1)),
+                    runtimeInstanceId)),
                 CreatedAt = now
+            },
+            new RuntimeInstance
+            {
+                Id = failedWithoutReceiptRuntimeInstanceId,
+                CompetitionId = competitionId,
+                CompetitionChallengeId = competitionChallengeId,
+                RuntimeKind = RuntimeKind.Container,
+                RuntimeProvider = RuntimeProvider.Docker,
+                RunnerId = "runner-a",
+                State = RuntimeState.Failed,
+                FailureCode = RuntimeFailureCode.InvalidConfiguration,
+                CreatedAt = now.AddMilliseconds(500)
             },
             new RuntimeInstance
             {
                 Id = otherProviderRuntimeInstanceId,
                 CompetitionId = competitionId,
                 CompetitionChallengeId = competitionChallengeId,
-                Generation = 2,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Kubernetes,
-                RunnerPool = "pool-a",
                 RunnerId = "runner-a",
                 State = RuntimeState.Failed,
                 FailureCode = RuntimeFailureCode.CleanupFailed,
@@ -281,12 +313,17 @@ public sealed class RunnerAvailabilityPublisherTests
                 CreatedAt = now.AddSeconds(1)
             });
         await db.SaveChangesAsync(cancellationToken);
-        return new(now, runtimeInstanceId, otherProviderRuntimeInstanceId);
+        return new(
+            now,
+            runtimeInstanceId,
+            failedWithoutReceiptRuntimeInstanceId,
+            otherProviderRuntimeInstanceId);
     }
 
     private sealed record Fixture(
         DateTimeOffset Now,
         Guid RuntimeInstanceId,
+        Guid FailedWithoutReceiptRuntimeInstanceId,
         Guid OtherProviderRuntimeInstanceId);
 
     private sealed class RecordingResourceReconciler : IRuntimeManagedResourceReconciler

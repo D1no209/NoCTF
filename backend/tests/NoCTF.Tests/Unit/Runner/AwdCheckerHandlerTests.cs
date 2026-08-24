@@ -32,13 +32,11 @@ public sealed class AwdCheckerHandlerTests
         var deadline = DateTimeOffset.Parse("2026-07-24T00:01:00Z");
         var work = new AwdCheckerWork(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            7,
+            Guid.Parse("77777777-7777-7777-7777-777777777777"),
             RuntimeProvider.Docker,
             RuntimeKind.Container,
-            3,
             ContainerReceiptJson(
-                Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                3),
+                Guid.Parse("11111111-1111-1111-1111-111111111111")),
             "target.internal",
             "checker:latest",
             ["/checker"],
@@ -74,13 +72,11 @@ public sealed class AwdCheckerHandlerTests
             new StubHttpClientFactory());
         var work = new AwdCheckerWork(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            8,
+            Guid.Parse("88888888-8888-8888-8888-888888888888"),
             RuntimeProvider.Docker,
             RuntimeKind.Container,
-            3,
             ContainerReceiptJson(
-                Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                3),
+                Guid.Parse("11111111-1111-1111-1111-111111111111")),
             "target.internal",
             "checker:latest",
             ["/checker"],
@@ -97,7 +93,7 @@ public sealed class AwdCheckerHandlerTests
     }
 
     [Test]
-    public async Task Checker_supersedes_a_receipt_from_another_generation()
+    public async Task Checker_supersedes_a_receipt_from_another_runtime()
     {
         var runner = new RecordingOneShotRunner();
         var executor = new AwdCheckerExecutor(
@@ -106,11 +102,10 @@ public sealed class AwdCheckerHandlerTests
         var runtimeId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var work = new AwdCheckerWork(
             runtimeId,
-            9,
+            Guid.Parse("99999999-9999-9999-9999-999999999999"),
             RuntimeProvider.Docker,
             RuntimeKind.Container,
-            4,
-            ContainerReceiptJson(runtimeId, 3),
+            ContainerReceiptJson(Guid.Parse("22222222-2222-2222-2222-222222222222")),
             "target.internal",
             "checker:latest",
             ["/checker"],
@@ -126,7 +121,7 @@ public sealed class AwdCheckerHandlerTests
         await Assert.That(runner.Request).IsNull();
     }
 
-    private static string ContainerReceiptJson(Guid runtimeInstanceId, int generation) =>
+    private static string ContainerReceiptJson(Guid runtimeInstanceId) =>
         JsonSerializer.Serialize(new ContainerReceipt(
             runtimeInstanceId,
             RuntimeProvider.Docker,
@@ -136,8 +131,7 @@ public sealed class AwdCheckerHandlerTests
             "localhost",
             "target.internal",
             "target-network",
-            runtimeInstanceId,
-            generation));
+            runtimeInstanceId));
 
     private sealed class StubProviderCatalog(IAttachedOneShotJobRunner runner)
         : IOneShotRuntimeProviderCatalog
