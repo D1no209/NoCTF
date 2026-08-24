@@ -373,15 +373,30 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
-    public async Task Production_deployment_preloads_observability_images_with_bounded_retries()
+    public async Task Production_deployment_preloads_observability_images_without_server_docker_hub_access()
     {
         var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
+        var observabilityCompose = await ReadAsync("deploy", "docker-compose.observability.yml");
+        var ci = await ReadAsync(".github", "workflows", "ci.yml");
 
         await Assert.That(deployScript).Contains("pull_observability_images()");
+        await Assert.That(deployScript).Contains("load_grafana_image");
+        await Assert.That(deployScript).Contains(
+            "grafana_archive_path=${6:?verified Grafana image archive path is required}");
+        await Assert.That(ci).Contains("docker image save grafana/grafana:13.2.0");
+        await Assert.That(ci).Contains("grafana-image.tar.gz");
+        await Assert.That(observabilityCompose).Contains(
+            "image: quay.io/prometheus/prometheus:v3.14.0");
+        await Assert.That(observabilityCompose).Contains(
+            "image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1");
+        await Assert.That(observabilityCompose).Contains(
+            "image: quay.io/oliver006/redis_exporter:v1.89.0");
+        await Assert.That(observabilityCompose).Contains(
+            "image: quay.io/prometheus/node-exporter:v1.12.1");
         await Assert.That(deployScript).Contains(
             "NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5");
         await Assert.That(deployScript).Contains(
-            "ensure_build_space\nif ! pull_observability_images; then\n    exit 1\nfi\nbackup_database");
+            "ensure_build_space\nload_grafana_image\nif ! pull_observability_images; then\n    exit 1\nfi\nbackup_database");
         await Assert.That(deployScript).Contains("--pull never");
     }
 

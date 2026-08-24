@@ -5,7 +5,7 @@ services:
       Observability__GrafanaPublicUrl: ${NOCTF_GRAFANA_PUBLIC_URL:-}
 
   prometheus:
-    image: prom/prometheus:v3.14.0
+    image: quay.io/prometheus/prometheus:v3.14.0
     restart: unless-stopped
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -46,7 +46,7 @@ services:
       - prometheus
 
   postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:v0.20.1
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     restart: unless-stopped
     environment:
       DATA_SOURCE_NAME: >-
@@ -58,7 +58,7 @@ services:
         condition: service_healthy
 
   redis-exporter:
-    image: oliver006/redis_exporter:v1.89.0
+    image: quay.io/oliver006/redis_exporter:v1.89.0
     restart: unless-stopped
     environment:
       REDIS_ADDR: redis://redis:6379
@@ -69,7 +69,7 @@ services:
         condition: service_healthy
 
   node-exporter:
-    image: prom/node-exporter:v1.12.1
+    image: quay.io/prometheus/node-exporter:v1.12.1
     restart: unless-stopped
     command:
       - --path.rootfs=/host

@@ -1,5 +1,11 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 alpha.82 观测镜像跨境部署闭环
+
+- `main@44500612` 的完整 CI 构建与测试通过，但测试服务器对 Docker Hub 的 5 次有界重试全部超时；失败发生在数据库备份、migration、核心服务切换之前，已运行的 API、Worker、Runner 未被破坏。
+- Prometheus、Node Exporter、PostgreSQL Exporter 与 Redis Exporter 改用各项目维护的 Quay 官方镜像源；已在目标服务器逐一验证对应 manifest 可访问。Grafana 官方稳定镜像只发布于 Docker Hub，因此由 GitHub Actions 拉取后打包，通过受校验的 SSH 发布通道传输，服务器先验证压缩包、加载并确认精确镜像标签，再执行部署。目标服务器不再需要直接访问 Docker Hub。
+- 部署仍先准备全部观测镜像，再备份、构建、迁移和切换；Quay 镜像保留 5 次有界重试，最终 `docker compose up` 使用 `--pull never`。平台版本由 `0.1.0-alpha.81` 递增为 `0.1.0-alpha.82`，没有业务模型、migration、OpenAPI 或生成 SDK 变化。
+
 ## 2026-08-24 alpha.81 观测镜像拉取重试与测试环境部署
 
 - 测试服务器按授权删除旧 `deploy` Compose 容器、卷、网络、平台镜像和 Docker 构建缓存；未执行全局 prune。随后 `main@42667858` 以全新 PostgreSQL/Redis 环境执行 InitialBaseline。

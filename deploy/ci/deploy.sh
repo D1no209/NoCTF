@@ -6,6 +6,7 @@ commit_sha=${2:?commit SHA is required}
 config_root=${3:-/root/NoCTF}
 release_root=${4:-/root/noctf-releases}
 kompose_asset_path=${5:?verified Kompose asset path is required}
+grafana_archive_path=${6:?verified Grafana image archive path is required}
 minimum_free_kb=${NOCTF_DEPLOY_MIN_FREE_KB:-6291456}
 kompose_sha256=65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147
 
@@ -22,6 +23,10 @@ kompose_asset_path=$(realpath "$kompose_asset_path")
 [[ $(dirname "$kompose_asset_path") == "$upload_dir" ]]
 [[ $(basename "$kompose_asset_path") == "kompose-linux-amd64" ]]
 echo "$kompose_sha256  $kompose_asset_path" | sha256sum -c -
+grafana_archive_path=$(realpath "$grafana_archive_path")
+[[ $(dirname "$grafana_archive_path") == "$upload_dir" ]]
+[[ $(basename "$grafana_archive_path") == "grafana-image.tar.gz" ]]
+gzip --test "$grafana_archive_path"
 
 config_root=$(realpath "$config_root")
 mkdir -p "$release_root"
@@ -243,7 +248,6 @@ pull_observability_images()
     local retry_delay_seconds=${NOCTF_OBSERVABILITY_PULL_RETRY_DELAY_SECONDS:-10}
     local -a services=(
         prometheus
-        grafana
         postgres-exporter
         redis-exporter
         node-exporter
@@ -267,7 +271,14 @@ pull_observability_images()
     done
 }
 
+load_grafana_image()
+{
+    gzip --decompress --stdout "$grafana_archive_path" | docker image load
+    docker image inspect grafana/grafana:13.2.0 >/dev/null
+}
+
 ensure_build_space
+load_grafana_image
 if ! pull_observability_images; then
     exit 1
 fi
