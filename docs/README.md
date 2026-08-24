@@ -11,6 +11,8 @@
    - [阶段 6：GameplayFact 与 AWDP 强类型结果](data-model-wolverine-stage6-gameplay-facts.md)
    - [阶段 7：Wolverine competing consumers 与显式 fan-out](data-model-wolverine-stage7-messaging-topology.md)
    - [阶段 8：Singular Agent 周期调度](data-model-wolverine-stage8-singular-agent.md)
+   - [阶段 9：事件驱动排行榜投影](data-model-wolverine-stage9-leaderboard.md)
+   - [阶段 10：单一 EF 初始基线](data-model-wolverine-stage10-ef-baseline.md)
 2. [产品与领域模型](product-domain.md)
 3. [系统架构](architecture.md)
 4. [进程、消息与并发](processes-messaging.md)

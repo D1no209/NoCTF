@@ -1,5 +1,28 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 10
+
+- 当前分支：`codex/data-model-wolverine-simplification`；阶段 10 父提交为 `681138cc`。
+  本节随阶段 10 功能提交交付。未推送、未部署，未操作生产数据库、生产 Wolverine 队列、对象存储
+  或生产数据。
+- 旧七个源码 migration 已通过 EF CLI `migrations remove` 逆序移除，没有直接删文件或手改 snapshot；
+  EF CLI 生成新的单一 `20260824060413_InitialBaseline`。Release `migrations list` 只含该项，
+  `has-pending-model-changes` 返回无漂移。
+- 一次性开发 PostgreSQL 已完成旧 migration 链应用、custom-format backup 和独立库 restore；开发证据
+  位于被忽略的 `backend/artifacts/stage10/`，哈希与生产转换/停机/回滚边界见
+  `docs/data-model-wolverine-stage10-ef-baseline.md`。这些文件不是生产备份，也不会提交。
+- 新空库一次应用成功，public schema 恰好 15 张业务表加 EF 历史表；删除的 `data_exports`、Revision、
+  Dirty 和旧 Runtime 调度字段不存在。数据库共有 15 个业务主键、36 个外键、36 个 check constraint、
+  81 个 public index，外键无 Cascade。
+- `DataModelSchemaTests` 现在使用真实 `MigrateAsync`；定向真实 PostgreSQL/Testcontainers 2/2 和
+  migration 架构测试 1/1 通过，
+  并验证 Api/Worker/Runner 生产持久化配置能在同库建立 `wolverine_api`、`wolverine_worker`、
+  `wolverine_runner` durable schema。Release 测试项目构建 0 warning/0 error；阶段 10 的精确开发容器
+  `noctf-stage10-pg-20260824` 已删除。
+- 恢复：从本提交 checkout 后运行阶段文档中的 EF list/model-drift 和两项 schema 集成测试；不要连接
+  旧生产库尝试原位 migration。下一步只能进入阶段 11，统一 OpenAPI/SDK/文档/Alpha 版本并运行完整
+  测试矩阵；全新测试环境、推送、部署和生产切换仍未授权。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 9
 
 - 当前分支：`codex/data-model-wolverine-simplification`；阶段 9 父提交为 `5d2dc1df`。

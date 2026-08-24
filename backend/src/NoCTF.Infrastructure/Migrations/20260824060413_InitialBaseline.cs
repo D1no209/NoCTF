@@ -45,6 +45,7 @@ namespace NoCTF.Infrastructure.Migrations
                     sent_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     related_type = table.Column<short>(type: "smallint", nullable: true),
                     related_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    thread_root_id = table.Column<Guid>(type: "uuid", nullable: true),
                     reply_to_id = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
@@ -54,42 +55,17 @@ namespace NoCTF.Infrastructure.Migrations
                     table.CheckConstraint("ck_notifications_platform_administrators_target", "target_type <> 4 OR target_id = 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid");
                     table.CheckConstraint("ck_notifications_related_reference", "(related_type IS NULL) = (related_id IS NULL)");
                     table.CheckConstraint("ck_notifications_source", "(source_type IN (0, 4) AND source_id IS NULL) OR (source_type IN (1, 2, 3) AND source_id IS NOT NULL)");
+                    table.CheckConstraint("ck_notifications_thread_root", "thread_root_id IS NULL OR thread_root_id <> id");
                     table.ForeignKey(
                         name: "fk_notifications_notifications_reply_to_id",
                         column: x => x.reply_to_id,
                         principalTable: "notifications",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "data_exports",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    scope = table.Column<short>(type: "smallint", nullable: false),
-                    competition_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    requested_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    requested_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    include_protected_flags = table.Column<bool>(type: "boolean", nullable: false),
-                    reason = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    status = table.Column<short>(type: "smallint", nullable: false),
-                    active_slot = table.Column<short>(type: "smallint", nullable: true),
-                    started_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    completed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    purge_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    file_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    failure_code = table.Column<short>(type: "smallint", nullable: true),
-                    failure_detail = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_data_exports", x => x.id);
                     table.ForeignKey(
-                        name: "fk_data_exports_files_file_id",
-                        column: x => x.file_id,
-                        principalTable: "files",
+                        name: "fk_notifications_notifications_thread_root_id",
+                        column: x => x.thread_root_id,
+                        principalTable: "notifications",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -118,7 +94,6 @@ namespace NoCTF.Infrastructure.Migrations
                     email_smtp_from_address = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     email_smtp_from_name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     email_smtp_timeout_seconds = table.Column<int>(type: "integer", nullable: false),
-                    revision = table.Column<long>(type: "bigint", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
@@ -138,11 +113,9 @@ namespace NoCTF.Infrastructure.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    concurrency_version = table.Column<long>(type: "bigint", nullable: false),
                     user_name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     normalized_user_name = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
-                    normalized_email = table.Column<string>(type: "character varying(320)", maxLength: 320, nullable: false),
                     password_hash = table.Column<string>(type: "text", nullable: false),
                     kind = table.Column<short>(type: "smallint", nullable: false),
                     role = table.Column<short>(type: "smallint", nullable: false),
@@ -150,7 +123,6 @@ namespace NoCTF.Infrastructure.Migrations
                     token_version = table.Column<int>(type: "integer", nullable: false),
                     description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     avatar_file_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    is_email_public = table.Column<bool>(type: "boolean", nullable: false),
                     email_verified_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -210,7 +182,6 @@ namespace NoCTF.Infrastructure.Migrations
                     description = table.Column<string>(type: "text", nullable: true),
                     direction = table.Column<string>(type: "character varying(96)", maxLength: 96, nullable: false),
                     definition_json = table.Column<string>(type: "jsonb", nullable: false),
-                    revision = table.Column<int>(type: "integer", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     deleted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
@@ -239,25 +210,18 @@ namespace NoCTF.Infrastructure.Migrations
                     manager_ids = table.Column<Guid[]>(type: "uuid[]", nullable: false),
                     judge_ids = table.Column<Guid[]>(type: "uuid[]", nullable: false),
                     observer_ids = table.Column<Guid[]>(type: "uuid[]", nullable: false),
-                    permission_revision = table.Column<int>(type: "integer", nullable: false),
                     mode = table.Column<short>(type: "smallint", nullable: false),
                     configuration_json = table.Column<string>(type: "jsonb", nullable: false),
-                    configuration_revision = table.Column<int>(type: "integer", nullable: false),
-                    configuration_updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    leaderboard_dirty = table.Column<bool>(type: "boolean", nullable: false),
-                    leaderboard_visibility = table.Column<short>(type: "smallint", nullable: false),
-                    leaderboard_visibility_starts_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    leaderboard_visibility_applied_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    leaderboard_visibility_revision = table.Column<int>(type: "integer", nullable: false),
-                    frozen_leaderboard_snapshot_json = table.Column<string>(type: "jsonb", nullable: true),
+                    track_configuration_json = table.Column<string>(type: "jsonb", nullable: true),
+                    frozen_start_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    hidden_start_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     flag_derivation_secret = table.Column<byte[]>(type: "bytea", maxLength: 32, nullable: false),
                     start_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     end_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    running_since = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    accumulated_running_seconds = table.Column<long>(type: "bigint", nullable: false),
                     status = table.Column<short>(type: "smallint", nullable: false),
                     team_registration_auto_approve = table.Column<bool>(type: "boolean", nullable: false),
                     allow_team_registration_while_running = table.Column<bool>(type: "boolean", nullable: false),
+                    practice_mode_enabled = table.Column<bool>(type: "boolean", nullable: false),
                     max_team_members = table.Column<int>(type: "integer", nullable: false),
                     max_concurrent_runtime_instances_per_team = table.Column<int>(type: "integer", nullable: false),
                     max_active_questions_per_team = table.Column<int>(type: "integer", nullable: false, defaultValue: 5),
@@ -271,7 +235,6 @@ namespace NoCTF.Infrastructure.Migrations
                 {
                     table.PrimaryKey("pk_competitions", x => x.id);
                     table.CheckConstraint("ck_competitions_flag_secret_length", "octet_length(flag_derivation_secret) = 32");
-                    table.CheckConstraint("ck_competitions_leaderboard_visibility_state", "leaderboard_visibility BETWEEN 0 AND 2 AND ((leaderboard_visibility = 0 AND leaderboard_visibility_starts_at IS NULL AND frozen_leaderboard_snapshot_json IS NULL) OR (leaderboard_visibility = 1 AND leaderboard_visibility_starts_at IS NOT NULL AND ((leaderboard_visibility_applied_at IS NULL AND frozen_leaderboard_snapshot_json IS NULL) OR (leaderboard_visibility_applied_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NOT NULL))) OR (leaderboard_visibility = 2 AND leaderboard_visibility_starts_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NULL))");
                     table.CheckConstraint("ck_competitions_owner_not_permission", "NOT (owner_id = ANY(manager_ids)) AND NOT (owner_id = ANY(judge_ids)) AND NOT (owner_id = ANY(observer_ids))");
                     table.CheckConstraint("ck_competitions_permission_roles_exclusive", "NOT (manager_ids && judge_ids) AND NOT (manager_ids && observer_ids) AND NOT (judge_ids && observer_ids)");
                     table.CheckConstraint("ck_competitions_question_limits", "max_active_questions_per_team > 0 AND max_participant_messages_before_handler_reply > 0");
@@ -322,18 +285,13 @@ namespace NoCTF.Infrastructure.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    critical_section_version = table.Column<long>(type: "bigint", nullable: false),
                     competition_id = table.Column<Guid>(type: "uuid", nullable: false),
                     challenge_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    custom_title = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: true),
                     base_score = table.Column<long>(type: "bigint", nullable: false),
                     order = table.Column<int>(type: "integer", nullable: false),
                     is_published = table.Column<bool>(type: "boolean", nullable: false),
                     rules_json = table.Column<string>(type: "jsonb", nullable: false),
-                    revision = table.Column<int>(type: "integer", nullable: false),
-                    last_scheduled_awd_round = table.Column<int>(type: "integer", nullable: false),
-                    awd_schedule_competition_revision = table.Column<int>(type: "integer", nullable: false),
-                    awd_schedule_challenge_revision = table.Column<long>(type: "bigint", nullable: false),
-                    awd_schedule_due_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     deleted_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     hints_json = table.Column<string>(type: "jsonb", nullable: true)
@@ -403,11 +361,9 @@ namespace NoCTF.Infrastructure.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    concurrency_version = table.Column<long>(type: "bigint", nullable: false),
-                    critical_section_version = table.Column<long>(type: "bigint", nullable: false),
                     competition_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    track_key = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false, defaultValue: "default"),
                     name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    normalized_name = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     avatar_file_id = table.Column<Guid>(type: "uuid", nullable: true),
                     captain_id = table.Column<Guid>(type: "uuid", nullable: false),
                     member_ids = table.Column<Guid[]>(type: "uuid[]", nullable: false),
@@ -459,6 +415,7 @@ namespace NoCTF.Infrastructure.Migrations
                     specification_kind = table.Column<short>(type: "smallint", nullable: true),
                     specification_id = table.Column<Guid>(type: "uuid", nullable: true),
                     flag = table.Column<string>(type: "text", nullable: false),
+                    match_kind = table.Column<short>(type: "smallint", nullable: false),
                     valid_start = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     valid_until = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -518,7 +475,7 @@ namespace NoCTF.Infrastructure.Migrations
                     table.CheckConstraint("ck_gameplay_facts_result", "result IS NULL OR (kind IN (0, 1) AND result IN (0, 1, 2, 3, 4)) OR (kind = 2 AND result IN (0, 1, 3, 4)) OR (kind = 3 AND result IN (2, 4, 5)) OR (kind = 4 AND result = 6) OR (kind = 5 AND result IN (7, 8)) OR (kind = 6 AND result IN (9, 10))");
                     table.CheckConstraint("ck_gameplay_facts_shape", "(kind = 0 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NOT NULL AND octet_length(value_sha256) = 32 AND (reference_kind IS NULL OR reference_kind = 2)) OR (kind = 1 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NOT NULL AND octet_length(value_sha256) = 32 AND reference_kind IS NULL) OR (kind = 2 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NULL AND value_sha256 IS NULL AND reference_kind = 0) OR (kind = 3 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value IS NULL AND value_sha256 IS NULL AND reference_kind = 1) OR (kind = 4 AND team_id IS NOT NULL AND actor_user_id IS NOT NULL AND value ~ '^-?(0|[1-9][0-9]*)$' AND value <> '0' AND value <> '-0' AND value::bigint BETWEEN -2147483648 AND 2147483647 AND value_sha256 IS NULL AND reference_kind IS NULL) OR (kind = 5 AND team_id IS NOT NULL AND actor_user_id IS NULL AND value IS NULL AND value_sha256 IS NULL AND reference_kind IS NULL AND victim_team_id IS NULL) OR (kind = 6 AND actor_user_id IS NULL AND value IS NULL AND value_sha256 IS NULL AND reference_kind IS NULL AND victim_team_id IS NULL)");
                     table.CheckConstraint("ck_gameplay_facts_state_result", "state <> 3 OR result IS NOT NULL");
-                    table.CheckConstraint("ck_gameplay_facts_victim", "victim_team_id IS NULL OR kind = 0");
+                    table.CheckConstraint("ck_gameplay_facts_victim", "victim_team_id IS NULL OR kind IN (0, 1)");
                     table.ForeignKey(
                         name: "fk_gameplay_facts_competition_challenges_competition_challenge",
                         column: x => x.competition_challenge_id,
@@ -552,6 +509,61 @@ namespace NoCTF.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "runtime_instances",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    competition_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    competition_challenge_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    team_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    purpose = table.Column<short>(type: "smallint", nullable: false),
+                    gameplay_fact_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    runtime_kind = table.Column<short>(type: "smallint", nullable: false),
+                    runtime_provider = table.Column<short>(type: "smallint", nullable: false),
+                    runner_id = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    state = table.Column<short>(type: "smallint", nullable: false),
+                    failure_code = table.Column<short>(type: "smallint", nullable: true),
+                    provider_receipt_json = table.Column<string>(type: "jsonb", nullable: true),
+                    urls = table.Column<string[]>(type: "text[]", nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    running_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    stopped_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    published_ports_json = table.Column<string>(type: "jsonb", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("pk_runtime_instances", x => x.id);
+                    table.UniqueConstraint("ak_runtime_instances_id_competition_id", x => new { x.id, x.competition_id });
+                    table.CheckConstraint("ck_runtime_instances_awdp_gameplay_fact", "gameplay_fact_id IS NULL OR purpose = 1");
+                    table.CheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
+                    table.ForeignKey(
+                        name: "fk_runtime_instances_competition_challenges_competition_challe",
+                        column: x => x.competition_challenge_id,
+                        principalTable: "competition_challenges",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_runtime_instances_competitions_competition_id",
+                        column: x => x.competition_id,
+                        principalTable: "competitions",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_runtime_instances_gameplay_facts_gameplay_fact_id",
+                        column: x => x.gameplay_fact_id,
+                        principalTable: "gameplay_facts",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "fk_runtime_instances_teams_team_id",
+                        column: x => x.team_id,
+                        principalTable: "teams",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "patch_uploads",
                 columns: table => new
                 {
@@ -560,6 +572,7 @@ namespace NoCTF.Infrastructure.Migrations
                     competition_challenge_id = table.Column<Guid>(type: "uuid", nullable: false),
                     team_id = table.Column<Guid>(type: "uuid", nullable: false),
                     uploaded_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    runtime_instance_id = table.Column<Guid>(type: "uuid", nullable: true),
                     file_id = table.Column<Guid>(type: "uuid", nullable: false),
                     uploaded_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -585,6 +598,12 @@ namespace NoCTF.Infrastructure.Migrations
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
+                        name: "fk_patch_uploads_runtime_instances_runtime_instance_id",
+                        column: x => x.runtime_instance_id,
+                        principalTable: "runtime_instances",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
                         name: "fk_patch_uploads_teams_team_id",
                         column: x => x.team_id,
                         principalTable: "teams",
@@ -598,91 +617,10 @@ namespace NoCTF.Infrastructure.Migrations
                         onDelete: ReferentialAction.Restrict);
                 });
 
-            migrationBuilder.CreateTable(
-                name: "runtime_instances",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    competition_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    competition_challenge_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    team_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    purpose = table.Column<short>(type: "smallint", nullable: false),
-                    gameplay_fact_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    source_competition_configuration_revision = table.Column<int>(type: "integer", nullable: false),
-                    source_competition_challenge_revision = table.Column<int>(type: "integer", nullable: false),
-                    source_challenge_definition_revision = table.Column<int>(type: "integer", nullable: false),
-                    generation = table.Column<int>(type: "integer", nullable: false),
-                    runtime_kind = table.Column<short>(type: "smallint", nullable: false),
-                    runtime_provider = table.Column<short>(type: "smallint", nullable: false),
-                    runner_id = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    runner_pool = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    runner_assignment_release_token = table.Column<Guid>(type: "uuid", nullable: true),
-                    state = table.Column<short>(type: "smallint", nullable: false),
-                    failure_code = table.Column<short>(type: "smallint", nullable: true),
-                    runner_unavailable_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    processing_version = table.Column<long>(type: "bigint", nullable: false),
-                    replaces_runtime_instance_id = table.Column<Guid>(type: "uuid", nullable: true),
-                    provider_receipt_json = table.Column<string>(type: "jsonb", nullable: true),
-                    urls = table.Column<string[]>(type: "text[]", nullable: false),
-                    participant_url_indexes = table.Column<int[]>(type: "integer[]", nullable: false),
-                    control_check_url = table.Column<string>(type: "text", nullable: true),
-                    awd_checker_target_host = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    checker_status = table.Column<short>(type: "smallint", nullable: false),
-                    checker_status_updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    checker_sequence = table.Column<long>(type: "bigint", nullable: false),
-                    last_applied_checker_sequence = table.Column<long>(type: "bigint", nullable: false),
-                    next_checker_due_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    checker_deadline_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    running_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    stopped_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    published_ports_json = table.Column<string>(type: "jsonb", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_runtime_instances", x => x.id);
-                    table.UniqueConstraint("ak_runtime_instances_id_competition_id", x => new { x.id, x.competition_id });
-                    table.CheckConstraint("ck_runtime_instances_awd_checker_target", "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
-                    table.CheckConstraint("ck_runtime_instances_awdp_gameplay_fact", "(purpose = 1) = (gameplay_fact_id IS NOT NULL)");
-                    table.CheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
-                    table.CheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
-                    table.ForeignKey(
-                        name: "fk_runtime_instances_competition_challenges_competition_challe",
-                        column: x => x.competition_challenge_id,
-                        principalTable: "competition_challenges",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_runtime_instances_competitions_competition_id",
-                        column: x => x.competition_id,
-                        principalTable: "competitions",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_runtime_instances_gameplay_facts_gameplay_fact_id",
-                        column: x => x.gameplay_fact_id,
-                        principalTable: "gameplay_facts",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_runtime_instances_runtime_instances_replaces_runtime_instan",
-                        column: x => x.replaces_runtime_instance_id,
-                        principalTable: "runtime_instances",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "fk_runtime_instances_teams_team_id",
-                        column: x => x.team_id,
-                        principalTable: "teams",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
             migrationBuilder.InsertData(
                 table: "platform_settings",
-                columns: new[] { "id", "description", "email_password_reset_cooldown_seconds", "email_password_reset_max_requests_per_hour", "email_password_reset_token_lifetime_minutes", "email_public_base_url", "email_smtp_from_address", "email_smtp_from_name", "email_smtp_host", "email_smtp_password_ciphertext", "email_smtp_port", "email_smtp_security_mode", "email_smtp_timeout_seconds", "email_smtp_user_name", "email_verification_enabled", "email_verification_resend_cooldown_seconds", "email_verification_token_lifetime_minutes", "logo_file_id", "name", "revision", "updated_at" },
-                values: new object[] { (short)1, null, 60, 5, 30, "http://localhost:5000", "", "NoCTF", "", null, 587, null, 30, "", false, 60, 1440, null, "NoCTF", 1L, new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) });
+                columns: new[] { "id", "description", "email_password_reset_cooldown_seconds", "email_password_reset_max_requests_per_hour", "email_password_reset_token_lifetime_minutes", "email_public_base_url", "email_smtp_from_address", "email_smtp_from_name", "email_smtp_host", "email_smtp_password_ciphertext", "email_smtp_port", "email_smtp_security_mode", "email_smtp_timeout_seconds", "email_smtp_user_name", "email_verification_enabled", "email_verification_resend_cooldown_seconds", "email_verification_token_lifetime_minutes", "logo_file_id", "name", "updated_at" },
+                values: new object[] { (short)1, null, 60, 5, 30, "http://localhost:5000", "", "NoCTF", "", null, 587, null, 30, "", false, 60, 1440, null, "NoCTF", new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)) });
 
             migrationBuilder.CreateIndex(
                 name: "ix_account_tokens_token_sha256",
@@ -721,6 +659,13 @@ namespace NoCTF.Infrastructure.Migrations
                 name: "ix_challenge_flags_competition_challenge_id_team_id_specificat",
                 table: "challenge_flags",
                 columns: new[] { "competition_challenge_id", "team_id", "specification_kind", "specification_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_challenge_flags_specification_kind_specification_id",
+                table: "challenge_flags",
+                columns: new[] { "specification_kind", "specification_id" },
+                unique: true,
+                filter: "specification_kind = 4 AND deleted_at IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "ix_challenge_flags_team_id",
@@ -799,15 +744,15 @@ namespace NoCTF.Infrastructure.Migrations
                 columns: new[] { "parent_event_id", "occurred_at", "id" });
 
             migrationBuilder.CreateIndex(
+                name: "ix_competitions_frozen_start_at_hidden_start_at",
+                table: "competitions",
+                columns: new[] { "frozen_start_at", "hidden_start_at" });
+
+            migrationBuilder.CreateIndex(
                 name: "ix_competitions_judge_ids",
                 table: "competitions",
                 column: "judge_ids")
                 .Annotation("Npgsql:IndexMethod", "gin");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_competitions_leaderboard_visibility_leaderboard_visibility_",
-                table: "competitions",
-                columns: new[] { "leaderboard_visibility", "leaderboard_visibility_starts_at" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_competitions_manager_ids",
@@ -835,32 +780,6 @@ namespace NoCTF.Infrastructure.Migrations
                 name: "ix_competitions_status_start_at",
                 table: "competitions",
                 columns: new[] { "status", "start_at" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_data_exports_file_id",
-                table: "data_exports",
-                column: "file_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_data_exports_purge_at",
-                table: "data_exports",
-                column: "purge_at");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_data_exports_requested_by_user_id_scope_active_slot",
-                table: "data_exports",
-                columns: new[] { "requested_by_user_id", "scope", "active_slot" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "ix_data_exports_requested_by_user_id_scope_competition_id_requ",
-                table: "data_exports",
-                columns: new[] { "requested_by_user_id", "scope", "competition_id", "requested_at" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_data_exports_status",
-                table: "data_exports",
-                column: "status");
 
             migrationBuilder.CreateIndex(
                 name: "ix_files_object_key",
@@ -915,7 +834,6 @@ namespace NoCTF.Infrastructure.Migrations
                 name: "ix_notifications_reply_to_id",
                 table: "notifications",
                 column: "reply_to_id",
-                unique: true,
                 filter: "reply_to_id IS NOT NULL");
 
             migrationBuilder.CreateIndex(
@@ -928,6 +846,12 @@ namespace NoCTF.Infrastructure.Migrations
                 name: "ix_notifications_target_type_target_id_sent_at_id",
                 table: "notifications",
                 columns: new[] { "target_type", "target_id", "sent_at", "id" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_notifications_thread_root_id_sent_at_id",
+                table: "notifications",
+                columns: new[] { "thread_root_id", "sent_at", "id" },
+                filter: "thread_root_id IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "ix_patch_uploads_competition_challenge_id",
@@ -944,6 +868,13 @@ namespace NoCTF.Infrastructure.Migrations
                 table: "patch_uploads",
                 column: "file_id",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "ix_patch_uploads_runtime_instance_id",
+                table: "patch_uploads",
+                column: "runtime_instance_id",
+                unique: true,
+                filter: "runtime_instance_id IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "ix_patch_uploads_team_id_competition_challenge_id",
@@ -965,13 +896,12 @@ namespace NoCTF.Infrastructure.Migrations
                 table: "runtime_instances",
                 columns: new[] { "competition_challenge_id", "team_id" },
                 unique: true,
-                filter: "purpose = 0 AND state IN (0, 1, 2)");
+                filter: "purpose IN (0, 2, 3) AND state IN (0, 1, 2)");
 
             migrationBuilder.CreateIndex(
-                name: "ix_runtime_instances_competition_challenge_id_team_id_generati",
+                name: "ix_runtime_instances_competition_challenge_id_team_id_purpose_",
                 table: "runtime_instances",
-                columns: new[] { "competition_challenge_id", "team_id", "generation" },
-                unique: true);
+                columns: new[] { "competition_challenge_id", "team_id", "purpose", "created_at", "id" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_runtime_instances_competition_id",
@@ -986,20 +916,9 @@ namespace NoCTF.Infrastructure.Migrations
                 filter: "purpose = 1 AND gameplay_fact_id IS NOT NULL AND state IN (0, 1, 2, 3)");
 
             migrationBuilder.CreateIndex(
-                name: "ix_runtime_instances_replaces_runtime_instance_id",
+                name: "ix_runtime_instances_runner_id_state_created_at_id",
                 table: "runtime_instances",
-                column: "replaces_runtime_instance_id");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_runtime_instances_runner_pool_state_created_at_id",
-                table: "runtime_instances",
-                columns: new[] { "runner_pool", "state", "created_at", "id" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_runtime_instances_state_next_checker_due_at",
-                table: "runtime_instances",
-                columns: new[] { "state", "next_checker_due_at" },
-                filter: "next_checker_due_at IS NOT NULL");
+                columns: new[] { "runner_id", "state", "created_at", "id" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_runtime_instances_team_id",
@@ -1017,16 +936,14 @@ namespace NoCTF.Infrastructure.Migrations
                 column: "captain_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_teams_competition_id_normalized_name",
-                table: "teams",
-                columns: new[] { "competition_id", "normalized_name" },
-                unique: true,
-                filter: "deleted_at IS NULL");
-
-            migrationBuilder.CreateIndex(
                 name: "ix_teams_competition_id_registration_status",
                 table: "teams",
                 columns: new[] { "competition_id", "registration_status" });
+
+            migrationBuilder.CreateIndex(
+                name: "ix_teams_competition_id_track_key",
+                table: "teams",
+                columns: new[] { "competition_id", "track_key" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_teams_invitation_token",
@@ -1046,11 +963,11 @@ namespace NoCTF.Infrastructure.Migrations
                 column: "avatar_file_id");
 
             migrationBuilder.CreateIndex(
-                name: "ix_users_normalized_email",
+                name: "ix_users_email",
                 table: "users",
-                column: "normalized_email",
+                column: "email",
                 unique: true,
-                filter: "normalized_email <> ''");
+                filter: "email <> ''");
 
             migrationBuilder.CreateIndex(
                 name: "ix_users_normalized_user_name",
@@ -1073,9 +990,6 @@ namespace NoCTF.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "competition_events");
-
-            migrationBuilder.DropTable(
-                name: "data_exports");
 
             migrationBuilder.DropTable(
                 name: "notifications");
