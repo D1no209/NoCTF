@@ -116,7 +116,6 @@ public sealed class CompetitionEvent
     [NotMapped] public NoCTF.Domain.Runtime.RuntimeCleanupResult? RuntimeCleanupResult =>
         PayloadValue<NoCTF.Domain.Runtime.RuntimeCleanupResult>("runtimeCleanupResult");
     [NotMapped] public NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus? QuestionStatus => PayloadValue<NoCTF.Domain.Challenges.Questions.CompetitionQuestionStatus>("questionStatus");
-    [NotMapped] public int? RuntimeGeneration => PayloadValue<int>("runtimeGeneration");
     [NotMapped] public int? HostPort => PayloadValue<int>("hostPort");
     [NotMapped] public string? Reason => PayloadText("reason");
     [NotMapped] public string? TrackKey => PayloadText("trackKey");

@@ -3,8 +3,7 @@ namespace NoCTF.Application.Authentication;
 public sealed record AwdCheckerTokenRequest(
     string RunnerId,
     Guid RuntimeInstanceId,
-    int Generation,
-    long CheckerSequence,
+    Guid GameplayFactId,
     DateTimeOffset Deadline,
     DateTimeOffset IssuedAt);
 
@@ -12,7 +11,6 @@ public sealed record AwdpFixResultTokenRequest(
     string RunnerId,
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
-    int Generation,
     DateTimeOffset Deadline,
     DateTimeOffset IssuedAt);
 

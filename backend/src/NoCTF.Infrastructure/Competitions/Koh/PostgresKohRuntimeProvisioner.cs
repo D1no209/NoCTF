@@ -111,21 +111,18 @@ public sealed class PostgresKohRuntimeProvisioner(
             if (active)
                 continue;
 
-            var maximumGeneration = existing.Count == 0
-                ? 0
-                : existing.Max(runtime => runtime.Generation);
             var createdAt = timeProvider.GetUtcNow();
             var cleanupTarget = existing
                 .Where(runtime => runtime.State == RuntimeState.Failed
                     && runtime.ProviderReceiptJson != null)
-                .OrderByDescending(runtime => runtime.Generation)
+                .OrderByDescending(runtime => runtime.CreatedAt)
+                .ThenByDescending(runtime => runtime.Id)
                 .FirstOrDefault();
             RuntimeInstance runtime;
             if (cleanupTarget is not null)
             {
                 cleanupTarget.State = RuntimeState.Stopping;
                 cleanupTarget.FailureCode = null;
-                cleanupTarget.RunnerAssignmentReleaseToken = null;
                 runtime = new RuntimeInstance
                 {
                     Id = Guid.CreateVersion7(createdAt),
@@ -133,17 +130,15 @@ public sealed class PostgresKohRuntimeProvisioner(
                     CompetitionChallengeId = challenge.Id,
                     TeamId = null,
                     Purpose = RuntimePurpose.Player,
-                    Generation = checked(maximumGeneration + 1),
                     RuntimeKind = challenge.RuntimeKind,
                     RuntimeProvider = challenge.Placement.Provider,
-                    RunnerPool = challenge.Placement.RunnerPool,
                     State = RuntimeState.Queued,
-                    ReplacesRuntimeInstanceId = cleanupTarget.Id,
                     CreatedAt = createdAt
                 };
                 await RecordStateAsync(events, cleanupTarget, CompetitionEventLevel.Warning,
                     createdAt, cancellationToken);
                 await outbox.PublishAsync(new StopRuntime(cleanupTarget.Id));
+                await outbox.PublishAsync(new DispatchRuntime(runtime.Id));
                 deferredCleanup = true;
             }
             else
@@ -155,10 +150,8 @@ public sealed class PostgresKohRuntimeProvisioner(
                     CompetitionChallengeId = challenge.Id,
                     TeamId = null,
                     Purpose = RuntimePurpose.Player,
-                    Generation = checked(maximumGeneration + 1),
                     RuntimeKind = challenge.RuntimeKind,
                     RuntimeProvider = challenge.Placement.Provider,
-                    RunnerPool = challenge.Placement.RunnerPool,
                     State = RuntimeState.Queued,
                     CreatedAt = createdAt
                 };
@@ -191,8 +184,7 @@ public sealed class PostgresKohRuntimeProvisioner(
             occurredAt,
             CompetitionChallengeId: runtime.CompetitionChallengeId,
             RuntimeInstanceId: runtime.Id,
-            RuntimeState: runtime.State,
-            RuntimeGeneration: runtime.Generation), cancellationToken);
+            RuntimeState: runtime.State), cancellationToken);
 
     private static ValueTask<Guid> RecordStateAsync(
         ICompetitionEventRecorder events,
@@ -208,6 +200,5 @@ public sealed class PostgresKohRuntimeProvisioner(
             occurredAt,
             CompetitionChallengeId: runtime.CompetitionChallengeId,
             RuntimeInstanceId: runtime.Id,
-            RuntimeState: runtime.State,
-            RuntimeGeneration: runtime.Generation), cancellationToken);
+            RuntimeState: runtime.State), cancellationToken);
 }

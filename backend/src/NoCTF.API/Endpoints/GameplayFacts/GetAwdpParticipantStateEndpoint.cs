@@ -1,24 +1,11 @@
-using System.Text.Json.Serialization;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NoCTF.API.Endpoints.Runtime;
 using NoCTF.API.Security;
-using NoCTF.API.Serialization;
 using NoCTF.Application.GameplayFacts.Awdp;
 using NoCTF.Domain.Runtime;
-using Riok.Mapperly.Abstractions;
 
 namespace NoCTF.API.Endpoints.GameplayFacts;
-
-[JsonConverter(typeof(StrictPascalCaseEnumConverter<AwdpFixStageProtocol>))]
-public enum AwdpFixStageProtocol
-{
-    TargetProvisioning,
-    AwaitingPatch,
-    PatchApplying,
-    CheckerRunning,
-    Completed
-}
 
 public sealed record AwdpAchievementActivationResponse(
     Guid GameplayFactId,
@@ -34,7 +21,6 @@ public sealed record AwdpDefenseProgressResponse(
     GameplayFactStateProtocol? State,
     GameplayFactResultProtocol? Result,
     GameplayFactFailureCodeProtocol? FailureCode,
-    AwdpFixStageProtocol? Stage,
     DateTimeOffset? TargetCreatedAt,
     DateTimeOffset? TargetExpiresAt,
     DateTimeOffset? TargetStoppedAt,
@@ -48,12 +34,8 @@ public sealed record AwdpParticipantStateResponse(
     AwdpDefenseProgressResponse Defense,
     AwdpAchievementActivationResponse? FixActivation);
 
-[Mapper]
-internal static partial class AwdpParticipantStateMapping
+internal static class AwdpParticipantStateMapping
 {
-    [MapEnum(EnumMappingStrategy.ByName)]
-    private static partial AwdpFixStageProtocol ToProtocol(AwdpFixStage value);
-
     internal static AwdpParticipantStateResponse ToResponse(AwdpParticipantStateView view) =>
         new(
             view.CurrentRound,
@@ -81,7 +63,6 @@ internal static partial class AwdpParticipantStateMapping
                 view.Defense.FailureCode is null
                     ? null
                     : GameplayFactMapper.ToProtocol(view.Defense.FailureCode.Value),
-                view.Defense.Stage is null ? null : ToProtocol(view.Defense.Stage.Value),
                 view.Defense.TargetCreatedAt,
                 view.Defense.TargetExpiresAt,
                 view.Defense.TargetStoppedAt,
@@ -107,7 +88,7 @@ public sealed class GetAwdpParticipantStateEndpoint(
         {
             summary.Summary = "Gets the current team's AWDP attack and defense state.";
             summary.Description =
-                "Returns the current attack Runtime, Break activation, one-shot Fix stage and defense activation.";
+                "Returns the current attack Runtime, Break activation, one-shot Fix progress and defense activation.";
         });
     }
 

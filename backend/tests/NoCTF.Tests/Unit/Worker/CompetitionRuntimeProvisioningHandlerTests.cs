@@ -130,12 +130,6 @@ public sealed class CompetitionRuntimeProvisioningHandlerTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
 

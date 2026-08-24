@@ -14,21 +14,18 @@ public enum InternalResultDisposition
 
 public sealed record AwdCheckResult(
     Guid RuntimeInstanceId,
-    int Generation,
-    long CheckerSequence,
+    Guid GameplayFactId,
     AwdServiceState State,
     DateTimeOffset OccurredAt)
 {
     public static AwdCheckResult Create(
         Guid runtimeInstanceId,
-        int generation,
-        long checkerSequence,
+        Guid gameplayFactId,
         AwdServiceState state,
         DateTimeOffset occurredAt) =>
         new(
             runtimeInstanceId,
-            generation,
-            checkerSequence,
+            gameplayFactId,
             state,
             occurredAt);
 }
@@ -50,14 +47,12 @@ public static class AwdServiceStateTransition
 public sealed record AwdpFixResult(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
-    int Generation,
     AwdpFixOutcome Outcome,
     DateTimeOffset OccurredAt)
 {
     public static AwdpFixResult Create(
         Guid gameplayFactId,
         Guid runtimeInstanceId,
-        int generation,
         AwdpFixOutcome outcome,
         DateTimeOffset occurredAt)
     {
@@ -66,7 +61,6 @@ public sealed record AwdpFixResult(
         return new(
             gameplayFactId,
             runtimeInstanceId,
-            generation,
             outcome,
             occurredAt);
     }

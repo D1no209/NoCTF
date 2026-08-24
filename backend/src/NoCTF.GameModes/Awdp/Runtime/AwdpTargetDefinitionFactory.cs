@@ -7,7 +7,6 @@ public static class AwdpTargetDefinitionFactory
 {
     public static ContainerRequest Create(
         Guid operationId,
-        int generation,
         ChallengeRuntimeTemplate template,
         RuntimeProvider provider,
         DateTimeOffset now)
@@ -28,8 +27,6 @@ public static class AwdpTargetDefinitionFactory
             : new Dictionary<string, string>(definition.Labels, StringComparer.Ordinal);
         labels["noctf.io/managed"] = "true";
         labels["noctf.io/runtime-instance-id"] = operationId.ToString("D");
-        labels["noctf.io/generation"] = generation.ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
         labels["noctf.io/purpose"] = "awdp-target";
         labels["noctf.io/job-kind"] = "awdp-verification";
         var security = definition.Security
@@ -55,7 +52,6 @@ public static class AwdpTargetDefinitionFactory
                 : TimeSpan.FromMinutes(2),
             NetworkIsolation: ContainerNetworkIsolation.Isolated,
             InternalPorts: definition.InternalPorts,
-            Generation: generation,
             RuntimeInstanceId: operationId,
             EgressPolicy: definition.EgressPolicy,
             NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);

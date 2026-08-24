@@ -56,7 +56,7 @@ public sealed class CompetitionChallengeAudienceAccessPersistenceTests
         CancellationToken ct)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(ct);
+        await db.Database.EnsureCreatedAsync(ct);
         var now = DateTimeOffset.UtcNow;
         var ids = new Ids(
             Guid.CreateVersion7(), Guid.CreateVersion7(), Guid.CreateVersion7(),

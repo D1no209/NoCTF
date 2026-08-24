@@ -452,7 +452,7 @@ export const downloadFixArchiveEndpoint = <ThrowOnError extends boolean = false>
 /**
  * Updates the status reported by an AWD checker.
  *
- * Each accepted update replaces the runtime's previous checker status. Runtime identity and generation come from the internal JWT.
+ * Records the result of one independently persisted AWD checker execution. Runtime and gameplay-fact identities come from the internal JWT.
  */
 export const recordAwdCheckResultEndpoint = <ThrowOnError extends boolean = false>(options: Options<RecordAwdCheckResultEndpointData, ThrowOnError>): RequestResult<RecordAwdCheckResultEndpointResponses, RecordAwdCheckResultEndpointErrors, ThrowOnError> => (options.client ?? client).post<RecordAwdCheckResultEndpointResponses, RecordAwdCheckResultEndpointErrors, ThrowOnError>({
     security: [{
@@ -498,7 +498,7 @@ export const recordAwdpCheckResultEndpoint = <ThrowOnError extends boolean = fal
 /**
  * Gets the current team's AWDP attack and defense state.
  *
- * Returns the current attack Runtime, Break activation, one-shot Fix stage and defense activation.
+ * Returns the current attack Runtime, Break activation, one-shot Fix progress and defense activation.
  */
 export const getAwdpParticipantStateEndpoint = <ThrowOnError extends boolean = false>(options: Options<GetAwdpParticipantStateEndpointData, ThrowOnError>): RequestResult<GetAwdpParticipantStateEndpointResponses, GetAwdpParticipantStateEndpointErrors, ThrowOnError> => (options.client ?? client).get<GetAwdpParticipantStateEndpointResponses, GetAwdpParticipantStateEndpointErrors, ThrowOnError>({
     security: [{
@@ -1510,7 +1510,7 @@ export const adminListRuntimes = <ThrowOnError extends boolean = false>(options:
 /**
  * Queues a KoH shared runtime replacement.
  *
- * Replaces the shared hill through the normal generation-fenced runtime state machine.
+ * Stops the current shared runtime and creates a replacement with a new UUID.
  */
 export const adminResetSharedRuntime = <ThrowOnError extends boolean = false>(options: Options<AdminResetSharedRuntimeData, ThrowOnError>): RequestResult<AdminResetSharedRuntimeResponses, AdminResetSharedRuntimeErrors, ThrowOnError> => (options.client ?? client).post<AdminResetSharedRuntimeResponses, AdminResetSharedRuntimeErrors, ThrowOnError>({
     security: [{
@@ -1525,7 +1525,7 @@ export const adminResetSharedRuntime = <ThrowOnError extends boolean = false>(op
 /**
  * Queues an atomic team runtime replacement.
  *
- * Uses the same generation and replacement invariants as the player runtime API.
+ * Stops the current runtime and creates a new runtime with a new UUID.
  */
 export const adminResetTeamRuntime = <ThrowOnError extends boolean = false>(options: Options<AdminResetTeamRuntimeData, ThrowOnError>): RequestResult<AdminResetTeamRuntimeResponses, AdminResetTeamRuntimeErrors, ThrowOnError> => (options.client ?? client).post<AdminResetTeamRuntimeResponses, AdminResetTeamRuntimeErrors, ThrowOnError>({
     security: [{

@@ -35,10 +35,9 @@ public sealed class LibvirtOvaRuntimeTests
             var operationId = Guid.Parse("11111111-1111-1111-1111-111111111111");
             var request = new OvaRuntimeRequest(
                 operationId,
-                3,
                 new Uri(ovaPath),
                 digest,
-                $"noctf-{operationId:N}-3",
+                $"noctf-{operationId:N}",
                 new(256 * 1024 * 1024, 2_000_000_000, 256),
                 TimeSpan.FromHours(1),
                 TimeSpan.FromSeconds(5));
@@ -55,7 +54,7 @@ public sealed class LibvirtOvaRuntimeTests
             await Assert.That(adapter.CreatedDomains.Count).IsEqualTo(2);
             await Assert.That(adapter.NetworkExists).IsTrue();
             await Assert.That(await runtime.ListManagedAsync(CancellationToken.None))
-                .IsEquivalentTo([new OvaManagedRuntimeResource(operationId, 3)]);
+                .IsEquivalentTo([new OvaManagedRuntimeResource(operationId)]);
 
             var unsafeCleanup = () => runtime.DestroyAsync(
                 receipt with { NetworkId = "default" },
@@ -64,7 +63,7 @@ public sealed class LibvirtOvaRuntimeTests
             await Assert.That(adapter.NetworkExists).IsTrue();
 
             await runtime.DestroyByIdentityAsync(
-                new(operationId, 3),
+                new(operationId),
                 CancellationToken.None);
             await runtime.DestroyAsync(receipt, CancellationToken.None);
             await runtime.DestroyAsync(receipt, CancellationToken.None);
@@ -72,7 +71,7 @@ public sealed class LibvirtOvaRuntimeTests
             await Assert.That(adapter.CreatedDomains).IsEmpty();
             await Assert.That(adapter.NetworkExists).IsFalse();
             await Assert.That(Directory.Exists(
-                    Path.Combine(options.WorkDirectory, $"{operationId:N}-3")))
+                    Path.Combine(options.WorkDirectory, $"{operationId:N}")))
                 .IsFalse();
         }
         finally
@@ -147,10 +146,9 @@ public sealed class LibvirtOvaRuntimeTests
                 _ = await runtime.ImportAsync(
                     new OvaRuntimeRequest(
                         operationId,
-                        0,
                         new Uri(ovaPath),
                         digest,
-                        $"noctf-{operationId:N}-0",
+                        $"noctf-{operationId:N}",
                         new(256 * 1024 * 1024, 2_000_000_000, 256),
                         TimeSpan.FromMinutes(1),
                         TimeSpan.FromSeconds(5)),

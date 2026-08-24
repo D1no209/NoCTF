@@ -270,7 +270,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
                             null,
                             null,
                             null,
-                            null,
                             null),
                         null,
                         null,
@@ -285,7 +284,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
                 await Assert.That(attackRuntimes.Select(runtime => runtime.SourceTeamName).ToArray())
                     .IsEquivalentTo(new string?[] { "Team 0", "Team 1" });
                 var flags = await verify.ChallengeFlags.AsNoTracking()
-                    .Where(flag => flag.SpecificationKind == SpecificationKind.RuntimeGeneration)
+                    .Where(flag => flag.SpecificationKind == SpecificationKind.RuntimeInstance)
                     .OrderBy(flag => flag.TeamId)
                     .ToArrayAsync(cancellationToken);
                 await Assert.That(flags.Length).IsEqualTo(2);
@@ -304,15 +303,15 @@ public sealed class AwdpAttackRuntimePersistenceTests
             await MarkRunningAsync(options, starts[0].Runtime!, cancellationToken);
             var reset = await ResetAsync(options, fixture, fixture.UserIds[0], cancellationToken);
             await Assert.That(reset.Failure).IsNull();
-            await Assert.That(reset.Runtime!.Generation).IsEqualTo(2);
+            await Assert.That(reset.Runtime!.Id).IsNotEqualTo(starts[0].Runtime!.Id);
 
             await using var final = new NoCtfDbContext(options);
             var firstGeneration = await final.ChallengeFlags.AsNoTracking().SingleAsync(
-                flag => flag.SpecificationKind == SpecificationKind.RuntimeGeneration
+                flag => flag.SpecificationKind == SpecificationKind.RuntimeInstance
                     && flag.SpecificationId == starts[0].Runtime!.Id,
                 cancellationToken);
             var secondGeneration = await final.ChallengeFlags.AsNoTracking().SingleAsync(
-                flag => flag.SpecificationKind == SpecificationKind.RuntimeGeneration
+                flag => flag.SpecificationKind == SpecificationKind.RuntimeInstance
                     && flag.SpecificationId == reset.Runtime.Id,
                 cancellationToken);
             await Assert.That(firstGeneration.ValidStart).IsNotNull();
@@ -338,6 +337,103 @@ public sealed class AwdpAttackRuntimePersistenceTests
                 .SingleAsync(flag => flag.Id == secondGeneration.Id, cancellationToken);
             await Assert.That(invalidated.ValidUntil).IsNotNull();
         });
+    }
+
+    [Test]
+    [Timeout(300_000)]
+    public async Task Different_envelopes_apply_in_completion_order_without_generation_guards(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_runtime_completion_order")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var started = await StartAsync(
+                options,
+                fixture,
+                fixture.UserIds[0],
+                cancellationToken);
+            await Assert.That(started.Runtime).IsNotNull();
+            var runtime = started.Runtime!;
+            var flag = await ReadRuntimeFlagAsync(options, runtime.Id, cancellationToken);
+            await AssertEnvironmentInjectionAsync(
+                options,
+                runtime,
+                flag.Flag,
+                cancellationToken);
+
+            await using var db = new NoCtfDbContext(options);
+            await RuntimeWriteBackHandler.Handle(
+                new RuntimeProvisionFailed(
+                    runtime.Id,
+                    RuntimeFailureCode.ProviderRejected,
+                    "runner-1"),
+                db,
+                cancellationToken);
+            await AssertRuntimeStateAsync(db, runtime.Id, RuntimeState.Failed, cancellationToken);
+
+            await RuntimeWriteBackHandler.Handle(
+                new RuntimeProvisioned(
+                    runtime.Id,
+                    "runner-1",
+                    RuntimeProvider.Docker,
+                    "{}",
+                    ["tcp://127.0.0.1:30000"],
+                    fixture.Now.AddMinutes(30),
+                    [new RuntimePublishedPortMapping(null, 31337, 30000)]),
+                db,
+                new NoopOutbox(),
+                cancellationToken);
+            await AssertRuntimeStateAsync(db, runtime.Id, RuntimeState.Running, cancellationToken);
+            var reactivated = await db.ChallengeFlags.AsNoTracking().SingleAsync(
+                item => item.Id == flag.Id,
+                cancellationToken);
+            await Assert.That(reactivated.ValidUntil).IsNull();
+
+            await RuntimeWriteBackHandler.Handle(
+                new RuntimeProvisionFailed(
+                    runtime.Id,
+                    RuntimeFailureCode.ProviderRejected,
+                    "runner-1"),
+                db,
+                cancellationToken);
+            await AssertRuntimeStateAsync(db, runtime.Id, RuntimeState.Failed, cancellationToken);
+        });
+    }
+
+    private static async Task<ChallengeFlag> ReadRuntimeFlagAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Guid runtimeId,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        return await db.ChallengeFlags.AsNoTracking().SingleAsync(
+            item => item.SpecificationKind == SpecificationKind.RuntimeInstance
+                && item.SpecificationId == runtimeId,
+            cancellationToken);
+    }
+
+    private static async Task AssertRuntimeStateAsync(
+        NoCtfDbContext db,
+        Guid runtimeId,
+        RuntimeState expected,
+        CancellationToken cancellationToken)
+    {
+        db.ChangeTracker.Clear();
+        var state = await db.RuntimeInstances.AsNoTracking()
+            .Where(item => item.Id == runtimeId)
+            .Select(item => item.State)
+            .SingleAsync(cancellationToken);
+        await Assert.That(state).IsEqualTo(expected);
     }
 
     [Test]
@@ -383,7 +479,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
             var listed = await store.ListAsync(new(
                     fixture.CompetitionId,
                     fixture.CompetitionChallengeId,
-                    null,
                     null,
                     null,
                     null,
@@ -472,11 +567,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
     {
         await using var db = new NoCtfDbContext(options);
         var runtimeId = Guid.CreateVersion7(fixture.Now.AddSeconds(1));
-        var generation = checked((await db.RuntimeInstances
-            .Where(item => item.CompetitionChallengeId == fixture.CompetitionChallengeId
-                && item.TeamId == fixture.TeamIds[0]
-                && item.Purpose == RuntimePurpose.AwdpAttack)
-            .MaxAsync(item => (int?)item.Generation, cancellationToken) ?? 0) + 1);
         var runtime = new RuntimeInstance
         {
             Id = runtimeId,
@@ -484,11 +574,9 @@ public sealed class AwdpAttackRuntimePersistenceTests
             CompetitionChallengeId = fixture.CompetitionChallengeId,
             TeamId = fixture.TeamIds[0],
             Purpose = RuntimePurpose.AwdpAttack,
-            Generation = generation,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
             RunnerId = "runner-1",
-            RunnerPool = "awdp-tests",
             State = RuntimeState.Provisioning,
             CreatedAt = fixture.Now
         };
@@ -500,7 +588,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
                 Id = Guid.CreateVersion7(fixture.Now.AddSeconds(2)),
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = fixture.TeamIds[0],
-                SpecificationKind = SpecificationKind.RuntimeGeneration,
+                SpecificationKind = SpecificationKind.RuntimeInstance,
                 SpecificationId = runtimeId,
                 Flag = flag,
                 FlagSha256 = ManageChallengeFlags.Hash(flag),
@@ -524,8 +612,9 @@ public sealed class AwdpAttackRuntimePersistenceTests
         var template = new ChallengeRuntimeTemplateCatalog().Get(
             GameMode.Awdp,
             challengeDefinition)!;
-        var claim = (ClaimContainerRuntime)NoCTF.Worker.Runtime.RuntimeClaimFactory.Create(
+        var claim = (ProvisionContainerRuntime)NoCTF.Worker.Runtime.RuntimeClaimFactory.Create(
             runtime,
+            "runner-1",
             GameMode.Awdp,
             template,
             challengeDefinition,
@@ -535,9 +624,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
             : new Dictionary<string, string>(StringComparer.Ordinal);
         return new(
             claim.RuntimeInstanceId,
-            claim.Generation,
-            claim.RunnerPool,
-            "runner-1",
+            claim.RunnerId,
             claim.Definition with { Environment = environment });
     }
 
@@ -562,8 +649,9 @@ public sealed class AwdpAttackRuntimePersistenceTests
         var template = new ChallengeRuntimeTemplateCatalog().Get(
             GameMode.Awdp,
             challengeDefinition)!;
-        var claim = (ClaimContainerRuntime)NoCTF.Worker.Runtime.RuntimeClaimFactory.Create(
+        var claim = (ProvisionContainerRuntime)NoCTF.Worker.Runtime.RuntimeClaimFactory.Create(
             entity,
+            "runner-1",
             GameMode.Awdp,
             template,
             challengeDefinition,
@@ -588,13 +676,12 @@ public sealed class AwdpAttackRuntimePersistenceTests
         await using var db = new NoCtfDbContext(options);
         await RuntimeWriteBackHandler.Handle(new RuntimeProvisioned(
             runtime.Id,
-            1,
             "runner-1",
             RuntimeProvider.Docker,
             "{}",
             ["tcp://127.0.0.1:30000"],
-            [0],
-            DateTimeOffset.UtcNow.AddMinutes(15)),
+            DateTimeOffset.UtcNow.AddMinutes(15),
+            [new RuntimePublishedPortMapping(null, 31337, 30000)]),
             db,
             new NoopOutbox(),
             cancellationToken);
@@ -605,7 +692,7 @@ public sealed class AwdpAttackRuntimePersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7(now);
         var competitionId = Guid.CreateVersion7(now);
@@ -718,8 +805,6 @@ public sealed class AwdpAttackRuntimePersistenceTests
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) => ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt) where T : IRunnerPoolMessage => ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage => ValueTask.CompletedTask;
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt) where T : IRunnerNodeMessage => ValueTask.CompletedTask;
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;

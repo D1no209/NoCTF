@@ -141,7 +141,6 @@ public sealed record CompetitionEventResponse(
     RuntimeStateProtocol? RuntimeState,
     RuntimeCleanupResultProtocol? RuntimeCleanupResult,
     CompetitionQuestionStatusProtocol? QuestionStatus,
-    int? RuntimeGeneration,
     int? HostPort,
     string? Reason,
     string? TrackKey,
@@ -291,7 +290,6 @@ public sealed class ListCompetitionEventsEndpoint(
                 ? null
                 : CompetitionEventProtocolMapper.ToProtocol(item.RuntimeCleanupResult.Value),
             item.QuestionStatus is null ? null : CompetitionEventProtocolMapper.ToProtocol(item.QuestionStatus.Value),
-            item.RuntimeGeneration,
             item.HostPort,
             item.Reason,
             item.TrackKey,

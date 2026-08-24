@@ -187,7 +187,6 @@ public sealed class KubernetesComposeRuntimeTests
     private static ComposeRequest Request() => new(
         Guid.Parse("11111111-1111-1111-1111-111111111111"),
         RuntimeProvider.Kubernetes,
-        3,
         "display-project",
         """
         services:

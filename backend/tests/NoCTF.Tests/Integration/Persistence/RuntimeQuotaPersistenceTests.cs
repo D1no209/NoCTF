@@ -29,7 +29,7 @@ public sealed class RuntimeQuotaPersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Admin_termination_targets_the_exact_instance_and_rejects_a_stale_version(
+    public async Task Admin_termination_targets_the_exact_instance_and_is_idempotent(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -76,19 +76,21 @@ public sealed class RuntimeQuotaPersistenceTests
             await Assert.That(recorded.RuntimeInstanceId).IsEqualTo(runtimeInstanceId);
             await Assert.That(recorded.RuntimeState).IsEqualTo(RuntimeState.Stopping);
 
-            await using (var staleDb = new NoCtfDbContext(options))
+            await using (var retryDb = new NoCtfDbContext(options))
             {
-                var staleOutbox = new RecordingOutbox();
-                var stale = await CreateAdminStore(staleDb, staleOutbox).TerminateAsync(
+                var retryOutbox = new RecordingOutbox();
+                var retry = await CreateAdminStore(retryDb, retryOutbox).TerminateAsync(
                     fixture.CompetitionId,
                     runtimeInstanceId,
                     actorUserId,
                     fixture.Now.AddSeconds(1),
                     cancellationToken);
 
-                await Assert.That(stale.Runtime).IsNull();
-                await Assert.That(stale.Failure).IsEqualTo(RuntimeMutationFailure.Conflict);
-                await Assert.That(staleOutbox.Published).IsEmpty();
+                await Assert.That(retry.Failure).IsNull();
+                await Assert.That(retry.Runtime).IsNotNull();
+                await Assert.That(retry.Runtime!.Id).IsEqualTo(runtimeInstanceId);
+                await Assert.That(retry.Runtime.State).IsEqualTo(RuntimeState.Stopping);
+                await Assert.That(retryOutbox.Published).IsEmpty();
             }
 
             await using (var assignmentDb = new NoCtfDbContext(options))
@@ -118,7 +120,7 @@ public sealed class RuntimeQuotaPersistenceTests
 
             var forceMessage = forceOutbox.Published.OfType<ForceTerminateRuntime>().Single();
             await Assert.That(forceMessage.RuntimeInstanceId).IsEqualTo(runtimeInstanceId);
-            await Assert.That(forceMessage.Generation).IsEqualTo(1);
+            await Assert.That(forceMessage.RunnerId).IsEqualTo("runner-a");
             var forceEvent = forceEvents.Drafts.Single();
             await Assert.That(forceEvent.Kind)
                 .IsEqualTo(CompetitionEventKind.RuntimeForceTerminationRequested);
@@ -235,6 +237,15 @@ public sealed class RuntimeQuotaPersistenceTests
             }
 
             var runningTeam = fixture.Teams.Single(team => team.State == RuntimeState.Running);
+            Guid previousRuntimeId;
+            await using (var beforeReset = new NoCtfDbContext(options))
+            {
+                previousRuntimeId = await beforeReset.RuntimeInstances.AsNoTracking()
+                    .Where(runtime => runtime.TeamId == runningTeam.TeamId
+                        && runtime.CompetitionChallengeId == fixture.ChallengeIds[0])
+                    .Select(runtime => runtime.Id)
+                    .SingleAsync(cancellationToken);
+            }
             var reset = await MutatePlayerAsync(
                 options,
                 fixture,
@@ -243,7 +254,7 @@ public sealed class RuntimeQuotaPersistenceTests
                 RuntimeAction.Reset,
                 cancellationToken);
             await Assert.That(reset.Result.Failure).IsNull();
-            await Assert.That(reset.Result.Runtime!.Generation).IsEqualTo(2);
+            await Assert.That(reset.Result.Runtime!.Id).IsNotEqualTo(previousRuntimeId);
 
             var afterReset = await MutatePlayerAsync(
                 options,
@@ -286,7 +297,7 @@ public sealed class RuntimeQuotaPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7(now);
         var competitionId = Guid.CreateVersion7(now.AddTicks(1));
@@ -344,10 +355,8 @@ public sealed class RuntimeQuotaPersistenceTests
                     CompetitionChallengeId = challengeIds[0],
                     TeamId = teamId,
                     Purpose = RuntimePurpose.Player,
-                    Generation = 1,
                     RuntimeKind = RuntimeKind.Container,
                     RuntimeProvider = RuntimeProvider.Docker,
-                    RunnerPool = "quota-tests",
                     State = runtimeState,
                     FailureCode = runtimeState == RuntimeState.Failed
                         ? RuntimeFailureCode.ProviderUnavailable
@@ -505,12 +514,6 @@ public sealed class RuntimeQuotaPersistenceTests
 
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage
         {

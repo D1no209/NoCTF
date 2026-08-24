@@ -129,10 +129,6 @@ public sealed class IdentityNormalizationPersistenceTests
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)

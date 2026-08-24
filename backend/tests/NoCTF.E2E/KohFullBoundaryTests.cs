@@ -152,7 +152,6 @@ public sealed class KohFullBoundaryTests
         var runtime = runtimeList.GetProperty("items")[0];
         var runtimeId = runtime.GetProperty("id").GetGuid();
         await Assert.That(runtime.GetProperty("teamId").ValueKind).IsEqualTo(JsonValueKind.Null);
-        await Assert.That(runtime.GetProperty("generation").GetInt32()).IsEqualTo(1);
         await Assert.That(runtime.GetProperty("controlCheckUrl").GetString()).Contains("/control");
 
         var detailPath = $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}";

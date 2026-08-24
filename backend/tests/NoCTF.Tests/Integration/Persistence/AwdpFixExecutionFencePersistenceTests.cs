@@ -1,25 +1,16 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.GameplayFacts.Processing;
-using NoCTF.Application.Messaging;
-using NoCTF.Application.Runtime.Instances;
-using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
-using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Storage;
 using NoCTF.Domain.Teams;
-using NoCTF.GameModes.Awdp.Configuration;
 using NoCTF.GameModes.Registration;
-using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
 using NoCTF.Infrastructure.Persistence;
-using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 
 namespace NoCTF.Tests.Integration.Persistence;
@@ -30,7 +21,7 @@ public sealed class AwdpFixExecutionFencePersistenceTests
 {
     [Test]
     [Timeout(300_000)]
-    public async Task Redelivery_cleans_the_consumed_target_without_rerunning_the_checker(
+    public async Task Authoritative_target_state_controls_execute_recover_and_superseded(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -40,94 +31,36 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var fixture = await SeedAsync(options, cancellationToken);
             var request = Request(fixture);
 
-            var staleGeneration = await AcquireAsync(
-                options,
-                request with { Generation = 2 },
-                cancellationToken);
-            await Assert.That(staleGeneration.Disposition)
-                .IsEqualTo(AwdpFixExecutionFenceDisposition.Superseded);
-
-            var first = await AcquireAsync(options, request, cancellationToken);
-            await Assert.That(first.Disposition)
+            var execute = await AcquireAsync(options, request, cancellationToken);
+            await Assert.That(execute.Disposition)
                 .IsEqualTo(AwdpFixExecutionFenceDisposition.Execute);
+            await Assert.That(execute.RuntimeInstanceId).IsEqualTo(fixture.RuntimeInstanceId);
+            await Assert.That(execute.RunnerId).IsEqualTo(fixture.RunnerId);
+            await Assert.That(execute.ProviderReceiptJson).IsEqualTo("{}");
 
-            var uncertain = await AcquireAsync(options, request, cancellationToken);
-            await Assert.That(uncertain.Disposition)
+            await SetRuntimeStateAsync(
+                options,
+                fixture.RuntimeInstanceId,
+                RuntimeState.Stopping,
+                cancellationToken);
+            var recover = await AcquireAsync(options, request, cancellationToken);
+            await Assert.That(recover.Disposition)
                 .IsEqualTo(AwdpFixExecutionFenceDisposition.Recover);
 
-            var resumedCleanup = await AcquireAsync(options, request, cancellationToken);
-            await Assert.That(resumedCleanup.Disposition)
-                .IsEqualTo(AwdpFixExecutionFenceDisposition.Recover);
-
-            await using (var staleResultDb = new NoCtfDbContext(options))
-            {
-                var staleResult = await new InternalResultStore(
-                    staleResultDb,
-                    new RecordingOutbox()).RecordAwdpAsync(AwdpFixResult.Create(
-                        fixture.GameplayFactId,
-                        fixture.RuntimeInstanceId,
-                        1,
-                        AwdpFixOutcome.DefenseSucceeded,
-                        fixture.Now.AddSeconds(1)), cancellationToken);
-                await Assert.That(staleResult).IsEqualTo(InternalResultDisposition.Applied);
-            }
-
-            var replayOutbox = new RecordingOutbox();
-            await using (var replayDb = new NoCtfDbContext(options))
-            {
-                await BackendMessageHandlers.Handle(new CompleteAwdpFixRecovery(
-                    fixture.GameplayFactId,
-                    fixture.RuntimeInstanceId,
-                    1,
-                    fixture.RunnerPool,
-                    fixture.RunnerId,
-                    fixture.Now.AddSeconds(2)),
-                    replayDb,
-                    replayOutbox,
-                    cancellationToken);
-            }
-
-            await using (var verification = new NoCtfDbContext(options))
-            {
-                var runtimes = await verification.RuntimeInstances.AsNoTracking()
-                    .Where(runtime => runtime.GameplayFactId == fixture.GameplayFactId)
-                    .OrderBy(runtime => runtime.Generation)
-                    .ToArrayAsync(cancellationToken);
-                await Assert.That(runtimes.Length).IsEqualTo(1);
-                await Assert.That(runtimes[0].State).IsEqualTo(RuntimeState.Stopped);
-                var fact = await verification.GameplayFacts.AsNoTracking()
-                    .SingleAsync(item => item.Id == fixture.GameplayFactId, cancellationToken);
-                await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
-                await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
-            }
-            await Assert.That(replayOutbox.Messages.OfType<DispatchRuntime>().Count())
-                .IsEqualTo(0);
-
-            var obsoleteMessage = await AcquireAsync(options, request, cancellationToken);
-            await Assert.That(obsoleteMessage.Disposition)
+            await SetRuntimeStateAsync(
+                options,
+                fixture.RuntimeInstanceId,
+                RuntimeState.Stopped,
+                cancellationToken);
+            var stopped = await AcquireAsync(options, request, cancellationToken);
+            await Assert.That(stopped.Disposition)
                 .IsEqualTo(AwdpFixExecutionFenceDisposition.Superseded);
-
-            await using (var duplicateDb = new NoCtfDbContext(options))
-            {
-                await BackendMessageHandlers.Handle(new CompleteAwdpFixRecovery(
-                    fixture.GameplayFactId,
-                    fixture.RuntimeInstanceId,
-                    1,
-                    fixture.RunnerPool,
-                    fixture.RunnerId,
-                    fixture.Now.AddSeconds(2)),
-                    duplicateDb,
-                    replayOutbox,
-                    cancellationToken);
-            }
-            await Assert.That(replayOutbox.Messages.OfType<DispatchRuntime>().Count())
-                .IsEqualTo(0);
         });
     }
 
     [Test]
     [Timeout(300_000)]
-    public async Task Source_update_does_not_block_cleanup_without_replay(
+    public async Task Mismatched_or_expired_operation_is_superseded(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -136,112 +69,46 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             var options = Options(postgres);
             var fixture = await SeedAsync(options, cancellationToken);
             var request = Request(fixture);
-            _ = await AcquireAsync(options, request, cancellationToken);
-            _ = await AcquireAsync(options, request, cancellationToken);
-            await using (var mutation = new NoCtfDbContext(options))
-            {
-                var challenge = await mutation.CompetitionChallenges.SingleAsync(
-                    item => item.Id == fixture.CompetitionChallengeId,
-                    cancellationToken);
-                challenge.Order++;
-                await mutation.SaveChangesAsync(cancellationToken);
-            }
 
-            var outbox = new RecordingOutbox();
-            await using (var replayDb = new NoCtfDbContext(options))
-            {
-                await BackendMessageHandlers.Handle(new CompleteAwdpFixRecovery(
-                    fixture.GameplayFactId,
-                    fixture.RuntimeInstanceId,
-                    1,
-                    fixture.RunnerPool,
-                    fixture.RunnerId,
-                    fixture.Now.AddSeconds(2)),
-                    replayDb,
-                    outbox,
-                    cancellationToken);
-            }
+            var wrongFact = await AcquireAsync(
+                options,
+                request with { GameplayFactId = Guid.NewGuid() },
+                cancellationToken);
+            var wrongPatch = await AcquireAsync(
+                options,
+                request with { PatchUploadId = Guid.NewGuid() },
+                cancellationToken);
+            var wrongRunner = await AcquireAsync(
+                options,
+                request with { RunnerId = "runner-2" },
+                cancellationToken);
+            var expired = await AcquireAsync(
+                options,
+                request with { Deadline = fixture.Now.AddMinutes(-1) },
+                cancellationToken);
 
-            await using var verification = new NoCtfDbContext(options);
-            await Assert.That(await verification.RuntimeInstances.CountAsync(
-                runtime => runtime.GameplayFactId == fixture.GameplayFactId,
-                cancellationToken)).IsEqualTo(1);
-            var fact = await verification.GameplayFacts.AsNoTracking()
-                .SingleAsync(item => item.Id == fixture.GameplayFactId, cancellationToken);
-            await Assert.That(fact.State).IsEqualTo(GameplayFactState.PlatformFailed);
-            await Assert.That(fact.FailureCode)
-                .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
-            await Assert.That(outbox.Messages.OfType<DispatchRuntime>()).IsEmpty();
-        });
-    }
+            await Assert.That(new[]
+                {
+                    wrongFact.Disposition,
+                    wrongPatch.Disposition,
+                    wrongRunner.Disposition,
+                    expired.Disposition
+                })
+                .IsEquivalentTo(Enumerable.Repeat(
+                    AwdpFixExecutionFenceDisposition.Superseded,
+                    4));
 
-    [Test]
-    [Timeout(300_000)]
-    public async Task Published_result_wins_before_redelivery_without_creating_a_replacement(
-        CancellationToken cancellationToken)
-    {
-        await DockerIntegrationTest.RunAsync(async () =>
-        {
-            await using var postgres = await StartPostgresAsync(cancellationToken);
-            var options = Options(postgres);
-            var fixture = await SeedAsync(options, cancellationToken);
-            var request = Request(fixture);
-            _ = await AcquireAsync(options, request, cancellationToken);
+            await using var mutation = new NoCtfDbContext(options);
+            var fact = await mutation.GameplayFacts.SingleAsync(
+                item => item.Id == fixture.GameplayFactId,
+                cancellationToken);
+            fact.State = GameplayFactState.Completed;
+            fact.Result = GameplayFactResult.Correct;
+            await mutation.SaveChangesAsync(cancellationToken);
 
-            await using (var stageDb = new NoCtfDbContext(options))
-            {
-                var advanced = await new PostgresAwdpFixExecutionFence(
-                    stageDb,
-                    new RecordingOutbox(),
-                    TimeProvider.System).TryAdvanceStageAsync(new(
-                        fixture.GameplayFactId,
-                        fixture.RuntimeInstanceId,
-                        1,
-                        AwdpFixStage.PatchApplying,
-                        AwdpFixStage.CheckerRunning), cancellationToken);
-                await Assert.That(advanced).IsTrue();
-            }
-
-            await using (var resultDb = new NoCtfDbContext(options))
-            {
-                var resultOutbox = new RecordingOutbox();
-                var applied = await new InternalResultStore(
-                    resultDb,
-                    resultOutbox,
-                    new CompetitionEventStore(resultDb, resultOutbox)).RecordAwdpAsync(AwdpFixResult.Create(
-                        fixture.GameplayFactId,
-                        fixture.RuntimeInstanceId,
-                        1,
-                        AwdpFixOutcome.DefenseSucceeded,
-                        fixture.Now.AddSeconds(1)), cancellationToken);
-                await Assert.That(applied).IsEqualTo(InternalResultDisposition.Applied);
-            }
-
-            var redelivery = await AcquireAsync(options, request, cancellationToken);
-            await Assert.That(redelivery.Disposition)
+            var completed = await AcquireAsync(options, request, cancellationToken);
+            await Assert.That(completed.Disposition)
                 .IsEqualTo(AwdpFixExecutionFenceDisposition.Superseded);
-            await using var verification = new NoCtfDbContext(options);
-            await Assert.That(await verification.RuntimeInstances.CountAsync(
-                runtime => runtime.GameplayFactId == fixture.GameplayFactId,
-                cancellationToken)).IsEqualTo(1);
-            var fact = await verification.GameplayFacts.AsNoTracking()
-                .SingleAsync(item => item.Id == fixture.GameplayFactId, cancellationToken);
-            await Assert.That(fact.State).IsEqualTo(GameplayFactState.Completed);
-            await Assert.That(fact.Result).IsEqualTo(GameplayFactResult.Correct);
-            var runtime = await verification.RuntimeInstances.AsNoTracking()
-                .SingleAsync(item => item.Id == fixture.RuntimeInstanceId, cancellationToken);
-            await Assert.That(runtime.AwdpFixStage).IsEqualTo(AwdpFixStage.Completed);
-            var resolution = await verification.CompetitionEvents.AsNoTracking()
-                .SingleAsync(item => item.Kind == CompetitionEventKind.AwdpFixResolved,
-                    cancellationToken);
-            await Assert.That(resolution.Visibility)
-                .IsEqualTo(CompetitionEventVisibility.Public);
-            await Assert.That(resolution.TeamId).IsEqualTo(fixture.TeamId);
-            await Assert.That(resolution.CompetitionChallengeId)
-                .IsEqualTo(fixture.CompetitionChallengeId);
-            await Assert.That(resolution.GameplayFactId).IsEqualTo(fixture.GameplayFactId);
-            await Assert.That(resolution.Reason).IsNull();
-            await Assert.That(resolution.PayloadJson).DoesNotContain("flag{");
         });
     }
 
@@ -251,10 +118,8 @@ public sealed class AwdpFixExecutionFencePersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        return await new PostgresAwdpFixExecutionFence(
-            db,
-            new RecordingOutbox(),
-            TimeProvider.System).AcquireAsync(request, cancellationToken);
+        return await new PostgresAwdpFixExecutionFence(db, TimeProvider.System)
+            .AcquireAsync(request, cancellationToken);
     }
 
     private static AwdpFixExecutionFenceRequest Request(Fixture fixture) =>
@@ -263,10 +128,24 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             fixture.CompetitionChallengeId,
             fixture.PatchUploadId,
             fixture.RuntimeInstanceId,
-            1,
             fixture.Now.AddMinutes(15),
-            fixture.RunnerPool,
             fixture.RunnerId);
+
+    private static async Task SetRuntimeStateAsync(
+        DbContextOptions<NoCtfDbContext> options,
+        Guid runtimeInstanceId,
+        RuntimeState state,
+        CancellationToken cancellationToken)
+    {
+        await using var db = new NoCtfDbContext(options);
+        var runtime = await db.RuntimeInstances.SingleAsync(
+            item => item.Id == runtimeInstanceId,
+            cancellationToken);
+        runtime.State = state;
+        if (state == RuntimeState.Stopped)
+            runtime.StoppedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
 
     private static async Task<Fixture> SeedAsync(
         DbContextOptions<NoCtfDbContext> options,
@@ -282,25 +161,8 @@ public sealed class AwdpFixExecutionFencePersistenceTests
         var patchUploadId = Guid.NewGuid();
         var fileId = Guid.NewGuid();
         var runtimeId = Guid.NewGuid();
-        var runnerPool = "tests";
-        var runnerId = "runner-1";
-        var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-        var definition = new AwdpChallengeConfiguration(
-            AwdpChallengeConfiguration.CurrentSchemaVersion,
-            null,
-            null,
-            null,
-            null,
-            null,
-            new ChallengeRuntimeTemplate(
-                RuntimeAllocation.Shared,
-                new ContainerRuntimeDefinition(
-                    "target:latest",
-                    InternalPorts: [8080]),
-                new RuntimeResourceLimits(256 * 1024 * 1024, 250_000_000, 128),
-                TtlSeconds: 900,
-                OperationTimeoutSeconds: 120),
-            Checker: new("checker:latest"));
+        const string runnerId = "runner-1";
+
         await using var db = new NoCtfDbContext(options);
         await db.Database.EnsureCreatedAsync(cancellationToken);
         db.Users.Add(new User
@@ -338,7 +200,8 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             Mode = GameMode.Awdp,
             Title = "Fence target",
             Visibility = ChallengeVisibility.Private,
-            DefinitionJson = JsonSerializer.Serialize(definition, jsonOptions),
+            DefinitionJson = new GameModeChallengeConfigurationCatalog()
+                .GetDefaultJson(GameMode.Awdp),
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -409,11 +272,8 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             TeamId = teamId,
             Purpose = RuntimePurpose.AwdpTarget,
             GameplayFactId = factId,
-            AwdpFixStage = AwdpFixStage.PatchApplying,
-            Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
-            RunnerPool = runnerPool,
             RunnerId = runnerId,
             State = RuntimeState.Running,
             ProviderReceiptJson = "{}",
@@ -424,12 +284,10 @@ public sealed class AwdpFixExecutionFencePersistenceTests
         await db.SaveChangesAsync(cancellationToken);
         return new(
             now,
-            teamId,
             competitionChallengeId,
             factId,
             patchUploadId,
             runtimeId,
-            runnerPool,
             runnerId);
     }
 
@@ -451,58 +309,11 @@ public sealed class AwdpFixExecutionFencePersistenceTests
             .UseSnakeCaseNamingConvention()
             .Options;
 
-    private sealed class RecordingOutbox : ITransactionalMessageOutbox
-    {
-        public ConcurrentQueue<object> Messages { get; } = [];
-
-        public ValueTask PublishAsync<T>(T message)
-        {
-            Messages.Enqueue(message!);
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt)
-        {
-            Messages.Enqueue(message!);
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage
-        {
-            Messages.Enqueue(message!);
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage
-        {
-            Messages.Enqueue(message!);
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage
-        {
-            Messages.Enqueue(message!);
-            return ValueTask.CompletedTask;
-        }
-
-        public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerNodeMessage
-        {
-            Messages.Enqueue(message!);
-            return ValueTask.CompletedTask;
-        }
-
-        public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;
-    }
-
     private sealed record Fixture(
         DateTimeOffset Now,
-        Guid TeamId,
         Guid CompetitionChallengeId,
         Guid GameplayFactId,
         Guid PatchUploadId,
         Guid RuntimeInstanceId,
-        string RunnerPool,
         string RunnerId);
 }

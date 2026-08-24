@@ -146,7 +146,6 @@ public sealed class DockerComposeRuntimeIntegrationTests
                             ["noctf.io/managed"] = "true",
                             ["noctf.io/job-kind"] = "awd-checker",
                             ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
-                            ["noctf.io/generation"] = "1",
                             ["noctf.io/purpose"] = "awd-checker"
                         },
                         new Dictionary<int, int>(),
@@ -155,11 +154,10 @@ public sealed class DockerComposeRuntimeIntegrationTests
                         TimeSpan.FromMinutes(1),
                         OperationTimeout: TimeSpan.FromSeconds(30),
                         AllowInternalCallback: true,
-                        Generation: 1,
                         RuntimeInstanceId: operationId,
                         NetworkPurpose: ContainerNetworkPurpose.AwdChecker),
                     new AttachedComposeRuntimeTarget(
-                        new RuntimeResourceIdentity(operationId, 1),
+                        new RuntimeResourceIdentity(operationId),
                         receipt,
                         "db"),
                     cancellationToken);
@@ -178,9 +176,9 @@ public sealed class DockerComposeRuntimeIntegrationTests
                     .ToArray();
                 var operationDirectory = receipt.Namespace;
                 await Assert.That(await reconciler.ListManagedAsync(cancellationToken))
-                    .Contains(new RuntimeResourceIdentity(operationId, 1));
+                    .Contains(new RuntimeResourceIdentity(operationId));
                 await reconciler.DestroyByIdentityAsync(
-                    new(operationId, 1),
+                    new(operationId),
                     cancellationToken);
                 receipt = null;
 
@@ -410,7 +408,6 @@ public sealed class DockerComposeRuntimeIntegrationTests
     private static ComposeRequest Request(Guid operationId) => new(
         operationId,
         RuntimeProvider.Docker,
-        1,
         $"it-{operationId:N}",
         """
         services:
@@ -432,8 +429,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
         {
             ["noctf.io/managed"] = "true",
             ["noctf.io/job-kind"] = "persistent-runtime",
-            ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
-            ["noctf.io/generation"] = "1"
+            ["noctf.io/runtime-instance-id"] = operationId.ToString("D")
         },
         new Dictionary<string, RuntimeResourceLimits>
         {
@@ -466,7 +462,6 @@ public sealed class DockerComposeRuntimeIntegrationTests
     private static ComposeRequest PrivateRequest(Guid operationId) => new(
         operationId,
         RuntimeProvider.Docker,
-        1,
         $"down-{operationId:N}",
         """
         services:
@@ -481,8 +476,7 @@ public sealed class DockerComposeRuntimeIntegrationTests
         {
             ["noctf.io/managed"] = "true",
             ["noctf.io/job-kind"] = "persistent-runtime",
-            ["noctf.io/runtime-instance-id"] = operationId.ToString("D"),
-            ["noctf.io/generation"] = "1"
+            ["noctf.io/runtime-instance-id"] = operationId.ToString("D")
         },
         new Dictionary<string, RuntimeResourceLimits>
         {

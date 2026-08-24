@@ -19,7 +19,6 @@ namespace NoCTF.Runner.Messages;
 
 public sealed record AwdpCheckerWork(
     Guid RuntimeInstanceId,
-    int Generation,
     RuntimeProvider Provider,
     string Image,
     IReadOnlyList<string> Command,
@@ -49,10 +48,8 @@ public interface IAwdpFixWorkReader
 public sealed record AwdpFixRecoveryWork(
     Guid GameplayFactId,
     Guid RuntimeInstanceId,
-    int Generation,
     RuntimeProvider Provider,
     string? ProviderReceiptJson,
-    string RunnerPool,
     string RunnerId);
 
 public sealed record AwdpFixWorkClaim(
@@ -118,9 +115,7 @@ public sealed class AwdpFixWorkReader(
             message.CompetitionChallengeId,
             message.PatchUploadId,
             message.RuntimeInstanceId,
-            message.Generation,
             message.Deadline,
-            message.RunnerPool,
             message.RunnerId), cancellationToken);
         if (fenceResult.Disposition == AwdpFixExecutionFenceDisposition.Superseded)
             return new(AwdpFixExecutionFenceDisposition.Superseded);
@@ -131,10 +126,8 @@ public sealed class AwdpFixWorkReader(
                 Recovery: new(
                     message.GameplayFactId,
                     fenceResult.RuntimeInstanceId,
-                    fenceResult.Generation,
                     fenceResult.Provider,
                     fenceResult.ProviderReceiptJson,
-                    fenceResult.RunnerPool,
                     fenceResult.RunnerId));
         }
 
@@ -161,9 +154,7 @@ public sealed class AwdpFixWorkReader(
                     .Where(runtime => runtime.Id == message.RuntimeInstanceId
                         && runtime.Purpose == RuntimePurpose.AwdpTarget
                         && runtime.GameplayFactId == message.GameplayFactId
-                        && runtime.Generation == message.Generation
                         && runtime.State == RuntimeState.Running
-                        && runtime.RunnerPool == message.RunnerPool
                         && runtime.RunnerId == message.RunnerId),
                 pair => pair.GameplayFact.Id,
                 runtime => runtime.GameplayFactId,
@@ -253,7 +244,6 @@ public sealed class AwdpFixWorkReader(
             message.RunnerId,
             message.GameplayFactId,
             message.RuntimeInstanceId,
-            message.Generation,
             message.Deadline,
             now));
         var archiveToken = tokens.IssueFixArchiveRead(
@@ -281,7 +271,6 @@ public sealed class AwdpFixWorkReader(
                 TimeSpan.FromSeconds(settings.PatchTimeoutSeconds),
                 new(
                     message.RuntimeInstanceId,
-                    message.Generation,
                     target.Runtime.RuntimeProvider,
                     checker.Image,
                     checker.Command ?? [],
@@ -324,7 +313,6 @@ public sealed class AwdpCheckerExecutor(IOneShotRuntimeProviderCatalog providers
             NetworkName: work.NetworkId,
             OperationTimeout: work.Timeout,
             AllowInternalCallback: true,
-            Generation: work.Generation,
             RuntimeInstanceId: work.RuntimeInstanceId,
             NetworkPurpose: ContainerNetworkPurpose.AwdpVerification);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -361,7 +349,6 @@ public sealed class AwdpFixVerificationHandler(
     FixArchivePreparer preparer,
     IRuntimeProviderCatalog providers,
     IAwdpCheckerExecutor checker,
-    IAwdpFixExecutionFence executionFence,
     IEnumerable<IRuntimeManagedResourceReconciler> resourceReconcilers,
     IRunnerCapacityGate capacity,
     ITransactionalMessageOutbox outbox,
@@ -409,11 +396,10 @@ public sealed class AwdpFixVerificationHandler(
                 logger.LogWarning(
                     "AWDP Fix archive failed before patch execution. "
                     + "FailureCode={FailureCode} GameplayFactId={GameplayFactId} "
-                    + "RuntimeInstanceId={RuntimeInstanceId} Generation={Generation}",
+                    + "RuntimeInstanceId={RuntimeInstanceId}",
                     download,
                     message.GameplayFactId,
-                    message.RuntimeInstanceId,
-                    message.Generation);
+                    message.RuntimeInstanceId);
                 outcome = AwdpFixOutcome.PlatformFailed;
             }
             else
@@ -441,14 +427,6 @@ public sealed class AwdpFixVerificationHandler(
                     outcome = AwdpFixOutcome.PatchFailed;
                 else
                 {
-                    var advanced = await executionFence.TryAdvanceStageAsync(new(
-                        message.GameplayFactId,
-                        message.RuntimeInstanceId,
-                        message.Generation,
-                        AwdpFixStage.PatchApplying,
-                        AwdpFixStage.CheckerRunning), cancellationToken);
-                    if (!advanced)
-                        return;
                     var execution = await checker.ExecuteAsync(
                         work.Checker, cancellationToken);
                     outcome = AwdpCheckerCompletionPolicy.ResultFor(execution);
@@ -473,7 +451,6 @@ public sealed class AwdpFixVerificationHandler(
         await outbox.PublishAsync(AwdpFixResult.Create(
             message.GameplayFactId,
             message.RuntimeInstanceId,
-            message.Generation,
             result,
             DateTimeOffset.UtcNow));
         await outbox.FlushOutgoingMessagesAsync();
@@ -483,9 +460,7 @@ public sealed class AwdpFixVerificationHandler(
         AwdpFixRecoveryWork recovery,
         CancellationToken cancellationToken)
     {
-        var identity = new RuntimeResourceIdentity(
-            recovery.RuntimeInstanceId,
-            recovery.Generation);
+        var identity = new RuntimeResourceIdentity(recovery.RuntimeInstanceId);
         if (!string.IsNullOrWhiteSpace(recovery.ProviderReceiptJson))
         {
             await RuntimeReceiptCleanup.CleanupContainerAsync(
@@ -520,8 +495,6 @@ public sealed class AwdpFixVerificationHandler(
         await outbox.PublishAsync(new CompleteAwdpFixRecovery(
             recovery.GameplayFactId,
             recovery.RuntimeInstanceId,
-            recovery.Generation,
-            recovery.RunnerPool,
             recovery.RunnerId,
             DateTimeOffset.UtcNow));
         await outbox.FlushOutgoingMessagesAsync();

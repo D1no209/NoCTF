@@ -138,7 +138,7 @@ public sealed class TeamBanAppealPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7();
         var captainId = Guid.CreateVersion7();
@@ -227,16 +227,6 @@ public sealed class TeamBanAppealPersistenceTests
         }
 
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            ValueTask.CompletedTask;
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(
-            T message,
-            DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage =>
             ValueTask.CompletedTask;
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message)

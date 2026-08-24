@@ -38,7 +38,7 @@ public sealed class PlatformConfigurationPersistenceTests
             var caches = cacheServices.GetRequiredService<IFusionCacheProvider>();
 
             await using (var db = new NoCtfDbContext(options))
-                await db.Database.MigrateAsync(cancellationToken);
+                await db.Database.EnsureCreatedAsync(cancellationToken);
 
             await using (var db = new NoCtfDbContext(options))
             {

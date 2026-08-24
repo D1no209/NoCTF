@@ -9,7 +9,6 @@ namespace NoCTF.Infrastructure.GameplayFacts.Processing;
 
 public sealed class PostgresAwdpFixExecutionFence(
     NoCtfDbContext db,
-    ITransactionalMessageOutbox outbox,
     TimeProvider timeProvider) : IAwdpFixExecutionFence
 {
     public async Task<AwdpFixExecutionFenceResult> AcquireAsync(
@@ -31,34 +30,13 @@ public sealed class PostgresAwdpFixExecutionFence(
         if (!IsSameOperation(runtime, fact, request))
             return AwdpFixExecutionFenceResult.Superseded(request);
 
-        if (runtime!.State == RuntimeState.Running
-            && runtime.AwdpFixStage == AwdpFixStage.PatchApplying)
+        if (runtime!.State == RuntimeState.Running)
         {
             if (timeProvider.GetUtcNow() >= request.Deadline)
                 return AwdpFixExecutionFenceResult.Superseded(request);
 
-            runtime.AwdpFixStage = AwdpFixStage.CheckerRunning;
-            await outbox.ScheduleAsync(new ExpireAwdpFixVerification(
-                request.GameplayFactId,
-                runtime.Id,
-                runtime.Generation,
-                request.Deadline,
-                runtime.RunnerPool,
-                runtime.RunnerId!), request.Deadline);
-            await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            await outbox.FlushOutgoingMessagesAsync();
             return Result(AwdpFixExecutionFenceDisposition.Execute, runtime);
-        }
-
-        if (runtime.State == RuntimeState.Running
-            && runtime.AwdpFixStage == AwdpFixStage.CheckerRunning)
-        {
-            runtime.State = RuntimeState.Stopping;
-            runtime.RunnerAssignmentReleaseToken = null;
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return Result(AwdpFixExecutionFenceDisposition.Recover, runtime);
         }
 
         if (runtime.State == RuntimeState.Stopping)
@@ -68,45 +46,6 @@ public sealed class PostgresAwdpFixExecutionFence(
         }
 
         return AwdpFixExecutionFenceResult.Superseded(request);
-    }
-
-    public async Task<bool> TryAdvanceStageAsync(
-        AwdpFixStageTransitionRequest request,
-        CancellationToken cancellationToken)
-    {
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        var runtime = await db.RuntimeInstances
-            .FromSqlInterpolated($"""
-                SELECT *
-                FROM runtime_instances
-                WHERE id = {request.RuntimeInstanceId}
-                FOR UPDATE
-                """)
-            .SingleOrDefaultAsync(cancellationToken);
-        if (runtime is not
-            {
-                Purpose: RuntimePurpose.AwdpTarget,
-                State: RuntimeState.Running,
-                GameplayFactId: not null
-            }
-            || runtime.GameplayFactId != request.GameplayFactId
-            || runtime.Generation != request.Generation)
-        {
-            return false;
-        }
-
-        if (runtime.AwdpFixStage == request.NextStage)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return true;
-        }
-        if (runtime.AwdpFixStage != request.ExpectedStage)
-            return false;
-
-        runtime.AwdpFixStage = request.NextStage;
-        await db.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return true;
     }
 
     private static bool IsSameOperation(
@@ -121,8 +60,6 @@ public sealed class PostgresAwdpFixExecutionFence(
         }
         && runtime.GameplayFactId == request.GameplayFactId
         && runtime.CompetitionChallengeId == request.CompetitionChallengeId
-        && runtime.Generation == request.Generation
-        && string.Equals(runtime.RunnerPool, request.RunnerPool, StringComparison.Ordinal)
         && string.Equals(runtime.RunnerId, request.RunnerId, StringComparison.Ordinal)
         && fact is
         {
@@ -140,9 +77,7 @@ public sealed class PostgresAwdpFixExecutionFence(
         new(
             disposition,
             runtime.Id,
-            runtime.Generation,
             runtime.RuntimeProvider,
             runtime.ProviderReceiptJson,
-            runtime.RunnerPool,
             runtime.RunnerId!);
 }

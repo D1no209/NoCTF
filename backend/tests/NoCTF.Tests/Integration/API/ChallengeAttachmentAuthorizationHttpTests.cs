@@ -220,7 +220,7 @@ public sealed class ChallengeAttachmentAuthorizationHttpTests
         CancellationToken cancellationToken)
     {
         await using var db = CreateDbContext(connectionString);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var userId = Guid.CreateVersion7();
         var competitionId = Guid.CreateVersion7();

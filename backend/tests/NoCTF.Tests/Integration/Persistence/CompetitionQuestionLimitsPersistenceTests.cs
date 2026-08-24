@@ -656,7 +656,7 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
         public async Task InitializeAsync(CancellationToken ct)
         {
             await using var db = CreateDbContext();
-            await db.Database.MigrateAsync(ct);
+            await db.Database.EnsureCreatedAsync(ct);
             db.Users.AddRange(
                 User(OwnerId, "owner", UserRole.Organizer),
                 User(ManagerId, "manager", UserRole.Organizer),
@@ -775,12 +775,6 @@ public sealed class CompetitionQuestionLimitsPersistenceTests
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
             ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>

@@ -26,9 +26,10 @@ public sealed class AwdCheckerCallbackHttpTests
     public async Task Claims_are_forwarded_to_the_persistence_fence()
     {
         var runtimeId = Guid.Parse("0f66c20e-6064-4a20-a54e-bbe6a79aff56");
+        var gameplayFactId = Guid.Parse("1f66c20e-6064-4a20-a54e-bbe6a79aff56");
         var store = new CapturingInternalResultStore();
         await using var app = await CreateApplicationAsync(
-            Claims(runtimeId, checkerSequence: "23"),
+            Claims(runtimeId, gameplayFactId.ToString("D")),
             store);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Authorization =
@@ -42,8 +43,7 @@ public sealed class AwdCheckerCallbackHttpTests
         await Assert.That(store.AwdCalls).IsEqualTo(1);
         await Assert.That(store.AwdResult).IsNotNull();
         await Assert.That(store.AwdResult!.RuntimeInstanceId).IsEqualTo(runtimeId);
-        await Assert.That(store.AwdResult.Generation).IsEqualTo(3);
-        await Assert.That(store.AwdResult.CheckerSequence).IsEqualTo(23);
+        await Assert.That(store.AwdResult.GameplayFactId).IsEqualTo(gameplayFactId);
     }
 
     [Test]
@@ -52,7 +52,7 @@ public sealed class AwdCheckerCallbackHttpTests
         var runtimeId = Guid.Parse("0f66c20e-6064-4a20-a54e-bbe6a79aff56");
         var store = new CapturingInternalResultStore();
         await using var app = await CreateApplicationAsync(
-            Claims(runtimeId, checkerSequence: "not-a-number"),
+            Claims(runtimeId, gameplayFactId: "not-a-guid"),
             store);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Authorization =
@@ -79,7 +79,7 @@ public sealed class AwdCheckerCallbackHttpTests
             Disposition = disposition
         };
         await using var app = await CreateApplicationAsync(
-            Claims(runtimeId, checkerSequence: "23"),
+            Claims(runtimeId, Guid.NewGuid().ToString("D")),
             store);
         using var client = app.GetTestClient();
         client.DefaultRequestHeaders.Authorization =
@@ -128,8 +128,7 @@ public sealed class AwdCheckerCallbackHttpTests
                 .RequireClaim("permission", "awd:check-result:write")
                 .RequireClaim("resource")
                 .RequireClaim("runtime_instance_id")
-                .RequireClaim("generation")
-                .RequireClaim("checker_sequence")
+                .RequireClaim("gameplay_fact_id")
                 .RequireClaim("deadline"));
         });
         builder.Services.AddSingleton(store);
@@ -145,14 +144,13 @@ public sealed class AwdCheckerCallbackHttpTests
 
     private static IReadOnlyList<Claim> Claims(
         Guid runtimeId,
-        string checkerSequence) =>
+        string gameplayFactId) =>
     [
         new("token_type", "internal"),
         new("permission", "awd:check-result:write"),
         new("resource", $"runtime:{runtimeId:D}"),
         new("runtime_instance_id", runtimeId.ToString("D")),
-        new("generation", "3"),
-        new("checker_sequence", checkerSequence),
+        new("gameplay_fact_id", gameplayFactId),
         new(
             "deadline",
             DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds().ToString())

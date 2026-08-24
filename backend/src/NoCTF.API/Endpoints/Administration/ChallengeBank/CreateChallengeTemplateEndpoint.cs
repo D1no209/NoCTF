@@ -28,7 +28,7 @@ public enum SpecificationKindProtocol
     AwdRound,
     RuntimeDefinition,
     Hint,
-    RuntimeGeneration
+    RuntimeInstance
 }
 
 public sealed class CreateChallengeTemplateRequest

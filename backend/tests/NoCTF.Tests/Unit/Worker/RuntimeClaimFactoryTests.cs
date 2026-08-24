@@ -23,13 +23,13 @@ public sealed class RuntimeClaimFactoryTests
                 EgressPolicy: RuntimeEgressPolicy.Isolated),
             Limits: new(268_435_456, 500_000_000, 128));
 
-        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
+        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, "{}");
 
-        await Assert.That(claim).IsTypeOf<ClaimContainerRuntime>();
-        var container = (ClaimContainerRuntime)claim;
+        await Assert.That(claim).IsTypeOf<ProvisionContainerRuntime>();
+        var container = (ProvisionContainerRuntime)claim;
+        await Assert.That(container.RunnerId).IsEqualTo("runner-a");
         await Assert.That(container.Definition.Image).IsEqualTo("challenge:v1");
         await Assert.That(container.Definition.RuntimeInstanceId).IsEqualTo(instance.Id);
-        await Assert.That(container.Definition.Generation).IsEqualTo(instance.Generation);
         await Assert.That(container.Definition.NetworkIsolation)
             .IsEqualTo(ContainerNetworkIsolation.Isolated);
         await Assert.That(container.Definition.EgressPolicy)
@@ -59,8 +59,9 @@ public sealed class RuntimeClaimFactoryTests
                     ["ALL"],
                     null!)));
 
-        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+        var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
             instance,
+            "runner-a",
             GameMode.Ctf,
             template,
             "{}");
@@ -80,8 +81,9 @@ public sealed class RuntimeClaimFactoryTests
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 
-        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+        var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
             instance,
+            "runner-a",
             GameMode.Ctf,
             template,
             "{}",
@@ -111,8 +113,9 @@ public sealed class RuntimeClaimFactoryTests
             UrlBindings: [ownerOnlyUrl],
             FlagSource: RuntimeFlagSource.PerTeam);
 
-        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+        var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
             instance,
+            "runner-a",
             GameMode.Awdp,
             template,
             "{}",
@@ -138,6 +141,7 @@ public sealed class RuntimeClaimFactoryTests
 
         var action = () => RuntimeClaimFactory.Create(
             instance,
+            "runner-a",
             GameMode.Awdp,
             template,
             "{}");
@@ -160,14 +164,15 @@ public sealed class RuntimeClaimFactoryTests
                 EgressPolicy: RuntimeEgressPolicy.Isolated),
             Limits: new(268_435_456, 500_000_000, 128));
 
-        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
+        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, "{}");
 
-        await Assert.That(claim).IsTypeOf<ClaimComposeRuntime>();
-        var compose = (ClaimComposeRuntime)claim;
+        await Assert.That(claim).IsTypeOf<ProvisionComposeRuntime>();
+        var compose = (ProvisionComposeRuntime)claim;
+        await Assert.That(compose.RunnerId).IsEqualTo("runner-a");
         await Assert.That(compose.Definition.ComposeYaml)
             .IsEqualTo("services:\n  web:\n    image: challenge:v1");
         await Assert.That(compose.Definition.ProjectName)
-            .IsEqualTo($"noctf-{instance.Id:N}-{instance.Generation}");
+            .IsEqualTo($"noctf-{instance.Id:N}");
         await Assert.That(compose.Definition.EgressPolicy)
             .IsEqualTo(RuntimeEgressPolicy.Isolated);
         await Assert.That(compose.Definition.Labels["noctf.io/job-kind"])
@@ -188,8 +193,9 @@ public sealed class RuntimeClaimFactoryTests
                     new RunnerJobConfiguration("checker:v1"))),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
-        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+        var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
             instance,
+            "runner-a",
             GameMode.Awd,
             template,
             configuration);
@@ -220,8 +226,9 @@ public sealed class RuntimeClaimFactoryTests
                     TargetServiceName: "web")),
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
-        var claim = (ClaimComposeRuntime)RuntimeClaimFactory.Create(
+        var claim = (ProvisionComposeRuntime)RuntimeClaimFactory.Create(
             instance,
+            "runner-a",
             GameMode.Awd,
             template,
             configuration);
@@ -244,8 +251,9 @@ public sealed class RuntimeClaimFactoryTests
             new ContainerRuntimeDefinition("challenge:v1"),
             ControlCheckUrlBinding: control);
 
-        var claim = (ClaimContainerRuntime)RuntimeClaimFactory.Create(
+        var claim = (ProvisionContainerRuntime)RuntimeClaimFactory.Create(
             instance,
+            "runner-a",
             GameMode.Koh,
             template,
             "{}");
@@ -280,8 +288,9 @@ public sealed class RuntimeClaimFactoryTests
                 }),
             FlagSource: RuntimeFlagSource.PerTeam);
 
-        var claim = (ClaimComposeRuntime)RuntimeClaimFactory.Create(
+        var claim = (ProvisionComposeRuntime)RuntimeClaimFactory.Create(
             instance,
+            "runner-a",
             GameMode.Ctf,
             template,
             "{}",
@@ -305,7 +314,12 @@ public sealed class RuntimeClaimFactoryTests
                 FlagEnvironmentVariableName: "FLAG"),
             FlagSource: RuntimeFlagSource.PerTeam);
 
-        var action = () => RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
+        var action = () => RuntimeClaimFactory.Create(
+            instance,
+            "runner-a",
+            GameMode.Ctf,
+            template,
+            "{}");
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
@@ -321,16 +335,17 @@ public sealed class RuntimeClaimFactoryTests
                 "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
             Limits: new(1_073_741_824, 1_000_000_000, 256));
 
-        var claim = RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
+        var claim = RuntimeClaimFactory.Create(instance, "runner-a", GameMode.Ctf, template, "{}");
 
-        await Assert.That(claim).IsTypeOf<ClaimOvaRuntime>();
-        var ova = (ClaimOvaRuntime)claim;
+        await Assert.That(claim).IsTypeOf<ProvisionOvaRuntime>();
+        var ova = (ProvisionOvaRuntime)claim;
+        await Assert.That(ova.RunnerId).IsEqualTo("runner-a");
         await Assert.That(ova.Definition.OvaSource)
             .IsEqualTo(new Uri("file:///var/lib/noctf/challenge.ova"));
         await Assert.That(ova.Definition.Sha256)
             .IsEqualTo("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
         await Assert.That(ova.Definition.NetworkName)
-            .IsEqualTo($"noctf-{instance.Id:N}-{instance.Generation}");
+            .IsEqualTo($"noctf-{instance.Id:N}");
     }
 
     [Test]
@@ -347,7 +362,12 @@ public sealed class RuntimeClaimFactoryTests
                 }),
             Limits: new(268_435_456, 500_000_000, 128));
 
-        var action = () => RuntimeClaimFactory.Create(instance, GameMode.Ctf, template, "{}");
+        var action = () => RuntimeClaimFactory.Create(
+            instance,
+            "runner-a",
+            GameMode.Ctf,
+            template,
+            "{}");
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
@@ -359,10 +379,8 @@ public sealed class RuntimeClaimFactoryTests
             CompetitionId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
             CompetitionChallengeId = Guid.Parse("33333333-3333-3333-3333-333333333333"),
             TeamId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
-            Generation = 3,
             RuntimeKind = kind,
             RuntimeProvider = provider,
-            RunnerPool = "default",
             State = RuntimeState.Queued,
             CreatedAt = DateTimeOffset.Parse("2026-07-26T00:00:00Z")
         };

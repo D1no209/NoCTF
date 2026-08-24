@@ -16,7 +16,6 @@ public sealed class LibvirtRoutedNetworkManager(
 
     internal async Task<LibvirtRoutedNetwork> EnsureAsync(
         Guid operationId,
-        int generation,
         string networkName,
         CancellationToken cancellationToken)
     {
@@ -42,7 +41,7 @@ public sealed class LibvirtRoutedNetworkManager(
                 cancellationToken);
             var subnetCount = options.RoutedNetwork.SubnetCount(
                 options.RuntimeSubnetPrefixLength);
-            var startIndex = Ipv4Cidr.StableIndex(operationId, generation, subnetCount);
+            var startIndex = Ipv4Cidr.StableIndex(operationId, 0, subnetCount);
             Ipv4Cidr? selected = null;
             for (ulong offset = 0; offset < subnetCount; offset++)
             {

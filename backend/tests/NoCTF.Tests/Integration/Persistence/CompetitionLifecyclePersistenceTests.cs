@@ -51,7 +51,7 @@ public sealed class CompetitionLifecyclePersistenceTests
 
             await using (var seed = new NoCtfDbContext(options))
             {
-                await seed.Database.MigrateAsync(cancellationToken);
+                await seed.Database.EnsureCreatedAsync(cancellationToken);
                 seed.Users.Add(new User
                 {
                     Id = ownerId,
@@ -277,10 +277,7 @@ public sealed class CompetitionLifecyclePersistenceTests
             var runtime = await verify.RuntimeInstances.AsNoTracking().SingleAsync(
                 item => item.Id == fixture.RuntimeId,
                 cancellationToken);
-            await Assert.That(runtime.NextCheckerDueAt).IsNotNull();
-            await Assert.That(runtime.NextCheckerDueAt!.Value)
-                .IsGreaterThanOrEqualTo(pausedAt.AddMinutes(5));
-            await Assert.That(runtime.CheckerSequence).IsEqualTo(1);
+            await Assert.That(runtime.State).IsEqualTo(RuntimeState.Running);
             var flag = await verify.ChallengeFlags.AsNoTracking().SingleAsync(
                 item => item.Id == fixture.FlagId,
                 cancellationToken);
@@ -302,7 +299,7 @@ public sealed class CompetitionLifecyclePersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7(now);
         var competitionId = Guid.CreateVersion7(now);
@@ -375,7 +372,7 @@ public sealed class CompetitionLifecyclePersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var ownerId = Guid.CreateVersion7();
         var competitionId = Guid.CreateVersion7();
@@ -432,13 +429,10 @@ public sealed class CompetitionLifecyclePersistenceTests
             Id = runtimeId,
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
-            Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
-            RunnerPool = "awd",
             State = RuntimeState.Running,
             ProviderReceiptJson = "{\"id\":\"runtime\"}",
-            NextCheckerDueAt = now.AddMinutes(1),
             CreatedAt = now,
             RunningAt = now
         });
@@ -508,12 +502,6 @@ public sealed class CompetitionLifecyclePersistenceTests
             Scheduled.Add((message!, scheduledAt));
             return ValueTask.CompletedTask;
         }
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
-            throw new NotSupportedException();
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => throw new NotSupportedException();
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage =>
             throw new NotSupportedException();

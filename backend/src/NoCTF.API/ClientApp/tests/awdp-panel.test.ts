@@ -24,7 +24,8 @@ describe('AWDP participant panel', () => {
 
     expect(source).toContain('requestAwdpDefenseTargetEndpoint')
     expect(source).toContain('uploadPatchEndpoint')
-    expect(source).toContain('AwaitingPatch')
+    expect(source).toContain("props.defense?.runtimeState === 'Running'")
+    expect(source).toContain('!props.defense.gameplayFactId')
     expect(source).toContain('申请防御环境')
     expect(source).toContain('上传本次 Fix 包')
     expect(source).toContain('正在验证本次 Fix')

@@ -1487,7 +1487,7 @@ export const englishMessages: Record<string, string> = {
   "将「{team}」的封禁标记为误封并纠正。": "Mark the ban of “{team}” as incorrect and publish a correction.",
   "将吊销用户「{user}」的全部访问与刷新令牌，该用户需要重新登录。": "Revoke all access and refresh tokens for “{user}”. The user must sign in again.",
   "将把模板「{title}」的负责人转让给用户 {user}，你将失去负责人身份。此操作立即生效。": "Transfer ownership of “{title}” to user {user}. You will lose ownership immediately.",
-  "将立即停止并清理「{team}」在「{challenge}」的第 {generation} 代实例。该操作不会重建环境。": "Immediately stop and clean generation {generation} of “{challenge}” for “{team}”. The environment will not be recreated.",
+  "将立即停止并清理「{team}」在「{challenge}」的实例。该操作不会重建环境。": "Immediately stop and clean the instance for “{team}” on “{challenge}”. The environment will not be recreated.",
   "将立即恢复「{team}」的参赛资格、历史计分资格和正常运行时生命周期。": "Immediately restore “{team}”'s eligibility, historical scoring eligibility, and normal runtime lifecycle.",
   "将软删除模板「{title}」，之后可以恢复。已被竞赛引用的历史数据不受影响。": "Soft-delete template “{title}”. It can be restored later, and historical competition references are preserved.",
   "将软删除该 Flag（{flag}），之后可以恢复。": "Soft-delete this Flag ({flag}). It can be restored later.",

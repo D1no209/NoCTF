@@ -211,7 +211,7 @@ public sealed class AwdpGameplayFactEvaluator(IGameplayFactEvaluator inner) : IG
         {
             ApplicableFlags = context.ApplicableFlags
                 .Where(flag => flag.MatchKind == ChallengeFlagMatchKind.Exact)
-                .Where(flag => flag.SpecificationKind == SpecificationKind.RuntimeGeneration)
+                .Where(flag => flag.SpecificationKind == SpecificationKind.RuntimeInstance)
                 .ToArray(),
             PriorFacts = []
         };

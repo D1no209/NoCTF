@@ -102,37 +102,8 @@ public sealed class CompetitionLifecycleStore(
         var now = DateTimeOffset.UtcNow;
         if (competition.Mode == GameMode.Awd)
         {
-            if (from == CompetitionStatus.Running && to == CompetitionStatus.Paused)
+            if (from == CompetitionStatus.Paused && to == CompetitionStatus.Running)
             {
-                await db.RuntimeInstances
-                    .Where(instance => instance.CompetitionId == competitionId
-                        && instance.NextCheckerDueAt != null)
-                    .ExecuteUpdateAsync(
-                        setters => setters
-                            .SetProperty(
-                                instance => instance.NextCheckerDueAt,
-                                (DateTimeOffset?)null)
-                            .SetProperty(
-                                instance => instance.CheckerSequence,
-                                instance => instance.CheckerSequence + 1)
-                            .SetProperty(
-                                instance => instance.LastAppliedCheckerSequence,
-                                instance => instance.CheckerSequence + 1)
-                            .SetProperty(
-                                instance => instance.CheckerDeadlineAt,
-                                (DateTimeOffset?)null),
-                        cancellationToken);
-            }
-            else if (from == CompetitionStatus.Paused && to == CompetitionStatus.Running)
-            {
-                await db.RuntimeInstances
-                    .Where(instance => instance.CompetitionId == competitionId
-                        && instance.State == NoCTF.Domain.Runtime.RuntimeState.Running)
-                    .ExecuteUpdateAsync(
-                        setters => setters.SetProperty(
-                            instance => instance.NextCheckerDueAt,
-                            now),
-                        cancellationToken);
                 var pauseEvent = await db.CompetitionEvents.AsNoTracking()
                     .Where(@event => @event.CompetitionId == competitionId
                         && @event.Kind == CompetitionEventKind.CompetitionLifecycleChanged)

@@ -52,12 +52,12 @@ public sealed class AwdpParticipantStatePersistenceTests
             await Assert.That(state).IsNotNull();
             await Assert.That(state!.CurrentRound).IsEqualTo(3);
             await Assert.That(state.AttackRuntime?.Id).IsEqualTo(fixture.AttackRuntimeId);
-            await Assert.That(state.AttackRuntime?.Generation).IsEqualTo(2);
+            await Assert.That(state.AttackRuntime?.Id).IsEqualTo(fixture.AttackRuntimeId);
             await Assert.That(state.BreakActivation?.GameplayFactId).IsEqualTo(fixture.BreakFactId);
             await Assert.That(state.BreakActivation?.EffectiveRound).IsEqualTo(1);
             await Assert.That(state.LatestBreakAttempt?.Result).IsEqualTo(GameplayFactResult.Wrong);
             await Assert.That(state.Defense.GameplayFactId).IsEqualTo(fixture.FixFactId);
-            await Assert.That(state.Defense.Stage).IsEqualTo(AwdpFixStage.Completed);
+            await Assert.That(state.Defense.RuntimeState).IsEqualTo(RuntimeState.Stopped);
             await Assert.That(state.Defense.Result).IsEqualTo(GameplayFactResult.Correct);
             await Assert.That(state.FixActivation?.EffectiveRound).IsEqualTo(2);
 
@@ -136,7 +136,7 @@ public sealed class AwdpParticipantStatePersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var userId = Guid.CreateVersion7(now);
         var competitionId = Guid.CreateVersion7(now.AddMilliseconds(1));
         var challengeId = Guid.CreateVersion7(now.AddMilliseconds(2));
@@ -213,10 +213,8 @@ public sealed class AwdpParticipantStatePersistenceTests
                 CompetitionChallengeId = competitionChallengeId,
                 TeamId = teamId,
                 Purpose = RuntimePurpose.AwdpAttack,
-                Generation = 2,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
-                RunnerPool = "awdp-state",
                 RunnerId = "runner-state",
                 State = RuntimeState.Running,
                 ProviderReceiptJson = "{}",
@@ -233,11 +231,8 @@ public sealed class AwdpParticipantStatePersistenceTests
                 TeamId = teamId,
                 Purpose = RuntimePurpose.AwdpTarget,
                 GameplayFactId = fixFactId,
-                AwdpFixStage = AwdpFixStage.Completed,
-                Generation = 1,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
-                RunnerPool = "awdp-state",
                 State = RuntimeState.Stopped,
                 CreatedAt = now.AddSeconds(-75),
                 RunningAt = now.AddSeconds(-74),
@@ -260,7 +255,7 @@ public sealed class AwdpParticipantStatePersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var ownerId = Guid.CreateVersion7(now);
         var competitionId = Guid.CreateVersion7(now.AddMilliseconds(1));
         db.Users.Add(User(ownerId, "round-owner", now));
@@ -425,12 +420,6 @@ public sealed class AwdpParticipantStatePersistenceTests
 
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;

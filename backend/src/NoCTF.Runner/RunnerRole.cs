@@ -41,20 +41,15 @@ public static class RunnerRole
         IConfiguration configuration,
         bool durable = true)
     {
-        var runnerPool = configuration["Runner:Pool"] ?? "default";
         var runnerId = configuration["Runner:Id"]
             ?? throw new InvalidOperationException("Runner:Id is required.");
-        var poolQueueName = RunnerQueueName.FromPool(runnerPool);
-        var nodeQueueName = RunnerNodeQueueName.FromAssignment(runnerPool, runnerId);
+        var nodeQueueName = RunnerNodeQueueName.FromRunnerId(runnerId);
 
         options.Discovery.IncludeAssembly(typeof(RuntimeProviderHandler).Assembly);
         options.Durability.Mode = DurabilityMode.Balanced;
         options.ConfigureNoCtfInfrastructureRetries();
         if (durable)
-        {
-            options.ListenToPostgresqlQueue(poolQueueName.Value).UseDurableInbox();
             options.ListenToPostgresqlQueue(nodeQueueName.Value).UseDurableInbox();
-        }
     }
 
 }

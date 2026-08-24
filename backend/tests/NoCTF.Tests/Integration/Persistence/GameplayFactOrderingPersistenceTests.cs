@@ -70,8 +70,7 @@ public sealed class GameplayFactOrderingPersistenceTests
                         unrelatedRuntimeId,
                         fixture.TeamIds[0],
                         RuntimePurpose.AwdpTarget,
-                        defenseFactId,
-                        AwdpFixStage.AwaitingPatch));
+                        defenseFactId));
                 }
                 setup.GameplayFacts.Add(Fact(
                     fixture,
@@ -492,7 +491,7 @@ public sealed class GameplayFactOrderingPersistenceTests
             .Select(_ => Guid.CreateVersion7())
             .ToArray();
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         db.Users.Add(User(ownerId, "fact-owner", UserRole.Organizer, now));
         for (var index = 0; index < teamCount; index++)
         {
@@ -611,8 +610,7 @@ public sealed class GameplayFactOrderingPersistenceTests
         Guid id,
         Guid teamId,
         RuntimePurpose purpose,
-        Guid? gameplayFactId = null,
-        AwdpFixStage? fixStage = null) => new()
+        Guid? gameplayFactId = null) => new()
         {
             Id = id,
             CompetitionId = fixture.CompetitionId,
@@ -620,11 +618,8 @@ public sealed class GameplayFactOrderingPersistenceTests
             TeamId = teamId,
             Purpose = purpose,
             GameplayFactId = gameplayFactId,
-            AwdpFixStage = fixStage,
-            Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
-            RunnerPool = "fact-tests",
             RunnerId = "runner-fact-tests",
             State = RuntimeState.Running,
             ProviderReceiptJson = "{}",
@@ -682,14 +677,6 @@ public sealed class GameplayFactOrderingPersistenceTests
         }
 
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            ValueTask.CompletedTask;
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
             ValueTask.CompletedTask;
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message)

@@ -78,7 +78,6 @@ public sealed class CompetitionPracticeModePersistenceTests
                 var runtime = await db.RuntimeInstances.SingleAsync(
                     item => item.Purpose == RuntimePurpose.Practice,
                     ct);
-                await Assert.That(runtime.Generation).IsEqualTo(1);
                 await Assert.That(runtime.Purpose).IsEqualTo(RuntimePurpose.Practice);
                 runtime.State = RuntimeState.Running;
                 runtime.RunningAt = fixture.Now;
@@ -293,10 +292,8 @@ public sealed class CompetitionPracticeModePersistenceTests
         CompetitionChallengeId = fixture.CompetitionChallengeId,
         TeamId = fixture.TeamId,
         Purpose = purpose,
-        Generation = 1,
         RuntimeKind = RuntimeKind.Container,
         RuntimeProvider = RuntimeProvider.Docker,
-        RunnerPool = "practice-tests",
         State = state,
         CreatedAt = fixture.Now,
         RunningAt = state == RuntimeState.Running ? fixture.Now : null,
@@ -333,8 +330,6 @@ public sealed class CompetitionPracticeModePersistenceTests
             return ValueTask.CompletedTask;
         }
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) => ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt) where T : IRunnerPoolMessage => ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage => ValueTask.CompletedTask;
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt) where T : IRunnerNodeMessage => ValueTask.CompletedTask;
         public Task FlushOutgoingMessagesAsync() => Task.CompletedTask;

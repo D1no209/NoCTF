@@ -18,10 +18,8 @@ public sealed record RuntimeInstanceView(
     Guid CompetitionChallengeId,
     Guid? TeamId,
     RuntimePurpose Purpose,
-    int Generation,
     RuntimeKind RuntimeKind,
     RuntimeProvider Provider,
-    string RunnerPool,
     RuntimeState State,
     RuntimeFailureCode? FailureCode,
     IReadOnlyList<string> Urls,
@@ -30,8 +28,6 @@ public sealed record RuntimeInstanceView(
     DateTimeOffset? ExpiresAt,
     DateTimeOffset? StoppedAt,
     string? RunnerId = null,
-    string? ProviderReceiptJson = null,
-    string? ControlCheckUrl = null,
     IReadOnlyList<RuntimePublishedPortView>? PublishedPorts = null,
     DateTimeOffset? StateChangedAt = null,
     Guid? SourceTeamId = null,
@@ -40,8 +36,7 @@ public sealed record RuntimeInstanceView(
 public sealed record RuntimePublishedPortView(
     string? ServiceName,
     int ContainerPort,
-    int HostPort,
-    DateTimeOffset AllocatedAt);
+    int HostPort);
 
 public sealed record RuntimeMutationCommand(
     Guid CompetitionId,

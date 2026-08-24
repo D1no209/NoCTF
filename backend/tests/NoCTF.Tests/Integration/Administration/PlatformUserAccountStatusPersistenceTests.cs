@@ -32,7 +32,7 @@ public sealed class PlatformUserAccountStatusPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using (var migrationDb = new NoCtfDbContext(options))
-                await migrationDb.Database.MigrateAsync(cancellationToken);
+                await migrationDb.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var actorId = Guid.CreateVersion7(now);
@@ -125,7 +125,7 @@ public sealed class PlatformUserAccountStatusPersistenceTests
                 .UseSnakeCaseNamingConvention()
                 .Options;
             await using (var migrationDb = new NoCtfDbContext(options))
-                await migrationDb.Database.MigrateAsync(cancellationToken);
+                await migrationDb.Database.EnsureCreatedAsync(cancellationToken);
 
             var now = DateTimeOffset.UtcNow;
             var actorId = Guid.CreateVersion7(now);

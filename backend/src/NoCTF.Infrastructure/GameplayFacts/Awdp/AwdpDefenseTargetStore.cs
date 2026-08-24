@@ -113,8 +113,7 @@ public sealed class AwdpDefenseTargetStore(
                 || instance.State == RuntimeState.Running
                 || instance.State == RuntimeState.Stopping
                 || instance.State == RuntimeState.Failed
-                    && (instance.ProviderReceiptJson != null
-                        || instance.RunnerAssignmentReleaseToken != null)),
+                    && instance.ProviderReceiptJson != null),
             cancellationToken);
         if (activeTargetExists)
             return new(AwdpDefenseTargetRequestState.ActiveTargetExists);
@@ -148,18 +147,11 @@ public sealed class AwdpDefenseTargetStore(
             return new(AwdpDefenseTargetRequestState.InvalidConfiguration);
         }
 
-        var generation = checked((await db.RuntimeInstances
-            .Where(instance => instance.CompetitionId == competitionId
-                && instance.CompetitionChallengeId == competitionChallengeId
-                && instance.TeamId == scope.TeamId
-                && instance.Purpose == RuntimePurpose.AwdpTarget)
-            .MaxAsync(instance => (int?)instance.Generation, cancellationToken) ?? 0) + 1);
         var runtimeInstanceId = Guid.CreateVersion7(now);
         try
         {
             _ = AwdpTargetDefinitionFactory.Create(
                 runtimeInstanceId,
-                generation,
                 template,
                 placement.Provider,
                 now);
@@ -177,7 +169,6 @@ public sealed class AwdpDefenseTargetStore(
             runtimeInstanceId,
             template,
             placement,
-            generation,
             now);
         db.RuntimeInstances.Add(target);
         await outbox.PublishAsync(new DispatchRuntime(target.Id));
@@ -191,8 +182,7 @@ public sealed class AwdpDefenseTargetStore(
             TeamId: scope.TeamId,
             CompetitionChallengeId: competitionChallengeId,
             RuntimeInstanceId: target.Id,
-            RuntimeState: target.State,
-            RuntimeGeneration: target.Generation), cancellationToken);
+            RuntimeState: target.State), cancellationToken);
         try
         {
             await db.SaveChangesAsync(cancellationToken);

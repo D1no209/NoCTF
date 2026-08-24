@@ -21,15 +21,13 @@ public sealed class LibvirtRuntimeResourceReconciler(
     public async Task<IReadOnlyList<RuntimeResourceIdentity>> ListManagedAsync(
         CancellationToken cancellationToken) =>
         (await runtime.ListManagedAsync(cancellationToken))
-        .Select(resource => new RuntimeResourceIdentity(
-            resource.OperationId,
-            resource.Generation))
+        .Select(resource => new RuntimeResourceIdentity(resource.OperationId))
         .ToArray();
 
     public Task DestroyByIdentityAsync(
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken) =>
         runtime.DestroyByIdentityAsync(
-            new(identity.RuntimeInstanceId, identity.Generation),
+            new(identity.RuntimeInstanceId),
             cancellationToken);
 }

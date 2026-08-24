@@ -36,9 +36,10 @@ public sealed class LibvirtOvaRuntimeIntegrationTests
             "noctf-libvirt-integration",
             Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        var operationId = Guid.NewGuid();
-        var initialIdentity = new OvaManagedRuntimeResource(operationId, 0);
-        var replacementIdentity = new OvaManagedRuntimeResource(operationId, 1);
+        var initialRuntimeId = Guid.NewGuid();
+        var replacementRuntimeId = Guid.NewGuid();
+        var initialIdentity = new OvaManagedRuntimeResource(initialRuntimeId);
+        var replacementIdentity = new OvaManagedRuntimeResource(replacementRuntimeId);
         var ovaPath = Path.Combine(root, "appliance.ova");
         var options = new LibvirtRuntimeOptions(
             Path.Combine(root, "cache"),
@@ -62,8 +63,7 @@ public sealed class LibvirtOvaRuntimeIntegrationTests
                 runtime,
                 ovaPath,
                 digest,
-                operationId,
-                initialIdentity.Generation,
+                initialRuntimeId,
                 cancellationToken);
 
             await Assert.That(receipt.VirtualMachines).HasSingleItem();
@@ -87,8 +87,7 @@ public sealed class LibvirtOvaRuntimeIntegrationTests
                 runtime,
                 ovaPath,
                 digest,
-                operationId,
-                replacementIdentity.Generation,
+                replacementRuntimeId,
                 cancellationToken);
             await Assert.That(replacement.VirtualMachines).HasSingleItem();
             await Assert.That(IPAddress.TryParse(
@@ -116,16 +115,14 @@ public sealed class LibvirtOvaRuntimeIntegrationTests
         IOvaRuntime runtime,
         string ovaPath,
         string digest,
-        Guid operationId,
-        int generation,
+        Guid runtimeInstanceId,
         CancellationToken cancellationToken) =>
         runtime.ImportAsync(
             new OvaRuntimeRequest(
-                operationId,
-                generation,
+                runtimeInstanceId,
                 new Uri(ovaPath),
                 digest,
-                $"noctf-{operationId:N}-{generation}",
+                $"noctf-{runtimeInstanceId:N}",
                 new(512 * 1024 * 1024, 1_000_000_000, 256),
                 TimeSpan.FromMinutes(10),
                 TimeSpan.FromMinutes(5)),

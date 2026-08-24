@@ -7,7 +7,7 @@ namespace NoCTF.Tests.Unit.Runner;
 public sealed class RuntimeUrlExpanderTests
 {
     [Test]
-    public async Task Container_bindings_use_public_mapping_and_private_control_address()
+    public async Task Container_bindings_use_public_mapping()
     {
         var receipt = new ContainerReceipt(
             Guid.CreateVersion7(),
@@ -22,24 +22,12 @@ public sealed class RuntimeUrlExpanderTests
             new("http://{HOST}:{PORT}/owner", RuntimeExposure.OwnerOnly, ContainerPort: 8080),
             new("http://{HOST}:{PORT}/play", RuntimeExposure.Participants, ContainerPort: 8080)
         ];
-        var control = new RuntimeUrlBinding(
-            "http://{HOST}:{PORT}/control",
-            RuntimeExposure.OwnerOnly,
-            ContainerPort: 8080);
-
         var expanded = RuntimeUrlExpander.ExpandContainer(
             receipt,
-            bindings,
-            control,
-            new RuntimeInternalEndpointBinding());
+            bindings);
 
         await Assert.That(expanded.Urls).IsEquivalentTo(
             ["http://runner.example:32000/owner", "http://runner.example:32000/play"]);
-        await Assert.That(expanded.ParticipantUrlIndexes).IsEquivalentTo([1]);
-        await Assert.That(expanded.ControlCheckUrl)
-            .IsEqualTo("http://container-1:8080/control");
-        await Assert.That(expanded.AwdCheckerTargetHost)
-            .IsEqualTo("container-1");
     }
 
     [Test]
@@ -56,8 +44,7 @@ public sealed class RuntimeUrlExpanderTests
 
         await Assert.That(() => RuntimeUrlExpander.ExpandContainer(
                 receipt,
-                [new("http://{HOST}:{PORT}", RuntimeExposure.Participants, ContainerPort: 8080)],
-                null))
+                [new("http://{HOST}:{PORT}", RuntimeExposure.Participants, ContainerPort: 8080)]))
             .Throws<InvalidOperationException>();
     }
 
@@ -75,8 +62,7 @@ public sealed class RuntimeUrlExpanderTests
 
         await Assert.That(() => RuntimeUrlExpander.ExpandContainer(
                 receipt,
-                [new("javascript://{HOST}:{PORT}/unsafe", RuntimeExposure.OwnerOnly, ContainerPort: 8080)],
-                null))
+                [new("javascript://{HOST}:{PORT}/unsafe", RuntimeExposure.OwnerOnly, ContainerPort: 8080)]))
             .Throws<InvalidOperationException>();
     }
 
@@ -89,7 +75,6 @@ public sealed class RuntimeUrlExpanderTests
             "noctf-runtime",
             "/tmp/noctf-runtime",
             "runner.example",
-            2,
             DateTimeOffset.UtcNow);
         var status = new ComposeStatus(
             receipt.ProjectName,
@@ -110,24 +95,12 @@ public sealed class RuntimeUrlExpanderTests
                 ContainerPort: 8080,
                 ServiceName: "web")
         ];
-        var control = new RuntimeUrlBinding(
-            "http://{HOST}:{PORT}/control",
-            RuntimeExposure.OwnerOnly,
-            ContainerPort: 8080,
-            ServiceName: "web");
-
         var expanded = RuntimeUrlExpander.ExpandCompose(
             receipt,
             status,
-            bindings,
-            control,
-            new RuntimeInternalEndpointBinding("web"));
+            bindings);
 
         await Assert.That(expanded.Urls)
             .IsEquivalentTo(["http://runner.example:32000/play"]);
-        await Assert.That(expanded.ParticipantUrlIndexes).IsEquivalentTo([0]);
-        await Assert.That(expanded.ControlCheckUrl)
-            .IsEqualTo("http://web:8080/control");
-        await Assert.That(expanded.AwdCheckerTargetHost).IsEqualTo("web");
     }
 }

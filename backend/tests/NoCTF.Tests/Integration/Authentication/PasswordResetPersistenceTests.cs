@@ -34,7 +34,7 @@ public sealed class PasswordResetPersistenceTests
 
             await using (var setupDb = new NoCtfDbContext(options))
             {
-                await setupDb.Database.MigrateAsync(cancellationToken);
+                await setupDb.Database.EnsureCreatedAsync(cancellationToken);
                 await new AuthenticationStore(setupDb, hasher).CreateAsync(
                     userId,
                     "ResetOwner",
@@ -151,7 +151,7 @@ public sealed class PasswordResetPersistenceTests
             var outbox = new RecordingOutbox();
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             db.Users.AddRange(
                 CreateUser("unverified", UserKind.Human, UserAccountStatus.Active, false, now),
                 CreateUser("bot", UserKind.Bot, UserAccountStatus.Active, true, now),
@@ -301,10 +301,6 @@ public sealed class PasswordResetPersistenceTests
 
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
             ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : IRunnerNodeMessage => ValueTask.CompletedTask;
         public ValueTask ScheduleToRunnerNodeAsync<T>(T message, DateTimeOffset scheduledAt)

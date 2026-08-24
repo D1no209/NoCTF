@@ -274,8 +274,6 @@ public sealed class AwdpFullBoundaryTests
             .IsNotEqualTo(blueRuntime.GetProperty("id").GetGuid());
         await Assert.That(blueRuntime.GetProperty("id").GetGuid())
             .IsNotEqualTo(blueDefenseTargetId);
-        await Assert.That(redRuntime.GetProperty("generation").GetInt32()).IsGreaterThanOrEqualTo(1);
-        await Assert.That(blueRuntime.GetProperty("generation").GetInt32()).IsGreaterThanOrEqualTo(1);
         var redUrl = redRuntime.GetProperty("urls")[0].GetString()
             ?? throw new InvalidOperationException("Red attack Runtime did not expose a URL.");
         var blueUrl = blueRuntime.GetProperty("urls")[0].GetString()
@@ -505,7 +503,6 @@ public sealed class AwdpFullBoundaryTests
             cancellationToken);
         await Assert.That(redGenerationTwo.GetProperty("id").GetGuid())
             .IsNotEqualTo(redRuntime.GetProperty("id").GetGuid());
-        await Assert.That(redGenerationTwo.GetProperty("generation").GetInt32()).IsEqualTo(2);
         var redGenerationTwoUrl = redGenerationTwo.GetProperty("urls")[0].GetString()
             ?? throw new InvalidOperationException("Reset attack Runtime did not expose a URL.");
         var redGenerationTwoFlag = await PollTextAsync(

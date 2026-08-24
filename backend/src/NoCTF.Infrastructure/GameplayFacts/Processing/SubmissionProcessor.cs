@@ -606,7 +606,8 @@ public sealed class GameplayFactProcessor(
                     || instance.State == RuntimeState.Running
                     || instance.State == RuntimeState.Failed
                         && instance.ProviderReceiptJson != null))
-            .OrderBy(instance => instance.Generation)
+            .OrderBy(instance => instance.CreatedAt)
+            .ThenBy(instance => instance.Id)
             .ToListAsync(ct);
         foreach (var runtime in runtimes)
         {
@@ -618,7 +619,6 @@ public sealed class GameplayFactProcessor(
             else
             {
                 runtime.State = RuntimeState.Stopping;
-                runtime.RunnerAssignmentReleaseToken = null;
                 await outbox.PublishAsync(new StopRuntime(runtime.Id));
             }
 
@@ -633,8 +633,7 @@ public sealed class GameplayFactProcessor(
                 CompetitionChallengeId: runtime.CompetitionChallengeId,
                 RuntimeInstanceId: runtime.Id,
                 GameplayFactId: submission.Id,
-                RuntimeState: runtime.State,
-                RuntimeGeneration: runtime.Generation), ct);
+                RuntimeState: runtime.State), ct);
         }
     }
 

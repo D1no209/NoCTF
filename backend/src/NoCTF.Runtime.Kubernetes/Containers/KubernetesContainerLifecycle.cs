@@ -71,8 +71,6 @@ public sealed class KubernetesContainerLifecycle(
         labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
         labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
             ?? request.OperationId).ToString("D");
-        labels["noctf.io/generation"] = request.Generation.ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
         if (request.AllowInternalCallback)
             labels["noctf.io/purpose"] = CallbackPurpose(request.NetworkPurpose);
         if (request.NetworkPurpose == ContainerNetworkPurpose.PersistentRuntime
@@ -158,8 +156,7 @@ public sealed class KubernetesContainerLifecycle(
             return new(request.OperationId, RuntimeProvider.Kubernetes, name, RuntimeStatus.Pending,
                 services.PublishedPorts, options.PublicHost,
                 services.InternalHost ?? $"{name}.{options.Namespace}.svc",
-                RuntimeInstanceId: request.RuntimeInstanceId,
-                Generation: request.Generation);
+                RuntimeInstanceId: request.RuntimeInstanceId);
         }
         catch
         {
@@ -236,8 +233,6 @@ public sealed class KubernetesContainerLifecycle(
         labels["noctf.io/job-kind"] = JobKind(request.NetworkPurpose);
         labels["noctf.io/runtime-instance-id"] = (request.RuntimeInstanceId
             ?? request.OperationId).ToString("D");
-        labels["noctf.io/generation"] = request.Generation.ToString(
-            System.Globalization.CultureInfo.InvariantCulture);
         if (request.AllowInternalCallback)
             _ = await EnsureInternalCallbackPolicyAsync(
                 name,
@@ -272,8 +267,7 @@ public sealed class KubernetesContainerLifecycle(
             services.PublishedPorts,
             options.PublicHost,
             services.InternalHost ?? $"{name}.{options.Namespace}.svc",
-            RuntimeInstanceId: request.RuntimeInstanceId,
-            Generation: request.Generation);
+            RuntimeInstanceId: request.RuntimeInstanceId);
     }
 
     public async Task DestroyAsync(ContainerReceipt receipt, CancellationToken cancellationToken)
@@ -371,8 +365,6 @@ public sealed class KubernetesContainerLifecycle(
         {
             ["noctf.io/managed"] = "true",
             ["noctf.io/runtime-instance-id"] = target.Identity.RuntimeInstanceId.ToString("D"),
-            ["noctf.io/generation"] = target.Identity.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture),
             ["noctf.io/job-kind"] = JobKindAwdChecker,
             ["noctf.io/purpose"] = NetworkPurposeAwdChecker
         };
@@ -382,7 +374,6 @@ public sealed class KubernetesContainerLifecycle(
                 Labels = labels,
                 NetworkName = sandbox,
                 AllowInternalCallback = true,
-                Generation = target.Identity.Generation,
                 RuntimeInstanceId = target.Identity.RuntimeInstanceId,
                 NetworkPurpose = ContainerNetworkPurpose.AwdChecker
             },
@@ -396,7 +387,6 @@ public sealed class KubernetesContainerLifecycle(
         var receipt = target.Receipt;
         if (receipt.Provider != RuntimeProvider.Kubernetes
             || receipt.RuntimeInstanceId != target.Identity.RuntimeInstanceId
-            || receipt.Generation != target.Identity.Generation
             || string.IsNullOrWhiteSpace(receipt.NetworkId)
             || string.IsNullOrWhiteSpace(receipt.ResourceId))
             throw new InvalidOperationException(
@@ -425,14 +415,12 @@ public sealed class KubernetesContainerLifecycle(
         var receipt = target.Receipt;
         if (receipt.Provider != RuntimeProvider.Kubernetes
             || receipt.OperationId != target.Identity.RuntimeInstanceId
-            || receipt.Generation != target.Identity.Generation
             || !string.Equals(receipt.Namespace, options.Namespace, StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(target.ServiceName))
             throw new InvalidOperationException(
                 "The attached Compose receipt has a different ownership identity.");
         var selector = $"noctf.io/managed=true,"
             + $"noctf.io/runtime-instance-id={target.Identity.RuntimeInstanceId:D},"
-            + $"noctf.io/generation={target.Identity.Generation},"
             + $"noctf.io/compose-service={target.ServiceName}";
         var deployments = await client.AppsV1.ListNamespacedDeploymentAsync(
             options.Namespace,
@@ -449,8 +437,7 @@ public sealed class KubernetesContainerLifecycle(
         CancellationToken cancellationToken)
     {
         var identity = request.Identity;
-        if (identity.RuntimeInstanceId == Guid.Empty
-            || identity.Generation <= 0)
+        if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(request));
         if (!Enum.IsDefined(request.Purpose)
             || !Enum.IsDefined(request.EgressPolicy)
@@ -464,7 +451,7 @@ public sealed class KubernetesContainerLifecycle(
                 "Kubernetes container runtimes require NetworkPolicy enforcement.");
         var name = request.Purpose == ContainerNetworkPurpose.AwdpVerification
             ? $"noctf-awdp-{identity.RuntimeInstanceId:N}"
-            : $"noctf-rt-{identity.RuntimeInstanceId:N}-{identity.Generation}";
+            : $"noctf-rt-{identity.RuntimeInstanceId:N}";
         var purpose = request.Purpose == ContainerNetworkPurpose.AwdpVerification
             ? NetworkPurposeAwdpVerification
             : NetworkPurposePersistentRuntime;
@@ -490,9 +477,7 @@ public sealed class KubernetesContainerLifecycle(
             ["noctf.io/job-kind"] = purpose,
             ["noctf.io/network-purpose"] = purpose,
             ["noctf.io/managed"] = "true",
-            ["noctf.io/runtime-instance-id"] = identity.RuntimeInstanceId.ToString("D"),
-            ["noctf.io/generation"] = identity.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture)
+            ["noctf.io/runtime-instance-id"] = identity.RuntimeInstanceId.ToString("D")
         };
         var selector = new V1LabelSelector
         {
@@ -835,8 +820,7 @@ public sealed class KubernetesContainerLifecycle(
                 "A Kubernetes Container service requires an isolated Runtime network.");
 
         var identity = new RuntimeResourceIdentity(
-            request.RuntimeInstanceId ?? request.OperationId,
-            request.Generation);
+            request.RuntimeInstanceId ?? request.OperationId);
         var internalService = await EnsureServiceAsync(
             name,
             name,
@@ -1032,9 +1016,8 @@ public sealed class KubernetesContainerLifecycle(
     private static void ValidateContainerRequest(ContainerRequest request)
     {
         var identity = new RuntimeResourceIdentity(
-            request.RuntimeInstanceId ?? request.OperationId,
-            request.Generation);
-        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+            request.RuntimeInstanceId ?? request.OperationId);
+        if (identity.RuntimeInstanceId == Guid.Empty)
             throw new InvalidOperationException(
                 "A Kubernetes Container requires a valid Runtime identity.");
         if (request.ContainerPorts.Any(port => port is < 1 or > 65535)
@@ -1071,8 +1054,7 @@ public sealed class KubernetesContainerLifecycle(
             return;
         }
         var identity = new RuntimeResourceIdentity(
-            request.RuntimeInstanceId ?? request.OperationId,
-            request.Generation);
+            request.RuntimeInstanceId ?? request.OperationId);
         var publicName = $"{podName}{PublicServiceSuffix}";
         var metadata = existing.Metadata;
         if (metadata is null
@@ -1116,8 +1098,7 @@ public sealed class KubernetesContainerLifecycle(
     private static void ValidatePod(V1Pod pod, string name, ContainerRequest request)
     {
         var identity = new RuntimeResourceIdentity(
-            request.RuntimeInstanceId ?? request.OperationId,
-            request.Generation);
+            request.RuntimeInstanceId ?? request.OperationId);
         if (!string.Equals(pod.Metadata?.Name, name, StringComparison.Ordinal)
             || !HasResourceIdentity(pod.Metadata?.Labels, identity)
             || !HasLabel(pod.Metadata?.Labels, "noctf.io/runtime-id", name)
@@ -1148,9 +1129,7 @@ public sealed class KubernetesContainerLifecycle(
             ["noctf.io/runtime-id"] = podName,
             ["noctf.io/managed"] = "true",
             ["noctf.io/job-kind"] = jobKind,
-            ["noctf.io/runtime-instance-id"] = identity.RuntimeInstanceId.ToString("D"),
-            ["noctf.io/generation"] = identity.Generation.ToString(
-                System.Globalization.CultureInfo.InvariantCulture)
+            ["noctf.io/runtime-instance-id"] = identity.RuntimeInstanceId.ToString("D")
         };
 
     private static Dictionary<string, string> PlatformServiceLabels(
@@ -1346,8 +1325,7 @@ public sealed class KubernetesContainerLifecycle(
         int callbackPort)
     {
         var identity = new RuntimeResourceIdentity(
-            request.RuntimeInstanceId ?? request.OperationId,
-            request.Generation);
+            request.RuntimeInstanceId ?? request.OperationId);
         var spec = policy.Spec;
         if (!string.Equals(
                 policy.Metadata?.Name,
@@ -1574,11 +1552,7 @@ public sealed class KubernetesContainerLifecycle(
         && string.Equals(managed, "true", StringComparison.Ordinal)
         && labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
         && Guid.TryParse(runtimeText, out var runtimeId)
-        && runtimeId == identity.RuntimeInstanceId
-        && labels.TryGetValue("noctf.io/generation", out var generationText)
-        && int.TryParse(generationText, System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out var generation)
-        && generation == identity.Generation;
+        && runtimeId == identity.RuntimeInstanceId;
 
     private static bool HasNetworkPurpose(
         IDictionary<string, string>? labels,

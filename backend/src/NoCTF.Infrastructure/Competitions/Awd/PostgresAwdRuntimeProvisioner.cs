@@ -144,9 +144,6 @@ public sealed class PostgresAwdRuntimeProvisioner(
                 break;
             }
 
-            var maximumGenerations = existing
-                .GroupBy(runtime => runtime.CompetitionChallengeId)
-                .ToDictionary(group => group.Key, group => group.Max(runtime => runtime.Generation));
             var createdAt = timeProvider.GetUtcNow();
             var cleanupTargets = existing
                 .Where(runtime => runtime.State == RuntimeState.Failed
@@ -154,7 +151,10 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     && desiredChallengeIds.Contains(runtime.CompetitionChallengeId))
                 .GroupBy(runtime => runtime.CompetitionChallengeId)
                 .Where(group => !active.Contains(group.Key))
-                .Select(group => group.OrderByDescending(runtime => runtime.Generation).First())
+                .Select(group => group
+                    .OrderByDescending(runtime => runtime.CreatedAt)
+                    .ThenByDescending(runtime => runtime.Id)
+                    .First())
                 .ToList();
             if (cleanupTargets.Count > 0)
             {
@@ -164,7 +164,6 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     var challenge = challengesById[cleanupTarget.CompetitionChallengeId];
                     cleanupTarget.State = RuntimeState.Stopping;
                     cleanupTarget.FailureCode = null;
-                    cleanupTarget.RunnerAssignmentReleaseToken = null;
                     var replacement = new RuntimeInstance
                     {
                         Id = Guid.CreateVersion7(createdAt),
@@ -172,13 +171,9 @@ public sealed class PostgresAwdRuntimeProvisioner(
                         CompetitionChallengeId = cleanupTarget.CompetitionChallengeId,
                         TeamId = teamId,
                         Purpose = RuntimePurpose.Player,
-                        Generation = checked(maximumGenerations.GetValueOrDefault(
-                            cleanupTarget.CompetitionChallengeId) + 1),
                         RuntimeKind = challenge.RuntimeKind,
                         RuntimeProvider = challenge.Placement.Provider,
-                        RunnerPool = challenge.Placement.RunnerPool,
                         State = RuntimeState.Queued,
-                        ReplacesRuntimeInstanceId = cleanupTarget.Id,
                         CreatedAt = createdAt
                     };
                     db.RuntimeInstances.Add(replacement);
@@ -186,6 +181,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     await RecordStateAsync(events, cleanupTarget, CompetitionEventLevel.Warning,
                         createdAt, cancellationToken);
                     await outbox.PublishAsync(new StopRuntime(cleanupTarget.Id));
+                    await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
                 }
                 await db.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
@@ -206,10 +202,8 @@ public sealed class PostgresAwdRuntimeProvisioner(
                     CompetitionChallengeId = challenge.Id,
                     TeamId = teamId,
                     Purpose = RuntimePurpose.Player,
-                    Generation = checked(maximumGenerations.GetValueOrDefault(challenge.Id) + 1),
                     RuntimeKind = challenge.RuntimeKind,
                     RuntimeProvider = challenge.Placement.Provider,
-                    RunnerPool = challenge.Placement.RunnerPool,
                     State = RuntimeState.Queued,
                     CreatedAt = createdAt
                 };
@@ -252,8 +246,7 @@ public sealed class PostgresAwdRuntimeProvisioner(
             TeamId: runtime.TeamId,
             CompetitionChallengeId: runtime.CompetitionChallengeId,
             RuntimeInstanceId: runtime.Id,
-            RuntimeState: runtime.State,
-            RuntimeGeneration: runtime.Generation), cancellationToken);
+            RuntimeState: runtime.State), cancellationToken);
 
     private static ValueTask<Guid> RecordStateAsync(
         ICompetitionEventRecorder events,
@@ -270,6 +263,5 @@ public sealed class PostgresAwdRuntimeProvisioner(
             TeamId: runtime.TeamId,
             CompetitionChallengeId: runtime.CompetitionChallengeId,
             RuntimeInstanceId: runtime.Id,
-            RuntimeState: runtime.State,
-            RuntimeGeneration: runtime.Generation), cancellationToken);
+            RuntimeState: runtime.State), cancellationToken);
 }

@@ -14,7 +14,6 @@ public sealed class AwdpCheckerExecutorTests
         var executor = new AwdpCheckerExecutor(new RecordingCatalog(runner));
         var work = new AwdpCheckerWork(
             Guid.Parse("11111111-1111-1111-1111-111111111111"),
-            3,
             RuntimeProvider.Docker,
             "checker:latest",
             ["/checker"],
@@ -87,7 +86,6 @@ public sealed class AwdpCheckerExecutorTests
 
     private static AwdpCheckerWork Work() => new(
         Guid.Parse("11111111-1111-1111-1111-111111111111"),
-        3,
         RuntimeProvider.Docker,
         "checker:latest",
         ["/checker"],

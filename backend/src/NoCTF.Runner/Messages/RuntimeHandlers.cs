@@ -68,9 +68,7 @@ public sealed class RuntimeProviderHandler(
             {
                 expanded = RuntimeUrlExpander.ExpandContainer(
                     receipt,
-                    definition.UrlBindings,
-                    definition.ControlCheckUrlBinding,
-                    definition.AwdCheckerTargetBinding);
+                    definition.UrlBindings);
             }
             catch (InvalidOperationException)
             {
@@ -79,15 +77,11 @@ public sealed class RuntimeProviderHandler(
             if (expanded is not null)
                 return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
-                    message.Generation,
-                    runnerOptions.Value.Id,
+                    message.RunnerId,
                     receipt.Provider,
                     JsonSerializer.Serialize(receipt),
                     expanded.Urls,
-                    expanded.ParticipantUrlIndexes,
                     definition.Ttl is { } ttl ? DateTimeOffset.UtcNow.Add(ttl) : null,
-                    expanded.ControlCheckUrl,
-                    expanded.AwdCheckerTargetHost,
                     definition.Provider == RuntimeProvider.Docker
                         ? receipt.PortMappings
                             .OrderBy(mapping => mapping.Key)
@@ -140,7 +134,7 @@ public sealed class RuntimeProviderHandler(
             {
                 await RuntimeReceiptCleanup.CleanupContainerAsync(
                     providers,
-                    new(message.RuntimeInstanceId, work.Generation),
+                    new(message.RuntimeInstanceId),
                     work.Provider,
                     receiptJson,
                     cancellationToken);
@@ -178,8 +172,7 @@ public sealed class RuntimeProviderHandler(
         try
         {
             var work = await workReader.ReadStopAsync(message, cancellationToken);
-            if (work is not null
-                && (work.Provider != message.Provider || work.Generation != message.Generation))
+            if (work is not null && work.Provider != message.Provider)
             {
                 return ForceTerminationFailed(
                     message,
@@ -187,9 +180,7 @@ public sealed class RuntimeProviderHandler(
                     RuntimeCleanupResult.CleanupFailed);
             }
 
-            var identity = new RuntimeResourceIdentity(
-                message.RuntimeInstanceId,
-                message.Generation);
+            var identity = new RuntimeResourceIdentity(message.RuntimeInstanceId);
             if (work?.ProviderReceiptJson is { } providerReceiptJson)
             {
                 await RuntimeReceiptCleanup.CleanupAsync(
@@ -295,9 +286,7 @@ public sealed class RuntimeProviderHandler(
                     expanded = RuntimeUrlExpander.ExpandCompose(
                         receipt,
                         status,
-                        message.Definition.UrlBindings,
-                        message.Definition.ControlCheckUrlBinding,
-                        message.Definition.AwdCheckerTargetBinding);
+                        message.Definition.UrlBindings);
                 }
                 catch (InvalidOperationException)
                 {
@@ -306,17 +295,13 @@ public sealed class RuntimeProviderHandler(
                 if (expanded is not null)
                     return new RuntimeProvisioned(
                         message.RuntimeInstanceId,
-                        message.Generation,
-                        runnerOptions.Value.Id,
+                        message.RunnerId,
                         receipt.Provider,
                         JsonSerializer.Serialize(receipt),
                         expanded.Urls,
-                        expanded.ParticipantUrlIndexes,
                         message.Definition.Ttl is { } ttl
                             ? DateTimeOffset.UtcNow.Add(ttl)
                             : null,
-                        expanded.ControlCheckUrl,
-                        expanded.AwdCheckerTargetHost,
                         message.Definition.Provider == RuntimeProvider.Docker
                             ? ReadComposePublishedPorts(message.Definition, status)
                             : null);
@@ -360,7 +345,7 @@ public sealed class RuntimeProviderHandler(
             {
                 await RuntimeReceiptCleanup.CleanupComposeAsync(
                     providers,
-                    new(message.RuntimeInstanceId, work.Generation),
+                    new(message.RuntimeInstanceId),
                     work.Provider,
                     receiptJson,
                     cancellationToken);
@@ -427,8 +412,7 @@ public sealed class RuntimeProviderHandler(
             {
                 expanded = RuntimeUrlExpander.ExpandOva(
                     receipt,
-                    message.Definition.UrlBindings,
-                    message.Definition.ControlCheckUrlBinding);
+                    message.Definition.UrlBindings);
             }
             catch (InvalidOperationException)
             {
@@ -437,16 +421,13 @@ public sealed class RuntimeProviderHandler(
             if (expanded is not null)
                 return new RuntimeProvisioned(
                     message.RuntimeInstanceId,
-                    message.Generation,
-                    runnerOptions.Value.Id,
+                    message.RunnerId,
                     receipt.Provider,
                     JsonSerializer.Serialize(receipt),
                     expanded.Urls,
-                    expanded.ParticipantUrlIndexes,
                     message.Definition.Ttl is { } ttl
                         ? DateTimeOffset.UtcNow.Add(ttl)
-                        : null,
-                    expanded.ControlCheckUrl);
+                        : null);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -539,13 +520,11 @@ public sealed class RuntimeProviderHandler(
     {
         var reconciler = ReadResourceReconciler(provider);
         await reconciler.DestroyByIdentityAsync(
-            new RuntimeResourceIdentity(message.RuntimeInstanceId, message.Generation),
+            new RuntimeResourceIdentity(message.RuntimeInstanceId),
             cancellationToken);
         await ReleaseCapacityOrThrowAsync(message, cancellationToken);
         return new RuntimeProvisionTerminated(
             message.RuntimeInstanceId,
-            message.Generation,
-            message.RunnerPool,
             message.RunnerId,
             failureCode);
     }
@@ -557,13 +536,11 @@ public sealed class RuntimeProviderHandler(
     {
         var reconciler = ReadResourceReconciler(provider);
         await reconciler.DestroyByIdentityAsync(
-            new RuntimeResourceIdentity(message.RuntimeInstanceId, message.Generation),
+            new RuntimeResourceIdentity(message.RuntimeInstanceId),
             cancellationToken);
         await ReleaseCapacityOrThrowAsync(message, cancellationToken);
         return new RuntimeProvisionCanceled(
             message.RuntimeInstanceId,
-            message.Generation,
-            message.RunnerPool,
             message.RunnerId);
     }
 
@@ -579,7 +556,7 @@ public sealed class RuntimeProviderHandler(
         CancellationToken cancellationToken)
     {
         var reconciler = ReadResourceReconciler(work.Provider);
-        var identity = new RuntimeResourceIdentity(runtimeInstanceId, work.Generation);
+        var identity = new RuntimeResourceIdentity(runtimeInstanceId);
         await reconciler.DestroyByIdentityAsync(identity, cancellationToken);
         var remaining = await reconciler.ListManagedAsync(cancellationToken);
         if (remaining.Contains(identity))
@@ -591,20 +568,12 @@ public sealed class RuntimeProviderHandler(
 
     private static RuntimeStopped StopSucceeded(
         IRuntimeStopMessage message,
-        RuntimeStopWork? work) =>
-        new(
-            message.RuntimeInstanceId,
-            work is { Generation: > 0 } ? work.Generation : message.Generation,
-            message.RunnerPool,
-            message.RunnerId);
+        RuntimeStopWork? work) => new(message.RuntimeInstanceId, message.RunnerId);
 
     private static RuntimeStopFailed StopFailed(
         IRuntimeStopMessage message,
-        RuntimeStopWork? work) =>
-        new(
+        RuntimeStopWork? work) => new(
             message.RuntimeInstanceId,
-            work is { Generation: > 0 } ? work.Generation : message.Generation,
-            message.RunnerPool,
             message.RunnerId,
             RuntimeFailureCode.CleanupFailed);
 
@@ -613,7 +582,6 @@ public sealed class RuntimeProviderHandler(
         DateTimeOffset completedAt) =>
         new(
             message.RuntimeInstanceId,
-            message.Generation,
             message.RunnerId,
             message.ActorUserId,
             message.Reason,
@@ -627,7 +595,6 @@ public sealed class RuntimeProviderHandler(
         RuntimeCleanupResult result) =>
         new(
             message.RuntimeInstanceId,
-            message.Generation,
             message.RunnerId,
             message.ActorUserId,
             message.Reason,
@@ -718,28 +685,20 @@ public static class RuntimeWriteBackHandler
             instance.ProviderReceiptJson ??= message.ProviderReceiptJson;
             await ReplacePublishedPortsAsync(
                 instance, message, events, DateTimeOffset.UtcNow, cancellationToken);
-            instance.RunnerAssignmentReleaseToken = null;
             await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
             await db.SaveChangesAsync(cancellationToken);
             await outbox.FlushOutgoingMessagesAsync();
             return;
         }
-        if (instance.State != RuntimeState.Provisioning
-            || instance.Generation != message.Generation
-            || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
+        if (!string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
             || instance.RuntimeProvider != message.Provider)
             return;
 
-        if (!TryNormalizeAccessUrls(
-                message.Urls,
-                message.ParticipantUrlIndexes,
-                out var normalizedUrls))
+        if (!TryNormalizeAccessUrls(message.Urls, out var normalizedUrls))
         {
             instance.ProviderReceiptJson = message.ProviderReceiptJson;
             instance.Urls = [];
-            instance.ParticipantUrlIndexes = [];
-            instance.ControlCheckUrl = null;
             instance.State = RuntimeState.Stopping;
             await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
             await PublishRuntimeStopAsync(outbox, instance, message.RunnerId);
@@ -755,26 +714,15 @@ public static class RuntimeWriteBackHandler
         }
 
         var runningAt = DateTimeOffset.UtcNow;
-        instance.RunnerId = message.RunnerId;
-        instance.RunnerAssignmentReleaseToken = null;
         instance.ProviderReceiptJson = message.ProviderReceiptJson;
         instance.Urls = normalizedUrls;
-        instance.ParticipantUrlIndexes = [.. message.ParticipantUrlIndexes];
-        instance.ControlCheckUrl = message.ControlCheckUrl;
-        instance.AwdCheckerTargetHost = message.AwdCheckerTargetHost;
         instance.State = RuntimeState.Running;
+        instance.FailureCode = null;
         instance.RunningAt = runningAt;
         instance.ExpiresAt = message.ExpiresAt;
         await ActivateAwdpAttackFlagAsync(db, instance, runningAt, cancellationToken);
         await ReplacePublishedPortsAsync(
             instance, message, events, runningAt, cancellationToken);
-        if (message.AwdCheckerTargetHost is not null)
-            instance.NextCheckerDueAt = instance.RunningAt;
-        if (instance.Purpose == RuntimePurpose.AwdpTarget
-            && instance.GameplayFactId is null)
-        {
-            instance.AwdpFixStage = AwdpFixStage.AwaitingPatch;
-        }
         var now = DateTimeOffset.UtcNow;
         var currentAwdFlag = instance.TeamId is null
             ? null
@@ -792,10 +740,8 @@ public static class RuntimeWriteBackHandler
                 instance.Id,
                 instance.CompetitionChallengeId,
                 currentAwdFlag.Id,
-                instance.Generation,
                 currentAwdFlag.ValidUntil!.Value,
-                instance.RunnerPool,
-                instance.RunnerId));
+                message.RunnerId));
         }
         await RecordRuntimeStateAsync(
             events,
@@ -818,7 +764,6 @@ public static class RuntimeWriteBackHandler
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || instance.State != RuntimeState.Provisioning
             || !string.Equals(
                 instance.RunnerId,
                 message.RunnerId,
@@ -846,8 +791,6 @@ public static class RuntimeWriteBackHandler
             candidate => candidate.Id == message.RuntimeInstanceId,
             cancellationToken);
         if (instance is null
-            || instance.Generation != message.Generation
-            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
             || instance.ProviderReceiptJson is not null)
             return;
@@ -863,19 +806,12 @@ public static class RuntimeWriteBackHandler
                 cancellationToken);
             return;
         }
-        if (instance.State != RuntimeState.Stopping
-            || instance.RunnerAssignmentReleaseToken is not null)
+        if (instance.State != RuntimeState.Stopping)
             return;
 
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
-        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
-            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
-                && candidate.State == RuntimeState.Queued,
-            cancellationToken);
-        if (replacement is not null)
-            await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -937,20 +873,12 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         if (instance is null
             || instance.State != RuntimeState.Stopping
-            || instance.Generation != message.Generation
-            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return;
 
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
-        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
-            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
-                && candidate.State == RuntimeState.Queued,
-            cancellationToken);
-        if (replacement is not null)
-            await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -974,21 +902,12 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         if (instance is null
             || instance.State != RuntimeState.Stopping
-            || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return;
 
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = message.CompletedAt;
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
-        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
-            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
-                && candidate.State == RuntimeState.Queued,
-            cancellationToken);
-        if (replacement is not null)
-        {
-            await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
-        }
         await events.RecordAsync(new(
             instance.CompetitionId,
             CompetitionEventKind.RuntimeForceTerminationCompleted,
@@ -1001,7 +920,6 @@ public static class RuntimeWriteBackHandler
             RuntimeInstanceId: instance.Id,
             RuntimeState: instance.State,
             RuntimeCleanupResult: message.CleanupResult,
-            RuntimeGeneration: instance.Generation,
             Reason: message.Reason), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
@@ -1020,7 +938,6 @@ public static class RuntimeWriteBackHandler
                 cancellationToken);
         if (instance is null
             || instance.State != RuntimeState.Stopping
-            || instance.Generation != message.Generation
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return;
 
@@ -1036,7 +953,6 @@ public static class RuntimeWriteBackHandler
             RuntimeInstanceId: instance.Id,
             RuntimeState: instance.State,
             RuntimeCleanupResult: message.CleanupResult,
-            RuntimeGeneration: instance.Generation,
             Reason: message.Reason), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -1053,29 +969,12 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         if (instance is null
             || instance.State != RuntimeState.Stopping
-            || instance.Generation != message.Generation
-            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal))
             return;
 
         instance.State = RuntimeState.Failed;
         instance.FailureCode = message.FailureCode;
         await InvalidateAwdpAttackFlagAsync(db, instance, DateTimeOffset.UtcNow, cancellationToken);
-        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
-            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
-                && candidate.State == RuntimeState.Queued,
-            cancellationToken);
-        if (replacement is not null)
-        {
-            replacement.State = RuntimeState.Failed;
-            replacement.FailureCode = message.FailureCode;
-            await RecordRuntimeStateAsync(
-                events,
-                replacement,
-                CompetitionEventLevel.Error,
-                DateTimeOffset.UtcNow,
-                cancellationToken);
-        }
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -1098,22 +997,13 @@ public static class RuntimeWriteBackHandler
             cancellationToken);
         if (instance is null
             || instance.State != RuntimeState.Stopping
-            || instance.Generation != message.Generation
-            || !string.Equals(instance.RunnerPool, message.RunnerPool, StringComparison.Ordinal)
             || !string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal)
-            || instance.RunnerAssignmentReleaseToken is not null
             || instance.ProviderReceiptJson is not null)
             return;
 
         instance.State = RuntimeState.Stopped;
         instance.StoppedAt = DateTimeOffset.UtcNow;
         await InvalidateAwdpAttackFlagAsync(db, instance, instance.StoppedAt.Value, cancellationToken);
-        var replacement = await db.RuntimeInstances.SingleOrDefaultAsync(
-            candidate => candidate.ReplacesRuntimeInstanceId == instance.Id
-                && candidate.State == RuntimeState.Queued,
-            cancellationToken);
-        if (replacement is not null)
-            await outbox.PublishAsync(new DispatchRuntime(replacement.Id));
         await RecordRuntimeStateAsync(
             events,
             instance,
@@ -1142,8 +1032,7 @@ public static class RuntimeWriteBackHandler
             CompetitionChallengeId: instance.CompetitionChallengeId,
             RuntimeInstanceId: instance.Id,
             GameplayFactId: instance.GameplayFactId,
-            RuntimeState: instance.State,
-            RuntimeGeneration: instance.Generation),
+            RuntimeState: instance.State),
             cancellationToken);
 
     private static async Task ActivateAwdpAttackFlagAsync(
@@ -1156,15 +1045,16 @@ public static class RuntimeWriteBackHandler
             return;
         var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
             candidate => candidate.SpecificationKind
-                    == NoCTF.Domain.Challenges.SpecificationKind.RuntimeGeneration
+                    == NoCTF.Domain.Challenges.SpecificationKind.RuntimeInstance
                 && candidate.SpecificationId == instance.Id
                 && candidate.CompetitionChallengeId == instance.CompetitionChallengeId
                 && candidate.TeamId == instance.TeamId
                 && candidate.DeletedAt == null,
             cancellationToken)
             ?? throw new InvalidOperationException(
-                "The AWDP attack Runtime generation flag is unavailable.");
+                "The AWDP attack Runtime flag is unavailable.");
         flag.ValidStart ??= runningAt;
+        flag.ValidUntil = null;
     }
 
     private static async Task InvalidateAwdpAttackFlagAsync(
@@ -1177,7 +1067,7 @@ public static class RuntimeWriteBackHandler
             return;
         var flag = await db.ChallengeFlags.SingleOrDefaultAsync(
             candidate => candidate.SpecificationKind
-                    == NoCTF.Domain.Challenges.SpecificationKind.RuntimeGeneration
+                    == NoCTF.Domain.Challenges.SpecificationKind.RuntimeInstance
                 && candidate.SpecificationId == instance.Id
                 && candidate.DeletedAt == null,
             cancellationToken);
@@ -1200,9 +1090,7 @@ public static class RuntimeWriteBackHandler
         RuntimeInstance instance,
         RuntimeProvisioned message) =>
         instance.State == RuntimeState.Stopping
-        && instance.Generation == message.Generation
         && instance.ProviderReceiptJson is null
-        && instance.RunnerAssignmentReleaseToken is null
         && instance.RuntimeProvider == message.Provider
         && string.Equals(instance.RunnerId, message.RunnerId, StringComparison.Ordinal);
 
@@ -1236,8 +1124,7 @@ public static class RuntimeWriteBackHandler
             {
                 ServiceName = mapping.ServiceName,
                 ContainerPort = mapping.ContainerPort,
-                HostPort = mapping.HostPort,
-                AllocatedAt = allocatedAt
+                HostPort = mapping.HostPort
             });
             await events.RecordAsync(new(
                 instance.CompetitionId,
@@ -1252,7 +1139,6 @@ public static class RuntimeWriteBackHandler
                 RuntimeInstanceId: instance.Id,
                 GameplayFactId: instance.GameplayFactId,
                 RuntimeState: instance.State,
-                RuntimeGeneration: instance.Generation,
                 HostPort: mapping.HostPort), cancellationToken);
         }
     }
@@ -1266,20 +1152,14 @@ public static class RuntimeWriteBackHandler
             RuntimeKind.Container => outbox.PublishToRunnerNodeAsync(
                 new StopContainerRuntime(
                     instance.Id,
-                    instance.Generation,
-                    instance.RunnerPool,
                     runnerId)),
             RuntimeKind.Compose => outbox.PublishToRunnerNodeAsync(
                 new StopComposeRuntime(
                     instance.Id,
-                    instance.Generation,
-                    instance.RunnerPool,
                     runnerId)),
             RuntimeKind.OvaVm => outbox.PublishToRunnerNodeAsync(
                 new StopOvaRuntime(
                     instance.Id,
-                    instance.Generation,
-                    instance.RunnerPool,
                     runnerId)),
             _ => throw new InvalidOperationException(
                 $"Unsupported runtime kind '{instance.RuntimeKind}'.")
@@ -1287,7 +1167,6 @@ public static class RuntimeWriteBackHandler
 
     private static bool TryNormalizeAccessUrls(
         IReadOnlyList<string> urls,
-        IReadOnlyList<int> participantUrlIndexes,
         out string[] normalizedUrls)
     {
         normalizedUrls = new string[urls.Count];
@@ -1298,8 +1177,6 @@ public static class RuntimeWriteBackHandler
             normalizedUrls[index] = accessUrl.Value;
         }
 
-        var normalizedUrlCount = normalizedUrls.Length;
-        return participantUrlIndexes.All(index => index >= 0 && index < normalizedUrlCount)
-            && participantUrlIndexes.Distinct().Count() == participantUrlIndexes.Count;
+        return true;
     }
 }

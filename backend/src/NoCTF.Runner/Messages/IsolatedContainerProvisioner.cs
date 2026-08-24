@@ -21,9 +21,7 @@ public static class IsolatedContainerProvisioner
 
         var networkId = await sandbox.CreateIsolatedNetworkAsync(
             new ContainerNetworkPolicyRequest(
-                new RuntimeResourceIdentity(
-                    request.RuntimeInstanceId ?? request.OperationId,
-                    request.Generation),
+                new RuntimeResourceIdentity(request.RuntimeInstanceId ?? request.OperationId),
                 request.NetworkPurpose,
                 request.EgressPolicy,
                 request.PortMappings.Keys.Order().ToArray(),

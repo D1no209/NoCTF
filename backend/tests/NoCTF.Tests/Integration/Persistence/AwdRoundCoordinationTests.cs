@@ -107,10 +107,8 @@ public sealed class AwdRoundCoordinationTests
                 CompetitionId = fixture.CompetitionId,
                 CompetitionChallengeId = fixture.CompetitionChallengeId,
                 TeamId = greenTeamId,
-                Generation = 1,
                 RuntimeKind = RuntimeKind.Container,
                 RuntimeProvider = RuntimeProvider.Docker,
-                RunnerPool = "default",
                 RunnerId = "runner-a",
                 State = RuntimeState.Provisioning,
                 CreatedAt = fixture.Now
@@ -125,7 +123,6 @@ public sealed class AwdRoundCoordinationTests
             await RuntimeWriteBackHandler.Handle(
                 new RuntimeProvisioned(
                     greenRuntimeId,
-                    1,
                     "runner-a",
                     RuntimeProvider.Docker,
                     JsonSerializer.Serialize(new ContainerReceipt(
@@ -135,20 +132,18 @@ public sealed class AwdRoundCoordinationTests
                         RuntimeStatus.Running,
                         new Dictionary<int, int>(),
                         null,
-                        null)),
+                        "green-container",
+                        RuntimeInstanceId: greenRuntimeId)),
                     [],
-                    [],
-                    null,
-                    AwdCheckerTargetHost: "green-container"),
+                    null),
                 db,
                 outbox,
                 cancellationToken);
             var runningGreenRuntime = await db.RuntimeInstances.SingleAsync(
                 runtime => runtime.Id == greenRuntimeId,
                 cancellationToken);
-            await Assert.That(runningGreenRuntime.AwdCheckerTargetHost)
-                .IsEqualTo("green-container");
-            await Assert.That(runningGreenRuntime.NextCheckerDueAt).IsNotNull();
+            await Assert.That(runningGreenRuntime.State).IsEqualTo(RuntimeState.Running);
+            await Assert.That(runningGreenRuntime.ProviderReceiptJson).IsNotNull();
             var deferredInjection = outbox.RunnerNodeMessages.OfType<InjectAwdFlag>().Last();
             var greenFlag = await db.ChallengeFlags.AsNoTracking().SingleAsync(
                 candidate => candidate.TeamId == greenTeamId
@@ -208,7 +203,7 @@ public sealed class AwdRoundCoordinationTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         var observedAt = DateTimeOffset.UtcNow;
         var now = observedAt.AddTicks(
             -(observedAt.Ticks % TimeSpan.TicksPerMicrosecond) + 1);
@@ -291,10 +286,8 @@ public sealed class AwdRoundCoordinationTests
             CompetitionId = competitionId,
             CompetitionChallengeId = competitionChallengeId,
             TeamId = teamId,
-            Generation = 1,
             RuntimeKind = RuntimeKind.Container,
             RuntimeProvider = RuntimeProvider.Docker,
-            RunnerPool = "default",
             RunnerId = "runner-a",
             State = RuntimeState.Running,
             ProviderReceiptJson = "{}",
@@ -336,12 +329,6 @@ public sealed class AwdRoundCoordinationTests
             Scheduled.Add((message!, scheduledAt));
             return ValueTask.CompletedTask;
         }
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message) where T : IRunnerPoolMessage =>
-            throw new NotSupportedException();
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : IRunnerPoolMessage => throw new NotSupportedException();
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message) where T : IRunnerNodeMessage
         {

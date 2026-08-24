@@ -42,7 +42,7 @@ public sealed class CompetitionEventHistoryPersistenceTests
 
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(cancellationToken);
+                await setup.Database.EnsureCreatedAsync(cancellationToken);
                 setup.Users.AddRange(
                     Human(ownerId, "history-owner", UserRole.Organizer, now),
                     Human(managerId, "history-manager", UserRole.Organizer, now),
@@ -242,12 +242,6 @@ public sealed class CompetitionEventHistoryPersistenceTests
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
             ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>

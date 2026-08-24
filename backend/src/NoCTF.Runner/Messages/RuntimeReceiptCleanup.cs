@@ -34,7 +34,6 @@ public static class RuntimeReceiptCleanup
         var receipt = Deserialize<ContainerReceipt>(providerReceiptJson);
         if (receipt.Provider != provider
             || receipt.RuntimeInstanceId != identity.RuntimeInstanceId
-            || receipt.Generation != identity.Generation
             || string.IsNullOrWhiteSpace(receipt.ResourceId))
         {
             throw new InvalidOperationException(
@@ -70,7 +69,6 @@ public static class RuntimeReceiptCleanup
         var receipt = Deserialize<ComposeReceipt>(providerReceiptJson);
         if (receipt.Provider != provider
             || receipt.OperationId != identity.RuntimeInstanceId
-            || receipt.Generation != identity.Generation
             || string.IsNullOrWhiteSpace(receipt.ProjectName)
             || string.IsNullOrWhiteSpace(receipt.Namespace))
         {
@@ -99,8 +97,7 @@ public static class RuntimeReceiptCleanup
         var receipt = Deserialize<OvaRuntimeReceipt>(providerReceiptJson);
         if (provider != RuntimeProvider.Libvirt
             || receipt.Provider != provider
-            || receipt.OperationId != identity.RuntimeInstanceId
-            || receipt.Generation != identity.Generation)
+            || receipt.OperationId != identity.RuntimeInstanceId)
         {
             throw new InvalidOperationException(
                 "OVA receipt does not match the Runtime assignment.");
@@ -109,9 +106,7 @@ public static class RuntimeReceiptCleanup
         var runtime = providers.Appliance(provider);
         await runtime.DestroyAsync(receipt, cancellationToken);
         var remaining = await runtime.ListManagedAsync(cancellationToken);
-        if (remaining.Any(candidate =>
-                candidate.OperationId == identity.RuntimeInstanceId
-                && candidate.Generation == identity.Generation))
+        if (remaining.Any(candidate => candidate.OperationId == identity.RuntimeInstanceId))
         {
             throw new InvalidOperationException(
                 "OVA resources remain after receipt-based cleanup.");

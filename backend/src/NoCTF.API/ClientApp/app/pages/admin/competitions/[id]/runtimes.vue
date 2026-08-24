@@ -205,7 +205,7 @@ function canTerminate(rt: NoCtfapiEndpointsAdministrationRuntimeAdminRuntimeResp
   return rt.state === 'Queued'
     || rt.state === 'Provisioning'
     || rt.state === 'Running'
-    || (rt.state === 'Failed' && Boolean(rt.providerReceiptJson))
+    || rt.state === 'Failed'
 }
 
 async function submitTermination() {
@@ -383,7 +383,6 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
           <TableRow>
             <TableHead>{{ $t('队伍') }}</TableHead>
             <TableHead>{{ $t('题目') }}</TableHead>
-            <TableHead class="w-20">{{ $t('代数') }}</TableHead>
             <TableHead class="w-24">{{ $t('类型') }}</TableHead>
             <TableHead class="w-24">{{ $t('状态') }}</TableHead>
             <TableHead class="w-44">{{ $t('到期时间') }}</TableHead>
@@ -394,7 +393,6 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
           <TableRow v-for="rt in items" :key="rt.id">
             <TableCell class="font-medium">{{ runtimeTeamLabel(rt) }}</TableCell>
             <TableCell>{{ challengeTitle(rt.competitionChallengeId) }}</TableCell>
-            <TableCell class="font-mono tabular-nums">{{ rt.generation }}</TableCell>
             <TableCell>{{ enumLabel(RuntimeKindLabel, rt.runtimeKind) }}</TableCell>
             <TableCell>
               <Badge :variant="rt.state === 'Running' ? 'default' : rt.state === 'Failed' ? 'destructive' : 'secondary'">
@@ -456,10 +454,9 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
         <div v-else-if="detail" class="flex flex-col gap-3 px-4 pb-4 text-sm">
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('队伍') }}</span><span>{{ runtimeTeamLabel(detail) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('题目') }}</span><span>{{ challengeTitle(detail.competitionChallengeId) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('代数') }}</span><span class="font-mono tabular-nums">{{ detail.generation }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('类型') }}</span><span>{{ enumLabel(RuntimeKindLabel, detail.runtimeKind) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">Provider</span><span>{{ enumLabel(RuntimeProviderLabel, detail.provider) }}</span></div>
-          <div class="flex justify-between"><span class="text-muted-foreground">Runner</span><span>{{ detail.runnerPool }}{{ detail.runnerId ? ` / ${detail.runnerId}` : '' }}</span></div>
+          <div class="flex justify-between"><span class="text-muted-foreground">Runner</span><span>{{ detail.runnerId ?? '-' }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('状态') }}</span><span>{{ enumLabel(RuntimeStateLabel, detail.state) }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('失败代码') }}</span><span>{{ detail.failureCode ?? '-' }}</span></div>
           <div class="flex justify-between"><span class="text-muted-foreground">{{ $t('创建时间') }}</span><span class="font-mono tabular-nums">{{ adminFormatDateTime(detail.createdAt) }}</span></div>
@@ -477,11 +474,6 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
             <div v-for="(p, i) in detail.publishedPorts" :key="i" class="font-mono text-xs">
               {{ $t('{service}:{containerPort} → 主机 {hostPort}', { service: p.serviceName ?? 'service', containerPort: p.containerPort ?? '-', hostPort: p.hostPort ?? '-' }) }}
             </div>
-          </template>
-          <template v-if="detail.providerReceiptJson">
-            <Separator />
-            <p class="text-muted-foreground">{{ $t('Provider 回执') }}</p>
-            <pre class="max-h-64 overflow-auto rounded-md border bg-muted p-2 font-mono text-xs">{{ detail.providerReceiptJson }}</pre>
           </template>
         </div>
       </SheetContent>
@@ -512,10 +504,9 @@ onBeforeUnmount(() => runtimeOperations.cancelAll())
         <AlertDialogHeader>
           <AlertDialogTitle>{{ $t('终止此运行时实例？') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            {{ $t('将立即停止并清理「{team}」在「{challenge}」的第 {generation} 代实例。该操作不会重建环境。', {
+            {{ $t('将立即停止并清理「{team}」在「{challenge}」的实例。该操作不会重建环境。', {
               team: runtimeTeamLabel(terminateDialog),
               challenge: challengeTitle(terminateDialog?.competitionChallengeId),
-              generation: terminateDialog?.generation ?? 0,
             }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>

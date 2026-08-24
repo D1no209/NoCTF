@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Net;
 using Docker.DotNet;
 using Docker.DotNet.Models;
@@ -54,7 +53,7 @@ public sealed class DockerRuntimeResourceReconciler(
         RuntimeResourceIdentity identity,
         CancellationToken cancellationToken)
     {
-        if (identity.RuntimeInstanceId == Guid.Empty || identity.Generation <= 0)
+        if (identity.RuntimeInstanceId == Guid.Empty)
             throw new ArgumentOutOfRangeException(nameof(identity));
         Exception? failure = null;
         try
@@ -147,9 +146,7 @@ public sealed class DockerRuntimeResourceReconciler(
             ["label"] = new Dictionary<string, bool>
             {
                 ["noctf.io/managed=true"] = true,
-                [$"noctf.io/runtime-instance-id={identity.RuntimeInstanceId:D}"] = true,
-                [$"noctf.io/generation={identity.Generation.ToString(CultureInfo.InvariantCulture)}"] =
-                    true
+                [$"noctf.io/runtime-instance-id={identity.RuntimeInstanceId:D}"] = true
             }
         };
 
@@ -163,16 +160,9 @@ public sealed class DockerRuntimeResourceReconciler(
             || !string.Equals(managed, "true", StringComparison.Ordinal)
             || !labels.TryGetValue("noctf.io/runtime-instance-id", out var runtimeText)
             || !Guid.TryParse(runtimeText, out var runtimeId)
-            || runtimeId == Guid.Empty
-            || !labels.TryGetValue("noctf.io/generation", out var generationText)
-            || !int.TryParse(
-                generationText,
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var generation)
-            || generation <= 0)
+            || runtimeId == Guid.Empty)
             return false;
-        identity = new(runtimeId, generation);
+        identity = new(runtimeId);
         return true;
     }
 }

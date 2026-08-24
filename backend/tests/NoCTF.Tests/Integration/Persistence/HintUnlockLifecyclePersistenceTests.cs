@@ -46,7 +46,7 @@ public sealed class HintUnlockLifecyclePersistenceTests
             var teamId = Guid.CreateVersion7();
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(cancellationToken);
+                await setup.Database.EnsureCreatedAsync(cancellationToken);
                 setup.Users.Add(new User
                 {
                     Id = userId,

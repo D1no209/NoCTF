@@ -86,7 +86,6 @@ public sealed class IsolatedContainerProvisionerTests
         new RuntimeResourceLimits(1, 1, 1),
         new ContainerSecurityPolicy(true, true, true, ["ALL"], []),
         null,
-        Generation: 3,
         RuntimeInstanceId: Guid.Parse("11111111-1111-1111-1111-111111111111"),
         NetworkIsolation: ContainerNetworkIsolation.Isolated);
 

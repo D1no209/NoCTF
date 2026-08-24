@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Notifications;
@@ -44,7 +45,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             var competitionId = Guid.CreateVersion7();
             var ownerId = Guid.CreateVersion7();
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(ct);
+            await db.Database.EnsureCreatedAsync(ct);
             db.Users.Add(Human(ownerId, "announcement-owner", UserRole.Organizer, now));
             db.Competitions.Add(new Competition
             {
@@ -114,7 +115,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             var observerId = Guid.CreateVersion7();
             var participantId = Guid.CreateVersion7();
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(ct);
+            await db.Database.EnsureCreatedAsync(ct);
             db.Users.AddRange(
                 Human(administratorId, "incident-administrator", UserRole.Administrator, now),
                 Human(ownerId, "incident-owner", UserRole.Organizer, now),
@@ -204,7 +205,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
 
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(ct);
+                await setup.Database.EnsureCreatedAsync(ct);
                 setup.Users.AddRange(
                     Human(ownerId, "notification-owner", UserRole.Organizer, now),
                     Human(managerAndMemberId, "notification-manager", UserRole.Organizer, now),
@@ -472,7 +473,7 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
 
             await using (var setup = new NoCtfDbContext(options))
             {
-                await setup.Database.MigrateAsync(ct);
+                await setup.Database.EnsureCreatedAsync(ct);
                 setup.Users.AddRange(
                     Human(ownerId, "hint-owner", UserRole.Organizer, now),
                     Human(memberId, "hint-member", UserRole.User, now));
@@ -599,13 +600,20 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
             var notifications = await db.Notifications.AsNoTracking()
                 .ToArrayAsync(ct);
             await Assert.That(notifications).Count().IsEqualTo(1);
-            await Assert.That(notifications.All(notification =>
-                notification.Kind == NotificationKind.HintPublished
-                && notification.TargetType == NotificationTargetType.CompetitionParticipants
-                && notification.TargetId == competitionId
-                && notification.ContentJson.Contains($"hint-published:{hintId:N}:2")
-                && !notification.ContentJson.Contains("paid secret", StringComparison.Ordinal)))
-                .IsTrue();
+            var notification = notifications.Single();
+            var payload = JsonSerializer.Deserialize<JsonElement>(notification.ContentJson);
+            await Assert.That(notification.Kind).IsEqualTo(NotificationKind.HintPublished);
+            await Assert.That(notification.TargetType)
+                .IsEqualTo(NotificationTargetType.CompetitionParticipants);
+            await Assert.That(notification.TargetId).IsEqualTo(competitionId);
+            await Assert.That(payload.GetProperty("sourceEventKey").GetString())
+                .IsEqualTo($"hint-published:{hintId:N}:{publishedAt.UtcTicks}");
+            await Assert.That(payload.GetProperty("hintId").GetGuid()).IsEqualTo(hintId);
+            await Assert.That(payload.GetProperty("publishedAt").GetDateTimeOffset())
+                .IsEqualTo(publishedAt);
+            await Assert.That(notification.ContentJson.Contains(
+                "paid secret",
+                StringComparison.Ordinal)).IsFalse();
             var reader = new NotificationReader(db);
             var start = new KeysetNotificationPosition(now.AddDays(-1), Guid.Empty);
             await Assert.That(await reader.ReadFeedAsync(memberId, start, 10, ct))
@@ -675,12 +683,6 @@ public sealed class CompetitionNotificationDeliveryPersistenceTests
     {
         public ValueTask PublishAsync<T>(T message) => ValueTask.CompletedTask;
         public ValueTask ScheduleAsync<T>(T message, DateTimeOffset scheduledAt) =>
-            ValueTask.CompletedTask;
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
             ValueTask.CompletedTask;
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>

@@ -252,7 +252,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             await using var postgres = await StartPostgresAsync(cancellationToken);
             var options = Options(postgres);
             await using (var migrationDb = new NoCtfDbContext(options))
-                await migrationDb.Database.MigrateAsync(cancellationToken);
+                await migrationDb.Database.EnsureCreatedAsync(cancellationToken);
             var fixtures = new[]
             {
                 await SeedAwdpHistoryAsync(options, "legacy-a", 'm', cancellationToken),
@@ -664,7 +664,7 @@ public sealed class HistoricalAdjudicationPreviewPersistenceTests
             Guid.Parse("10000000-0000-0000-0000-000000000001"),
             Guid.Parse("20000000-0000-0000-0000-000000000001"));
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(ct);
+        await db.Database.EnsureCreatedAsync(ct);
         db.Users.AddRange(
             User(ownerId, "preview-owner", UserRole.Organizer, now),
             User(managerId, "preview-manager", UserRole.Organizer, now),

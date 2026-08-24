@@ -76,17 +76,16 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 && runtime.TeamId == scope.TeamId
                 && (runtime.Purpose == RuntimePurpose.Player
                     || runtime.Purpose == RuntimePurpose.AwdpAttack))
-            .OrderByDescending(runtime => runtime.Generation)
+            .OrderByDescending(runtime => runtime.CreatedAt)
+            .ThenByDescending(runtime => runtime.Id)
             .Select(runtime => new RuntimeInstanceView(
                 runtime.Id,
                 runtime.CompetitionId,
                 runtime.CompetitionChallengeId,
                 runtime.TeamId,
                 runtime.Purpose,
-                runtime.Generation,
                 runtime.RuntimeKind,
                 runtime.RuntimeProvider,
-                runtime.RunnerPool,
                 runtime.State,
                 runtime.FailureCode,
                 runtime.Urls,
@@ -101,14 +100,14 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 && runtime.CompetitionChallengeId == competitionChallengeId
                 && runtime.TeamId == scope.TeamId
                 && runtime.Purpose == RuntimePurpose.AwdpTarget)
-            .OrderByDescending(runtime => runtime.Generation)
+            .OrderByDescending(runtime => runtime.CreatedAt)
+            .ThenByDescending(runtime => runtime.Id)
             .Select(runtime => new
             {
                 runtime.Id,
                 runtime.State,
                 runtime.FailureCode,
                 runtime.GameplayFactId,
-                runtime.AwdpFixStage,
                 runtime.CreatedAt,
                 runtime.ExpiresAt,
                 runtime.StoppedAt
@@ -171,7 +170,6 @@ public sealed class AwdpParticipantStateReader(NoCtfDbContext db) : IAwdpPartici
                 latestFix?.State,
                 GameplayFactResultDisclosure.PlayerResult(latestFix?.Result, latestFix?.FailureCode),
                 GameplayFactResultDisclosure.PlayerFailureCode(latestFix?.FailureCode),
-                fixRuntime?.AwdpFixStage,
                 fixRuntime?.CreatedAt,
                 fixRuntime?.ExpiresAt,
                 fixRuntime?.StoppedAt,

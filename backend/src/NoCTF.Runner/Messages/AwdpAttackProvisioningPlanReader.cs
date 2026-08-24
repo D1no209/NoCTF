@@ -41,9 +41,7 @@ public sealed class AwdpAttackProvisioningPlanReader(IServiceScopeFactory scopes
         var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
         var runtime = await db.RuntimeInstances.AsNoTracking()
             .Where(candidate => candidate.Id == message.RuntimeInstanceId
-                && candidate.Generation == message.Generation
                 && candidate.State == RuntimeState.Provisioning
-                && candidate.RunnerPool == message.RunnerPool
                 && candidate.RunnerId == message.RunnerId)
             .Select(candidate => new
             {
@@ -85,7 +83,7 @@ public sealed class AwdpAttackProvisioningPlanReader(IServiceScopeFactory scopes
             .Where(candidate => candidate.CompetitionChallengeId
                     == runtime.CompetitionChallengeId
                 && candidate.TeamId == teamId
-                && candidate.SpecificationKind == SpecificationKind.RuntimeGeneration
+                && candidate.SpecificationKind == SpecificationKind.RuntimeInstance
                 && candidate.SpecificationId == message.RuntimeInstanceId
                 && candidate.ValidStart == null
                 && candidate.ValidUntil == null

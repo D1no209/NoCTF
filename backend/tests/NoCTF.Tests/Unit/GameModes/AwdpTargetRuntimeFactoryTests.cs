@@ -23,15 +23,11 @@ public sealed class AwdpTargetRuntimeFactoryTests
             Guid.Parse("55555555-5555-5555-5555-555555555555"),
             template,
             new RuntimePlacement(RuntimeProvider.Docker, "awdp"),
-            generation: 2,
             now: DateTimeOffset.Parse("2026-07-24T00:00:00Z"));
 
         await Assert.That(target.Purpose).IsEqualTo(RuntimePurpose.AwdpTarget);
-        await Assert.That(target.AwdpFixStage).IsEqualTo(AwdpFixStage.TargetProvisioning);
         await Assert.That(target.GameplayFactId).IsEqualTo(gameplayFactId);
         await Assert.That(target.TeamId).IsEqualTo(teamId);
-        await Assert.That(target.Generation).IsEqualTo(2);
-        await Assert.That(target.RunnerPool).IsEqualTo("awdp");
         await Assert.That(target.State).IsEqualTo(RuntimeState.Queued);
         await Assert.That(target.ExpiresAt).IsNull();
     }

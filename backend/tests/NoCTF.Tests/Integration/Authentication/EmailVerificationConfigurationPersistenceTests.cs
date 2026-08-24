@@ -38,7 +38,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 .Build();
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(cancellationToken);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
             var store = new EmailVerificationConfigurationStore(
                 db,
                 new EmailVerificationSecretProtector(configuration));
@@ -89,7 +89,7 @@ public sealed class EmailVerificationConfigurationPersistenceTests
             await Assert.That(delivery.SmtpSecurityMode)
                 .IsEqualTo(SmtpSecurityMode.SslOnConnect);
 
-            var staleUpdate = await store.UpdateAsync(new(
+            var lastUpdate = await store.UpdateAsync(new(
                 Enabled: false,
                 PublicBaseUrl: "https://stale.example",
                 TokenLifetimeMinutes: 120,
@@ -105,7 +105,12 @@ public sealed class EmailVerificationConfigurationPersistenceTests
                 SmtpFromName: "NoCTF",
                 SmtpTimeoutSeconds: 10,
                 Now: DateTimeOffset.UtcNow), cancellationToken);
-            await Assert.That(staleUpdate).IsNull();
+            await Assert.That(lastUpdate).IsNotNull();
+            await Assert.That(lastUpdate!.Enabled).IsFalse();
+            await Assert.That(lastUpdate.PublicBaseUrl).IsEqualTo("https://stale.example");
+            await Assert.That(lastUpdate.SmtpSecurityMode)
+                .IsEqualTo(SmtpSecurityMode.StartTls);
+            await Assert.That(lastUpdate.SmtpPasswordConfigured).IsTrue();
         });
     }
 }

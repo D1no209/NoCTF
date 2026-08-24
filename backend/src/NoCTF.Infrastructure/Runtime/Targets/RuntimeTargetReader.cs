@@ -2,6 +2,7 @@ using NoCTF.Infrastructure.Persistence;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Runtime.Instances;
+using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Teams;
@@ -9,7 +10,9 @@ using NoCTF.Infrastructure.Competitions.Lifecycle;
 
 namespace NoCTF.Infrastructure.Runtime.Targets;
 
-public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReader
+public sealed class RuntimeTargetReader(
+    NoCtfDbContext db,
+    IChallengeRuntimeTemplateCatalog runtimeTemplates) : IRuntimeTargetReader
 {
     public async Task<IReadOnlyList<RuntimeTargetView>?> ListAsync(
         Guid competitionId,
@@ -33,7 +36,7 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
             .SingleOrDefaultAsync(ct);
         if (competition is null || competition.Status != CompetitionStatus.Running)
             return null;
-        if (!await db.CompetitionChallenges.AsNoTracking()
+        var challenge = await db.CompetitionChallenges.AsNoTracking()
                 .Where(item =>
                     item.Id == competitionChallengeId &&
                     item.CompetitionId == competitionId &&
@@ -44,8 +47,9 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
                         .Where(template => template.DeletedAt == null),
                     challenge => challenge.ChallengeId,
                     template => template.Id,
-                    (challenge, _) => challenge.Id)
-                .AnyAsync(ct))
+                    (challenge, template) => new { template.DefinitionJson })
+                .SingleOrDefaultAsync(ct);
+        if (challenge is null)
             return null;
 
         var ownTeamId = await db.Teams.AsNoTracking()
@@ -92,8 +96,7 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
             .Select(instance => new
             {
                 TeamId = instance.TeamId!.Value,
-                instance.Urls,
-                instance.ParticipantUrlIndexes
+                instance.Urls
             })
             .ToListAsync(ct);
         var byTeam = runtimes.ToDictionary(runtime => runtime.TeamId);
@@ -101,10 +104,11 @@ public sealed class RuntimeTargetReader(NoCtfDbContext db) : IRuntimeTargetReade
         {
             if (!byTeam.TryGetValue(team.Id, out var runtime))
                 return new RuntimeTargetView(team.Id, team.Name, []);
-            var urls = runtime.ParticipantUrlIndexes
-                .Where(index => index >= 0 && index < runtime.Urls.Length)
-                .Select(index => runtime.Urls[index])
-                .ToArray();
+            var urls = RuntimeParticipantUrlProjection.Filter(
+                runtimeTemplates,
+                GameMode.Awd,
+                challenge.DefinitionJson,
+                runtime.Urls);
             return new RuntimeTargetView(team.Id, team.Name, urls);
         }).ToArray();
     }

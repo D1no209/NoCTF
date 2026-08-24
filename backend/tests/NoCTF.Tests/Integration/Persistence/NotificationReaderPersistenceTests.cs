@@ -227,7 +227,7 @@ public sealed class NotificationReaderPersistenceTests
         CancellationToken cancellationToken)
     {
         await using var db = new NoCtfDbContext(options);
-        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.EnsureCreatedAsync(cancellationToken);
         db.Users.AddRange(
             User(ids.OwnerId, "notification-owner", UserRole.Organizer, now),
             User(ids.FormerManagerId, "notification-former-manager", UserRole.Organizer, now),

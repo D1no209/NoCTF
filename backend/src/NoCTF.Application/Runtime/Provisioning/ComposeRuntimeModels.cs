@@ -5,7 +5,6 @@ namespace NoCTF.Application.Runtime.Provisioning;
 public sealed record ComposeRequest(
     Guid OperationId,
     RuntimeProvider Provider,
-    int Generation,
     string ProjectName,
     string ComposeYaml,
     IReadOnlyDictionary<string, string> Environment,
@@ -34,7 +33,6 @@ public sealed record ComposeReceipt(
     string ProjectName,
     string Namespace,
     string PublicHost,
-    int Generation,
     DateTimeOffset CreatedAt);
 public sealed record ComposeStatus(string ProjectName, RuntimeStatus Status, IReadOnlyList<ComposeServiceStatus> Services);
 

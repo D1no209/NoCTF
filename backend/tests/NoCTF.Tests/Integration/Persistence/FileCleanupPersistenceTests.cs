@@ -43,7 +43,7 @@ public sealed class FileCleanupPersistenceTests
 
             await using (var db = new NoCtfDbContext(options))
             {
-                await db.Database.MigrateAsync(cancellationToken);
+                await db.Database.EnsureCreatedAsync(cancellationToken);
                 var registry = new ManagedFileUploadRegistry(
                     db,
                     outbox,
@@ -111,7 +111,7 @@ public sealed class FileCleanupPersistenceTests
 
                 await using (var db = new NoCtfDbContext(options))
                 {
-                    await db.Database.MigrateAsync(cancellationToken);
+                    await db.Database.EnsureCreatedAsync(cancellationToken);
                     db.Files.Add(new StoredFile
                     {
                         Id = fileId,
@@ -261,14 +261,6 @@ public sealed class FileCleanupPersistenceTests
             Scheduled.Add((message!, scheduledAt));
             return ValueTask.CompletedTask;
         }
-
-        public ValueTask PublishToRunnerPoolAsync<T>(T message)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
-
-        public ValueTask ScheduleToRunnerPoolAsync<T>(T message, DateTimeOffset scheduledAt)
-            where T : NoCTF.Application.Runtime.Instances.IRunnerPoolMessage =>
-            ValueTask.CompletedTask;
 
         public ValueTask PublishToRunnerNodeAsync<T>(T message)
             where T : NoCTF.Application.Runtime.Instances.IRunnerNodeMessage =>

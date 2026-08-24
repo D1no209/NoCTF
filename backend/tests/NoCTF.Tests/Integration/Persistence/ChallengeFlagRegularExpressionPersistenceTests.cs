@@ -42,7 +42,7 @@ public sealed class ChallengeFlagRegularExpressionPersistenceTests
             var awdpChallengeId = Guid.CreateVersion7(now.AddTicks(4));
 
             await using var db = new NoCtfDbContext(options);
-            await db.Database.MigrateAsync(ct);
+            await db.Database.EnsureCreatedAsync(ct);
             db.Users.AddRange(
                 User(ownerId, "regex-owner", now),
                 User(managerId, "regex-manager", now),

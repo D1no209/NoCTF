@@ -40,7 +40,7 @@ public sealed class PlatformAuditLogStoreTests
             var competitionId = Guid.CreateVersion7(now.AddMilliseconds(2));
             await using (var seed = new NoCtfDbContext(options))
             {
-                await seed.Database.MigrateAsync(cancellationToken);
+                await seed.Database.EnsureCreatedAsync(cancellationToken);
                 seed.Users.AddRange(
                     CreateUser(actorId, "audit-actor", now),
                     CreateUser(targetId, "audit-target", now));
