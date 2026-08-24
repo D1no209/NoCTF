@@ -1,5 +1,11 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 alpha.84 API 指标监听部署闭环
+
+- `alpha.83` 已通过完整 CI 并在可丢弃测试环境完成 InitialBaseline 部署，API、Worker、Runner、PostgreSQL、Redis、Prometheus、Grafana 及三项 exporter 均健康；数据库确认仅包含权威 15 张业务表，公开 HTTPS 与健康检查返回 200。
+- 部署后逐项检查 Prometheus targets 发现仅 API 抓取失败。根因是服务器保留的生产 Compose 覆盖文件仍把 `ASPNETCORE_URLS` 设置为仅监听 `8080`，覆盖了仓库基础清单的专用 `9464` 指标监听器；Worker 与 Runner 未受该旧覆盖影响。
+- 可观测性 Compose 现在为 API、Worker、Runner 显式重申 `8080;9464` 监听和指标端口，并作为部署链最后一层覆盖生产专用配置。新增架构测试锁定覆盖顺序和三项服务的监听配置，避免旧服务器配置再次静默关闭指标端点。平台版本递增为 `0.1.0-alpha.84`；没有业务模型、migration、OpenAPI 或生成 SDK 变化。
+
 ## 2026-08-24 alpha.83 观测镜像服务端直拉闭环
 
 - `main@cd292289` 的完整 CI 构建与测试通过；但 GitHub 到测试服务器的 SSH 上传速率不足以在合理时间内传输 Grafana 镜像，因此主动取消尚未进入服务切换阶段的部署任务，旧服务未受影响。

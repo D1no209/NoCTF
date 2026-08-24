@@ -89,8 +89,8 @@ compose=(
     --env-file "$config_root/.env"
     --env-file "$observability_env"
     --file "$release_dir/deploy/docker-compose.yml"
-    --file "$release_dir/deploy/docker-compose.observability.yml"
     --file "$config_root/deploy/docker-compose.prod.yml"
+    --file "$release_dir/deploy/docker-compose.observability.yml"
 )
 "${compose[@]}" config --quiet
 

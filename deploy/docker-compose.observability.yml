@@ -1,8 +1,20 @@
 services:
   backend:
     environment:
+      ASPNETCORE_URLS: http://+:8080;http://+:9464
+      Observability__MetricsPort: 9464
       Observability__PrometheusBaseUrl: http://prometheus:9090
       Observability__GrafanaPublicUrl: ${NOCTF_GRAFANA_PUBLIC_URL:-}
+
+  worker:
+    environment:
+      ASPNETCORE_URLS: http://+:8080;http://+:9464
+      Observability__MetricsPort: 9464
+
+  runner:
+    environment:
+      ASPNETCORE_URLS: http://+:8080;http://+:9464
+      Observability__MetricsPort: 9464
 
   prometheus:
     image: quay.io/prometheus/prometheus:v3.14.0

@@ -400,6 +400,38 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task Production_observability_overlay_keeps_the_private_metrics_listener_enabled()
+    {
+        var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
+        var observabilityCompose = (await ReadAsync(
+            "deploy",
+            "docker-compose.observability.yml")).ReplaceLineEndings("\n");
+        var productionOverride =
+            "--file \"$config_root/deploy/docker-compose.prod.yml\"";
+        var observabilityOverride =
+            "--file \"$release_dir/deploy/docker-compose.observability.yml\"";
+
+        await Assert.That(deployScript.IndexOf(
+            productionOverride,
+            StringComparison.Ordinal)).IsLessThan(deployScript.IndexOf(
+                observabilityOverride,
+                StringComparison.Ordinal));
+
+        foreach (var service in new[] { "backend", "worker", "runner" })
+        {
+            var serviceBlock = System.Text.RegularExpressions.Regex.Match(
+                observabilityCompose,
+                $"(?ms)^  {service}:\\n(?<body>.*?)(?=^  \\S|\\z)")
+                .Groups["body"]
+                .Value;
+            await Assert.That(serviceBlock).Contains(
+                "ASPNETCORE_URLS: http://+:8080;http://+:9464");
+            await Assert.That(serviceBlock).Contains(
+                "Observability__MetricsPort: 9464");
+        }
+    }
+
+    [Test]
     public async Task Ci_and_test_infrastructure_dependencies_are_immutable()
     {
         var ci = await ReadAsync(".github", "workflows", "ci.yml");
