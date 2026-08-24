@@ -32,3 +32,27 @@ public static class WorkerQueueNames
         _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
     };
 }
+
+public static class CompetitionEventFanoutQueueNames
+{
+    public const string Realtime = "noctf-competition-events-realtime";
+    public const string Leaderboard = "noctf-competition-events-leaderboard";
+
+    public static readonly IReadOnlyList<string> All = [Realtime, Leaderboard];
+}
+
+public static class WorkerQueueMonitoringNames
+{
+    public static readonly IReadOnlyList<string> All =
+    [
+        WorkerQueueNames.Control,
+        WorkerQueueNames.Gameplay,
+        WorkerQueueNames.Projection,
+        WorkerQueueNames.Background,
+        CompetitionEventFanoutQueueNames.Realtime,
+        CompetitionEventFanoutQueueNames.Leaderboard
+    ];
+
+    public static bool IsKnown(string queueName) =>
+        All.Contains(queueName, StringComparer.Ordinal);
+}

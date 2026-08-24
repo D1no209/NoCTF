@@ -62,7 +62,9 @@ else
 }
 
 if (roles.Has(HostRole.Worker))
-    builder.Services.AddNoCtfWorkerRole(collectQueueMetrics: !development);
+    builder.Services.AddNoCtfWorkerRole(
+        collectQueueMetrics: !development,
+        validateMessageTopology: !development);
 if (roles.Has(HostRole.Runner))
     builder.Services.AddNoCtfRunner(builder.Configuration, development);
 if (!development)

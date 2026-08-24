@@ -32,7 +32,9 @@ builder.Services.AddNoCtfApi(builder.Configuration, includeInfrastructure: true,
 builder.Services.AddNoCtfAuthentication(builder.Configuration);
 if (development)
 {
-    builder.Services.AddNoCtfWorkerRole(collectQueueMetrics: false);
+    builder.Services.AddNoCtfWorkerRole(
+        collectQueueMetrics: false,
+        validateMessageTopology: false);
     builder.Services.AddNoCtfRunner(builder.Configuration, development: true);
 }
 if (!exportSwagger && !development)

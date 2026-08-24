@@ -3,6 +3,7 @@ using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Application.GameplayFacts.Processing;
+using NoCTF.Hosting.Messaging;
 using Wolverine;
 using Wolverine.Postgresql;
 
@@ -15,6 +16,7 @@ public static class MessageRouting
         IConfiguration configuration,
         HostRoles roles)
     {
+        options.Durability.MessageIdentity = MessageIdentity.IdAndDestination;
         Route<EvaluateGameplayFact>(options, WorkerQueue.Gameplay);
         Route<GameplayFactStateChanged>(options, WorkerQueue.Gameplay);
         Route<RefreshDirtyLeaderboards>(options, WorkerQueue.Projection);
@@ -44,7 +46,7 @@ public static class MessageRouting
         Route<ForeignTeamFlagDetected>(options, WorkerQueue.Gameplay);
         Route<TeamBanCorrected>(options, WorkerQueue.Background);
         Route<DeliverCompetitionQuestionNotification>(options, WorkerQueue.Background);
-        Route<CompetitionEventCommitted>(options, WorkerQueue.Background);
+        FanOutCompetitionEvents(options);
         Route<ReconcileRunnerAssignments>(options, WorkerQueue.Control);
         Route<BloodAwarded>(options, WorkerQueue.Background);
         Route<AwdpFixResult>(options, WorkerQueue.Gameplay);
@@ -52,6 +54,23 @@ public static class MessageRouting
         Route<ExpireAwdpFixVerification>(options, WorkerQueue.Control);
     }
 
-    private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue) =>
-        options.PublishMessage<TMessage>().ToPostgresqlQueue(WorkerQueues.GetName(queue));
+    private static void Route<TMessage>(WolverineOptions options, WorkerQueue queue)
+    {
+        var queueName = WorkerQueues.GetName(queue);
+        options.PublishMessage<TMessage>().ToPostgresqlQueue(queueName);
+        options.ConfigureNoCtfInfrastructureRetriesFor<TMessage>(queue, queueName);
+    }
+
+    private static void FanOutCompetitionEvents(WolverineOptions options)
+    {
+        var route = options.PublishMessage<CompetitionEventCommitted>();
+        route.ToPostgresqlQueue(CompetitionEventFanoutQueueNames.Realtime);
+        route.ToPostgresqlQueue(CompetitionEventFanoutQueueNames.Leaderboard);
+        options.ConfigureNoCtfInfrastructureRetriesFor<CompetitionEventCommitted>(
+            WorkerQueue.Background,
+            CompetitionEventFanoutQueueNames.Realtime);
+        options.ConfigureNoCtfInfrastructureRetriesFor<CompetitionEventCommitted>(
+            WorkerQueue.Projection,
+            CompetitionEventFanoutQueueNames.Leaderboard);
+    }
 }

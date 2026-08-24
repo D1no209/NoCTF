@@ -1,32 +1,119 @@
-using Microsoft.EntityFrameworkCore;
+using JasperFx;
+using JasperFx.CodeGeneration;
 using Npgsql;
+using NoCTF.Application.Messaging;
 using Wolverine;
+using Wolverine.Configuration;
 using Wolverine.ErrorHandling;
+using Wolverine.Runtime.Handlers;
 
 namespace NoCTF.Hosting.Messaging;
 
 public static class NoCtfMessagingRetryPolicies
 {
-    private static readonly TimeSpan[] ScheduledRetryDelays =
+    private static readonly TimeSpan[] ControlRetryDelays =
     [
+        TimeSpan.FromSeconds(1),
+        TimeSpan.FromSeconds(3),
+        TimeSpan.FromSeconds(10),
+        TimeSpan.FromSeconds(30)
+    ];
+
+    private static readonly TimeSpan[] GameplayRetryDelays =
+    {
+        TimeSpan.FromSeconds(1),
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(15)
+    };
+
+    private static readonly TimeSpan[] ProjectionRetryDelays =
+    {
+        TimeSpan.FromSeconds(2),
+        TimeSpan.FromSeconds(10),
+        TimeSpan.FromSeconds(30)
+    };
+
+    private static readonly TimeSpan[] BackgroundRetryDelays =
+    {
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(30),
+        TimeSpan.FromMinutes(2)
+    };
+
+    private static readonly TimeSpan[] RunnerRetryDelays =
+    {
         TimeSpan.FromSeconds(1),
         TimeSpan.FromSeconds(5),
         TimeSpan.FromSeconds(15),
-        TimeSpan.FromMinutes(1),
-        TimeSpan.FromMinutes(5)
-    ];
+        TimeSpan.FromMinutes(1)
+    };
 
-    public static void ConfigureNoCtfInfrastructureRetries(this WolverineOptions options)
+    public static void ConfigureNoCtfInfrastructureRetriesFor<TMessage>(
+        this WolverineOptions options,
+        WorkerQueue queue,
+        string endpointName)
     {
-        ConfigureInfrastructureRetry<TimeoutException>(options);
-        ConfigureInfrastructureRetry<NpgsqlException>(options);
-        options.Policies.OnException<DbUpdateConcurrencyException>().RetryTimes(5);
+        var delays = queue switch
+        {
+            WorkerQueue.Control => ControlRetryDelays,
+            WorkerQueue.Gameplay => GameplayRetryDelays,
+            WorkerQueue.Projection => ProjectionRetryDelays,
+            WorkerQueue.Background => BackgroundRetryDelays,
+            _ => throw new ArgumentOutOfRangeException(nameof(queue), queue, null)
+        };
+
+        options.Policies.Add(new NoCtfInfrastructureRetryPolicy(
+            typeof(TMessage),
+            endpointName,
+            delays));
     }
 
-    private static void ConfigureInfrastructureRetry<TException>(WolverineOptions options)
-        where TException : Exception =>
-        options.Policies.OnException<TException>()
+    public static void ConfigureNoCtfRunnerInfrastructureRetries(this WolverineOptions options)
+    {
+        options.Policies.OnException<TimeoutException>()
             .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
-            .Then.ScheduleRetry(ScheduledRetryDelays)
+            .Then.ScheduleRetry(RunnerRetryDelays)
             .WithFullJitter();
+        options.Policies.OnException<NpgsqlException>()
+            .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
+            .Then.ScheduleRetry(RunnerRetryDelays)
+            .WithFullJitter();
+    }
+
+    private sealed class NoCtfInfrastructureRetryPolicy(
+        Type messageType,
+        string endpointName,
+        TimeSpan[] delays) : IHandlerPolicy
+    {
+        public void Apply(
+            IReadOnlyList<HandlerChain> chains,
+            GenerationRules rules,
+            IServiceContainer container)
+        {
+            foreach (var chain in chains.Where(Matches))
+            {
+                chain.OnException<TimeoutException>()
+                    .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
+                    .Then.ScheduleRetry(delays)
+                    .WithFullJitter();
+                chain.OnException<NpgsqlException>()
+                    .RetryWithCooldown(TimeSpan.FromMilliseconds(250))
+                    .Then.ScheduleRetry(delays)
+                    .WithFullJitter();
+            }
+        }
+
+        private bool Matches(HandlerChain chain)
+        {
+            if (chain.MessageType != messageType)
+                return false;
+
+            return chain.Endpoints.Any(endpoint =>
+                string.Equals(endpoint.EndpointName, endpointName, StringComparison.Ordinal)
+                || string.Equals(
+                    endpoint.Uri?.ToString().TrimEnd('/'),
+                    $"postgresql://{endpointName}",
+                    StringComparison.OrdinalIgnoreCase));
+        }
+    }
 }
