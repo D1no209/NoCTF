@@ -90,7 +90,6 @@ public sealed class ChallengeConfigurationStore(
             if (tracked is null)
                 return new(null, ChallengeConfigurationUpdateFailure.ChallengeNotFound);
         }
-        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         if (competition.Mode == GameMode.Awd
             && status == CompetitionStatus.Running
             && published.Value)

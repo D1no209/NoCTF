@@ -250,7 +250,6 @@ public sealed class CheatIncidentStore(
                 ActorUserId: command.ActorUserId,
                 TeamId: team.Id,
                 GameplayFactId: fact.Id), cancellationToken);
-            await MarkLeaderboardDirtyAsync(command.CompetitionId, cancellationToken);
             await outbox.PublishAsync(new TeamBanned(
                 command.CompetitionId,
                 team.Id,
@@ -308,7 +307,6 @@ public sealed class CheatIncidentStore(
                 command.OccurredAt,
                 TeamId: team.Id,
                 ParentEventId: ban.Id), cancellationToken);
-            await MarkLeaderboardDirtyAsync(command.CompetitionId, cancellationToken);
             await outbox.PublishAsync(new TeamBanCorrected(
                 command.CompetitionId,
                 team.Id,
@@ -562,9 +560,6 @@ public sealed class CheatIncidentStore(
             : reason.Replace(submittedFlag, "[REDACTED]", StringComparison.Ordinal);
         return PlatformLogRedactor.Redact(sanitized, []);
     }
-
-    private static Task MarkLeaderboardDirtyAsync(Guid competitionId, CancellationToken ct) =>
-        Task.CompletedTask;
 
     private enum ResolutionOperation : short
     {

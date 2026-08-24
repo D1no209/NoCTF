@@ -41,71 +41,10 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             await using (var migrationDb = new NoCtfDbContext(options))
                 await migrationDb.Database.EnsureCreatedAsync(cancellationToken);
 
-            await RefreshWhileCreatingAsync(options, cancellationToken);
             await SameUserCreatesTwiceAsync(options, cancellationToken);
             await CreateWhileJoiningAsync(options, cancellationToken);
             await DifferentUsersJoinAsync(options, cancellationToken);
         });
-    }
-
-    private static async Task RefreshWhileCreatingAsync(
-        DbContextOptions<NoCtfDbContext> options,
-        CancellationToken ct)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var owner = User(Guid.CreateVersion7(now), "refresh-owner", now);
-        var participant = User(Guid.CreateVersion7(now.AddTicks(1)), "refresh-player", now);
-        var competition = Competition(
-            Guid.CreateVersion7(now.AddTicks(2)),
-            owner.Id,
-            "Refresh versus registration",
-            leaderboardDirty: true,
-            now);
-        await SeedAsync(options, [owner, participant], [competition], [], ct);
-
-        await using var registrationDb = new NoCtfDbContext(options);
-        await using var refreshDb = new NoCtfDbContext(options);
-        var registrationOutbox = new NoopOutbox();
-        var eventStore = new CompetitionEventStore(registrationDb, registrationOutbox);
-        var blocker = new BlockingEventRecorder(eventStore);
-        var store = new TeamRegistrationStore(
-            registrationDb,
-            registrationOutbox,
-            eventRecorder: blocker);
-        var registrationTask = store.TryCreateAsync(
-            new(competition.Id, participant.Id, "Refresh Team", now.AddMinutes(1), "default"),
-            TeamRegistrationStatus.Approved,
-            ct);
-
-        await blocker.Entered.WaitAsync(TimeSpan.FromSeconds(30), ct);
-        try
-        {
-            await BackendMessageHandlers.Handle(
-                    new RefreshDirtyLeaderboards(now),
-                    refreshDb,
-                    new NoopOutbox(),
-                    new EmptyLeaderboardCache(),
-                    ct)
-                .WaitAsync(TimeSpan.FromSeconds(30), ct);
-        }
-        finally
-        {
-            blocker.Release();
-        }
-
-        var result = await registrationTask.WaitAsync(TimeSpan.FromSeconds(30), ct);
-        await Assert.That(result.Team).IsNotNull();
-        await Assert.That(result.Failure).IsNull();
-        await Assert.That(registrationOutbox.FlushCount).IsEqualTo(1);
-
-        await using var verification = new NoCtfDbContext(options);
-        await Assert.That(await verification.Teams.CountAsync(
-            team => team.CompetitionId == competition.Id,
-            ct)).IsEqualTo(1);
-        await Assert.That(await verification.CompetitionEvents.CountAsync(
-            item => item.CompetitionId == competition.Id
-                && item.Kind == CompetitionEventKind.TeamRegistered,
-            ct)).IsEqualTo(1);
     }
 
     private static async Task SameUserCreatesTwiceAsync(
@@ -119,7 +58,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             Guid.CreateVersion7(now.AddTicks(2)),
             owner.Id,
             "Double registration",
-            leaderboardDirty: false,
             now);
         await SeedAsync(options, [owner, participant], [competition], [], ct);
 
@@ -159,7 +97,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             Guid.CreateVersion7(now.AddTicks(3)),
             owner.Id,
             "Create versus join",
-            leaderboardDirty: false,
             now);
         const string invitationToken = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
         var existingTeam = Team(
@@ -223,7 +160,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
             Guid.CreateVersion7(now.AddTicks(4)),
             owner.Id,
             "Parallel membership",
-            leaderboardDirty: false,
             now);
         const string invitationToken = "ZYXWVUTSRQPONMLKJIHGFEDCBA987654";
         var existingTeam = Team(
@@ -338,7 +274,6 @@ public sealed class TeamMutationConcurrencyPersistenceTests
         Guid id,
         Guid ownerId,
         string title,
-        bool leaderboardDirty,
         DateTimeOffset now) => new()
     {
         Id = id,

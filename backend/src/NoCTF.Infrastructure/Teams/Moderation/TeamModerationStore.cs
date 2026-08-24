@@ -76,7 +76,6 @@ public sealed class TeamModerationStore(
             ParentEventId: ban?.Id,
             Reason: safeReason), cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        await LeaderboardDirty.MarkAsync(db, command.CompetitionId, cancellationToken);
         if (command.Ban)
         {
             await outbox.PublishAsync(new TeamBanned(

@@ -43,6 +43,14 @@ public static class NoCtfTelemetry
         "noctf.leaderboard.projection.teams", unit: "{team}");
     private static readonly Counter<long> LeaderboardPublishFailures = Meter.CreateCounter<long>(
         "noctf.leaderboard.publish.failures", unit: "{failure}");
+    private static readonly Counter<long> LeaderboardInvalidations = Meter.CreateCounter<long>(
+        "noctf.leaderboard.cache.invalidations", unit: "{invalidation}");
+    private static readonly Counter<long> LeaderboardMergeEvents = Meter.CreateCounter<long>(
+        "noctf.leaderboard.merge.events", unit: "{event}");
+    private static readonly Counter<long> LeaderboardMergeDispatches = Meter.CreateCounter<long>(
+        "noctf.leaderboard.merge.dispatches", unit: "{projection}");
+    private static readonly Counter<long> LeaderboardCacheMissRebuilds = Meter.CreateCounter<long>(
+        "noctf.leaderboard.cache_miss.rebuilds", unit: "{rebuild}");
     private static readonly Counter<long> SchedulerTakeovers = Meter.CreateCounter<long>(
         "noctf.scheduler.takeovers", unit: "{takeover}");
     private static readonly Histogram<double> SchedulerRebuildDuration = Meter.CreateHistogram<double>(
@@ -55,8 +63,6 @@ public static class NoCtfTelemetry
         "noctf.scheduler.dispatches", unit: "{message}");
     private static readonly Counter<long> SchedulerSkippedTicks = Meter.CreateCounter<long>(
         "noctf.scheduler.skipped_ticks", unit: "{tick}");
-    private static long _dirtyCompetitionCount;
-    private static long _oldestDirtyAgeSeconds;
     private static long _waitingRuntimeCount;
     private static long _oldestWaitingRuntimeAgeSeconds;
     private static readonly ConcurrentDictionary<string, WorkerQueueSnapshot> WorkerQueueSnapshots =
@@ -66,14 +72,6 @@ public static class NoCtfTelemetry
 
     static NoCtfTelemetry()
     {
-        Meter.CreateObservableGauge(
-            "noctf.leaderboard.dirty.competitions",
-            () => Interlocked.Read(ref _dirtyCompetitionCount),
-            unit: "{competition}");
-        Meter.CreateObservableGauge(
-            "noctf.leaderboard.dirty.oldest_age",
-            () => Interlocked.Read(ref _oldestDirtyAgeSeconds),
-            unit: "s");
         Meter.CreateObservableGauge(
             "noctf.runtime.waiting",
             () => Interlocked.Read(ref _waitingRuntimeCount),
@@ -159,6 +157,21 @@ public static class NoCtfTelemetry
     public static void RecordLeaderboardPublishFailure(string endpoint) =>
         LeaderboardPublishFailures.Add(1, new TagList { { "endpoint", endpoint } });
 
+    public static void RecordLeaderboardInvalidation(string outcome) =>
+        LeaderboardInvalidations.Add(1, new TagList { { "outcome", outcome } });
+
+    public static void RecordLeaderboardMergeEvent(bool startedWindow) =>
+        LeaderboardMergeEvents.Add(1, new TagList
+        {
+            { "outcome", startedWindow ? "window_started" : "merged" }
+        });
+
+    public static void RecordLeaderboardMergeDispatch(string outcome) =>
+        LeaderboardMergeDispatches.Add(1, new TagList { { "outcome", outcome } });
+
+    public static void RecordLeaderboardCacheMissRebuild(string outcome) =>
+        LeaderboardCacheMissRebuilds.Add(1, new TagList { { "outcome", outcome } });
+
     public static void RecordSchedulerTakeover() => SchedulerTakeovers.Add(1);
 
     public static void RecordSchedulerRebuild(
@@ -189,15 +202,9 @@ public static class NoCtfTelemetry
     }
 
     public static void UpdateOperationalSnapshot(
-        long dirtyCompetitionCount,
-        TimeSpan oldestDirtyAge,
         long waitingRuntimeCount,
         TimeSpan oldestWaitingRuntimeAge)
     {
-        Interlocked.Exchange(ref _dirtyCompetitionCount, Math.Max(0, dirtyCompetitionCount));
-        Interlocked.Exchange(
-            ref _oldestDirtyAgeSeconds,
-            Math.Max(0, (long)oldestDirtyAge.TotalSeconds));
         Interlocked.Exchange(ref _waitingRuntimeCount, Math.Max(0, waitingRuntimeCount));
         Interlocked.Exchange(
             ref _oldestWaitingRuntimeAgeSeconds,

@@ -373,10 +373,6 @@ public sealed class TeamBanAppealStore(
             correctedAt,
             TeamId: team.Id,
             ParentEventId: ban.Id), cancellationToken);
-        await LeaderboardDirty.MarkAsync(
-            db,
-            team.CompetitionId,
-            cancellationToken);
         await outbox.PublishAsync(new TeamBanCorrected(
             team.CompetitionId,
             team.Id,

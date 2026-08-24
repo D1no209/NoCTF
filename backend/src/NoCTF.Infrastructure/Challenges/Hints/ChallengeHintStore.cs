@@ -102,7 +102,6 @@ public sealed class ChallengeHintStore(
         try
         {
             await db.SaveChangesAsync(ct);
-            await LeaderboardDirty.MarkAsync(db, command.CompetitionId, ct);
             await QueueHintPublicationAsync(
                 command.CompetitionId,
                 challenge,
@@ -141,7 +140,6 @@ public sealed class ChallengeHintStore(
         hint.HiddenAt = now;
         challenge!.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await transaction.CommitAsync(ct);
         await outbox.FlushOutgoingMessagesAsync();
         return true;
@@ -169,7 +167,6 @@ public sealed class ChallengeHintStore(
         hint.HiddenAt = null;
         challenge!.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
-        await LeaderboardDirty.MarkAsync(db, competitionId, ct);
         await QueueHintPublicationAsync(
             competitionId,
             challenge,

@@ -17,6 +17,7 @@ public interface ILeaderboardPublicationFence
         CancellationToken cancellationToken);
     Task<LeaderboardFencedPayload?> GetAsync(Guid competitionId, CancellationToken cancellationToken);
     Task<bool> IsCurrentAsync(Guid competitionId, long fence, CancellationToken cancellationToken);
+    Task InvalidateAsync(Guid competitionId, long minimumFence, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -58,6 +59,27 @@ public sealed class RedisLeaderboardPublicationFence(IConnectionMultiplexer redi
         end
         redis.call('HSET', KEYS[1], 'fence', incoming, 'payload', ARGV[2])
         return 1
+        """;
+
+    private const string InvalidateScript = """
+        local current = redis.call('GET', KEYS[1])
+        local floor = ARGV[1]
+        local function less_than(left, right)
+            if string.len(left) ~= string.len(right) then
+                return string.len(left) < string.len(right)
+            end
+            return left < right
+        end
+        local next
+        if (not current) or less_than(current, floor) then
+            next = floor
+            redis.call('SET', KEYS[1], next)
+        else
+            next = redis.call('INCR', KEYS[1])
+        end
+        redis.call('HSET', KEYS[2], 'fence', next)
+        redis.call('HDEL', KEYS[2], 'payload')
+        return next
         """;
 
     public async Task<long> IssueAsync(
@@ -148,6 +170,35 @@ public sealed class RedisLeaderboardPublicationFence(IConnectionMultiplexer redi
         return !current.IsNullOrEmpty
             && long.TryParse(current.ToString(), CultureInfo.InvariantCulture, out var value)
             && value == fence;
+    }
+
+    public async Task InvalidateAsync(
+        Guid competitionId,
+        long minimumFence,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var started = Stopwatch.GetTimestamp();
+        var outcome = "success";
+        try
+        {
+            _ = await redis.GetDatabase().ScriptEvaluateAsync(
+                InvalidateScript,
+                [FenceKey(competitionId), PayloadKey(competitionId)],
+                [minimumFence.ToString(CultureInfo.InvariantCulture)]);
+        }
+        catch
+        {
+            outcome = "failure";
+            throw;
+        }
+        finally
+        {
+            NoCtfTelemetry.RecordRedisOperation(
+                "leaderboard_fence_invalidate",
+                outcome,
+                Stopwatch.GetElapsedTime(started).TotalSeconds);
+        }
     }
 
     internal static RedisKey FenceKey(Guid competitionId) =>

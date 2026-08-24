@@ -14,12 +14,13 @@ public sealed class MaintenanceTickAgent(
     ClusterSchedulingState state,
     ClusterSchedulerNodeIdentity nodeIdentity,
     IClusterSchedulerStatusStore statusStore,
+    LeaderboardProjectionMergeQueue leaderboardMergeQueue,
     ILogger<MaintenanceTickAgent> logger)
     : SingularAgent(AgentName)
 {
     public const string AgentName = "noctf-maintenance-ticks";
     private static readonly TimeSpan RebuildInterval = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan LoopInterval = TimeSpan.FromMilliseconds(200);
+    private static readonly TimeSpan LoopInterval = TimeSpan.FromMilliseconds(50);
     private static readonly HashSet<ClusterScheduleKind> RebuiltKinds =
     [
         ClusterScheduleKind.AwdRound,
@@ -139,8 +140,35 @@ public sealed class MaintenanceTickAgent(
                 nextRebuildAt = timeProvider.GetUtcNow().Add(RebuildInterval);
             }
 
+            await DrainLeaderboardMergesAsync(now, cancellationToken);
             await DrainDueAsync(now, cancellationToken);
             await timer.WaitForNextTickAsync(cancellationToken);
+        }
+    }
+
+    private async Task DrainLeaderboardMergesAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        foreach (var competitionId in leaderboardMergeQueue.TakeDue(now))
+        {
+            try
+            {
+                await PublishAsync(new ProjectLeaderboard(competitionId), cancellationToken);
+                NoCtfTelemetry.RecordLeaderboardMergeDispatch("success");
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                leaderboardMergeQueue.Retry(competitionId, now.AddSeconds(1));
+                NoCtfTelemetry.RecordLeaderboardMergeDispatch("failure");
+                logger.LogError(
+                    exception,
+                    "Cluster scheduler failed to publish merged leaderboard projection.");
+            }
         }
     }
 
@@ -268,7 +296,7 @@ public sealed class MaintenanceTickAgent(
             DispatchAwdCheckers value => bus.PublishAsync(value),
             PollKohChallenge value => bus.PublishAsync(value),
             AdvanceCompetitionLifecycle value => bus.PublishAsync(value),
-            RefreshDirtyLeaderboards value => bus.PublishAsync(value),
+            ProjectLeaderboard value => bus.PublishAsync(value),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(message),
                 message.GetType().FullName,
@@ -290,13 +318,6 @@ public sealed class MaintenanceTickAgent(
             now,
             TimeSpan.FromSeconds(30),
             new AdvanceCompetitionLifecycle(now)));
-        // Removed in phase 9 when leaderboard invalidation becomes event driven.
-        AddFixed(new(
-            "leaderboard-refresh",
-            ClusterScheduleKind.LeaderboardRefresh,
-            now,
-            TimeSpan.FromSeconds(15),
-            new RefreshDirtyLeaderboards(now)));
     }
 
     private void AddFixed(ClusterScheduleEntry entry)
@@ -318,7 +339,6 @@ public sealed class MaintenanceTickAgent(
         ClusterScheduleKind.AwdChecker => "awd_checker",
         ClusterScheduleKind.KohPoll => "koh_poll",
         ClusterScheduleKind.CompetitionLifecycle => "competition_lifecycle",
-        ClusterScheduleKind.LeaderboardRefresh => "leaderboard_refresh",
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
     };
 }

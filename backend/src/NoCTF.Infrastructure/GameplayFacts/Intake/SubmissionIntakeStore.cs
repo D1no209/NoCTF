@@ -103,7 +103,6 @@ public sealed class GameplayFactIntakeStore(
             UpdatedAt = item.OccurredAt
         }).ToArray();
         db.GameplayFacts.AddRange(entities);
-        await LeaderboardDirty.MarkAsync(db, received[0].CompetitionId, cancellationToken);
         foreach (var entity in entities)
         {
             await outbox.PublishAsync(new EvaluateGameplayFact(entity.Id));
@@ -176,7 +175,6 @@ public sealed class GameplayFactIntakeStore(
             UpdatedAt = received.OccurredAt
         };
         db.GameplayFacts.Add(entity);
-        await LeaderboardDirty.MarkAsync(db, entity.CompetitionId, cancellationToken);
         await outbox.PublishAsync(new EvaluateGameplayFact(entity.Id));
         await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State));
         await db.SaveChangesAsync(cancellationToken);
@@ -213,7 +211,6 @@ public sealed class GameplayFactIntakeStore(
             UpdatedAt = received.OccurredAt
         };
         db.GameplayFacts.Add(entity);
-        await LeaderboardDirty.MarkAsync(db, entity.CompetitionId, cancellationToken);
         await outbox.PublishAsync(new GameplayFactStateChanged(entity.Id, entity.State));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

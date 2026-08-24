@@ -176,6 +176,18 @@ public sealed class WolverineTransactionalOutboxTests
 
                 var activeHostId = MaintenanceTickObservation.ActiveHostIds.Single();
                 var active = activeHostId == firstHostId ? first : second;
+                var leaderboardCompetitionId = Guid.CreateVersion7();
+                active.Services.GetRequiredService<LeaderboardProjectionMergeQueue>()
+                    .Enqueue(leaderboardCompetitionId, DateTimeOffset.UtcNow);
+                await WaitUntilAsync(
+                    () => MaintenanceTickObservation.LeaderboardDispatchCount(
+                        leaderboardCompetitionId) == 1,
+                    TimeSpan.FromSeconds(30),
+                    cancellationToken);
+                await Assert.That(MaintenanceTickObservation.LeaderboardDispatchCount(
+                        leaderboardCompetitionId))
+                    .IsEqualTo(1);
+
                 var standbyHostId = activeHostId == firstHostId ? secondHostId : firstHostId;
                 var standbyCountBeforeFailover =
                     MaintenanceTickObservation.DispatchCount(standbyHostId);
@@ -1019,6 +1031,7 @@ public sealed class WolverineTransactionalOutboxTests
         builder.Services.AddSingleton(new MaintenanceHostIdentity(hostId));
         builder.Services.AddSingleton(new ClusterSchedulerNodeIdentity(hostId));
         builder.Services.AddSingleton<ClusterSchedulingState>();
+        builder.Services.AddSingleton<LeaderboardProjectionMergeQueue>();
         builder.Services.AddSingleton<IClusterSchedulerStatusStore, InMemorySchedulerStatusStore>();
         builder.Services.AddScoped<IClusterScheduleSource, EmptyClusterScheduleSource>();
         builder.Services.AddSingleton(TimeProvider.System);
@@ -1029,6 +1042,10 @@ public sealed class WolverineTransactionalOutboxTests
             options.Discovery.IncludeType<MaintenanceTickProbeHandler>();
             options.PersistMessagesWithPostgresql(connectionString, "wolverine_maintenance_test");
             options.AutoBuildMessageStorageOnStartup = JasperFx.AutoCreate.All;
+            options.ListenToPostgresqlQueue("maintenance-projection-test")
+                .UseDurableInbox();
+            options.PublishMessage<ProjectLeaderboard>()
+                .ToPostgresqlQueue("maintenance-projection-test");
             options.Durability.CheckAssignmentPeriod = TimeSpan.FromMilliseconds(250);
             options.Durability.FirstHealthCheckExecution = TimeSpan.FromMilliseconds(100);
             options.Durability.HealthCheckPollingTime = TimeSpan.FromMilliseconds(250);
@@ -1273,6 +1290,8 @@ public static class MaintenanceTickObservation
 {
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int>
         DispatchCounts = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, int>
+        LeaderboardDispatchCounts = new();
 
     public static int ActiveHostCount => DispatchCounts.Count(item => item.Value > 0);
 
@@ -1284,10 +1303,20 @@ public static class MaintenanceTickObservation
     public static int DispatchCount(string hostId) =>
         DispatchCounts.GetValueOrDefault(hostId);
 
-    public static void Reset() => DispatchCounts.Clear();
+    public static void Reset()
+    {
+        DispatchCounts.Clear();
+        LeaderboardDispatchCounts.Clear();
+    }
 
     public static void RecordDispatch(string hostId) =>
         DispatchCounts.AddOrUpdate(hostId, 1, (_, count) => count + 1);
+
+    public static void RecordLeaderboardDispatch(Guid competitionId) =>
+        LeaderboardDispatchCounts.AddOrUpdate(competitionId, 1, (_, count) => count + 1);
+
+    public static int LeaderboardDispatchCount(Guid competitionId) =>
+        LeaderboardDispatchCounts.GetValueOrDefault(competitionId);
 }
 
 public sealed record MaintenanceHostIdentity(string Value);
@@ -1351,11 +1380,12 @@ public sealed class MaintenanceTickProbeHandler
     public static void Handle(DispatchAwdCheckers _, MaintenanceHostIdentity host) =>
         MaintenanceTickObservation.RecordDispatch(host.Value);
 
-    public static void Handle(RefreshDirtyLeaderboards _) { }
-
     public static void Handle(ReconcileRunnerAssignments _) { }
 
     public static void Handle(LifecycleMessage _) { }
+
+    public static void Handle(ProjectLeaderboard message) =>
+        MaintenanceTickObservation.RecordLeaderboardDispatch(message.CompetitionId);
 }
 
 public sealed class OutboxBusinessProbeHandler
