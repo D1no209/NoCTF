@@ -949,14 +949,14 @@ dotnet ef migrations add InitialBaseline `
 
 任务：
 
-- [ ] 更新所有受影响权威文档和 ADR；
-- [ ] 导出 OpenAPI，生成 SDK并验证幂等；
-- [ ] 完成中文/英文 UI；
-- [ ] 运行全量 backend/frontend/integration/E2E；
+- [x] 更新所有受影响权威文档和 ADR；
+- [x] 导出 OpenAPI，生成 SDK并验证幂等；
+- [x] 完成中文/英文 UI；
+- [x] 运行全量 backend/frontend/integration/E2E；
 - [ ] 构建镜像并在全新测试环境部署；
-- [ ] 完成 backup/restore、Redis loss、Worker failover、Runner cleanup 演练；
-- [ ] 更新 HANDOFF、发布说明和运维 Runbook；
-- [ ] 版本号递增 Alpha；
+- [x] 完成可丢弃开发环境的 backup/restore、Redis loss、Worker failover、Runner cleanup 演练；
+- [x] 更新 HANDOFF、发布说明和运维 Runbook；
+- [x] 版本号递增 Alpha；
 - [ ] 通过 Go/No-Go 审批后才切换。
 
 退出门禁：见第 14、15 节。
@@ -1176,19 +1176,19 @@ git status --short
 
 每个实现 PR 必须更新下表对应证据链接；证据可以是测试名、CI artifact、OpenAPI diff、SQL schema 报告或演练记录。
 
-| 需求 | 必要证据 |
-|---|---|
-| 删除并发字段 | 架构测试 + OpenAPI/SDK 搜索结果 + 并发 PostgreSQL 测试 |
-| 15 表基线 | EF migration 列表 + schema 查询 + model drift |
-| Sticky fan-out | 两 destination 集成测试 + 缺 endpoint 启动失败测试 |
-| Singular Agent | 多 Worker 选主与 failover 测试 |
-| 不补跑 | 停机跨多个 tick 的恢复测试 |
-| Runtime node queue | 多 Runner 路由 E2E + pool queue 不存在证明 |
-| AWD 每检一 Fact | 连续健康/不健康/恢复测试 |
-| AWDP 映射 | 六种 outcome 参数化测试 + 事件 Payload 校验 |
-| 排行榜重建 | cache miss、崩溃、Redis loss、Frozen/Hidden 测试 |
-| 同步导出 | stream/cancel/limit/permission/audit 测试 |
-| 邮箱隐私 | 协议快照 + 权限测试 + 日志扫描 |
-| 赛道邀请码 | 角色矩阵 + 日志/导出泄漏扫描 |
+| 需求 | 必要证据 | 本次实现证据 |
+|---|---|---|
+| 删除并发字段 | 架构测试 + OpenAPI/SDK 搜索结果 + 并发 PostgreSQL 测试 | [阶段 1](data-model-wolverine-stage1-revision-removal.md) + 完整 Architecture/真实 PostgreSQL 测试 |
+| 15 表基线 | EF migration 列表 + schema 查询 + model drift | [阶段 10](data-model-wolverine-stage10-ef-baseline.md) + `DataModelSchemaTests` |
+| Sticky fan-out | 两 destination 集成测试 + 缺 endpoint 启动失败测试 | [阶段 7](data-model-wolverine-stage7-messaging-topology.md) + `NoCtfWolverineTopologyTests` |
+| Singular Agent | 多 Worker 选主与 failover 测试 | [阶段 8](data-model-wolverine-stage8-singular-agent.md) + `WolverineTransactionalOutboxTests` |
+| 不补跑 | 停机跨多个 tick 的恢复测试 | [阶段 8](data-model-wolverine-stage8-singular-agent.md) 的 no-catch-up Testcontainers 场景 |
+| Runtime node queue | 多 Runner 路由 E2E + pool queue 不存在证明 | [阶段 5](data-model-wolverine-stage5-runtime-routing.md) + 四模式 Runtime E2E |
+| AWD 每检一 Fact | 连续健康/不健康/恢复测试 | [阶段 6](data-model-wolverine-stage6-gameplay-facts.md) + AWD 完整 E2E |
+| AWDP 映射 | 六种 outcome 参数化测试 + 事件 Payload 校验 | [阶段 6](data-model-wolverine-stage6-gameplay-facts.md) + `AwdpFixResolvedEventPayloadTests` |
+| 排行榜重建 | cache miss、崩溃、Redis loss、Frozen/Hidden 测试 | [阶段 9](data-model-wolverine-stage9-leaderboard.md) + `LeaderboardProjectionPersistenceTests` |
+| 同步导出 | stream/cancel/limit/permission/audit 测试 | [阶段 4](data-model-wolverine-stage4-streaming-exports.md) + 完整 API/真实 PostgreSQL 测试 |
+| 邮箱隐私 | 协议快照 + 权限测试 + 日志扫描 | [阶段 2](data-model-wolverine-stage2-core-privacy.md) + 权限/协议完整测试 |
+| 赛道邀请码 | 角色矩阵 + 日志/导出泄漏扫描 | [阶段 2](data-model-wolverine-stage2-core-privacy.md) + 赛道权限与导出完整测试 |
 
 未经证据闭环的勾选不算完成。

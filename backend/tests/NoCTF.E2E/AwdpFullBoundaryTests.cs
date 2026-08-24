@@ -322,6 +322,38 @@ public sealed class AwdpFullBoundaryTests
             result: "Wrong",
             failureCode: null);
 
+        var redGenerationTwo = await ResetAndPollRuntimeAsync(
+            redClient,
+            competitionId,
+            competitionChallengeId,
+            cancellationToken);
+        await Assert.That(redGenerationTwo.GetProperty("id").GetGuid())
+            .IsNotEqualTo(redRuntime.GetProperty("id").GetGuid());
+        var redGenerationTwoUrl = redGenerationTwo.GetProperty("urls")[0].GetString()
+            ?? throw new InvalidOperationException("Reset attack Runtime did not expose a URL.");
+        var redGenerationTwoFlag = await PollTextAsync(
+            new Uri(new Uri(redGenerationTwoUrl), "flag").ToString(),
+            TimeSpan.FromSeconds(30),
+            cancellationToken);
+        await Assert.That(redGenerationTwoFlag).IsNotEqualTo(redFlag);
+        var expiredBreakId = await SubmitBreakAsync(
+            redClient,
+            competitionId,
+            competitionChallengeId,
+            redFlag,
+            cancellationToken);
+        var expiredBreak = await PollCompletedSubmissionAsync(
+            redClient,
+            competitionId,
+            expiredBreakId,
+            TimeSpan.FromSeconds(30),
+            cancellationToken);
+        await AssertSubmissionAsync(
+            expiredBreak,
+            "BreakAttempt",
+            "Wrong",
+            "FlagExpired");
+
         var fixedArchive = CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/fixed\n");
         var blueFixId = await UploadPatchAsync(
             blueClient,
@@ -371,7 +403,7 @@ public sealed class AwdpFullBoundaryTests
             CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/service-abnormal-bypass\n"),
             "service-abnormal-bypass.tar.gz",
             "FixAttempt",
-            "Wrong",
+            "Rejected",
             "AwdpServiceAbnormal",
             TimeSpan.FromSeconds(90),
             cancellationToken);
@@ -382,7 +414,7 @@ public sealed class AwdpFullBoundaryTests
             CreatePatchArchive("#!/bin/sh\nset -eu\ntouch /dev/shm/service-down\n"),
             "service-abnormal-down.tar.gz",
             "FixAttempt",
-            "Wrong",
+            "Rejected",
             "AwdpServiceAbnormal",
             TimeSpan.FromSeconds(90),
             cancellationToken);
@@ -393,7 +425,7 @@ public sealed class AwdpFullBoundaryTests
             CreatePatchArchive("#!/bin/sh\nexit 9\n"),
             "nonzero.tar.gz",
             "FixAttempt",
-            "Wrong",
+            "Rejected",
             "AwdpPatchFailed",
             TimeSpan.FromSeconds(90),
             cancellationToken);
@@ -404,7 +436,7 @@ public sealed class AwdpFullBoundaryTests
             CreatePatchArchive("#!/bin/sh\nsleep 30\n"),
             "timeout.tar.gz",
             "FixAttempt",
-            "Wrong",
+            "Rejected",
             "AwdpPatchTimeout",
             TimeSpan.FromSeconds(90),
             cancellationToken);
@@ -415,7 +447,7 @@ public sealed class AwdpFullBoundaryTests
             CreateTarGzipArchive(("payload/readme.txt", "missing entrypoint\n")),
             "missing-fix-sh.tar.gz",
             "FixAttempt",
-            "Wrong",
+            "Rejected",
             "AwdpPatchFailed",
             TimeSpan.FromSeconds(90),
             cancellationToken);
@@ -424,7 +456,7 @@ public sealed class AwdpFullBoundaryTests
             redClient,
             competitionId,
             competitionChallengeId,
-            redFlag,
+            redGenerationTwoFlag,
             cancellationToken);
         var correctBreak = await PollCompletedSubmissionAsync(
             redClient,
@@ -440,7 +472,7 @@ public sealed class AwdpFullBoundaryTests
             TimeSpan.FromSeconds(60),
             cancellationToken);
         await Assert.That(stoppedRedRuntime.GetProperty("id").GetGuid())
-            .IsEqualTo(redRuntime.GetProperty("id").GetGuid());
+            .IsEqualTo(redGenerationTwo.GetProperty("id").GetGuid());
         var redState = await PollJsonAsync(
             redClient,
             $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
@@ -475,8 +507,14 @@ public sealed class AwdpFullBoundaryTests
         await AssertSubmissionAsync(
             redFailedFix,
             kind: "FixAttempt",
-            result: "Wrong",
+            result: "Rejected",
             failureCode: "AwdpPatchFailed");
+        _ = await PollDefenseTargetRecycledAsync(
+            redClient,
+            competitionId,
+            competitionChallengeId,
+            redDefenseTargetId,
+            cancellationToken);
 
         var firstSettledScoreboard = await PollAwdpSettledScoreboardAsync(
             anonymous,
@@ -496,74 +534,26 @@ public sealed class AwdpFullBoundaryTests
         var firstRedScore = Team(firstSettledScoreboard.Snapshot, red.TeamId)
             .GetProperty("totalScore").GetInt64();
 
-        var redGenerationTwo = await StartAndPollRuntimeAsync(
-            redClient,
-            competitionId,
-            competitionChallengeId,
-            cancellationToken);
-        await Assert.That(redGenerationTwo.GetProperty("id").GetGuid())
-            .IsNotEqualTo(redRuntime.GetProperty("id").GetGuid());
-        var redGenerationTwoUrl = redGenerationTwo.GetProperty("urls")[0].GetString()
-            ?? throw new InvalidOperationException("Reset attack Runtime did not expose a URL.");
-        var redGenerationTwoFlag = await PollTextAsync(
-            new Uri(new Uri(redGenerationTwoUrl), "flag").ToString(),
-            TimeSpan.FromSeconds(30),
-            cancellationToken);
-        await Assert.That(redGenerationTwoFlag).IsNotEqualTo(redFlag);
-        var generationTwoStartRound = (await GetJsonAsync(
-            redClient,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
-            cancellationToken)).GetProperty("currentRound").GetInt32();
-        _ = await PollJsonAsync(
-            redClient,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
-            value => value.GetProperty("currentRound").GetInt32() > generationTwoStartRound,
-            TimeSpan.FromSeconds(45),
-            cancellationToken);
-        var expiredBreakId = await SubmitBreakAsync(
-            redClient,
-            competitionId,
-            competitionChallengeId,
-            redFlag,
-            cancellationToken);
-        var expiredBreak = await PollCompletedSubmissionAsync(
-            redClient,
-            competitionId,
-            expiredBreakId,
-            TimeSpan.FromSeconds(30),
-            cancellationToken);
-        await AssertSubmissionAsync(
-            expiredBreak,
-            "BreakAttempt",
-            "Wrong",
-            "FlagExpired");
-        _ = await PollJsonAsync(
-            redClient,
-            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
-            value => value.GetProperty("currentRound").GetInt32() > redActivationRound,
-            TimeSpan.FromSeconds(30),
-            cancellationToken);
-        var currentGenerationBreakId = await SubmitBreakAsync(
+        await AssertAwdpBreakJudgementAsync(
             redClient,
             competitionId,
             competitionChallengeId,
             redGenerationTwoFlag,
+            "Correct",
             cancellationToken);
-        var currentGenerationBreak = await PollCompletedSubmissionAsync(
+        await AssertAwdpBreakJudgementAsync(
             redClient,
             competitionId,
-            currentGenerationBreakId,
-            TimeSpan.FromSeconds(30),
+            competitionChallengeId,
+            redFlag,
+            "Wrong",
             cancellationToken);
-        await AssertSubmissionAsync(currentGenerationBreak, "BreakAttempt", "Correct", null);
-        var pendingRoundScoreboard = await PollScoreboardAsync(
-            anonymous,
+        await AssertRuntimeStartRejectedAsync(
+            redClient,
             competitionId,
-            observation => HasPendingEntry(observation, red.TeamId, currentGenerationBreakId),
-            TimeSpan.FromSeconds(25),
+            competitionChallengeId,
+            HttpStatusCode.Conflict,
             cancellationToken);
-        await AssertCurrentRoundScoresPendingAsync(pendingRoundScoreboard);
-        await AssertScoreboardArithmeticAsync(pendingRoundScoreboard.Snapshot);
         var accumulatedScoreboard = await PollScoreboardAsync(
             anonymous,
             competitionId,
@@ -815,12 +805,12 @@ public sealed class AwdpFullBoundaryTests
         _ = await PollJsonAsync(
             client,
             $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-state",
-            value => value.GetProperty("defense").GetProperty("runtimeInstanceId").GetGuid()
-                    == runtimeInstanceId
-                && value.GetProperty("defense").GetProperty("runtimeState").GetString()
-                    == "Running"
-                && value.GetProperty("defense").GetProperty("stage").GetString()
-                    == "AwaitingPatch",
+            value => value.GetProperty("defense") is var defense
+                && defense.TryGetProperty("runtimeInstanceId", out var observedRuntimeId)
+                && observedRuntimeId.ValueKind == JsonValueKind.String
+                && observedRuntimeId.GetGuid() == runtimeInstanceId
+                && defense.TryGetProperty("runtimeState", out var runtimeState)
+                && runtimeState.GetString() == "Running",
             TimeSpan.FromSeconds(90),
             cancellationToken);
         return runtimeInstanceId;
@@ -878,10 +868,13 @@ public sealed class AwdpFullBoundaryTests
             value =>
             {
                 var defense = value.GetProperty("defense");
-                return defense.GetProperty("runtimeInstanceId").GetGuid() == runtimeInstanceId
-                    && defense.GetProperty("runtimeState").GetString() == "Stopped"
-                    && defense.GetProperty("stage").GetString() == "Completed"
-                    && defense.GetProperty("targetStoppedAt").ValueKind == JsonValueKind.String;
+                return defense.TryGetProperty("runtimeInstanceId", out var runtimeId)
+                    && runtimeId.ValueKind == JsonValueKind.String
+                    && runtimeId.GetGuid() == runtimeInstanceId
+                    && defense.TryGetProperty("runtimeState", out var runtimeState)
+                    && runtimeState.GetString() == "Stopped"
+                    && defense.TryGetProperty("targetStoppedAt", out var targetStoppedAt)
+                    && targetStoppedAt.ValueKind == JsonValueKind.String;
             },
             TimeSpan.FromSeconds(90),
             cancellationToken);
@@ -946,6 +939,47 @@ public sealed class AwdpFullBoundaryTests
             value => value.GetProperty("state").GetString() == "Running",
             TimeSpan.FromSeconds(90),
             cancellationToken);
+    }
+
+    private static async Task<JsonElement> ResetAndPollRuntimeAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid competitionChallengeId,
+        CancellationToken cancellationToken)
+    {
+        var accepted = await SendWithoutBodyForJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime/reset",
+            HttpStatusCode.Accepted,
+            cancellationToken);
+        var replacementId = accepted.GetProperty("runtimeInstanceId").GetGuid();
+        return await PollJsonAsync(
+            client,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/runtime",
+            value => value.GetProperty("id").GetGuid() == replacementId
+                && value.GetProperty("state").GetString() == "Running",
+            TimeSpan.FromSeconds(90),
+            cancellationToken);
+    }
+
+    private static async Task AssertAwdpBreakJudgementAsync(
+        HttpClient client,
+        Guid competitionId,
+        Guid competitionChallengeId,
+        string flag,
+        string expectedResult,
+        CancellationToken cancellationToken)
+    {
+        var response = await SendJsonAsync(
+            client,
+            HttpMethod.Post,
+            $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}/awdp-break-flag-judgement",
+            new { flag },
+            HttpStatusCode.OK,
+            cancellationToken);
+        await Assert.That(response.GetProperty("result").GetString())
+            .IsEqualTo(expectedResult);
     }
 
     private static async Task AssertRuntimeStartRejectedAsync(

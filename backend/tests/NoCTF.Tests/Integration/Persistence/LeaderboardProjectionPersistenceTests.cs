@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using NoCTF.Application.Notifications;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Instances;
@@ -38,6 +39,87 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class LeaderboardProjectionPersistenceTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Awdp_cache_rebuilds_after_round_boundary_without_a_business_event(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_projection_awdp_boundary")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await using var redisContainer = new RedisBuilder(
+                "redis:7.4.10-alpine3.21@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2").Build();
+            await Task.WhenAll(
+                postgres.StartAsync(cancellationToken),
+                redisContainer.StartAsync(cancellationToken));
+            await using var redis = await ConnectionMultiplexer.ConnectAsync(
+                redisContainer.GetConnectionString());
+
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var now = DateTimeOffset.Parse("2026-08-24T00:00:01Z");
+            var clock = new FakeTimeProvider(now);
+            await using var db = new NoCtfDbContext(options);
+            await db.Database.EnsureCreatedAsync(cancellationToken);
+            var owner = CreateUser(now);
+            var fixture = CreateFixture(GameMode.Awdp, 0, owner.Id, now);
+            fixture.Competition.StartAt = now.AddSeconds(-1);
+            fixture.Competition.EndAt = now.AddHours(1);
+            fixture.Competition.ConfigurationJson = JsonSerializer.Serialize(
+                new AwdpConfiguration(
+                    AwdpConfiguration.CurrentSchemaVersion,
+                    2,
+                    ScoreCurveConfiguration.Default,
+                    ScoreCurveConfiguration.Default,
+                    RequireBreakBeforeFix: false),
+                new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            db.Users.Add(owner);
+            db.Competitions.Add(fixture.Competition);
+            db.Challenges.Add(fixture.Challenge);
+            db.CompetitionChallenges.Add(fixture.CompetitionChallenge);
+            db.Teams.Add(fixture.Team);
+            db.GameplayFacts.AddRange(fixture.Facts);
+            await db.SaveChangesAsync(cancellationToken);
+
+            using var cacheServices = new ServiceCollection()
+                .AddFusionCache(NoCtfCacheNames.Leaderboards)
+                .Services
+                .BuildServiceProvider();
+            var publisher = Substitute.For<ILeaderboardRefreshPublisher>();
+            var cache = new FusionLeaderboardCache(
+                db,
+                new LeaderboardProjectionEngine(new LeaderboardProjectorCatalog()),
+                publisher,
+                cacheServices.GetRequiredService<IFusionCacheProvider>(),
+                new RedisLeaderboardPublicationFence(redis),
+                new LeaderboardProjectionKeyedLock(),
+                clock);
+
+            var first = await cache.GetScoreboardAsync(
+                fixture.Competition.Id,
+                cancellationToken);
+            await Assert.That(first).IsNotNull();
+            await Assert.That(first!.Schema.Rounds[^1].Number).IsEqualTo(1);
+
+            clock.Advance(TimeSpan.FromSeconds(2));
+            var second = await cache.GetScoreboardAsync(
+                fixture.Competition.Id,
+                cancellationToken);
+
+            await Assert.That(second).IsNotNull();
+            await Assert.That(second!.Schema.Rounds[^1].Number).IsEqualTo(2);
+            await publisher.Received(2).PublishAsync(
+                Arg.Any<ScoreboardProjection>(),
+                Arg.Any<CancellationToken>());
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Concurrent_cache_misses_and_complete_cache_loss_rebuild_from_PostgreSQL_once(

@@ -4,9 +4,11 @@ using System.Text.Json;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Competitions.Koh;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Runtime;
 using NoCTF.Domain.Gameplay;
 using NoCTF.GameModes.Koh.Configuration;
@@ -193,6 +195,7 @@ public sealed class KohPollingHandler(
 public sealed class KohObservationHandler(
     NoCtfDbContext db,
     ITransactionalMessageOutbox outbox,
+    ICompetitionEventRecorder events,
     TimeProvider timeProvider)
 {
     public async Task Handle(
@@ -235,6 +238,22 @@ public sealed class KohObservationHandler(
             OccurredAt = message.ObservedAt,
             UpdatedAt = timeProvider.GetUtcNow()
         });
+        await events.RecordAsync(new(
+            message.CompetitionId,
+            CompetitionEventKind.GameplayFactAdjudicated,
+            message.Result is null
+                ? CompetitionEventLevel.Error
+                : CompetitionEventLevel.Information,
+            CompetitionEventVisibility.Staff,
+            message.ObservedAt,
+            TeamId: message.TeamId,
+            CompetitionChallengeId: message.CompetitionChallengeId,
+            GameplayFactId: message.GameplayFactId,
+            GameplayFactKind: GameplayFactKind.KohControlObservation,
+            GameplayFactState: message.Result is null
+                ? GameplayFactState.PlatformFailed
+                : GameplayFactState.Completed,
+            GameplayFactResult: message.Result), cancellationToken);
         // The cluster Singular Agent derives the next poll from this observation.
         // Do not persist recursive scheduled messages as a second scheduler.
         await db.SaveChangesAsync(cancellationToken);

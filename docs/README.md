@@ -8,11 +8,17 @@
    - [阶段 0 基线](data-model-wolverine-stage0-baseline.md)
    - [Wolverine 6.29.2 Spike](wolverine-6.29.2-spike.md)
    - [生产切换与回滚 Runbook](data-model-wolverine-cutover.md)
+   - [阶段 1：删除 Revision 协议闭环](data-model-wolverine-stage1-revision-removal.md)
+   - [阶段 2：核心实体与隐私模型](data-model-wolverine-stage2-core-privacy.md)
+   - [阶段 3：Notifications/Questions 线程化](data-model-wolverine-stage3-notification-threads.md)
+   - [阶段 4：同步流式导出](data-model-wolverine-stage4-streaming-exports.md)
+   - [阶段 5：Runtime 最小模型与节点直投](data-model-wolverine-stage5-runtime-routing.md)
    - [阶段 6：GameplayFact 与 AWDP 强类型结果](data-model-wolverine-stage6-gameplay-facts.md)
    - [阶段 7：Wolverine competing consumers 与显式 fan-out](data-model-wolverine-stage7-messaging-topology.md)
    - [阶段 8：Singular Agent 周期调度](data-model-wolverine-stage8-singular-agent.md)
    - [阶段 9：事件驱动排行榜投影](data-model-wolverine-stage9-leaderboard.md)
    - [阶段 10：单一 EF 初始基线](data-model-wolverine-stage10-ef-baseline.md)
+   - [阶段 11：契约与全量验证](data-model-wolverine-stage11-validation.md)
 2. [产品与领域模型](product-domain.md)
 3. [系统架构](architecture.md)
 4. [进程、消息与并发](processes-messaging.md)
@@ -32,7 +38,9 @@
 18. [比赛题目仓库与 GitOps 管理设计](challenge-repository-gitops.md)
 19. [AWD、AWDP 出题规范](challenge-authoring-awd-awdp.md) 与 [可复制出题模板](challenge-authoring-templates/README.md)
 
-当前代码和其余文档尚未完成简化迁移时，第一项文档定义新版本目标语义并优先于冲突内容；现状只能用于建立迁移清单。完成阶段 0 后，必须同步 `AGENTS.md` 及所有受影响专题文档，不能长期依赖优先级说明维持矛盾规范。
+当前本地重构分支已完成阶段 0 至阶段 11 的代码、契约与自动化验证；生产部署和数据切换仍受
+[生产切换与回滚 Runbook](data-model-wolverine-cutover.md) 约束。在尚未切换的分支、部署或历史文档中出现冲突时，
+第一项文档仍定义目标语义，不能据此恢复已经废弃的兼容模型。
 
 ## 强制边界
 

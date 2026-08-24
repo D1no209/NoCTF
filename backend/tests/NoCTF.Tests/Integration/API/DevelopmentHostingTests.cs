@@ -21,6 +21,7 @@ using Wolverine;
 using ZiggyCreatures.Caching.Fusion;
 using NoCTF.Infrastructure.Caching;
 using NoCTF.Infrastructure.Scoring.Leaderboard;
+using NoCTF.Infrastructure.Messaging;
 
 namespace NoCTF.Tests.Integration.API;
 
@@ -64,6 +65,8 @@ public sealed class DevelopmentHostingTests
                 .IsTypeOf<FusionKohProducerConfigurationCatalog>();
             await Assert.That(scope.ServiceProvider.GetRequiredService<ILeaderboardCache>())
                 .IsTypeOf<FusionLeaderboardCache>();
+            await Assert.That(scope.ServiceProvider.GetService<IClusterSchedulerStatusStore>())
+                .IsNull();
 
             var capacity = scope.ServiceProvider.GetRequiredService<IRunnerCapacityGate>();
             await Assert.That(await capacity.GetHeartbeatAsync(

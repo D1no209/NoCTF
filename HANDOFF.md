@@ -1,5 +1,29 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 11
+
+- 当前分支：`codex/data-model-wolverine-simplification`；阶段 11 父提交为 `4f3d3d99`，版本已递增为
+  `0.1.0-alpha.80`。本节随阶段 11 本地提交交付；未推送、未部署，未操作生产数据库、生产 Wolverine
+  队列、生产 Redis、生产 Runner、对象存储或生产数据。
+- OpenAPI 与 TypeScript SDK 已用仓库工具重新生成，两次复跑哈希一致；EF model drift 无变化，单一
+  InitialBaseline 仍严格对应 15 张业务表。没有手改 migration、snapshot 或生成 SDK。
+- 阶段收尾修复了独立 Worker 开发宿主依赖 Wolverine 内部控制器、Docker 并发网络创建/重复删除、
+  Runner 对账错误遍历未启用 provider、AWDP 缓存跨轮有效期和 KoH adjudication 未发布排行榜失效事件
+  五类问题；AWDP/KoH 完整 E2E 已同步到新 Runtime、Fix、隐私与事件驱动语义。
+- 最终验证：Release build 0 warning/0 error；完整 TUnit 1091 项中 1089 通过、0 失败、2 跳过；跳过项
+  分别是未启用的真实 Kubernetes provider 与未提供磁盘路径的真实 Libvirt provider，未当作通过。
+  CTF/AWD/AWDP/KoH 完整 E2E 和 API/PostgreSQL/Redis/Worker/Runner 恢复场景通过；前端 275/275、
+  2029 assertions，typecheck、production build、static generate 通过。完整命令、哈希与证据见
+  `docs/data-model-wolverine-stage11-validation.md`。
+- 全新共享测试环境部署、浏览器发布验收、生产快照转换、停机窗口、负责人签字和 Go/No-Go 因当前未
+  授权而未执行。不得把本地 Testcontainers/开发备份恢复演练解释为生产切换完成；执行前必须遵循
+  `docs/data-model-wolverine-cutover.md`。
+- 恢复：checkout 本阶段提交后执行
+  `dotnet build backend/NoCTF.slnx --configuration Release --no-restore`、
+  `dotnet test backend/NoCTF.slnx --configuration Release --no-build`，再进入 ClientApp 执行
+  `bun run test`、`bun run typecheck`、`bun run build`。下一步只能在主线程明确授权后构建发布镜像、
+  部署全新测试环境并进入正式 Go/No-Go；不要直接连接旧生产库执行 InitialBaseline。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 10
 
 - 当前分支：`codex/data-model-wolverine-simplification`；阶段 10 父提交为 `681138cc`。

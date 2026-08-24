@@ -8,9 +8,9 @@
 2. [`AGENTS.md`](AGENTS.md)
 3. [`docs/README.md`](docs/README.md)
 4. [`PLAN.md`](PLAN.md)
-5. [`NoCTF-backend-handoff-2026-07-24.md`](NoCTF-backend-handoff-2026-07-24.md)
+5. [`HANDOFF.md`](HANDOFF.md)
 
-## 当前阶段：阶段 5
+## 当前阶段：阶段 11
 
 - [x] 建立独立分支并记录 main 基线。
 - [x] 完整阅读项目规范、权威规范、现有 schema、OpenAPI、SDK 和 Wolverine 拓扑。
@@ -53,17 +53,29 @@
 - [x] 删除前端任务轮询并通过生成 SDK 直接下载。
 - [x] 更新 OpenAPI、SDK、文档、HANDOFF 并创建阶段 4 独立提交。
 
-## 阶段 5：Runtime 最小模型与节点直投
+## 阶段 5 至阶段 10
 
-- [ ] 建立 Runtime 字段、消息、Runner 路由和测试基线。
-- [ ] 删除冗余 Runtime 调度状态并把 Reset 改为新 UUID。
-- [ ] 按具体 Runner Sticky PostgreSQL endpoint 直投并移除 pool queue 消费。
-- [ ] 验证 URL 读取过滤、receipt Checker 目标、幂等和清理。
-- [ ] 更新契约、SDK、前端、HANDOFF 并创建阶段 5 独立提交。
+- [x] 阶段 5：Runtime 最小模型、Reset 新 UUID 与 Runner 节点 Sticky 直投。
+- [x] 阶段 6：AWD 每检一 Fact、AWDP 强类型结果与版本化事件 Payload。
+- [x] 阶段 7：competing consumers、显式 fan-out、durable inbox/outbox 与 Sticky fail-fast。
+- [x] 阶段 8：Singular Agent、事实重建、单活动实例、failover 与停机不补跑。
+- [x] 阶段 9：事件驱动排行榜失效、500ms 合并、PostgreSQL 全量投影与缓存重建。
+- [x] 阶段 10：EF 工具生成单一 InitialBaseline，真实 PostgreSQL 验证严格 15 张业务表。
 
-## 后续阶段
+## 阶段 11：契约、文档、全量验证与切换
 
-严格按 [`PLAN.md`](PLAN.md) 的阶段 1 至阶段 11 顺序推进。每阶段只有在权威规范第 12 节退出门禁全部通过后才能勾选完成。
+- [x] 更新权威文档、HANDOFF、发布验证说明与 Runbook 引用。
+- [x] OpenAPI 导出和 TypeScript SDK 重新生成，连续两次哈希一致。
+- [x] Release build、完整 TUnit、Architecture、真实 PostgreSQL/Redis/Wolverine/Docker 集成测试。
+- [x] CTF、AWD、AWDP、KoH 完整 E2E 与恢复场景。
+- [x] 前端 275 项测试、typecheck、production build 和静态 generate。
+- [x] EF model drift 无变化；静态扫描无已废弃业务协议。
+- [x] Alpha 版本递增到 `0.1.0-alpha.80`。
+- [ ] 构建发布镜像并部署全新共享测试环境（当前未授权部署）。
+- [ ] 生产快照转换、停机切换、负责人签字与 Go/No-Go（当前未授权生产操作）。
+
+阶段 11 的本地证据和两个明确跳过的真实 provider 测试见
+[`docs/data-model-wolverine-stage11-validation.md`](docs/data-model-wolverine-stage11-validation.md)。不得把未授权项目报告为通过。
 
 ## 当前禁止事项
 

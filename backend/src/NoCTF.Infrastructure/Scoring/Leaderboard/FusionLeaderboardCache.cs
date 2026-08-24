@@ -22,7 +22,8 @@ public sealed class FusionLeaderboardCache(
     ILeaderboardRefreshPublisher publisher,
     IFusionCacheProvider caches,
     ILeaderboardPublicationFence? publicationFence = null,
-    LeaderboardProjectionKeyedLock? projectionKeyedLock = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
+    LeaderboardProjectionKeyedLock? projectionKeyedLock = null,
+    TimeProvider? clock = null) : ILeaderboardCache, ILeaderboardSnapshotFactory
 {
     private sealed record LifecyclePayload(
         int SchemaVersion,
@@ -34,6 +35,7 @@ public sealed class FusionLeaderboardCache(
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IFusionCache cache = caches.GetCache(NoCtfCacheNames.Leaderboards);
     private readonly LeaderboardProjectionKeyedLock keyedLock = projectionKeyedLock ?? new();
+    private readonly TimeProvider timeProvider = clock ?? TimeProvider.System;
 
     public async Task<LeaderboardResponse?> GetAsync(Guid competitionId, CancellationToken ct) =>
         (await GetOrRebuildPublishedBundleAsync(competitionId, ct))?.Legacy;
@@ -326,7 +328,14 @@ public sealed class FusionLeaderboardCache(
         {
             ParticipantView = ScoreboardAudienceView.From(participantScoreboard)
         };
-        return new(legacy, scoreboard);
+        return new(legacy, scoreboard)
+        {
+            ValidUntil = competition.Mode == GameMode.Awdp
+                && competitionStatusAtProjection == CompetitionStatus.Running
+                && projection.CurrentRoundRemainingSeconds is > 0
+                ? projectedAt.AddSeconds(projection.CurrentRoundRemainingSeconds.Value)
+                : null
+        };
     }
 
     private async Task<AwdScoreboardWindow> ReadAwdScoreboardWindowAsync(
@@ -393,7 +402,7 @@ public sealed class FusionLeaderboardCache(
         if (db.Database.IsInMemory())
         {
             var developmentResponse = await ProjectBundleAsync(
-                competitionId, null, DateTimeOffset.UtcNow, null, ct);
+                competitionId, null, timeProvider.GetUtcNow(), null, ct);
             if (developmentResponse is null)
                 return;
             var previous = await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
@@ -426,7 +435,7 @@ public sealed class FusionLeaderboardCache(
                 response = await ProjectBundleAsync(
                     competitionId,
                     null,
-                    DateTimeOffset.UtcNow,
+                    timeProvider.GetUtcNow(),
                     null,
                     ct);
             }
@@ -505,7 +514,7 @@ public sealed class FusionLeaderboardCache(
         {
             if (publicationPhase)
                 NoCtfTelemetry.RecordLeaderboardPublishFailure("projection");
-            await cache.SetAsync(FailureKey(competitionId), DateTimeOffset.UtcNow, token: CancellationToken.None);
+            await cache.SetAsync(FailureKey(competitionId), timeProvider.GetUtcNow(), token: CancellationToken.None);
             throw;
         }
         finally
@@ -526,7 +535,7 @@ public sealed class FusionLeaderboardCache(
             {
                 await publicationFence.InvalidateAsync(
                     competitionId,
-                    DateTimeOffset.UtcNow.UtcTicks,
+                    timeProvider.GetUtcNow().UtcTicks,
                     ct);
             }
             await cache.RemoveAsync(ProjectionKey(competitionId), token: ct);
@@ -589,8 +598,11 @@ public sealed class FusionLeaderboardCache(
         CancellationToken ct)
     {
         if (publicationFence is null)
-            return await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
+        {
+            var unfenced = await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
                 ProjectionKey(competitionId), null, token: ct);
+            return IsExpired(unfenced) ? null : unfenced;
+        }
 
         var published = await publicationFence.GetAsync(competitionId, ct);
         if (published is null)
@@ -600,6 +612,8 @@ public sealed class FusionLeaderboardCache(
             JsonOptions);
         if (bundle is null || bundle.Scoreboard.Snapshot.Version != published.Fence)
             throw new InvalidOperationException("The fenced leaderboard payload is invalid.");
+        if (IsExpired(bundle))
+            return null;
 
         var cached = await cache.GetOrDefaultAsync<LeaderboardProjectionBundle?>(
             ProjectionKey(competitionId), null, token: ct);
@@ -607,6 +621,9 @@ public sealed class FusionLeaderboardCache(
             await cache.SetAsync(ProjectionKey(competitionId), bundle, token: ct);
         return bundle;
     }
+
+    private bool IsExpired(LeaderboardProjectionBundle? bundle) =>
+        bundle?.ValidUntil is { } validUntil && timeProvider.GetUtcNow() >= validUntil;
 
     private async Task RepairFusionCacheAsync(Guid competitionId, CancellationToken ct)
     {

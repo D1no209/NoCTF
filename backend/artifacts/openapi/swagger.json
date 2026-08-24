@@ -18079,8 +18079,10 @@
           "CriticalQueueOldestSeconds",
           "RuntimeWaitingCount",
           "RuntimeOldestWaitingSeconds",
-          "LeaderboardDirtyCount",
-          "LeaderboardDirtyOldestSeconds",
+          "LeaderboardInvalidationsPerSecond",
+          "LeaderboardMergeDispatchesPerSecond",
+          "LeaderboardCacheMissRebuildsPerSecond",
+          "LeaderboardProjectionP95Milliseconds",
           "RunnerOnlineCount",
           "RunnerMinimumAvailablePercent",
           "PostgreSqlConnectionUsagePercent",
@@ -18102,7 +18104,9 @@
           11,
           12,
           13,
-          14
+          14,
+          15,
+          16
         ]
       },
       "NoCTFApplicationAdministrationMonitoringPlatformMonitoringUnit": {

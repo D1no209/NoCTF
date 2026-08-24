@@ -464,6 +464,10 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
             }, cancellationToken);
             return response.ID;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch
         {
             using var cleanup = new CancellationTokenSource(
@@ -474,18 +478,32 @@ public sealed class DockerContainerLifecycle : IContainerLifecycle, IOneShotJobR
                 if (ambiguous is not null
                     && HasResourceIdentity(ambiguous.Labels, identity)
                     && HasNetworkPurpose(ambiguous.Labels, purpose))
-                    await DeleteNetworkAsync(ambiguous, cleanup.Token);
+                    return ambiguous.ID;
             }
             catch
             {
-                // The ambiguous network could not be safely cleaned up.
+                // Preserve the original create failure when the ambiguous result
+                // cannot be inspected safely.
             }
             throw;
         }
     }
 
-    public Task DeleteIsolatedNetworkAsync(string networkId, CancellationToken cancellationToken) =>
-        client.Networks.DeleteNetworkAsync(networkId, cancellationToken);
+    public async Task DeleteIsolatedNetworkAsync(
+        string networkId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await client.Networks.DeleteNetworkAsync(networkId, cancellationToken);
+        }
+        catch (DockerApiException exception)
+            when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            // Exact cleanup is idempotent. Duplicate delivery or reconciliation may
+            // already have removed the isolated network.
+        }
+    }
 
     public async Task<bool> IsolatedNetworkExistsAsync(
         string networkId,

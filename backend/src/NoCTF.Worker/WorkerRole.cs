@@ -20,17 +20,20 @@ public static class WorkerRole
     public static IServiceCollection AddNoCtfWorkerRole(
         this IServiceCollection services,
         bool collectQueueMetrics = true,
-        bool validateMessageTopology = true)
+        bool validateMessageTopology = true,
+        bool enableClusterScheduling = true)
     {
-        services.AddSingleton<ClusterSchedulingState>();
-        services.AddSingleton(new ClusterSchedulerNodeIdentity(
-            $"{Environment.MachineName}:{Environment.ProcessId}"));
-        services.AddSingleton<IClusterSchedulerStatusStore, RedisClusterSchedulerStatusStore>();
-        services.AddScoped<IClusterScheduleSource, PostgresClusterScheduleSource>();
         services.AddSingleton<LeaderboardProjectionMergeQueue>();
-        services.AddHostedService<ClusterLeadershipStatusReporter>();
-        services.AddSingleton<IReadinessDependency, ClusterSchedulingReadinessDependency>();
-        services.AddSingularAgent<MaintenanceTickAgent>();
+        if (enableClusterScheduling)
+        {
+            services.AddSingleton<ClusterSchedulingState>();
+            services.AddSingleton(new ClusterSchedulerNodeIdentity(
+                $"{Environment.MachineName}:{Environment.ProcessId}"));
+            services.AddSingleton<IClusterSchedulerStatusStore, RedisClusterSchedulerStatusStore>();
+            services.AddScoped<IClusterScheduleSource, PostgresClusterScheduleSource>();
+            services.AddSingleton<IReadinessDependency, ClusterSchedulingReadinessDependency>();
+            services.AddSingularAgent<MaintenanceTickAgent>();
+        }
         if (collectQueueMetrics)
             services.AddHostedService<WorkerQueueMetricsCollector>();
         if (validateMessageTopology)
