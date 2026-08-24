@@ -310,8 +310,8 @@ tar --format=ustar -czf fix.tar.gz fix.sh
 补丁执行结果：
 
 - 退出码 0：继续运行 Checker；
-- 非零退出：`Wrong / AwdpPatchFailed`；
-- 超时：`Wrong / AwdpPatchTimeout`。
+- 非零退出：`Rejected / AwdpPatchFailed`；
+- 超时：`Rejected / AwdpPatchTimeout`。
 
 ### 4.6 AWDP Checker 合约
 
@@ -371,7 +371,7 @@ wget -qO /dev/null -T 5 \
 | --- | --- | --- |
 | `DefenseSucceeded` | Correct | EXP 未能利用且服务满足规则 |
 | `ExploitSucceeded` | Wrong / AwdpExploitSucceeded | EXP 仍可利用 |
-| `ServiceAbnormal` | Wrong / AwdpServiceAbnormal | 正常服务交互失败、超时或崩溃 |
+| `ServiceAbnormal` | Rejected / AwdpServiceAbnormal | 正常服务交互失败、超时或崩溃 |
 
 Checker 必须把 EXP 作为子进程运行并捕获失败/崩溃，然后继续做正常服务交互；服务异常优先级高于 EXP 结果。只检测“某个文件存在”通常不足以证明真实题目已修复；正式题应实际请求漏洞路径、正常业务路径和禁止绕过路径。
 

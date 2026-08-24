@@ -334,6 +334,9 @@ internal static class LeaderboardFactProjectionReader
                         && fact.TeamId == flag.TeamId
                         && fact.CompetitionChallengeId == flag.CompetitionChallengeId
                         && fact.Kind == GameplayFactKind.AwdServiceTransition
+                        && fact.State == GameplayFactState.Completed
+                        && (fact.Result == GameplayFactResult.ServiceUp
+                            || fact.Result == GameplayFactResult.ServiceDown)
                         && fact.OccurredAt < flag.ValidUntil)
                     .OrderByDescending(fact => fact.OccurredAt)
                     .ThenByDescending(fact => fact.Id)
@@ -460,10 +463,16 @@ internal static class LeaderboardFactProjectionReader
                 group.Max(fact => fact.OccurredAt)))
             .ToListAsync(ct);
         var inWindow = query.Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition
+            && fact.State == GameplayFactState.Completed
+            && (fact.Result == GameplayFactResult.ServiceUp
+                || fact.Result == GameplayFactResult.ServiceDown)
             && fact.OccurredAt >= startsAt
             && fact.OccurredAt < endsAt);
         var carryIds = query
             .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition
+                && fact.State == GameplayFactState.Completed
+                && (fact.Result == GameplayFactResult.ServiceUp
+                    || fact.Result == GameplayFactResult.ServiceDown)
                 && fact.OccurredAt < startsAt)
             .GroupBy(fact => new { fact.TeamId, fact.CompetitionChallengeId })
             .Select(group => group.OrderByDescending(fact => fact.OccurredAt)

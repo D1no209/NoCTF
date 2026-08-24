@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using FastEndpoints;
 using FluentValidation;
@@ -13,7 +12,6 @@ namespace NoCTF.API.Endpoints.Internal;
 
 public sealed class RecordAwdpCheckResultRequest
 {
-    [JsonConverter(typeof(AwdpFixOutcomeJsonConverter))]
     public AwdpFixResultOutcome Outcome { get; set; }
 }
 
@@ -23,33 +21,6 @@ public enum AwdpFixResultOutcome
     ExploitSucceeded,
     DefenseSucceeded,
     ServiceAbnormal
-}
-
-public sealed class AwdpFixOutcomeJsonConverter : JsonConverter<AwdpFixResultOutcome>
-{
-    public override AwdpFixResultOutcome Read(
-        ref Utf8JsonReader reader,
-        Type typeToConvert,
-        JsonSerializerOptions options)
-    {
-        if (reader.TokenType != JsonTokenType.String)
-            throw new JsonException("AWDP fix outcome must be a string.");
-        return reader.GetString() switch
-        {
-            nameof(AwdpFixResultOutcome.ExploitSucceeded) or "StillVulnerable" =>
-                AwdpFixResultOutcome.ExploitSucceeded,
-            nameof(AwdpFixResultOutcome.DefenseSucceeded) or "Fixed" =>
-                AwdpFixResultOutcome.DefenseSucceeded,
-            nameof(AwdpFixResultOutcome.ServiceAbnormal) or "RuleViolation" or "ServiceUnavailable" =>
-                AwdpFixResultOutcome.ServiceAbnormal,
-            _ => throw new JsonException("AWDP fix outcome is invalid.")
-        };
-    }
-
-    public override void Write(
-        Utf8JsonWriter writer,
-        AwdpFixResultOutcome value,
-        JsonSerializerOptions options) => writer.WriteStringValue(value.ToString());
 }
 
 [Mapper(RequiredMappingStrategy = RequiredMappingStrategy.Source)]

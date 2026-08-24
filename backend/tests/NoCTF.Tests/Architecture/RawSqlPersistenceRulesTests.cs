@@ -109,6 +109,11 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "FOR UPDATE"
             ],
+            ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/InternalResultStore.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/GameplayFacts/Processing/BloodRankCriticalSection.cs"] =
             [
                 "FromSqlInterpolated",

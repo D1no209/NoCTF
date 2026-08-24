@@ -1,16 +1,20 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NoCTF.Application.Messaging;
+using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
 using NoCTF.Domain.Identity;
+using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Runtime;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Awd.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Awd;
+using NoCTF.Infrastructure.GameplayFacts.Processing;
+using NoCTF.Worker;
 using NoCTF.Runner.Messages;
 using Testcontainers.PostgreSql;
 
@@ -19,6 +23,137 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class AwdRoundCoordinationTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Checker_executions_create_independent_facts_and_callback_retries_are_idempotent(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awd_checker_facts")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken, includeChecker: true);
+            var outbox = new RecordingOutbox();
+
+            await using (var dispatchDb = new NoCtfDbContext(options))
+            {
+                var first = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                    new DispatchAwdCheckers(fixture.Now),
+                    dispatchDb,
+                    new AwdCheckerConfigurationCatalog(),
+                    outbox,
+                    cancellationToken);
+                var replay = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                    new DispatchAwdCheckers(fixture.Now),
+                    dispatchDb,
+                    new AwdCheckerConfigurationCatalog(),
+                    outbox,
+                    cancellationToken);
+
+                await Assert.That(first).IsEqualTo(MessageExecutionOutcome.Applied);
+                await Assert.That(replay).IsEqualTo(MessageExecutionOutcome.Idempotent);
+            }
+
+            Guid healthyFactId;
+            await using (var verification = new NoCtfDbContext(options))
+            {
+                var facts = await verification.GameplayFacts.AsNoTracking()
+                    .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition)
+                    .ToListAsync(cancellationToken);
+                await Assert.That(facts.Count).IsEqualTo(1);
+                await Assert.That(facts[0].State).IsEqualTo(GameplayFactState.Processing);
+                healthyFactId = facts[0].Id;
+            }
+
+            await using (var healthyDb = new NoCtfDbContext(options))
+            {
+                var store = new InternalResultStore(healthyDb, new RecordingOutbox());
+                var applied = await store.RecordAwdAsync(AwdCheckResult.Create(
+                    fixture.RuntimeId,
+                    healthyFactId,
+                    AwdServiceState.Up,
+                    fixture.Now), cancellationToken);
+                var replay = await store.RecordAwdAsync(AwdCheckResult.Create(
+                    fixture.RuntimeId,
+                    healthyFactId,
+                    AwdServiceState.Down,
+                    fixture.Now), cancellationToken);
+                await Assert.That(applied).IsEqualTo(InternalResultDisposition.Applied);
+                await Assert.That(replay).IsEqualTo(InternalResultDisposition.Duplicate);
+            }
+
+            var nextCheckAt = fixture.Now.AddSeconds(
+                AwdConfiguration.Default.CheckerIntervalSeconds);
+            await using (var dispatchDb = new NoCtfDbContext(options))
+            {
+                var next = await BackendMessageHandlers.ExecuteAwdCheckerDispatchAsync(
+                    new DispatchAwdCheckers(nextCheckAt),
+                    dispatchDb,
+                    new AwdCheckerConfigurationCatalog(),
+                    outbox,
+                    cancellationToken);
+                await Assert.That(next).IsEqualTo(MessageExecutionOutcome.Applied);
+            }
+
+            Guid unhealthyFactId;
+            await using (var verification = new NoCtfDbContext(options))
+            {
+                var facts = await verification.GameplayFacts.AsNoTracking()
+                    .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition)
+                    .OrderBy(fact => fact.OccurredAt)
+                    .ThenBy(fact => fact.Id)
+                    .ToListAsync(cancellationToken);
+                await Assert.That(facts.Count).IsEqualTo(2);
+                await Assert.That(facts[0].Result).IsEqualTo(GameplayFactResult.ServiceUp);
+                unhealthyFactId = facts[1].Id;
+            }
+
+            await using var firstCallbackDb = new NoCtfDbContext(options);
+            await using var retryCallbackDb = new NoCtfDbContext(options);
+            var callbackResults = await Task.WhenAll(
+                new InternalResultStore(firstCallbackDb, new RecordingOutbox())
+                    .RecordAwdAsync(AwdCheckResult.Create(
+                        fixture.RuntimeId,
+                        unhealthyFactId,
+                        AwdServiceState.CheckerTimedOut,
+                        nextCheckAt), cancellationToken),
+                new InternalResultStore(retryCallbackDb, new RecordingOutbox())
+                    .RecordAwdAsync(AwdCheckResult.Create(
+                        fixture.RuntimeId,
+                        unhealthyFactId,
+                        AwdServiceState.CheckerTimedOut,
+                        nextCheckAt), cancellationToken));
+
+            await Assert.That(callbackResults.Count(result =>
+                    result == InternalResultDisposition.Applied))
+                .IsEqualTo(1);
+            await Assert.That(callbackResults.Count(result =>
+                    result == InternalResultDisposition.Duplicate))
+                .IsEqualTo(1);
+            await using var final = new NoCtfDbContext(options);
+            var finalFacts = await final.GameplayFacts.AsNoTracking()
+                .Where(fact => fact.Kind == GameplayFactKind.AwdServiceTransition)
+                .OrderBy(fact => fact.OccurredAt)
+                .ThenBy(fact => fact.Id)
+                .ToListAsync(cancellationToken);
+            await Assert.That(finalFacts.Count).IsEqualTo(2);
+            await Assert.That(finalFacts[1].State).IsEqualTo(GameplayFactState.Completed);
+            await Assert.That(finalFacts[1].Result).IsEqualTo(GameplayFactResult.ServiceDown);
+            await Assert.That(finalFacts[1].FailureCode)
+                .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
+            await Assert.That(outbox.RunnerNodeMessages.OfType<RunAwdChecker>().Count())
+                .IsEqualTo(2);
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Current_round_creates_one_flag_fact_and_one_durable_successor(
@@ -200,7 +335,8 @@ public sealed class AwdRoundCoordinationTests
 
     private static async Task<Fixture> SeedAsync(
         DbContextOptions<NoCtfDbContext> options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeChecker = false)
     {
         await using var db = new NoCtfDbContext(options);
         await db.Database.EnsureCreatedAsync(cancellationToken);
@@ -250,7 +386,11 @@ public sealed class AwdRoundCoordinationTests
             Mode = GameMode.Awd,
             Title = "AWD service",
             DefinitionJson = JsonSerializer.Serialize(
-                new AwdChallengeConfiguration(AwdChallengeConfiguration.CurrentSchemaVersion),
+                new AwdChallengeConfiguration(
+                    AwdChallengeConfiguration.CurrentSchemaVersion,
+                    Checker: includeChecker
+                        ? new(new("checker:test"))
+                        : null),
                 new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             CreatedAt = now,
             UpdatedAt = now

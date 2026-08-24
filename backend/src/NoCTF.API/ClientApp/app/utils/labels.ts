@@ -99,6 +99,7 @@ export function gameplayFactFailureCodeLabel(code?: NoCtfapiEndpointsGameplayFac
     AwdpPatchFailed: translate('Patch 执行失败'),
     AwdpPatchTimeout: translate('Patch 执行超时'),
     AwdpServiceAbnormal: translate('服务异常'),
+    AwdpPlatformFailed: translate('AWDP 平台错误'),
     AwdpViolation: translate('旧 AWDP 违规记录'),
     ForeignTeamFlagDetected: translate('提交了非本队 Flag'),
     InsufficientScore: translate('分数不足'),

@@ -11,11 +11,7 @@ public sealed class AwdpCheckResultProtocolTests
     [Arguments("ExploitSucceeded", AwdpFixResultOutcome.ExploitSucceeded)]
     [Arguments("DefenseSucceeded", AwdpFixResultOutcome.DefenseSucceeded)]
     [Arguments("ServiceAbnormal", AwdpFixResultOutcome.ServiceAbnormal)]
-    [Arguments("StillVulnerable", AwdpFixResultOutcome.ExploitSucceeded)]
-    [Arguments("Fixed", AwdpFixResultOutcome.DefenseSucceeded)]
-    [Arguments("RuleViolation", AwdpFixResultOutcome.ServiceAbnormal)]
-    [Arguments("ServiceUnavailable", AwdpFixResultOutcome.ServiceAbnormal)]
-    public async Task Awdp_check_result_accepts_new_values_and_maps_legacy_inputs(
+    public async Task Awdp_check_result_accepts_only_current_protocol_values(
         string input,
         AwdpFixResultOutcome expected)
     {
@@ -43,10 +39,15 @@ public sealed class AwdpCheckResultProtocolTests
     }
 
     [Test]
-    public async Task Awdp_check_result_rejects_unknown_outcomes()
+    [Arguments("StillVulnerable")]
+    [Arguments("Fixed")]
+    [Arguments("RuleViolation")]
+    [Arguments("ServiceUnavailable")]
+    [Arguments("PatchFailed")]
+    public async Task Awdp_check_result_rejects_legacy_and_unknown_outcomes(string outcome)
     {
         var act = () => JsonSerializer.Deserialize<RecordAwdpCheckResultRequest>(
-            """{"outcome":"PatchFailed"}""",
+            $$"""{"outcome":"{{outcome}}"}""",
             Options);
 
         await Assert.That(act).Throws<JsonException>();

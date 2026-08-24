@@ -79,7 +79,7 @@ public sealed class WolverineTransactionalOutboxTests
                 await WaitForGameplayFactStateAsync(
                     host,
                     fixture.GameplayFactId,
-                    GameplayFactState.PlatformFailed,
+                    GameplayFactState.Completed,
                     cancellationToken);
                 await using var scope = host.Services.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<NoCtfDbContext>();
@@ -99,7 +99,9 @@ public sealed class WolverineTransactionalOutboxTests
                 await Assert.That(AwdpFixResultObservation.Count(fixture.GameplayFactId))
                     .IsEqualTo(1);
                 await Assert.That(fact.FailureCode)
-                    .IsEqualTo(GameplayFactFailureCode.CheckerPlatformError);
+                    .IsEqualTo(GameplayFactFailureCode.AwdpPlatformFailed);
+                await Assert.That(fact.Result)
+                    .IsEqualTo(GameplayFactResult.Rejected);
                 await Assert.That(runtime.State).IsEqualTo(RuntimeState.Stopping);
             }
             finally

@@ -293,9 +293,18 @@ public static class BackendMessageHandlers
 
     public static async Task Handle(
         AwdCheckerCallbackMissing message,
+        IInternalResultStore results,
         NoCtfDbContext db,
         CancellationToken cancellationToken)
     {
+        var disposition = await results.RecordAwdAsync(AwdCheckResult.Create(
+            message.RuntimeInstanceId,
+            message.GameplayFactId,
+            AwdServiceState.CheckerTimedOut,
+            message.OccurredAt), cancellationToken);
+        if (disposition != InternalResultDisposition.Applied)
+            return;
+
         var competition = await db.Competitions.AsNoTracking()
             .Where(candidate => candidate.Id == message.CompetitionId)
             .Select(candidate => new { candidate.OwnerId, candidate.ManagerIds })
@@ -306,8 +315,8 @@ public static class BackendMessageHandlers
             .AnyAsync(notification =>
                 notification.TargetType == NotificationTargetType.CompetitionCollaborators
                 && notification.TargetId == message.CompetitionId
-                && notification.RelatedType == EntityReferenceKind.RuntimeInstance
-                && notification.RelatedId == message.RuntimeInstanceId
+                && notification.RelatedType == EntityReferenceKind.GameplayFact
+                && notification.RelatedId == message.GameplayFactId
                 && notification.Kind == NotificationKind.ManagementFailure)
             ;
         if (existing)
@@ -328,8 +337,8 @@ public static class BackendMessageHandlers
             TargetId = message.CompetitionId,
             Kind = NotificationKind.ManagementFailure,
             ContentJson = payload,
-            RelatedType = EntityReferenceKind.RuntimeInstance,
-            RelatedId = message.RuntimeInstanceId,
+            RelatedType = EntityReferenceKind.GameplayFact,
+            RelatedId = message.GameplayFactId,
             SentAt = message.OccurredAt
         });
         await db.SaveChangesAsync(cancellationToken);

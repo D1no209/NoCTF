@@ -409,7 +409,7 @@ internal static class AwdpDynamicLeaderboardProjection
             (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong,
                 GameplayFactFailureCode.AwdpExploitSucceeded)
                 => configuration.ExploitSucceededPenalty,
-            (GameplayFactKind.FixAttempt, GameplayFactResult.Wrong,
+            (GameplayFactKind.FixAttempt, GameplayFactResult.Rejected,
                 GameplayFactFailureCode.AwdpServiceAbnormal)
                 => configuration.ServiceAbnormalPenalty,
             _ => 0L
