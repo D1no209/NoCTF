@@ -34,7 +34,8 @@ if (development)
 {
     builder.Services.AddNoCtfWorkerRole(
         collectQueueMetrics: false,
-        validateMessageTopology: false);
+        validateMessageTopology: false,
+        enableClusterScheduling: false);
     builder.Services.AddNoCtfRunner(builder.Configuration, development: true);
 }
 if (!exportSwagger && !development)

@@ -1048,11 +1048,14 @@ public static class BackendMessageHandlers
                 .Distinct()
                 .ToListAsync(cancellationToken);
             var failedCleanupOwnerSet = failedCleanupOwners.ToHashSet(StringComparer.Ordinal);
-            var runtimePools = Enum.GetValues<RuntimeKind>()
-                .Select(kind => placementPolicy.Resolve(kind).RunnerPool)
-                .Distinct()
-                .OrderBy(pool => pool)
-                .ToArray();
+            // A deployment owns one active container provider/pool. Do not enumerate
+            // every domain RuntimeKind here: unsupported kinds (for example OVA on a
+            // Docker deployment) are intentionally rejected by the placement policy
+            // and must not abort reconciliation for the configured pool.
+            var runtimePools = new[]
+            {
+                placementPolicy.Resolve(RuntimeKind.Container).RunnerPool
+            };
             foreach (var pool in runtimePools)
             {
                 var inventory = await capacity.GetPoolInventoryAsync(

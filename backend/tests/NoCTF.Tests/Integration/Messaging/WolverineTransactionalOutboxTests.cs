@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using NoCTF.Application.Competitions.Lifecycle;
+using NoCTF.Application.Competitions.Events;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Runtime.Capacity;
 using NoCTF.Application.Runtime.Provisioning;
@@ -26,6 +27,7 @@ using NoCTF.Infrastructure.Administration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Awd;
 using NoCTF.Infrastructure.Competitions.Lifecycle;
+using NoCTF.Infrastructure.Competitions.Events;
 using NoCTF.Worker;
 using Testcontainers.PostgreSql;
 using Wolverine;
@@ -949,6 +951,7 @@ public sealed class WolverineTransactionalOutboxTests
         builder.Services.AddDbContextWithWolverineIntegration<NoCtfDbContext>(
             options => options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
         builder.Services.AddScoped<ITransactionalMessageOutbox, WolverineTransactionalMessageOutbox>();
+        builder.Services.AddScoped<ICompetitionEventRecorder, CompetitionEventStore>();
         builder.Services.AddScoped<IInternalResultStore, InternalResultStore>();
         builder.Services.AddScoped<ICompetitionLifecycleStore, EmptyLifecycleStore>();
         builder.Services.AddScoped<LifecycleAdvancer>();
@@ -1332,7 +1335,6 @@ public sealed class EmptyClusterScheduleSource : IClusterScheduleSource
 public sealed class InMemorySchedulerStatusStore : IClusterSchedulerStatusStore
 {
     private ClusterSchedulerStatus? scheduler;
-    private ClusterLeaderStatus? leader;
 
     public Task TakeOverAsync(
         ClusterSchedulerStatus status,
@@ -1362,17 +1364,6 @@ public sealed class InMemorySchedulerStatusStore : IClusterSchedulerStatusStore
 
     public Task<ClusterSchedulerStatus?> ReadAsync(CancellationToken cancellationToken) =>
         Task.FromResult(scheduler);
-
-    public Task ReportLeaderAsync(
-        ClusterLeaderStatus status,
-        CancellationToken cancellationToken)
-    {
-        leader = status;
-        return Task.CompletedTask;
-    }
-
-    public Task<ClusterLeaderStatus?> ReadLeaderAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(leader);
 }
 
 public sealed class MaintenanceTickProbeHandler

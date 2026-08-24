@@ -205,6 +205,41 @@ public sealed class DockerContainerLifecycleTests
 
     [Test]
     [Timeout(300_000)]
+    public async Task Concurrent_isolated_network_replays_share_one_live_network(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var dockerProbe = new ContainerBuilder("alpine:3.20")
+                .WithCommand("true")
+                .Build();
+            await dockerProbe.StartAsync(cancellationToken);
+            using var lifecycle = CreateLifecycle();
+            var operationId = Guid.NewGuid();
+
+            var networkIds = await Task.WhenAll(Enumerable.Range(0, 8)
+                .Select(_ => lifecycle.CreateIsolatedNetworkAsync(
+                    SandboxRequest(operationId),
+                    cancellationToken)));
+            var networkId = networkIds[0];
+            try
+            {
+                await Assert.That(networkIds.Distinct().ToArray())
+                    .IsEquivalentTo([networkId]);
+                await Assert.That(await lifecycle.IsolatedNetworkExistsAsync(
+                    networkId,
+                    cancellationToken)).IsTrue();
+            }
+            finally
+            {
+                await lifecycle.DeleteIsolatedNetworkAsync(networkId, CancellationToken.None);
+                await lifecycle.DeleteIsolatedNetworkAsync(networkId, CancellationToken.None);
+            }
+        });
+    }
+
+    [Test]
+    [Timeout(300_000)]
     public async Task Persistent_runtime_publishes_the_target_port_directly(
         CancellationToken cancellationToken)
     {

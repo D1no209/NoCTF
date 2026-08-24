@@ -152,12 +152,17 @@ public sealed class KohFullBoundaryTests
         var runtime = runtimeList.GetProperty("items")[0];
         var runtimeId = runtime.GetProperty("id").GetGuid();
         await Assert.That(runtime.GetProperty("teamId").ValueKind).IsEqualTo(JsonValueKind.Null);
-        await Assert.That(runtime.GetProperty("controlCheckUrl").GetString()).Contains("/control");
+        await Assert.That(runtime.GetProperty("urls").GetArrayLength()).IsEqualTo(1);
+        await Assert.That(runtime.GetProperty("urls")[0].GetString()).Contains("/play");
+        await Assert.That(runtime.ToString()).DoesNotContain("controlCheckUrl");
 
         var detailPath = $"/api/v1/competitions/{competitionId}/challenges/{competitionChallengeId}";
-        var anonymousDetail = await GetJsonAsync(anonymous, detailPath, cancellationToken);
-        await Assert.That(anonymousDetail.GetProperty("controlFlag").ValueKind)
-            .IsEqualTo(JsonValueKind.Null);
+        await SendWithoutBodyAsync(
+            anonymous,
+            HttpMethod.Get,
+            detailPath,
+            HttpStatusCode.NotFound,
+            cancellationToken);
         var redDetail = await GetJsonAsync(red.Client, detailPath, cancellationToken);
         var blueDetail = await GetJsonAsync(blue.Client, detailPath, cancellationToken);
         await Assert.That(redDetail.GetProperty("controlFlag").GetString()).IsEqualTo(redFlag);

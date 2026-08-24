@@ -7,8 +7,8 @@
 
 - 工作分支：`codex/data-model-wolverine-simplification`
 - 基线提交：`8e366fbda160e24d5142d54f1151bf0024950dc1`
-- 已完成：阶段 0、阶段 1、阶段 2、阶段 3、阶段 4
-- 当前阶段：阶段 5（Runtime 最小模型与节点直投）
+- 已完成并独立提交：阶段 0 至阶段 10
+- 当前阶段：阶段 11（契约、文档与本地全量验证已完成，等待获准的部署/生产切换门禁）
 - 推送、部署、生产数据库和生产队列操作：未授权
 
 ## 强制阶段顺序
@@ -61,4 +61,5 @@
 - 当前证据与精确命令：[`docs/data-model-wolverine-stage0-baseline.md`](docs/data-model-wolverine-stage0-baseline.md)
 - Wolverine Spike：[`docs/wolverine-6.29.2-spike.md`](docs/wolverine-6.29.2-spike.md)
 - 切换与回滚：[`docs/data-model-wolverine-cutover.md`](docs/data-model-wolverine-cutover.md)
-- 最新进度：[`NoCTF-backend-handoff-2026-07-24.md`](NoCTF-backend-handoff-2026-07-24.md)
+- 最新进度：[`HANDOFF.md`](HANDOFF.md)
+- 阶段 11 验证：[`docs/data-model-wolverine-stage11-validation.md`](docs/data-model-wolverine-stage11-validation.md)

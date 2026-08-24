@@ -40,7 +40,15 @@ public sealed record LeaderboardCacheStatus(DateTimeOffset? LastFailureAt);
 /// </summary>
 public sealed record LeaderboardProjectionBundle(
     LeaderboardResponse Legacy,
-    ScoreboardProjection Scoreboard);
+    ScoreboardProjection Scoreboard)
+{
+    /// <summary>
+    /// The first wall-clock boundary after which this time-derived projection must be
+    /// rebuilt even when no business event has been committed. This is cache metadata,
+    /// not persisted scheduling state.
+    /// </summary>
+    public DateTimeOffset? ValidUntil { get; init; }
+}
 
 public interface ILeaderboardCache
 {
