@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace NoCTF.Infrastructure.Migrations
 {
     [DbContext(typeof(NoCtfDbContext))]
-    [Migration("20260818170133_BindAwdpFixTarget")]
-    partial class BindAwdpFixTarget
+    [Migration("20260824060413_InitialBaseline")]
+    partial class InitialBaseline
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -67,11 +67,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
-
-                    b.Property<int>("Revision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer")
-                        .HasColumnName("revision");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -233,18 +228,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<long>("AwdScheduleChallengeRevision")
-                        .HasColumnType("bigint")
-                        .HasColumnName("awd_schedule_challenge_revision");
-
-                    b.Property<int>("AwdScheduleCompetitionRevision")
-                        .HasColumnType("integer")
-                        .HasColumnName("awd_schedule_competition_revision");
-
-                    b.Property<DateTimeOffset?>("AwdScheduleDueAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("awd_schedule_due_at");
-
                     b.Property<long>("BaseScore")
                         .HasColumnType("bigint")
                         .HasColumnName("base_score");
@@ -256,10 +239,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
-
-                    b.Property<long>("CriticalSectionVersion")
-                        .HasColumnType("bigint")
-                        .HasColumnName("critical_section_version");
 
                     b.Property<string>("CustomTitle")
                         .HasMaxLength(160)
@@ -274,18 +253,9 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_published");
 
-                    b.Property<int>("LastScheduledAwdRound")
-                        .HasColumnType("integer")
-                        .HasColumnName("last_scheduled_awd_round");
-
                     b.Property<int>("Order")
                         .HasColumnType("integer")
                         .HasColumnName("order");
-
-                    b.Property<int>("Revision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer")
-                        .HasColumnName("revision");
 
                     b.Property<string>("RulesJson")
                         .IsRequired()
@@ -322,10 +292,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<long>("AccumulatedRunningSeconds")
-                        .HasColumnType("bigint")
-                        .HasColumnName("accumulated_running_seconds");
-
                     b.Property<bool>("AllowChallengeOwnersToHandleQuestions")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -340,15 +306,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("jsonb")
                         .HasColumnName("configuration_json");
-
-                    b.Property<int>("ConfigurationRevision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer")
-                        .HasColumnName("configuration_revision");
-
-                    b.Property<DateTimeOffset>("ConfigurationUpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("configuration_updated_at");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -372,35 +329,18 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("flag_derivation_secret");
 
-                    b.Property<string>("FrozenLeaderboardSnapshotJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("frozen_leaderboard_snapshot_json");
+                    b.Property<DateTimeOffset?>("FrozenStartAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("frozen_start_at");
+
+                    b.Property<DateTimeOffset?>("HiddenStartAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("hidden_start_at");
 
                     b.PrimitiveCollection<Guid[]>("JudgeIds")
                         .IsRequired()
                         .HasColumnType("uuid[]")
                         .HasColumnName("judge_ids");
-
-                    b.Property<bool>("LeaderboardDirty")
-                        .HasColumnType("boolean")
-                        .HasColumnName("leaderboard_dirty");
-
-                    b.Property<short>("LeaderboardVisibility")
-                        .HasColumnType("smallint")
-                        .HasColumnName("leaderboard_visibility");
-
-                    b.Property<DateTimeOffset?>("LeaderboardVisibilityAppliedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("leaderboard_visibility_applied_at");
-
-                    b.Property<int>("LeaderboardVisibilityRevision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer")
-                        .HasColumnName("leaderboard_visibility_revision");
-
-                    b.Property<DateTimeOffset?>("LeaderboardVisibilityStartsAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("leaderboard_visibility_starts_at");
 
                     b.PrimitiveCollection<Guid[]>("ManagerIds")
                         .IsRequired()
@@ -440,11 +380,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
 
-                    b.Property<int>("PermissionRevision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer")
-                        .HasColumnName("permission_revision");
-
                     b.Property<Guid?>("PosterFileId")
                         .HasColumnType("uuid")
                         .HasColumnName("poster_file_id");
@@ -453,16 +388,11 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("practice_mode_enabled");
 
-                    b.Property<DateTimeOffset?>("RunningSince")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("running_since");
-
                     b.Property<DateTimeOffset>("StartAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("start_at");
 
                     b.Property<short>("Status")
-                        .IsConcurrencyToken()
                         .HasColumnType("smallint")
                         .HasColumnName("status");
 
@@ -479,17 +409,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<string>("TrackConfigurationJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("track_configuration_json");
-
-                    b.Property<int>("TrackConfigurationRevision")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("track_configuration_revision");
-
-                    b.Property<DateTimeOffset>("TrackConfigurationUpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("track_configuration_updated_at");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -519,8 +438,8 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("PosterFileId")
                         .HasDatabaseName("ix_competitions_poster_file_id");
 
-                    b.HasIndex("LeaderboardVisibility", "LeaderboardVisibilityStartsAt")
-                        .HasDatabaseName("ix_competitions_leaderboard_visibility_leaderboard_visibility_");
+                    b.HasIndex("FrozenStartAt", "HiddenStartAt")
+                        .HasDatabaseName("ix_competitions_frozen_start_at_hidden_start_at");
 
                     b.HasIndex("Status", "StartAt")
                         .HasDatabaseName("ix_competitions_status_start_at");
@@ -528,8 +447,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.ToTable("competitions", null, t =>
                         {
                             t.HasCheckConstraint("ck_competitions_flag_secret_length", "octet_length(flag_derivation_secret) = 32");
-
-                            t.HasCheckConstraint("ck_competitions_leaderboard_visibility_state", "leaderboard_visibility BETWEEN 0 AND 2 AND ((leaderboard_visibility = 0 AND leaderboard_visibility_starts_at IS NULL AND frozen_leaderboard_snapshot_json IS NULL) OR (leaderboard_visibility = 1 AND leaderboard_visibility_starts_at IS NOT NULL AND ((leaderboard_visibility_applied_at IS NULL AND frozen_leaderboard_snapshot_json IS NULL) OR (leaderboard_visibility_applied_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NOT NULL))) OR (leaderboard_visibility = 2 AND leaderboard_visibility_starts_at IS NOT NULL AND frozen_leaderboard_snapshot_json IS NULL))");
 
                             t.HasCheckConstraint("ck_competitions_owner_not_permission", "NOT (owner_id = ANY(manager_ids)) AND NOT (owner_id = ANY(judge_ids)) AND NOT (owner_id = ANY(observer_ids))");
 
@@ -631,97 +548,6 @@ namespace NoCTF.Infrastructure.Migrations
 
                             t.HasCheckConstraint("ck_competition_events_related_reference", "(related_type IS NULL) = (related_id IS NULL)");
                         });
-                });
-
-            modelBuilder.Entity("NoCTF.Domain.DataExports.DataExport", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<short?>("ActiveSlot")
-                        .HasColumnType("smallint")
-                        .HasColumnName("active_slot");
-
-                    b.Property<Guid?>("CompetitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("competition_id");
-
-                    b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<DateTimeOffset?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<short?>("FailureCode")
-                        .HasColumnType("smallint")
-                        .HasColumnName("failure_code");
-
-                    b.Property<string>("FailureDetail")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("failure_detail");
-
-                    b.Property<Guid?>("FileId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("file_id");
-
-                    b.Property<bool>("IncludeProtectedFlags")
-                        .HasColumnType("boolean")
-                        .HasColumnName("include_protected_flags");
-
-                    b.Property<DateTimeOffset>("PurgeAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("purge_at");
-
-                    b.Property<string>("Reason")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("reason");
-
-                    b.Property<DateTimeOffset>("RequestedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("requested_at");
-
-                    b.Property<Guid>("RequestedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("requested_by_user_id");
-
-                    b.Property<short>("Scope")
-                        .HasColumnType("smallint")
-                        .HasColumnName("scope");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
-
-                    b.Property<short>("Status")
-                        .HasColumnType("smallint")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id")
-                        .HasName("pk_data_exports");
-
-                    b.HasIndex("FileId")
-                        .HasDatabaseName("ix_data_exports_file_id");
-
-                    b.HasIndex("PurgeAt")
-                        .HasDatabaseName("ix_data_exports_purge_at");
-
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_data_exports_status");
-
-                    b.HasIndex("RequestedByUserId", "Scope", "ActiveSlot")
-                        .IsUnique()
-                        .HasDatabaseName("ix_data_exports_requested_by_user_id_scope_active_slot");
-
-                    b.HasIndex("RequestedByUserId", "Scope", "CompetitionId", "RequestedAt")
-                        .HasDatabaseName("ix_data_exports_requested_by_user_id_scope_competition_id_requ");
-
-                    b.ToTable("data_exports", (string)null);
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
@@ -973,11 +799,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("avatar_file_id");
 
-                    b.Property<long>("ConcurrencyVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("concurrency_version");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -997,19 +818,9 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("email_verified_at");
 
-                    b.Property<bool>("IsEmailPublic")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_email_public");
-
                     b.Property<short>("Kind")
                         .HasColumnType("smallint")
                         .HasColumnName("kind");
-
-                    b.Property<string>("NormalizedEmail")
-                        .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
-                        .HasColumnName("normalized_email");
 
                     b.Property<string>("NormalizedUserName")
                         .IsRequired()
@@ -1046,10 +857,10 @@ namespace NoCTF.Infrastructure.Migrations
                     b.HasIndex("AvatarFileId")
                         .HasDatabaseName("ix_users_avatar_file_id");
 
-                    b.HasIndex("NormalizedEmail")
+                    b.HasIndex("Email")
                         .IsUnique()
-                        .HasDatabaseName("ix_users_normalized_email")
-                        .HasFilter("normalized_email <> ''");
+                        .HasDatabaseName("ix_users_email")
+                        .HasFilter("email <> ''");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
@@ -1109,13 +920,20 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("target_type");
 
+                    b.Property<Guid?>("ThreadRootId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("thread_root_id");
+
                     b.HasKey("Id")
                         .HasName("pk_notifications");
 
                     b.HasIndex("ReplyToId")
-                        .IsUnique()
                         .HasDatabaseName("ix_notifications_reply_to_id")
                         .HasFilter("reply_to_id IS NOT NULL");
+
+                    b.HasIndex("ThreadRootId", "SentAt", "Id")
+                        .HasDatabaseName("ix_notifications_thread_root_id_sent_at_id")
+                        .HasFilter("thread_root_id IS NOT NULL");
 
                     b.HasIndex("RelatedType", "RelatedId", "SentAt", "Id")
                         .HasDatabaseName("ix_notifications_related_type_related_id_sent_at_id")
@@ -1137,6 +955,8 @@ namespace NoCTF.Infrastructure.Migrations
                             t.HasCheckConstraint("ck_notifications_related_reference", "(related_type IS NULL) = (related_id IS NULL)");
 
                             t.HasCheckConstraint("ck_notifications_source", "(source_type IN (0, 4) AND source_id IS NULL) OR (source_type IN (1, 2, 3) AND source_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_notifications_thread_root", "thread_root_id IS NULL OR thread_root_id <> id");
                         });
                 });
 
@@ -1235,11 +1055,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
-                    b.Property<long>("Revision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("revision");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -1273,7 +1088,6 @@ namespace NoCTF.Infrastructure.Migrations
                             EmailVerificationResendCooldownSeconds = 60,
                             EmailVerificationTokenLifetimeMinutes = 1440,
                             Name = "NoCTF",
-                            Revision = 1L,
                             UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
                         });
                 });
@@ -1285,31 +1099,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("AwdCheckerTargetHost")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("awd_checker_target_host");
-
-                    b.Property<short?>("AwdpFixStage")
-                        .HasColumnType("smallint")
-                        .HasColumnName("awdp_fix_stage");
-
-                    b.Property<DateTimeOffset?>("CheckerDeadlineAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("checker_deadline_at");
-
-                    b.Property<long>("CheckerSequence")
-                        .HasColumnType("bigint")
-                        .HasColumnName("checker_sequence");
-
-                    b.Property<short>("CheckerStatus")
-                        .HasColumnType("smallint")
-                        .HasColumnName("checker_status");
-
-                    b.Property<DateTimeOffset?>("CheckerStatusUpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("checker_status_updated_at");
-
                     b.Property<Guid>("CompetitionChallengeId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_challenge_id");
@@ -1317,10 +1106,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
-
-                    b.Property<string>("ControlCheckUrl")
-                        .HasColumnType("text")
-                        .HasColumnName("control_check_url");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -1338,28 +1123,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("gameplay_fact_id");
 
-                    b.Property<int>("Generation")
-                        .HasColumnType("integer")
-                        .HasColumnName("generation");
-
-                    b.Property<long>("LastAppliedCheckerSequence")
-                        .HasColumnType("bigint")
-                        .HasColumnName("last_applied_checker_sequence");
-
-                    b.Property<DateTimeOffset?>("NextCheckerDueAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_checker_due_at");
-
-                    b.PrimitiveCollection<int[]>("ParticipantUrlIndexes")
-                        .IsRequired()
-                        .HasColumnType("integer[]")
-                        .HasColumnName("participant_url_indexes");
-
-                    b.Property<long>("ProcessingVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("processing_version");
-
                     b.Property<string>("ProviderReceiptJson")
                         .HasColumnType("jsonb")
                         .HasColumnName("provider_receipt_json");
@@ -1368,28 +1131,10 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("purpose");
 
-                    b.Property<Guid?>("ReplacesRuntimeInstanceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("replaces_runtime_instance_id");
-
-                    b.Property<Guid?>("RunnerAssignmentReleaseToken")
-                        .HasColumnType("uuid")
-                        .HasColumnName("runner_assignment_release_token");
-
                     b.Property<string>("RunnerId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
                         .HasColumnName("runner_id");
-
-                    b.Property<string>("RunnerPool")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("runner_pool");
-
-                    b.Property<DateTimeOffset?>("RunnerUnavailableAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("runner_unavailable_at");
 
                     b.Property<DateTimeOffset?>("RunningAt")
                         .HasColumnType("timestamp with time zone")
@@ -1402,18 +1147,6 @@ namespace NoCTF.Infrastructure.Migrations
                     b.Property<short>("RuntimeProvider")
                         .HasColumnType("smallint")
                         .HasColumnName("runtime_provider");
-
-                    b.Property<int>("SourceChallengeDefinitionRevision")
-                        .HasColumnType("integer")
-                        .HasColumnName("source_challenge_definition_revision");
-
-                    b.Property<int>("SourceCompetitionChallengeRevision")
-                        .HasColumnType("integer")
-                        .HasColumnName("source_competition_challenge_revision");
-
-                    b.Property<int>("SourceCompetitionConfigurationRevision")
-                        .HasColumnType("integer")
-                        .HasColumnName("source_competition_configuration_revision");
 
                     b.Property<short>("State")
                         .HasColumnType("smallint")
@@ -1446,9 +1179,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasDatabaseName("ix_runtime_instances_gameplay_fact_id")
                         .HasFilter("purpose = 1 AND gameplay_fact_id IS NOT NULL AND state IN (0, 1, 2, 3)");
 
-                    b.HasIndex("ReplacesRuntimeInstanceId")
-                        .HasDatabaseName("ix_runtime_instances_replaces_runtime_instance_id");
-
                     b.HasIndex("TeamId")
                         .HasDatabaseName("ix_runtime_instances_team_id");
 
@@ -1457,28 +1187,15 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasDatabaseName("ix_runtime_instances_competition_challenge_id_team_id")
                         .HasFilter("purpose IN (0, 2, 3) AND state IN (0, 1, 2)");
 
-                    b.HasIndex("State", "NextCheckerDueAt")
-                        .HasDatabaseName("ix_runtime_instances_state_next_checker_due_at")
-                        .HasFilter("next_checker_due_at IS NOT NULL");
+                    b.HasIndex("RunnerId", "State", "CreatedAt", "Id")
+                        .HasDatabaseName("ix_runtime_instances_runner_id_state_created_at_id");
 
-                    b.HasIndex("CompetitionChallengeId", "TeamId", "Purpose", "Generation")
-                        .IsUnique()
+                    b.HasIndex("CompetitionChallengeId", "TeamId", "Purpose", "CreatedAt", "Id")
                         .HasDatabaseName("ix_runtime_instances_competition_challenge_id_team_id_purpose_");
-
-                    b.HasIndex("RunnerPool", "State", "CreatedAt", "Id")
-                        .HasDatabaseName("ix_runtime_instances_runner_pool_state_created_at_id");
 
                     b.ToTable("runtime_instances", null, t =>
                         {
-                            t.HasCheckConstraint("ck_runtime_instances_awd_checker_target", "awd_checker_target_host IS NULL OR runtime_kind IN (0, 1)");
-
-                            t.HasCheckConstraint("ck_runtime_instances_awdp_bound_attempt", "purpose <> 1 OR awdp_fix_stage IN (0, 1) OR gameplay_fact_id IS NOT NULL");
-
-                            t.HasCheckConstraint("ck_runtime_instances_awdp_fix_stage", "(awdp_fix_stage IS NOT NULL) = (purpose = 1)");
-
                             t.HasCheckConstraint("ck_runtime_instances_awdp_gameplay_fact", "gameplay_fact_id IS NULL OR purpose = 1");
-
-                            t.HasCheckConstraint("ck_runtime_instances_checker_sequence", "last_applied_checker_sequence <= checker_sequence");
 
                             t.HasCheckConstraint("ck_runtime_instances_failure", "(state = 5) = (failure_code IS NOT NULL)");
                         });
@@ -1568,15 +1285,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("competition_id");
 
-                    b.Property<long>("ConcurrencyVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint")
-                        .HasColumnName("concurrency_version");
-
-                    b.Property<long>("CriticalSectionVersion")
-                        .HasColumnType("bigint")
-                        .HasColumnName("critical_section_version");
-
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
@@ -1605,12 +1313,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
                         .HasColumnName("name");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)")
-                        .HasColumnName("normalized_name");
 
                     b.Property<DateTimeOffset>("RegisteredAt")
                         .HasColumnType("timestamp with time zone")
@@ -1645,11 +1347,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasDatabaseName("ix_teams_member_ids");
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("MemberIds"), "gin");
-
-                    b.HasIndex("CompetitionId", "NormalizedName")
-                        .IsUnique()
-                        .HasDatabaseName("ix_teams_competition_id_normalized_name")
-                        .HasFilter("deleted_at IS NULL");
 
                     b.HasIndex("CompetitionId", "RegistrationStatus")
                         .HasDatabaseName("ix_teams_competition_id_registration_status");
@@ -1808,17 +1505,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasConstraintName("fk_competition_events_competition_events_parent_event_id");
                 });
 
-            modelBuilder.Entity("NoCTF.Domain.DataExports.DataExport", b =>
-                {
-                    b.HasOne("NoCTF.Domain.Storage.StoredFile", "File")
-                        .WithMany()
-                        .HasForeignKey("FileId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_data_exports_files_file_id");
-
-                    b.Navigation("File");
-                });
-
             modelBuilder.Entity("NoCTF.Domain.Gameplay.GameplayFact", b =>
                 {
                     b.HasOne("NoCTF.Domain.Identity.User", null)
@@ -1928,6 +1614,12 @@ namespace NoCTF.Infrastructure.Migrations
                         .HasForeignKey("ReplyToId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_notifications_notifications_reply_to_id");
+
+                    b.HasOne("NoCTF.Domain.Notifications.Notification", null)
+                        .WithMany()
+                        .HasForeignKey("ThreadRootId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_notifications_notifications_thread_root_id");
                 });
 
             modelBuilder.Entity("NoCTF.Domain.Platform.PlatformSettings", b =>
@@ -1963,12 +1655,6 @@ namespace NoCTF.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_runtime_instances_gameplay_facts_gameplay_fact_id");
 
-                    b.HasOne("NoCTF.Domain.Runtime.RuntimeInstance", null)
-                        .WithMany()
-                        .HasForeignKey("ReplacesRuntimeInstanceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_runtime_instances_runtime_instances_replaces_runtime_instan");
-
                     b.HasOne("NoCTF.Domain.Teams.Team", null)
                         .WithMany()
                         .HasForeignKey("TeamId")
@@ -1981,8 +1667,6 @@ namespace NoCTF.Infrastructure.Migrations
 
                             b1.Property<int>("__synthesizedOrdinal")
                                 .ValueGeneratedOnAdd();
-
-                            b1.Property<DateTimeOffset>("AllocatedAt");
 
                             b1.Property<int>("ContainerPort");
 
