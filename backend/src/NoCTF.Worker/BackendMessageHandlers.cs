@@ -367,6 +367,9 @@ public static class BackendMessageHandlers
         CancellationToken cancellationToken)
     {
         var transitions = await advancer.ExecuteAsync(message.At, cancellationToken);
+        // Capacity reconciliation remains durable maintenance work, but lifecycle is
+        // the only periodic trigger owned by the Singular Agent.
+        await outbox.PublishAsync(new ReconcileRunnerAssignments(message.At));
         await db.SaveChangesAsync(cancellationToken);
         await outbox.FlushOutgoingMessagesAsync();
         return transitions.Count > 0

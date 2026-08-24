@@ -5,15 +5,18 @@ using NoCTF.Application.GameplayFacts.Processing;
 using NoCTF.Application.Runtime.Instances;
 using NoCTF.Domain.Challenges;
 using NoCTF.Domain.Competitions;
+using NoCTF.Domain.Competitions.Events;
 using NoCTF.Domain.Identity;
 using NoCTF.Domain.Gameplay;
 using NoCTF.Domain.Teams;
 using NoCTF.Domain.Runtime;
 using NoCTF.Application.Runtime.Provisioning;
 using NoCTF.GameModes.Awd.Configuration;
+using NoCTF.GameModes.Koh.Configuration;
 using NoCTF.Infrastructure.Persistence;
 using NoCTF.Infrastructure.Competitions.Awd;
 using NoCTF.Infrastructure.GameplayFacts.Processing;
+using NoCTF.Infrastructure.Messaging;
 using NoCTF.Worker;
 using NoCTF.Runner.Messages;
 using Testcontainers.PostgreSql;
@@ -23,6 +26,55 @@ namespace NoCTF.Tests.Integration.Persistence;
 [Category("Integration")]
 public sealed class AwdRoundCoordinationTests
 {
+    [Test]
+    [Timeout(300_000)]
+    public async Task Rebuilt_schedule_resumes_at_current_round_without_historical_ticks(
+        CancellationToken cancellationToken)
+    {
+        await DockerIntegrationTest.RunAsync(async () =>
+        {
+            await using var postgres = new PostgreSqlBuilder("postgres:17.10-alpine3.24@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193")
+                .WithDatabase("noctf_awd_schedule_rebuild")
+                .WithUsername("postgres")
+                .WithPassword("postgres")
+                .Build();
+            await postgres.StartAsync(cancellationToken);
+            var options = new DbContextOptionsBuilder<NoCtfDbContext>()
+                .UseNpgsql(postgres.GetConnectionString())
+                .UseSnakeCaseNamingConvention()
+                .Options;
+            var fixture = await SeedAsync(options, cancellationToken);
+            var resumedAt = fixture.Now.AddMinutes(17);
+
+            await using var db = new NoCtfDbContext(options);
+            var source = new PostgresClusterScheduleSource(
+                db,
+                new AwdRoundConfigurationCatalog(),
+                new KohProducerConfigurationCatalog());
+            var rebuilt = await source.RebuildAsync(resumedAt, cancellationToken);
+
+            var entry = rebuilt.Single();
+            await Assert.That(entry.Kind).IsEqualTo(ClusterScheduleKind.AwdRound);
+            await Assert.That(entry.DueAt).IsEqualTo(resumedAt);
+            var message = (AdvanceAwdRound)entry.Message;
+            var outbox = new RecordingOutbox();
+            var coordinator = new PostgresAwdRoundCoordinator(
+                db,
+                new AwdRoundConfigurationCatalog(),
+                outbox,
+                new MutableTimeProvider(resumedAt));
+
+            var outcome = await coordinator.AdvanceAsync(message, cancellationToken);
+
+            await Assert.That(outcome).IsEqualTo(MessageExecutionOutcome.Applied);
+            var generate = outbox.Published.OfType<GenerateAwdFlags>().Single();
+            await Assert.That(generate.Round).IsEqualTo(AwdRoundSpecificationId.FromRound(4));
+            await Assert.That(generate.ValidStart).IsLessThan(resumedAt);
+            await Assert.That(generate.ValidUntil).IsGreaterThan(resumedAt);
+            await Assert.That(outbox.Scheduled).IsEmpty();
+        });
+    }
+
     [Test]
     [Timeout(300_000)]
     public async Task Checker_executions_create_independent_facts_and_callback_retries_are_idempotent(
@@ -156,7 +208,7 @@ public sealed class AwdRoundCoordinationTests
 
     [Test]
     [Timeout(300_000)]
-    public async Task Current_round_creates_one_flag_fact_and_one_durable_successor(
+    public async Task Current_round_creates_one_flag_fact_without_recursive_schedule(
         CancellationToken cancellationToken)
     {
         await DockerIntegrationTest.RunAsync(async () =>
@@ -205,8 +257,7 @@ public sealed class AwdRoundCoordinationTests
             var injection = outbox.RunnerNodeMessages.OfType<InjectAwdFlag>().Single();
             await Assert.That(injection.RuntimeInstanceId).IsEqualTo(fixture.RuntimeId);
             await Assert.That(injection.ChallengeFlagId).IsEqualTo(flag.Id);
-            await Assert.That(outbox.Scheduled.Select(item => item.Message)
-                .OfType<AdvanceAwdRound>().Count()).IsEqualTo(1);
+            await Assert.That(outbox.Scheduled).IsEmpty();
 
             var extendedUntil = generate.ValidUntil.AddMinutes(2);
             await db.ChallengeFlags.ExecuteUpdateAsync(
@@ -219,8 +270,7 @@ public sealed class AwdRoundCoordinationTests
                     fixture.Now),
                 cancellationToken);
             await Assert.That(resumeReplacement).IsEqualTo(MessageExecutionOutcome.DeferredSchedule);
-            await Assert.That(outbox.Scheduled.Select(item => item.Message)
-                .OfType<AdvanceAwdRound>().Count()).IsEqualTo(2);
+            await Assert.That(outbox.Scheduled).IsEmpty();
             var currentRoundGenerate = generate with { ValidUntil = extendedUntil };
 
             var greenTeamId = Guid.CreateVersion7();
@@ -253,8 +303,7 @@ public sealed class AwdRoundCoordinationTests
                 currentRoundGenerate,
                 cancellationToken);
             await Assert.That(generatedForLateTeam).IsEqualTo(MessageExecutionOutcome.Applied);
-            await Assert.That(outbox.Scheduled.Select(item => item.Message)
-                .OfType<AdvanceAwdRound>().Count()).IsEqualTo(2);
+            await Assert.That(outbox.Scheduled).IsEmpty();
             await RuntimeWriteBackHandler.Handle(
                 new RuntimeProvisioned(
                     greenRuntimeId,
@@ -317,11 +366,8 @@ public sealed class AwdRoundCoordinationTests
                     fixture.CompetitionChallengeId,
                     currentGenerate.ValidUntil),
                 cancellationToken);
-            var emptyRound = outbox.Published.OfType<GenerateAwdFlags>().Last();
-            var emptyGenerated = await coordinator.GenerateFlagsAsync(emptyRound, cancellationToken);
-            await Assert.That(emptyGenerated).IsEqualTo(MessageExecutionOutcome.Applied);
-            await Assert.That(outbox.Scheduled.Select(item => item.Message)
-                .OfType<AdvanceAwdRound>().Count()).IsEqualTo(5);
+            await Assert.That(outbox.Published.OfType<GenerateAwdFlags>().Count()).IsEqualTo(2);
+            await Assert.That(outbox.Scheduled).IsEmpty();
 
             var stale = await coordinator.AdvanceAsync(
                 new AdvanceAwdRound(
@@ -329,7 +375,7 @@ public sealed class AwdRoundCoordinationTests
                     fixture.CompetitionChallengeId,
                     fixture.Now),
                 cancellationToken);
-            await Assert.That(stale).IsEqualTo(MessageExecutionOutcome.Superseded);
+            await Assert.That(stale).IsEqualTo(MessageExecutionOutcome.Idempotent);
         });
     }
 
@@ -378,6 +424,25 @@ public sealed class AwdRoundCoordinationTests
             FlagDerivationSecret = Enumerable.Range(1, 32).Select(value => (byte)value).ToArray(),
             CreatedAt = now,
             UpdatedAt = now,
+        });
+        db.CompetitionEvents.Add(new CompetitionEvent
+        {
+            Id = Guid.CreateVersion7(now.AddMinutes(-10)),
+            CompetitionId = competitionId,
+            Kind = CompetitionEventKind.CompetitionLifecycleChanged,
+            Level = CompetitionEventLevel.Information,
+            Visibility = CompetitionEventVisibility.Public,
+            SubjectType = NoCTF.Domain.Shared.EntityReferenceKind.Competition,
+            SubjectId = competitionId,
+            PayloadJson = JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                from = CompetitionStatus.Published,
+                to = CompetitionStatus.Running,
+                automatic = false,
+                reason = (string?)null
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            OccurredAt = now.AddMinutes(-10)
         });
         db.Challenges.Add(new Challenge
         {

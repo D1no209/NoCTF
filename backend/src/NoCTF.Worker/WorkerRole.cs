@@ -6,6 +6,7 @@ using NoCTF.Application.Messaging;
 using NoCTF.Infrastructure.Messaging;
 using NoCTF.Infrastructure.Observability;
 using NoCTF.Hosting;
+using NoCTF.Hosting.Health;
 using NoCTF.Hosting.Messaging;
 using Wolverine;
 using Wolverine.ErrorHandling;
@@ -21,6 +22,13 @@ public static class WorkerRole
         bool collectQueueMetrics = true,
         bool validateMessageTopology = true)
     {
+        services.AddSingleton<ClusterSchedulingState>();
+        services.AddSingleton(new ClusterSchedulerNodeIdentity(
+            $"{Environment.MachineName}:{Environment.ProcessId}"));
+        services.AddSingleton<IClusterSchedulerStatusStore, RedisClusterSchedulerStatusStore>();
+        services.AddScoped<IClusterScheduleSource, PostgresClusterScheduleSource>();
+        services.AddHostedService<ClusterLeadershipStatusReporter>();
+        services.AddSingleton<IReadinessDependency, ClusterSchedulingReadinessDependency>();
         services.AddSingularAgent<MaintenanceTickAgent>();
         if (collectQueueMetrics)
             services.AddHostedService<WorkerQueueMetricsCollector>();

@@ -194,39 +194,8 @@ public sealed class CompetitionLifecycleStore(
             await outbox.PublishAsync(new ProvisionCompetitionRuntimes(competitionId));
         if (effects.HasFlag(CompetitionLifecycleEffects.CleanupRuntimes))
             await outbox.PublishAsync(new CleanupCompetitionRuntimes(competitionId));
-        if (competition.Mode == GameMode.Awd && to == CompetitionStatus.Running)
-        {
-            var challenges = await db.CompetitionChallenges.AsNoTracking()
-                .Where(challenge => challenge.CompetitionId == competitionId
-                    && challenge.IsPublished
-                    && challenge.DeletedAt == null)
-                .Select(challenge => challenge.Id)
-                .ToListAsync(cancellationToken);
-            foreach (var challengeId in challenges)
-            {
-                await outbox.PublishAsync(new AdvanceAwdRound(
-                    competitionId,
-                    challengeId,
-                    now));
-            }
-        }
-        if (competition.Mode == GameMode.Koh && to == CompetitionStatus.Running)
-        {
-            var challenges = await db.CompetitionChallenges.AsNoTracking()
-                .Where(challenge => challenge.CompetitionId == competitionId
-                    && challenge.IsPublished
-                    && challenge.DeletedAt == null)
-                .Select(challenge => challenge.Id)
-                .ToListAsync(cancellationToken);
-            foreach (var challengeId in challenges)
-            {
-                await outbox.PublishAsync(new PollKohChallenge(
-                    competitionId,
-                    challengeId,
-                    now,
-                    now));
-            }
-        }
+        // AWD rounds and KoH polls are rebuilt from PostgreSQL facts by the cluster
+        // Singular Agent. Lifecycle transitions must not create a second scheduler.
         await db.SaveChangesAsync(cancellationToken);
         if (transaction is not null)
         {

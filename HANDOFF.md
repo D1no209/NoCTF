@@ -1,5 +1,24 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 8
+
+- 当前分支：`codex/data-model-wolverine-simplification`；阶段 8 父提交为 `55e26af4`。
+  本节随阶段 8 功能提交交付。未推送、未部署，未操作生产数据库、生产队列、对象存储或生产数据。
+- 周期调度已迁移到 Wolverine 6.29.2 集群 `SingularAgent`：AWD Round、AWD Checker、KoH Poll
+  与比赛生命周期由唯一活动 Agent 从 PostgreSQL 当前事实重建内存优先队列并只派发 durable 消息。
+  AWD Round、KoH Poll 和生命周期 Handler 不再递归创建 Wolverine Scheduled Message。
+- 停机恢复采用 no-catch-up：逾期计划最多在接管时执行当前一次，下一次从当前时刻继续。AWD 按当前
+  有效运行时长恢复当前轮次；没有合格参赛队伍时不制造空轮次，队伍后续加入时直接从当前轮次开始。
+  KoH Poll 以题目和 due time 派生确定性 FactId，重投幂等。
+- readiness 现在 fail closed 地核验 Wolverine balanced agent assignment、当前 leader、scheduler owner、
+  接管时间、本地重建状态和诊断租约；Redis 只保存 15 秒低敏诊断租约，不参与业务选主。
+- 验证：Release build 0 warning/0 error；调度时钟/KoH FactId 单元 2/2；真实 PostgreSQL AWD 当前轮次
+  恢复与无空轮次 3/3；真实 PostgreSQL/Wolverine 双 Worker 唯一 Agent 和 owner 停止后 failover 1/1。
+  完整阶段证据见 `docs/data-model-wolverine-stage8-singular-agent.md`。
+- 本阶段没有业务表、EF migration、HTTP/OpenAPI 或 TypeScript SDK 变化。阶段 9 前临时保留由同一
+  Agent 派发的 15 秒排行榜刷新；下一步只能进入阶段 9，删除 `LeaderboardDirty`、旧扫描和临时 tick，
+  实现事件驱动失效、500ms 合并、全量 PostgreSQL 投影、cache miss keyed-lock 重建与乱序保护。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 7
 
 - 当前分支：`codex/data-model-wolverine-simplification`；阶段 7 父提交为 `b70f8546`。

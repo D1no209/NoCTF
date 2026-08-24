@@ -188,25 +188,9 @@ public sealed class PostgresAwdRoundCoordinator(
             }
             await db.SaveChangesAsync(cancellationToken);
         }
-        // The created round flags are the business fact. Scheduling state must not be
-        // persisted on CompetitionChallenge. A replay that observes a complete round
-        // therefore has no successor work to add; the original transaction committed
-        // the flags and successor message atomically through the EF outbox.
-        var scheduledSuccessor = missing.Length > 0
-            || existingFlags.Count == 0 && teamIds.Count == 0;
-        if (scheduledSuccessor)
-        {
-            if (message.ValidUntil < target.Competition.EndAt)
-            {
-                await outbox.ScheduleAsync(
-                    new AdvanceAwdRound(
-                        message.CompetitionId,
-                        message.CompetitionChallengeId,
-                        message.ValidUntil),
-                    message.ValidUntil);
-            }
-        }
-        if (missing.Length == 0 && !scheduledSuccessor)
+        // The Singular Agent rebuilds the next due round from these persisted flags.
+        // Do not persist a recursive scheduled message as a second scheduling source.
+        if (missing.Length == 0)
             return MessageExecutionOutcome.Idempotent;
         await db.SaveChangesAsync(cancellationToken);
         await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
@@ -247,6 +231,14 @@ public sealed class PostgresAwdRoundCoordinator(
             || target.Competition.Mode != GameMode.Awd
             || !target.Challenge.IsPublished)
             return MessageExecutionOutcome.RejectedBusiness;
+        var hasEligibleTeam = await db.Teams.AsNoTracking().AnyAsync(
+            team => team.CompetitionId == message.CompetitionId
+                && team.RegistrationStatus == TeamRegistrationStatus.Approved
+                && !team.IsBanned
+                && team.DeletedAt == null,
+            cancellationToken);
+        if (!hasEligibleTeam)
+            return MessageExecutionOutcome.Idempotent;
         var latest = await LoadLatestWindowAsync(
             message.CompetitionChallengeId,
             cancellationToken);
@@ -273,23 +265,11 @@ public sealed class PostgresAwdRoundCoordinator(
         switch (plan.Kind)
         {
             case AwdRoundPlanKind.WaitingForHardening:
-                var dueAt = handledAt
-                    + (TimeSpan.FromSeconds(settings.HardeningDurationSeconds)
-                        - effectiveRunningTime);
-                if (dueAt < target.Competition.EndAt)
-                {
-                    await ScheduleAdvanceAsync(dueAt, message);
-                    await db.SaveChangesAsync(cancellationToken);
-                    await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
-                }
                 return MessageExecutionOutcome.DeferredSchedule;
             case AwdRoundPlanKind.Current:
                 var current = plan.Window!.Value;
                 if (current.ValidUntil >= target.Competition.EndAt)
                     return MessageExecutionOutcome.Idempotent;
-                await ScheduleAdvanceAsync(current.ValidUntil, message);
-                await db.SaveChangesAsync(cancellationToken);
-                await CommitAndFlushIfOwnedAsync(transaction, cancellationToken);
                 return MessageExecutionOutcome.DeferredSchedule;
             case AwdRoundPlanKind.Finished:
                 return MessageExecutionOutcome.RejectedBusiness;
@@ -396,14 +376,6 @@ public sealed class PostgresAwdRoundCoordinator(
                 return candidate;
         }
         throw new InvalidOperationException("Flag candidate loop did not return a value.");
-    }
-
-    private async Task ScheduleAdvanceAsync(
-        DateTimeOffset dueAt,
-        AdvanceAwdRound message)
-    {
-        dueAt = ToPostgresTimestamp(dueAt);
-        await outbox.ScheduleAsync(message with { At = dueAt }, dueAt);
     }
 
     private async Task CommitAndFlushIfOwnedAsync(
