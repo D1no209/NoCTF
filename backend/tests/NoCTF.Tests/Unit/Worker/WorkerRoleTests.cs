@@ -75,4 +75,48 @@ public sealed class WorkerRoleTests
 
         await Assert.That(action).Throws<InvalidOperationException>();
     }
+
+    [Test]
+    public async Task Queue_metrics_include_only_enabled_workloads_and_their_fanout_destinations()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Worker:Queues:0"] = "projection",
+                ["Worker:Queues:1"] = "background"
+            })
+            .Build();
+
+        var queues = WorkerQueueMetricsCollector.ResolveMonitoredQueues(configuration);
+
+        await Assert.That(queues).IsEquivalentTo(new[]
+        {
+            WorkerQueueNames.Projection,
+            WorkerQueueNames.Background,
+            CompetitionEventFanoutQueueNames.Realtime,
+            CompetitionEventFanoutQueueNames.Leaderboard
+        });
+    }
+
+    [Test]
+    public async Task Missing_sticky_postgresql_listener_is_a_startup_failure()
+    {
+        var action = () => WorkerMessageTopologyStartupValidator.ValidateFanoutRouting(
+            [CompetitionEventFanoutQueueNames.Realtime],
+            $"local://{CompetitionEventFanoutQueueNames.Realtime}");
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+    }
+
+    [Test]
+    public async Task Sticky_fanout_rejects_local_fallback_even_when_postgresql_listener_exists()
+    {
+        var endpoint = WorkerMessageTopologyStartupValidator.PostgresqlQueueAddress(
+            CompetitionEventFanoutQueueNames.Realtime);
+        var action = () => WorkerMessageTopologyStartupValidator.ValidateFanoutRouting(
+            [CompetitionEventFanoutQueueNames.Realtime],
+            $"{endpoint}{Environment.NewLine}local://{CompetitionEventFanoutQueueNames.Realtime}");
+
+        await Assert.That(action).Throws<InvalidOperationException>();
+    }
 }

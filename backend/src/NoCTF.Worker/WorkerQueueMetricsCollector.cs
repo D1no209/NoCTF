@@ -1,21 +1,25 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NoCTF.Application.Messaging;
 using NoCTF.Application.Observability;
+using NoCTF.Hosting;
 using NoCTF.Infrastructure.Persistence;
 
 namespace NoCTF.Worker;
 
 public sealed class WorkerQueueMetricsCollector(
     IServiceScopeFactory scopeFactory,
+    IConfiguration configuration,
     TimeProvider timeProvider,
     ILogger<WorkerQueueMetricsCollector> logger) : BackgroundService
 {
     private const string QueueSchema = "wolverine_queues";
     private static readonly TimeSpan CollectionInterval = TimeSpan.FromSeconds(5);
+    private readonly IReadOnlyList<string> monitoredQueues = ResolveMonitoredQueues(configuration);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -39,7 +43,7 @@ public sealed class WorkerQueueMetricsCollector(
 
             try
             {
-                foreach (var queue in WorkerQueueNames.All)
+                foreach (var queue in monitoredQueues)
                 {
                     await using var command = connection.CreateCommand();
                     command.CommandText = BuildSnapshotSql(queue);
@@ -70,9 +74,22 @@ public sealed class WorkerQueueMetricsCollector(
         }
     }
 
-    private static string BuildSnapshotSql(WorkerQueue queue)
+    internal static IReadOnlyList<string> ResolveMonitoredQueues(IConfiguration configuration)
     {
-        var tableName = WorkerQueueNames.GetName(queue).Replace('-', '_');
+        var enabled = WorkerQueues.GetEnabled(configuration);
+        var queues = enabled.Select(WorkerQueueNames.GetName).ToList();
+        if (enabled.Contains(WorkerQueue.Background))
+            queues.Add(CompetitionEventFanoutQueueNames.Realtime);
+        if (enabled.Contains(WorkerQueue.Projection))
+            queues.Add(CompetitionEventFanoutQueueNames.Leaderboard);
+        return queues;
+    }
+
+    private static string BuildSnapshotSql(string queue)
+    {
+        if (!WorkerQueueMonitoringNames.IsKnown(queue))
+            throw new ArgumentOutOfRangeException(nameof(queue), queue, "Unknown worker queue.");
+        var tableName = queue.Replace('-', '_');
         return $"""
             SELECT COUNT(*)::bigint,
                    COALESCE(

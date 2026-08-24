@@ -42,7 +42,11 @@ public sealed class DeploymentTopologyTests
         await Assert.That(hostProgram).Contains("ConfigureNoCtfWorkerMessaging");
         await Assert.That(hostProgram).Contains("ConfigureNoCtfRunnerMessaging");
         await Assert.That(routing)
-            .Contains("Route<CompetitionEventCommitted>(options, WorkerQueue.Background)");
+            .Contains("options.Durability.MessageIdentity = MessageIdentity.IdAndDestination");
+        await Assert.That(routing)
+            .Contains("route.ToPostgresqlQueue(CompetitionEventFanoutQueueNames.Realtime)");
+        await Assert.That(routing)
+            .Contains("route.ToPostgresqlQueue(CompetitionEventFanoutQueueNames.Leaderboard)");
         await Assert.That(routing)
             .Contains("Route<CompleteAwdpFixRecovery>(options, WorkerQueue.Control)");
         foreach (var workerQueue in new[]

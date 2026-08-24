@@ -47,8 +47,8 @@ public static class NoCtfTelemetry
     private static long _oldestDirtyAgeSeconds;
     private static long _waitingRuntimeCount;
     private static long _oldestWaitingRuntimeAgeSeconds;
-    private static readonly long[] WorkerQueueDepths = new long[WorkerQueueNames.All.Count];
-    private static readonly long[] WorkerQueueOldestAgeSeconds = new long[WorkerQueueNames.All.Count];
+    private static readonly ConcurrentDictionary<string, WorkerQueueSnapshot> WorkerQueueSnapshots =
+        new(StringComparer.Ordinal);
     private static readonly ConcurrentDictionary<string, RunnerCapacitySnapshot> RunnerCapacitySnapshots =
         new(StringComparer.Ordinal);
 
@@ -164,14 +164,15 @@ public static class NoCtfTelemetry
     }
 
     public static void UpdateWorkerQueueSnapshot(
-        WorkerQueue queue,
+        string queue,
         long depth,
         TimeSpan oldestAge)
     {
-        var index = (int)queue;
-        Interlocked.Exchange(ref WorkerQueueDepths[index], Math.Max(0, depth));
-        Interlocked.Exchange(
-            ref WorkerQueueOldestAgeSeconds[index],
+        ArgumentException.ThrowIfNullOrWhiteSpace(queue);
+        if (!WorkerQueueMonitoringNames.IsKnown(queue))
+            throw new ArgumentOutOfRangeException(nameof(queue), queue, "Unknown worker queue.");
+        WorkerQueueSnapshots[queue] = new(
+            Math.Max(0, depth),
             Math.Max(0, (long)oldestAge.TotalSeconds));
     }
 
@@ -200,14 +201,16 @@ public static class NoCtfTelemetry
     }
 
     private static IEnumerable<Measurement<long>> ObserveWorkerQueueDepth() =>
-        WorkerQueueNames.All.Select(queue => new Measurement<long>(
-            Interlocked.Read(ref WorkerQueueDepths[(int)queue]),
-            new KeyValuePair<string, object?>("queue", WorkerQueueNames.GetName(queue))));
+        WorkerQueueMonitoringNames.All.Select(queue => new Measurement<long>(
+            WorkerQueueSnapshots.TryGetValue(queue, out var snapshot) ? snapshot.Depth : 0,
+            new KeyValuePair<string, object?>("queue", queue)));
 
     private static IEnumerable<Measurement<long>> ObserveWorkerQueueOldestAge() =>
-        WorkerQueueNames.All.Select(queue => new Measurement<long>(
-            Interlocked.Read(ref WorkerQueueOldestAgeSeconds[(int)queue]),
-            new KeyValuePair<string, object?>("queue", WorkerQueueNames.GetName(queue))));
+        WorkerQueueMonitoringNames.All.Select(queue => new Measurement<long>(
+            WorkerQueueSnapshots.TryGetValue(queue, out var snapshot)
+                ? snapshot.OldestAgeSeconds
+                : 0,
+            new KeyValuePair<string, object?>("queue", queue)));
 
     private static IEnumerable<Measurement<long>> ObserveRunnerOnline() =>
         RunnerCapacitySnapshots.Values
@@ -264,4 +267,6 @@ public static class NoCtfTelemetry
         long TotalNanoCpus,
         long AvailablePids,
         long TotalPids);
+
+    private sealed record WorkerQueueSnapshot(long Depth, long OldestAgeSeconds);
 }

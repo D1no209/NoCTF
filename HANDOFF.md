@@ -1,5 +1,31 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 数据模型与 Wolverine 简化：阶段 7
+
+- 当前分支：`codex/data-model-wolverine-simplification`；阶段 7 父提交为 `b70f8546`。
+  本节随阶段 7 功能提交交付。未推送、未部署，未操作生产数据库、生产队列、对象存储或生产数据。
+- 四类单消费者工作继续使用命名 PostgreSQL queue 和 durable inbox，由多 Worker 作为 competing
+  consumers 消费。`CompetitionEventCommitted` 已拆成 realtime 与 leaderboard 两个唯一 Sticky
+  Handler，分别绑定同名 durable PostgreSQL endpoint；MessageIdentity 固定为 `IdAndDestination`，
+  一个订阅者失败不会阻塞另一个。
+- 新增启动期 fail-closed 拓扑校验：在 Wolverine transport 初始化后的 `StartedAsync`、Host 宣告启动
+  成功前核对 Sticky 名称、同名 PostgreSQL listener、durable mode、唯一 Handler 与路由，并拒绝
+  Wolverine 6.29.2 的静默
+  `local://` fallback 或全局 `MultipleHandlerBehavior.Separated`。开发期 stub host 显式关闭该生产
+  校验，生产 Worker/Host 强制启用。
+- 基础设施瞬时故障按 control/gameplay/projection/background/runner queue 使用不同 retry schedule；
+  确定性业务失败不无限重试，旧 Revision 并发异常重试已删除。六个稳定 Worker/fan-out queue 均采集
+  backlog 与 oldest-age；完成/失败/执行耗时/dead-letter 使用 Wolverine 原生低基数 OpenTelemetry
+  destination/message/exception 标签和关联 trace。
+- 验证：Release build 0 warning/0 error；非 Integration TUnit 899/899；WorkerRole 定向单元 7/7；
+  transactional outbox 10/10；真实 PostgreSQL/Wolverine
+  拓扑 3/3，覆盖双 fan-out 各一次、订阅者故障隔离、缺 Sticky endpoint 真实 Host 启动失败、两个
+  competing consumer 在 PostgreSQL 重启后处理 24 条消息逐条严格一次及 replay probe 无重复。
+  完整阶段证据见 `docs/data-model-wolverine-stage7-messaging-topology.md`。
+- 本阶段没有数据模型、migration、HTTP/OpenAPI 或 SDK 变化。下一步只能进入阶段 8 Singular Agent：
+  从 PostgreSQL 事实重建周期任务、只派发 durable 消息、多 Worker 单活动 Agent、failover 与停机不补跑；
+  不得在阶段 8 提前实现阶段 9 的排行榜 500ms 合并投影。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 6
 
 - 当前分支：`codex/data-model-wolverine-simplification`；阶段 6 父提交为 `851fc689`。

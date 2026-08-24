@@ -47,7 +47,7 @@ public static class RunnerRole
 
         options.Discovery.IncludeAssembly(typeof(RuntimeProviderHandler).Assembly);
         options.Durability.Mode = DurabilityMode.Balanced;
-        options.ConfigureNoCtfInfrastructureRetries();
+        options.ConfigureNoCtfRunnerInfrastructureRetries();
         if (durable)
             options.ListenToPostgresqlQueue(nodeQueueName.Value).UseDurableInbox();
     }

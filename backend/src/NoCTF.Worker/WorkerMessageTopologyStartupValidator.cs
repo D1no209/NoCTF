@@ -1,0 +1,143 @@
+using JasperFx;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using NoCTF.Application.Competitions.Events;
+using NoCTF.Application.Messaging;
+using NoCTF.Hosting;
+using Wolverine.Configuration;
+using Wolverine.Runtime;
+using Wolverine.Runtime.Handlers;
+
+namespace NoCTF.Worker;
+
+public sealed class WorkerMessageTopologyStartupValidator(
+    IWolverineRuntime runtime,
+    IConfiguration configuration) : IHostedLifecycleService
+{
+    public Task StartingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public async Task StartedAsync(CancellationToken cancellationToken)
+    {
+        var expectedQueues = ExpectedFanoutQueues(configuration);
+        await runtime.AllRegisteredListenersAsync(cancellationToken);
+        var routing = runtime.ExplainRoutingFor(typeof(CompetitionEventCommitted)).ToText();
+
+        ValidateFanoutRouting(expectedQueues, routing);
+        ValidateFanoutEndpoints(expectedQueues);
+        ValidateFanoutHandlers(expectedQueues);
+    }
+
+    private void ValidateFanoutEndpoints(IReadOnlyList<string> expectedQueues)
+    {
+        if (expectedQueues.Distinct(StringComparer.Ordinal).Count() != expectedQueues.Count)
+        {
+            throw new InvalidOperationException(
+                "Competition event fan-out endpoint names must be unique.");
+        }
+
+        foreach (var queueName in expectedQueues)
+        {
+            Endpoint? endpoint;
+            try
+            {
+                endpoint = runtime.Endpoints.EndpointByName(queueName);
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException(
+                    $"Required fan-out endpoint '{queueName}' is not registered.",
+                    exception);
+            }
+
+            if (endpoint is null)
+            {
+                throw new InvalidOperationException(
+                    $"Required fan-out endpoint '{queueName}' is not registered.");
+            }
+            if (!endpoint.IsListener
+                || endpoint.Uri?.Scheme != "postgresql"
+                || endpoint.Mode != EndpointMode.Durable)
+            {
+                throw new InvalidOperationException(
+                    $"Fan-out endpoint '{queueName}' must be a durable PostgreSQL listener.");
+            }
+        }
+    }
+
+    private void ValidateFanoutHandlers(IReadOnlyList<string> expectedQueues)
+    {
+        var graph = runtime.Services.GetRequiredService<HandlerGraph>();
+        var root = graph.ChainFor(typeof(CompetitionEventCommitted))
+            ?? throw new InvalidOperationException(
+                "Competition event fan-out handler graph is not registered.");
+        var chains = root.ByEndpoint;
+        var handlerTypes = new HashSet<Type>();
+
+        foreach (var queueName in expectedQueues)
+        {
+            var endpointAddress = PostgresqlQueueAddress(queueName);
+            var matches = chains
+                .Where(chain => chain.Endpoints.Any(endpoint =>
+                    string.Equals(endpoint.EndpointName, queueName, StringComparison.Ordinal)
+                    || string.Equals(
+                        endpoint.Uri?.ToString().TrimEnd('/'),
+                        endpointAddress,
+                        StringComparison.OrdinalIgnoreCase)))
+                .ToArray();
+            if (matches.Length != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Fan-out endpoint '{queueName}' must own exactly one Sticky handler chain.");
+            }
+
+            var calls = matches[0].HandlerCalls();
+            if (calls.Length != 1 || !handlerTypes.Add(calls[0].HandlerType))
+            {
+                throw new InvalidOperationException(
+                    $"Fan-out endpoint '{queueName}' must own one unique Sticky handler.");
+            }
+        }
+    }
+
+    internal static void ValidateFanoutRouting(
+        IReadOnlyList<string> expectedQueues,
+        string routing)
+    {
+        foreach (var queueName in expectedQueues)
+        {
+            var endpoint = PostgresqlQueueAddress(queueName);
+            if (!routing.Contains(endpoint, StringComparison.OrdinalIgnoreCase)
+                || routing.Contains($"local://{queueName}", StringComparison.OrdinalIgnoreCase)
+                || routing.Contains(
+                    $"local://{queueName.Replace('-', '_')}",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"Competition event fan-out destination '{queueName}' is not routed to PostgreSQL.");
+            }
+        }
+    }
+
+    internal static string PostgresqlQueueAddress(string queueName) =>
+        $"postgresql://{queueName.Replace('-', '_')}";
+
+    public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    internal static IReadOnlyList<string> ExpectedFanoutQueues(IConfiguration configuration)
+    {
+        var enabled = WorkerQueues.GetEnabled(configuration);
+        var queues = new List<string>(2);
+        if (enabled.Contains(WorkerQueue.Background))
+            queues.Add(CompetitionEventFanoutQueueNames.Realtime);
+        if (enabled.Contains(WorkerQueue.Projection))
+            queues.Add(CompetitionEventFanoutQueueNames.Leaderboard);
+        return queues;
+    }
+}
