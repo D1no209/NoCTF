@@ -217,23 +217,42 @@ rollback_services()
 
 build_images()
 {
-    local build_log
-    build_log=$(mktemp)
-    if "${compose[@]}" build migration backend worker runner 2>&1 | tee "$build_log"; then
-        rm -f -- "$build_log"
-        return
-    fi
+    local attempt build_log
+    local max_attempts=${NOCTF_BUILD_ATTEMPTS:-3}
+    local retry_delay_seconds=${NOCTF_BUILD_RETRY_DELAY_SECONDS:-10}
 
-    if ! grep -Eiq 'no space left on device|disk quota exceeded' "$build_log"; then
-        rm -f -- "$build_log"
-        return 1
-    fi
+    [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]]
+    [[ "$retry_delay_seconds" =~ ^[1-9][0-9]*$ ]]
 
-    echo "Docker build exhausted disk space; cleaning build cache and retrying once."
-    rm -f -- "$build_log"
-    docker builder prune --all --force >/dev/null
-    cleanup_platform_images
-    "${compose[@]}" build migration backend worker runner
+    for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
+        build_log=$(mktemp)
+        if "${compose[@]}" build migration backend worker runner 2>&1 | tee "$build_log"; then
+            rm -f -- "$build_log"
+            return
+        fi
+
+        if grep -Eiq 'no space left on device|disk quota exceeded' "$build_log"; then
+            echo "Docker build exhausted disk space; cleaning build cache before retrying." >&2
+            docker builder prune --all --force >/dev/null
+            cleanup_platform_images
+        elif grep -Eiq \
+            'i/o timeout|TLS handshake timeout|connection reset by peer|temporary failure in name resolution|failed to do request|unexpected EOF' \
+            "$build_log"; then
+            echo "Docker registry request failed transiently." >&2
+        else
+            rm -f -- "$build_log"
+            return 1
+        fi
+
+        rm -f -- "$build_log"
+        if (( attempt == max_attempts )); then
+            echo "Unable to build platform images after $max_attempts attempts." >&2
+            return 1
+        fi
+
+        echo "Docker build attempt $attempt/$max_attempts failed; retrying in $retry_delay_seconds seconds." >&2
+        sleep "$retry_delay_seconds"
+    done
 }
 
 pull_observability_images()

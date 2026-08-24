@@ -1,5 +1,11 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 alpha.85 CI 跨境构建与发布恢复
+
+- `alpha.84` 的完整构建和测试全部通过，但测试服务器构建镜像时访问 Docker Hub 的 Bun manifest 发生网络超时，部署脚本在切换前安全终止并保留旧服务。根因不是应用构建错误，而是服务器到 Docker Hub 的不稳定链路。
+- 前端构建基础镜像改为保留相同不可变 digest 的 DaoCloud 代理地址；平台镜像构建对磁盘耗尽和明确的 registry 瞬态网络错误执行最多 3 次有界重试，非瞬态编译错误仍立即失败。CI 优先复用服务器当前 release 中经过 SHA-256 校验的 Kompose 资产，仅在首次部署或缓存校验失败时通过 SSH 重新上传，避免每次发布重复传输 25 MB 二进制。
+- 平台版本递增为 `0.1.0-alpha.85`。没有业务模型、migration、OpenAPI 或生成 SDK 变化；完成定向架构测试和部署后，必须核对 API/Worker/Runner 指标目标、InitialBaseline 15 张业务表、公开 HTTPS 与服务器剩余空间。
+
 ## 2026-08-24 alpha.84 API 指标监听部署闭环
 
 - `alpha.83` 已通过完整 CI 并在可丢弃测试环境完成 InitialBaseline 部署，API、Worker、Runner、PostgreSQL、Redis、Prometheus、Grafana 及三项 exporter 均健康；数据库确认仅包含权威 15 张业务表，公开 HTTPS 与健康检查返回 200。

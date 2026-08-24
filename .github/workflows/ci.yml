@@ -207,6 +207,7 @@ jobs:
           remote_parent=$(dirname "$DEPLOY_PATH")
           remote_upload="$remote_parent/noctf-ci-upload-$GITHUB_SHA"
           release_root="$remote_parent/noctf-releases"
+          kompose_sha256=65a6a720605bead3964e8b22d423a0763de451a236fe03de902e366cf3d9c147
           ssh_options=(
             -i "$HOME/.ssh/noctf_deploy"
             -o BatchMode=yes
@@ -231,9 +232,28 @@ jobs:
           )
           ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
             "mkdir -p -- '$remote_upload'"
+
+          if ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$release_root' '$remote_upload' '$kompose_sha256'" <<'CACHE_KOMPOSE'
+          set -Eeuo pipefail
+          release_root=$1
+          remote_upload=$2
+          kompose_sha256=$3
+          cached_kompose="$release_root/current/backend/docker-assets/kompose-linux-amd64"
+          [[ -f "$cached_kompose" ]]
+          echo "$kompose_sha256  $cached_kompose" | sha256sum -c -
+          install -m 0644 "$cached_kompose" "$remote_upload/kompose-linux-amd64"
+          CACHE_KOMPOSE
+          then
+            echo "Reused the verified Kompose asset from the current server release."
+          else
+            scp "${scp_options[@]}" \
+              "$RUNNER_TEMP/kompose-linux-amd64" \
+              "$DEPLOY_USER@$DEPLOY_HOST:$remote_upload/kompose-linux-amd64"
+          fi
+
           scp "${scp_options[@]}" \
             "$RUNNER_TEMP/noctf-release.tar.gz" \
-            "$RUNNER_TEMP/kompose-linux-amd64" \
             deploy/ci/deploy.sh \
             "$DEPLOY_USER@$DEPLOY_HOST:$remote_upload/"
           ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
