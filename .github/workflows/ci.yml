@@ -198,6 +198,10 @@ jobs:
             --output="$RUNNER_TEMP/noctf-release.tar.gz" \
             "$GITHUB_SHA"
           tar -tzf "$RUNNER_TEMP/noctf-release.tar.gz" >/dev/null
+          docker pull grafana/grafana:13.2.0
+          docker image save grafana/grafana:13.2.0 \
+            | gzip --best > "$RUNNER_TEMP/grafana-image.tar.gz"
+          gzip --test "$RUNNER_TEMP/grafana-image.tar.gz"
 
       - name: Upload and deploy
         shell: bash
@@ -234,10 +238,11 @@ jobs:
           scp "${scp_options[@]}" \
             "$RUNNER_TEMP/noctf-release.tar.gz" \
             "$RUNNER_TEMP/kompose-linux-amd64" \
+            "$RUNNER_TEMP/grafana-image.tar.gz" \
             deploy/ci/deploy.sh \
             "$DEPLOY_USER@$DEPLOY_HOST:$remote_upload/"
           ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "bash '$remote_upload/deploy.sh' '$remote_upload/noctf-release.tar.gz' '$GITHUB_SHA' '$DEPLOY_PATH' '$release_root' '$remote_upload/kompose-linux-amd64'"
+            "bash '$remote_upload/deploy.sh' '$remote_upload/noctf-release.tar.gz' '$GITHUB_SHA' '$DEPLOY_PATH' '$release_root' '$remote_upload/kompose-linux-amd64' '$remote_upload/grafana-image.tar.gz'"
 
       - name: Remove interrupted upload
         if: always()
