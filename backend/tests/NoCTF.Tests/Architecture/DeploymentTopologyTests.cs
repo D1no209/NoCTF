@@ -373,6 +373,19 @@ public sealed class DeploymentTopologyTests
     }
 
     [Test]
+    public async Task Production_deployment_preloads_observability_images_with_bounded_retries()
+    {
+        var deployScript = await ReadAsync("deploy", "ci", "deploy.sh");
+
+        await Assert.That(deployScript).Contains("pull_observability_images()");
+        await Assert.That(deployScript).Contains(
+            "NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5");
+        await Assert.That(deployScript).Contains(
+            "ensure_build_space\nif ! pull_observability_images; then\n    exit 1\nfi\nbackup_database");
+        await Assert.That(deployScript).Contains("--pull never");
+    }
+
+    [Test]
     public async Task Ci_and_test_infrastructure_dependencies_are_immutable()
     {
         var ci = await ReadAsync(".github", "workflows", "ci.yml");

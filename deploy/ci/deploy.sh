@@ -236,7 +236,41 @@ build_images()
     "${compose[@]}" build migration backend worker runner
 }
 
+pull_observability_images()
+{
+    local attempt
+    local max_attempts=${NOCTF_OBSERVABILITY_PULL_ATTEMPTS:-5}
+    local retry_delay_seconds=${NOCTF_OBSERVABILITY_PULL_RETRY_DELAY_SECONDS:-10}
+    local -a services=(
+        prometheus
+        grafana
+        postgres-exporter
+        redis-exporter
+        node-exporter
+    )
+
+    [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]]
+    [[ "$retry_delay_seconds" =~ ^[1-9][0-9]*$ ]]
+
+    for (( attempt = 1; attempt <= max_attempts; attempt++ )); do
+        if "${compose[@]}" pull "${services[@]}"; then
+            return
+        fi
+
+        if (( attempt == max_attempts )); then
+            echo "Unable to pull observability images after $max_attempts attempts." >&2
+            return 1
+        fi
+
+        echo "Observability image pull attempt $attempt/$max_attempts failed; retrying in $retry_delay_seconds seconds." >&2
+        sleep "$retry_delay_seconds"
+    done
+}
+
 ensure_build_space
+if ! pull_observability_images; then
+    exit 1
+fi
 backup_database
 
 if ! build_images; then
@@ -253,6 +287,7 @@ if ! "${compose[@]}" up \
     --detach \
     --no-deps \
     --force-recreate \
+    --pull never \
     --wait \
     --wait-timeout 180 \
     backend worker runner; then
@@ -270,6 +305,7 @@ if ! "${compose[@]}" up \
     --detach \
     --no-deps \
     --force-recreate \
+    --pull never \
     --wait \
     --wait-timeout 180 \
     prometheus grafana postgres-exporter redis-exporter node-exporter; then
