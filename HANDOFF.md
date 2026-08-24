@@ -1,5 +1,20 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 测试环境切换与 CI 并发断言修正
+
+- `main` 已快进合并数据模型与 Wolverine 简化阶段 0—11，并推送至远端提交
+  `5beb61c8c293b8cdc4181d319815af616c007038`。按用户明确授权，测试服务器原 `deploy` Compose
+  容器、项目卷、项目网络、NoCTF managed Runtime 资源和 Docker builder cache 已清理；这是可丢弃
+  测试数据的破坏性重置，不保留旧数据库或对象存储数据。
+- 首次 CI `32713734754` 在 1091 项后端测试中通过 1088、跳过 2、失败 1。失败用例
+  `Random_assignments_are_stable_unique_until_exhausted_and_concurrency_safe` 错误地假定两个并发下载中
+  固定的队伍先取得 PostgreSQL 行锁；业务不变量只要求任一后续队伍在候选耗尽前取得尚未分配附件。
+  断言已改为验证并发结果包含唯一剩余附件，且所有结果均来自候选集合，没有放宽稳定分配、未耗尽前
+  不复用或事务内并发保护。
+- 修正后的真实 PostgreSQL/Testcontainers 定向用例连续运行 6 次均通过；待本节提交并重新推送后，
+  必须等待完整 CI 和自动部署全部成功，再核对服务器 InitialBaseline、15 张业务表、Wolverine 独立
+  持久化 schema、API/Worker/Runner 健康状态以及外部 HTTPS。
+
 ## 2026-08-24 数据模型与 Wolverine 简化：阶段 11
 
 - 当前分支：`codex/data-model-wolverine-simplification`；阶段 11 父提交为 `4f3d3d99`，版本已递增为
