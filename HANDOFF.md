@@ -1,5 +1,11 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-24 alpha.86 Runner 基础镜像跨境构建恢复
+
+- 平台版本递增为 `0.1.0-alpha.86`。alpha.85 的完整 CI 测试全部通过，但部署服务器连续三次访问 Docker Hub 的 `docker:28.5.1-cli` 固定摘要均超时；构建在切换 release 前退出，旧服务未中断。
+- Runner 的 Docker CLI 基础镜像改为 DaoCloud 镜像代理 `docker.m.daocloud.io/docker:28.5.1-cli`，继续固定原始 digest，不改变 CLI 版本或产物内容。Bun 仍使用同一镜像代理；.NET SDK/ASP.NET 基础层在失败构建中已经完整缓存。
+- 架构测试同时锁定 Bun 与 Docker CLI 的镜像代理，并禁止回退到 Docker Hub 原始 `FROM docker:28.5.1-cli`。无需 migration、OpenAPI 或生成 SDK 变更。
+
 ## 2026-08-24 alpha.85 CI 跨境构建与发布恢复
 
 - `alpha.84` 的完整构建和测试全部通过，但测试服务器构建镜像时访问 Docker Hub 的 Bun manifest 发生网络超时，部署脚本在切换前安全终止并保留旧服务。根因不是应用构建错误，而是服务器到 Docker Hub 的不稳定链路。

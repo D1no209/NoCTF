@@ -348,6 +348,10 @@ public sealed class DeploymentTopologyTests
                 "^FROM [^ ]+@sha256:[a-f0-9]{64} AS [^ ]+$"))).IsTrue();
         await Assert.That(dockerfile).Contains(
             "FROM docker.m.daocloud.io/oven/bun:1.3.14@sha256:");
+        await Assert.That(dockerfile).Contains(
+            "FROM docker.m.daocloud.io/docker:28.5.1-cli@sha256:");
+        await Assert.That(dockerfile).DoesNotContain(
+            "FROM docker:28.5.1-cli@sha256:");
         await Assert.That(dockerfile).Contains("sha256sum -c -");
         await Assert.That(dockerfile).Contains("KOMPOSE_SHA256=");
         await Assert.That(dockerfile).Contains("--retry-all-errors");

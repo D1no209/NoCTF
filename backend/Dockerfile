@@ -5,7 +5,7 @@ RUN bun install --frozen-lockfile --ignore-scripts
 COPY backend/src/NoCTF.API/ClientApp/ ./
 RUN bun --bun run generate
 
-FROM docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad AS docker-cli
+FROM docker.m.daocloud.io/docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad AS docker-cli
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0.302@sha256:72dd743782f2ae7e5476fd64f6a460045e3998dc862218b80e6944cba79a01b0 AS kompose-cli
 ARG KOMPOSE_VERSION=1.38.0
