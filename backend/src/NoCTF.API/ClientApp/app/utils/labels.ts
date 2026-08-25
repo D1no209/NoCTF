@@ -318,6 +318,22 @@ export function notificationBody(
   notification: NoCtfapiEndpointsNotificationsNotificationResponse,
 ): string | null {
   const payload = notificationContent(notification)
+  if (notification.kind === 'UserAccountLifecycleChanged') {
+    const user = typeof payload.targetUserName === 'string' && payload.targetUserName.trim().length > 0
+      ? payload.targetUserName
+      : translate('未知用户')
+    const action = typeof payload.action === 'string' ? payload.action : null
+    const templates: Record<string, string> = {
+      Activated: '已激活用户「{user}」的账户。',
+      Banned: '已封禁用户「{user}」的账户。',
+      Disabled: '已停用用户「{user}」的账户。',
+      EmailVerified: '已手动验证用户「{user}」的邮箱。',
+      EmailUnverified: '已撤销用户「{user}」的邮箱验证。',
+      Anonymized: '已匿名化用户「{user}」的账户。',
+      PhysicallyDeleted: '已彻底删除用户「{user}」的账户。',
+    }
+    return translate(templates[action ?? ''] ?? '用户「{user}」的账户状态已由管理员更新。', { user })
+  }
   for (const key of ['body', 'reason', 'detail', 'message']) {
     const value = payload[key]
     if (typeof value === 'string' && value.trim().length > 0)
