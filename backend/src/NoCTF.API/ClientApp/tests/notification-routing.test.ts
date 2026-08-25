@@ -1,6 +1,7 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 import type { NoCtfapiEndpointsNotificationsNotificationResponse } from '../app/api'
-import { notificationThreadRootId, notificationTargetPath } from '../app/utils/labels'
+import { setLocale } from '../app/utils/i18n'
+import { notificationBody, notificationThreadRootId, notificationTargetPath } from '../app/utils/labels'
 
 function notification(
   kind: NoCtfapiEndpointsNotificationsNotificationResponse['kind'],
@@ -15,6 +16,8 @@ function notification(
 }
 
 describe('notificationTargetPath', () => {
+  afterEach(() => setLocale('zh-CN'))
+
   test('routes cheat incident cards to competition administration', () => {
     expect(notificationTargetPath(notification('CheatIncidentDetected', 'competition-1', {
       gameplayFactId: 'incident-1',
@@ -94,6 +97,20 @@ describe('notificationTargetPath', () => {
   test('opens notification detail when there is no competition target', () => {
     expect(notificationTargetPath(notification('UserAccountLifecycleChanged')))
       .toBe('/notifications?notification=notification-1')
+  })
+
+  test('localizes account lifecycle details without exposing internal reason codes', () => {
+    const item = notification('UserAccountLifecycleChanged', undefined, {
+      targetUserName: 'IssueJuice',
+      action: 'EmailVerified',
+      reason: 'manual_verify_email',
+    })
+
+    expect(notificationBody(item)).toBe('已手动验证用户「IssueJuice」的邮箱。')
+    expect(notificationBody(item)).not.toContain('manual_verify_email')
+
+    setLocale('en')
+    expect(notificationBody(item)).toBe('Manually verified the email address for “IssueJuice”.')
   })
 
   test('keeps official competition announcements in the global message center', () => {
