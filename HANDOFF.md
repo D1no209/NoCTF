@@ -1,5 +1,14 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-25 alpha.87 注册验证邮件投递与匿名重发
+
+- 已确认“测试邮件可投递、注册验证邮件收不到”的直接原因：SMTP 上游已经接受注册邮件，但 QQ 收件服务器随后以垃圾邮件评分过高返回 `550 Message rejected as spam`。这不是 SMTP 密码错误，也不是注册事务未派发邮件。验证邮件改为简洁中文事务主题与正文，增加自动邮件标识，并继续使用纯文本与 HTML 双版本；平台无法在同步注册响应中感知收件服务器稍后返回的退信，域名 SPF、DKIM、DMARC 和发件信誉仍需在邮件服务商侧持续维护。
+- 新增匿名 `POST /api/v1/auth/email-verification/request`，无论邮箱不存在、已验证、邮件未配置、处于冷却期或已关闭验证，均只返回相同的 `202 Accepted`，防止邮箱枚举。接口同时受 IP 固定窗口限流和账户级冷却约束；登录前验证页与注册完成页均可重新发送，发送失败保留当前邮箱和表单内容。
+- 账户级签发在真实 PostgreSQL 事务内锁定用户行，冷却检查、旧令牌失效、新令牌写入和 Wolverine transactional outbox 原子完成，避免同一邮箱并发重发生成多枚有效令牌或重复邮件。验证时拒绝已失效令牌。没有新增业务表、EF migration 或持久化兼容层。
+- OpenAPI 与生成 TypeScript SDK 已通过仓库命令重新生成并复跑确认哈希稳定，前端只调用生成 SDK。平台版本递增为 `0.1.0-alpha.87`。
+- 验证结果：Release build 0 warning/0 error；后端非集成测试 914/914 通过；匿名接口覆盖 7 种内部状态且均不泄露账户状态；前端测试 276/276、typecheck 和 production build 通过；OpenAPI 导出、SDK 幂等及 `git diff --check` 通过。真实 PostgreSQL 并发重发测试已补充，但本机 Docker 当前不可用，因此该 Testcontainers 用例被明确跳过，未计为通过。
+- 本节仅创建本地提交；未推送、未部署、未修改生产/测试服务器数据。若后续仍出现 QQ `550`，应首先核对邮件服务商控制台中的 SPF/DKIM/DMARC、Envelope-From 对齐和退信记录，而不是反复修改 SMTP 密码。
+
 ## 2026-08-24 alpha.86 Runner 基础镜像跨境构建恢复
 
 - 平台版本递增为 `0.1.0-alpha.86`。alpha.85 的完整 CI 测试全部通过，但部署服务器连续三次访问 Docker Hub 的 `docker:28.5.1-cli` 固定摘要均超时；构建在切换 release 前退出，旧服务未中断。
