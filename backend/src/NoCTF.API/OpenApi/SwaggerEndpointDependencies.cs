@@ -169,6 +169,11 @@ internal sealed class SwaggerEmailVerificationStore : IEmailVerificationStore
         DateTimeOffset now,
         CancellationToken cancellationToken) =>
         Task.FromResult(EmailVerificationState.Issued);
+    public Task<EmailVerificationState> IssueByEmailAsync(
+        string email,
+        DateTimeOffset now,
+        CancellationToken cancellationToken) =>
+        Task.FromResult(EmailVerificationState.Issued);
     public Task<EmailVerificationState> VerifyAsync(
         string token,
         DateTimeOffset now,

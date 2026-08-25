@@ -107,10 +107,16 @@ public sealed class SmtpEmailVerificationDeliveryTests
 
             var messages = await ReadMessagesAsync(greenMail, cancellationToken);
             await Assert.That(messages.Count).IsEqualTo(1);
+            await Assert.That(messages[0].Subject).IsEqualTo("NoCTF 邮箱验证");
             await Assert.That(messages[0].TextBody).Contains("你好-admin");
+            await Assert.That(messages[0].TextBody).Contains("请勿回复");
             await Assert.That(messages[0].TextBody).Contains("token-two");
             await Assert.That(messages[0].HtmlBody).Contains(
                 "auth/verify-email?token=token-two");
+            await Assert.That(messages[0].Headers["Auto-Submitted"])
+                .IsEqualTo("auto-generated");
+            await Assert.That(messages[0].Headers["X-Auto-Response-Suppress"])
+                .IsEqualTo("All");
         });
     }
 

@@ -27,6 +27,10 @@ public enum EmailVerificationFailureCode
 public interface IEmailVerificationStore
 {
     Task<bool> IsRequiredAsync(CancellationToken cancellationToken);
+    Task<EmailVerificationState> IssueByEmailAsync(
+        string email,
+        DateTimeOffset now,
+        CancellationToken cancellationToken);
     Task<EmailVerificationState> IssueAsync(
         Guid userId,
         DateTimeOffset now,
@@ -35,6 +39,15 @@ public interface IEmailVerificationStore
         string token,
         DateTimeOffset now,
         CancellationToken cancellationToken);
+}
+
+public sealed class RequestEmailVerification(IEmailVerificationStore store)
+{
+    public async Task ExecuteAsync(
+        string email,
+        DateTimeOffset now,
+        CancellationToken ct = default) =>
+        _ = await store.IssueByEmailAsync(email, now, ct);
 }
 
 public sealed class ResendEmailVerification(IEmailVerificationStore store)

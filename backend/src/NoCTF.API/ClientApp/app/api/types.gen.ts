@@ -1003,6 +1003,14 @@ export type NoCtfapiEndpointsAuthenticationRegisterRequest = {
     password: string;
 };
 
+export type NoCtfapiEndpointsAuthenticationRequestEmailVerificationAcceptedResponse = {
+    accepted?: boolean;
+};
+
+export type NoCtfapiEndpointsAuthenticationRequestEmailVerificationRequest = {
+    email: string;
+};
+
 export type NoCtfapiEndpointsAuthenticationRequestPasswordResetAcceptedResponse = {
     accepted?: boolean;
 };
@@ -4370,6 +4378,35 @@ export type RegisterEndpointResponses = {
 };
 
 export type RegisterEndpointResponse = RegisterEndpointResponses[keyof RegisterEndpointResponses];
+
+export type AuthenticationRequestEmailVerificationData = {
+    body: NoCtfapiEndpointsAuthenticationRequestEmailVerificationRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/auth/email-verification/request';
+};
+
+export type AuthenticationRequestEmailVerificationErrors = {
+    /**
+     * Bad Request
+     */
+    400: MicrosoftAspNetCoreMvcValidationProblemDetails;
+    /**
+     * Too Many Requests
+     */
+    429: unknown;
+};
+
+export type AuthenticationRequestEmailVerificationError = AuthenticationRequestEmailVerificationErrors[keyof AuthenticationRequestEmailVerificationErrors];
+
+export type AuthenticationRequestEmailVerificationResponses = {
+    /**
+     * Accepted
+     */
+    202: NoCtfapiEndpointsAuthenticationRequestEmailVerificationAcceptedResponse;
+};
+
+export type AuthenticationRequestEmailVerificationResponse = AuthenticationRequestEmailVerificationResponses[keyof AuthenticationRequestEmailVerificationResponses];
 
 export type AuthenticationRequestPasswordResetData = {
     body: NoCtfapiEndpointsAuthenticationRequestPasswordResetRequest;

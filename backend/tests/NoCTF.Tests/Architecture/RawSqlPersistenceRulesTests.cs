@@ -62,6 +62,11 @@ public sealed class RawSqlPersistenceRulesTests
                 "FromSqlInterpolated",
                 "FOR UPDATE"
             ],
+            ["backend/src/NoCTF.Infrastructure/Authentication/EmailVerificationStore.cs"] =
+            [
+                "FromSqlInterpolated",
+                "FOR UPDATE"
+            ],
             ["backend/src/NoCTF.Infrastructure/Competitions/Administration/AdminCompetitionStore.cs"] =
             [
                 "ExecuteSqlInterpolated",

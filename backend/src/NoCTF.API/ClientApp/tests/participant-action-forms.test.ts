@@ -58,6 +58,23 @@ describe('participant action page wiring', () => {
     expect(page).toContain("alias: ['/reset-password']")
   })
 
+  test('offers an anonymous non-disclosing verification email resend flow', async () => {
+    const register = await Bun.file(
+      new URL('../app/pages/auth/register.vue', import.meta.url),
+    ).text()
+    const verification = await Bun.file(
+      new URL('../app/pages/auth/verify-email.vue', import.meta.url),
+    ).text()
+
+    expect(register).toContain('authenticationRequestEmailVerification')
+    expect(register).toContain('verificationEmailQueued')
+    expect(register).toContain('@click="resendVerification"')
+    expect(verification).toContain('authenticationRequestEmailVerification')
+    expect(verification).toContain('v-model="email"')
+    expect(verification).toContain("isLoggedIn.value")
+    expect(register).not.toContain('验证邮件已发送,请查收邮箱完成验证后登录。')
+  })
+
   test('offers an accessible password visibility toggle on every password form', async () => {
     const component = await Bun.file(
       new URL('../app/components/PasswordInput.vue', import.meta.url),

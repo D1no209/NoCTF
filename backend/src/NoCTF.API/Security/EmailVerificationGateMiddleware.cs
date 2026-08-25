@@ -20,6 +20,7 @@ public sealed class EmailVerificationGateMiddleware(RequestDelegate next)
         new("/api/v1/auth/logout"),
         new("/api/v1/auth/logout-all"),
         new("/api/v1/auth/password"),
+        new("/api/v1/auth/email-verification/request"),
         new("/api/v1/auth/email-verification/resend"),
         new("/api/v1/auth/email-verification/verify")
     ];

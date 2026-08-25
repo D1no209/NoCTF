@@ -60,15 +60,18 @@ public sealed class SmtpEmailVerificationDelivery(
         using var message = CreateMessage(
             configuration,
             user.Email,
-            "Verify your NoCTF email address",
-            $"Hello {user.UserName},\n\n"
-                + "Verify your email address to unlock NoCTF competition features:\n\n"
+            "NoCTF 邮箱验证",
+            $"你好，{user.UserName}：\n\n"
+                + "你正在验证 NoCTF 账户邮箱。请访问以下链接完成验证：\n\n"
                 + $"{verificationUrl}\n\n"
-                + "If you did not create this account, you can ignore this message.",
-            $"Hello {WebUtility.HtmlEncode(user.UserName)},<br><br>"
-                + "Verify your email address to unlock NoCTF competition features:<br><br>"
-                + $"<a href=\"{WebUtility.HtmlEncode(verificationUrl)}\">Verify email address</a><br><br>"
-                + "If you did not create this account, you can ignore this message.");
+                + "如果这不是你的操作，请忽略本邮件。此邮件由系统自动发送，请勿回复。",
+            "<!doctype html><html lang=\"zh-CN\"><body>"
+                + $"<p>你好，{WebUtility.HtmlEncode(user.UserName)}：</p>"
+                + "<p>你正在验证 NoCTF 账户邮箱。请点击下方链接完成验证：</p>"
+                + $"<p><a href=\"{WebUtility.HtmlEncode(verificationUrl)}\">验证 NoCTF 邮箱</a></p>"
+                + $"<p style=\"word-break:break-all;color:#64748b\">{WebUtility.HtmlEncode(verificationUrl)}</p>"
+                + "<p>如果这不是你的操作，请忽略本邮件。此邮件由系统自动发送，请勿回复。</p>"
+                + "</body></html>");
         await SendAsync(configuration, message, ct);
         logger.LogInformation("Sent an email verification message to user {UserId}.", userId);
         return EmailVerificationDeliveryState.Sent;
@@ -182,6 +185,8 @@ public sealed class SmtpEmailVerificationDelivery(
         message.From.Add(sender);
         message.To.Add(MailboxAddress.Parse(recipient));
         message.Subject = subject;
+        message.Headers.Add("Auto-Submitted", "auto-generated");
+        message.Headers.Add("X-Auto-Response-Suppress", "All");
         message.Body = new BodyBuilder
         {
             TextBody = textBody,

@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { resendEmailVerificationEndpoint, verifyEmailEndpoint } from '~/api'
+import {
+  authenticationRequestEmailVerification,
+  resendEmailVerificationEndpoint,
+  verifyEmailEndpoint,
+} from '~/api'
 
 definePageMeta({ alias: ['/verify-email'] })
 
@@ -11,6 +15,7 @@ const state = ref<'idle' | 'verifying' | 'success' | 'failed'>('idle')
 const message = ref<string | null>(null)
 const resendPending = ref(false)
 const resendDone = ref(false)
+const email = ref('')
 
 const token = computed(() => (typeof route.query.token === 'string' ? route.query.token : null))
 
@@ -28,15 +33,23 @@ onMounted(async () => {
 })
 
 async function resend() {
+  message.value = null
   resendPending.value = true
-  const { error } = await resendEmailVerificationEndpoint()
-  resendPending.value = false
-  if (error) {
+  try {
+    const { error } = isLoggedIn.value
+      ? await resendEmailVerificationEndpoint()
+      : await authenticationRequestEmailVerification({ body: { email: email.value } })
+    if (error) {
+      message.value = parseApiError(error).message
+      return
+    }
+    resendDone.value = true
+  }
+  catch (error) {
     message.value = parseApiError(error).message
   }
-  else {
-    resendDone.value = true
-    message.value = null
+  finally {
+    resendPending.value = false
   }
 }
 </script>
@@ -68,8 +81,12 @@ async function resend() {
             <AlertDescription>{{ message }}</AlertDescription>
           </Alert>
           <Alert v-if="resendDone">
-            <AlertDescription>{{ $t('验证邮件已重新发送,请查收。') }}</AlertDescription>
+            <AlertDescription>{{ $t('如果该邮箱对应未验证账户,系统会再次提交验证邮件。') }}</AlertDescription>
           </Alert>
+          <Field v-if="!isLoggedIn && state !== 'success' && !resendDone">
+            <FieldLabel for="email">{{ $t('邮箱') }}</FieldLabel>
+            <Input id="email" v-model="email" type="email" autocomplete="email" required />
+          </Field>
         </FieldGroup>
       </CardContent>
       <CardFooter class="flex flex-col gap-2">
@@ -77,14 +94,14 @@ async function resend() {
           <NuxtLink to="/auth/login">{{ $t('前往登录') }}</NuxtLink>
         </Button>
         <Button
-          v-if="isLoggedIn && state !== 'success'"
+          v-if="state !== 'success' && !resendDone"
           variant="outline"
           class="w-full"
-          :disabled="resendPending || resendDone"
+          :disabled="resendPending || (!isLoggedIn && !email)"
           @click="resend"
         >
           <Spinner v-if="resendPending" data-icon="inline-start" /> {{ $t('重新发送验证邮件') }} </Button>
-        <Button v-if="!isLoggedIn && !token" as-child variant="outline" class="w-full">
+        <Button v-if="!isLoggedIn && state !== 'success'" as-child variant="ghost" class="w-full">
           <NuxtLink to="/auth/login">{{ $t('返回登录') }}</NuxtLink>
         </Button>
       </CardFooter>

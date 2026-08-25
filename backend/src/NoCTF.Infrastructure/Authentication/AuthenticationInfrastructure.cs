@@ -52,6 +52,7 @@ internal static class AuthenticationInfrastructure
         services.AddScoped<ManageEmailVerificationConfiguration>();
         services.AddScoped<SendEmailVerificationTest>();
         services.AddScoped<ResendEmailVerification>();
+        services.AddScoped<RequestEmailVerification>();
         services.AddScoped<VerifyEmail>();
         services.AddScoped<IAccessTokenVersionReader, AccessTokenVersionReader>();
         services.AddSingleton<IAccessTokenIssuer, JwtIssuer>();
