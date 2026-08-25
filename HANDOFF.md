@@ -1,5 +1,13 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-25 alpha.88 平台监控非有限数序列化修复
+
+- 已定位 `/admin/platform/monitoring` 偶发返回 500 的根因：Prometheus 在样本不足等场景会返回 `NaN` 或正负无穷值，旧读取器将其保留为 `double` 并交给 ASP.NET Core JSON 序列化器，最终触发“non-finite number cannot be written as valid JSON”异常。
+- Prometheus 读取边界现在把结构有效但不可用的非有限数转换为 `null`，保留监控源可用状态；Application 输出边界另加有限数校验，确保未来其他读取器也无法把 `NaN`/`Infinity` 写入公开响应。受影响的单项指标显示为不可用，页面整体降级为警告而不再返回服务器内部错误。
+- 平台版本递增为 `0.1.0-alpha.88`。本次没有数据库、migration、OpenAPI、生成 TypeScript SDK 或前端契约变化。
+- 验证结果：监控定向测试 4/4 通过，其中新增非有限数归一化和 JSON 安全回归测试；Release build 0 warning/0 error；`git diff --check` 通过。
+- 本节仅创建本地提交；未推送、未部署、未操作测试服务器或生产数据。
+
 ## 2026-08-25 alpha.87 注册验证邮件投递与匿名重发
 
 - 已确认“测试邮件可投递、注册验证邮件收不到”的直接原因：SMTP 上游已经接受注册邮件，但 QQ 收件服务器随后以垃圾邮件评分过高返回 `550 Message rejected as spam`。这不是 SMTP 密码错误，也不是注册事务未派发邮件。验证邮件改为简洁中文事务主题与正文，增加自动邮件标识，并继续使用纯文本与 HTML 双版本；平台无法在同步注册响应中感知收件服务器稍后返回的退信，域名 SPF、DKIM、DMARC 和发件信誉仍需在邮件服务商侧持续维护。
