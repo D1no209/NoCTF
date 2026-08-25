@@ -153,6 +153,7 @@ public sealed class ObservePlatformMonitoring(IPlatformMonitoringReader reader)
         double? criticalAbove = null,
         double? criticalBelow = null)
     {
+        value = Finite(value);
         var status = value switch
         {
             null => PlatformMonitoringStatus.Unavailable,
@@ -184,4 +185,7 @@ public sealed class ObservePlatformMonitoring(IPlatformMonitoringReader reader)
     private static double? Milliseconds(double? seconds) => seconds * 1000;
 
     private static double? Percent(double? ratio) => ratio * 100;
+
+    private static double? Finite(double? value) =>
+        value is { } number && double.IsFinite(number) ? number : null;
 }

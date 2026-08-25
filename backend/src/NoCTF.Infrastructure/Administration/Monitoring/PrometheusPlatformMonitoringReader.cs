@@ -107,10 +107,15 @@ internal sealed class PrometheusPlatformMonitoringReader(
             }
 
             var raw = value[1].GetString();
-            return double.TryParse(raw, NumberStyles.Float,
-                CultureInfo.InvariantCulture, out var parsed)
+            if (!double.TryParse(raw, NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out var parsed))
+            {
+                return new(definition.Kind, false, null);
+            }
+
+            return double.IsFinite(parsed)
                 ? new(definition.Kind, true, parsed)
-                : new(definition.Kind, false, null);
+                : new(definition.Kind, true, null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using NoCTF.Application.Administration.Monitoring;
 
 namespace NoCTF.Tests.Unit.Application;
@@ -48,6 +49,36 @@ public sealed class PlatformMonitoringTests
 
         await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Unavailable);
         await Assert.That(result.SourceAvailable).IsFalse();
+    }
+
+    [Test]
+    public async Task NonFiniteMeasurements_AreUnavailableAndJsonSafe()
+    {
+        var measurements = Measurements() with
+        {
+            ApiRequestsPerSecond = double.PositiveInfinity,
+            ApiP95Seconds = double.NaN,
+            DiskAvailableRatio = double.NegativeInfinity
+        };
+        var useCase = new ObservePlatformMonitoring(new StubReader(measurements));
+
+        var result = await useCase.ExecuteAsync();
+
+        await Assert.That(result.Status).IsEqualTo(PlatformMonitoringStatus.Warning);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.ApiRequestsPerSecond).Value)
+            .IsNull();
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.ApiP95Milliseconds).Status)
+            .IsEqualTo(PlatformMonitoringStatus.Unavailable);
+        await Assert.That(Metric(result,
+                PlatformMonitoringMetricKind.DiskAvailablePercent).Value)
+            .IsNull();
+        await Assert.That(result.Metrics
+                .Where(metric => metric.Value is not null)
+                .All(metric => double.IsFinite(metric.Value!.Value)))
+            .IsTrue();
+        await Assert.That(() => JsonSerializer.Serialize(result)).ThrowsNothing();
     }
 
     private static PlatformMonitoringMetricView Metric(
