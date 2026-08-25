@@ -1,5 +1,13 @@
 # NoCTF 数据模型重构交接
 
+## 2026-08-25 alpha.89 账号生命周期通知正文汉化
+
+- 已修复消息中心在中文界面直接显示 `manual_verify_email` 等内部原因代码的问题。根因是 `UserAccountLifecycleChanged` 通知此前走通用 `reason` 正文回退逻辑，把仅供系统追踪的原因码当成了用户文案。
+- 通知正文现在按强类型生命周期动作统一生成中英文文案，覆盖账户激活、封禁、停用、邮箱手动验证/撤销验证、匿名化和彻底删除；未知动作使用安全的本地化兜底，不再暴露内部原因码。
+- 平台版本递增为 `0.1.0-alpha.89`。本次没有数据库、migration、OpenAPI、生成 TypeScript SDK 或后端契约变化。
+- 验证结果：前端测试 277/277 通过；typecheck 通过；production build 通过；`git diff --check` 通过。新增回归测试同时验证中文、英文和内部代码不泄露。
+- 本节仅创建本地提交；未推送、未部署、未操作测试服务器或生产数据。
+
 ## 2026-08-25 alpha.88 平台监控非有限数序列化修复
 
 - 已定位 `/admin/platform/monitoring` 偶发返回 500 的根因：Prometheus 在样本不足等场景会返回 `NaN` 或正负无穷值，旧读取器将其保留为 `double` 并交给 ASP.NET Core JSON 序列化器，最终触发“non-finite number cannot be written as valid JSON”异常。
